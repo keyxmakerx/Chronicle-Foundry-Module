@@ -169,7 +169,9 @@ func (r *entityTypeRepository) ListByCampaign(ctx context.Context, campaignID st
 		}
 		et.Layout = ParseLayoutJSON(layoutRaw)
 		if len(pinnedRaw) > 0 {
-			json.Unmarshal(pinnedRaw, &et.PinnedEntityIDs)
+			if err := json.Unmarshal(pinnedRaw, &et.PinnedEntityIDs); err != nil {
+				return nil, fmt.Errorf("unmarshaling pinned entity IDs: %w", err)
+			}
 		}
 		types = append(types, et)
 	}

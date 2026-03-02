@@ -187,6 +187,7 @@ func (s *calendarService) seedDefaults(ctx context.Context, cal *Calendar) error
 		now := time.Now().UTC()
 		return s.UpdateCalendar(ctx, cal.ID, UpdateCalendarInput{
 			Name:             cal.Name,
+			Description:      cal.Description,
 			EpochName:        cal.EpochName,
 			CurrentYear:      now.Year(),
 			CurrentMonth:     int(now.Month()),

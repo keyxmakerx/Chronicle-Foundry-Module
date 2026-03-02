@@ -504,6 +504,9 @@ All 6 sprints (5-10) are complete:
 - **Template editor**: `JSON.parse` calls wrapped in try-catch with fallback defaults.
 - **Notes widget**: Added `.catch()` handler to create note promise chain.
 - **Dashboard editor**: Fixed validation mismatch (prompt said 4-12, code allowed 1-50).
+- **Follow-up**: Fixed missed `json.Unmarshal` error check in `ListByCampaign` (double-tab
+  indentation wasn't caught by `replace_all`). Fixed `seedDefaults` to preserve
+  `cal.Description` in the `UpdateCalendar` call (was silently nulling it out).
 - **Files changed**: sessions/{service,handler}.go, sanitize/sanitize.go, settings/handler.go,
   calendar/{service,handler}.go, entities/{repository,handler}.go, app/routes.go,
   editor.js, template_editor.js, notes.js, dashboard_editor.js, .ai/status.md.
