@@ -1,6 +1,6 @@
 -- Sessions plugin: game session scheduling, linked entities, and RSVP tracking.
 
-CREATE TABLE sessions (
+CREATE TABLE IF NOT EXISTS sessions (
     id CHAR(36) PRIMARY KEY,
     campaign_id CHAR(36) NOT NULL,
     name VARCHAR(200) NOT NULL,
@@ -20,7 +20,7 @@ CREATE TABLE sessions (
     FOREIGN KEY (created_by) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE session_entities (
+CREATE TABLE IF NOT EXISTS session_entities (
     id INT AUTO_INCREMENT PRIMARY KEY,
     session_id CHAR(36) NOT NULL,
     entity_id CHAR(36) NOT NULL,
@@ -30,7 +30,7 @@ CREATE TABLE session_entities (
     UNIQUE KEY uq_session_entity (session_id, entity_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE session_attendees (
+CREATE TABLE IF NOT EXISTS session_attendees (
     id INT AUTO_INCREMENT PRIMARY KEY,
     session_id CHAR(36) NOT NULL,
     user_id CHAR(36) NOT NULL,
@@ -41,10 +41,10 @@ CREATE TABLE session_attendees (
     UNIQUE KEY uq_session_attendee (session_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE INDEX idx_sessions_campaign ON sessions(campaign_id);
-CREATE INDEX idx_sessions_scheduled ON sessions(campaign_id, scheduled_date);
-CREATE INDEX idx_session_entities_entity ON session_entities(entity_id);
-CREATE INDEX idx_session_attendees_user ON session_attendees(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_campaign ON sessions(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_scheduled ON sessions(campaign_id, scheduled_date);
+CREATE INDEX IF NOT EXISTS idx_session_entities_entity ON session_entities(entity_id);
+CREATE INDEX IF NOT EXISTS idx_session_attendees_user ON session_attendees(user_id);
 
 -- Register sessions addon.
 INSERT INTO addons (id, name, slug, description, category, status, created_at, updated_at)
