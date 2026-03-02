@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/keyxmakerx/chronicle/internal/apperror"
+	"github.com/keyxmakerx/chronicle/internal/sanitize"
 )
 
 // generateID creates a random UUID v4 string.
@@ -31,6 +32,7 @@ type CalendarService interface {
 	SetWeekdays(ctx context.Context, calendarID string, weekdays []WeekdayInput) error
 	SetMoons(ctx context.Context, calendarID string, moons []MoonInput) error
 	SetSeasons(ctx context.Context, calendarID string, seasons []Season) error
+	SetEras(ctx context.Context, calendarID string, eras []EraInput) error
 
 	// Events.
 	CreateEvent(ctx context.Context, calendarID string, input CreateEventInput) (*Event, error)
@@ -42,8 +44,13 @@ type CalendarService interface {
 	ListUpcomingEvents(ctx context.Context, calendarID string, limit int, role int) ([]Event, error)
 	ListEventsForYear(ctx context.Context, calendarID string, year int, role int) ([]Event, error)
 
-	// Date helpers.
+	// Date/time helpers.
 	AdvanceDate(ctx context.Context, calendarID string, days int) error
+	AdvanceTime(ctx context.Context, calendarID string, hours, minutes int) error
+
+	// Import/export.
+	ApplyImport(ctx context.Context, calendarID string, result *ImportResult) error
+	ListAllEvents(ctx context.Context, calendarID string) ([]Event, error)
 }
 
 // calendarService is the default CalendarService implementation.
@@ -70,21 +77,38 @@ func (s *calendarService) CreateCalendar(ctx context.Context, campaignID string,
 	if input.Name == "" {
 		input.Name = "Campaign Calendar"
 	}
+	// Validate and default mode.
+	if input.Mode != ModeRealLife {
+		input.Mode = ModeFantasy
+	}
 	if input.CurrentYear == 0 {
 		input.CurrentYear = 1
 	}
+	if input.HoursPerDay <= 0 {
+		input.HoursPerDay = 24
+	}
+	if input.MinutesPerHour <= 0 {
+		input.MinutesPerHour = 60
+	}
+	if input.SecondsPerMinute <= 0 {
+		input.SecondsPerMinute = 60
+	}
 
 	cal := &Calendar{
-		ID:             generateID(),
-		CampaignID:     campaignID,
-		Name:           input.Name,
-		Description:    input.Description,
-		EpochName:      input.EpochName,
-		CurrentYear:    input.CurrentYear,
-		CurrentMonth:   1,
-		CurrentDay:     1,
-		LeapYearEvery:  input.LeapYearEvery,
-		LeapYearOffset: input.LeapYearOffset,
+		ID:               generateID(),
+		CampaignID:       campaignID,
+		Mode:             input.Mode,
+		Name:             input.Name,
+		Description:      input.Description,
+		EpochName:        input.EpochName,
+		CurrentYear:      input.CurrentYear,
+		CurrentMonth:     1,
+		CurrentDay:       1,
+		HoursPerDay:      input.HoursPerDay,
+		MinutesPerHour:   input.MinutesPerHour,
+		SecondsPerMinute: input.SecondsPerMinute,
+		LeapYearEvery:    input.LeapYearEvery,
+		LeapYearOffset:   input.LeapYearOffset,
 	}
 
 	if err := s.repo.Create(ctx, cal); err != nil {
@@ -132,6 +156,9 @@ func (s *calendarService) eagerLoad(ctx context.Context, cal *Calendar) (*Calend
 	if cal.Seasons, err = s.repo.GetSeasons(ctx, cal.ID); err != nil {
 		return nil, fmt.Errorf("get seasons: %w", err)
 	}
+	if cal.Eras, err = s.repo.GetEras(ctx, cal.ID); err != nil {
+		return nil, fmt.Errorf("get eras: %w", err)
+	}
 	return cal, nil
 }
 
@@ -151,6 +178,11 @@ func (s *calendarService) UpdateCalendar(ctx context.Context, calendarID string,
 	cal.CurrentYear = input.CurrentYear
 	cal.CurrentMonth = input.CurrentMonth
 	cal.CurrentDay = input.CurrentDay
+	cal.CurrentHour = input.CurrentHour
+	cal.CurrentMinute = input.CurrentMinute
+	cal.HoursPerDay = input.HoursPerDay
+	cal.MinutesPerHour = input.MinutesPerHour
+	cal.SecondsPerMinute = input.SecondsPerMinute
 	cal.LeapYearEvery = input.LeapYearEvery
 	cal.LeapYearOffset = input.LeapYearOffset
 
@@ -220,6 +252,22 @@ func (s *calendarService) SetSeasons(ctx context.Context, calendarID string, sea
 	return s.repo.SetSeasons(ctx, calendarID, seasons)
 }
 
+// SetEras replaces all eras. Validates names and year ranges.
+func (s *calendarService) SetEras(ctx context.Context, calendarID string, eras []EraInput) error {
+	for i, e := range eras {
+		if e.Name == "" {
+			return apperror.NewValidation(fmt.Sprintf("era %d: name is required", i+1))
+		}
+		if e.EndYear != nil && *e.EndYear < e.StartYear {
+			return apperror.NewValidation(fmt.Sprintf("era %q: end year cannot be before start year", e.Name))
+		}
+		if e.Color == "" {
+			eras[i].Color = "#6366f1"
+		}
+	}
+	return s.repo.SetEras(ctx, calendarID, eras)
+}
+
 // CreateEvent creates a new calendar event.
 func (s *calendarService) CreateEvent(ctx context.Context, calendarID string, input CreateEventInput) (*Event, error) {
 	if input.Name == "" {
@@ -232,18 +280,30 @@ func (s *calendarService) CreateEvent(ctx context.Context, calendarID string, in
 		return nil, apperror.NewValidation("visibility must be 'everyone' or 'dm_only'")
 	}
 
+	// Sanitize HTML if provided (rich text descriptions from TipTap editor).
+	var descHTML *string
+	if input.DescriptionHTML != nil && *input.DescriptionHTML != "" {
+		sanitized := sanitize.HTML(*input.DescriptionHTML)
+		descHTML = &sanitized
+	}
+
 	evt := &Event{
-		ID:             generateID(),
-		CalendarID:     calendarID,
-		EntityID:       input.EntityID,
-		Name:           input.Name,
-		Description:    input.Description,
-		Year:           input.Year,
+		ID:              generateID(),
+		CalendarID:      calendarID,
+		EntityID:        input.EntityID,
+		Name:            input.Name,
+		Description:     input.Description,
+		DescriptionHTML: descHTML,
+		Year:            input.Year,
 		Month:          input.Month,
 		Day:            input.Day,
+		StartHour:      input.StartHour,
+		StartMinute:    input.StartMinute,
 		EndYear:        input.EndYear,
 		EndMonth:       input.EndMonth,
 		EndDay:         input.EndDay,
+		EndHour:        input.EndHour,
+		EndMinute:      input.EndMinute,
 		IsRecurring:    input.IsRecurring,
 		RecurrenceType: input.RecurrenceType,
 		Visibility:     input.Visibility,
@@ -281,13 +341,24 @@ func (s *calendarService) UpdateEvent(ctx context.Context, eventID string, input
 
 	evt.Name = input.Name
 	evt.Description = input.Description
+	// Sanitize rich text HTML if provided.
+	if input.DescriptionHTML != nil && *input.DescriptionHTML != "" {
+		sanitized := sanitize.HTML(*input.DescriptionHTML)
+		evt.DescriptionHTML = &sanitized
+	} else {
+		evt.DescriptionHTML = input.DescriptionHTML
+	}
 	evt.EntityID = input.EntityID
 	evt.Year = input.Year
 	evt.Month = input.Month
 	evt.Day = input.Day
+	evt.StartHour = input.StartHour
+	evt.StartMinute = input.StartMinute
 	evt.EndYear = input.EndYear
 	evt.EndMonth = input.EndMonth
 	evt.EndDay = input.EndDay
+	evt.EndHour = input.EndHour
+	evt.EndMinute = input.EndMinute
 	evt.IsRecurring = input.IsRecurring
 	evt.RecurrenceType = input.RecurrenceType
 	evt.Visibility = input.Visibility
@@ -378,4 +449,140 @@ func (s *calendarService) AdvanceDate(ctx context.Context, calendarID string, da
 	cal.CurrentMonth = monthIdx + 1
 	cal.CurrentYear = year
 	return s.repo.Update(ctx, cal)
+}
+
+// AdvanceTime moves the current time forward by the given hours and minutes,
+// rolling over into days (and subsequently months/years) as needed.
+func (s *calendarService) AdvanceTime(ctx context.Context, calendarID string, hours, minutes int) error {
+	cal, err := s.repo.GetByID(ctx, calendarID)
+	if err != nil {
+		return fmt.Errorf("get calendar: %w", err)
+	}
+	if cal == nil {
+		return apperror.NewNotFound("calendar not found")
+	}
+
+	months, err := s.repo.GetMonths(ctx, calendarID)
+	if err != nil {
+		return fmt.Errorf("get months: %w", err)
+	}
+	if len(months) == 0 {
+		return apperror.NewValidation("calendar has no months configured")
+	}
+	cal.Months = months
+
+	hpd := cal.HoursPerDay
+	if hpd <= 0 {
+		hpd = 24
+	}
+	mph := cal.MinutesPerHour
+	if mph <= 0 {
+		mph = 60
+	}
+
+	// Add minutes, roll into hours.
+	totalMin := cal.CurrentMinute + minutes
+	extraHours := totalMin / mph
+	cal.CurrentMinute = totalMin % mph
+
+	// Add hours (including rollover from minutes), roll into days.
+	totalHours := cal.CurrentHour + hours + extraHours
+	extraDays := totalHours / hpd
+	cal.CurrentHour = totalHours % hpd
+
+	// Delegate day rollover to the existing date advancement logic.
+	if extraDays > 0 {
+		day := cal.CurrentDay
+		monthIdx := cal.CurrentMonth - 1
+		year := cal.CurrentYear
+
+		for i := 0; i < extraDays; i++ {
+			day++
+			maxDays := cal.MonthDays(monthIdx, year)
+			if day > maxDays {
+				day = 1
+				monthIdx++
+				if monthIdx >= len(months) {
+					monthIdx = 0
+					year++
+				}
+			}
+		}
+
+		cal.CurrentDay = day
+		cal.CurrentMonth = monthIdx + 1
+		cal.CurrentYear = year
+	}
+
+	return s.repo.Update(ctx, cal)
+}
+
+// ApplyImport replaces a calendar's configuration with data from an ImportResult.
+// Updates the calendar settings and all sub-resources (months, weekdays, moons,
+// seasons, eras). This is a destructive operation — existing sub-resources are replaced.
+func (s *calendarService) ApplyImport(ctx context.Context, calendarID string, result *ImportResult) error {
+	cal, err := s.repo.GetByID(ctx, calendarID)
+	if err != nil {
+		return fmt.Errorf("get calendar: %w", err)
+	}
+	if cal == nil {
+		return apperror.NewNotFound("calendar not found")
+	}
+
+	// Update calendar-level settings from import.
+	if result.CalendarName != "" {
+		cal.Name = result.CalendarName
+	}
+	cal.EpochName = result.Settings.EpochName
+	if result.Settings.CurrentYear != 0 {
+		cal.CurrentYear = result.Settings.CurrentYear
+	}
+	cal.CurrentMonth = 1
+	cal.CurrentDay = 1
+	cal.HoursPerDay = result.Settings.HoursPerDay
+	cal.MinutesPerHour = result.Settings.MinutesPerHour
+	cal.SecondsPerMinute = result.Settings.SecondsPerMinute
+	cal.LeapYearEvery = result.Settings.LeapYearEvery
+	cal.LeapYearOffset = result.Settings.LeapYearOffset
+
+	if err := s.repo.Update(ctx, cal); err != nil {
+		return fmt.Errorf("update calendar: %w", err)
+	}
+
+	// Apply sub-resources.
+	if len(result.Months) > 0 {
+		if err := s.SetMonths(ctx, calendarID, result.Months); err != nil {
+			return fmt.Errorf("set months: %w", err)
+		}
+	}
+	if len(result.Weekdays) > 0 {
+		if err := s.SetWeekdays(ctx, calendarID, result.Weekdays); err != nil {
+			return fmt.Errorf("set weekdays: %w", err)
+		}
+	}
+	if err := s.SetMoons(ctx, calendarID, result.Moons); err != nil {
+		return fmt.Errorf("set moons: %w", err)
+	}
+	if err := s.SetSeasons(ctx, calendarID, result.Seasons); err != nil {
+		return fmt.Errorf("set seasons: %w", err)
+	}
+	if err := s.SetEras(ctx, calendarID, result.Eras); err != nil {
+		return fmt.Errorf("set eras: %w", err)
+	}
+
+	return nil
+}
+
+// ListAllEvents returns all events for a calendar (owner visibility, no limit).
+// Used for calendar export.
+func (s *calendarService) ListAllEvents(ctx context.Context, calendarID string) ([]Event, error) {
+	cal, err := s.repo.GetByID(ctx, calendarID)
+	if err != nil {
+		return nil, fmt.Errorf("get calendar: %w", err)
+	}
+	if cal == nil {
+		return nil, nil
+	}
+	// Use current year, owner role (3) to get all events including dm_only.
+	return s.repo.ListEventsForYear(ctx, calendarID, cal.CurrentYear, 3)
 }

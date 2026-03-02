@@ -25,6 +25,8 @@ User --< CampaignMember >-- Campaign
          |                      |       |---< CalendarSeason
          |                      |       |---< CalendarEvent
          |                      +--< Map --< MapMarker
+         |                      +--< Session --< SessionAttendee >-- User
+         |                      |       |---< SessionEntity >-- Entity
          |                      +--< AuditLog
          |                      +--< SecurityEvent (site-wide)
          |                      +--< Addon --< CampaignAddon
@@ -49,6 +51,7 @@ User --< CampaignMember >-- Campaign
 | is_admin | BOOLEAN | DEFAULT false | System-level admin |
 | totp_secret | VARCHAR(255) | NULL | 2FA secret |
 | totp_enabled | BOOLEAN | DEFAULT false | |
+| timezone | VARCHAR(50) | NULL | IANA timezone string (added 000031) |
 | created_at | DATETIME | NOT NULL, DEFAULT NOW() | |
 | last_login_at | DATETIME | NULL | |
 
@@ -334,17 +337,23 @@ User --< CampaignMember >-- Campaign
 | details | JSON | NULL | Flexible metadata |
 | created_at | DATETIME | NOT NULL | |
 
-### calendars (implemented -- migrations 000027, 000028)
+### calendars (implemented -- migrations 000027, 000028, 000030, 000031)
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | id | VARCHAR(36) | PK | UUID |
 | campaign_id | VARCHAR(36) | UNIQUE, FK -> campaigns.id ON DELETE CASCADE | One per campaign |
+| mode | VARCHAR(20) | NOT NULL, DEFAULT 'fantasy' | 'fantasy' or 'reallife' (added 000031) |
 | name | VARCHAR(255) | NOT NULL, DEFAULT 'Campaign Calendar' | |
 | description | TEXT | NULL | |
 | epoch_name | VARCHAR(100) | NULL | e.g., "Third Age" |
 | current_year | INT | NOT NULL, DEFAULT 1 | In-game year |
 | current_month | INT | NOT NULL, DEFAULT 1 | In-game month |
 | current_day | INT | NOT NULL, DEFAULT 1 | In-game day |
+| hours_per_day | INT | NOT NULL, DEFAULT 24 | Configurable time system (added 000030) |
+| minutes_per_hour | INT | NOT NULL, DEFAULT 60 | Configurable time system (added 000030) |
+| seconds_per_minute | INT | NOT NULL, DEFAULT 60 | Configurable time system (added 000030) |
+| current_hour | INT | NOT NULL, DEFAULT 0 | In-game hour (added 000030) |
+| current_minute | INT | NOT NULL, DEFAULT 0 | In-game minute (added 000030) |
 | leap_year_every | INT | NOT NULL, DEFAULT 0 | 0 = no leap years (added 000028) |
 | leap_year_offset | INT | NOT NULL, DEFAULT 0 | Offset for calculation (added 000028) |
 | created_at | DATETIME | NOT NULL | |
@@ -391,21 +400,39 @@ User --< CampaignMember >-- Campaign
 | end_day | INT | NOT NULL | |
 | description | TEXT | NULL | |
 | color | VARCHAR(7) | NOT NULL, DEFAULT '#6b7280' | Visual indicator (added 000028) |
+| weather_effect | VARCHAR(200) | NULL | Weather description for season (added 000033) |
 
-### calendar_events (implemented -- migrations 000027, 000028)
+### calendar_eras (implemented -- migration 000033)
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | INT | PK, AUTO_INCREMENT | |
+| calendar_id | VARCHAR(36) | FK -> calendars.id ON DELETE CASCADE | |
+| name | VARCHAR(200) | NOT NULL | Era name (e.g. "First Age") |
+| start_year | INT | NOT NULL | First year of era |
+| end_year | INT | NULL | Last year of era (NULL = ongoing) |
+| description | TEXT | NULL | |
+| color | VARCHAR(20) | NOT NULL, DEFAULT '#6366f1' | |
+| sort_order | INT | NOT NULL, DEFAULT 0 | |
+
+### calendar_events (implemented -- migrations 000027, 000028, 000030, 000034)
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | id | VARCHAR(36) | PK | UUID |
 | calendar_id | VARCHAR(36) | FK -> calendars.id ON DELETE CASCADE | |
 | entity_id | VARCHAR(36) | NULL, FK -> entities.id ON DELETE SET NULL | |
 | name | VARCHAR(255) | NOT NULL | |
-| description | TEXT | NULL | |
+| description | TEXT | NULL | ProseMirror JSON (rich text) or plain text (legacy) |
+| description_html | TEXT | NULL | Pre-rendered sanitized HTML (added 000034) |
 | year | INT | NOT NULL | |
 | month | INT | NOT NULL | |
 | day | INT | NOT NULL | |
+| start_hour | INT | NULL | Event start hour (added 000030) |
+| start_minute | INT | NULL | Event start minute (added 000030) |
 | end_year | INT | NULL | Multi-day event end (added 000028) |
 | end_month | INT | NULL | (added 000028) |
 | end_day | INT | NULL | (added 000028) |
+| end_hour | INT | NULL | Event end hour (added 000030) |
+| end_minute | INT | NULL | Event end minute (added 000030) |
 | is_recurring | TINYINT(1) | NOT NULL, DEFAULT 0 | |
 | recurrence_type | VARCHAR(20) | NULL | yearly, monthly |
 | visibility | VARCHAR(20) | NOT NULL, DEFAULT 'everyone' | |
@@ -445,6 +472,44 @@ User --< CampaignMember >-- Campaign
 | created_at | DATETIME | NOT NULL | |
 | updated_at | DATETIME | NOT NULL | |
 
+### sessions (implemented -- migration 000032)
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | VARCHAR(36) | PK | UUID |
+| campaign_id | VARCHAR(36) | FK -> campaigns.id ON DELETE CASCADE | |
+| name | VARCHAR(200) | NOT NULL | Session title |
+| summary | TEXT | NULL | Brief description |
+| notes | JSON | NULL | ProseMirror JSON (GM notes) |
+| notes_html | TEXT | NULL | Pre-rendered HTML |
+| scheduled_date | DATE | NULL | Real-world date |
+| calendar_year | INT | NULL | In-game year |
+| calendar_month | INT | NULL | In-game month |
+| calendar_day | INT | NULL | In-game day |
+| status | VARCHAR(20) | NOT NULL, DEFAULT 'planned' | planned, completed, cancelled |
+| sort_order | INT | NOT NULL, DEFAULT 0 | Manual ordering |
+| created_by | VARCHAR(36) | FK -> users.id | Session creator |
+| created_at | DATETIME | NOT NULL | |
+| updated_at | DATETIME | NOT NULL | |
+
+### session_attendees (implemented -- migration 000032)
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | INT | PK, AUTO_INCREMENT | |
+| session_id | VARCHAR(36) | FK -> sessions.id ON DELETE CASCADE | |
+| user_id | VARCHAR(36) | FK -> users.id ON DELETE CASCADE | |
+| status | VARCHAR(20) | NOT NULL, DEFAULT 'invited' | invited, accepted, declined, tentative |
+| responded_at | DATETIME | NULL | When user last RSVPed |
+| UNIQUE(session_id, user_id) | | | |
+
+### session_entities (implemented -- migration 000032)
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | INT | PK, AUTO_INCREMENT | |
+| session_id | VARCHAR(36) | FK -> sessions.id ON DELETE CASCADE | |
+| entity_id | VARCHAR(36) | FK -> entities.id ON DELETE CASCADE | |
+| role | VARCHAR(50) | NOT NULL, DEFAULT 'mentioned' | mentioned, encountered, key |
+| UNIQUE(session_id, entity_id) | | | |
+
 ## MariaDB-Specific Notes
 
 - **JSON columns:** MariaDB validates JSON on write. Use `JSON_EXTRACT()` for
@@ -471,9 +536,13 @@ User --< CampaignMember >-- Campaign
 - `calendar_weekdays`: INDEX on (calendar_id, sort_order)
 - `calendar_moons`: INDEX on calendar_id
 - `calendar_seasons`: INDEX on calendar_id
+- `calendar_eras`: INDEX on calendar_id
 - `calendar_events`: INDEX on (calendar_id, year, month, day), INDEX on entity_id
 - `maps`: INDEX on (campaign_id, sort_order)
 - `map_markers`: INDEX on map_id, INDEX on entity_id
+- `sessions`: INDEX on (campaign_id, status), INDEX on campaign_id
+- `session_attendees`: UNIQUE on (session_id, user_id), INDEX on session_id
+- `session_entities`: UNIQUE on (session_id, entity_id), INDEX on session_id, INDEX on entity_id
 
 ## Migration Log
 
@@ -508,3 +577,8 @@ User --< CampaignMember >-- Campaign
 | 27 | 000027_calendar_plugin | Calendar tables (calendars, months, weekdays, moons, seasons, events) + addon | 2026-02-25 |
 | 28 | 000028_calendar_v2_device_fingerprint | Leap years, event end dates, season colors, event categories, device fingerprint on api_keys | 2026-02-25 |
 | 29 | 000029_maps_plugin | Maps + map_markers tables + addon registration | 2026-02-28 |
+| 30 | 000030_calendar_time_system | Time system on calendars (hours/min/sec config, current time) + event times | 2026-03-01 |
+| 31 | 000031_calendar_mode_timezone | Calendar mode column (fantasy/reallife) + user timezone | 2026-03-01 |
+| 32 | 000032_sessions_plugin | Sessions, session_attendees, session_entities tables + addon | 2026-03-01 |
+| 33 | 000033_calendar_eras_weather | calendar_eras table + season weather_effect column | 2026-03-01 |
+| 34 | 000034_calendar_event_rich_text | Add description_html column to calendar_events | 2026-03-01 |

@@ -4,18 +4,35 @@
 // one calendar; the addon must be enabled per-campaign.
 package calendar
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
+
+// Calendar mode constants.
+const (
+	// ModeFantasy indicates a fully custom fantasy calendar.
+	ModeFantasy = "fantasy"
+	// ModeRealLife indicates a Gregorian calendar synced to real-world time.
+	ModeRealLife = "reallife"
+)
 
 // Calendar is the top-level calendar definition for a campaign.
 type Calendar struct {
 	ID             string  `json:"id"`
 	CampaignID     string  `json:"campaign_id"`
+	Mode           string  `json:"mode"` // "fantasy" or "reallife"
 	Name           string  `json:"name"`
 	Description    *string `json:"description,omitempty"`
 	EpochName      *string `json:"epoch_name,omitempty"`
 	CurrentYear    int     `json:"current_year"`
 	CurrentMonth   int     `json:"current_month"`
 	CurrentDay     int     `json:"current_day"`
+	HoursPerDay      int `json:"hours_per_day"`
+	MinutesPerHour   int `json:"minutes_per_hour"`
+	SecondsPerMinute int `json:"seconds_per_minute"`
+	CurrentHour    int     `json:"current_hour"`
+	CurrentMinute  int     `json:"current_minute"`
 	LeapYearEvery  int     `json:"leap_year_every"`
 	LeapYearOffset int     `json:"leap_year_offset"`
 	CreatedAt      time.Time `json:"created_at"`
@@ -26,6 +43,12 @@ type Calendar struct {
 	Weekdays []Weekday `json:"weekdays,omitempty"`
 	Moons    []Moon    `json:"moons,omitempty"`
 	Seasons  []Season  `json:"seasons,omitempty"`
+	Eras     []Era     `json:"eras,omitempty"`
+}
+
+// IsRealLife returns true if this calendar syncs to real-world time.
+func (c *Calendar) IsRealLife() bool {
+	return c.Mode == ModeRealLife
 }
 
 // IsLeapYear returns true if the given year is a leap year according to
@@ -79,6 +102,13 @@ func (c *Calendar) WeekLength() int {
 	return len(c.Weekdays)
 }
 
+// FormatCurrentTime returns the current time formatted as "HH:MM".
+// Pads hours/minutes with leading zeros based on the max values
+// (e.g. a 24-hour system uses 2 digits, a 100-hour system uses 3).
+func (c *Calendar) FormatCurrentTime() string {
+	return fmt.Sprintf("%02d:%02d", c.CurrentHour, c.CurrentMinute)
+}
+
 // CurrentSeason returns the season for the current date, or nil if none match.
 func (c *Calendar) CurrentSeason() *Season {
 	return c.SeasonForDate(c.CurrentMonth, c.CurrentDay)
@@ -90,6 +120,23 @@ func (c *Calendar) SeasonForDate(month, day int) *Season {
 		s := &c.Seasons[i]
 		if s.ContainsDate(month, day) {
 			return s
+		}
+	}
+	return nil
+}
+
+// CurrentEra returns the era containing the current year, or nil if none match.
+func (c *Calendar) CurrentEra() *Era {
+	return c.EraForYear(c.CurrentYear)
+}
+
+// EraForYear returns the era containing the given year, or nil if none match.
+// An era with nil EndYear is considered ongoing (matches all years >= StartYear).
+func (c *Calendar) EraForYear(year int) *Era {
+	for i := range c.Eras {
+		e := &c.Eras[i]
+		if year >= e.StartYear && (e.EndYear == nil || year <= *e.EndYear) {
+			return e
 		}
 	}
 	return nil
@@ -164,15 +211,16 @@ func (m *Moon) MoonPhaseName(absoluteDay int) string {
 
 // Season is a named period spanning a range of month+day to month+day.
 type Season struct {
-	ID          int     `json:"id"`
-	CalendarID  string  `json:"calendar_id"`
-	Name        string  `json:"name"`
-	StartMonth  int     `json:"start_month"`
-	StartDay    int     `json:"start_day"`
-	EndMonth    int     `json:"end_month"`
-	EndDay      int     `json:"end_day"`
-	Description *string `json:"description,omitempty"`
-	Color       string  `json:"color"`
+	ID            int     `json:"id"`
+	CalendarID    string  `json:"calendar_id"`
+	Name          string  `json:"name"`
+	StartMonth    int     `json:"start_month"`
+	StartDay      int     `json:"start_day"`
+	EndMonth      int     `json:"end_month"`
+	EndDay        int     `json:"end_day"`
+	Description   *string `json:"description,omitempty"`
+	Color         string  `json:"color"`
+	WeatherEffect *string `json:"weather_effect,omitempty"`
 }
 
 // ContainsDate returns true if the given month+day falls within this season.
@@ -190,19 +238,48 @@ func (s *Season) ContainsDate(month, day int) bool {
 	return dateVal >= startVal || dateVal <= endVal
 }
 
+// Era is a named time period spanning a range of years (e.g. "First Age", "Age of Fire").
+type Era struct {
+	ID         int     `json:"id"`
+	CalendarID string  `json:"calendar_id"`
+	Name       string  `json:"name"`
+	StartYear  int     `json:"start_year"`
+	EndYear    *int    `json:"end_year,omitempty"` // nil = ongoing
+	Description *string `json:"description,omitempty"`
+	Color      string  `json:"color"`
+	SortOrder  int     `json:"sort_order"`
+}
+
+// IsOngoing returns true if this era has no end year (still in progress).
+func (e *Era) IsOngoing() bool {
+	return e.EndYear == nil
+}
+
+// ContainsYear returns true if the given year falls within this era.
+func (e *Era) ContainsYear(year int) bool {
+	return year >= e.StartYear && (e.EndYear == nil || year <= *e.EndYear)
+}
+
 // Event is a calendar entry on a specific date, optionally linked to an entity.
+// Description stores ProseMirror JSON for rich text editing; DescriptionHTML
+// stores pre-rendered sanitized HTML for display (same pattern as entity entries).
 type Event struct {
-	ID             string    `json:"id"`
-	CalendarID     string    `json:"calendar_id"`
-	EntityID       *string   `json:"entity_id,omitempty"`
-	Name           string    `json:"name"`
-	Description    *string   `json:"description,omitempty"`
-	Year           int       `json:"year"`
+	ID              string    `json:"id"`
+	CalendarID      string    `json:"calendar_id"`
+	EntityID        *string   `json:"entity_id,omitempty"`
+	Name            string    `json:"name"`
+	Description     *string   `json:"description,omitempty"`
+	DescriptionHTML *string   `json:"description_html,omitempty"`
+	Year            int       `json:"year"`
 	Month          int       `json:"month"`
 	Day            int       `json:"day"`
+	StartHour      *int      `json:"start_hour,omitempty"`
+	StartMinute    *int      `json:"start_minute,omitempty"`
 	EndYear        *int      `json:"end_year,omitempty"`
 	EndMonth       *int      `json:"end_month,omitempty"`
 	EndDay         *int      `json:"end_day,omitempty"`
+	EndHour        *int      `json:"end_hour,omitempty"`
+	EndMinute      *int      `json:"end_minute,omitempty"`
 	IsRecurring    bool      `json:"is_recurring"`
 	RecurrenceType *string   `json:"recurrence_type,omitempty"`
 	Visibility     string    `json:"visibility"`
@@ -217,46 +294,115 @@ type Event struct {
 	EntityColor string `json:"entity_color,omitempty"`
 }
 
+// HasTime returns true if this event has a specific start time (not all-day).
+func (e *Event) HasTime() bool {
+	return e.StartHour != nil && e.StartMinute != nil
+}
+
+// FormatTime returns the event's start time as "HH:MM", or empty for all-day events.
+func (e *Event) FormatTime() string {
+	if !e.HasTime() {
+		return ""
+	}
+	return fmt.Sprintf("%02d:%02d", *e.StartHour, *e.StartMinute)
+}
+
+// FormatEndTime returns the event's end time as "HH:MM", or empty if not set.
+func (e *Event) FormatEndTime() string {
+	if e.EndHour == nil || e.EndMinute == nil {
+		return ""
+	}
+	return fmt.Sprintf("%02d:%02d", *e.EndHour, *e.EndMinute)
+}
+
+// FormatTimeRange returns "HH:MM - HH:MM" or just "HH:MM" if no end time.
+func (e *Event) FormatTimeRange() string {
+	start := e.FormatTime()
+	if start == "" {
+		return ""
+	}
+	end := e.FormatEndTime()
+	if end == "" {
+		return start
+	}
+	return start + " – " + end
+}
+
 // IsMultiDay returns true if this event spans more than one day.
 func (e *Event) IsMultiDay() bool {
 	return e.EndYear != nil && e.EndMonth != nil && e.EndDay != nil
+}
+
+// HasRichText returns true if this event has a rich text description (ProseMirror JSON
+// with pre-rendered HTML), as opposed to a legacy plain text description.
+func (e *Event) HasRichText() bool {
+	return e.DescriptionHTML != nil && *e.DescriptionHTML != ""
+}
+
+// PlainDescription returns a plain text version of the description for tooltips.
+// For rich text events, returns empty (tooltip should not show raw JSON).
+// For legacy plain text events, returns the description as-is.
+func (e *Event) PlainDescription() string {
+	if e.Description == nil || *e.Description == "" {
+		return ""
+	}
+	// If there's no HTML version, description is plain text (legacy).
+	if !e.HasRichText() {
+		return *e.Description
+	}
+	// Rich text event: description is ProseMirror JSON, not displayable as text.
+	return ""
 }
 
 // --- Request DTOs ---
 
 // CreateCalendarInput is the validated input for creating a calendar.
 type CreateCalendarInput struct {
-	Name           string
-	Description    *string
-	EpochName      *string
-	CurrentYear    int
-	LeapYearEvery  int
-	LeapYearOffset int
+	Mode             string // "fantasy" or "reallife"
+	Name             string
+	Description      *string
+	EpochName        *string
+	CurrentYear      int
+	HoursPerDay      int
+	MinutesPerHour   int
+	SecondsPerMinute int
+	LeapYearEvery    int
+	LeapYearOffset   int
 }
 
 // UpdateCalendarInput is the validated input for updating calendar settings.
 type UpdateCalendarInput struct {
-	Name           string
-	Description    *string
-	EpochName      *string
-	CurrentYear    int
-	CurrentMonth   int
-	CurrentDay     int
-	LeapYearEvery  int
-	LeapYearOffset int
+	Name             string
+	Description      *string
+	EpochName        *string
+	CurrentYear      int
+	CurrentMonth     int
+	CurrentDay       int
+	CurrentHour      int
+	CurrentMinute    int
+	HoursPerDay      int
+	MinutesPerHour   int
+	SecondsPerMinute int
+	LeapYearEvery    int
+	LeapYearOffset   int
 }
 
 // CreateEventInput is the validated input for creating a calendar event.
 type CreateEventInput struct {
-	Name           string
-	Description    *string
-	EntityID       *string
+	Name            string
+	Description     *string
+	DescriptionHTML *string
+	EntityID        *string
 	Year           int
 	Month          int
 	Day            int
+	StartHour      *int
+	StartMinute    *int
 	EndYear        *int
 	EndMonth       *int
 	EndDay         *int
+	EndHour        *int
+	EndMinute      *int
 	IsRecurring    bool
 	RecurrenceType *string
 	Visibility     string
@@ -266,15 +412,20 @@ type CreateEventInput struct {
 
 // UpdateEventInput is the validated input for updating an event.
 type UpdateEventInput struct {
-	Name           string
-	Description    *string
-	EntityID       *string
+	Name            string
+	Description     *string
+	DescriptionHTML *string
+	EntityID        *string
 	Year           int
 	Month          int
 	Day            int
+	StartHour      *int
+	StartMinute    *int
 	EndYear        *int
 	EndMonth       *int
 	EndDay         *int
+	EndHour        *int
+	EndMinute      *int
 	IsRecurring    bool
 	RecurrenceType *string
 	Visibility     string
@@ -302,4 +453,14 @@ type MoonInput struct {
 	CycleDays   float64 `json:"cycle_days"`
 	PhaseOffset float64 `json:"phase_offset"`
 	Color       string  `json:"color"`
+}
+
+// EraInput is the input for creating/updating an era.
+type EraInput struct {
+	Name        string  `json:"name"`
+	StartYear   int     `json:"start_year"`
+	EndYear     *int    `json:"end_year"`
+	Description *string `json:"description"`
+	Color       string  `json:"color"`
+	SortOrder   int     `json:"sort_order"`
 }

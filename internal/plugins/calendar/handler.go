@@ -1,10 +1,13 @@
 package calendar
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -94,6 +97,7 @@ func (h *Handler) CreateCalendar(c echo.Context) error {
 	cc := campaigns.GetCampaignContext(c)
 	ctx := c.Request().Context()
 
+	mode := c.FormValue("mode")
 	name := c.FormValue("name")
 	if name == "" {
 		name = "Campaign Calendar"
@@ -109,45 +113,114 @@ func (h *Handler) CreateCalendar(c echo.Context) error {
 		epoch = &epochName
 	}
 
-	cal, err := h.svc.CreateCalendar(ctx, cc.Campaign.ID, CreateCalendarInput{
+	// For real-life mode, set Gregorian defaults.
+	input := CreateCalendarInput{
+		Mode:        mode,
 		Name:        name,
 		EpochName:   epoch,
 		CurrentYear: startYear,
-	})
+	}
+	if mode == ModeRealLife {
+		now := time.Now().UTC()
+		input.CurrentYear = now.Year()
+		input.HoursPerDay = 24
+		input.MinutesPerHour = 60
+		input.SecondsPerMinute = 60
+		input.LeapYearEvery = 4
+		input.LeapYearOffset = 0
+		if name == "" || name == "Campaign Calendar" {
+			input.Name = "Session Calendar"
+		}
+		ad := "AD"
+		input.EpochName = &ad
+	}
+
+	cal, err := h.svc.CreateCalendar(ctx, cc.Campaign.ID, input)
 	if err != nil {
 		return err
 	}
 
-	// Seed default months (12 months, 30 days each) and weekdays (7 days).
-	defaultMonths := []MonthInput{
-		{Name: "Month 1", Days: 30, SortOrder: 0},
-		{Name: "Month 2", Days: 30, SortOrder: 1},
-		{Name: "Month 3", Days: 30, SortOrder: 2},
-		{Name: "Month 4", Days: 30, SortOrder: 3},
-		{Name: "Month 5", Days: 30, SortOrder: 4},
-		{Name: "Month 6", Days: 30, SortOrder: 5},
-		{Name: "Month 7", Days: 30, SortOrder: 6},
-		{Name: "Month 8", Days: 30, SortOrder: 7},
-		{Name: "Month 9", Days: 30, SortOrder: 8},
-		{Name: "Month 10", Days: 30, SortOrder: 9},
-		{Name: "Month 11", Days: 30, SortOrder: 10},
-		{Name: "Month 12", Days: 30, SortOrder: 11},
-	}
-	if err := h.svc.SetMonths(ctx, cal.ID, defaultMonths); err != nil {
-		return err
-	}
-
-	defaultWeekdays := []WeekdayInput{
-		{Name: "Day 1", SortOrder: 0},
-		{Name: "Day 2", SortOrder: 1},
-		{Name: "Day 3", SortOrder: 2},
-		{Name: "Day 4", SortOrder: 3},
-		{Name: "Day 5", SortOrder: 4},
-		{Name: "Day 6", SortOrder: 5},
-		{Name: "Day 7", SortOrder: 6},
-	}
-	if err := h.svc.SetWeekdays(ctx, cal.ID, defaultWeekdays); err != nil {
-		return err
+	// Seed months and weekdays based on mode.
+	if mode == ModeRealLife {
+		// Gregorian months with correct day counts.
+		gregorianMonths := []MonthInput{
+			{Name: "January", Days: 31, SortOrder: 0},
+			{Name: "February", Days: 28, SortOrder: 1, LeapYearDays: 1},
+			{Name: "March", Days: 31, SortOrder: 2},
+			{Name: "April", Days: 30, SortOrder: 3},
+			{Name: "May", Days: 31, SortOrder: 4},
+			{Name: "June", Days: 30, SortOrder: 5},
+			{Name: "July", Days: 31, SortOrder: 6},
+			{Name: "August", Days: 31, SortOrder: 7},
+			{Name: "September", Days: 30, SortOrder: 8},
+			{Name: "October", Days: 31, SortOrder: 9},
+			{Name: "November", Days: 30, SortOrder: 10},
+			{Name: "December", Days: 31, SortOrder: 11},
+		}
+		if err := h.svc.SetMonths(ctx, cal.ID, gregorianMonths); err != nil {
+			return err
+		}
+		gregorianWeekdays := []WeekdayInput{
+			{Name: "Sunday", SortOrder: 0},
+			{Name: "Monday", SortOrder: 1},
+			{Name: "Tuesday", SortOrder: 2},
+			{Name: "Wednesday", SortOrder: 3},
+			{Name: "Thursday", SortOrder: 4},
+			{Name: "Friday", SortOrder: 5},
+			{Name: "Saturday", SortOrder: 6},
+		}
+		if err := h.svc.SetWeekdays(ctx, cal.ID, gregorianWeekdays); err != nil {
+			return err
+		}
+		// Set current date/time from wall clock.
+		now := time.Now().UTC()
+		if err := h.svc.UpdateCalendar(ctx, cal.ID, UpdateCalendarInput{
+			Name:             cal.Name,
+			EpochName:        cal.EpochName,
+			CurrentYear:      now.Year(),
+			CurrentMonth:     int(now.Month()),
+			CurrentDay:       now.Day(),
+			CurrentHour:      now.Hour(),
+			CurrentMinute:    now.Minute(),
+			HoursPerDay:      24,
+			MinutesPerHour:   60,
+			SecondsPerMinute: 60,
+			LeapYearEvery:    4,
+			LeapYearOffset:   0,
+		}); err != nil {
+			return err
+		}
+	} else {
+		// Fantasy defaults: 12 months, 30 days each, 7 generic weekdays.
+		defaultMonths := []MonthInput{
+			{Name: "Month 1", Days: 30, SortOrder: 0},
+			{Name: "Month 2", Days: 30, SortOrder: 1},
+			{Name: "Month 3", Days: 30, SortOrder: 2},
+			{Name: "Month 4", Days: 30, SortOrder: 3},
+			{Name: "Month 5", Days: 30, SortOrder: 4},
+			{Name: "Month 6", Days: 30, SortOrder: 5},
+			{Name: "Month 7", Days: 30, SortOrder: 6},
+			{Name: "Month 8", Days: 30, SortOrder: 7},
+			{Name: "Month 9", Days: 30, SortOrder: 8},
+			{Name: "Month 10", Days: 30, SortOrder: 9},
+			{Name: "Month 11", Days: 30, SortOrder: 10},
+			{Name: "Month 12", Days: 30, SortOrder: 11},
+		}
+		if err := h.svc.SetMonths(ctx, cal.ID, defaultMonths); err != nil {
+			return err
+		}
+		defaultWeekdays := []WeekdayInput{
+			{Name: "Day 1", SortOrder: 0},
+			{Name: "Day 2", SortOrder: 1},
+			{Name: "Day 3", SortOrder: 2},
+			{Name: "Day 4", SortOrder: 3},
+			{Name: "Day 5", SortOrder: 4},
+			{Name: "Day 6", SortOrder: 5},
+			{Name: "Day 7", SortOrder: 6},
+		}
+		if err := h.svc.SetWeekdays(ctx, cal.ID, defaultWeekdays); err != nil {
+			return err
+		}
 	}
 
 	// Auto-enable the calendar addon for this campaign so dashboard/entity
@@ -162,8 +235,14 @@ func (h *Handler) CreateCalendar(c echo.Context) error {
 		}
 	}
 
+	// Redirect to settings for fantasy mode so users can immediately customize
+	// months, weekdays, etc. Real-life mode goes straight to the calendar.
+	if mode == ModeRealLife {
+		return c.Redirect(http.StatusSeeOther,
+			fmt.Sprintf("/campaigns/%s/calendar", cc.Campaign.ID))
+	}
 	return c.Redirect(http.StatusSeeOther,
-		fmt.Sprintf("/campaigns/%s/calendar", cc.Campaign.ID))
+		fmt.Sprintf("/campaigns/%s/calendar/settings", cc.Campaign.ID))
 }
 
 // UpdateCalendarAPI updates calendar settings.
@@ -178,28 +257,38 @@ func (h *Handler) UpdateCalendarAPI(c echo.Context) error {
 	}
 
 	var req struct {
-		Name           string  `json:"name"`
-		Description    *string `json:"description"`
-		EpochName      *string `json:"epoch_name"`
-		CurrentYear    int     `json:"current_year"`
-		CurrentMonth   int     `json:"current_month"`
-		CurrentDay     int     `json:"current_day"`
-		LeapYearEvery  int     `json:"leap_year_every"`
-		LeapYearOffset int     `json:"leap_year_offset"`
+		Name             string  `json:"name"`
+		Description      *string `json:"description"`
+		EpochName        *string `json:"epoch_name"`
+		CurrentYear      int     `json:"current_year"`
+		CurrentMonth     int     `json:"current_month"`
+		CurrentDay       int     `json:"current_day"`
+		CurrentHour      int     `json:"current_hour"`
+		CurrentMinute    int     `json:"current_minute"`
+		HoursPerDay      int     `json:"hours_per_day"`
+		MinutesPerHour   int     `json:"minutes_per_hour"`
+		SecondsPerMinute int     `json:"seconds_per_minute"`
+		LeapYearEvery    int     `json:"leap_year_every"`
+		LeapYearOffset   int     `json:"leap_year_offset"`
 	}
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
 	}
 
 	return h.svc.UpdateCalendar(ctx, cal.ID, UpdateCalendarInput{
-		Name:           req.Name,
-		Description:    req.Description,
-		EpochName:      req.EpochName,
-		CurrentYear:    req.CurrentYear,
-		CurrentMonth:   req.CurrentMonth,
-		CurrentDay:     req.CurrentDay,
-		LeapYearEvery:  req.LeapYearEvery,
-		LeapYearOffset: req.LeapYearOffset,
+		Name:             req.Name,
+		Description:      req.Description,
+		EpochName:        req.EpochName,
+		CurrentYear:      req.CurrentYear,
+		CurrentMonth:     req.CurrentMonth,
+		CurrentDay:       req.CurrentDay,
+		CurrentHour:      req.CurrentHour,
+		CurrentMinute:    req.CurrentMinute,
+		HoursPerDay:      req.HoursPerDay,
+		MinutesPerHour:   req.MinutesPerHour,
+		SecondsPerMinute: req.SecondsPerMinute,
+		LeapYearEvery:    req.LeapYearEvery,
+		LeapYearOffset:   req.LeapYearOffset,
 	})
 }
 
@@ -272,19 +361,24 @@ func (h *Handler) CreateEventAPI(c echo.Context) error {
 	}
 
 	var req struct {
-		Name           string  `json:"name"`
-		Description    *string `json:"description"`
-		EntityID       *string `json:"entity_id"`
-		Year           int     `json:"year"`
-		Month          int     `json:"month"`
-		Day            int     `json:"day"`
-		EndYear        *int    `json:"end_year"`
-		EndMonth       *int    `json:"end_month"`
-		EndDay         *int    `json:"end_day"`
-		IsRecurring    bool    `json:"is_recurring"`
-		RecurrenceType *string `json:"recurrence_type"`
-		Visibility     string  `json:"visibility"`
-		Category       *string `json:"category"`
+		Name            string  `json:"name"`
+		Description     *string `json:"description"`
+		DescriptionHTML *string `json:"description_html"`
+		EntityID        *string `json:"entity_id"`
+		Year            int     `json:"year"`
+		Month           int     `json:"month"`
+		Day             int     `json:"day"`
+		StartHour       *int    `json:"start_hour"`
+		StartMinute     *int    `json:"start_minute"`
+		EndYear         *int    `json:"end_year"`
+		EndMonth        *int    `json:"end_month"`
+		EndDay          *int    `json:"end_day"`
+		EndHour         *int    `json:"end_hour"`
+		EndMinute       *int    `json:"end_minute"`
+		IsRecurring     bool    `json:"is_recurring"`
+		RecurrenceType  *string `json:"recurrence_type"`
+		Visibility      string  `json:"visibility"`
+		Category        *string `json:"category"`
 	}
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
@@ -299,15 +393,20 @@ func (h *Handler) CreateEventAPI(c echo.Context) error {
 	}
 
 	evt, err := h.svc.CreateEvent(ctx, cal.ID, CreateEventInput{
-		Name:           req.Name,
-		Description:    req.Description,
-		EntityID:       req.EntityID,
+		Name:            req.Name,
+		Description:     req.Description,
+		DescriptionHTML: req.DescriptionHTML,
+		EntityID:        req.EntityID,
 		Year:           req.Year,
 		Month:          req.Month,
 		Day:            req.Day,
+		StartHour:      req.StartHour,
+		StartMinute:    req.StartMinute,
 		EndYear:        req.EndYear,
 		EndMonth:       req.EndMonth,
 		EndDay:         req.EndDay,
+		EndHour:        req.EndHour,
+		EndMinute:      req.EndMinute,
 		IsRecurring:    req.IsRecurring,
 		RecurrenceType: req.RecurrenceType,
 		Visibility:     req.Visibility,
@@ -350,34 +449,44 @@ func (h *Handler) UpdateEventAPI(c echo.Context) error {
 	}
 
 	var req struct {
-		Name           string  `json:"name"`
-		Description    *string `json:"description"`
-		EntityID       *string `json:"entity_id"`
-		Year           int     `json:"year"`
-		Month          int     `json:"month"`
-		Day            int     `json:"day"`
-		EndYear        *int    `json:"end_year"`
-		EndMonth       *int    `json:"end_month"`
-		EndDay         *int    `json:"end_day"`
-		IsRecurring    bool    `json:"is_recurring"`
-		RecurrenceType *string `json:"recurrence_type"`
-		Visibility     string  `json:"visibility"`
-		Category       *string `json:"category"`
+		Name            string  `json:"name"`
+		Description     *string `json:"description"`
+		DescriptionHTML *string `json:"description_html"`
+		EntityID        *string `json:"entity_id"`
+		Year            int     `json:"year"`
+		Month           int     `json:"month"`
+		Day             int     `json:"day"`
+		StartHour       *int    `json:"start_hour"`
+		StartMinute     *int    `json:"start_minute"`
+		EndYear         *int    `json:"end_year"`
+		EndMonth        *int    `json:"end_month"`
+		EndDay          *int    `json:"end_day"`
+		EndHour         *int    `json:"end_hour"`
+		EndMinute       *int    `json:"end_minute"`
+		IsRecurring     bool    `json:"is_recurring"`
+		RecurrenceType  *string `json:"recurrence_type"`
+		Visibility      string  `json:"visibility"`
+		Category        *string `json:"category"`
 	}
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
 	}
 
 	return h.svc.UpdateEvent(ctx, eventID, UpdateEventInput{
-		Name:           req.Name,
-		Description:    req.Description,
-		EntityID:       req.EntityID,
+		Name:            req.Name,
+		Description:     req.Description,
+		DescriptionHTML: req.DescriptionHTML,
+		EntityID:        req.EntityID,
 		Year:           req.Year,
 		Month:          req.Month,
 		Day:            req.Day,
+		StartHour:      req.StartHour,
+		StartMinute:    req.StartMinute,
 		EndYear:        req.EndYear,
 		EndMonth:       req.EndMonth,
 		EndDay:         req.EndDay,
+		EndHour:        req.EndHour,
+		EndMinute:      req.EndMinute,
 		IsRecurring:    req.IsRecurring,
 		RecurrenceType: req.RecurrenceType,
 		Visibility:     req.Visibility,
@@ -420,6 +529,25 @@ func (h *Handler) UpdateSeasonsAPI(c echo.Context) error {
 	}
 
 	return h.svc.SetSeasons(ctx, cal.ID, seasons)
+}
+
+// UpdateErasAPI replaces all eras.
+// PUT /campaigns/:id/calendar/eras
+func (h *Handler) UpdateErasAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	ctx := c.Request().Context()
+
+	cal, err := h.svc.GetCalendar(ctx, cc.Campaign.ID)
+	if err != nil || cal == nil {
+		return echo.NewHTTPError(http.StatusNotFound, "calendar not found")
+	}
+
+	var eras []EraInput
+	if err := c.Bind(&eras); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
+	}
+
+	return h.svc.SetEras(ctx, cal.ID, eras)
 }
 
 // DeleteCalendarAPI removes the calendar and all its data.
@@ -483,6 +611,38 @@ func (h *Handler) AdvanceDateAPI(c echo.Context) error {
 	}
 
 	return h.svc.AdvanceDate(ctx, cal.ID, req.Days)
+}
+
+// AdvanceTimeAPI moves the current time forward by hours and/or minutes,
+// rolling over into days as needed.
+// POST /campaigns/:id/calendar/advance-time
+func (h *Handler) AdvanceTimeAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	ctx := c.Request().Context()
+
+	cal, err := h.svc.GetCalendar(ctx, cc.Campaign.ID)
+	if err != nil || cal == nil {
+		return echo.NewHTTPError(http.StatusNotFound, "calendar not found")
+	}
+
+	var req struct {
+		Hours   int `json:"hours"`
+		Minutes int `json:"minutes"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
+	}
+	if req.Hours < 0 || req.Minutes < 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "hours and minutes must be non-negative")
+	}
+	if req.Hours == 0 && req.Minutes == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "must advance by at least 1 minute or 1 hour")
+	}
+	if req.Hours > 87600 { // ~10 years of 24-hour days
+		return echo.NewHTTPError(http.StatusBadRequest, "hours must be at most 87600")
+	}
+
+	return h.svc.AdvanceTime(ctx, cal.ID, req.Hours, req.Minutes)
 }
 
 // EntityEventsFragment returns a small HTMX fragment listing calendar events
@@ -593,6 +753,210 @@ func (h *Handler) ShowTimeline(c echo.Context) error {
 	}
 	return middleware.Render(c, http.StatusOK, TimelinePage(cc, data))
 }
+
+// ExportCalendarAPI returns the calendar as a downloadable JSON file.
+// GET /campaigns/:id/calendar/export
+func (h *Handler) ExportCalendarAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	ctx := c.Request().Context()
+
+	cal, err := h.svc.GetCalendar(ctx, cc.Campaign.ID)
+	if err != nil || cal == nil {
+		return echo.NewHTTPError(http.StatusNotFound, "calendar not found")
+	}
+
+	// Optionally include events.
+	var events []Event
+	includeEvents := c.QueryParam("events") == "true"
+	if includeEvents {
+		events, err = h.svc.ListAllEvents(ctx, cal.ID)
+		if err != nil {
+			slog.Error("export: failed to list events", slog.Any("error", err))
+		}
+	}
+
+	export := BuildExport(cal, events, includeEvents)
+	c.Response().Header().Set("Content-Disposition",
+		fmt.Sprintf(`attachment; filename="%s-calendar.json"`, cc.Campaign.Slug))
+	return c.JSON(http.StatusOK, export)
+}
+
+// ImportCalendarAPI handles calendar import from an uploaded JSON file.
+// Accepts Simple Calendar, Calendaria, Fantasy-Calendar, and Chronicle formats.
+// POST /campaigns/:id/calendar/import
+func (h *Handler) ImportCalendarAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	ctx := c.Request().Context()
+
+	cal, err := h.svc.GetCalendar(ctx, cc.Campaign.ID)
+	if err != nil {
+		return err
+	}
+	if cal == nil {
+		return echo.NewHTTPError(http.StatusNotFound, "calendar not found — create a calendar first")
+	}
+
+	// Read uploaded file (multipart form or raw JSON body).
+	var data []byte
+	file, fileErr := c.FormFile("file")
+	if fileErr == nil {
+		// Multipart upload.
+		src, openErr := file.Open()
+		if openErr != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "could not read uploaded file")
+		}
+		defer src.Close()
+		data, err = io.ReadAll(io.LimitReader(src, 10*1024*1024)) // 10MB limit
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "could not read uploaded file")
+		}
+	} else {
+		// Try raw JSON body.
+		data, err = io.ReadAll(io.LimitReader(c.Request().Body, 10*1024*1024))
+		if err != nil || len(data) == 0 {
+			return echo.NewHTTPError(http.StatusBadRequest, "no file uploaded and no JSON body")
+		}
+	}
+
+	// Parse and detect format.
+	result, parseErr := DetectAndParse(data)
+	if parseErr != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, parseErr.Error())
+	}
+
+	// Check for preview mode — return what would be imported without applying.
+	if c.QueryParam("preview") == "true" {
+		return c.JSON(http.StatusOK, result)
+	}
+
+	// Apply the import to the existing calendar.
+	if err := h.svc.ApplyImport(ctx, cal.ID, result); err != nil {
+		slog.Error("import: failed to apply", slog.Any("error", err))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to apply import")
+	}
+
+	// Return JSON response with summary.
+	return c.JSON(http.StatusOK, map[string]any{
+		"status":   "ok",
+		"format":   result.Format,
+		"name":     result.CalendarName,
+		"months":   len(result.Months),
+		"weekdays": len(result.Weekdays),
+		"moons":    len(result.Moons),
+		"seasons":  len(result.Seasons),
+		"eras":     len(result.Eras),
+	})
+}
+
+// ImportPreviewAPI returns a preview of what would be imported from a JSON file
+// without actually applying the changes. Used by the import UI for confirmation.
+// POST /campaigns/:id/calendar/import/preview
+func (h *Handler) ImportPreviewAPI(c echo.Context) error {
+	// Read uploaded file.
+	var data []byte
+	var err error
+	file, fileErr := c.FormFile("file")
+	if fileErr == nil {
+		src, openErr := file.Open()
+		if openErr != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "could not read uploaded file")
+		}
+		defer src.Close()
+		data, err = io.ReadAll(io.LimitReader(src, 10*1024*1024))
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "could not read uploaded file")
+		}
+	} else {
+		data, err = io.ReadAll(io.LimitReader(c.Request().Body, 10*1024*1024))
+		if err != nil || len(data) == 0 {
+			return echo.NewHTTPError(http.StatusBadRequest, "no file uploaded")
+		}
+	}
+
+	result, parseErr := DetectAndParse(data)
+	if parseErr != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, parseErr.Error())
+	}
+
+	// Return the parsed preview as JSON.
+	return c.JSON(http.StatusOK, result)
+}
+
+// ImportFromSetupAPI handles import during calendar setup (no existing calendar).
+// Creates a new calendar and applies the imported configuration.
+// POST /campaigns/:id/calendar/import-setup
+func (h *Handler) ImportFromSetupAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	ctx := c.Request().Context()
+
+	// Read uploaded file.
+	file, fileErr := c.FormFile("file")
+	if fileErr != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "no file uploaded")
+	}
+	src, err := file.Open()
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "could not read uploaded file")
+	}
+	defer src.Close()
+	data, err := io.ReadAll(io.LimitReader(src, 10*1024*1024))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "could not read uploaded file")
+	}
+
+	// Parse the import.
+	result, parseErr := DetectAndParse(data)
+	if parseErr != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, parseErr.Error())
+	}
+
+	// Create a new fantasy calendar with the imported name.
+	calName := result.CalendarName
+	if calName == "" {
+		calName = "Imported Calendar"
+	}
+	input := CreateCalendarInput{
+		Mode:             ModeFantasy,
+		Name:             calName,
+		EpochName:        result.Settings.EpochName,
+		CurrentYear:      result.Settings.CurrentYear,
+		HoursPerDay:      result.Settings.HoursPerDay,
+		MinutesPerHour:   result.Settings.MinutesPerHour,
+		SecondsPerMinute: result.Settings.SecondsPerMinute,
+		LeapYearEvery:    result.Settings.LeapYearEvery,
+		LeapYearOffset:   result.Settings.LeapYearOffset,
+	}
+
+	cal, err := h.svc.CreateCalendar(ctx, cc.Campaign.ID, input)
+	if err != nil {
+		return err
+	}
+
+	// Apply imported sub-resources.
+	if err := h.svc.ApplyImport(ctx, cal.ID, result); err != nil {
+		slog.Error("import-setup: failed to apply", slog.Any("error", err))
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to apply import")
+	}
+
+	// Auto-enable the calendar addon.
+	if h.addonSvc != nil {
+		addon, aErr := h.addonSvc.GetBySlug(ctx, "calendar")
+		if aErr == nil && addon != nil {
+			userID := auth.GetUserID(c)
+			if eErr := h.addonSvc.EnableForCampaign(ctx, cc.Campaign.ID, addon.ID, userID); eErr != nil {
+				slog.Warn("auto-enable calendar addon failed", slog.Any("error", eErr))
+			}
+		}
+	}
+
+	// Redirect to settings page so user can review the import.
+	return c.Redirect(http.StatusSeeOther,
+		fmt.Sprintf("/campaigns/%s/calendar/settings", cc.Campaign.ID))
+}
+
+// Silence unused import warnings for json and io packages.
+var _ = json.Marshal
+var _ = io.ReadAll
 
 // CalendarViewData holds all data needed to render the calendar grid.
 type CalendarViewData struct {

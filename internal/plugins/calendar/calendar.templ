@@ -12,59 +12,191 @@ import (
 )
 
 // CalendarSetupPage renders the initial setup when no calendar exists yet.
+// Presents three mode cards: Sync to Real Life, New Custom Calendar, Import.
 templ CalendarSetupPage(cc *campaigns.CampaignContext, csrfToken string) {
 	@layouts.App("Calendar - Setup") {
-		<div class="max-w-lg mx-auto py-12">
-			@calendarSetupForm(cc, csrfToken)
+		<div class="max-w-3xl mx-auto py-12 px-4">
+			@calendarSetupChooser(cc, csrfToken)
 		</div>
 	}
 }
 
-// CalendarSetupFragment renders the setup form as an HTMX fragment.
+// CalendarSetupFragment renders the setup chooser as an HTMX fragment.
 templ CalendarSetupFragment(cc *campaigns.CampaignContext, csrfToken string) {
-	<div class="max-w-lg mx-auto py-12">
-		@calendarSetupForm(cc, csrfToken)
+	<div class="max-w-3xl mx-auto py-12 px-4">
+		@calendarSetupChooser(cc, csrfToken)
 	</div>
 }
 
-// calendarSetupForm renders the form to create a new calendar.
-templ calendarSetupForm(cc *campaigns.CampaignContext, csrfToken string) {
-	<div class="card p-8 text-center space-y-6">
-		<div>
-			<i class="fa-solid fa-calendar-days text-4xl text-accent mb-3"></i>
-			<h1 class="text-xl font-bold text-fg">Create Your Calendar</h1>
-			<p class="text-sm text-fg-secondary mt-1">
-				Set up a custom calendar for your world with unique months, weekdays, moons, and more.
-			</p>
-		</div>
-		<form
-			method="POST"
-			action={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar", cc.Campaign.ID)) }
-			class="space-y-4 text-left"
-		>
-			<input type="hidden" name="csrf_token" value={ csrfToken }/>
-			<div>
-				<label class="block text-sm font-medium text-fg-body mb-1">Calendar Name</label>
-				<input type="text" name="name" value="Campaign Calendar" class="input w-full" placeholder="e.g. The Reckoning of Ages"/>
-			</div>
-			<div>
-				<label class="block text-sm font-medium text-fg-body mb-1">Epoch / Era Name</label>
-				<input type="text" name="epoch_name" class="input w-full" placeholder="e.g. DR, Age of Fire, Third Era"/>
-				<p class="text-xs text-fg-muted mt-1">Optional. Displayed after the year number (e.g. "1492 DR").</p>
-			</div>
-			<div>
-				<label class="block text-sm font-medium text-fg-body mb-1">Starting Year</label>
-				<input type="number" name="start_year" value="1" class="input w-full"/>
-			</div>
-			<div class="pt-2">
-				<button type="submit" class="btn-primary w-full">
-					<i class="fa-solid fa-plus mr-2"></i> Create Calendar
-				</button>
-				<p class="text-xs text-fg-muted mt-2 text-center">
-					You can customize months, weekdays, and moons after creation.
+// calendarSetupChooser renders the mode selection cards and their forms.
+templ calendarSetupChooser(cc *campaigns.CampaignContext, csrfToken string) {
+	<div class="text-center mb-8">
+		<i class="fa-solid fa-calendar-days text-4xl text-accent mb-3"></i>
+		<h1 class="text-xl font-bold text-fg">Create Your Calendar</h1>
+		<p class="text-sm text-fg-secondary mt-1">
+			Choose how you want your calendar to work.
+		</p>
+	</div>
+	<div x-data="{ mode: '' }" class="space-y-6">
+		<!-- Mode selection cards -->
+		<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+			<!-- Real Life -->
+			<button
+				type="button"
+				@click="mode = 'reallife'"
+				:class="mode === 'reallife' ? 'ring-2 ring-accent bg-accent/5' : 'hover:border-accent/30'"
+				class="card p-5 text-left transition-all cursor-pointer"
+			>
+				<div class="flex items-center gap-2 mb-2">
+					<i class="fa-solid fa-globe text-lg text-accent"></i>
+					<h3 class="text-sm font-semibold text-fg">Sync to Real Life</h3>
+				</div>
+				<p class="text-xs text-fg-secondary">
+					Gregorian calendar synced to real-world dates and your timezone.
+					Schedule sessions, track RSVPs.
 				</p>
+			</button>
+			<!-- Custom Fantasy -->
+			<button
+				type="button"
+				@click="mode = 'fantasy'"
+				:class="mode === 'fantasy' ? 'ring-2 ring-accent bg-accent/5' : 'hover:border-accent/30'"
+				class="card p-5 text-left transition-all cursor-pointer"
+			>
+				<div class="flex items-center gap-2 mb-2">
+					<i class="fa-solid fa-hat-wizard text-lg text-purple-400"></i>
+					<h3 class="text-sm font-semibold text-fg">New Custom Calendar</h3>
+				</div>
+				<p class="text-xs text-fg-secondary">
+					Build a fantasy calendar from scratch. Custom months, weekdays,
+					moons, seasons, and time system.
+				</p>
+			</button>
+			<!-- Import -->
+			<button
+				@click="mode = 'import'"
+				:class="mode === 'import' ? 'ring-2 ring-accent bg-accent/5' : 'hover:bg-surface-alt/50'"
+				class="card p-5 text-left transition-all"
+			>
+				<div class="flex items-center gap-2 mb-2">
+					<i class="fa-solid fa-file-import text-lg text-accent"></i>
+					<h3 class="text-sm font-semibold text-fg">Import Calendar</h3>
+				</div>
+				<p class="text-xs text-fg-secondary">
+					Import from Simple Calendar, Calendaria (Foundry VTT), Fantasy-Calendar, or Chronicle.
+				</p>
+			</button>
+		</div>
+		<!-- Real Life form -->
+		<div x-show="mode === 'reallife'" x-transition x-cloak class="card p-6 space-y-4">
+			<h2 class="text-base font-semibold text-fg">Sync to Real Life</h2>
+			<p class="text-xs text-fg-secondary">
+				Uses the Gregorian calendar with real-world dates. Events will use your timezone.
+				You can still add moons and seasons for flavor.
+			</p>
+			<form
+				method="POST"
+				action={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar", cc.Campaign.ID)) }
+				class="space-y-4"
+			>
+				<input type="hidden" name="csrf_token" value={ csrfToken }/>
+				<input type="hidden" name="mode" value="reallife"/>
+				<div>
+					<label class="block text-sm font-medium text-fg-body mb-1">Calendar Name</label>
+					<input type="text" name="name" value="Session Calendar" class="input w-full"/>
+				</div>
+				<button type="submit" class="btn-primary w-full">
+					<i class="fa-solid fa-globe mr-2"></i> Create Real-Life Calendar
+				</button>
+			</form>
+		</div>
+		<!-- Fantasy form -->
+		<div x-show="mode === 'fantasy'" x-transition x-cloak class="card p-6 space-y-4">
+			<h2 class="text-base font-semibold text-fg">New Custom Calendar</h2>
+			<p class="text-xs text-fg-secondary">
+				Create a fully custom fantasy calendar. You can configure months, weekdays,
+				moons, and seasons after creation.
+			</p>
+			<form
+				method="POST"
+				action={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar", cc.Campaign.ID)) }
+				class="space-y-4"
+			>
+				<input type="hidden" name="csrf_token" value={ csrfToken }/>
+				<input type="hidden" name="mode" value="fantasy"/>
+				<div>
+					<label class="block text-sm font-medium text-fg-body mb-1">Calendar Name</label>
+					<input type="text" name="name" value="Campaign Calendar" class="input w-full" placeholder="e.g. The Reckoning of Ages"/>
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-fg-body mb-1">Epoch / Era Name</label>
+					<input type="text" name="epoch_name" class="input w-full" placeholder="e.g. DR, Age of Fire, Third Era"/>
+					<p class="text-xs text-fg-muted mt-1">Optional. Displayed after the year (e.g. "1492 DR").</p>
+				</div>
+				<div>
+					<label class="block text-sm font-medium text-fg-body mb-1">Starting Year</label>
+					<input type="number" name="start_year" value="1" class="input w-full"/>
+				</div>
+				<button type="submit" class="btn-primary w-full">
+					<i class="fa-solid fa-hat-wizard mr-2"></i> Create Fantasy Calendar
+				</button>
+				<!-- Post-creation setup guidance -->
+				<div class="bg-surface-alt/50 rounded-lg p-3 space-y-1.5">
+					<p class="text-xs font-medium text-fg-secondary">After creation, customize in Settings:</p>
+					<div class="grid grid-cols-2 gap-1 text-[11px] text-fg-muted">
+						<span><i class="fa-solid fa-calendar text-accent/60 mr-1"></i> Months &amp; days</span>
+						<span><i class="fa-solid fa-calendar-week text-accent/60 mr-1"></i> Weekday names</span>
+						<span><i class="fa-solid fa-moon text-accent/60 mr-1"></i> Moons &amp; phases</span>
+						<span><i class="fa-solid fa-leaf text-accent/60 mr-1"></i> Seasons &amp; weather</span>
+						<span><i class="fa-solid fa-landmark text-accent/60 mr-1"></i> Eras &amp; ages</span>
+						<span><i class="fa-solid fa-gear text-accent/60 mr-1"></i> Time &amp; leap years</span>
+					</div>
+				</div>
+			</form>
+		</div>
+		<!-- Import form -->
+		<div x-show="mode === 'import'" x-transition x-cloak class="card p-6 space-y-4">
+			<h2 class="text-base font-semibold text-fg">Import Calendar</h2>
+			<p class="text-xs text-fg-secondary">
+				Upload a JSON file exported from Simple Calendar, Calendaria, Fantasy-Calendar.com,
+				or another Chronicle instance. The file will be auto-detected and imported.
+			</p>
+			<form
+				method="POST"
+				action={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar/import-setup", cc.Campaign.ID)) }
+				enctype="multipart/form-data"
+				class="space-y-4"
+			>
+				<input type="hidden" name="csrf_token" value={ csrfToken }/>
+				<div>
+					<label class="block text-sm font-medium text-fg-body mb-1">Calendar File (JSON)</label>
+					<input
+						type="file"
+						name="file"
+						accept=".json,application/json"
+						required
+						class="block w-full text-sm text-fg-secondary file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-accent file:text-white hover:file:bg-accent/80 file:cursor-pointer"
+					/>
+					<p class="text-xs text-fg-muted mt-1">
+						Max 10MB. Supported formats: Simple Calendar (.json), Calendaria (.json),
+						Fantasy-Calendar.com (.json), Chronicle export (.json).
+					</p>
+				</div>
+				<button type="submit" class="btn-primary w-full">
+					<i class="fa-solid fa-file-import mr-2"></i> Import Calendar
+				</button>
+			</form>
+			<!-- Supported format details -->
+			<div class="bg-surface-alt/50 rounded-lg p-3 space-y-1.5">
+				<p class="text-xs font-medium text-fg-secondary">Supported formats:</p>
+				<div class="grid grid-cols-2 gap-1 text-[11px] text-fg-muted">
+					<span><i class="fa-solid fa-dice-d20 text-accent/60 mr-1"></i> Simple Calendar (Foundry VTT)</span>
+					<span><i class="fa-solid fa-calendar-alt text-accent/60 mr-1"></i> Calendaria (Foundry VTT)</span>
+					<span><i class="fa-solid fa-globe text-accent/60 mr-1"></i> Fantasy-Calendar.com</span>
+					<span><i class="fa-solid fa-download text-accent/60 mr-1"></i> Chronicle Export</span>
+				</div>
 			</div>
-		</form>
+		</div>
 	</div>
 }
 
@@ -128,13 +260,27 @@ templ calendarHeader(cc *campaigns.CampaignContext, data CalendarViewData) {
 						{ " " + *data.Calendar.EpochName }
 					}
 				</h1>
-				<!-- Season indicator -->
-				if season := data.CurrentSeason(1); season != nil {
-					<p class="text-xs text-fg-muted">
-						<span class="inline-block w-2 h-2 rounded-full mr-1" style={ fmt.Sprintf("background:%s", season.Color) }></span>
-						{ season.Name }
-					</p>
-				}
+				<div class="flex items-center gap-3">
+					<!-- Current time -->
+					<span class="text-xs text-fg-secondary">{ data.Calendar.FormatCurrentTime() }</span>
+					<!-- Season indicator -->
+					if season := data.CurrentSeason(1); season != nil {
+						<span class="text-xs text-fg-muted">
+							<span class="inline-block w-2 h-2 rounded-full mr-1" style={ fmt.Sprintf("background:%s", season.Color) }></span>
+							{ season.Name }
+							if season.WeatherEffect != nil && *season.WeatherEffect != "" {
+								<span class="text-fg-muted"> &middot; { *season.WeatherEffect }</span>
+							}
+						</span>
+					}
+					<!-- Era indicator -->
+					if era := data.Calendar.EraForYear(data.Year); era != nil {
+						<span class="text-xs" style={ fmt.Sprintf("color:%s", era.Color) }>
+							<i class="fa-solid fa-landmark mr-0.5 text-[10px]"></i>
+							{ era.Name }
+						</span>
+					}
+				</div>
 			</div>
 		</div>
 		<div class="flex items-center gap-3">
@@ -272,15 +418,24 @@ templ dayCell(data CalendarViewData, day int) {
 					data-event-id={ evt.ID }
 					data-event-name={ evt.Name }
 					data-event-description={ derefStr(evt.Description) }
+					data-event-description-html={ derefStr(evt.DescriptionHTML) }
 					data-event-year={ strconv.Itoa(evt.Year) }
 					data-event-month={ strconv.Itoa(evt.Month) }
 					data-event-day={ strconv.Itoa(evt.Day) }
+					data-event-start-hour={ derefInt(evt.StartHour) }
+					data-event-start-minute={ derefInt(evt.StartMinute) }
+					data-event-end-hour={ derefInt(evt.EndHour) }
+					data-event-end-minute={ derefInt(evt.EndMinute) }
 					data-event-visibility={ evt.Visibility }
 					data-event-category={ derefStr(evt.Category) }
 					data-event-recurring={ strconv.FormatBool(evt.IsRecurring) }
 					data-event-entity-id={ derefStr(evt.EntityID) }
 					onclick="openEditEventModal(this)"
 				>
+					if evt.HasTime() {
+						<span class="opacity-60">{ evt.FormatTime() }</span>
+						{ " " }
+					}
 					if evt.EntityID != nil && evt.EntityIcon != "" {
 						<i class={ "fa-solid " + evt.EntityIcon, "mr-0.5" } style={ fmt.Sprintf("color:%s", evt.EntityColor) }></i>
 					}
@@ -299,6 +454,10 @@ templ dayCell(data CalendarViewData, day int) {
 					}
 					title={ eventTooltip(evt) }
 				>
+					if evt.HasTime() {
+						<span class="opacity-60">{ evt.FormatTime() }</span>
+						{ " " }
+					}
 					if evt.EntityID != nil && evt.EntityIcon != "" {
 						<i class={ "fa-solid " + evt.EntityIcon, "mr-0.5" } style={ fmt.Sprintf("color:%s", evt.EntityColor) }></i>
 					}
@@ -322,7 +481,7 @@ templ eventModal(data CalendarViewData) {
 		class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50"
 		onclick="if(event.target===this)closeEventModal()"
 	>
-		<div class="card p-6 w-full max-w-md space-y-4">
+		<div class="card p-6 w-full max-w-lg space-y-4">
 			<div class="flex items-center justify-between">
 				<h2 id="evt-modal-title" class="text-lg font-semibold text-fg">New Event</h2>
 				<button class="text-fg-muted hover:text-fg" onclick="closeEventModal()">
@@ -337,7 +496,7 @@ templ eventModal(data CalendarViewData) {
 				</div>
 				<div>
 					<label class="block text-xs font-medium text-fg-body mb-1">Description</label>
-					<textarea name="description" id="evt-description" class="input w-full" rows="2" placeholder="Optional description"></textarea>
+					<div id="evt-description-editor" class="input w-full min-h-[80px] max-h-[200px] overflow-y-auto !p-0"></div>
 				</div>
 				<div class="grid grid-cols-3 gap-2">
 					<div>
@@ -351,6 +510,32 @@ templ eventModal(data CalendarViewData) {
 					<div>
 						<label class="block text-xs font-medium text-fg-body mb-1">Day</label>
 						<input type="number" name="day" id="evt-day" class="input w-full" value="1"/>
+					</div>
+				</div>
+				<!-- Optional event time -->
+				<div x-data="{ hasTime: false }" x-init="hasTime = document.getElementById('evt-start-hour').value !== ''">
+					<label class="flex items-center gap-2 text-xs text-fg-body mb-2 cursor-pointer">
+						<input type="checkbox" x-model="hasTime" class="rounded" id="evt-has-time"
+							@change="if(!hasTime){document.getElementById('evt-start-hour').value='';document.getElementById('evt-start-minute').value='';document.getElementById('evt-end-hour').value='';document.getElementById('evt-end-minute').value=''}"/>
+						Set specific time
+					</label>
+					<div x-show="hasTime" x-transition class="grid grid-cols-2 gap-2">
+						<div>
+							<label class="block text-[10px] text-fg-secondary mb-0.5">Start Time</label>
+							<div class="flex items-center gap-1">
+								<input type="number" name="start_hour" id="evt-start-hour" class="input w-full text-sm" min="0" placeholder="HH"/>
+								<span class="text-fg-muted">:</span>
+								<input type="number" name="start_minute" id="evt-start-minute" class="input w-full text-sm" min="0" placeholder="MM"/>
+							</div>
+						</div>
+						<div>
+							<label class="block text-[10px] text-fg-secondary mb-0.5">End Time (optional)</label>
+							<div class="flex items-center gap-1">
+								<input type="number" name="end_hour" id="evt-end-hour" class="input w-full text-sm" min="0" placeholder="HH"/>
+								<span class="text-fg-muted">:</span>
+								<input type="number" name="end_minute" id="evt-end-minute" class="input w-full text-sm" min="0" placeholder="MM"/>
+							</div>
+						</div>
 					</div>
 				</div>
 				<div class="grid grid-cols-2 gap-2">
@@ -432,6 +617,94 @@ templ eventModal(data CalendarViewData) {
 					var form = document.getElementById('event-form');
 					var campaignID = window.location.pathname.split('/')[2];
 
+					// --- TipTap rich text editor for event descriptions ---
+					var evtEditor = null;
+					var mentionExt = null;
+
+					function initEventEditor() {
+						if (evtEditor) return;
+						if (!window.TipTap) return;
+						var el = document.getElementById('evt-description-editor');
+						if (!el) return;
+
+						var extensions = [
+							TipTap.StarterKit.configure({
+								heading: false,
+								link: false,
+								underline: false,
+							}),
+							TipTap.Placeholder.configure({
+								placeholder: 'Optional description (supports @mentions)...',
+							}),
+							TipTap.Link.configure({
+								openOnClick: false,
+								HTMLAttributes: { class: 'text-accent hover:underline' },
+							}),
+							TipTap.Underline,
+						];
+
+						if (window.Chronicle && Chronicle.SecretMark) {
+							extensions.push(Chronicle.SecretMark);
+						}
+
+						var mentionExtRef = { current: null };
+						var editorProps = {
+							attributes: {
+								class: 'prose prose-sm max-w-none focus:outline-none min-h-[60px] p-2 text-fg-body text-sm',
+							},
+						};
+
+						if (campaignID && window.Chronicle && Chronicle.MentionExtension) {
+							editorProps.handleKeyDown = function(view, event) {
+								if (mentionExtRef.current) return mentionExtRef.current.onKeyDown(null, event);
+								return false;
+							};
+						}
+
+						evtEditor = new TipTap.Editor({
+							element: el,
+							extensions: extensions,
+							editable: true,
+							content: '',
+							editorProps: editorProps,
+						});
+
+						if (campaignID && window.Chronicle && Chronicle.MentionExtension) {
+							mentionExt = Chronicle.MentionExtension({ campaignId: campaignID });
+							mentionExt.onCreate(evtEditor);
+							mentionExtRef.current = mentionExt;
+							evtEditor.on('update', function() { mentionExt.onUpdate(evtEditor); });
+							evtEditor.on('selectionUpdate', function() { mentionExt.onUpdate(evtEditor); });
+						}
+					}
+
+					function setEditorContent(data) {
+						if (!evtEditor) return;
+						if (!data) { evtEditor.commands.setContent(''); return; }
+						try {
+							var parsed = JSON.parse(data);
+							if (parsed && parsed.type === 'doc') {
+								evtEditor.commands.setContent(parsed);
+							} else {
+								evtEditor.commands.setContent(data);
+							}
+						} catch (e) {
+							// Plain text fallback (legacy events).
+							evtEditor.commands.setContent('<p>' + data.replace(/\n/g, '</p><p>') + '</p>');
+						}
+					}
+
+					function getEditorDescription() {
+						if (!evtEditor) return { description: null, description_html: null };
+						var html = evtEditor.getHTML();
+						if (!html || html === '<p></p>') return { description: null, description_html: null };
+						var json = evtEditor.getJSON();
+						return {
+							description: JSON.stringify(json),
+							description_html: html,
+						};
+					}
+
 					function getHeaders() {
 						var csrfMeta = document.querySelector('meta[name="csrf-token"]');
 						var headers = { 'Content-Type': 'application/json' };
@@ -456,12 +729,25 @@ templ eventModal(data CalendarViewData) {
 							is_recurring: fd.has('is_recurring'),
 							recurrence_type: fd.has('is_recurring') ? 'yearly' : null,
 						};
-						var desc = fd.get('description');
-						if (desc) body.description = desc;
+						// Rich text description from TipTap editor.
+						var desc = getEditorDescription();
+						if (desc.description) {
+							body.description = desc.description;
+							body.description_html = desc.description_html;
+						}
 						var cat = fd.get('category');
 						if (cat) body.category = cat;
 						var eid = fd.get('entity_id');
 						if (eid) body.entity_id = eid;
+						// Time fields (nullable — only set if the user enabled time).
+						var sh = fd.get('start_hour');
+						var sm = fd.get('start_minute');
+						if (sh !== '' && sh !== null) body.start_hour = parseInt(sh);
+						if (sm !== '' && sm !== null) body.start_minute = parseInt(sm);
+						var eh = fd.get('end_hour');
+						var em = fd.get('end_minute');
+						if (eh !== '' && eh !== null) body.end_hour = parseInt(eh);
+						if (em !== '' && em !== null) body.end_minute = parseInt(em);
 
 						var eventID = fd.get('event_id');
 						var url, method;
@@ -492,6 +778,7 @@ templ eventModal(data CalendarViewData) {
 					// Open modal in create mode with a pre-set date.
 					window.openEventModal = function(year, month, day) {
 						resetEventModal();
+						initEventEditor();
 						document.getElementById('evt-year').value = year;
 						document.getElementById('evt-month').value = month;
 						document.getElementById('evt-day').value = day;
@@ -501,9 +788,11 @@ templ eventModal(data CalendarViewData) {
 					// Open modal in edit mode, reading data-event-* attributes from the chip.
 					window.openEditEventModal = function(el) {
 						resetEventModal();
+						initEventEditor();
 						document.getElementById('evt-id').value = el.dataset.eventId;
 						document.getElementById('evt-name').value = el.dataset.eventName || '';
-						document.getElementById('evt-description').value = el.dataset.eventDescription || '';
+						// Load description into TipTap editor.
+						setEditorContent(el.dataset.eventDescription || '');
 						document.getElementById('evt-year').value = el.dataset.eventYear || '';
 						document.getElementById('evt-month').value = el.dataset.eventMonth || '';
 						document.getElementById('evt-day').value = el.dataset.eventDay || '';
@@ -511,6 +800,17 @@ templ eventModal(data CalendarViewData) {
 						document.getElementById('evt-category').value = el.dataset.eventCategory || '';
 						document.getElementById('evt-recurring').checked = el.dataset.eventRecurring === 'true';
 						document.getElementById('evt-entity-id').value = el.dataset.eventEntityId || '';
+						// Restore time fields if the event has a specific time.
+						document.getElementById('evt-start-hour').value = el.dataset.eventStartHour || '';
+						document.getElementById('evt-start-minute').value = el.dataset.eventStartMinute || '';
+						document.getElementById('evt-end-hour').value = el.dataset.eventEndHour || '';
+						document.getElementById('evt-end-minute').value = el.dataset.eventEndMinute || '';
+						// Toggle the "has time" checkbox via Alpine.
+						var hasTimeCheckbox = document.getElementById('evt-has-time');
+						if (el.dataset.eventStartHour) {
+							hasTimeCheckbox.checked = true;
+							hasTimeCheckbox.dispatchEvent(new Event('change'));
+						}
 
 						// Switch to edit mode UI.
 						document.getElementById('evt-modal-title').textContent = 'Edit Event';
@@ -531,6 +831,15 @@ templ eventModal(data CalendarViewData) {
 					function resetEventModal() {
 						form.reset();
 						document.getElementById('evt-id').value = '';
+						// Clear TipTap editor content.
+						if (evtEditor) evtEditor.commands.setContent('');
+						// Clear time fields.
+						document.getElementById('evt-start-hour').value = '';
+						document.getElementById('evt-start-minute').value = '';
+						document.getElementById('evt-end-hour').value = '';
+						document.getElementById('evt-end-minute').value = '';
+						var hasTimeCheckbox = document.getElementById('evt-has-time');
+						if (hasTimeCheckbox) { hasTimeCheckbox.checked = false; hasTimeCheckbox.dispatchEvent(new Event('change')); }
 						document.getElementById('evt-modal-title').textContent = 'New Event';
 						document.getElementById('evt-submit-icon').className = 'fa-solid fa-plus mr-1';
 						document.getElementById('evt-submit-text').textContent = 'Create Event';
@@ -599,9 +908,14 @@ templ EntityEventsSection(cc *campaigns.CampaignContext, cal *Calendar, events [
 							<span class="text-[10px] text-fg-muted">(yearly)</span>
 						}
 					</div>
-					<span class="text-xs text-fg-secondary whitespace-nowrap ml-2">
-						{ formatEventDate(cal, evt) }
-					</span>
+					<div class="text-right shrink-0 ml-2">
+						<span class="text-xs text-fg-secondary whitespace-nowrap">
+							{ formatEventDate(cal, evt) }
+						</span>
+						if evt.HasTime() {
+							<span class="text-[10px] text-fg-muted ml-1">{ evt.FormatTimeRange() }</span>
+						}
+					</div>
 				</a>
 			}
 		</div>
@@ -690,11 +1004,14 @@ func seasonBorderStyle(s *Season) string {
 // eventTooltip builds a tooltip string for an event chip.
 func eventTooltip(evt Event) string {
 	tip := evt.Name
-	if evt.EntityName != "" {
-		tip += " (" + evt.EntityName + ")"
+	if tr := evt.FormatTimeRange(); tr != "" {
+		tip += " (" + tr + ")"
 	}
-	if evt.Description != nil && *evt.Description != "" {
-		tip += "\n" + *evt.Description
+	if evt.EntityName != "" {
+		tip += " — " + evt.EntityName
+	}
+	if plain := evt.PlainDescription(); plain != "" {
+		tip += "\n" + plain
 	}
 	if evt.IsRecurring {
 		tip += " [recurring]"
@@ -705,6 +1022,28 @@ func eventTooltip(evt Event) string {
 // UpcomingEventsBlock renders the upcoming events list for the dashboard block.
 // Returned as an HTMX fragment that replaces the loading placeholder.
 templ UpcomingEventsBlock(cc *campaigns.CampaignContext, cal *Calendar, events []Event) {
+	<!-- Current date and time display (always shown) -->
+	<div class="px-4 py-2 bg-surface-alt/50 flex items-center justify-between">
+		<span class="text-xs text-fg-muted">
+			{ formatCurrentDate(cal) }
+			{ " " }
+			<span class="text-fg-secondary">{ cal.FormatCurrentTime() }</span>
+		</span>
+		if cal.CurrentSeason() != nil {
+			<span class="text-xs text-fg-muted">
+				<span class="inline-block w-2 h-2 rounded-full mr-0.5" style={ fmt.Sprintf("background:%s", cal.CurrentSeason().Color) }></span>
+				{ cal.CurrentSeason().Name }
+				if cal.CurrentSeason().WeatherEffect != nil && *cal.CurrentSeason().WeatherEffect != "" {
+					<span class="text-fg-muted"> &middot; { *cal.CurrentSeason().WeatherEffect }</span>
+				}
+			</span>
+		}
+	</div>
+	if era := cal.CurrentEra(); era != nil {
+		<div class="px-4 py-1 text-[10px]" style={ fmt.Sprintf("color:%s", era.Color) }>
+			<i class="fa-solid fa-landmark mr-0.5"></i> { era.Name }
+		</div>
+	}
 	if len(events) == 0 {
 		<div class="px-4 py-6 text-center">
 			<p class="text-sm text-fg-muted">No upcoming events</p>
@@ -716,18 +1055,6 @@ templ UpcomingEventsBlock(cc *campaigns.CampaignContext, cal *Calendar, events [
 			</a>
 		</div>
 	} else {
-		<!-- Current date display -->
-		<div class="px-4 py-2 bg-surface-alt/50 flex items-center justify-between">
-			<span class="text-xs text-fg-muted">
-				{ formatCurrentDate(cal) }
-			</span>
-			if cal.CurrentSeason() != nil {
-				<span class="text-xs text-fg-muted">
-					<span class="inline-block w-2 h-2 rounded-full mr-0.5" style={ fmt.Sprintf("background:%s", cal.CurrentSeason().Color) }></span>
-					{ cal.CurrentSeason().Name }
-				</span>
-			}
-		</div>
 		for _, evt := range events {
 			<a
 				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar?year=%d&month=%d", cc.Campaign.ID, evt.Year, evt.Month)) }
@@ -796,6 +1123,11 @@ templ timelineContent(cc *campaigns.CampaignContext, data TimelineViewData) {
 					{ " " + *data.Calendar.EpochName }
 				}
 			</h1>
+			if era := data.Calendar.EraForYear(data.Year); era != nil {
+				<span class="text-xs font-medium px-2 py-0.5 rounded-full" style={ fmt.Sprintf("background:%s20;color:%s", era.Color, era.Color) }>
+					<i class="fa-solid fa-landmark mr-0.5 text-[9px]"></i> { era.Name }
+				</span>
+			}
 			<a
 				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar/timeline?year=%d", data.CampaignID, data.Year+1)) }
 				class="p-2 rounded-md hover:bg-surface-alt text-fg-secondary hover:text-fg transition-colors"
@@ -874,6 +1206,9 @@ templ timelineEvent(cc *campaigns.CampaignContext, cal *Calendar, evt Event) {
 					if evt.Category != nil && *evt.Category != "" {
 						<span class="text-sm opacity-60">{ categoryIcon(*evt.Category) }</span>
 					}
+					if evt.HasTime() {
+						<span class="text-xs text-fg-secondary">{ evt.FormatTimeRange() }</span>
+					}
 					<span class="text-sm font-medium text-fg">{ evt.Name }</span>
 					if evt.IsRecurring {
 						<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-accent/10 text-accent">yearly</span>
@@ -882,7 +1217,11 @@ templ timelineEvent(cc *campaigns.CampaignContext, cal *Calendar, evt Event) {
 						<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400">DM only</span>
 					}
 				</div>
-				if evt.Description != nil && *evt.Description != "" {
+				if evt.HasRichText() {
+					<div class="prose prose-sm max-w-none text-xs text-fg-secondary mt-1">
+						@templ.Raw(*evt.DescriptionHTML)
+					</div>
+				} else if evt.Description != nil && *evt.Description != "" {
 					<p class="text-xs text-fg-secondary mt-1">{ *evt.Description }</p>
 				}
 				if evt.EntityID != nil && evt.EntityName != "" {
@@ -917,6 +1256,14 @@ func derefStr(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// derefInt safely dereferences a *int, returning "" for nil.
+func derefInt(i *int) string {
+	if i == nil {
+		return ""
+	}
+	return strconv.Itoa(*i)
 }
 
 // formatCurrentDate returns a formatted string of the calendar's current date.

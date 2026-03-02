@@ -8,11 +8,11 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-01 -- Fixed entity page 500 error caused by `scanEntity` column count
-mismatch: `popup_config` was selected in the SQL query but missing from the
-`row.Scan()` call, causing "expected 22 destination arguments in Scan, not 21"
-on every FindByID/FindBySlug. Also fixed: migration ENUM crash (000027/000029),
-calendar HTMX lazy-load auth mismatch, error handler silent 500s.
+2026-03-01 -- Rich text event descriptions with @mentions (Sprint 10). Added TipTap
+rich text editor to event create/edit modal with @mention entity search support. Dual
+storage: ProseMirror JSON in `description`, sanitized HTML in `description_html` (new
+column via migration 000034). Timeline renders rich HTML descriptions. Legacy plain text
+events handled gracefully. Calendar V2 plan (Sprints 5-10) is now fully complete.
 
 ## Current Phase
 **Phase H: Secrets & Permissions.** Inline secrets complete. Documentation audit
@@ -324,6 +324,163 @@ complete. Next: per-entity permissions, campaign export/import, or Maps Phase 2.
 - **Files**: `calendar/routes.go`, `campaigns/customize.templ`, `entities/show.templ`,
   `entities/category_blocks.templ`, `entities/entity_type_config.templ`,
   `static/js/widgets/template_editor.js`.
+
+### Calendar Plugin Sprint 5 — Time System — COMPLETE
+- **Migration 000030**: Added time columns to `calendars` (hours_per_day, minutes_per_hour,
+  seconds_per_minute, current_hour, current_minute) and `calendar_events` (start_hour,
+  start_minute, end_hour, end_minute). All nullable/defaulted for backwards compatibility.
+- **Model**: Calendar gets HoursPerDay, MinutesPerHour, SecondsPerMinute, CurrentHour,
+  CurrentMinute fields. Event gets StartHour, StartMinute, EndHour, EndMinute (*int, nullable).
+  Helper methods: FormatCurrentTime(), HasTime(), FormatTime(), FormatEndTime(),
+  FormatTimeRange(), IsMultiDay(). All DTOs updated with time fields.
+- **Repository**: All scan/insert/update queries updated for new columns. Event listing
+  now sorts by date AND time (COALESCE for null time = sort last).
+- **Service**: AdvanceTime() method with minute→hour→day rollover. CreateCalendar defaults
+  to 24/60/60 time system. All CRUD methods pass time fields through.
+- **Handler**: AdvanceTimeAPI endpoint (POST /calendar/advance-time). UpdateCalendarAPI,
+  CreateEventAPI, UpdateEventAPI all accept time fields.
+- **Settings UI**: General tab now has Current Hour/Minute inputs, Time System section
+  (hours/day, minutes/hour, seconds/minute). Save button sends all time fields.
+- **Event modal**: "Set specific time" checkbox reveals start/end time picker (hour:minute
+  inputs). Edit mode restores time from data attributes. Reset clears time fields.
+- **Calendar grid**: Event chips show time prefix (e.g. "14:30 Meeting") when HasTime().
+  Data attributes carry time fields for edit roundtrip.
+- **Calendar header**: Shows FormatCurrentTime() next to season indicator.
+- **Dashboard preview**: Shows current time alongside current date.
+- **Timeline view**: Shows FormatTimeRange() on events with times.
+- **Entity events**: Shows time range next to event date.
+- **Sync API**: All event endpoints (create/update) accept time fields. Settings endpoint
+  accepts time system fields. GetCurrentDate returns hour/minute. AdvanceTime endpoint added.
+- **Routes**: advance-time route on both internal and sync API.
+- **Files**: migration 000030, model.go, repository.go, service.go, handler.go, routes.go,
+  calendar.templ, calendar_settings.templ, syncapi/calendar_api_handler.go, syncapi/routes.go.
+
+### Calendar Plugin Sprint 6 — Calendar Modes + Timezone — COMPLETE
+- **Migration 000031**: Added `mode` VARCHAR(20) to calendars (fantasy/reallife),
+  `timezone` VARCHAR(50) to users.
+- **Two calendar modes**: Fantasy (full customization, existing behavior) and Real-Life
+  (Gregorian months/weekdays, synced to wall clock via user timezone).
+- **Model**: `ModeFantasy`/`ModeRealLife` constants, `IsRealLife()` method, `Mode` field
+  on Calendar and CreateCalendarInput.
+- **Repository**: `mode` column in all calendar scan/insert queries.
+- **Service**: Mode validation in CreateCalendar (defaults to "fantasy" if not "reallife").
+- **Handler CreateCalendar**: Mode-aware creation — real-life seeds Gregorian months (correct
+  day counts including Feb 28+1 leap), Gregorian weekdays (Sun–Sat), current date/time from
+  `time.Now().UTC()`, epoch "AD", leap year every 4. Fantasy seeds generic 12×30 months.
+- **Setup page redesign**: Three mode cards (Real Life / Custom Fantasy / Import Coming Soon)
+  with Alpine.js mode selection. Each mode opens its own form with appropriate fields.
+- **Settings page**: Months/Weekdays tabs hidden for real-life mode. Date/time/time-system/
+  leap-year fields hidden for real-life mode. Info box shown instead explaining Gregorian sync.
+- **User timezone**: Added `Timezone *string` to User model. Updated FindByID, FindByEmail,
+  ListUsers to scan timezone. Added `UpdateTimezone` to UserRepository and AuthService.
+  Validates IANA timezone via `time.LoadLocation()`.
+- **Account page**: New `GET /account` settings page with timezone dropdown (curated list
+  of ~65 IANA timezones). `PUT /account/timezone` API for saving. Account link added to
+  app header navigation next to Logout.
+- **Sync API**: GetCurrentDate response includes `mode` field. GetCalendar already returns
+  full struct with mode.
+- **Files**: migration 000031, calendar/model.go, repository.go, service.go, handler.go,
+  calendar.templ, calendar_settings.templ, auth/model.go, auth/repository.go, auth/service.go,
+  auth/handler.go, auth/routes.go, auth/account.templ (new), auth/service_test.go (mock fix),
+  layouts/app.templ (account link), syncapi/calendar_api_handler.go.
+
+### Sessions Plugin (Sprint 7) — COMPLETE
+- **Migration 000032**: `sessions` table (id, campaign_id, name, summary, notes/notes_html,
+  scheduled_date, calendar_year/month/day, status, sort_order, created_by), `session_attendees`
+  table (session_id, user_id, status RSVP, responded_at), `session_entities` table (session_id,
+  entity_id, role). Addon registered as "sessions".
+- **Model**: Session, Attendee, SessionEntity structs with DTOs. Status constants (planned,
+  completed, cancelled). RSVP constants (invited, accepted, declined, tentative). Entity role
+  constants (mentioned, encountered, key).
+- **Repository**: Full CRUD for sessions, attendees (upsert via ON DUPLICATE KEY UPDATE),
+  entity linking. ListByCampaign sorts planned first, then by scheduled_date.
+- **Service**: Validation (name required, max 200 chars), CRUD orchestration, InviteAll for
+  batch attendee invites, UpdateRSVP with status validation, entity linking with role defaults.
+- **Handler**: MemberLister interface for cross-plugin campaign member access. All HTTP handlers
+  with IDOR protection (requireSessionInCampaign). Auto-invites all campaign members on create.
+  HTMX-aware RSVP responses (returns AttendeeList fragment or JSON).
+- **Templates**: Session list page with status grouping (Upcoming/Completed/Cancelled), detail
+  page with attendee list and RSVP buttons (Going/Maybe/Can't), create modal with name/date/summary.
+- **Wiring**: Added to app/routes.go, installedAddons, sidebar nav (dice-d20 icon).
+- **Files**: migration 000032, sessions/model.go, repository.go, service.go, handler.go,
+  routes.go, sessions.templ, sessions/.ai.md (new). Modified: app/routes.go, addons/service.go,
+  layouts/app.templ.
+
+### Eras, Weather & Setup Wizard (Sprint 8) — COMPLETE
+- **Migration 000033**: `calendar_eras` table (name, start_year, end_year, description,
+  color, sort_order). Added `weather_effect` VARCHAR(200) column to `calendar_seasons`.
+- **Model**: Era struct with IsOngoing(), ContainsYear() methods. Calendar.Eras field,
+  Calendar.CurrentEra(), Calendar.EraForYear() helpers. Season.WeatherEffect field.
+  EraInput DTO.
+- **Repository**: SetEras/GetEras (same bulk pattern as other sub-resources). Season
+  scan/insert updated for weather_effect column.
+- **Service**: SetEras validation (name required, end >= start), color defaults.
+  eagerLoad includes eras.
+- **Handler**: UpdateErasAPI (PUT /calendar/eras). CreateCalendar redirects fantasy
+  mode to settings page for immediate customization (real-life still goes to grid).
+- **Templates**: 6th tab "Eras" in settings page (name, start/end year, color,
+  description). Weather effect field added to seasons editor. Era indicator shown in
+  calendar header, timeline header, and dashboard preview (landmark icon + era name
+  with era color). Season weather effect shown alongside season name (middot separator).
+  Enhanced fantasy setup form with post-creation guidance grid showing all customizable
+  features.
+- **Sync API**: Added PUT /api/v1/campaigns/:id/calendar/eras endpoint.
+- **Files**: migration 000033, calendar/model.go, repository.go, service.go, handler.go,
+  routes.go, calendar.templ, calendar_settings.templ, syncapi/calendar_api_handler.go,
+  syncapi/routes.go, calendar/.ai.md.
+
+### Calendar Import/Export (Sprint 9) — COMPLETE
+- **export.go** (NEW): Chronicle native export format (`chronicle-calendar-v1`).
+  `ChronicleExport` envelope with calendar config + optional events. `BuildExport()`
+  constructs export from fully-loaded Calendar struct.
+- **import.go** (NEW): Auto-detection and parsing of 4 calendar JSON formats.
+  `DetectAndParse()` inspects top-level JSON keys: `"format"` for Chronicle,
+  `"calendar"` for Simple Calendar v1, `"exportVersion"+"calendars"` for SC v2,
+  `"static_data"+"dynamic_data"` for Fantasy-Calendar, `"days.hoursPerDay"` or
+  months-as-object for Calendaria. Format-specific parsers handle: 0-indexed→1-indexed
+  conversion (SC), localization key stripping (Calendaria), day-of-year→month+day
+  conversion (Calendaria seasons), `{values: {...}}` nesting (Calendaria), SC v1
+  legacy field aliases, leap day accumulation (Fantasy-Calendar).
+- **service.go**: Added `ApplyImport()` (destructive replacement of all sub-resources)
+  and `ListAllEvents()` (owner-visibility for export).
+- **handler.go**: 4 new handlers: `ExportCalendarAPI` (GET, JSON download),
+  `ImportCalendarAPI` (POST, multipart or JSON, 10MB limit, preview mode),
+  `ImportPreviewAPI` (POST, preview without applying), `ImportFromSetupAPI` (POST,
+  creates new calendar + applies import + auto-enables addon).
+- **routes.go**: 4 new routes (all Owner only).
+- **syncapi**: `ExportCalendar` and `ImportCalendar` methods on CalendarAPIHandler.
+  Routes: `GET /calendar/export` (read), `POST /calendar/import` (write).
+- **calendar.templ**: Setup page import card now functional with file upload form
+  (multipart, CSRF, supported formats list).
+- **calendar_settings.templ**: Export download button in settings header.
+
+### Rich Text Event Descriptions (Sprint 10) — COMPLETE
+- **Migration 000034**: `ALTER TABLE calendar_events ADD COLUMN description_html TEXT`
+- **model.go**: Added `DescriptionHTML *string` to Event struct and input DTOs.
+  Added `HasRichText()` and `PlainDescription()` helper methods.
+- **repository.go**: Updated eventCols, scanEvents, CreateEvent, UpdateEvent to
+  include description_html column.
+- **service.go**: Added `sanitize.HTML()` call in CreateEvent and UpdateEvent for
+  rich text HTML. Imported sanitize package.
+- **handler.go**: Both CreateEventAPI and UpdateEventAPI accept `description_html` in
+  JSON request bodies.
+- **syncapi/calendar_api_handler.go**: Both apiCreateEventRequest and
+  apiUpdateEventRequest accept `description_html`.
+- **export.go**: ExportEvent includes `description_html` for round-trip fidelity.
+- **calendar.templ**: Replaced textarea with inline TipTap editor in event modal.
+  Editor supports @mentions via Chronicle.MentionExtension. Editor initialized lazily
+  on modal open, content stored as ProseMirror JSON + rendered HTML. Modal widened to
+  max-w-lg. Timeline renders rich HTML via `templ.Raw()` with plain text fallback.
+  Tooltip uses PlainDescription() for clean display.
+
+### Calendar V2 Plan — FULLY COMPLETE
+All 6 sprints (5-10) are complete:
+- Sprint 5: Time System
+- Sprint 6: Calendar Modes + Timezone
+- Sprint 7: Session Scheduling + RSVP
+- Sprint 8: Eras, Weather & Setup Wizard
+- Sprint 9: Calendar Import/Export
+- Sprint 10: Rich Text Event Descriptions + @Mentions
 
 ### In Progress
 - Nothing currently in progress.
