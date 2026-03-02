@@ -559,6 +559,27 @@ All 6 sprints (5-10) are complete:
   (event picker modal, header buttons), app/routes.go (calendarEventListerAdapter),
   .ai.md (updated routes/docs).
 
+### Timeline Plugin Sprint 3 — D3.js Interactive Visualization — COMPLETE
+- **D3.js loaded per-page**: CDN-loaded D3 v7 on timeline show pages only (matching
+  Leaflet per-page pattern from maps plugin). No bundle bloat for other pages.
+- **timeline_viz.js widget**: Self-contained Chronicle widget (`data-widget="timeline-viz"`)
+  that renders an interactive SVG timeline:
+  - Horizontal time axis with year-level default zoom
+  - Event markers positioned by fractional year (year + month/12 + day/365)
+  - d3.zoom for pan/drag/scroll-zoom (horizontal only)
+  - Color-coded events (per-link color_override or timeline default)
+  - Entity group swim-lanes with alternating background bands
+  - Tooltips on hover (name, date, entity, category, description excerpt)
+  - Event labels shown/hidden based on zoom level
+- **Toolbar**: Zoom in/out buttons, zoom-fit (all events), zoom level indicator
+  (Era/Century/Decade/Year/Month/Day), skip-to-year input.
+- **CSS**: Full dark-theme styling in input.css (toolbar, SVG elements, tooltip,
+  empty state). Uses CSS custom properties matching Chronicle's theme system.
+- **Template changes**: Static event list replaced with D3 widget mount point.
+  Event list preserved as collapsible `<details>` section below visualization.
+- **Files**: static/js/widgets/timeline_viz.js (new), static/css/input.css
+  (timeline-viz styles), timeline.templ (D3 script tags, widget mount, collapsible list).
+
 ### In Progress
 - Nothing currently in progress.
 
@@ -581,9 +602,10 @@ LegendKeeper. Key findings:
   H (secrets) → I (integrations) → J (visualization) → K (delight)
 
 ## Next Session Should
-1. **Timeline Sprint 3:** Interactive D3.js visualization (vendor D3, timeline.js widget,
-   year-level zoom, pan/drag, tooltips, JSON data endpoint).
-2. **Timeline Sprint 4:** Zoom levels and search (era→day, skip-to-date, filter).
+1. **Timeline Sprint 4:** Zoom levels and search (era→day visual styles, skip-to-date,
+   search/filter bar for events).
+2. **Timeline Sprint 5:** Entity groups and swim-lanes (group CRUD, member management,
+   swim-lane visualization in D3 widget).
 3. **Phase H continued:** Per-entity permissions, group-based visibility.
 4. **Maps Phase 2 (optional):** Layers, marker groups, nested maps, fog of war.
 4. **Handler-level "view as player":** Extend toggle to filter is_private entities

@@ -190,9 +190,11 @@ templ TimelineShowFragment(cc *campaigns.CampaignContext, data TimelineViewData)
 	@timelineShowContent(cc, data)
 }
 
-// timelineShowContent renders the timeline detail page with event list.
-// Sprint 1: Static event list. Sprint 3 will replace with D3.js visualization.
+// timelineShowContent renders the timeline detail page with D3.js visualization.
 templ timelineShowContent(cc *campaigns.CampaignContext, data TimelineViewData) {
+	<!-- D3.js (loaded only on timeline detail pages) -->
+	<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+	<script src="/static/js/widgets/timeline_viz.js"></script>
 	<div class="max-w-5xl mx-auto py-6 px-4">
 		<!-- Header -->
 		<div class="flex items-center justify-between mb-6">
@@ -260,20 +262,29 @@ templ timelineShowContent(cc *campaigns.CampaignContext, data TimelineViewData) 
 				<span>This timeline is only visible to the DM</span>
 			</div>
 		}
-		<!-- Event List (Sprint 1: static list, Sprint 3: D3.js visualization) -->
-		<div class="space-y-3">
-			if len(data.Events) > 0 {
-				for _, el := range data.Events {
-					@timelineEventCard(data, el)
-				}
-			} else {
-				<div class="card p-8 text-center">
-					<i class="fa-solid fa-calendar-plus text-3xl text-fg-muted mb-3"></i>
-					<p class="text-fg-secondary text-sm">No events linked yet.</p>
-					<p class="text-xs text-fg-muted mt-1">Link calendar events to build your timeline.</p>
+		<!-- D3.js Interactive Timeline Visualization -->
+		<div
+			data-widget="timeline-viz"
+			data-campaign-id={ data.CampaignID }
+			data-timeline-id={ data.Timeline.ID }
+			data-timeline-color={ data.Timeline.Color }
+			data-api-url={ fmt.Sprintf("/campaigns/%s/timelines/%s/data", data.CampaignID, data.Timeline.ID) }
+			style="min-height: 300px"
+			class="mb-6"
+		></div>
+		<!-- Event List (collapsed by default, toggleable) -->
+		if len(data.Events) > 0 {
+			<details class="mt-4">
+				<summary class="text-sm font-medium text-fg-secondary cursor-pointer hover:text-fg transition-colors mb-3">
+					<i class="fa-solid fa-list mr-1"></i> Event List ({ fmt.Sprintf("%d", len(data.Events)) })
+				</summary>
+				<div class="space-y-3">
+					for _, el := range data.Events {
+						@timelineEventCard(data, el)
+					}
 				</div>
-			}
-		</div>
+			</details>
+		}
 		if data.IsScribe {
 			@eventPickerModal(data)
 		}
