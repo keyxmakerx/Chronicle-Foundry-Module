@@ -2,14 +2,21 @@
  * timeline_viz.js -- D3.js Interactive Timeline Visualization Widget
  *
  * Renders an interactive SVG timeline with:
- *   - Horizontal time axis (year-level default zoom)
- *   - Event markers positioned by date (year, month, day)
- *   - Pan/drag via d3.zoom
- *   - Zoom in/out with mouse wheel and toolbar buttons
+ *   - Horizontal time axis with 6 zoom levels (era→day)
+ *   - Event markers with zoom-level-dependent visual styles
+ *   - Pan/drag via d3.zoom, scroll wheel zoom
  *   - Tooltips on hover (event name, date, entity, category)
  *   - Color-coded events (per-link override or timeline default color)
  *   - Entity group swim-lanes (when groups exist)
- *   - Skip-to-date input
+ *   - Skip-to-date input, zoom fit, search/filter bar
+ *
+ * Zoom levels and visual styles:
+ *   Era     — Small dots, event count badges per era
+ *   Century — Small circles with count badges per century
+ *   Decade  — Medium circles, category color coding
+ *   Year    — Circles with labels, date annotations
+ *   Month   — Large circles with full labels and entity info
+ *   Day     — Full cards with all event detail
  *
  * Mount: <div data-widget="timeline-viz"
  *             data-campaign-id="..."
@@ -38,12 +45,33 @@ Chronicle.register('timeline-viz', {
     this.svg = null;
     this.zoom = null;
     this.currentTransform = d3.zoomIdentity;
+    this.searchQuery = '';
+    this.currentZoomLevel = 'year';
 
     // Layout constants.
     this.margin = { top: 60, right: 40, bottom: 40, left: 40 };
     this.rowHeight = 36;
-    this.eventRadius = 6;
     this.laneHeight = 50;
+
+    // Zoom level thresholds (scale factor k).
+    this.zoomThresholds = {
+      era:     { max: 0.3 },
+      century: { min: 0.3, max: 0.8 },
+      decade:  { min: 0.8, max: 2 },
+      year:    { min: 2, max: 8 },
+      month:   { min: 8, max: 25 },
+      day:     { min: 25 }
+    };
+
+    // Visual config per zoom level.
+    this.zoomStyles = {
+      era:     { radius: 3,  showLabel: false, showDate: false, showEntity: false, strokeWidth: 1 },
+      century: { radius: 4,  showLabel: false, showDate: false, showEntity: false, strokeWidth: 1.5 },
+      decade:  { radius: 5,  showLabel: false, showDate: false, showEntity: false, strokeWidth: 2 },
+      year:    { radius: 6,  showLabel: true,  showDate: false, showEntity: false, strokeWidth: 2 },
+      month:   { radius: 8,  showLabel: true,  showDate: true,  showEntity: true,  strokeWidth: 2 },
+      day:     { radius: 10, showLabel: true,  showDate: true,  showEntity: true,  strokeWidth: 2.5 }
+    };
 
     this._buildDOM();
     this._loadData();
@@ -71,6 +99,15 @@ Chronicle.register('timeline-viz', {
           '<i class="fa-solid fa-expand"></i>' +
         '</button>' +
         '<span class="timeline-viz-zoom-label">Year</span>' +
+      '</div>' +
+      '<div class="timeline-viz-toolbar-center">' +
+        '<div class="timeline-viz-search-wrap">' +
+          '<i class="fa-solid fa-search timeline-viz-search-icon"></i>' +
+          '<input type="text" class="timeline-viz-search-input" placeholder="Filter events..."/>' +
+          '<button class="timeline-viz-search-clear" data-action="search-clear" style="display:none">' +
+            '<i class="fa-solid fa-xmark"></i>' +
+          '</button>' +
+        '</div>' +
       '</div>' +
       '<div class="timeline-viz-toolbar-right">' +
         '<label class="timeline-viz-skip-label">Go to year:</label>' +
@@ -104,12 +141,22 @@ Chronicle.register('timeline-viz', {
       else if (action === 'zoom-out') self._zoomBy(1 / 1.5);
       else if (action === 'zoom-fit') self._zoomFit();
       else if (action === 'skip-to') self._skipToYear();
+      else if (action === 'search-clear') self._clearSearch();
     });
 
     // Enter key on skip input.
     var skipInput = toolbar.querySelector('.timeline-viz-skip-input');
     skipInput.addEventListener('keydown', function(e) {
       if (e.key === 'Enter') self._skipToYear();
+    });
+
+    // Search input.
+    var searchInput = toolbar.querySelector('.timeline-viz-search-input');
+    var clearBtn = toolbar.querySelector('.timeline-viz-search-clear');
+    searchInput.addEventListener('input', function() {
+      self.searchQuery = this.value.toLowerCase();
+      clearBtn.style.display = self.searchQuery ? '' : 'none';
+      self._applySearchFilter();
     });
   },
 
@@ -165,11 +212,10 @@ Chronicle.register('timeline-viz', {
     // Compute year range.
     var minYear = d3.min(this.events, function(d) { return d.event_year; });
     var maxYear = d3.max(this.events, function(d) { return d.event_year; });
-    // Add padding of 1 year on each side.
     minYear = minYear - 1;
     maxYear = maxYear + 1;
 
-    // Build swim-lanes: one lane per entity group, plus "Ungrouped" lane.
+    // Build swim-lanes.
     var lanes = this._buildLanes();
     var laneCount = Math.max(lanes.length, 1);
     var contentHeight = laneCount * this.laneHeight;
@@ -277,9 +323,7 @@ Chronicle.register('timeline-viz', {
       });
 
     svg.call(this.zoom);
-
-    // Update zoom label.
-    this._updateZoomLabel();
+    this._updateZoomLevel();
   },
 
   /**
@@ -300,7 +344,6 @@ Chronicle.register('timeline-viz', {
       }
       lanes.push({ name: g.name, color: g.color, entityIDs: entityIDs });
     }
-    // Add "Other" lane for events without a matching group.
     lanes.push({ name: 'Other', color: null, entityIDs: null });
     return lanes;
   },
@@ -311,14 +354,13 @@ Chronicle.register('timeline-viz', {
   _assignLanes: function(lanes) {
     for (var i = 0; i < this.events.length; i++) {
       var evt = this.events[i];
-      evt._lane = 0; // default
+      evt._lane = 0;
       if (lanes.length > 0 && evt.event_entity_id) {
         for (var j = 0; j < lanes.length; j++) {
           if (lanes[j].entityIDs && lanes[j].entityIDs[evt.event_entity_id]) {
             evt._lane = j;
             break;
           }
-          // Last lane is "Other" - catches everything unmatched.
           if (j === lanes.length - 1) {
             evt._lane = j;
           }
@@ -326,8 +368,6 @@ Chronicle.register('timeline-viz', {
       }
     }
 
-    // Within each lane, spread events vertically to avoid overlap.
-    // Group by lane, then assign sub-positions.
     var laneGroups = {};
     for (var i = 0; i < this.events.length; i++) {
       var lane = this.events[i]._lane;
@@ -347,7 +387,6 @@ Chronicle.register('timeline-viz', {
    * Convert event date to a fractional year for precise positioning.
    */
   _dateToYear: function(evt) {
-    // Approximate: year + (month-1)/12 + (day-1)/365
     return evt.event_year + (evt.event_month - 1) / 12 + (evt.event_day - 1) / 365;
   },
 
@@ -360,13 +399,33 @@ Chronicle.register('timeline-viz', {
   },
 
   /**
+   * Determine the current zoom level name from scale factor.
+   */
+  _getZoomLevel: function() {
+    var k = this.currentTransform.k;
+    if (k < 0.3) return 'era';
+    if (k < 0.8) return 'century';
+    if (k < 2) return 'decade';
+    if (k < 8) return 'year';
+    if (k < 25) return 'month';
+    return 'day';
+  },
+
+  /**
+   * Get visual style config for current zoom level.
+   */
+  _currentStyle: function() {
+    return this.zoomStyles[this.currentZoomLevel];
+  },
+
+  /**
    * Draw event markers on the timeline.
    */
   _drawEvents: function() {
     var self = this;
     var xScale = this.xScale;
     var yScale = this.yScale;
-    var r = this.eventRadius;
+    var style = this._currentStyle();
 
     var eventGroups = this.contentGroup.selectAll('.timeline-event')
       .data(this.events)
@@ -382,23 +441,62 @@ Chronicle.register('timeline-viz', {
       })
       .style('cursor', 'pointer');
 
-    // Event circle.
+    // Event circle — base marker.
     eventGroups.append('circle')
-      .attr('r', r)
+      .attr('class', 'timeline-event-dot')
+      .attr('r', style.radius)
       .attr('fill', function(d) { return self._eventColor(d); })
       .attr('stroke', 'var(--color-surface, #1a1b26)')
-      .attr('stroke-width', 2);
+      .attr('stroke-width', style.strokeWidth);
 
-    // Event label (shown when zoomed in enough).
+    // Pulsing ring for highlighted (searched) events.
+    eventGroups.append('circle')
+      .attr('class', 'timeline-event-highlight')
+      .attr('r', style.radius + 4)
+      .attr('fill', 'none')
+      .attr('stroke', function(d) { return self._eventColor(d); })
+      .attr('stroke-width', 1.5)
+      .attr('opacity', 0)
+      .attr('stroke-dasharray', '3,3');
+
+    // Event name label.
     eventGroups.append('text')
-      .attr('x', r + 4)
-      .attr('y', 4)
       .attr('class', 'timeline-event-label')
-      .text(function(d) {
-        return d.label || d.event_name || '';
+      .attr('x', style.radius + 4)
+      .attr('y', -2)
+      .text(function(d) { return d.label || d.event_name || ''; })
+      .style('display', style.showLabel ? null : 'none');
+
+    // Date sub-label.
+    eventGroups.append('text')
+      .attr('class', 'timeline-event-date')
+      .attr('x', style.radius + 4)
+      .attr('y', 10)
+      .text(function(d) { return 'M' + d.event_month + ' D' + d.event_day; })
+      .style('display', style.showDate ? null : 'none');
+
+    // Entity sub-label.
+    eventGroups.append('text')
+      .attr('class', 'timeline-event-entity')
+      .attr('x', style.radius + 4)
+      .attr('y', 22)
+      .text(function(d) { return d.event_entity_name || ''; })
+      .style('display', style.showEntity && this.currentZoomLevel === 'day' ? null : 'none');
+
+    // Category indicator dot (small colored dot next to main circle at decade+ zoom).
+    eventGroups.append('circle')
+      .attr('class', 'timeline-event-cat-dot')
+      .attr('cx', function() { return -(style.radius + 3); })
+      .attr('cy', 0)
+      .attr('r', 2.5)
+      .attr('fill', function(d) {
+        return self._categoryColor(d.event_category);
+      })
+      .style('display', function(d) {
+        return d.event_category ? null : 'none';
       });
 
-    // Hover handlers.
+    // Hover/click handlers.
     eventGroups
       .on('mouseenter', function(event, d) { self._showTooltip(event, d); })
       .on('mouseleave', function() { self._hideTooltip(); })
@@ -408,17 +506,69 @@ Chronicle.register('timeline-viz', {
   },
 
   /**
-   * Draw the time axis at the top.
+   * Map event category to a color for the category indicator dot.
+   */
+  _categoryColor: function(cat) {
+    if (!cat) return 'transparent';
+    var map = {
+      holiday:  '#f59e0b',
+      battle:   '#ef4444',
+      quest:    '#22c55e',
+      birthday: '#ec4899',
+      festival: '#a855f7',
+      travel:   '#3b82f6',
+      custom:   '#6b7280'
+    };
+    return map[cat] || '#6b7280';
+  },
+
+  /**
+   * Draw the time axis with zoom-level-aware tick formatting.
    */
   _drawAxis: function() {
+    var self = this;
+    var level = this.currentZoomLevel;
+    var tickFormat, tickCount;
+
+    if (level === 'era' || level === 'century') {
+      tickFormat = function(d) { return 'Y' + Math.round(d); };
+      tickCount = Math.max(2, Math.floor((self.width - self.margin.left - self.margin.right) / 120));
+    } else if (level === 'decade') {
+      tickFormat = function(d) { return 'Y' + Math.round(d); };
+      tickCount = Math.max(2, Math.floor((self.width - self.margin.left - self.margin.right) / 80));
+    } else if (level === 'year') {
+      tickFormat = function(d) { return 'Y' + Math.round(d); };
+      tickCount = Math.max(2, Math.floor((self.width - self.margin.left - self.margin.right) / 60));
+    } else if (level === 'month') {
+      tickFormat = function(d) {
+        var year = Math.floor(d);
+        var monthFrac = (d - year) * 12;
+        var month = Math.round(monthFrac) + 1;
+        if (month <= 1 || month > 12) return 'Y' + year;
+        return 'M' + month;
+      };
+      tickCount = Math.max(4, Math.floor((self.width - self.margin.left - self.margin.right) / 50));
+    } else {
+      // Day level.
+      tickFormat = function(d) {
+        var year = Math.floor(d);
+        var dayFrac = (d - year) * 365;
+        var month = Math.floor(dayFrac / 30) + 1;
+        var day = Math.round(dayFrac % 30) + 1;
+        if (day <= 1 && month <= 1) return 'Y' + year;
+        return 'M' + month + ' D' + day;
+      };
+      tickCount = Math.max(4, Math.floor((self.width - self.margin.left - self.margin.right) / 70));
+    }
+
     var xAxis = d3.axisTop(this.xScale)
-      .tickFormat(function(d) { return 'Y' + Math.round(d); })
-      .ticks(Math.max(2, Math.floor((this.width - this.margin.left - this.margin.right) / 80)));
+      .tickFormat(tickFormat)
+      .ticks(tickCount);
     this.axisGroup.call(xAxis);
   },
 
   /**
-   * Draw vertical grid lines for each year tick.
+   * Draw vertical grid lines.
    */
   _drawGrid: function() {
     var m = this.margin;
@@ -442,7 +592,7 @@ Chronicle.register('timeline-viz', {
   },
 
   /**
-   * Handle zoom/pan events: rescale axis and reposition events.
+   * Handle zoom/pan events: rescale axis, reposition events, update styles.
    */
   _onZoom: function() {
     var self = this;
@@ -452,14 +602,17 @@ Chronicle.register('timeline-viz', {
     var newX = t.rescaleX(this.xScaleOrig);
     this.xScale = newX;
 
-    // Update axis.
-    var xAxis = d3.axisTop(newX)
-      .tickFormat(function(d) { return 'Y' + Math.round(d); })
-      .ticks(Math.max(2, Math.floor((this.width - this.margin.left - this.margin.right) / 80)));
-    this.axisGroup.call(xAxis);
+    // Detect zoom level change.
+    var newLevel = this._getZoomLevel();
+    var levelChanged = (newLevel !== this.currentZoomLevel);
+    this.currentZoomLevel = newLevel;
 
-    // Update grid.
+    // Update axis with level-aware formatting.
+    this._drawAxis();
     this._drawGrid();
+
+    // Get current style.
+    var style = this._currentStyle();
 
     // Reposition events.
     this.eventGroups.attr('transform', function(d) {
@@ -470,29 +623,44 @@ Chronicle.register('timeline-viz', {
       return 'translate(' + x + ',' + y + ')';
     });
 
-    // Show/hide labels based on zoom level.
-    var pixelsPerYear = Math.abs(newX(1) - newX(0)) * t.k;
-    this.eventGroups.selectAll('.timeline-event-label')
-      .style('display', pixelsPerYear > 60 ? null : 'none');
+    // Update event visual styles based on zoom level.
+    if (levelChanged) {
+      this.eventGroups.selectAll('.timeline-event-dot')
+        .transition().duration(200)
+        .attr('r', style.radius)
+        .attr('stroke-width', style.strokeWidth);
 
-    this._updateZoomLabel();
+      this.eventGroups.selectAll('.timeline-event-highlight')
+        .attr('r', style.radius + 4);
+
+      this.eventGroups.selectAll('.timeline-event-label')
+        .style('display', style.showLabel ? null : 'none')
+        .attr('x', style.radius + 4);
+
+      this.eventGroups.selectAll('.timeline-event-date')
+        .style('display', style.showDate ? null : 'none')
+        .attr('x', style.radius + 4);
+
+      this.eventGroups.selectAll('.timeline-event-entity')
+        .style('display', style.showEntity && this.currentZoomLevel === 'day' ? null : 'none')
+        .attr('x', style.radius + 4);
+
+      this.eventGroups.selectAll('.timeline-event-cat-dot')
+        .attr('cx', function() { return -(style.radius + 3); });
+    }
+
+    this._updateZoomLevel();
   },
 
   /**
    * Update the zoom level indicator in the toolbar.
    */
-  _updateZoomLabel: function() {
+  _updateZoomLevel: function() {
     var label = this.el.querySelector('.timeline-viz-zoom-label');
     if (!label) return;
-    var k = this.currentTransform.k;
-    var level;
-    if (k < 0.3) level = 'Era';
-    else if (k < 0.8) level = 'Century';
-    else if (k < 2) level = 'Decade';
-    else if (k < 8) level = 'Year';
-    else if (k < 25) level = 'Month';
-    else level = 'Day';
-    label.textContent = level;
+    var level = this.currentZoomLevel;
+    var display = level.charAt(0).toUpperCase() + level.slice(1);
+    label.textContent = display;
   },
 
   /**
@@ -517,7 +685,6 @@ Chronicle.register('timeline-viz', {
     var yearSpan = maxYear - minYear;
     if (yearSpan <= 0) yearSpan = 2;
 
-    // Reset to identity then compute the right transform.
     var scale = w / (this.xScaleOrig(maxYear) - this.xScaleOrig(minYear));
     var tx = m.left - scale * this.xScaleOrig(minYear);
 
@@ -549,13 +716,68 @@ Chronicle.register('timeline-viz', {
   },
 
   /**
+   * Apply search filter: highlight matching events, dim non-matching ones.
+   */
+  _applySearchFilter: function() {
+    if (!this.eventGroups) return;
+    var q = this.searchQuery;
+    var self = this;
+
+    this.eventGroups.each(function(d) {
+      var g = d3.select(this);
+      if (!q) {
+        // No filter: reset all to full opacity.
+        g.style('opacity', 1);
+        g.select('.timeline-event-highlight').attr('opacity', 0);
+        return;
+      }
+
+      var match = self._eventMatchesSearch(d, q);
+      g.style('opacity', match ? 1 : 0.15);
+      g.select('.timeline-event-highlight')
+        .attr('opacity', match ? 0.6 : 0);
+    });
+  },
+
+  /**
+   * Check if an event matches the search query.
+   */
+  _eventMatchesSearch: function(d, q) {
+    var name = (d.label || d.event_name || '').toLowerCase();
+    if (name.indexOf(q) !== -1) return true;
+    var entity = (d.event_entity_name || '').toLowerCase();
+    if (entity.indexOf(q) !== -1) return true;
+    var cat = (d.event_category || '').toLowerCase();
+    if (cat.indexOf(q) !== -1) return true;
+    var desc = (d.event_description || '').toLowerCase();
+    if (desc.indexOf(q) !== -1) return true;
+    // Match year.
+    if (String(d.event_year).indexOf(q) !== -1) return true;
+    return false;
+  },
+
+  /**
+   * Clear the search filter.
+   */
+  _clearSearch: function() {
+    var input = this.el.querySelector('.timeline-viz-search-input');
+    input.value = '';
+    this.searchQuery = '';
+    this.el.querySelector('.timeline-viz-search-clear').style.display = 'none';
+    this._applySearchFilter();
+  },
+
+  /**
    * Show tooltip for an event.
    */
   _showTooltip: function(event, d) {
     var tip = this.tooltip;
     var label = d.label || d.event_name || 'Untitled';
     var date = 'Y' + d.event_year + ' M' + d.event_month + ' D' + d.event_day;
-    var lines = ['<strong>' + this._escapeHTML(label) + '</strong>', '<span class="text-fg-muted">' + date + '</span>'];
+    var lines = [
+      '<strong>' + this._escapeHTML(label) + '</strong>',
+      '<span class="text-fg-muted">' + date + '</span>'
+    ];
     if (d.event_entity_name) {
       lines.push('<span class="text-fg-secondary">' +
         (d.event_entity_icon ? '<i class="fa-solid ' + d.event_entity_icon + ' mr-1"></i>' : '') +
@@ -573,10 +795,8 @@ Chronicle.register('timeline-viz', {
     tip.innerHTML = lines.join('<br/>');
     tip.style.display = 'block';
 
-    // Position near the mouse.
     var x = event.pageX + 12;
     var y = event.pageY - 10;
-    // Keep tooltip on screen.
     var tipW = tip.offsetWidth;
     if (x + tipW > window.innerWidth - 20) {
       x = event.pageX - tipW - 12;
@@ -594,11 +814,13 @@ Chronicle.register('timeline-viz', {
 
   /**
    * Handle click on an event marker.
-   * For now, scrolls to the event card if it exists on the page.
    */
   _onEventClick: function(event, d) {
-    // Could be extended to open a detail panel or navigate.
-    // For now, just show a persistent tooltip.
+    // Open the collapsible event list and scroll to the matching card.
+    var details = this.el.parentElement.querySelector('details');
+    if (details) {
+      details.open = true;
+    }
   },
 
   /**

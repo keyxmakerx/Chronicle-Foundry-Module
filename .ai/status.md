@@ -580,6 +580,22 @@ All 6 sprints (5-10) are complete:
 - **Files**: static/js/widgets/timeline_viz.js (new), static/css/input.css
   (timeline-viz styles), timeline.templ (D3 script tags, widget mount, collapsible list).
 
+### Timeline Plugin Sprint 4 — Zoom Levels and Search — COMPLETE
+- **Zoom-level visual styles**: 6 distinct visual configurations (era→day), each with
+  different marker radius, stroke width, label/date/entity visibility. Markers smoothly
+  transition between sizes via D3 transitions on zoom level change.
+- **Zoom-level-aware axis**: Tick formatting adapts per level — years at era/century/decade,
+  months at month level, individual days at day level.
+- **Category indicator dots**: Small colored dots next to event markers showing category
+  color (holiday=amber, battle=red, quest=green, birthday=pink, etc.).
+- **Search/filter bar**: Text input in center of toolbar. Filters events in real-time:
+  matching events stay full opacity with highlight ring, non-matching dim to 15% opacity.
+  Searches across name, entity, category, description, and year. Clear button to reset.
+- **Enhanced date/entity sub-labels**: Additional text elements on events showing
+  month/day (at month+ zoom) and entity name (at day zoom) for fuller context.
+- **Files**: static/js/widgets/timeline_viz.js (enhanced), static/css/input.css
+  (search bar, date/entity label styles).
+
 ### In Progress
 - Nothing currently in progress.
 
@@ -602,10 +618,9 @@ LegendKeeper. Key findings:
   H (secrets) → I (integrations) → J (visualization) → K (delight)
 
 ## Next Session Should
-1. **Timeline Sprint 4:** Zoom levels and search (era→day visual styles, skip-to-date,
-   search/filter bar for events).
-2. **Timeline Sprint 5:** Entity groups and swim-lanes (group CRUD, member management,
+1. **Timeline Sprint 5:** Entity groups and swim-lanes (group CRUD, member management,
    swim-lane visualization in D3 widget).
+2. **Timeline Sprint 6:** Visibility controls (per-user JSON rules, view-as-player).
 3. **Phase H continued:** Per-entity permissions, group-based visibility.
 4. **Maps Phase 2 (optional):** Layers, marker groups, nested maps, fog of war.
 4. **Handler-level "view as player":** Extend toggle to filter is_private entities
