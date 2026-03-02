@@ -36,6 +36,27 @@ type CalendarRef struct {
 	Name string `json:"name"`
 }
 
+// CalendarEventLister fetches calendar events for the event picker.
+// Implemented as an adapter in app/routes.go to avoid importing the calendar package.
+type CalendarEventLister interface {
+	ListEventsForCalendar(ctx context.Context, calendarID string, role int) ([]CalendarEventRef, error)
+}
+
+// CalendarEventRef is a lightweight reference to a calendar event used in the
+// event picker when linking events to a timeline.
+type CalendarEventRef struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Year        int     `json:"year"`
+	Month       int     `json:"month"`
+	Day         int     `json:"day"`
+	Category    *string `json:"category,omitempty"`
+	Visibility  string  `json:"visibility"`
+	EntityID    *string `json:"entity_id,omitempty"`
+	EntityName  string  `json:"entity_name,omitempty"`
+	EntityIcon  string  `json:"entity_icon,omitempty"`
+}
+
 // TimelineService defines business logic for the timeline plugin.
 type TimelineService interface {
 	// Timeline CRUD.
@@ -47,8 +68,10 @@ type TimelineService interface {
 
 	// Event linking.
 	LinkEvent(ctx context.Context, timelineID, eventID string, input LinkEventInput) (*EventLink, error)
+	LinkAllEvents(ctx context.Context, timelineID string, role int) (int, error)
 	UnlinkEvent(ctx context.Context, timelineID, eventID string) error
 	ListTimelineEvents(ctx context.Context, timelineID string, role int, userID string) ([]EventLink, error)
+	ListAvailableEvents(ctx context.Context, timelineID string, role int) ([]CalendarEventRef, error)
 
 	// Entity groups.
 	CreateEntityGroup(ctx context.Context, timelineID string, input CreateEntityGroupInput) (*EntityGroup, error)
@@ -64,14 +87,15 @@ type TimelineService interface {
 
 // timelineService is the default TimelineService implementation.
 type timelineService struct {
-	repo     TimelineRepository
-	calLists CalendarLister
+	repo      TimelineRepository
+	calLists  CalendarLister
+	calEvents CalendarEventLister
 }
 
-// NewTimelineService creates a TimelineService backed by the given repository
-// and calendar lister (for the calendar selector dropdown).
-func NewTimelineService(repo TimelineRepository, calLists CalendarLister) TimelineService {
-	return &timelineService{repo: repo, calLists: calLists}
+// NewTimelineService creates a TimelineService backed by the given repository,
+// calendar lister (for the selector dropdown), and event lister (for the event picker).
+func NewTimelineService(repo TimelineRepository, calLists CalendarLister, calEvents CalendarEventLister) TimelineService {
+	return &timelineService{repo: repo, calLists: calLists, calEvents: calEvents}
 }
 
 // CreateTimeline creates a new timeline in a campaign.
@@ -261,6 +285,75 @@ func (s *timelineService) ListTimelineEvents(ctx context.Context, timelineID str
 		return nil, fmt.Errorf("list timeline events: %w", err)
 	}
 	return events, nil
+}
+
+// ListAvailableEvents returns calendar events that can be linked to a timeline.
+// Filters out events already linked, returning only unlinked events.
+func (s *timelineService) ListAvailableEvents(ctx context.Context, timelineID string, role int) ([]CalendarEventRef, error) {
+	t, err := s.repo.GetByID(ctx, timelineID)
+	if err != nil {
+		return nil, fmt.Errorf("get timeline for available events: %w", err)
+	}
+	if t == nil {
+		return nil, apperror.NewNotFound("timeline not found")
+	}
+
+	if s.calEvents == nil {
+		return nil, nil
+	}
+
+	// Get all calendar events.
+	allEvents, err := s.calEvents.ListEventsForCalendar(ctx, t.CalendarID, role)
+	if err != nil {
+		return nil, fmt.Errorf("list calendar events: %w", err)
+	}
+
+	// Get already-linked event IDs.
+	linked, err := s.repo.ListEventLinks(ctx, timelineID, role)
+	if err != nil {
+		return nil, fmt.Errorf("list linked events: %w", err)
+	}
+	linkedSet := make(map[string]bool, len(linked))
+	for _, el := range linked {
+		linkedSet[el.EventID] = true
+	}
+
+	// Filter to unlinked only.
+	var available []CalendarEventRef
+	for _, ev := range allEvents {
+		if !linkedSet[ev.ID] {
+			available = append(available, ev)
+		}
+	}
+	return available, nil
+}
+
+// LinkAllEvents links all calendar events to a timeline that aren't already linked.
+// Returns the number of newly linked events.
+func (s *timelineService) LinkAllEvents(ctx context.Context, timelineID string, role int) (int, error) {
+	available, err := s.ListAvailableEvents(ctx, timelineID, role)
+	if err != nil {
+		return 0, err
+	}
+
+	count, err := s.repo.CountEvents(ctx, timelineID)
+	if err != nil {
+		return 0, fmt.Errorf("count events: %w", err)
+	}
+
+	linked := 0
+	for i, ev := range available {
+		link := &EventLink{
+			TimelineID:   timelineID,
+			EventID:      ev.ID,
+			DisplayOrder: count + i,
+		}
+		if err := s.repo.LinkEvent(ctx, link); err != nil {
+			return linked, fmt.Errorf("link event %s: %w", ev.ID, err)
+		}
+		linked++
+	}
+	return linked, nil
 }
 
 // CreateEntityGroup creates a new entity group for swim-lane organization.

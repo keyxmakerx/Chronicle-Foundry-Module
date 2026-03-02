@@ -538,6 +538,27 @@ All 6 sprints (5-10) are complete:
   routes,timeline.templ,.ai.md} (all new), app/routes.go, addons/service.go,
   layouts/app.templ.
 
+### Timeline Plugin Sprint 2 — Calendar Event Linking — COMPLETE
+- **CalendarEventLister interface**: Cross-plugin adapter for reading calendar events
+  without importing the calendar repo. `calendarEventListerAdapter` in app/routes.go wraps
+  `CalendarService.ListAllEvents()`, maps to `CalendarEventRef` struct, and filters by
+  visibility role.
+- **Service methods**: `ListAvailableEvents` fetches all calendar events from the timeline's
+  calendar, filters out already-linked event IDs, returns unlinked events. `LinkAllEvents`
+  bulk-links all available events in a single call.
+- **Handler endpoints**: `ListAvailableEventsAPI` (GET .../available-events) for event picker
+  data, `LinkAllEventsAPI` (POST .../events/all) for bulk linking.
+- **Routes**: 2 new Scribe-level routes added to authenticated group.
+- **Event picker modal**: Alpine.js-powered modal on timeline show page. Fetches available
+  events from API, renders searchable list with date/name/entity/category, click-to-link
+  with immediate removal from list. Search filters by name, entity name, or category.
+- **Header buttons**: "Add Events" (opens picker modal) and "Add All" (bulk-link with
+  confirmation) buttons for Scribe+ users. Delete button styled with red text for Owner.
+- **Files**: service.go (CalendarEventLister, CalendarEventRef, ListAvailableEvents,
+  LinkAllEvents), handler.go (2 new handlers), routes.go (2 new routes), timeline.templ
+  (event picker modal, header buttons), app/routes.go (calendarEventListerAdapter),
+  .ai.md (updated routes/docs).
+
 ### In Progress
 - Nothing currently in progress.
 
@@ -560,10 +581,9 @@ LegendKeeper. Key findings:
   H (secrets) → I (integrations) → J (visualization) → K (delight)
 
 ## Next Session Should
-1. **Timeline Sprint 2:** Calendar event linking UI (event picker modal, link/unlink
-   workflow, "create new event" flow from timeline).
-2. **Timeline Sprint 3:** Interactive D3.js visualization (vendor D3, timeline.js widget,
+1. **Timeline Sprint 3:** Interactive D3.js visualization (vendor D3, timeline.js widget,
    year-level zoom, pan/drag, tooltips, JSON data endpoint).
+2. **Timeline Sprint 4:** Zoom levels and search (era→day, skip-to-date, filter).
 3. **Phase H continued:** Per-entity permissions, group-based visibility.
 4. **Maps Phase 2 (optional):** Layers, marker groups, nested maps, fog of war.
 4. **Handler-level "view as player":** Extend toggle to filter is_private entities

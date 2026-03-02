@@ -218,18 +218,38 @@ templ timelineShowContent(cc *campaigns.CampaignContext, data TimelineViewData) 
 					</p>
 				</div>
 			</div>
-			if data.IsOwner {
-				<div class="flex items-center gap-2">
+			<div class="flex items-center gap-2">
+				if data.IsScribe {
+					<button
+						class="btn-primary text-xs"
+						onclick="document.getElementById('event-picker-modal').classList.remove('hidden')"
+					>
+						<i class="fa-solid fa-link mr-1"></i> Add Events
+					</button>
 					<button
 						class="btn-secondary text-xs"
+						hx-post={ fmt.Sprintf("/campaigns/%s/timelines/%s/events/all", data.CampaignID, data.Timeline.ID) }
+						hx-headers={ fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, data.CSRFToken) }
+						hx-confirm="Link all available calendar events to this timeline?"
+						hx-swap="none"
+						hx-on::after-request="if(event.detail.successful) window.location.reload()"
+					>
+						<i class="fa-solid fa-link mr-1"></i> Add All
+					</button>
+				}
+				if data.IsOwner {
+					<button
+						class="btn-secondary text-xs text-red-500 hover:text-red-400"
 						hx-delete={ fmt.Sprintf("/campaigns/%s/timelines/%s", data.CampaignID, data.Timeline.ID) }
 						hx-confirm="Delete this timeline? This action cannot be undone."
 						hx-headers={ fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, data.CSRFToken) }
+						hx-swap="none"
+						hx-on::after-request="if(event.detail.successful) window.location.href='/campaigns/'+window.location.pathname.split('/')[2]+'/timelines'"
 					>
 						<i class="fa-solid fa-trash mr-1"></i> Delete
 					</button>
-				</div>
-			}
+				}
+			</div>
 		</div>
 		if data.Timeline.Description != nil && *data.Timeline.Description != "" {
 			<p class="text-sm text-fg-secondary mb-6">{ *data.Timeline.Description }</p>
@@ -254,7 +274,108 @@ templ timelineShowContent(cc *campaigns.CampaignContext, data TimelineViewData) 
 				</div>
 			}
 		</div>
+		if data.IsScribe {
+			@eventPickerModal(data)
+		}
 	</div>
+}
+
+// eventPickerModal renders the modal for linking calendar events to a timeline.
+templ eventPickerModal(data TimelineViewData) {
+	<div
+		id="event-picker-modal"
+		class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+		onclick="if(event.target===this)this.classList.add('hidden')"
+	>
+		<div class="card p-6 w-full max-w-lg space-y-4" x-data="eventPicker()">
+			<div class="flex items-center justify-between">
+				<h2 class="text-lg font-semibold text-fg">Link Calendar Events</h2>
+				<button class="text-fg-muted hover:text-fg" onclick="document.getElementById('event-picker-modal').classList.add('hidden')">
+					<i class="fa-solid fa-xmark"></i>
+				</button>
+			</div>
+			<div>
+				<input
+					type="text"
+					class="input w-full"
+					placeholder="Search events..."
+					x-model="search"
+				/>
+			</div>
+			<div class="max-h-80 overflow-y-auto space-y-2">
+				<template x-if="loading">
+					<div class="text-center py-4 text-fg-muted text-sm">Loading events...</div>
+				</template>
+				<template x-if="\!loading && filteredEvents().length === 0">
+					<div class="text-center py-4 text-fg-muted text-sm">No available events found.</div>
+				</template>
+				<template x-for="evt in filteredEvents()" :key="evt.id">
+					<div class="flex items-center gap-3 p-3 rounded-lg bg-surface-alt hover:bg-surface-alt/80 cursor-pointer" @click="linkEvent(evt)">
+						<div class="flex-shrink-0 text-xs font-mono text-fg-muted w-16 text-center">
+							<span x-text="'Y'+evt.year"></span><br/>
+							<span x-text="'M'+evt.month+' D'+evt.day"></span>
+						</div>
+						<div class="flex-1 min-w-0">
+							<div class="text-sm font-semibold text-fg truncate" x-text="evt.name"></div>
+							<div class="text-xs text-fg-muted" x-show="evt.entity_name" x-text="evt.entity_name"></div>
+							<div class="text-xs text-fg-secondary" x-show="evt.category" x-text="evt.category"></div>
+						</div>
+						<i class="fa-solid fa-plus text-fg-muted"></i>
+					</div>
+				</template>
+			</div>
+		</div>
+	</div>
+	<script>
+		function eventPicker() {
+			return {
+				search: '',
+				events: [],
+				loading: true,
+				init() {
+					var parts = window.location.pathname.split('/');
+					var campaignID = parts[2];
+					var timelineID = parts[4];
+					this.apiBase = '/campaigns/' + campaignID + '/timelines/' + timelineID;
+					this.loadEvents();
+				},
+				loadEvents() {
+					var self = this;
+					self.loading = true;
+					fetch(self.apiBase + '/available-events')
+						.then(function(r) { return r.json(); })
+						.then(function(data) { self.events = data || []; self.loading = false; })
+						.catch(function(err) { console.warn('[timeline] Failed to load events:', err); self.loading = false; });
+				},
+				filteredEvents() {
+					var q = this.search.toLowerCase();
+					if (\!q) return this.events;
+					return this.events.filter(function(e) {
+						return e.name.toLowerCase().indexOf(q) \!== -1 ||
+							(e.entity_name && e.entity_name.toLowerCase().indexOf(q) \!== -1) ||
+							(e.category && e.category.toLowerCase().indexOf(q) \!== -1);
+					});
+				},
+				linkEvent(evt) {
+					var self = this;
+					var csrfToken = document.querySelector('meta[name="csrf-token"]');
+					var headers = {'Content-Type': 'application/json'};
+					if (csrfToken) headers['X-CSRF-Token'] = csrfToken.content;
+					fetch(self.apiBase + '/events', {
+						method: 'POST',
+						headers: headers,
+						body: JSON.stringify({event_id: evt.id})
+					})
+					.then(function(r) {
+						if (r.ok) {
+							self.events = self.events.filter(function(e) { return e.id \!== evt.id; });
+						}
+					})
+					.catch(function(err) { console.warn('[timeline] Failed to link event:', err); });
+				}
+			};
+		}
+	</script>
 }
 
 // timelineEventCard renders a single event in the timeline event list.

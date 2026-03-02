@@ -192,6 +192,53 @@ func (a *calendarListerAdapter) ListCalendars(ctx context.Context, campaignID st
 	}, nil
 }
 
+// calendarEventListerAdapter wraps calendar.CalendarService to implement the
+// timeline.CalendarEventLister interface. Lists all calendar events for the
+// event picker when linking events to a timeline.
+type calendarEventListerAdapter struct {
+	svc calendar.CalendarService
+}
+
+// ListEventsForCalendar returns all events for a calendar as lightweight refs.
+func (a *calendarEventListerAdapter) ListEventsForCalendar(ctx context.Context, calendarID string, role int) ([]timeline.CalendarEventRef, error) {
+	cal, err := a.svc.GetCalendarByID(ctx, calendarID)
+	if err != nil {
+		return nil, err
+	}
+	if cal == nil {
+		return nil, nil
+	}
+
+	// Use ListAllEvents for owner-level access (gets all events regardless of visibility).
+	// For non-owners, use ListEventsForYear across a broad range.
+	// ListAllEvents returns all events with owner visibility.
+	events, err := a.svc.ListAllEvents(ctx, calendarID)
+	if err != nil {
+		return nil, err
+	}
+
+	refs := make([]timeline.CalendarEventRef, 0, len(events))
+	for _, ev := range events {
+		// Apply role-based visibility filter.
+		if role < 2 && ev.Visibility == "dm_only" {
+			continue
+		}
+		refs = append(refs, timeline.CalendarEventRef{
+			ID:         ev.ID,
+			Name:       ev.Name,
+			Year:       ev.Year,
+			Month:      ev.Month,
+			Day:        ev.Day,
+			Category:   ev.Category,
+			Visibility: ev.Visibility,
+			EntityID:   ev.EntityID,
+			EntityName: ev.EntityName,
+			EntityIcon: ev.EntityIcon,
+		})
+	}
+	return refs, nil
+}
+
 // storageLimiterAdapter wraps settings.SettingsService to implement the
 // media.StorageLimiter interface without creating a circular import.
 type storageLimiterAdapter struct {
@@ -383,7 +430,7 @@ func (a *App) RegisterRoutes() {
 
 	// Timeline plugin: interactive visual timelines with zoom levels and entity grouping.
 	timelineRepo := timeline.NewTimelineRepository(a.DB)
-	timelineSvc := timeline.NewTimelineService(timelineRepo, &calendarListerAdapter{svc: calendarService})
+	timelineSvc := timeline.NewTimelineService(timelineRepo, &calendarListerAdapter{svc: calendarService}, &calendarEventListerAdapter{svc: calendarService})
 	timelineHandler := timeline.NewHandler(timelineSvc)
 	timeline.RegisterRoutes(e, timelineHandler, campaignService, authService)
 

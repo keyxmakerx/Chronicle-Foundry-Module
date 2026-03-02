@@ -269,6 +269,46 @@ func (h *Handler) TimelineDataAPI(c echo.Context) error {
 	})
 }
 
+// ListAvailableEventsAPI returns calendar events not yet linked to a timeline.
+// GET /campaigns/:id/timelines/:tid/available-events
+func (h *Handler) ListAvailableEventsAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	ctx := c.Request().Context()
+	timelineID := c.Param("tid")
+	role := int(cc.MemberRole)
+
+	if _, err := h.requireTimelineInCampaign(c, timelineID, cc.Campaign.ID); err != nil {
+		return err
+	}
+
+	events, err := h.svc.ListAvailableEvents(ctx, timelineID, role)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, events)
+}
+
+// LinkAllEventsAPI links all available calendar events to a timeline at once.
+// POST /campaigns/:id/timelines/:tid/events/all
+func (h *Handler) LinkAllEventsAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	ctx := c.Request().Context()
+	timelineID := c.Param("tid")
+	role := int(cc.MemberRole)
+
+	if _, err := h.requireTimelineInCampaign(c, timelineID, cc.Campaign.ID); err != nil {
+		return err
+	}
+
+	count, err := h.svc.LinkAllEvents(ctx, timelineID, role)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, map[string]int{"linked": count})
+}
+
 // ListCalendarsAPI returns available calendars for the create timeline form.
 // GET /campaigns/:id/timelines/calendars
 func (h *Handler) ListCalendarsAPI(c echo.Context) error {

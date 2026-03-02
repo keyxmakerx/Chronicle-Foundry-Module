@@ -27,7 +27,11 @@ func RegisterRoutes(e *echo.Echo, h *Handler, campaignSvc campaigns.CampaignServ
 
 	// Event linking (Scribe+).
 	cg.POST("/timelines/:tid/events", h.LinkEventAPI, campaigns.RequireRole(campaigns.RoleScribe))
+	cg.POST("/timelines/:tid/events/all", h.LinkAllEventsAPI, campaigns.RequireRole(campaigns.RoleScribe))
 	cg.DELETE("/timelines/:tid/events/:eid", h.UnlinkEventAPI, campaigns.RequireRole(campaigns.RoleScribe))
+
+	// Available events list for event picker (Scribe+).
+	cg.GET("/timelines/:tid/available-events", h.ListAvailableEventsAPI, campaigns.RequireRole(campaigns.RoleScribe))
 
 	// Public-capable views: timeline list, show, data endpoint.
 	// Use AllowPublicCampaignAccess so HTMX lazy-loads work correctly.
