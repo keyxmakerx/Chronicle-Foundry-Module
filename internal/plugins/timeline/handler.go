@@ -1,6 +1,7 @@
 package timeline
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -9,16 +10,28 @@ import (
 	"github.com/keyxmakerx/chronicle/internal/middleware"
 	"github.com/keyxmakerx/chronicle/internal/plugins/auth"
 	"github.com/keyxmakerx/chronicle/internal/plugins/campaigns"
+	"github.com/keyxmakerx/chronicle/internal/templates/layouts"
 )
+
+// MemberLister provides campaign membership data for the visibility user selector.
+type MemberLister interface {
+	ListMembers(ctx context.Context, campaignID string) ([]campaigns.CampaignMember, error)
+}
 
 // Handler processes HTTP requests for the timeline plugin.
 type Handler struct {
-	svc TimelineService
+	svc          TimelineService
+	memberLister MemberLister
 }
 
 // NewHandler creates a new timeline Handler.
 func NewHandler(svc TimelineService) *Handler {
 	return &Handler{svc: svc}
+}
+
+// SetMemberLister injects the campaign member lister for visibility settings.
+func (h *Handler) SetMemberLister(ml MemberLister) {
+	h.memberLister = ml
 }
 
 // requireTimelineInCampaign fetches a timeline by ID and verifies it belongs
@@ -35,12 +48,22 @@ func (h *Handler) requireTimelineInCampaign(c echo.Context, timelineID, campaign
 	return t, nil
 }
 
+// effectiveRole returns the role to use for content filtering. When
+// "view as player" mode is active, owners see content as a player would.
+func effectiveRole(c echo.Context, cc *campaigns.CampaignContext) int {
+	ctx := c.Request().Context()
+	if layouts.IsViewingAsPlayer(ctx) {
+		return int(campaigns.RolePlayer)
+	}
+	return int(cc.MemberRole)
+}
+
 // Index lists all timelines for a campaign.
 // GET /campaigns/:id/timelines
 func (h *Handler) Index(c echo.Context) error {
 	cc := campaigns.GetCampaignContext(c)
 	ctx := c.Request().Context()
-	role := int(cc.MemberRole)
+	role := effectiveRole(c, cc)
 	userID := auth.GetUserID(c)
 
 	timelines, err := h.svc.ListTimelines(ctx, cc.Campaign.ID, role, userID)
@@ -68,7 +91,7 @@ func (h *Handler) Show(c echo.Context) error {
 	cc := campaigns.GetCampaignContext(c)
 	ctx := c.Request().Context()
 	timelineID := c.Param("tid")
-	role := int(cc.MemberRole)
+	role := effectiveRole(c, cc)
 	userID := auth.GetUserID(c)
 
 	t, err := h.requireTimelineInCampaign(c, timelineID, cc.Campaign.ID)
@@ -86,6 +109,20 @@ func (h *Handler) Show(c echo.Context) error {
 		return err
 	}
 
+	// Load campaign members for visibility settings (Owner only).
+	var members []MemberRef
+	if cc.MemberRole >= campaigns.RoleOwner && h.memberLister != nil {
+		if ms, err := h.memberLister.ListMembers(ctx, cc.Campaign.ID); err == nil {
+			for _, m := range ms {
+				members = append(members, MemberRef{
+					UserID:   m.UserID,
+					Username: m.DisplayName,
+					Role:     m.Role.String(),
+				})
+			}
+		}
+	}
+
 	data := TimelineViewData{
 		CampaignID:   cc.Campaign.ID,
 		Timeline:     t,
@@ -94,6 +131,7 @@ func (h *Handler) Show(c echo.Context) error {
 		IsOwner:      cc.MemberRole >= campaigns.RoleOwner,
 		IsScribe:     cc.MemberRole >= campaigns.RoleScribe,
 		CSRFToken:    middleware.GetCSRFToken(c),
+		Members:      members,
 	}
 
 	if c.Request().Header.Get("HX-Request") != "" {
@@ -244,7 +282,7 @@ func (h *Handler) TimelineDataAPI(c echo.Context) error {
 	cc := campaigns.GetCampaignContext(c)
 	ctx := c.Request().Context()
 	timelineID := c.Param("tid")
-	role := int(cc.MemberRole)
+	role := effectiveRole(c, cc)
 	userID := auth.GetUserID(c)
 
 	t, err := h.requireTimelineInCampaign(c, timelineID, cc.Campaign.ID)
@@ -465,6 +503,93 @@ func (h *Handler) ListEntityGroupsAPI(c echo.Context) error {
 		return err
 	}
 	return c.JSON(http.StatusOK, groups)
+}
+
+// UpdateTimelineVisibilityAPI updates timeline visibility and per-user rules.
+// PUT /campaigns/:id/timelines/:tid/visibility
+func (h *Handler) UpdateTimelineVisibilityAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	ctx := c.Request().Context()
+	timelineID := c.Param("tid")
+
+	t, err := h.requireTimelineInCampaign(c, timelineID, cc.Campaign.ID)
+	if err != nil {
+		return err
+	}
+
+	var req struct {
+		Visibility      string  `json:"visibility"`
+		VisibilityRules *string `json:"visibility_rules"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
+	}
+
+	// Build a full update preserving existing settings.
+	return h.svc.UpdateTimeline(ctx, timelineID, UpdateTimelineInput{
+		Name:            t.Name,
+		Description:     t.Description,
+		DescriptionHTML: t.DescriptionHTML,
+		Color:           t.Color,
+		Icon:            t.Icon,
+		Visibility:      req.Visibility,
+		VisibilityRules: req.VisibilityRules,
+		ZoomDefault:     t.ZoomDefault,
+	})
+}
+
+// UpdateEventVisibilityAPI updates per-event visibility on a timeline event link.
+// PUT /campaigns/:id/timelines/:tid/events/:eid/visibility
+func (h *Handler) UpdateEventVisibilityAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	ctx := c.Request().Context()
+	timelineID := c.Param("tid")
+	eventID := c.Param("eid")
+
+	if _, err := h.requireTimelineInCampaign(c, timelineID, cc.Campaign.ID); err != nil {
+		return err
+	}
+
+	var req struct {
+		VisibilityOverride *string `json:"visibility_override"`
+		VisibilityRules    *string `json:"visibility_rules"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
+	}
+
+	if err := h.svc.UpdateEventLinkVisibility(ctx, timelineID, eventID, UpdateEventVisibilityInput{
+		VisibilityOverride: req.VisibilityOverride,
+		VisibilityRules:    req.VisibilityRules,
+	}); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusOK)
+}
+
+// ListCampaignMembersAPI returns campaign members for the visibility user selector.
+// GET /campaigns/:id/timelines/members
+func (h *Handler) ListCampaignMembersAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+
+	if h.memberLister == nil {
+		return c.JSON(http.StatusOK, []MemberRef{})
+	}
+
+	ms, err := h.memberLister.ListMembers(c.Request().Context(), cc.Campaign.ID)
+	if err != nil {
+		return err
+	}
+
+	refs := make([]MemberRef, 0, len(ms))
+	for _, m := range ms {
+		refs = append(refs, MemberRef{
+			UserID:   m.UserID,
+			Username: m.DisplayName,
+			Role:     m.Role.String(),
+		})
+	}
+	return c.JSON(http.StatusOK, refs)
 }
 
 // parseIntParam extracts an integer path parameter, returning 400 on failure.

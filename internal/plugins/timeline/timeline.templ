@@ -10,6 +10,19 @@ import (
 	"github.com/keyxmakerx/chronicle/internal/templates/layouts"
 )
 
+// visibilityJSON returns a JS-safe quoted string for the visibility value.
+func visibilityJSON(v string) string {
+	return "'" + v + "'"
+}
+
+// rulesJSON returns a JS-safe JSON object or null for visibility rules.
+func rulesJSON(v *string) string {
+	if v == nil || *v == "" {
+		return "null"
+	}
+	return *v
+}
+
 // TimelineListPage renders the full timeline list page.
 templ TimelineListPage(cc *campaigns.CampaignContext, data TimelineListData) {
 	@layouts.App("Timelines") {
@@ -286,12 +299,158 @@ templ timelineShowContent(cc *campaigns.CampaignContext, data TimelineViewData) 
 			</details>
 		}
 		if data.IsOwner {
+			@visibilitySettingsSection(data)
 			@entityGroupsSection(data)
 		}
 		if data.IsScribe {
 			@eventPickerModal(data)
 		}
 	</div>
+}
+
+// visibilitySettingsSection renders the per-user visibility controls for owners.
+templ visibilitySettingsSection(data TimelineViewData) {
+	<details class="mt-4">
+		<summary class="text-sm font-medium text-fg-secondary cursor-pointer hover:text-fg transition-colors mb-3">
+			<i class="fa-solid fa-eye mr-1"></i> Visibility Settings
+			if data.Timeline.IsDMOnly() {
+				<span class="text-xs text-amber-500 ml-2">DM Only</span>
+			}
+			if data.Timeline.VisibilityRules != nil && *data.Timeline.VisibilityRules != "" {
+				<span class="text-xs text-blue-500 ml-2">Custom Rules</span>
+			}
+		</summary>
+		<div
+			class="card p-4 space-y-4"
+			x-data={ fmt.Sprintf(`visibilityManager('%s', '%s', '%s', %s, %s)`,
+				data.CampaignID, data.Timeline.ID, data.CSRFToken,
+				visibilityJSON(data.Timeline.Visibility),
+				rulesJSON(data.Timeline.VisibilityRules)) }
+		>
+			<!-- Base visibility -->
+			<div>
+				<label class="block text-xs font-medium text-fg-body mb-1">Base Visibility</label>
+				<select class="input w-full text-sm" x-model="visibility" @change="saveTimeline()">
+					<option value="everyone">Everyone (all players can see)</option>
+					<option value="dm_only">DM Only (hidden from players)</option>
+				</select>
+			</div>
+			<!-- Per-user restrictions -->
+			<div x-show="visibility === 'everyone'">
+				<label class="block text-xs font-medium text-fg-body mb-1">Per-User Restrictions (Optional)</label>
+				<p class="text-xs text-fg-muted mb-2">Restrict this timeline to specific players, or hide it from specific players.</p>
+				<div class="flex items-center gap-3 mb-2">
+					<label class="inline-flex items-center gap-1 text-xs text-fg-secondary">
+						<input type="radio" name="rule_mode" value="none" x-model="ruleMode" @change="updateRules()" class="text-accent"/>
+						<span>No restrictions</span>
+					</label>
+					<label class="inline-flex items-center gap-1 text-xs text-fg-secondary">
+						<input type="radio" name="rule_mode" value="allow" x-model="ruleMode" @change="updateRules()" class="text-accent"/>
+						<span>Only these players</span>
+					</label>
+					<label class="inline-flex items-center gap-1 text-xs text-fg-secondary">
+						<input type="radio" name="rule_mode" value="deny" x-model="ruleMode" @change="updateRules()" class="text-accent"/>
+						<span>Everyone except</span>
+					</label>
+				</div>
+				<!-- Player checkboxes -->
+				<div x-show="ruleMode !== 'none'" class="space-y-1 max-h-40 overflow-y-auto">
+					<template x-for="member in members" :key="member.user_id">
+						<label class="flex items-center gap-2 text-xs p-1.5 rounded hover:bg-surface-alt cursor-pointer">
+							<input
+								type="checkbox"
+								:value="member.user_id"
+								:checked="selectedUsers.indexOf(member.user_id) !== -1"
+								@change="toggleUser(member.user_id)"
+								class="text-accent"
+							/>
+							<span class="text-fg-secondary" x-text="member.username"></span>
+							<span class="text-fg-muted" x-text="'(' + member.role + ')'"></span>
+						</label>
+					</template>
+				</div>
+			</div>
+			<!-- Save status -->
+			<div class="flex items-center gap-2 text-xs">
+				<span x-show="saving" class="text-fg-muted">Saving...</span>
+				<span x-show="saved" class="text-green-500" x-transition>Saved</span>
+			</div>
+		</div>
+	</details>
+	<script>
+		function visibilityManager(campaignID, timelineID, csrfToken, initVisibility, initRules) {
+			return {
+				visibility: initVisibility,
+				ruleMode: 'none',
+				selectedUsers: [],
+				members: [],
+				saving: false,
+				saved: false,
+				apiBase: '/campaigns/' + campaignID + '/timelines/' + timelineID,
+				init() {
+					// Parse initial rules.
+					if (initRules && initRules.allowed_users && initRules.allowed_users.length > 0) {
+						this.ruleMode = 'allow';
+						this.selectedUsers = initRules.allowed_users.slice();
+					} else if (initRules && initRules.denied_users && initRules.denied_users.length > 0) {
+						this.ruleMode = 'deny';
+						this.selectedUsers = initRules.denied_users.slice();
+					}
+					// Load campaign members.
+					var self = this;
+					fetch('/campaigns/' + campaignID + '/timelines/members')
+						.then(function(r) { return r.json(); })
+						.then(function(data) {
+							// Show non-owner members only (owners always see everything).
+							self.members = (data || []).filter(function(m) { return m.role !== 'owner'; });
+						})
+						.catch(function(err) { console.warn('[timeline] Failed to load members:', err); });
+				},
+				toggleUser(uid) {
+					var idx = this.selectedUsers.indexOf(uid);
+					if (idx === -1) {
+						this.selectedUsers.push(uid);
+					} else {
+						this.selectedUsers.splice(idx, 1);
+					}
+					this.updateRules();
+				},
+				updateRules() {
+					this.saveTimeline();
+				},
+				saveTimeline() {
+					var self = this;
+					self.saving = true;
+					self.saved = false;
+					var rules = null;
+					if (self.ruleMode === 'allow' && self.selectedUsers.length > 0) {
+						rules = JSON.stringify({allowed_users: self.selectedUsers});
+					} else if (self.ruleMode === 'deny' && self.selectedUsers.length > 0) {
+						rules = JSON.stringify({denied_users: self.selectedUsers});
+					}
+					fetch(self.apiBase + '/visibility', {
+						method: 'PUT',
+						headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+						body: JSON.stringify({
+							visibility: self.visibility,
+							visibility_rules: rules
+						})
+					})
+					.then(function(r) {
+						self.saving = false;
+						if (r.ok) {
+							self.saved = true;
+							setTimeout(function() { self.saved = false; }, 2000);
+						}
+					})
+					.catch(function(err) {
+						self.saving = false;
+						console.warn('[timeline] Failed to save visibility:', err);
+					});
+				}
+			};
+		}
+	</script>
 }
 
 // entityGroupsSection renders the swim-lane entity groups management panel.

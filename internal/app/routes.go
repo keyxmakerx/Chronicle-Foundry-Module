@@ -432,6 +432,7 @@ func (a *App) RegisterRoutes() {
 	timelineRepo := timeline.NewTimelineRepository(a.DB)
 	timelineSvc := timeline.NewTimelineService(timelineRepo, &calendarListerAdapter{svc: calendarService}, &calendarEventListerAdapter{svc: calendarService})
 	timelineHandler := timeline.NewHandler(timelineSvc)
+	timelineHandler.SetMemberLister(campaignService)
 	timeline.RegisterRoutes(e, timelineHandler, campaignService, authService)
 
 	// REST API v1: versioned endpoints for external clients (Foundry VTT, etc.).

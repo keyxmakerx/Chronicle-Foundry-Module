@@ -110,6 +110,28 @@ type EventLink struct {
 	EventEntityIcon  string  `json:"event_entity_icon,omitempty"`
 }
 
+// ParseVisibilityRules parses the JSON visibility rules on an event link.
+// Returns nil if no rules are set.
+func (el *EventLink) ParseVisibilityRules() *VisibilityRules {
+	if el.VisibilityRules == nil || *el.VisibilityRules == "" {
+		return nil
+	}
+	var rules VisibilityRules
+	if err := json.Unmarshal([]byte(*el.VisibilityRules), &rules); err != nil {
+		return nil
+	}
+	return &rules
+}
+
+// EffectiveVisibility returns the visibility override if set, otherwise
+// falls back to the original calendar event's visibility.
+func (el *EventLink) EffectiveVisibility() string {
+	if el.VisibilityOverride != nil && *el.VisibilityOverride != "" {
+		return *el.VisibilityOverride
+	}
+	return el.EventVisibility
+}
+
 // EffectiveLabel returns the display label — the override if set, otherwise
 // the original calendar event name.
 func (el *EventLink) EffectiveLabel() string {
@@ -197,6 +219,12 @@ type UpdateEntityGroupInput struct {
 	Color string
 }
 
+// UpdateEventVisibilityInput is the validated input for updating event link visibility.
+type UpdateEventVisibilityInput struct {
+	VisibilityOverride *string
+	VisibilityRules    *string
+}
+
 // --- View Data ---
 
 // TimelineListData holds all data needed to render the timeline list page.
@@ -217,4 +245,13 @@ type TimelineViewData struct {
 	IsOwner      bool
 	IsScribe     bool
 	CSRFToken    string
+	Members      []MemberRef
+}
+
+// MemberRef is a lightweight reference to a campaign member for the
+// visibility rules user selector.
+type MemberRef struct {
+	UserID   string `json:"user_id"`
+	Username string `json:"username"`
+	Role     string `json:"role"`
 }

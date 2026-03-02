@@ -43,6 +43,11 @@ func RegisterRoutes(e *echo.Echo, h *Handler, campaignSvc campaigns.CampaignServ
 	cg.POST("/timelines/:tid/groups/:gid/members", h.AddGroupMemberAPI, campaigns.RequireRole(campaigns.RoleOwner))
 	cg.DELETE("/timelines/:tid/groups/:gid/members/:eid", h.RemoveGroupMemberAPI, campaigns.RequireRole(campaigns.RoleOwner))
 
+	// Visibility management (Owner only).
+	cg.PUT("/timelines/:tid/visibility", h.UpdateTimelineVisibilityAPI, campaigns.RequireRole(campaigns.RoleOwner))
+	cg.PUT("/timelines/:tid/events/:eid/visibility", h.UpdateEventVisibilityAPI, campaigns.RequireRole(campaigns.RoleOwner))
+	cg.GET("/timelines/members", h.ListCampaignMembersAPI, campaigns.RequireRole(campaigns.RoleOwner))
+
 	// Public-capable views: timeline list, show, data endpoint.
 	// Use AllowPublicCampaignAccess so HTMX lazy-loads work correctly.
 	pub := e.Group("/campaigns/:id",

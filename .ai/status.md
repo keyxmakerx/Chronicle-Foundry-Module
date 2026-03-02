@@ -612,6 +612,34 @@ All 6 sprints (5-10) are complete:
 - **Files**: handler.go (7 new handlers + parseIntParam), routes.go (7 new routes),
   timeline.templ (entityGroupsSection component), .ai.md (updated routes + sprint).
 
+### Timeline Plugin Sprint 6 — Visibility Controls — COMPLETE
+- **Per-user visibility filtering**: `canUserView()` helper in service layer evaluates
+  base visibility (everyone/dm_only) then JSON `visibility_rules` (allowed_users whitelist
+  takes precedence over denied_users blacklist). Owners always see everything.
+- **ListTimelines and ListTimelineEvents**: Now filter by per-user visibility rules
+  using the userID parameter (previously reserved, now active).
+- **EventLink visibility**: `EffectiveVisibility()` and `ParseVisibilityRules()` methods
+  on EventLink. `UpdateEventLinkVisibility` service/repo method for per-event overrides.
+- **Validation**: `validateVisibilityRules()` checks JSON format on timeline update and
+  event visibility update. Visibility override validated against allowed values.
+- **MemberLister integration**: Cross-plugin adapter pattern (same as sessions plugin).
+  `ListCampaignMembersAPI` returns campaign members for the visibility user selector.
+  Non-owner members only shown in selector (owners always see everything).
+- **View-as-player integration**: `effectiveRole()` helper checks `layouts.IsViewingAsPlayer`
+  context. Index, Show, and TimelineDataAPI handlers use effective role for content
+  filtering. Owner in "view as player" mode sees only player-visible timelines/events.
+- **Visibility settings UI**: Alpine.js `visibilitySettingsSection` component on timeline
+  show page (Owner only). Base visibility dropdown (everyone/dm_only) + per-user
+  restrictions: radio toggle (none/only these players/everyone except) with member
+  checkboxes. Auto-saves to `PUT /timelines/:tid/visibility` with inline status feedback.
+- **Routes**: 3 new Owner-only routes: PUT .../visibility (timeline), PUT .../events/:eid/visibility
+  (event link), GET .../members (campaign members for selector).
+- **Files**: model.go (ParseVisibilityRules on EventLink, MemberRef, UpdateEventVisibilityInput),
+  service.go (canUserView, validateVisibilityRules, filtering in List methods),
+  repository.go (UpdateEventLinkVisibility), handler.go (MemberLister, effectiveRole,
+  3 new handlers), routes.go (3 new routes), timeline.templ (visibilitySettingsSection,
+  visibilityJSON/rulesJSON helpers), app/routes.go (SetMemberLister wiring).
+
 ### In Progress
 - Nothing currently in progress.
 
@@ -634,9 +662,8 @@ LegendKeeper. Key findings:
   H (secrets) → I (integrations) → J (visualization) → K (delight)
 
 ## Next Session Should
-1. **Timeline Sprint 6:** Visibility controls (per-user JSON rules, view-as-player).
-2. **Timeline Sprint 7:** @Mentions, dashboard block, polish.
-3. **Phase H continued:** Per-entity permissions, group-based visibility.
+1. **Timeline Sprint 7:** @Mentions, dashboard block, polish.
+2. **Phase H continued:** Per-entity permissions, group-based visibility.
 4. **Maps Phase 2 (optional):** Layers, marker groups, nested maps, fog of war.
 5. **Handler-level "view as player":** Extend toggle to filter is_private entities
    at repository level (currently template-only).

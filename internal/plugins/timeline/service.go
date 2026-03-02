@@ -3,6 +3,7 @@ package timeline
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"regexp"
 
@@ -72,6 +73,9 @@ type TimelineService interface {
 	UnlinkEvent(ctx context.Context, timelineID, eventID string) error
 	ListTimelineEvents(ctx context.Context, timelineID string, role int, userID string) ([]EventLink, error)
 	ListAvailableEvents(ctx context.Context, timelineID string, role int) ([]CalendarEventRef, error)
+
+	// Event link visibility.
+	UpdateEventLinkVisibility(ctx context.Context, timelineID, eventID string, input UpdateEventVisibilityInput) error
 
 	// Entity groups.
 	CreateEntityGroup(ctx context.Context, timelineID string, input CreateEntityGroupInput) (*EntityGroup, error)
@@ -169,12 +173,23 @@ func (s *timelineService) GetTimeline(ctx context.Context, timelineID string) (*
 	return t, nil
 }
 
-// ListTimelines returns all timelines for a campaign, filtered by role-based visibility.
-// The userID parameter is reserved for future per-user visibility rules.
+// ListTimelines returns all timelines for a campaign, filtered by role-based
+// visibility and per-user visibility rules.
 func (s *timelineService) ListTimelines(ctx context.Context, campaignID string, role int, userID string) ([]Timeline, error) {
 	timelines, err := s.repo.List(ctx, campaignID, role)
 	if err != nil {
 		return nil, fmt.Errorf("list timelines: %w", err)
+	}
+
+	// Apply per-user visibility rules (Owners always see everything).
+	if role < 3 && userID != "" {
+		filtered := timelines[:0]
+		for _, t := range timelines {
+			if canUserView(t.Visibility, t.VisibilityRules, role, userID) {
+				filtered = append(filtered, t)
+			}
+		}
+		timelines = filtered
 	}
 	return timelines, nil
 }
@@ -206,6 +221,9 @@ func (s *timelineService) UpdateTimeline(ctx context.Context, timelineID string,
 	}
 	if input.Color != "" && !colorPattern.MatchString(input.Color) {
 		return apperror.NewValidation("color must be a valid hex color")
+	}
+	if err := validateVisibilityRules(input.VisibilityRules); err != nil {
+		return err
 	}
 
 	t.Name = input.Name
@@ -277,12 +295,24 @@ func (s *timelineService) UnlinkEvent(ctx context.Context, timelineID, eventID s
 	return nil
 }
 
-// ListTimelineEvents returns all linked events for a timeline, filtered by visibility.
-// The userID parameter is reserved for future per-user visibility rules.
+// ListTimelineEvents returns all linked events for a timeline, filtered by
+// role-based visibility and per-user event link visibility rules.
 func (s *timelineService) ListTimelineEvents(ctx context.Context, timelineID string, role int, userID string) ([]EventLink, error) {
 	events, err := s.repo.ListEventLinks(ctx, timelineID, role)
 	if err != nil {
 		return nil, fmt.Errorf("list timeline events: %w", err)
+	}
+
+	// Apply per-user event link visibility rules (Owners always see everything).
+	if role < 3 && userID != "" {
+		filtered := events[:0]
+		for _, el := range events {
+			vis := el.EffectiveVisibility()
+			if canUserView(vis, el.VisibilityRules, role, userID) {
+				filtered = append(filtered, el)
+			}
+		}
+		events = filtered
 	}
 	return events, nil
 }
@@ -434,10 +464,79 @@ func (s *timelineService) RemoveGroupMember(ctx context.Context, groupID int, en
 	return nil
 }
 
+// UpdateEventLinkVisibility updates the visibility override and rules for an event link.
+func (s *timelineService) UpdateEventLinkVisibility(ctx context.Context, timelineID, eventID string, input UpdateEventVisibilityInput) error {
+	if input.VisibilityOverride != nil && *input.VisibilityOverride != "" {
+		v := *input.VisibilityOverride
+		if v != "everyone" && v != "dm_only" {
+			return apperror.NewValidation("visibility_override must be 'everyone', 'dm_only', or empty")
+		}
+	}
+	if err := validateVisibilityRules(input.VisibilityRules); err != nil {
+		return err
+	}
+	return s.repo.UpdateEventLinkVisibility(ctx, timelineID, eventID, input.VisibilityOverride, input.VisibilityRules)
+}
+
 // ListCalendars returns available calendars for the calendar selector dropdown.
 func (s *timelineService) ListCalendars(ctx context.Context, campaignID string) ([]CalendarRef, error) {
 	if s.calLists == nil {
 		return nil, nil
 	}
 	return s.calLists.ListCalendars(ctx, campaignID)
+}
+
+// --- Visibility Helpers ---
+
+// canUserView checks whether a user can see an item based on its base visibility
+// and per-user JSON rules. Owners (role >= 3) always see everything and should
+// be checked before calling this function.
+func canUserView(baseVisibility string, visRulesJSON *string, role int, userID string) bool {
+	// Base visibility: dm_only requires role >= 2 (Scribe+).
+	if baseVisibility == "dm_only" && role < 2 {
+		return false
+	}
+
+	// Parse per-user JSON rules if present.
+	if visRulesJSON == nil || *visRulesJSON == "" {
+		return true
+	}
+	var rules VisibilityRules
+	if err := json.Unmarshal([]byte(*visRulesJSON), &rules); err != nil {
+		return true // Unparseable rules = visible (fail open for existing items).
+	}
+
+	// AllowedUsers whitelist takes precedence.
+	if len(rules.AllowedUsers) > 0 {
+		for _, uid := range rules.AllowedUsers {
+			if uid == userID {
+				return true
+			}
+		}
+		return false
+	}
+
+	// DeniedUsers blacklist.
+	if len(rules.DeniedUsers) > 0 {
+		for _, uid := range rules.DeniedUsers {
+			if uid == userID {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+// validateVisibilityRules checks that a visibility_rules JSON string is
+// well-formed if present. Returns a validation error on bad JSON.
+func validateVisibilityRules(rulesJSON *string) error {
+	if rulesJSON == nil || *rulesJSON == "" {
+		return nil
+	}
+	var rules VisibilityRules
+	if err := json.Unmarshal([]byte(*rulesJSON), &rules); err != nil {
+		return apperror.NewValidation("visibility_rules must be valid JSON: " + err.Error())
+	}
+	return nil
 }

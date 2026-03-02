@@ -21,6 +21,9 @@ type TimelineRepository interface {
 	ListEventLinks(ctx context.Context, timelineID string, role int) ([]EventLink, error)
 	CountEvents(ctx context.Context, timelineID string) (int, error)
 
+	// Event link visibility.
+	UpdateEventLinkVisibility(ctx context.Context, timelineID, eventID string, visOverride *string, visRules *string) error
+
 	// Entity groups.
 	CreateEntityGroup(ctx context.Context, g *EntityGroup) error
 	UpdateEntityGroup(ctx context.Context, g *EntityGroup) error
@@ -255,6 +258,18 @@ func (r *timelineRepo) CountEvents(ctx context.Context, timelineID string) (int,
 		timelineID,
 	).Scan(&count)
 	return count, err
+}
+
+// --- Event Link Visibility ---
+
+// UpdateEventLinkVisibility sets the visibility override and rules on an event link.
+func (r *timelineRepo) UpdateEventLinkVisibility(ctx context.Context, timelineID, eventID string, visOverride *string, visRules *string) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE timeline_event_links SET visibility_override = ?, visibility_rules = ?
+		 WHERE timeline_id = ? AND event_id = ?`,
+		visOverride, visRules, timelineID, eventID,
+	)
+	return err
 }
 
 // --- Entity Groups ---
