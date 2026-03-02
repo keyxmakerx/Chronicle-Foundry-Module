@@ -1,8 +1,8 @@
 -- Sessions plugin: game session scheduling, linked entities, and RSVP tracking.
 
 CREATE TABLE sessions (
-    id VARCHAR(36) PRIMARY KEY,
-    campaign_id VARCHAR(36) NOT NULL,
+    id CHAR(36) PRIMARY KEY,
+    campaign_id CHAR(36) NOT NULL,
     name VARCHAR(200) NOT NULL,
     summary TEXT,
     notes TEXT,
@@ -13,7 +13,7 @@ CREATE TABLE sessions (
     calendar_day INT,
     status VARCHAR(20) NOT NULL DEFAULT 'planned',
     sort_order INT NOT NULL DEFAULT 0,
-    created_by VARCHAR(36) NOT NULL,
+    created_by CHAR(36) NOT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
@@ -22,8 +22,8 @@ CREATE TABLE sessions (
 
 CREATE TABLE session_entities (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    session_id VARCHAR(36) NOT NULL,
-    entity_id VARCHAR(36) NOT NULL,
+    session_id CHAR(36) NOT NULL,
+    entity_id CHAR(36) NOT NULL,
     role VARCHAR(50) NOT NULL DEFAULT 'mentioned',
     FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
     FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE CASCADE,
@@ -32,8 +32,8 @@ CREATE TABLE session_entities (
 
 CREATE TABLE session_attendees (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    session_id VARCHAR(36) NOT NULL,
-    user_id VARCHAR(36) NOT NULL,
+    session_id CHAR(36) NOT NULL,
+    user_id CHAR(36) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'invited',
     responded_at DATETIME,
     FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
