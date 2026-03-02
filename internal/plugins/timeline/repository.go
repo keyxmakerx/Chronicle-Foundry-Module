@@ -15,6 +15,9 @@ type TimelineRepository interface {
 	Update(ctx context.Context, t *Timeline) error
 	Delete(ctx context.Context, id string) error
 
+	// Search.
+	Search(ctx context.Context, campaignID, query string, role int) ([]Timeline, error)
+
 	// Event links.
 	LinkEvent(ctx context.Context, link *EventLink) error
 	UnlinkEvent(ctx context.Context, timelineID, eventID string) error
@@ -157,6 +160,45 @@ func (r *timelineRepo) Update(ctx context.Context, t *Timeline) error {
 func (r *timelineRepo) Delete(ctx context.Context, id string) error {
 	_, err := r.db.ExecContext(ctx, `DELETE FROM timelines WHERE id = ?`, id)
 	return err
+}
+
+// --- Search ---
+
+// Search returns timelines matching a name query, filtered by role-based visibility.
+func (r *timelineRepo) Search(ctx context.Context, campaignID, query string, role int) ([]Timeline, error) {
+	visFilter := "AND t.visibility = 'everyone'"
+	if role >= 2 {
+		visFilter = ""
+	}
+
+	q := fmt.Sprintf(`
+		SELECT `+timelineCols+`, COALESCE(c.name, '')
+		FROM timelines t
+		LEFT JOIN calendars c ON c.id = t.calendar_id
+		WHERE t.campaign_id = ? AND t.name LIKE ? %s
+		ORDER BY t.name
+		LIMIT 10`, visFilter)
+
+	rows, err := r.db.QueryContext(ctx, q, campaignID, "%"+query+"%")
+	if err != nil {
+		return nil, fmt.Errorf("search timelines: %w", err)
+	}
+	defer rows.Close()
+
+	var result []Timeline
+	for rows.Next() {
+		t := Timeline{}
+		if err := rows.Scan(
+			&t.ID, &t.CampaignID, &t.CalendarID, &t.Name, &t.Description,
+			&t.DescriptionHTML, &t.Color, &t.Icon, &t.Visibility, &t.VisibilityRules,
+			&t.SortOrder, &t.ZoomDefault, &t.CreatedBy, &t.CreatedAt, &t.UpdatedAt,
+			&t.CalendarName,
+		); err != nil {
+			return nil, fmt.Errorf("scan timeline: %w", err)
+		}
+		result = append(result, t)
+	}
+	return result, rows.Err()
 }
 
 // --- Event Links ---

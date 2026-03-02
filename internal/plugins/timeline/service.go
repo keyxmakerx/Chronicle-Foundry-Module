@@ -85,6 +85,9 @@ type TimelineService interface {
 	AddGroupMember(ctx context.Context, groupID int, entityID string) error
 	RemoveGroupMember(ctx context.Context, groupID int, entityID string) error
 
+	// Search.
+	SearchTimelines(ctx context.Context, campaignID, query string, role int) ([]map[string]string, error)
+
 	// Calendar lookup.
 	ListCalendars(ctx context.Context, campaignID string) ([]CalendarRef, error)
 }
@@ -462,6 +465,28 @@ func (s *timelineService) RemoveGroupMember(ctx context.Context, groupID int, en
 		return fmt.Errorf("remove group member: %w", err)
 	}
 	return nil
+}
+
+// SearchTimelines returns timelines matching a query as map results for the @mention system.
+// Results are formatted to match the entity search JSON format used by editor_mention.js.
+func (s *timelineService) SearchTimelines(ctx context.Context, campaignID, query string, role int) ([]map[string]string, error) {
+	timelines, err := s.repo.Search(ctx, campaignID, query, role)
+	if err != nil {
+		return nil, fmt.Errorf("search timelines: %w", err)
+	}
+
+	results := make([]map[string]string, 0, len(timelines))
+	for _, t := range timelines {
+		results = append(results, map[string]string{
+			"id":         t.ID,
+			"name":       t.Name,
+			"type_name":  "Timeline",
+			"type_icon":  t.Icon,
+			"type_color": t.Color,
+			"url":        fmt.Sprintf("/campaigns/%s/timelines/%s", campaignID, t.ID),
+		})
+	}
+	return results, nil
 }
 
 // UpdateEventLinkVisibility updates the visibility override and rules for an event link.

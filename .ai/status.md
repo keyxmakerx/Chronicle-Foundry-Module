@@ -640,6 +640,35 @@ All 6 sprints (5-10) are complete:
   3 new handlers), routes.go (3 new routes), timeline.templ (visibilitySettingsSection,
   visibilityJSON/rulesJSON helpers), app/routes.go (SetMemberLister wiring).
 
+### Timeline Plugin Sprint 7 — @Mentions, Dashboard Block, Polish — COMPLETE
+- **Dashboard block**: `timeline_preview` block type for campaign dashboard editor.
+  HTMX lazy-loaded from `GET /timelines/preview?limit=N`. Shows timeline cards with
+  icon, name, calendar name, event count, and DM-only indicator. Palette entry in
+  dashboard_editor.js with configurable limit (1-20).
+- **@Mention support**: `TimelineSearcher` cross-plugin interface on entity handler.
+  Timeline service `SearchTimelines()` method with LIKE query (name match, role-filtered,
+  limit 10). Entity search JSON response appends timeline results when the editor
+  @mention widget requests JSON (Accept: application/json). Timelines appear in the
+  @mention popup with type "Timeline" and timeline icon/color.
+- **Repository search**: `Search()` method on timeline repo with LIKE-based name matching,
+  visibility filtering, and calendar name JOIN.
+- **Wiring**: `entityHandler.SetTimelineSearcher(timelineSvc)` in app/routes.go.
+- **Files**: model.go (no change), service.go (SearchTimelines), repository.go (Search),
+  handler.go (PreviewAPI), routes.go (preview route), timeline.templ (timelinePreviewFragment),
+  campaigns/model.go (BlockTimelinePreview), campaigns/dashboard_blocks.templ
+  (dashTimelinePreview), entities/handler.go (TimelineSearcher interface, SearchAPI merge),
+  dashboard_editor.js (palette + config), app/routes.go (wiring).
+
+### All 7 Timeline Plugin Sprints Complete
+The timeline plugin is now fully implemented with all planned features:
+- Sprint 1: Core infrastructure (CRUD, migration, sidebar, list/show pages)
+- Sprint 2: Calendar event linking (link/unlink UI, event picker, bulk link)
+- Sprint 3: Interactive D3.js visualization (zoom, pan, drag, tooltips)
+- Sprint 4: Zoom levels and search (era→day visual styles, search/filter bar)
+- Sprint 5: Entity groups and swim-lanes
+- Sprint 6: Visibility controls (per-user JSON rules, view-as-player)
+- Sprint 7: @Mentions, dashboard block, polish
+
 ### In Progress
 - Nothing currently in progress.
 
@@ -662,8 +691,7 @@ LegendKeeper. Key findings:
   H (secrets) → I (integrations) → J (visualization) → K (delight)
 
 ## Next Session Should
-1. **Timeline Sprint 7:** @Mentions, dashboard block, polish.
-2. **Phase H continued:** Per-entity permissions, group-based visibility.
+1. **Phase H continued:** Per-entity permissions, group-based visibility.
 4. **Maps Phase 2 (optional):** Layers, marker groups, nested maps, fog of war.
 5. **Handler-level "view as player":** Extend toggle to filter is_private entities
    at repository level (currently template-only).

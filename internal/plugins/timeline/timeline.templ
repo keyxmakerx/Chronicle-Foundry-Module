@@ -23,6 +23,39 @@ func rulesJSON(v *string) string {
 	return *v
 }
 
+
+// timelinePreviewFragment renders timeline summary items for the dashboard preview block.
+templ timelinePreviewFragment(campaignID string, timelines []Timeline) {
+	if len(timelines) == 0 {
+		<div class="px-4 py-3 text-sm text-fg-muted">No timelines yet.</div>
+	} else {
+		for _, t := range timelines {
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/timelines/%s", campaignID, t.ID)) }
+				class="flex items-center gap-3 px-4 py-3 hover:bg-surface-alt transition-colors"
+			>
+				<div
+					class="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0"
+					style={ fmt.Sprintf("background-color: %s20; color: %s", t.Color, t.Color) }
+				>
+					<i class={ "fa-solid " + t.Icon + " text-sm" }></i>
+				</div>
+				<div class="min-w-0 flex-1">
+					<div class="text-sm font-medium text-fg truncate">{ t.Name }</div>
+					<div class="text-xs text-fg-muted">
+						{ t.CalendarName }
+						<span class="mx-1">&middot;</span>
+						{ fmt.Sprintf("%d events", t.EventCount) }
+					</div>
+				</div>
+				if t.IsDMOnly() {
+					<span class="text-xs text-amber-500"><i class="fa-solid fa-eye-slash"></i></span>
+				}
+			</a>
+		}
+	}
+}
+
 // TimelineListPage renders the full timeline list page.
 templ TimelineListPage(cc *campaigns.CampaignContext, data TimelineListData) {
 	@layouts.App("Timelines") {

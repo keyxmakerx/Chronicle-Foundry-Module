@@ -592,6 +592,37 @@ func (h *Handler) ListCampaignMembersAPI(c echo.Context) error {
 	return c.JSON(http.StatusOK, refs)
 }
 
+// PreviewAPI returns an HTMX fragment for the dashboard timeline preview block.
+// GET /campaigns/:id/timelines/preview
+func (h *Handler) PreviewAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	ctx := c.Request().Context()
+	role := effectiveRole(c, cc)
+	userID := auth.GetUserID(c)
+
+	timelines, err := h.svc.ListTimelines(ctx, cc.Campaign.ID, role, userID)
+	if err != nil {
+		return err
+	}
+
+	// Apply limit from query param (default 5, max 20).
+	limit := 5
+	if l := c.QueryParam("limit"); l != "" {
+		if _, err := fmt.Sscanf(l, "%d", &limit); err != nil || limit < 1 {
+			limit = 5
+		}
+		if limit > 20 {
+			limit = 20
+		}
+	}
+	if limit > len(timelines) {
+		limit = len(timelines)
+	}
+	timelines = timelines[:limit]
+
+	return middleware.Render(c, http.StatusOK, timelinePreviewFragment(cc.Campaign.ID, timelines))
+}
+
 // parseIntParam extracts an integer path parameter, returning 400 on failure.
 func parseIntParam(c echo.Context, name string) (int, error) {
 	s := c.Param(name)

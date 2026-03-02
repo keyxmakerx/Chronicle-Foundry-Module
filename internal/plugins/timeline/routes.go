@@ -57,4 +57,5 @@ func RegisterRoutes(e *echo.Echo, h *Handler, campaignSvc campaigns.CampaignServ
 	pub.GET("/timelines", h.Index, campaigns.RequireRole(campaigns.RolePlayer))
 	pub.GET("/timelines/:tid", h.Show, campaigns.RequireRole(campaigns.RolePlayer))
 	pub.GET("/timelines/:tid/data", h.TimelineDataAPI, campaigns.RequireRole(campaigns.RolePlayer))
+	pub.GET("/timelines/preview", h.PreviewAPI, campaigns.RequireRole(campaigns.RolePlayer))
 }
