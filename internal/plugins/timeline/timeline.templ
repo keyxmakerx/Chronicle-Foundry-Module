@@ -784,9 +784,9 @@ templ eventPickerModal(data TimelineViewData) {
 				},
 				linkEvent(evt) {
 					var self = this;
-					var csrfToken = document.querySelector('meta[name="csrf-token"]');
+					var m = document.cookie.match('(?:^|; )chronicle_csrf=([^;]*)');
 					var headers = {'Content-Type': 'application/json'};
-					if (csrfToken) headers['X-CSRF-Token'] = csrfToken.content;
+					if (m) headers['X-CSRF-Token'] = decodeURIComponent(m[1]);
 					fetch(self.apiBase + '/events', {
 						method: 'POST',
 						headers: headers,
