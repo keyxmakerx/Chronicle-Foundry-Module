@@ -152,6 +152,22 @@ func (a *entityTagFetcherAdapter) GetEntityTagsBatch(ctx context.Context, entity
 	return result, nil
 }
 
+// entityCampaignCheckerAdapter wraps entities.EntityService to implement the
+// sessions.EntityCampaignChecker interface, verifying entity-campaign membership
+// to prevent cross-campaign IDOR attacks on entity linking.
+type entityCampaignCheckerAdapter struct {
+	svc entities.EntityService
+}
+
+// EntityBelongsToCampaign checks if the given entity exists in the given campaign.
+func (a *entityCampaignCheckerAdapter) EntityBelongsToCampaign(ctx context.Context, entityID, campaignID string) (bool, error) {
+	entity, err := a.svc.GetByID(ctx, entityID)
+	if err != nil {
+		return false, err
+	}
+	return entity.CampaignID == campaignID, nil
+}
+
 // storageLimiterAdapter wraps settings.SettingsService to implement the
 // media.StorageLimiter interface without creating a circular import.
 type storageLimiterAdapter struct {
@@ -334,8 +350,9 @@ func (a *App) RegisterRoutes() {
 	maps.RegisterRoutes(e, mapsHandler, campaignService, authService)
 
 	// Sessions plugin: game session scheduling, linked entities, RSVP tracking.
+	// Entity campaign checker prevents cross-campaign entity linking (IDOR).
 	sessionsRepo := sessions.NewSessionRepository(a.DB)
-	sessionsService := sessions.NewSessionService(sessionsRepo)
+	sessionsService := sessions.NewSessionService(sessionsRepo, &entityCampaignCheckerAdapter{svc: entityService})
 	sessionsHandler := sessions.NewHandler(sessionsService)
 	sessionsHandler.SetMemberLister(campaignService)
 	sessions.RegisterRoutes(e, sessionsHandler, campaignService, authService)

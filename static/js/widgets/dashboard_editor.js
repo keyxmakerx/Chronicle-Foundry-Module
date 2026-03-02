@@ -543,7 +543,7 @@
           var limit = prompt('Number of recent pages to show (4-12):', cfg.limit || '8');
           if (limit !== null) {
             var n = parseInt(limit);
-            if (n >= 1 && n <= 50) {
+            if (n >= 4 && n <= 12) {
               block.config.limit = n;
               this.dirty = true;
               this.render();

@@ -8,11 +8,12 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-01 -- Rich text event descriptions with @mentions (Sprint 10). Added TipTap
-rich text editor to event create/edit modal with @mention entity search support. Dual
-storage: ProseMirror JSON in `description`, sanitized HTML in `description_html` (new
-column via migration 000034). Timeline renders rich HTML descriptions. Legacy plain text
-events handled gracefully. Calendar V2 plan (Sprints 5-10) is now fully complete.
+2026-03-02 -- Comprehensive code review. 14 issues identified and fixed across security,
+code quality, frontend, and documentation. Key fixes: Sessions IDOR (cross-campaign entity
+linking), secret stripping regex multiline leak, settings ParseFloat silent zero default,
+calendar event visibility validation on update, calendar handler refactored to thin handler
+pattern, entity repository error handling consistency, editor widget memory leak, template
+editor JSON.parse crash protection, notes widget missing error handler.
 
 ## Current Phase
 **Phase H: Secrets & Permissions.** Inline secrets complete. Documentation audit
@@ -482,6 +483,31 @@ All 6 sprints (5-10) are complete:
 - Sprint 9: Calendar Import/Export
 - Sprint 10: Rich Text Event Descriptions + @Mentions
 
+### Code Review & Hardening — COMPLETE
+- **Sessions IDOR fix**: `LinkEntityAPI` now verifies entity belongs to the same campaign
+  as the session via `EntityCampaignChecker` interface, preventing cross-campaign IDOR.
+- **Secret regex fix**: Added `(?s)` dotall flag to `secretSpanRe` for multiline matching.
+  Fixed misleading comment about nested tag handling.
+- **Settings validation**: `UpdateStorageSettings` now validates ParseFloat/Atoi results
+  instead of silently defaulting to 0 (which means "no limit").
+- **Calendar visibility**: `UpdateEvent` now validates visibility field (same rules as
+  `CreateEvent`), preventing arbitrary visibility values via API.
+- **Entity repo consistency**: Fixed 3 ignored `json.Unmarshal` errors on PinnedEntityIDs
+  and 13 ignored `RowsAffected()` errors throughout `entities/repository.go`.
+- **Calendar handler refactor**: Moved ~150 lines of seeding logic (Gregorian/fantasy
+  months, weekdays, time system defaults) from handler to service. Handler now follows
+  "thin handler" convention.
+- **Entity handler**: Added `slog.Warn` for previously unchecked `GetEntityTypes` and
+  `CountByType` service errors.
+- **Editor memory leak**: Insert menu global click listener now stored and removed in
+  widget `destroy()` to prevent leaks during HTMX re-mounts.
+- **Template editor**: `JSON.parse` calls wrapped in try-catch with fallback defaults.
+- **Notes widget**: Added `.catch()` handler to create note promise chain.
+- **Dashboard editor**: Fixed validation mismatch (prompt said 4-12, code allowed 1-50).
+- **Files changed**: sessions/{service,handler}.go, sanitize/sanitize.go, settings/handler.go,
+  calendar/{service,handler}.go, entities/{repository,handler}.go, app/routes.go,
+  editor.js, template_editor.js, notes.js, dashboard_editor.js, .ai/status.md.
+
 ### In Progress
 - Nothing currently in progress.
 
@@ -489,7 +515,7 @@ All 6 sprints (5-10) are complete:
 - Nothing blocked
 
 ## Active Branch
-`claude/fix-calendar-migration-67cQE`
+`claude/project-code-review-8BHVS`
 
 ## Competitive Analysis & Roadmap
 Created `.ai/roadmap.md` with comprehensive comparison vs WorldAnvil, Kanka, and

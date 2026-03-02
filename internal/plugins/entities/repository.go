@@ -98,7 +98,9 @@ func (r *entityTypeRepository) FindByID(ctx context.Context, id int) (*EntityTyp
 	}
 	et.Layout = ParseLayoutJSON(layoutRaw)
 	if len(pinnedRaw) > 0 {
-		json.Unmarshal(pinnedRaw, &et.PinnedEntityIDs)
+		if err := json.Unmarshal(pinnedRaw, &et.PinnedEntityIDs); err != nil {
+			return nil, fmt.Errorf("unmarshaling pinned entity IDs: %w", err)
+		}
 	}
 	return et, nil
 }
@@ -130,7 +132,9 @@ func (r *entityTypeRepository) FindBySlug(ctx context.Context, campaignID, slug 
 	}
 	et.Layout = ParseLayoutJSON(layoutRaw)
 	if len(pinnedRaw) > 0 {
-		json.Unmarshal(pinnedRaw, &et.PinnedEntityIDs)
+		if err := json.Unmarshal(pinnedRaw, &et.PinnedEntityIDs); err != nil {
+			return nil, fmt.Errorf("unmarshaling pinned entity IDs: %w", err)
+		}
 	}
 	return et, nil
 }
@@ -182,7 +186,10 @@ func (r *entityTypeRepository) UpdateLayout(ctx context.Context, id int, layoutJ
 	if err != nil {
 		return fmt.Errorf("updating entity type layout: %w", err)
 	}
-	rows, _ := result.RowsAffected()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
 	if rows == 0 {
 		return apperror.NewNotFound("entity type not found")
 	}
@@ -199,7 +206,10 @@ func (r *entityTypeRepository) UpdateColor(ctx context.Context, id int, color st
 	if err != nil {
 		return fmt.Errorf("updating entity type color: %w", err)
 	}
-	rows, _ := result.RowsAffected()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
 	if rows == 0 {
 		return apperror.NewNotFound("entity type not found")
 	}
@@ -221,7 +231,10 @@ func (r *entityTypeRepository) UpdateDashboard(ctx context.Context, id int, desc
 	if err != nil {
 		return fmt.Errorf("updating entity type dashboard: %w", err)
 	}
-	rows, _ := result.RowsAffected()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
 	if rows == 0 {
 		return apperror.NewNotFound("entity type not found")
 	}
@@ -238,7 +251,10 @@ func (r *entityTypeRepository) UpdateDashboardLayout(ctx context.Context, id int
 	if err != nil {
 		return fmt.Errorf("updating entity type dashboard layout: %w", err)
 	}
-	rows, _ := result.RowsAffected()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
 	if rows == 0 {
 		return apperror.NewNotFound("entity type not found")
 	}
@@ -262,7 +278,10 @@ func (r *entityTypeRepository) Update(ctx context.Context, et *EntityType) error
 		return fmt.Errorf("updating entity type: %w", err)
 	}
 
-	rows, _ := result.RowsAffected()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
 	if rows == 0 {
 		return apperror.NewNotFound("entity type not found")
 	}
@@ -276,7 +295,10 @@ func (r *entityTypeRepository) Delete(ctx context.Context, id int) error {
 		return fmt.Errorf("deleting entity type: %w", err)
 	}
 
-	rows, _ := result.RowsAffected()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
 	if rows == 0 {
 		return apperror.NewNotFound("entity type not found")
 	}
@@ -555,7 +577,10 @@ func (r *entityRepository) Update(ctx context.Context, entity *Entity) error {
 		return fmt.Errorf("updating entity: %w", err)
 	}
 
-	rows, _ := result.RowsAffected()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
 	if rows == 0 {
 		return apperror.NewNotFound("entity not found")
 	}
@@ -572,7 +597,10 @@ func (r *entityRepository) UpdateEntry(ctx context.Context, id, entryJSON, entry
 		return fmt.Errorf("updating entity entry: %w", err)
 	}
 
-	rows, _ := result.RowsAffected()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
 	if rows == 0 {
 		return apperror.NewNotFound("entity not found")
 	}
@@ -594,7 +622,10 @@ func (r *entityRepository) UpdateFields(ctx context.Context, id string, fieldsDa
 		return fmt.Errorf("updating entity fields: %w", err)
 	}
 
-	rows, _ := result.RowsAffected()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
 	if rows == 0 {
 		return apperror.NewNotFound("entity not found")
 	}
@@ -619,7 +650,10 @@ func (r *entityRepository) UpdateFieldOverrides(ctx context.Context, id string, 
 		return fmt.Errorf("updating entity field overrides: %w", err)
 	}
 
-	rows, _ := result.RowsAffected()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
 	if rows == 0 {
 		return apperror.NewNotFound("entity not found")
 	}
@@ -657,7 +691,10 @@ func (r *entityRepository) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("deleting entity: %w", err)
 	}
 
-	rows, _ := result.RowsAffected()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
 	if rows == 0 {
 		return apperror.NewNotFound("entity not found")
 	}
@@ -953,7 +990,10 @@ func (r *entityRepository) UpdateParent(ctx context.Context, entityID string, pa
 		return fmt.Errorf("updating entity parent: %w", err)
 	}
 
-	rows, _ := result.RowsAffected()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
 	if rows == 0 {
 		return apperror.NewNotFound("entity not found")
 	}
@@ -1018,7 +1058,10 @@ func (r *entityRepository) UpdatePopupConfig(ctx context.Context, entityID strin
 		return fmt.Errorf("updating popup config: %w", err)
 	}
 
-	rows, _ := result.RowsAffected()
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
 	if rows == 0 {
 		return apperror.NewNotFound("entity not found")
 	}

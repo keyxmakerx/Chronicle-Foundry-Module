@@ -121,9 +121,16 @@ func (h *Handler) Index(c echo.Context) error {
 		}
 	}
 
-	// Fetch entity types for sidebar filter and counts.
-	entityTypes, _ := h.service.GetEntityTypes(c.Request().Context(), campaignID)
-	counts, _ := h.service.CountByType(c.Request().Context(), campaignID, role)
+	// Fetch entity types for sidebar filter and counts. Non-fatal: degrade
+	// gracefully if these fail (page still renders, just without filters).
+	entityTypes, err := h.service.GetEntityTypes(c.Request().Context(), campaignID)
+	if err != nil {
+		slog.Warn("failed to load entity types for list page", slog.Any("error", err))
+	}
+	counts, err := h.service.CountByType(c.Request().Context(), campaignID, role)
+	if err != nil {
+		slog.Warn("failed to load entity counts for list page", slog.Any("error", err))
+	}
 
 	entities, total, err := h.service.List(c.Request().Context(), campaignID, typeID, role, opts)
 	if err != nil {
