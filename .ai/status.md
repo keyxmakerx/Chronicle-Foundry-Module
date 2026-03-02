@@ -596,6 +596,22 @@ All 6 sprints (5-10) are complete:
 - **Files**: static/js/widgets/timeline_viz.js (enhanced), static/css/input.css
   (search bar, date/entity label styles).
 
+### Timeline Plugin Sprint 5 — Entity Groups and Swim-Lanes — COMPLETE
+- **Entity group CRUD handlers**: CreateEntityGroupAPI, UpdateEntityGroupAPI,
+  DeleteEntityGroupAPI, ListEntityGroupsAPI — all Owner-only with IDOR protection
+  via requireTimelineInCampaign.
+- **Group member management**: AddGroupMemberAPI (with entity_id validation),
+  RemoveGroupMemberAPI — Owner-only routes.
+- **parseIntParam helper**: Extracts integer path parameters (:gid) with 400 error
+  on non-numeric input.
+- **Routes**: 7 new Owner-only routes under `/campaigns/:id/timelines/:tid/groups/...`
+  for full group and member lifecycle.
+- **Template**: entityGroupsSection Alpine.js component on timeline show page with:
+  create group form (name + color), group list with member chips, entity search for
+  adding members, inline delete for groups and members. Only visible to Owner role.
+- **Files**: handler.go (7 new handlers + parseIntParam), routes.go (7 new routes),
+  timeline.templ (entityGroupsSection component), .ai.md (updated routes + sprint).
+
 ### In Progress
 - Nothing currently in progress.
 
@@ -618,14 +634,13 @@ LegendKeeper. Key findings:
   H (secrets) → I (integrations) → J (visualization) → K (delight)
 
 ## Next Session Should
-1. **Timeline Sprint 5:** Entity groups and swim-lanes (group CRUD, member management,
-   swim-lane visualization in D3 widget).
-2. **Timeline Sprint 6:** Visibility controls (per-user JSON rules, view-as-player).
+1. **Timeline Sprint 6:** Visibility controls (per-user JSON rules, view-as-player).
+2. **Timeline Sprint 7:** @Mentions, dashboard block, polish.
 3. **Phase H continued:** Per-entity permissions, group-based visibility.
 4. **Maps Phase 2 (optional):** Layers, marker groups, nested maps, fog of war.
-4. **Handler-level "view as player":** Extend toggle to filter is_private entities
+5. **Handler-level "view as player":** Extend toggle to filter is_private entities
    at repository level (currently template-only).
-5. **UX polish:** Entity search typeahead for calendar event + map marker entity linking.
+6. **UX polish:** Entity search typeahead for calendar event + map marker entity linking.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)

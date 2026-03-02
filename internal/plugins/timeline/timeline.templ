@@ -285,10 +285,201 @@ templ timelineShowContent(cc *campaigns.CampaignContext, data TimelineViewData) 
 				</div>
 			</details>
 		}
+		if data.IsOwner {
+			@entityGroupsSection(data)
+		}
 		if data.IsScribe {
 			@eventPickerModal(data)
 		}
 	</div>
+}
+
+// entityGroupsSection renders the swim-lane entity groups management panel.
+templ entityGroupsSection(data TimelineViewData) {
+	<details class="mt-4">
+		<summary class="text-sm font-medium text-fg-secondary cursor-pointer hover:text-fg transition-colors mb-3">
+			<i class="fa-solid fa-layer-group mr-1"></i> Entity Groups ({ fmt.Sprintf("%d", len(data.EntityGroups)) })
+		</summary>
+		<div
+			class="space-y-3"
+			x-data={ fmt.Sprintf(`entityGroupManager('%s', '%s', '%s')`, data.CampaignID, data.Timeline.ID, data.CSRFToken) }
+		>
+			<!-- Create group form -->
+			<div class="flex items-center gap-2 mb-3">
+				<input
+					type="text"
+					class="input flex-1 text-sm"
+					placeholder="New group name..."
+					x-model="newGroupName"
+					@keydown.enter="createGroup()"
+				/>
+				<input type="color" class="input w-10 h-8" x-model="newGroupColor" value="#6b7280"/>
+				<button class="btn-primary text-xs" @click="createGroup()" :disabled="!newGroupName.trim()">
+					<i class="fa-solid fa-plus mr-1"></i> Add Group
+				</button>
+			</div>
+			<!-- Group list -->
+			<template x-for="group in groups" :key="group.id">
+				<div class="card p-3">
+					<div class="flex items-center gap-2 mb-2">
+						<div class="w-3 h-3 rounded-full flex-shrink-0" :style="'background-color:' + group.color"></div>
+						<span class="text-sm font-medium text-fg flex-1" x-text="group.name"></span>
+						<span class="text-xs text-fg-muted" x-text="(group.members||[]).length + ' entities'"></span>
+						<button class="text-xs text-fg-muted hover:text-red-500" @click="deleteGroup(group.id)" title="Delete group">
+							<i class="fa-solid fa-trash"></i>
+						</button>
+					</div>
+					<!-- Members -->
+					<div class="flex flex-wrap gap-1 mb-2" x-show="(group.members||[]).length > 0">
+						<template x-for="member in (group.members||[])" :key="member.entity_id">
+							<span class="inline-flex items-center gap-1 text-xs bg-surface-alt text-fg-secondary px-2 py-0.5 rounded">
+								<span x-text="member.entity_name"></span>
+								<button class="text-fg-muted hover:text-red-500" @click="removeMember(group.id, member.entity_id)">&times;</button>
+							</span>
+						</template>
+					</div>
+					<!-- Add member input -->
+					<div class="flex items-center gap-2">
+						<input
+							type="text"
+							class="input flex-1 text-xs"
+							placeholder="Search entity to add..."
+							:id="'group-entity-input-' + group.id"
+							@input.debounce.300ms="searchEntities(group.id, \.target.value)"
+						/>
+					</div>
+					<!-- Entity search results -->
+					<div class="mt-1 space-y-1" x-show="entityResults[group.id] && entityResults[group.id].length > 0">
+						<template x-for="ent in (entityResults[group.id] || [])" :key="ent.id">
+							<button
+								class="w-full text-left text-xs p-1.5 rounded hover:bg-surface-alt text-fg-secondary"
+								@click="addMember(group.id, ent.id, ent.name)"
+							>
+								<span x-text="ent.name"></span>
+							</button>
+						</template>
+					</div>
+				</div>
+			</template>
+			<template x-if="groups.length === 0">
+				<div class="text-center text-xs text-fg-muted py-3">
+					No entity groups yet. Create one to organize events into swim-lanes.
+				</div>
+			</template>
+		</div>
+	</details>
+	<script>
+		function entityGroupManager(campaignID, timelineID, csrfToken) {
+			return {
+				groups: [],
+				newGroupName: '',
+				newGroupColor: '#6b7280',
+				entityResults: {},
+				apiBase: '/campaigns/' + campaignID + '/timelines/' + timelineID,
+				init() {
+					this.loadGroups();
+				},
+				loadGroups() {
+					var self = this;
+					fetch(self.apiBase + '/groups')
+						.then(function(r) { return r.json(); })
+						.then(function(data) { self.groups = data || []; })
+						.catch(function(err) { console.warn('[timeline] Failed to load groups:', err); });
+				},
+				createGroup() {
+					var name = this.newGroupName.trim();
+					if (!name) return;
+					var self = this;
+					fetch(self.apiBase + '/groups', {
+						method: 'POST',
+						headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+						body: JSON.stringify({name: name, color: self.newGroupColor})
+					})
+					.then(function(r) { return r.json(); })
+					.then(function(g) {
+						g.members = [];
+						self.groups.push(g);
+						self.newGroupName = '';
+						self.newGroupColor = '#6b7280';
+					})
+					.catch(function(err) { console.warn('[timeline] Failed to create group:', err); });
+				},
+				deleteGroup(groupID) {
+					if (!confirm('Delete this group?')) return;
+					var self = this;
+					fetch(self.apiBase + '/groups/' + groupID, {
+						method: 'DELETE',
+						headers: {'X-CSRF-Token': csrfToken}
+					})
+					.then(function(r) {
+						if (r.ok) self.groups = self.groups.filter(function(g) { return g.id !== groupID; });
+					})
+					.catch(function(err) { console.warn('[timeline] Failed to delete group:', err); });
+				},
+				addMember(groupID, entityID, entityName) {
+					var self = this;
+					fetch(self.apiBase + '/groups/' + groupID + '/members', {
+						method: 'POST',
+						headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+						body: JSON.stringify({entity_id: entityID})
+					})
+					.then(function(r) {
+						if (r.ok) {
+							var group = self.groups.find(function(g) { return g.id === groupID; });
+							if (group) {
+								if (!group.members) group.members = [];
+								group.members.push({entity_id: entityID, entity_name: entityName});
+							}
+							self.entityResults[groupID] = [];
+							var input = document.getElementById('group-entity-input-' + groupID);
+							if (input) input.value = '';
+						}
+					})
+					.catch(function(err) { console.warn('[timeline] Failed to add member:', err); });
+				},
+				removeMember(groupID, entityID) {
+					var self = this;
+					fetch(self.apiBase + '/groups/' + groupID + '/members/' + entityID, {
+						method: 'DELETE',
+						headers: {'X-CSRF-Token': csrfToken}
+					})
+					.then(function(r) {
+						if (r.ok) {
+							var group = self.groups.find(function(g) { return g.id === groupID; });
+							if (group) {
+								group.members = (group.members||[]).filter(function(m) { return m.entity_id !== entityID; });
+							}
+						}
+					})
+					.catch(function(err) { console.warn('[timeline] Failed to remove member:', err); });
+				},
+				searchEntities(groupID, query) {
+					var self = this;
+					if (!query || query.length < 2) {
+						self.entityResults[groupID] = [];
+						return;
+					}
+					fetch('/campaigns/' + campaignID + '/entities/search?q=' + encodeURIComponent(query), {
+						headers: {'Accept': 'application/json'}
+					})
+					.then(function(r) { return r.json(); })
+					.then(function(data) {
+						var results = (data.entities || data || []).slice(0, 8);
+						// Filter out already-added members.
+						var group = self.groups.find(function(g) { return g.id === groupID; });
+						var memberIDs = {};
+						if (group && group.members) {
+							for (var i = 0; i < group.members.length; i++) {
+								memberIDs[group.members[i].entity_id] = true;
+							}
+						}
+						self.entityResults[groupID] = results.filter(function(e) { return !memberIDs[e.id]; });
+					})
+					.catch(function(err) { console.warn('[timeline] Entity search failed:', err); });
+				}
+			};
+		}
+	</script>
 }
 
 // eventPickerModal renders the modal for linking calendar events to a timeline.

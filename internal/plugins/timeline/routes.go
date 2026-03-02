@@ -33,6 +33,16 @@ func RegisterRoutes(e *echo.Echo, h *Handler, campaignSvc campaigns.CampaignServ
 	// Available events list for event picker (Scribe+).
 	cg.GET("/timelines/:tid/available-events", h.ListAvailableEventsAPI, campaigns.RequireRole(campaigns.RoleScribe))
 
+	// Entity group CRUD (Owner only — swim-lane management).
+	cg.GET("/timelines/:tid/groups", h.ListEntityGroupsAPI, campaigns.RequireRole(campaigns.RoleOwner))
+	cg.POST("/timelines/:tid/groups", h.CreateEntityGroupAPI, campaigns.RequireRole(campaigns.RoleOwner))
+	cg.PUT("/timelines/:tid/groups/:gid", h.UpdateEntityGroupAPI, campaigns.RequireRole(campaigns.RoleOwner))
+	cg.DELETE("/timelines/:tid/groups/:gid", h.DeleteEntityGroupAPI, campaigns.RequireRole(campaigns.RoleOwner))
+
+	// Entity group member management (Owner only).
+	cg.POST("/timelines/:tid/groups/:gid/members", h.AddGroupMemberAPI, campaigns.RequireRole(campaigns.RoleOwner))
+	cg.DELETE("/timelines/:tid/groups/:gid/members/:eid", h.RemoveGroupMemberAPI, campaigns.RequireRole(campaigns.RoleOwner))
+
 	// Public-capable views: timeline list, show, data endpoint.
 	// Use AllowPublicCampaignAccess so HTMX lazy-loads work correctly.
 	pub := e.Group("/campaigns/:id",

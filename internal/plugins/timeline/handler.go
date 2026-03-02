@@ -322,3 +322,157 @@ func (h *Handler) ListCalendarsAPI(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, calendars)
 }
+
+// CreateEntityGroupAPI creates a new entity group for swim-lane organization.
+// POST /campaigns/:id/timelines/:tid/groups
+func (h *Handler) CreateEntityGroupAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	timelineID := c.Param("tid")
+
+	if _, err := h.requireTimelineInCampaign(c, timelineID, cc.Campaign.ID); err != nil {
+		return err
+	}
+
+	var req struct {
+		Name  string `json:"name"`
+		Color string `json:"color"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
+	}
+
+	g, err := h.svc.CreateEntityGroup(c.Request().Context(), timelineID, CreateEntityGroupInput{
+		Name:  req.Name,
+		Color: req.Color,
+	})
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusCreated, g)
+}
+
+// UpdateEntityGroupAPI modifies an existing entity group.
+// PUT /campaigns/:id/timelines/:tid/groups/:gid
+func (h *Handler) UpdateEntityGroupAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	timelineID := c.Param("tid")
+	groupID, err := parseIntParam(c, "gid")
+	if err != nil {
+		return err
+	}
+
+	if _, err := h.requireTimelineInCampaign(c, timelineID, cc.Campaign.ID); err != nil {
+		return err
+	}
+
+	var req struct {
+		Name  string `json:"name"`
+		Color string `json:"color"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
+	}
+
+	return h.svc.UpdateEntityGroup(c.Request().Context(), groupID, UpdateEntityGroupInput{
+		Name:  req.Name,
+		Color: req.Color,
+	})
+}
+
+// DeleteEntityGroupAPI removes an entity group and all its members.
+// DELETE /campaigns/:id/timelines/:tid/groups/:gid
+func (h *Handler) DeleteEntityGroupAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	timelineID := c.Param("tid")
+	groupID, err := parseIntParam(c, "gid")
+	if err != nil {
+		return err
+	}
+
+	if _, err := h.requireTimelineInCampaign(c, timelineID, cc.Campaign.ID); err != nil {
+		return err
+	}
+
+	if err := h.svc.DeleteEntityGroup(c.Request().Context(), groupID); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusOK)
+}
+
+// AddGroupMemberAPI adds an entity to an entity group.
+// POST /campaigns/:id/timelines/:tid/groups/:gid/members
+func (h *Handler) AddGroupMemberAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	timelineID := c.Param("tid")
+	groupID, err := parseIntParam(c, "gid")
+	if err != nil {
+		return err
+	}
+
+	if _, err := h.requireTimelineInCampaign(c, timelineID, cc.Campaign.ID); err != nil {
+		return err
+	}
+
+	var req struct {
+		EntityID string `json:"entity_id"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
+	}
+	if req.EntityID == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "entity_id is required")
+	}
+
+	if err := h.svc.AddGroupMember(c.Request().Context(), groupID, req.EntityID); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusCreated)
+}
+
+// RemoveGroupMemberAPI removes an entity from an entity group.
+// DELETE /campaigns/:id/timelines/:tid/groups/:gid/members/:eid
+func (h *Handler) RemoveGroupMemberAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	timelineID := c.Param("tid")
+	groupID, err := parseIntParam(c, "gid")
+	if err != nil {
+		return err
+	}
+	entityID := c.Param("eid")
+
+	if _, err := h.requireTimelineInCampaign(c, timelineID, cc.Campaign.ID); err != nil {
+		return err
+	}
+
+	if err := h.svc.RemoveGroupMember(c.Request().Context(), groupID, entityID); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusOK)
+}
+
+// ListEntityGroupsAPI returns all entity groups for a timeline.
+// GET /campaigns/:id/timelines/:tid/groups
+func (h *Handler) ListEntityGroupsAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	timelineID := c.Param("tid")
+
+	if _, err := h.requireTimelineInCampaign(c, timelineID, cc.Campaign.ID); err != nil {
+		return err
+	}
+
+	groups, err := h.svc.ListEntityGroups(c.Request().Context(), timelineID)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, groups)
+}
+
+// parseIntParam extracts an integer path parameter, returning 400 on failure.
+func parseIntParam(c echo.Context, name string) (int, error) {
+	s := c.Param(name)
+	var v int
+	if _, err := fmt.Sscanf(s, "%d", &v); err != nil {
+		return 0, echo.NewHTTPError(http.StatusBadRequest, name+" must be a number")
+	}
+	return v, nil
+}
