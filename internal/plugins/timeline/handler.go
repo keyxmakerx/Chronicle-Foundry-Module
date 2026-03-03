@@ -567,7 +567,7 @@ func (h *Handler) UpdateEntityGroupAPI(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
 	}
 
-	return h.svc.UpdateEntityGroup(c.Request().Context(), groupID, UpdateEntityGroupInput{
+	return h.svc.UpdateEntityGroup(c.Request().Context(), timelineID, groupID, UpdateEntityGroupInput{
 		Name:  req.Name,
 		Color: req.Color,
 	})
@@ -587,7 +587,7 @@ func (h *Handler) DeleteEntityGroupAPI(c echo.Context) error {
 		return err
 	}
 
-	if err := h.svc.DeleteEntityGroup(c.Request().Context(), groupID); err != nil {
+	if err := h.svc.DeleteEntityGroup(c.Request().Context(), timelineID, groupID); err != nil {
 		return err
 	}
 	return c.NoContent(http.StatusOK)
@@ -617,7 +617,7 @@ func (h *Handler) AddGroupMemberAPI(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "entity_id is required")
 	}
 
-	if err := h.svc.AddGroupMember(c.Request().Context(), groupID, req.EntityID); err != nil {
+	if err := h.svc.AddGroupMember(c.Request().Context(), timelineID, groupID, req.EntityID); err != nil {
 		return err
 	}
 	return c.NoContent(http.StatusCreated)
@@ -638,7 +638,7 @@ func (h *Handler) RemoveGroupMemberAPI(c echo.Context) error {
 		return err
 	}
 
-	if err := h.svc.RemoveGroupMember(c.Request().Context(), groupID, entityID); err != nil {
+	if err := h.svc.RemoveGroupMember(c.Request().Context(), timelineID, groupID, entityID); err != nil {
 		return err
 	}
 	return c.NoContent(http.StatusOK)

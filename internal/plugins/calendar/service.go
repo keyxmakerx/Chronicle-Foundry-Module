@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/keyxmakerx/chronicle/internal/apperror"
@@ -289,6 +290,32 @@ func (s *calendarService) UpdateCalendar(ctx context.Context, calendarID string,
 		return apperror.NewNotFound("calendar not found")
 	}
 
+	// Validate time system values to prevent division by zero and invalid state.
+	if input.HoursPerDay < 1 {
+		return apperror.NewValidation("hours_per_day must be at least 1")
+	}
+	if input.MinutesPerHour < 1 {
+		return apperror.NewValidation("minutes_per_hour must be at least 1")
+	}
+	if input.SecondsPerMinute < 1 {
+		return apperror.NewValidation("seconds_per_minute must be at least 1")
+	}
+	if input.CurrentMonth < 1 {
+		return apperror.NewValidation("current_month must be at least 1")
+	}
+	if input.CurrentDay < 1 {
+		return apperror.NewValidation("current_day must be at least 1")
+	}
+	if input.CurrentHour < 0 || input.CurrentHour >= input.HoursPerDay {
+		return apperror.NewValidation("current_hour must be between 0 and hours_per_day - 1")
+	}
+	if input.CurrentMinute < 0 || input.CurrentMinute >= input.MinutesPerHour {
+		return apperror.NewValidation("current_minute must be between 0 and minutes_per_hour - 1")
+	}
+	if input.LeapYearEvery < 0 {
+		return apperror.NewValidation("leap_year_every must not be negative")
+	}
+
 	cal.Name = input.Name
 	cal.Description = input.Description
 	cal.EpochName = input.EpochName
@@ -390,11 +417,23 @@ func (s *calendarService) CreateEvent(ctx context.Context, calendarID string, in
 	if input.Name == "" {
 		return nil, apperror.NewValidation("event name is required")
 	}
+	if len(input.Name) > 255 {
+		return nil, apperror.NewValidation("event name must be 255 characters or less")
+	}
+	if input.Month < 1 {
+		return nil, apperror.NewValidation("month must be at least 1")
+	}
+	if input.Day < 1 {
+		return nil, apperror.NewValidation("day must be at least 1")
+	}
 	if input.Visibility == "" {
 		input.Visibility = "everyone"
 	}
 	if input.Visibility != "everyone" && input.Visibility != "dm_only" {
 		return nil, apperror.NewValidation("visibility must be 'everyone' or 'dm_only'")
+	}
+	if err := validateVisibilityRules(input.VisibilityRules); err != nil {
+		return nil, err
 	}
 
 	// Sanitize HTML if provided (rich text descriptions from TipTap editor).
@@ -463,6 +502,9 @@ func (s *calendarService) UpdateEvent(ctx context.Context, eventID string, input
 	}
 	if input.Visibility != "everyone" && input.Visibility != "dm_only" {
 		return apperror.NewValidation("visibility must be 'everyone' or 'dm_only'")
+	}
+	if err := validateVisibilityRules(input.VisibilityRules); err != nil {
+		return err
 	}
 
 	evt.Name = input.Name
@@ -780,7 +822,8 @@ func canUserView(baseVisibility string, visRulesJSON *string, role int, userID s
 	}
 	var rules VisibilityRules
 	if err := json.Unmarshal([]byte(*visRulesJSON), &rules); err != nil {
-		return true // Unparseable rules = visible (fail open for existing items).
+		slog.Warn("unparseable visibility_rules JSON, failing open", slog.Any("error", err))
+		return true // Fail open for existing items — validated on write path.
 	}
 
 	// AllowedUsers whitelist takes precedence.

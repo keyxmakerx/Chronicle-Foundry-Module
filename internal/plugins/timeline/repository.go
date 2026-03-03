@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
+	"github.com/keyxmakerx/chronicle/internal/apperror"
 )
 
 // TimelineRepository defines persistence operations for timelines and related data.
@@ -38,10 +40,10 @@ type TimelineRepository interface {
 	// Entity groups.
 	CreateEntityGroup(ctx context.Context, g *EntityGroup) error
 	UpdateEntityGroup(ctx context.Context, g *EntityGroup) error
-	DeleteEntityGroup(ctx context.Context, groupID int) error
+	DeleteEntityGroup(ctx context.Context, groupID int, timelineID string) error
 	ListEntityGroups(ctx context.Context, timelineID string) ([]EntityGroup, error)
-	AddGroupMember(ctx context.Context, groupID int, entityID string) error
-	RemoveGroupMember(ctx context.Context, groupID int, entityID string) error
+	AddGroupMember(ctx context.Context, groupID int, timelineID, entityID string) error
+	RemoveGroupMember(ctx context.Context, groupID int, timelineID, entityID string) error
 }
 
 // timelineRepo is the MariaDB implementation of TimelineRepository.
@@ -473,19 +475,34 @@ func (r *timelineRepo) CreateEntityGroup(ctx context.Context, g *EntityGroup) er
 
 // UpdateEntityGroup modifies an existing entity group.
 func (r *timelineRepo) UpdateEntityGroup(ctx context.Context, g *EntityGroup) error {
-	_, err := r.db.ExecContext(ctx,
+	res, err := r.db.ExecContext(ctx,
 		`UPDATE timeline_entity_groups SET name = ?, color = ?, sort_order = ?
-		 WHERE id = ?`,
-		g.Name, g.Color, g.SortOrder, g.ID,
+		 WHERE id = ? AND timeline_id = ?`,
+		g.Name, g.Color, g.SortOrder, g.ID, g.TimelineID,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return apperror.NewNotFound("entity group not found")
+	}
+	return nil
 }
 
 // DeleteEntityGroup removes an entity group and its members (cascaded by FK).
-func (r *timelineRepo) DeleteEntityGroup(ctx context.Context, groupID int) error {
-	_, err := r.db.ExecContext(ctx,
-		`DELETE FROM timeline_entity_groups WHERE id = ?`, groupID)
-	return err
+// timelineID scoping prevents cross-timeline IDOR.
+func (r *timelineRepo) DeleteEntityGroup(ctx context.Context, groupID int, timelineID string) error {
+	res, err := r.db.ExecContext(ctx,
+		`DELETE FROM timeline_entity_groups WHERE id = ? AND timeline_id = ?`, groupID, timelineID)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return apperror.NewNotFound("entity group not found")
+	}
+	return nil
 }
 
 // ListEntityGroups returns all entity groups for a timeline with members loaded.
@@ -554,7 +571,16 @@ func (r *timelineRepo) listGroupMembers(ctx context.Context, groupID int) ([]Ent
 }
 
 // AddGroupMember adds an entity to an entity group.
-func (r *timelineRepo) AddGroupMember(ctx context.Context, groupID int, entityID string) error {
+// Verifies the group belongs to the given timeline to prevent cross-timeline IDOR.
+func (r *timelineRepo) AddGroupMember(ctx context.Context, groupID int, timelineID, entityID string) error {
+	// Verify group belongs to this timeline before inserting.
+	var exists int
+	if err := r.db.QueryRowContext(ctx,
+		`SELECT 1 FROM timeline_entity_groups WHERE id = ? AND timeline_id = ?`,
+		groupID, timelineID,
+	).Scan(&exists); err != nil {
+		return apperror.NewNotFound("entity group not found")
+	}
 	_, err := r.db.ExecContext(ctx,
 		`INSERT INTO timeline_entity_group_members (group_id, entity_id) VALUES (?, ?)`,
 		groupID, entityID,
@@ -563,7 +589,16 @@ func (r *timelineRepo) AddGroupMember(ctx context.Context, groupID int, entityID
 }
 
 // RemoveGroupMember removes an entity from an entity group.
-func (r *timelineRepo) RemoveGroupMember(ctx context.Context, groupID int, entityID string) error {
+// Verifies the group belongs to the given timeline to prevent cross-timeline IDOR.
+func (r *timelineRepo) RemoveGroupMember(ctx context.Context, groupID int, timelineID, entityID string) error {
+	// Verify group belongs to this timeline before deleting.
+	var exists int
+	if err := r.db.QueryRowContext(ctx,
+		`SELECT 1 FROM timeline_entity_groups WHERE id = ? AND timeline_id = ?`,
+		groupID, timelineID,
+	).Scan(&exists); err != nil {
+		return apperror.NewNotFound("entity group not found")
+	}
 	_, err := r.db.ExecContext(ctx,
 		`DELETE FROM timeline_entity_group_members WHERE group_id = ? AND entity_id = ?`,
 		groupID, entityID,

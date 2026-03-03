@@ -8,12 +8,12 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-03 -- Full per-user visibility for calendar and timeline events. Fixed critical
-visibility leak (timeline used role >= 2, calendar/maps used role >= 3 for dm_only).
-Migration 000037 adds `visibility_rules` JSON column to `calendar_events` and
-`timeline_events`. Per-user whitelist/blacklist UI on calendar event modals and timeline
-event cards. Standalone events now support per-user visibility rules. Service-layer
-`filterEventsByUser()` / `canUserView()` applied to all event listing endpoints.
+2026-03-03 -- Security and validation audit of calendar + timeline plugins. Fixed entity
+group IDOR (cross-timeline manipulation via unscoped group IDs), XSS in standalone
+timeline events (missing HTML sanitization), missing visibility_rules validation on
+create/update paths, and missing input validation on calendar time system and event dates.
+Added slog.Warn for malformed visibility_rules JSON. Updated plugin documentation with
+Security & Validation sections and Known Limitations.
 
 ## Current Phase
 **Phase H: Secrets & Permissions.** Inline secrets complete. Documentation audit
