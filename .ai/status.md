@@ -8,13 +8,40 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-03 -- Timeline visualization Phase 2 UI overhaul complete (8 items: center
-spine ruler, rich grid, era bands, range bars, clustering, category icons, minimap,
-toolbar polish). Branch: `claude/improve-timeline-ui-e1R9X`.
+2026-03-03 -- Alpha documentation sprint: fixed public campaign 403 bug (entities,
+tags, relations routes), restructured todo.md/roadmap.md, created 6 new .ai.md
+documentation files (media plugin, 5 JS widgets). Branch: `claude/improve-timeline-ui-e1R9X`.
 
 ## Current Phase
-**Phase G: Maps & Geography + Timeline.** Timeline Phase 2 visualization UI overhaul
-complete. Phase 2B (event connections, create-from-timeline) remaining.
+**Alpha Documentation Sprint.** Critical bug fix (public campaign widget 403s) complete.
+Extension documentation sprint in progress. Next: remaining bug fixes (image upload,
+tag visibility, attributes template reset), then media management, API hardening.
+
+### Alpha Documentation Sprint — IN PROGRESS
+Branch: `claude/improve-timeline-ui-e1R9X`
+1. **BUG-0 fix (CRITICAL)** — Public campaign entities returned 403 on editor, attributes,
+   tags, and relations widget endpoints. Root cause: GET routes only in authenticated group,
+   not in public-capable group. Fixed in `entities/routes.go`, `tags/routes.go`,
+   `relations/routes.go` by adding read-only routes to `pub` group.
+2. **Todo.md restructured** — Reorganized from phase-based to 3 categories: Bugfixes &
+   Problems (severity-ordered), Features To Do (alpha priority), Competitive Analysis.
+3. **Roadmap.md updated** — Added Obsidian competitive analysis (~4M users, plugin
+   ecosystem, local-first, graph visualization).
+4. **6 new .ai.md documentation files created:**
+   - `internal/plugins/media/.ai.md` (full plugin docs, was completely missing)
+   - `static/js/widgets/image_upload.ai.md`
+   - `static/js/widgets/timeline_viz.ai.md`
+   - `static/js/widgets/dashboard_editor.ai.md`
+   - `static/js/widgets/template_editor.ai.md`
+   - `static/js/widgets/entity_tooltip.ai.md`
+
+### Remaining Alpha Priorities
+- Debug image upload click handler (BUG-1)
+- Tag visibility controls — per-tag `dm_only` flag (BUG-3)
+- Attributes "Reset to Template" button (BUG-4)
+- Campaign-scoped media browser for owners (BUG-2)
+- `RequireAddon` API middleware for graceful extension degradation
+- ClamAV file scanning integration
 
 ### Timeline Phase 2 — COMPLETE
 Branch: `claude/improve-timeline-ui-e1R9X`
