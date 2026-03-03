@@ -8,32 +8,33 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-03 -- Alpha documentation sprint: fixed public campaign 403 bug (entities,
-tags, relations routes), restructured todo.md/roadmap.md, created 6 new .ai.md
-documentation files (media plugin, 5 JS widgets). Branch: `claude/improve-timeline-ui-e1R9X`.
+2026-03-03 -- Code quality sprint: fixed all 138 golangci-lint issues, consolidated
+JS utility duplication (18 copies → 3 shared functions in boot.js), fixed syncapi
+repository error handling. Branch: `claude/improve-timeline-ui-e1R9X`.
 
 ## Current Phase
-**Alpha Documentation Sprint.** Critical bug fix (public campaign widget 403s) complete.
-Extension documentation sprint in progress. Next: remaining bug fixes (image upload,
-tag visibility, attributes template reset), then media management, API hardening.
+**Code Quality Sprint complete.** Documentation sprint and lint/deduplication done.
+Next: remaining bug fixes (image upload, tag visibility, attributes template reset),
+then media management, API hardening.
 
-### Alpha Documentation Sprint — IN PROGRESS
+### Code Quality Sprint — COMPLETE
 Branch: `claude/improve-timeline-ui-e1R9X`
-1. **BUG-0 fix (CRITICAL)** — Public campaign entities returned 403 on editor, attributes,
-   tags, and relations widget endpoints. Root cause: GET routes only in authenticated group,
-   not in public-capable group. Fixed in `entities/routes.go`, `tags/routes.go`,
-   `relations/routes.go` by adding read-only routes to `pub` group.
-2. **Todo.md restructured** — Reorganized from phase-based to 3 categories: Bugfixes &
-   Problems (severity-ordered), Features To Do (alpha priority), Competitive Analysis.
-3. **Roadmap.md updated** — Added Obsidian competitive analysis (~4M users, plugin
-   ecosystem, local-first, graph visualization).
-4. **6 new .ai.md documentation files created:**
-   - `internal/plugins/media/.ai.md` (full plugin docs, was completely missing)
-   - `static/js/widgets/image_upload.ai.md`
-   - `static/js/widgets/timeline_viz.ai.md`
-   - `static/js/widgets/dashboard_editor.ai.md`
-   - `static/js/widgets/template_editor.ai.md`
-   - `static/js/widgets/entity_tooltip.ai.md`
+1. **golangci-lint v2 config** — Updated `.golangci.yml` for v2 compatibility (version
+   field, removed typecheck/gosimple linters).
+2. **Fixed all 138 lint issues:**
+   - 126 errcheck: added exclusion rules for idiomatic defer patterns, fixed real bugs
+     (unchecked json.Unmarshal, Row.Scan, rand.Read)
+   - 11 staticcheck S1016: simplified struct conversions in calendar/campaigns/entities
+   - 1 unused: removed dead `scanTimeline` function from timeline repository
+3. **JS utility consolidation:** `escapeHtml` (9 copies), `escapeAttr` (7 copies),
+   `getCsrf` (3 copies) replaced with shared `Chronicle.escapeHtml`, `Chronicle.escapeAttr`,
+   `Chronicle.getCsrf` in `boot.js`. 11 widget files updated.
+4. **syncapi repository** — Proper error handling for 6 Row.Scan calls and 5
+   json.Unmarshal calls in stats/key scanning methods.
+
+### Alpha Documentation Sprint — COMPLETE
+1. BUG-0 fix (public campaign 403s), todo.md restructure, roadmap.md update
+2. 6 new `.ai.md` documentation files (media plugin, 5 JS widgets)
 
 ### Remaining Alpha Priorities
 - Debug image upload click handler (BUG-1)
@@ -41,6 +42,8 @@ Branch: `claude/improve-timeline-ui-e1R9X`
 - Attributes "Reset to Template" button (BUG-4)
 - Campaign-scoped media browser for owners (BUG-2)
 - `RequireAddon` API middleware for graceful extension degradation
+- Add golangci-lint + security scanning to CI pipeline
+- Increase test coverage (currently 5.3%)
 - ClamAV file scanning integration
 
 ### Timeline Phase 2 — COMPLETE

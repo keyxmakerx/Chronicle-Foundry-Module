@@ -31,6 +31,8 @@ Known broken or missing things, ordered by severity.
 
 - [ ] **API endpoints ignore addon disabled state** — Routes are hardcoded at startup. If calendar addon is disabled for a campaign, `/api/v1/campaigns/:id/calendar` still executes. Need `RequireAddon` middleware on API route groups.
 - [ ] **API technical documentation missing** — REST API v1 exists and works but has no public documentation (OpenAPI spec or reference).
+- [ ] **Calendar HTMX detection inconsistency** — `internal/plugins/calendar/handler.go` uses raw `c.Request().Header.Get("HX-Request")` in 5 places instead of centralized `middleware.IsHTMX(c)`. Should standardize.
+- [ ] **Cross-plugin adapter interface duplication** — `MemberLister` interface duplicated in timeline and sessions plugins. Should extract to shared package.
 
 ---
 
@@ -99,6 +101,9 @@ New capabilities ordered by priority for alpha release.
 
 ### Infrastructure
 
+- [ ] **Add golangci-lint to CI pipeline** — Currently only `go vet` + unit tests run in CI. golangci-lint catches real bugs (unchecked errors, dead code) and should be enforced.
+- [ ] **Add security scanning to CI** — gosec (static analysis) and govulncheck (dependency vulnerabilities) should run in CI. Requires Go 1.25+ for latest gosec.
+- [ ] **Increase test coverage** — Currently 5.3% (6 test files). Priority: campaigns service tests, relations service tests, tags service tests, media service tests, then handler tests.
 - [ ] docker-compose.yml full stack verification (app + MariaDB + Redis)
 - [ ] `air` hot reload setup for dev workflow
 
@@ -217,3 +222,9 @@ Summary of strengths/weaknesses for strategic positioning. Full analysis in `.ai
 - [x] Roadmap.md Obsidian competitive analysis
 - [x] Extension documentation sprint (media plugin, 5 JS widgets: image_upload, timeline_viz, dashboard_editor, template_editor, entity_tooltip)
 - [x] Status.md update
+
+### Code Quality Sprint (2026-03-03)
+- [x] golangci-lint v2 config fixes (.golangci.yml: version field, removed typecheck/gosimple)
+- [x] Fixed all 138 golangci-lint issues (errcheck, staticcheck S1016, unused dead code)
+- [x] Consolidated JS utility duplication: escapeHtml (9 copies), escapeAttr (7 copies), getCsrf (3 copies) → shared Chronicle.* in boot.js
+- [x] Syncapi repository errcheck fixes (Row.Scan error handling, json.Unmarshal acknowledgement)
