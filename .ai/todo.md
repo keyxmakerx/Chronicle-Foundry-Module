@@ -33,6 +33,15 @@ Known broken or missing things, ordered by severity.
 - [ ] **API technical documentation missing** — REST API v1 exists and works but has no public documentation (OpenAPI spec or reference).
 - [ ] **Calendar HTMX detection inconsistency** — `internal/plugins/calendar/handler.go` uses raw `c.Request().Header.Get("HX-Request")` in 5 places instead of centralized `middleware.IsHTMX(c)`. Should standardize.
 - [ ] **Cross-plugin adapter interface duplication** — `MemberLister` interface duplicated in timeline and sessions plugins. Should extract to shared package.
+- [ ] **IDOR check functions duplicated** — `requireTimelineInCampaign`, `requireMapInCampaign`, `requireSessionInCampaign`, `requireEventInCampaign` follow identical patterns in 4 plugins. Extract to shared generic helper.
+- [ ] **logAudit fire-and-forget duplicated** — Similar audit logging patterns in entities, campaigns, tags handlers. Could extract to shared `FireAudit()` utility.
+- [ ] **JS fetch header setup duplicated** — CSRF + JSON header construction repeated in notes, relations, tag_picker, attributes. Add `Chronicle.apiFetch()` wrapper to boot.js.
+- [ ] **Mixed error types** — `echo.NewHTTPError` used directly in 30+ places instead of centralized `apperror` package. Should standardize.
+- [ ] **LIKE metacharacter in backlinks** — `entities/repository.go:1011` concatenates entityID into LIKE pattern without escaping `%`/`_`. Low risk (UUIDs only) but should escape for safety.
+- [ ] **No Content Security Policy headers** — CSP not implemented. Would provide XSS defense-in-depth alongside bluemonday sanitization.
+- [ ] **No input size validation on text fields** — Relies on DB column limits. Handler-level validation (name max 200, description max 5000, etc.) would be better.
+- [ ] **Package-level Go doc comments missing** — ~80% of .go files lack `// Package ...` comments (handler.go, service.go, repository.go, routes.go across all plugins).
+- [ ] **Missing JS widget .ai.md docs** — 11 widget files + 6 core JS files lack documentation. Priority: editor.js, attributes.js, tag_picker.js, relations.js, notes.js.
 
 ---
 
