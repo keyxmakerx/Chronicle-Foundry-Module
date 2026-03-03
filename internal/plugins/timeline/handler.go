@@ -723,6 +723,74 @@ func (h *Handler) UpdateEventVisibilityAPI(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
+// UpdateStandaloneEventVisibilityAPI updates visibility and per-user rules on a standalone event.
+// PUT /campaigns/:id/timelines/:tid/standalone-events/:eid/visibility
+func (h *Handler) UpdateStandaloneEventVisibilityAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	ctx := c.Request().Context()
+	timelineID := c.Param("tid")
+	eventID := c.Param("eid")
+
+	if _, err := h.requireTimelineInCampaign(c, timelineID, cc.Campaign.ID); err != nil {
+		return err
+	}
+
+	var req struct {
+		Visibility      string  `json:"visibility"`
+		VisibilityRules *string `json:"visibility_rules"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request")
+	}
+
+	// Get the standalone event and verify it belongs to this timeline.
+	e, err := h.svc.GetStandaloneEvent(ctx, eventID)
+	if err != nil {
+		return err
+	}
+	if e.TimelineID != timelineID {
+		return echo.NewHTTPError(http.StatusNotFound, "event not found")
+	}
+
+	// Validate visibility.
+	if req.Visibility == "" {
+		req.Visibility = e.Visibility
+	}
+	if req.Visibility != "everyone" && req.Visibility != "dm_only" {
+		return echo.NewHTTPError(http.StatusBadRequest, "visibility must be 'everyone' or 'dm_only'")
+	}
+
+	e.Visibility = req.Visibility
+	e.VisibilityRules = req.VisibilityRules
+
+	if err := h.svc.UpdateStandaloneEvent(ctx, timelineID, eventID, UpdateTimelineEventInput{
+		Name:            e.Name,
+		Description:     e.Description,
+		DescriptionHTML: e.DescriptionHTML,
+		EntityID:        e.EntityID,
+		Year:            e.Year,
+		Month:           e.Month,
+		Day:             e.Day,
+		StartHour:       e.StartHour,
+		StartMinute:     e.StartMinute,
+		EndYear:         e.EndYear,
+		EndMonth:        e.EndMonth,
+		EndDay:          e.EndDay,
+		EndHour:         e.EndHour,
+		EndMinute:       e.EndMinute,
+		IsRecurring:     e.IsRecurring,
+		RecurrenceType:  e.RecurrenceType,
+		Category:        e.Category,
+		Visibility:      req.Visibility,
+		VisibilityRules: req.VisibilityRules,
+		Label:           e.Label,
+		Color:           e.Color,
+	}); err != nil {
+		return err
+	}
+	return c.NoContent(http.StatusOK)
+}
+
 // ListCampaignMembersAPI returns campaign members for the visibility user selector.
 // GET /campaigns/:id/timelines/members
 func (h *Handler) ListCampaignMembersAPI(c echo.Context) error {

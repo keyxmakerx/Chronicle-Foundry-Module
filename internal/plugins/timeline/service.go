@@ -556,6 +556,7 @@ func (s *timelineService) UpdateStandaloneEvent(ctx context.Context, timelineID,
 	e.RecurrenceType = input.RecurrenceType
 	e.Category = input.Category
 	e.Visibility = input.Visibility
+	e.VisibilityRules = input.VisibilityRules
 	e.Label = input.Label
 	e.Color = input.Color
 
@@ -709,8 +710,8 @@ func (s *timelineService) ListCalendars(ctx context.Context, campaignID string) 
 // and per-user JSON rules. Owners (role >= 3) always see everything and should
 // be checked before calling this function.
 func canUserView(baseVisibility string, visRulesJSON *string, role int, userID string) bool {
-	// Base visibility: dm_only requires role >= 2 (Scribe+).
-	if baseVisibility == "dm_only" && role < 2 {
+	// Base visibility: dm_only requires role >= 3 (Owner).
+	if baseVisibility == "dm_only" && role < 3 {
 		return false
 	}
 

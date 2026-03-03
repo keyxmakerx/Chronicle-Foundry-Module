@@ -260,6 +260,7 @@ type TimelineEvent struct {
 	RecurrenceType  *string   `json:"recurrence_type,omitempty"`
 	Category        *string   `json:"category,omitempty"`
 	Visibility      string    `json:"visibility"`
+	VisibilityRules *string   `json:"visibility_rules,omitempty"`
 	DisplayOrder    int       `json:"display_order"`
 	Label           *string   `json:"label,omitempty"`
 	Color           *string   `json:"color,omitempty"`
@@ -317,6 +318,7 @@ type UpdateTimelineEventInput struct {
 	RecurrenceType  *string
 	Category        *string
 	Visibility      string
+	VisibilityRules *string
 	Label           *string
 	Color           *string
 }
@@ -329,6 +331,7 @@ func (e *TimelineEvent) ToEventLink() EventLink {
 		EventID:          e.ID,
 		Source:           "standalone",
 		DisplayOrder:     e.DisplayOrder,
+		VisibilityRules:  e.VisibilityRules,
 		Label:            e.Label,
 		ColorOverride:    e.Color,
 		CreatedAt:        e.CreatedAt,
