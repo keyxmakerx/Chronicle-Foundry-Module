@@ -40,11 +40,11 @@ Known broken or missing things, ordered by severity.
 - [x] **No loading/spinner states** — Fixed: added HTMX loading indicator (3px accent-colored progress bar at top of viewport). CSS animation in input.css, request tracking in boot.js, indicator div in app.templ layout. Tracks concurrent requests, only hides when all complete.
 - [x] **Keyboard shortcuts help** — Fixed: press `?` to open shortcuts help overlay showing all 4 global shortcuts (Ctrl+K/N/E/S). Closes with `?`, Escape, or clicking outside. Mac-aware (shows ⌘ vs Ctrl).
 - [x] **Form validation feedback** — Fixed: added `:user-invalid` and `.input-error` CSS for red borders on invalid fields. JS in boot.js listens for `invalid` events and inserts `.field-error` inline hints with the browser's validation message. Errors clear on input.
-- [ ] **Mobile sidebar toggle** — Sidebar doesn't collapse/hamburger on mobile. No mobile navigation menu.
+- [x] **Mobile sidebar toggle** — Already implemented: hamburger button in topbar (md:hidden), Alpine.js sidebarOpen state, CSS translate slide-in animation, backdrop overlay, auto-close on navigation.
 - [ ] **Calendar recurring events limited** — Only "yearly" recurrence type. No monthly/weekly/daily/custom recurrence patterns.
 - [ ] **Editor lacks table support** — TipTap editor has no table insert/edit (common need for TTRPG stat blocks, encounter tables).
 - [ ] **Editor lacks callout/highlight blocks** — No callout/admonition blocks for DM notes, rules references, warnings.
-- [ ] **Entity cloning** — No "duplicate this entity" action to create copy with prefilled fields.
+- [x] **Entity cloning** — Fixed: Clone button on entity show page (Scribe+). POST creates copy with "(Copy)" suffix, clones entry, image, fields, field overrides, popup config, tags via INSERT...SELECT. Redirects to edit page. Does NOT copy relations.
 - [ ] **Map marker search** — No search-by-name for markers within a map. Must scan visually.
 - [ ] **Timeline event creation from timeline page** — Must leave timeline to create events. No inline add button or modal on timeline.
 

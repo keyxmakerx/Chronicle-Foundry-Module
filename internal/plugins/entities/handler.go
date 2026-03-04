@@ -322,6 +322,33 @@ func (h *Handler) Show(c echo.Context) error {
 	return middleware.Render(c, http.StatusOK, EntityShowPage(cc, entity, entityType, ancestors, children, backlinks, showAttributes, showCalendar, csrfToken))
 }
 
+// Clone creates a copy of an entity (POST /campaigns/:id/entities/:eid/clone).
+// Copies name (with " (Copy)" suffix), entry, fields, image, parent, privacy,
+// field overrides, popup config, and tags. Does NOT copy relations.
+func (h *Handler) Clone(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	if cc == nil {
+		return apperror.NewInternal(fmt.Errorf("campaign context is nil for entity clone"))
+	}
+
+	userID := auth.GetUserID(c)
+	entityID := c.Param("eid")
+	clone, err := h.service.Clone(c.Request().Context(), cc.Campaign.ID, userID, entityID)
+	if err != nil {
+		return err
+	}
+
+	h.logAudit(c, cc.Campaign.ID, "entity.clone", clone.ID, clone.Name)
+
+	// Redirect to the edit page of the new clone so user can review/rename.
+	editURL := fmt.Sprintf("/campaigns/%s/entities/%s/edit", cc.Campaign.ID, clone.ID)
+	if middleware.IsHTMX(c) {
+		c.Response().Header().Set("HX-Redirect", editURL)
+		return c.NoContent(http.StatusOK)
+	}
+	return c.Redirect(http.StatusSeeOther, editURL)
+}
+
 // EditForm renders the entity edit form (GET /campaigns/:id/entities/:eid/edit).
 func (h *Handler) EditForm(c echo.Context) error {
 	cc := campaigns.GetCampaignContext(c)

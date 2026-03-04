@@ -39,6 +39,7 @@ func RegisterRoutes(e *echo.Echo, h *Handler, campaignSvc campaigns.CampaignServ
 	cg.GET("/entities/new", h.NewForm, campaigns.RequireRole(campaigns.RoleScribe))
 	cg.POST("/entities", h.Create, campaigns.RequireRole(campaigns.RoleScribe))
 	cg.GET("/entities/:eid/edit", h.EditForm, campaigns.RequireRole(campaigns.RoleScribe))
+	cg.POST("/entities/:eid/clone", h.Clone, campaigns.RequireRole(campaigns.RoleScribe))
 	cg.PUT("/entities/:eid", h.Update, campaigns.RequireRole(campaigns.RoleScribe))
 
 	// Owner routes.

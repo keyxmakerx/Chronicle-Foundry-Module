@@ -206,6 +206,17 @@ templ blockTitle(cc *campaigns.CampaignContext, entity *Entity, csrfToken string
 					href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/entities/%s/edit", cc.Campaign.ID, entity.ID)) }
 					class="btn-secondary text-sm"
 				>Edit</a>
+				<form
+					method="POST"
+					action={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/entities/%s/clone", cc.Campaign.ID, entity.ID)) }
+					hx-post={ fmt.Sprintf("/campaigns/%s/entities/%s/clone", cc.Campaign.ID, entity.ID) }
+					class="inline"
+				>
+					<input type="hidden" name="csrf_token" value={ csrfToken }/>
+					<button type="submit" class="btn-secondary text-sm" title="Create a copy of this page">
+						<i class="fa-regular fa-clone mr-1"></i> Clone
+					</button>
+				</form>
 				if cc.MemberRole >= campaigns.RoleOwner {
 					<form
 						method="POST"
