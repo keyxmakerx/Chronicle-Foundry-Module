@@ -19,13 +19,13 @@ Known broken or missing things, ordered by severity.
 
 ### High
 
-- [ ] **@mention popup won't dismiss** — After selecting a mention, the popup keeps reappearing on every keystroke. Also reappears when clicking "Edit" on entity pages. Two root causes: (1) `Chronicle.MentionNode` is defined in `editor_mention.js` but never registered as a TipTap extension in `editor.js` — so `insertContent()` inserts the mention as a regular Link/text instead of an atom node, leaving literal `@Name` text that the trigger regex keeps matching. (2) `selectionUpdate` event calls `onUpdate` which re-checks for `@` triggers — any cursor movement near an `@` in plain text re-triggers the popup. Fix: register MentionNode in extensions array, and only fire `@` detection on content changes (not selection changes).
+- [x] **@mention popup won't dismiss** — Fixed by adding link mark guard in `onUpdate` (skips `@` inside existing mention links) and removing `selectionUpdate` event binding. Mentions still stored as Link marks, but popup no longer re-triggers.
 - [ ] **Image upload click does nothing** — Users click "Add Image" area, nothing happens. Widget code (`image_upload.js`) appears correct; likely browser-level issue (Firefox blocking programmatic file input `.click()`) or widget not mounting. Needs browser-level debugging with DevTools.
 - [ ] **No media management for campaign owners** — Admin has `/admin/storage` page. Campaign owners have NO way to browse, manage, or delete their uploads. Need campaign-scoped media browser at `/campaigns/:id/media` with "referenced by" tracking, delete with warnings, and upload from browser page.
 
 ### Medium
 
-- [ ] **Tags not hideable from players** — All tags visible to all campaign members. No per-tag visibility field. Need `dm_only` visibility option so GMs can create tags players shouldn't see (e.g., "Plot Hook", "Deceased").
+- [x] **Tags not hideable from players** — Implemented `dm_only` column (migration 000038), role-based filtering in repo/service/handler, eye-slash badge + DM checkbox in tag_picker.js.
 - [ ] **Attributes missing "Use Template" reset** — Entity types define field templates, entities can override with `FieldOverrides`. But no UI to reset overrides back to type defaults. Especially painful when entity type fields are updated — old entities don't get new fields automatically.
 
 ### Low
@@ -53,7 +53,7 @@ New capabilities ordered by priority for alpha release.
 ### Alpha-Critical (Must Have)
 
 - [ ] **Media management for owners + admins** — Campaign-scoped media browser: grid/list view, "referenced by" queries, delete with entity reference warnings, upload from browser page. Admin view spans all campaigns.
-- [ ] **Tag visibility controls** — Per-tag `dm_only` flag. Migration for new column. Filter in repo/handler. Respect in tag_picker.js widget. Player role should not see DM-only tags.
+- [x] **Tag visibility controls** — Implemented: migration 000038, `dm_only` bool in model/repo/service/handler, role-based filtering, tag_picker.js DM-only badge + create checkbox.
 - [ ] **Attributes template reset** — "Reset to Type Template" button in attributes customize panel. Clear `field_overrides`, restore type-level defaults.
 - [ ] **Extension technical documentation** — 1-3 page `.ai.md` writeup per plugin/widget/module. Standard template covering purpose, architecture, API endpoints, widget integration, lifecycle, security. See documentation audit in plan.
 - [ ] **Graceful extension degradation** — `RequireAddon` API middleware, human-readable errors for disabled/uninstalled addons, addon dependency checking.

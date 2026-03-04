@@ -8,16 +8,16 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-03 -- HTMX sidebar drill-down conversion + JS hoisting bug fixes. Converted
-sidebar drill-down from 238 lines of JS HTML-building to server-rendered HTMX fragments
-(~95 lines of CSS-toggling JS). Fixed var hoisting bugs in 10 widget files introduced
-by Code Quality Sprint's JS utility consolidation. Branch: `claude/review-codebase-R1WqN`.
+2026-03-04 -- Tag dm_only visibility controls, @mention popup fix, blank sidebar panel
+fix. Tags can now be marked "DM only" (hidden from Players). @mention popup no longer
+persists after selection. Sidebar drill panel renders content correctly.
+Branch: `claude/review-codebase-R1WqN`.
 
 ## Current Phase
-**Sidebar HTMX conversion + JS hoisting fixes complete.** Sidebar drill-down now uses
-server-rendered Templ fragments via HTMX. All widget JS files use Chronicle.* utilities
-directly (no local aliases). Next: remaining bug fixes (image upload, tag visibility,
-attributes template reset), then media management, API hardening.
+**Bug fixes + tag visibility complete.** Fixed @mention popup persistence, blank sidebar
+drill panel, and implemented tag dm_only visibility controls (backend + frontend).
+Next: attributes template reset, campaigns service tests, image upload fix, media
+management.
 
 ### HTMX Sidebar Conversion + JS Hoisting Fixes — COMPLETE
 Branch: `claude/review-codebase-R1WqN`

@@ -706,6 +706,34 @@ func (h *Handler) UpdateFieldOverridesAPI(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 
+// ResetFieldOverridesAPI clears all per-entity field customizations, restoring
+// the entity to its category's default field template.
+// DELETE /campaigns/:id/entities/:eid/field-overrides
+func (h *Handler) ResetFieldOverridesAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	if cc == nil {
+		return apperror.NewMissingContext()
+	}
+
+	entityID := c.Param("eid")
+
+	entity, err := h.service.GetByID(c.Request().Context(), entityID)
+	if err != nil {
+		return err
+	}
+	if entity.CampaignID != cc.Campaign.ID {
+		return apperror.NewNotFound("entity not found")
+	}
+
+	if err := h.service.UpdateFieldOverrides(c.Request().Context(), entityID, nil); err != nil {
+		return err
+	}
+
+	h.logAudit(c, cc.Campaign.ID, audit.ActionEntityUpdated, entityID, entity.Name)
+
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}
+
 // --- Image API ---
 
 // UpdateImageAPI updates the entity's header image path.
