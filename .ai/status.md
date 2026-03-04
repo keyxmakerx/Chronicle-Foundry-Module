@@ -32,6 +32,23 @@ Branch: `claude/review-codebase-R1WqN`.
   Public /rsvp/:token endpoint for redemption — no login required.
 - **Discord bot plan**: Documented in ADR-012. Future plugin at internal/plugins/discord/
   with reaction-based RSVP via bot token + webhook.
+2026-03-04 -- Foundry VTT sync feature (batch 16, Phase 1+2 partial).
+Branch: `claude/foundry-sync-feature-05M5a`.
+
+## Current Phase
+**Foundry VTT bidirectional sync.** Completed this session (batch 16):
+- WebSocket hub infrastructure (`internal/websocket/`): hub, client, message types,
+  multi-authenticator (API key + session cookie), EventBus interface.
+- Sync mapping service: CRUD for `sync_mappings` table tracking Chronicle↔Foundry
+  document ID relationships with version tracking.
+- Foundry VTT module skeleton (`foundry-module/`): 8 JS modules (api-client, sync-manager,
+  journal-sync, map-sync, shop-widget, calendar-sync, settings, module entry point),
+  templates, styles, lang, module.json manifest.
+- Map data model expansion: migrations 000042 (layers, drawings, tokens, fog tables +
+  grid/fog columns on maps table) and 000043 (relation metadata for shop inventory).
+- Drawing/Token/Layer/Fog CRUD: full service, repository, and REST API handler with
+  role-based visibility filtering, IDOR protection, percentage-based coordinates.
+- Wired everything into app routes.go with adapter patterns to avoid circular imports.
 
 Previously completed (batch 15):
 - Entity link hover fix + codebase review
