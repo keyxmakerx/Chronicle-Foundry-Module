@@ -12,7 +12,12 @@
 consistency. Branch: `claude/review-codebase-R1WqN`.
 
 ## Current Phase
-**UX hardening.** Completed this session (batch 2):
+**UX hardening.** Completed this session (batch 3):
+- Calendar click-to-create: date cells clickable for Scribes+ (opens create modal with date pre-filled)
+- Calendar event detail view: read-only modal showing event details, Edit button for Scribes
+- Event chips now open view modal first (all users), then Edit transitions to edit modal
+
+Completed (batch 2):
 - Added HTMX loading indicator (thin progress bar at top, CSS animation, auto-tracks requests)
 - Fixed empty states in 5 list views: campaign members, admin campaigns, admin users,
   admin modules, entity types (fixed if/else structure)
