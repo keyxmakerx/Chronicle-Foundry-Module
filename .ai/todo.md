@@ -22,15 +22,31 @@ Known broken or missing things, ordered by severity.
 - [x] **@mention popup won't dismiss** — Fixed by adding link mark guard in `onUpdate` (skips `@` inside existing mention links) and removing `selectionUpdate` event binding. Mentions still stored as Link marks, but popup no longer re-triggers.
 - [x] **Image upload click does nothing** — Fixed event recursion: file input's click event bubbled back to parent widget, causing Firefox to suppress file picker. Added stopPropagation on file input click, campaign_id to upload FormData, and fixed hover feedback on placeholder.
 - [ ] **No media management for campaign owners** — Admin has `/admin/storage` page. Campaign owners have NO way to browse, manage, or delete their uploads. Need campaign-scoped media browser at `/campaigns/:id/media` with "referenced by" tracking, delete with warnings, and upload from browser page.
-- [ ] **Public users can't access categories** — Non-player public visitors cannot access category pages at all (likely 403 or redirect). Permissions issue introduced during sidebar revamp. Need to audit category route groups and ensure public campaign viewers can browse categories read-only.
-- [ ] **Timeline eras not editable** — No UI to edit existing eras after creation. Need edit/delete actions on era items (inline edit or modal) in the timeline settings or visualization.
-- [ ] **Calendar RSVP missing for DM/owner** — RSVP functionality appears to only be available on the player side. DM/campaign owner needs to be able to RSVP to their own events too. Either expose RSVP to all roles or add it explicitly for owners.
-- [ ] **Calendar events lack view→edit mode** — Calendar events should follow the same pattern as other entities: open in view mode first, then switch to edit mode. Currently may open directly in edit or lack a proper read-only view.
+- [ ] **Sidebar drill 403 for public visitors** — Root cause: `GET /campaigns/:id/sidebar/drill/:slug` only registered in authenticated `cg` group (`campaigns/routes.go:49`), not in `pub` group. Category pages via `/:typeSlug` work fine for public users (in `pub` group), but clicking categories in sidebar triggers drill route → 403. Fix: add drill route to `pub` group.
+- [ ] **Timeline eras not editable** — Backend `PUT /calendar/eras` exists (Owner-only) but only as a bulk update via calendar settings. No per-era edit/delete UI buttons. No link from timeline page to era editor. Fix: add per-era edit/delete in calendar settings + "Edit Eras" link from timeline.
+- [ ] **Sessions addon not discoverable** — RSVP is in Sessions plugin (not Calendar). Sessions is an addon requiring manual enable per-campaign. Sidebar shows Sessions link only when addon enabled (`app.templ:159`). Users expect RSVP in Calendar. Fix: improve Sessions discoverability, add Calendar→Sessions cross-linking, consider auto-enabling Sessions.
+- [ ] **Calendar events lack view→edit mode** — Events open directly in create/edit modal. No read-only event detail view (unlike entity pages which have separate show/edit routes). Fix: add event detail panel with view mode, edit button.
+- [ ] **Calendar click-to-create on date** — No way to click a calendar date cell to create an event (standard calendar UX, Google Calendar style). Must use separate "New Event" button.
+- [ ] **No unsaved changes warning** — Navigating away from editor/forms loses work without warning. Need `beforeunload` handler when there are unsaved changes.
+- [ ] **Empty states inconsistent** — Many list views lack empty state messaging or CTAs (some entity lists, maps list, timelines). Calendar has `UpcomingEventsEmpty()` as good pattern to follow.
+- [ ] **Calendar event categories not customizable** — 8 hardcoded category strings (birthday, battle, ceremony, death, discovery, marriage, milestone, other) in `categoryIcon()` helper. No UI to add custom categories.
 
 ### Medium
 
 - [x] **Tags not hideable from players** — Implemented `dm_only` column (migration 000038), role-based filtering in repo/service/handler, eye-slash badge + DM checkbox in tag_picker.js.
 - [x] **Attributes missing "Use Template" reset** — Added DELETE `/field-overrides` endpoint and "Reset" button in attributes customize panel with confirmation dialog. Clears field_overrides to NULL, restoring category template defaults.
+- [ ] **Search scope limited to entities** — Ctrl+K quick search only searches entities. Should also search calendar events, timelines, maps, sessions. Would significantly improve discoverability.
+- [ ] **No confirmation dialogs for destructive actions** — No standard confirm modal for delete entity/event/map/timeline. Some delete operations fire immediately on click.
+- [ ] **No loading/spinner states** — No visual loading indicator during HTMX requests or API calls. Users see no feedback while waiting.
+- [ ] **Keyboard shortcuts help** — No way to discover available shortcuts (Ctrl+? or help overlay). 4 shortcuts exist but undocumented in UI.
+- [ ] **Form validation feedback** — No client-side validation styling (red borders, inline error messages). Server validates but user gets no inline hints.
+- [ ] **Mobile sidebar toggle** — Sidebar doesn't collapse/hamburger on mobile. No mobile navigation menu.
+- [ ] **Calendar recurring events limited** — Only "yearly" recurrence type. No monthly/weekly/daily/custom recurrence patterns.
+- [ ] **Editor lacks table support** — TipTap editor has no table insert/edit (common need for TTRPG stat blocks, encounter tables).
+- [ ] **Editor lacks callout/highlight blocks** — No callout/admonition blocks for DM notes, rules references, warnings.
+- [ ] **Entity cloning** — No "duplicate this entity" action to create copy with prefilled fields.
+- [ ] **Map marker search** — No search-by-name for markers within a map. Must scan visually.
+- [ ] **Timeline event creation from timeline page** — Must leave timeline to create events. No inline add button or modal on timeline.
 
 ### Low
 
@@ -61,7 +77,8 @@ New capabilities ordered by priority for alpha release.
 - [x] **Attributes template reset** — Implemented DELETE endpoint + "Reset" button in customize panel with confirmation dialog.
 - [ ] **Extension technical documentation** — 1-3 page `.ai.md` writeup per plugin/widget/module. Standard template covering purpose, architecture, API endpoints, widget integration, lifecycle, security. See documentation audit in plan.
 - [ ] **Graceful extension degradation** — `RequireAddon` API middleware, human-readable errors for disabled/uninstalled addons, addon dependency checking.
-- [ ] **Permissions & UX completeness audit** — Systematic walkthrough of all features as each role (admin, DM/owner, player, public visitor) to catch missing permissions, broken routes, inaccessible UI, and missing edit flows. Known issues include public category access, era editing, RSVP for owners, calendar event view/edit mode. Likely more small gaps exist across plugins.
+- [x] **Permissions & UX completeness audit** — Completed 2026-03-04. Audited all 17 route files, 24 JS widgets, all templ templates. Found 10 MUST-haves, 15 NEED-to-haves, 20 WANTs, 15 MAYBEs. Key findings: sidebar drill public access, sessions discoverability, calendar UX gaps, missing editor features (tables, callouts), no unsaved changes warning, inconsistent empty states. All items added to Bugfixes section above.
+- [ ] **README.md** — Project has only `# Chronicle` stub. Need proper open-source README with features, setup instructions, tech stack, screenshots placeholders, inspiration credits.
 
 ### Alpha-Nice-to-Have
 
@@ -70,6 +87,23 @@ New capabilities ordered by priority for alpha release.
 - [ ] **Maps Phase 2** — Layers, marker groups, privacy controls, nested maps (world → continent → city).
 - [ ] **Timeline Phase 2B** — Event connections (visual lines between related events), create-from-timeline modal, beautification pass.
 - [ ] **Campaign export/import** — JSON bundle for backup/migration. Media as separate zip or URL references.
+- [ ] **Image drag-and-drop upload** — Upload widget is click-only. Add drag-and-drop support + upload progress indicator.
+- [ ] **Calendar week view** — Only month + timeline views exist. Week view is standard calendar UX expectation.
+- [ ] **Calendar event drag-and-drop** — Can't drag events between dates (standard Google Calendar UX).
+- [ ] **Calendar day view** — No single-day detailed view with time blocks.
+- [ ] **Map marker clustering** — Markers don't auto-cluster when zoomed out (Leaflet.markercluster).
+- [ ] **Map marker icon picker** — No predefined POI icons (city, dungeon, tavern, etc.).
+- [ ] **Recent entities sidebar** — No "recently viewed" quick-access list.
+- [ ] **Command palette (Ctrl+Shift+P)** — Quick action palette beyond Ctrl+K search.
+- [ ] **Breadcrumb consistency** — Breadcrumbs exist on entity pages but not calendar/timeline/maps.
+- [ ] **Timeline search/filter** — No search within timeline events by name/text.
+- [ ] **Timeline zoom-to-era** — No button to jump viewport to a specific era.
+- [ ] **Editor find/replace** — No Ctrl+F within editor content.
+- [ ] **Editor code syntax highlighting** — Code blocks have no language-aware highlighting.
+- [ ] **Entity version history UI** — Audit log exists but no "view diff / restore version" for entities.
+- [ ] **Notes search/filter** — No search within notes panel.
+- [ ] **Toast notification grouping** — Duplicate toasts stack separately instead of grouping.
+- [ ] **Entity image gallery** — Only one image per entity; no carousel/gallery for multiple images.
 
 ### Post-Alpha
 
@@ -91,6 +125,21 @@ New capabilities ordered by priority for alpha release.
 - [ ] 2FA/TOTP support
 - [ ] Invite system (email invitations for campaigns)
 - [ ] Webhook support for external event notifications
+- [ ] Fog of war for maps (DM-only visibility per marker/region)
+- [ ] Map drawing tools (freehand, shapes, annotations)
+- [ ] Map hex/square grid overlay for tactical combat
+- [ ] Map measurement tool (distance/area)
+- [ ] Accessibility audit (ARIA labels, focus traps, screen readers, skip-to-content)
+- [ ] Offline mode / service worker caching
+- [ ] Collaborative editing presence indicators ("user X is editing")
+- [ ] Additional themes beyond light/dark (sepia, high-contrast, custom accent colors)
+- [ ] Editor markdown import/export
+- [ ] Calendar timezone support (real-life mode uses UTC; need per-user timezone)
+- [ ] Calendar print/PDF export
+- [ ] Notes rich text (TipTap in notes instead of plain text blocks)
+- [ ] Note folders/nesting organization
+- [ ] Reusable modal/dropdown component library (widgets each build their own)
+- [ ] Widget inline CSS → CSS classes migration (consistency, maintainability)
 
 ### Testing (High Priority)
 
@@ -118,7 +167,7 @@ New capabilities ordered by priority for alpha release.
 
 - [ ] **Add golangci-lint to CI pipeline** — Currently only `go vet` + unit tests run in CI. golangci-lint catches real bugs (unchecked errors, dead code) and should be enforced.
 - [ ] **Add security scanning to CI** — gosec (static analysis) and govulncheck (dependency vulnerabilities) should run in CI. Requires Go 1.25+ for latest gosec.
-- [ ] **Increase test coverage** — Currently 5.3% (6 test files). Priority: campaigns service tests, relations service tests, tags service tests, media service tests, then handler tests.
+- [ ] **Increase test coverage** — Currently 8 test files (294+ tests). Priority: media service tests, audit service tests, settings service tests, then handler tests.
 - [ ] docker-compose.yml full stack verification (app + MariaDB + Redis)
 - [ ] `air` hot reload setup for dev workflow
 
