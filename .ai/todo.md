@@ -50,7 +50,7 @@ Known broken or missing things, ordered by severity.
 
 ### Low
 
-- [x] **API endpoints ignore addon disabled state** — RequireAddon middleware gates web routes. RequireAddonAPI middleware now gates API v1 calendar and map routes (syncapi). Returns 404 JSON for disabled addons.
+- [~] **API endpoints ignore addon disabled state** — RequireAddon middleware now gates calendar, maps, sessions, timeline routes. Still needed: API v1 routes (syncapi).
 - [ ] **API technical documentation missing** — REST API v1 exists and works but has no public documentation (OpenAPI spec or reference).
 - [x] **Calendar HTMX detection inconsistency** — Replaced 5 raw `HX-Request` header checks in calendar handler with `middleware.IsHTMX(c)`, which also checks `HX-Boosted` to avoid returning fragments on boosted navigation.
 - [ ] **Cross-plugin adapter interface duplication** — `MemberLister` interface duplicated in timeline and sessions plugins. Should extract to shared package.
@@ -84,7 +84,7 @@ New capabilities ordered by priority for alpha release.
 
 - [ ] **File security audit + ClamAV** — Add ClamAV container to docker-compose, scan uploads before storage, configurable file type allowlist, SVG blocking (XSS vector).
 - [ ] **API documentation** — OpenAPI 3.0 spec or handwritten reference for REST v1. Auth guide, endpoint reference, rate limiting docs, sync protocol.
-- [x] **Foundry VTT Sync** — Bidirectional sync between Chronicle and Foundry VTT. Phase 1 (WebSocket hub, sync mappings, Foundry module skeleton, journal sync), Phase 2 (map expansion: drawings, tokens, layers, fog CRUD + internal API), Phase 3 (EventBus wiring + Map REST API v1, 23 endpoints), Phase 4 (calendar live sync with Calendaria + SimpleCalendar adapter), and Phase 5 (relations API for shop inventory, RequireAddonAPI permission hardening, E2E testing checklist) complete.
+- [x] **Foundry VTT Sync** — Bidirectional sync between Chronicle and Foundry VTT. Phases 1-4 complete (WebSocket, sync mappings, journal sync, map expansion, EventBus, Map API v1, calendar live sync). Phase 5 (shop entity type + Chronicle inventory widget + relation metadata, Foundry shop widget wiring, RequireAddonAPI permission hardening, E2E testing checklist) complete.
 - [x] **Maps Phase 2** — Layers, drawings, tokens, fog of war. Migration 000042, full CRUD service + repository + REST API handler. Role-based visibility filtering. Percentage-based coordinates for resolution independence.
 - [ ] **Timeline Phase 2B** — Event connections (visual lines between related events), create-from-timeline modal, beautification pass.
 - [ ] **Campaign export/import** — JSON bundle for backup/migration. Media as separate zip or URL references.
@@ -305,7 +305,7 @@ Summary of strengths/weaknesses for strategic positioning. Full analysis in `.ai
 - [x] Relations service tests (25 tests)
 - [x] Tags service tests (40 tests)
 
-### Production Fix + Mobile Nav + Widgets + Foundry Completion (2026-03-04, batch 19)
+### Production Fix + Mobile Nav + Widgets + Foundry Completion (2026-03-04, batch 20)
 - [x] Fixed duplicate migration 000041 (renumbered sync_mappings→044, map_expansion→045, relation_metadata→046)
 - [x] Removed Calendar/Maps/Timelines addon sidebar links from mobile nav
 - [x] Added map_preview dashboard block type with Leaflet-based widget

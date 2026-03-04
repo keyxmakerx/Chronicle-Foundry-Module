@@ -8,11 +8,11 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-04 -- Production fix, mobile nav cleanup, dashboard widgets, Foundry completion (batch 19).
+2026-03-04 -- Production fix, mobile nav cleanup, dashboard widgets, Foundry completion (batch 20).
 Branch: `claude/fix-production-logging-bwyeV`.
 
 ## Current Phase
-**Production fix + Mobile nav + Dashboard widgets + Foundry completion.** Completed this session (batch 19):
+**Production fix + Mobile nav + Dashboard widgets + Foundry completion.** Completed this session (batch 20):
 - **Critical: Fixed duplicate migration 000041** — Two different migrations shared number
   000041 (session_recurrence_and_rsvp_tokens vs sync_mappings). Renumbered:
   sync_mappings→000044, map_expansion→000045, relation_metadata→000046. Production blocker resolved.
@@ -30,7 +30,56 @@ Branch: `claude/fix-production-logging-bwyeV`.
   and map API routes behind addon enabled checks. Returns 404 for disabled addons.
 - **Foundry E2E testing checklist** — Created comprehensive `foundry-module/TESTING.md`.
 
+Previously completed (batch 19):
+- Shop inventory widget + README cleanup
+
+Previously completed (batch 16-18):
+**Sessions-Calendar integration + RSVP system.** Completed (batch 16):
+- **RequireAddon middleware**: Route-level addon gating for calendar, maps, sessions,
+  timeline. Disabled addons now return 404/redirect instead of just hiding sidebar links.
+- **Sessions merged into calendar**: Sessions sidebar link removed. Sessions now
+  accessed via calendar header (dice icon). Sessions require calendar addon.
+- **Sessions on calendar grid**: Real-life mode calendars display session chips
+  (purple, dice icon) on their scheduled dates. Click opens inline session detail
+  modal with RSVP controls (Going/Maybe/Can't).
+- **Recurring sessions**: Weekly, biweekly, monthly, and custom N-week intervals.
+  New DB columns: is_recurring, recurrence_type, recurrence_interval,
+  recurrence_day_of_week, recurrence_end_date. Migration 000041.
+- **Date formatting**: Session dates now display as "Mon, Jan 2, 2006" instead of
+  raw ISO 8601 strings. FormatScheduledDate() helper on Session model.
+- **SMTP HTML email**: Added SendHTMLMail with multipart/alternative MIME support
+  (plain text + HTML variants). Existing SendMail unchanged.
+- **RSVP email system**: Session creation auto-sends HTML invitation emails with
+  one-click accept/decline links. Token-based (7-day expiry, single-use).
+  Public /rsvp/:token endpoint for redemption — no login required.
+- **Discord bot plan**: Documented in ADR-012. Future plugin at internal/plugins/discord/
+  with reaction-based RSVP via bot token + webhook.
+2026-03-04 -- Foundry VTT sync feature (batch 16, Phase 1+2 partial).
+Branch: `claude/foundry-sync-feature-05M5a`.
+
+## Current Phase
+**Shop inventory widget + README updates.** Completed this session (batch 19):
+- **Shop entity type**: New default entity type "Shop" seeded with field definitions
+  (shop_type select, shopkeeper, currency, price_modifier). fa-store icon, orange color.
+- **Relation metadata**: Added `Metadata` (JSON) field to Relation model, repository,
+  and service. Migration 000043 column was already in DB — now wired end-to-end.
+  New `PUT /entities/:eid/relations/:rid/metadata` endpoint for updating metadata.
+  "sells"/"sold by" relation type pair added to common types.
+- **Shop inventory widget** (`static/js/widgets/shop_inventory.js`): Self-contained
+  JS widget that displays "sells" relations as inventory items with price, quantity,
+  and in-stock controls. Search + add items UI. Auto-mounted on Shop entities via
+  `data-widget="shop_inventory"`. Editable for Scribe+ roles.
+- **Layout integration**: `blockShopInventory` templ block added. Auto-renders on
+  Shop entities in fallback layout; available as `shop_inventory` block type in
+  custom entity type layouts.
+- **README cleanup**: Removed direct competitor comparisons (legal concern). Kept
+  attribution as reference/inspiration. Added Foundry module manifest URL. Updated
+  features and planned features lists.
+- **Templ regeneration**: Fixed sessions handler build error (upstream merge had
+  added userID param to templ but generated code was stale).
+
 Previously completed (batch 18):
+**Foundry VTT bidirectional sync:**
 - **Map REST API v1** (batch 17): 23 new endpoints for maps, drawings, tokens, layers, fog
   CRUD. Authenticated via API keys with read/write permission levels.
 - **Calendar live sync** (batch 18, Phase 4):

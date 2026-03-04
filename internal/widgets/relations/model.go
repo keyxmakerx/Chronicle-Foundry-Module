@@ -24,8 +24,9 @@ type Relation struct {
 	TargetEntityID      string    `json:"targetEntityId"`
 	RelationType        string    `json:"relationType"`
 	ReverseRelationType string    `json:"reverseRelationType"`
-	CreatedAt           time.Time `json:"createdAt"`
-	CreatedBy           string    `json:"createdBy"`
+	Metadata            json.RawMessage `json:"metadata,omitempty"`
+	CreatedAt           time.Time       `json:"createdAt"`
+	CreatedBy           string          `json:"createdBy"`
 
 	// Joined fields from the entities table (populated by repository queries).
 	TargetEntityName  string `json:"targetEntityName,omitempty"`
@@ -33,11 +34,6 @@ type Relation struct {
 	TargetEntityColor string `json:"targetEntityColor,omitempty"`
 	TargetEntitySlug  string `json:"targetEntitySlug,omitempty"`
 	TargetEntityType  string `json:"targetEntityType,omitempty"`
-
-	// Metadata holds relation-specific JSON data (e.g., shop inventory:
-	// price, quantity, stock status). Populated from the metadata column
-	// added in migration 000046.
-	Metadata json.RawMessage `json:"metadata,omitempty"`
 }
 
 // --- Request DTOs (bound from HTTP requests) ---
@@ -45,9 +41,15 @@ type Relation struct {
 // CreateRelationRequest holds the data submitted when creating a new relation.
 // The reverse relation is created automatically by the service layer.
 type CreateRelationRequest struct {
-	TargetEntityID      string `json:"targetEntityId"`
-	RelationType        string `json:"relationType"`
-	ReverseRelationType string `json:"reverseRelationType"`
+	TargetEntityID      string          `json:"targetEntityId"`
+	RelationType        string          `json:"relationType"`
+	ReverseRelationType string          `json:"reverseRelationType"`
+	Metadata            json.RawMessage `json:"metadata,omitempty"`
+}
+
+// UpdateRelationMetadataRequest holds the data for updating relation metadata.
+type UpdateRelationMetadataRequest struct {
+	Metadata json.RawMessage `json:"metadata"`
 }
 
 // --- Common Relation Types ---
@@ -71,6 +73,8 @@ var CommonRelationTypes = []RelationTypePair{
 	{Forward: "rules", Reverse: "ruled by"},
 	{Forward: "ruled by", Reverse: "rules"},
 	{Forward: "knows", Reverse: "known by"},
+	{Forward: "sells", Reverse: "sold by"},
+	{Forward: "sold by", Reverse: "sells"},
 }
 
 // RelationTypePair holds a forward and reverse relation type label.
