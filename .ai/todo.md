@@ -22,6 +22,10 @@ Known broken or missing things, ordered by severity.
 - [x] **@mention popup won't dismiss** — Fixed by adding link mark guard in `onUpdate` (skips `@` inside existing mention links) and removing `selectionUpdate` event binding. Mentions still stored as Link marks, but popup no longer re-triggers.
 - [x] **Image upload click does nothing** — Fixed event recursion: file input's click event bubbled back to parent widget, causing Firefox to suppress file picker. Added stopPropagation on file input click, campaign_id to upload FormData, and fixed hover feedback on placeholder.
 - [ ] **No media management for campaign owners** — Admin has `/admin/storage` page. Campaign owners have NO way to browse, manage, or delete their uploads. Need campaign-scoped media browser at `/campaigns/:id/media` with "referenced by" tracking, delete with warnings, and upload from browser page.
+- [ ] **Public users can't access categories** — Non-player public visitors cannot access category pages at all (likely 403 or redirect). Permissions issue introduced during sidebar revamp. Need to audit category route groups and ensure public campaign viewers can browse categories read-only.
+- [ ] **Timeline eras not editable** — No UI to edit existing eras after creation. Need edit/delete actions on era items (inline edit or modal) in the timeline settings or visualization.
+- [ ] **Calendar RSVP missing for DM/owner** — RSVP functionality appears to only be available on the player side. DM/campaign owner needs to be able to RSVP to their own events too. Either expose RSVP to all roles or add it explicitly for owners.
+- [ ] **Calendar events lack view→edit mode** — Calendar events should follow the same pattern as other entities: open in view mode first, then switch to edit mode. Currently may open directly in edit or lack a proper read-only view.
 
 ### Medium
 
@@ -57,6 +61,7 @@ New capabilities ordered by priority for alpha release.
 - [x] **Attributes template reset** — Implemented DELETE endpoint + "Reset" button in customize panel with confirmation dialog.
 - [ ] **Extension technical documentation** — 1-3 page `.ai.md` writeup per plugin/widget/module. Standard template covering purpose, architecture, API endpoints, widget integration, lifecycle, security. See documentation audit in plan.
 - [ ] **Graceful extension degradation** — `RequireAddon` API middleware, human-readable errors for disabled/uninstalled addons, addon dependency checking.
+- [ ] **Permissions & UX completeness audit** — Systematic walkthrough of all features as each role (admin, DM/owner, player, public visitor) to catch missing permissions, broken routes, inaccessible UI, and missing edit flows. Known issues include public category access, era editing, RSVP for owners, calendar event view/edit mode. Likely more small gaps exist across plugins.
 
 ### Alpha-Nice-to-Have
 
