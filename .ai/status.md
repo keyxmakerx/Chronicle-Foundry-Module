@@ -8,28 +8,26 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-04 -- Media security hardening (Part 3e-3i).
+2026-03-04 -- Media API v1 endpoints (Part 2).
 Branch: `claude/review-codebase-R1WqN`.
 
 ## Current Phase
-**Media security hardening.** Completed this session (batch 11):
-- Audit logging: upload/delete/quota events logged to admin security dashboard
-  - New event types: `media.uploaded`, `media.deleted`, `media.quota_exceeded`
-  - Fire-and-forget pattern (same as auth events)
-  - Wired via `SecurityEventLogger` interface in handler
-- Concurrent upload limiting: max 3 simultaneous uploads per user
-  - `uploadSemaphore` with `acquire()`/`release()` using sync.Mutex
-  - Returns 400 "too many concurrent uploads" if exceeded
-- Disk space monitoring: rejects uploads if <100MB free space would remain
-  - `checkDiskSpace()` uses `syscall.Statfs` before writing
-  - Fails gracefully if statfs is unavailable
-- Orphan file cleanup: `CleanupOrphans()` method walks media dir vs DB
-  - `ListAllFilenames()` repository method returns all tracked files + thumbnails
-  - Logs each removed orphan; no periodic scheduler yet
+**Media API v1 endpoints.** Completed this session (batch 12):
+- REST API v1 media endpoints for Foundry VTT and external tools:
+  - `GET /api/v1/campaigns/:id/media` — list media with pagination
+  - `GET /api/v1/campaigns/:id/media/:mediaID` — get single file metadata
+  - `GET /api/v1/campaigns/:id/media/stats` — campaign storage stats
+  - `POST /api/v1/campaigns/:id/media` — upload via multipart form
+  - `DELETE /api/v1/campaigns/:id/media/:mediaID` — delete media file
+  - Read endpoints require "read" permission, write endpoints require "write"
+  - IDOR protection: verifies file belongs to campaign before returning
+  - Signed URLs in responses when signer is configured
+  - New `MediaAPIHandler` in `syncapi/media_api_handler.go`
+
+Previously completed (batch 11):
+- Security hardening: audit logging, concurrent upload limits, disk space checks, orphan cleanup
 
 Remaining from approved media plan:
-- Part 2: API v1 media endpoints for Foundry VTT
-- Part 1: Temporary storage limit bypass
 - Part 5: QoL features (drag-drop, progress, multi-upload, usage indicators)
 
 Completed (batch 9):

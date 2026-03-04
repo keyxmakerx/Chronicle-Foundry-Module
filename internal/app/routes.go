@@ -511,7 +511,11 @@ func (a *App) RegisterRoutes() {
 	// Authenticates via API keys, not browser sessions.
 	syncAPIHandler := syncapi.NewAPIHandler(syncService, entityService, campaignService)
 	calendarAPIHandler := syncapi.NewCalendarAPIHandler(syncService, calendarService)
-	syncapi.RegisterAPIRoutes(e, syncAPIHandler, calendarAPIHandler, syncService)
+	mediaAPIHandler := syncapi.NewMediaAPIHandler(syncService, mediaService)
+	if urlSigner != nil {
+		mediaAPIHandler.SetURLSigner(urlSigner)
+	}
+	syncapi.RegisterAPIRoutes(e, syncAPIHandler, calendarAPIHandler, mediaAPIHandler, syncService)
 
 	// Tags widget: campaign-scoped entity tagging (CRUD + entity associations).
 	tagRepo := tags.NewTagRepository(a.DB)
