@@ -67,17 +67,17 @@ type MapEventPublisher interface {
 	PublishTokenEvent(eventType string, campaignID string, token *Token)
 	PublishTokenPositionEvent(campaignID, tokenID string, x, y float64)
 	PublishLayerEvent(eventType string, campaignID string, layer *Layer)
-	PublishFogEvent(eventType string, campaignID, mapID string)
+	PublishFogEvent(eventType string, campaignID, mapID string, region *FogRegion)
 }
 
 // NoopMapEventPublisher is a no-op implementation for tests.
 type NoopMapEventPublisher struct{}
 
-func (NoopMapEventPublisher) PublishDrawingEvent(string, string, *Drawing)        {}
-func (NoopMapEventPublisher) PublishTokenEvent(string, string, *Token)            {}
+func (NoopMapEventPublisher) PublishDrawingEvent(string, string, *Drawing)              {}
+func (NoopMapEventPublisher) PublishTokenEvent(string, string, *Token)                  {}
 func (NoopMapEventPublisher) PublishTokenPositionEvent(string, string, float64, float64) {}
-func (NoopMapEventPublisher) PublishLayerEvent(string, string, *Layer)            {}
-func (NoopMapEventPublisher) PublishFogEvent(string, string, string)              {}
+func (NoopMapEventPublisher) PublishLayerEvent(string, string, *Layer)                  {}
+func (NoopMapEventPublisher) PublishFogEvent(string, string, string, *FogRegion)        {}
 
 // drawingService implements DrawingService.
 type drawingService struct {
@@ -453,7 +453,7 @@ func (s *drawingService) CreateFog(ctx context.Context, input CreateFogInput) (*
 	if err := s.repo.CreateFog(ctx, f); err != nil {
 		return nil, err
 	}
-	s.events.PublishFogEvent("created", s.campaignForMap(ctx, f.MapID), f.MapID)
+	s.events.PublishFogEvent("created", s.campaignForMap(ctx, f.MapID), f.MapID, f)
 	return f, nil
 }
 
@@ -477,6 +477,6 @@ func (s *drawingService) ResetFog(ctx context.Context, mapID string) error {
 	if err := s.repo.ResetFog(ctx, mapID); err != nil {
 		return err
 	}
-	s.events.PublishFogEvent("reset", s.campaignForMap(ctx, mapID), mapID)
+	s.events.PublishFogEvent("reset", s.campaignForMap(ctx, mapID), mapID, nil)
 	return nil
 }
