@@ -45,6 +45,11 @@ type MediaRepository interface {
 	// FindReferences returns entities that reference the given media file,
 	// either via image_path or in their editor HTML content.
 	FindReferences(ctx context.Context, campaignID, mediaID string) ([]MediaRef, error)
+
+	// ListAllFilenames returns all filenames (including thumbnail paths) tracked
+	// in the database. Used by the orphan cleanup job to find disk files without
+	// a corresponding DB record.
+	ListAllFilenames(ctx context.Context) (map[string]bool, error)
 }
 
 // mediaRepository implements MediaRepository with MariaDB queries.
@@ -268,6 +273,36 @@ func (r *mediaRepository) GetCampaignUsage(ctx context.Context, campaignID strin
 		return 0, 0, fmt.Errorf("querying campaign storage usage: %w", err)
 	}
 	return totalBytes, fileCount, nil
+}
+
+// ListAllFilenames returns a set of all filenames tracked in the database,
+// including thumbnail paths. The returned map uses relative paths (e.g.,
+// "2006/01/uuid.jpg") as keys.
+func (r *mediaRepository) ListAllFilenames(ctx context.Context) (map[string]bool, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT filename, thumbnail_paths FROM media_files`)
+	if err != nil {
+		return nil, fmt.Errorf("listing all filenames: %w", err)
+	}
+	defer rows.Close()
+
+	known := make(map[string]bool)
+	for rows.Next() {
+		var filename, thumbJSON string
+		if err := rows.Scan(&filename, &thumbJSON); err != nil {
+			return nil, fmt.Errorf("scanning filename row: %w", err)
+		}
+		known[filename] = true
+		if thumbJSON != "" && thumbJSON != "{}" {
+			var thumbs map[string]string
+			if err := json.Unmarshal([]byte(thumbJSON), &thumbs); err == nil {
+				for _, tp := range thumbs {
+					known[tp] = true
+				}
+			}
+		}
+	}
+	return known, rows.Err()
 }
 
 // FindReferences returns entities that reference the given media file.

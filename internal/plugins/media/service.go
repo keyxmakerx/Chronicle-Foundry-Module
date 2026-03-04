@@ -13,6 +13,8 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync"
+	"syscall"
 	"time"
 
 	// Register decoders for image formats.
@@ -50,6 +52,48 @@ type MediaService interface {
 
 	// DeleteCampaignMedia deletes a media file after verifying it belongs to the campaign.
 	DeleteCampaignMedia(ctx context.Context, campaignID, mediaID string) error
+
+	// CleanupOrphans finds files on disk without a corresponding DB record and
+	// deletes them. Returns the number of files removed.
+	CleanupOrphans(ctx context.Context) (int, error)
+}
+
+// maxConcurrentUploadsPerUser limits simultaneous uploads per user to prevent
+// resource exhaustion from parallel large file processing.
+const maxConcurrentUploadsPerUser = 3
+
+// minFreeDiskBytes is the minimum free disk space required after writing a file.
+// Uploads are rejected if writing the file would leave less than this available.
+const minFreeDiskBytes = 100 * 1024 * 1024 // 100 MB
+
+// uploadSemaphore tracks concurrent uploads per user.
+type uploadSemaphore struct {
+	mu    sync.Mutex
+	slots map[string]int
+}
+
+// acquire increments the user's active upload count and returns true, or
+// returns false if the user has reached the concurrency limit.
+func (s *uploadSemaphore) acquire(userID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.slots[userID] >= maxConcurrentUploadsPerUser {
+		return false
+	}
+	s.slots[userID]++
+	return true
+}
+
+// release decrements the user's active upload count.
+func (s *uploadSemaphore) release(userID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.slots[userID] > 0 {
+		s.slots[userID]--
+	}
+	if s.slots[userID] == 0 {
+		delete(s.slots, userID)
+	}
 }
 
 // mediaService implements MediaService.
@@ -58,6 +102,7 @@ type mediaService struct {
 	mediaPath string         // Root directory for file storage.
 	maxSize   int64          // Maximum file size in bytes (static fallback).
 	limiter   StorageLimiter // Dynamic storage limits from settings plugin. May be nil.
+	sem       *uploadSemaphore
 }
 
 // NewMediaService creates a new media service.
@@ -66,6 +111,7 @@ func NewMediaService(repo MediaRepository, mediaPath string, maxSize int64) Medi
 		repo:      repo,
 		mediaPath: mediaPath,
 		maxSize:   maxSize,
+		sem:       &uploadSemaphore{slots: make(map[string]int)},
 	}
 }
 
@@ -77,6 +123,12 @@ func (s *mediaService) SetStorageLimiter(limiter StorageLimiter) {
 
 // Upload validates, stores, and records a new media file.
 func (s *mediaService) Upload(ctx context.Context, input UploadInput) (*MediaFile, error) {
+	// Limit concurrent uploads per user to prevent resource exhaustion.
+	if !s.sem.acquire(input.UploadedBy) {
+		return nil, apperror.NewBadRequest("too many concurrent uploads; please wait and try again")
+	}
+	defer s.sem.release(input.UploadedBy)
+
 	// Validate MIME type.
 	if !AllowedMimeTypes[input.MimeType] {
 		return nil, apperror.NewBadRequest("unsupported file type: " + input.MimeType)
@@ -121,6 +173,11 @@ func (s *mediaService) Upload(ctx context.Context, input UploadInput) (*MediaFil
 	// Create directory with restrictive permissions.
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, apperror.NewInternal(fmt.Errorf("creating media directory: %w", err))
+	}
+
+	// Verify sufficient disk space before writing to prevent filling the filesystem.
+	if err := checkDiskSpace(dir, input.FileSize); err != nil {
+		return nil, err
 	}
 
 	// Write sanitized file to disk with restrictive permissions.
@@ -314,6 +371,51 @@ func (s *mediaService) DeleteCampaignMedia(ctx context.Context, campaignID, medi
 	return s.Delete(ctx, mediaID)
 }
 
+// CleanupOrphans walks the media directory, checks each file against the
+// database, and deletes any files not tracked. This handles the case where
+// an upload crashes between writing the file and saving the DB record.
+func (s *mediaService) CleanupOrphans(ctx context.Context) (int, error) {
+	knownFiles, err := s.repo.ListAllFilenames(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("listing known files: %w", err)
+	}
+
+	removed := 0
+	err = filepath.Walk(s.mediaPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // Skip unreadable entries.
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		// Get the relative path from mediaPath for comparison with DB filenames.
+		rel, relErr := filepath.Rel(s.mediaPath, path)
+		if relErr != nil {
+			return nil
+		}
+
+		if !knownFiles[rel] {
+			if removeErr := os.Remove(path); removeErr == nil {
+				removed++
+				slog.Info("removed orphan media file", slog.String("path", rel))
+			} else {
+				slog.Warn("failed to remove orphan media file",
+					slog.String("path", rel),
+					slog.Any("error", removeErr),
+				)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return removed, fmt.Errorf("walking media directory: %w", err)
+	}
+
+	slog.Info("orphan cleanup completed", slog.Int("removed", removed))
+	return removed, nil
+}
+
 // maxImageDimension is the maximum width or height in pixels for uploaded images.
 // Images larger than this are rejected to prevent decompression bomb attacks
 // (e.g., a tiny PNG that decompresses to gigabytes in memory).
@@ -407,6 +509,26 @@ func validateMagicBytes(data []byte, declaredMIME string) bool {
 	default:
 		return false
 	}
+}
+
+// checkDiskSpace verifies that writing a file of the given size will leave at
+// least minFreeDiskBytes of free space. Prevents media uploads from filling
+// the filesystem and breaking other services.
+func checkDiskSpace(path string, fileSize int64) error {
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(path, &stat); err != nil {
+		slog.Warn("disk space check failed, allowing upload",
+			slog.String("path", path),
+			slog.Any("error", err),
+		)
+		return nil // Don't block uploads if statfs fails.
+	}
+	available := int64(stat.Bavail) * int64(stat.Bsize)
+	if available-fileSize < minFreeDiskBytes {
+		return apperror.NewInternal(fmt.Errorf("insufficient disk space: %d bytes available, need %d + %d reserve",
+			available, fileSize, minFreeDiskBytes))
+	}
+	return nil
 }
 
 // generateUUID creates a new v4 UUID string using crypto/rand.

@@ -1,6 +1,7 @@
 package media
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,11 +24,18 @@ type MemberChecker interface {
 	IsCampaignMember(campaignID, userID string) bool
 }
 
+// SecurityEventLogger records security events for the admin security dashboard.
+// Implemented by the admin security service; wired after both are initialized.
+type SecurityEventLogger interface {
+	LogEvent(ctx context.Context, eventType, userID, actorID, ip, userAgent string, details map[string]any) error
+}
+
 // Handler handles HTTP requests for media operations.
 type Handler struct {
-	service       MediaService
-	signer        *URLSigner
-	memberChecker MemberChecker
+	service        MediaService
+	signer         *URLSigner
+	memberChecker  MemberChecker
+	securityLogger SecurityEventLogger
 }
 
 // NewHandler creates a new media handler.
@@ -45,6 +53,20 @@ func (h *Handler) SetURLSigner(signer *URLSigner) {
 // on private campaign media. Called during wiring in app/routes.go.
 func (h *Handler) SetMemberChecker(checker MemberChecker) {
 	h.memberChecker = checker
+}
+
+// SetSecurityLogger wires a security event logger for recording media events
+// (uploads, deletes, quota failures). Called during wiring in app/routes.go.
+func (h *Handler) SetSecurityLogger(logger SecurityEventLogger) {
+	h.securityLogger = logger
+}
+
+// logSecurityEvent fires a security event if a logger is wired. Fire-and-forget
+// so media operations are never blocked by logging failures.
+func (h *Handler) logSecurityEvent(ctx context.Context, eventType, userID, actorID, ip, userAgent string, details map[string]any) {
+	if h.securityLogger != nil {
+		_ = h.securityLogger.LogEvent(ctx, eventType, userID, actorID, ip, userAgent, details)
+	}
 }
 
 // Upload handles multipart file uploads (POST /media/upload).
@@ -86,8 +108,29 @@ func (h *Handler) Upload(c echo.Context) error {
 
 	mediaFile, err := h.service.Upload(c.Request().Context(), input)
 	if err != nil {
+		// Log quota-exceeded errors as security events for admin visibility.
+		if apperror.SafeCode(err) == http.StatusBadRequest &&
+			(strings.Contains(err.Error(), "quota") || strings.Contains(err.Error(), "limit")) {
+			h.logSecurityEvent(c.Request().Context(), "media.quota_exceeded",
+				userID, "", c.RealIP(), c.Request().UserAgent(),
+				map[string]any{
+					"campaign_id": input.CampaignID,
+					"mime_type":   input.MimeType,
+					"size":        input.FileSize,
+					"reason":      apperror.SafeMessage(err),
+				})
+		}
 		return err
 	}
+
+	h.logSecurityEvent(c.Request().Context(), "media.uploaded",
+		userID, "", c.RealIP(), c.Request().UserAgent(),
+		map[string]any{
+			"file_id":     mediaFile.ID,
+			"campaign_id": input.CampaignID,
+			"mime_type":   mediaFile.MimeType,
+			"size":        mediaFile.FileSize,
+		})
 
 	// Return signed URLs if signer is available.
 	var url, thumbURL string
@@ -345,6 +388,17 @@ func (h *Handler) Delete(c echo.Context) error {
 		return err
 	}
 
+	var campaignID string
+	if file.CampaignID != nil {
+		campaignID = *file.CampaignID
+	}
+	h.logSecurityEvent(c.Request().Context(), "media.deleted",
+		userID, "", c.RealIP(), c.Request().UserAgent(),
+		map[string]any{
+			"file_id":     fileID,
+			"campaign_id": campaignID,
+		})
+
 	return c.JSON(http.StatusOK, map[string]string{"status": "deleted"})
 }
 
@@ -412,6 +466,13 @@ func (h *Handler) CampaignDeleteMedia(c echo.Context) error {
 	if err := h.service.DeleteCampaignMedia(c.Request().Context(), cc.Campaign.ID, mediaID); err != nil {
 		return err
 	}
+
+	h.logSecurityEvent(c.Request().Context(), "media.deleted",
+		auth.GetUserID(c), "", c.RealIP(), c.Request().UserAgent(),
+		map[string]any{
+			"file_id":     mediaID,
+			"campaign_id": cc.Campaign.ID,
+		})
 
 	// Redirect back to media page for HTMX and standard requests.
 	c.Response().Header().Set("HX-Redirect", fmt.Sprintf("/campaigns/%s/media", cc.Campaign.ID))

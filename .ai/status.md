@@ -8,29 +8,26 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-04 -- Media security overhaul (Part 3a-3d).
+2026-03-04 -- Media security hardening (Part 3e-3i).
 Branch: `claude/review-codebase-R1WqN`.
 
 ## Current Phase
-**Media security overhaul.** Completed this session (batch 10):
-- HMAC-SHA256 signed URLs for media access (`signed_url.go`)
-- Image re-encoding / Content Disarm & Reconstruction (`sanitize.go`)
-- Per-campaign media access control with defense-in-depth:
-  - Signed URL verification for campaign media
-  - Campaign membership check for private campaigns
-  - Graceful migration: authenticated members can access without signatures
-  - Site admins bypass all checks
-- Security headers on all media responses (nosniff, CSP, X-Frame-Options, etc.)
-- Rate limiting on serve routes (300/min/IP, configurable)
-- Template signed URL helpers (`layouts.MediaURL`, `layouts.MediaThumbURL`)
-- All templates updated to generate signed URLs
-- Upload handler returns signed URLs in responses
-- Config: `MEDIA_SIGNING_SECRET`, `MEDIA_SERVE_RATE_LIMIT` env vars
-- Repository: `FindByID` now LEFT JOINs campaigns for `CampaignIsPublic`
-- File permissions hardened (0640 files, 0750 directories)
+**Media security hardening.** Completed this session (batch 11):
+- Audit logging: upload/delete/quota events logged to admin security dashboard
+  - New event types: `media.uploaded`, `media.deleted`, `media.quota_exceeded`
+  - Fire-and-forget pattern (same as auth events)
+  - Wired via `SecurityEventLogger` interface in handler
+- Concurrent upload limiting: max 3 simultaneous uploads per user
+  - `uploadSemaphore` with `acquire()`/`release()` using sync.Mutex
+  - Returns 400 "too many concurrent uploads" if exceeded
+- Disk space monitoring: rejects uploads if <100MB free space would remain
+  - `checkDiskSpace()` uses `syscall.Statfs` before writing
+  - Fails gracefully if statfs is unavailable
+- Orphan file cleanup: `CleanupOrphans()` method walks media dir vs DB
+  - `ListAllFilenames()` repository method returns all tracked files + thumbnails
+  - Logs each removed orphan; no periodic scheduler yet
 
 Remaining from approved media plan:
-- Part 3e-3i: Audit logging, concurrent upload limiting, disk space monitoring, orphan cleanup
 - Part 2: API v1 media endpoints for Foundry VTT
 - Part 1: Temporary storage limit bypass
 - Part 5: QoL features (drag-drop, progress, multi-upload, usage indicators)

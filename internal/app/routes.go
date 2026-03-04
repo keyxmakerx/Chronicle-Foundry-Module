@@ -466,6 +466,10 @@ func (a *App) RegisterRoutes() {
 	// failed attempts, and password resets are recorded automatically.
 	authHandler.SetSecurityLogger(securityService)
 
+	// Wire security event logging into the media handler so uploads, deletes,
+	// and quota failures are recorded in the admin security dashboard.
+	mediaHandler.SetSecurityLogger(securityService)
+
 	// Sync API plugin: external tool integration with API key auth,
 	// request logging, security monitoring, and admin dashboard.
 	syncRepo := syncapi.NewSyncAPIRepository(a.DB)
