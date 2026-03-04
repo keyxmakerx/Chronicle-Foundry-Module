@@ -8,24 +8,23 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-04 -- Alpha Hardening batch (batch 25 complete).
+2026-03-04 -- Phase H: Release Readiness complete (batch 26).
 Branch: `claude/project-review-planning-Yr4CL`.
 
 ## Current Phase
-**All major features complete through batch 25.** Alpha hardening done.
+**Phase H complete (batch 26).** Release readiness: error standardization, code dedup,
+API documentation, extension docs all done. Ready for Phase I (Core UX Features).
 
-### Summary of Recent Work (batches 21-25)
+### Summary of Recent Work (batches 24-26)
+- **Batch 26**: Phase H Release Readiness — (H-1) 249 `echo.NewHTTPError` → `apperror`
+  across 15+ files, (H-2) `MemberLister` interface extraction + LIKE metacharacter
+  escaping, (H-3) OpenAPI 3.0.3 spec (63 endpoints, 42 schemas), (H-4) extension
+  `.ai.md` docs (syncapi, maps, editor, tags).
 - **Batch 25**: Alpha Hardening — CI pipeline (golangci-lint + govulncheck), 3 new
   service test suites (audit, media, settings), generic IDOR helper, input size
   validation helpers, JS widget `.ai.md` docs, TipTap table support.
 - **Batch 24**: Security hardening (input sanitization, rate limit bounds, fail-closed
   addon middleware) + fog-of-war Chronicle→Foundry sync (polygon drawings).
-- **Batch 23**: WebSocket security (origin validation, message type validation), device
-  fingerprint race fix, extension `.ai.md` documentation (foundry-module, websocket).
-- **Batch 22**: Entity page widget blocks (timeline, map_preview, upcoming_events,
-  shop_inventory, text_block).
-- **Batch 21**: Calendar sessions modal, RSVP inline controls, recurring session
-  auto-generation, calendar sessions fragment endpoint, SMTP verification.
 
 ### Earlier Batches (summary)
 - **Batch 20**: Fixed duplicate migration 000041, mobile nav cleanup, 3 dashboard widgets.
@@ -39,13 +38,10 @@ Branch: `claude/project-review-planning-Yr4CL`.
 ---
 
 ## Next Session Should
-1. **Mixed error types cleanup** — Standardize `echo.NewHTTPError` → `apperror` in 30+ places.
-2. **Extension documentation** — `.ai.md` writeups still needed for: syncapi, maps drawing
-   subsystem, editor.js, tag_picker.js, relations.js, notes.js.
-3. **API documentation** — OpenAPI spec or handwritten REST v1 reference. Auth guide,
-   endpoint reference, rate limiting docs, sync protocol.
-4. **Timeline Phase 2B** — Event connections, create-from-timeline modal, beautification.
-5. **Campaign export/import** — JSON bundle for backup/migration.
+1. **Campaign export/import** (Sprint I-1) — JSON bundle for backup/migration. High complexity.
+2. **Timeline Phase 2B** (Sprint I-2) — Event connections, create-from-timeline modal, beautification.
+3. **Calendar week view** (Sprint I-3) — 7-day grid with time blocks.
+4. **Map UX polish** (Sprint I-4) — Marker clustering + POI icon picker.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)
@@ -80,3 +76,5 @@ Branch: `claude/project-review-planning-Yr4CL`.
 - **2026-03-04: Alpha Hardening** — CI pipeline (golangci-lint + govulncheck), 3 service
   test suites (audit/media/settings), generic IDOR helper, input validation, widget docs,
   TipTap table extensions
+- **2026-03-04: Phase H Release Readiness** — Error standardization (249 calls, 15+ files),
+  code dedup (MemberLister, LIKE escape), OpenAPI 3.0.3 spec (63 endpoints), extension docs

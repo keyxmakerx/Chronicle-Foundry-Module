@@ -51,7 +51,7 @@ Known broken or missing things, ordered by severity.
 ### Low
 
 - [x] **API endpoints ignore addon disabled state** — RequireAddon middleware gates calendar, maps, sessions, timeline routes. RequireAddonAPI middleware gates API v1 routes (syncapi). Fail-closed on DB errors.
-- [ ] **API technical documentation missing** — REST API v1 exists and works but has no public documentation (OpenAPI spec or reference).
+- [x] **API technical documentation missing** — Created OpenAPI 3.0.3 spec at `docs/api/openapi.yaml` with 63 endpoints, 42 schemas, auth details, and error responses.
 - [x] **Calendar HTMX detection inconsistency** — Replaced 5 raw `HX-Request` header checks in calendar handler with `middleware.IsHTMX(c)`, which also checks `HX-Boosted` to avoid returning fragments on boosted navigation.
 - [x] **Cross-plugin adapter interface duplication** — Extracted `campaigns.MemberLister` interface. Timeline and sessions handlers now import it instead of defining local copies.
 - [x] **IDOR check functions duplicated** — Extracted generic `middleware.RequireInCampaign[T]()` helper with Go generics. Updated maps, timeline, sessions handlers. Calendar/markers left as-is (parent traversal needed).
@@ -62,7 +62,7 @@ Known broken or missing things, ordered by severity.
 - [x] **No Content Security Policy headers** — CSP implemented in `middleware/security.go` (default-src 'self', script-src, style-src, img-src, font-src, connect-src, frame-ancestors, base-uri, form-action). Alpine.js requires 'unsafe-inline'/'unsafe-eval'; documented tradeoff.
 - [x] **No input size validation on text fields** — Added `apperror/validate.go` helpers (ValidateStringLength, ValidateRequired) and wired into entities, campaigns, maps, timeline, sessions create handlers.
 - [ ] **Package-level Go doc comments missing** — ~80% of .go files lack `// Package ...` comments (handler.go, service.go, repository.go, routes.go across all plugins).
-- [~] **Missing JS widget .ai.md docs** — Done: image_upload, timeline_viz, dashboard_editor, template_editor, entity_tooltip, foundry-module, websocket, attributes, mentions, title, boot.js. Still needed: editor.js, tag_picker.js, relations.js, notes.js.
+- [x] **Missing JS widget .ai.md docs** — All done: image_upload, timeline_viz, dashboard_editor, template_editor, entity_tooltip, foundry-module, websocket, attributes, mentions, title, boot.js, editor, tags. Relations and notes already existed.
 
 ---
 
@@ -75,7 +75,7 @@ New capabilities ordered by priority for alpha release.
 - [x] **Media management for owners** — Campaign-scoped media browser at `/campaigns/:id/media` (Owner-only): grid view with thumbnails, "referenced by" entity queries, delete with warnings, upload from browser, pagination, storage stats. Admin already had `/admin/storage`.
 - [x] **Tag visibility controls** — Implemented: migration 000038, `dm_only` bool in model/repo/service/handler, role-based filtering, tag_picker.js DM-only badge + create checkbox.
 - [x] **Attributes template reset** — Implemented DELETE endpoint + "Reset" button in customize panel with confirmation dialog.
-- [~] **Extension technical documentation** — 1-3 page `.ai.md` writeup per plugin/widget/module. Done: foundry-module, websocket, media, image_upload, timeline_viz, dashboard_editor, template_editor, entity_tooltip. Still needed: syncapi, maps drawing subsystem, editor.js, attributes.js, tag_picker.js, relations.js, notes.js.
+- [x] **Extension technical documentation** — All `.ai.md` writeups complete: foundry-module, websocket, media, image_upload, timeline_viz, dashboard_editor, template_editor, entity_tooltip, syncapi, maps, editor, tags, attributes, mentions, title, boot.js, relations, notes.
 - [x] **Graceful extension degradation** — `RequireAddon` middleware (web) and `RequireAddonAPI` middleware (API) gate routes. Human-readable errors for disabled addons. Fail-closed on DB errors.
 - [x] **Permissions & UX completeness audit** — Completed 2026-03-04. Audited all 17 route files, 24 JS widgets, all templ templates. Found 10 MUST-haves, 15 NEED-to-haves, 20 WANTs, 15 MAYBEs. Key findings: sidebar drill public access, sessions discoverability, calendar UX gaps, missing editor features (tables, callouts), no unsaved changes warning, inconsistent empty states. All items added to Bugfixes section above.
 - [x] **README.md** — Full open-source README with features, setup instructions, tech stack, architecture, project structure, screenshots placeholders, inspiration credits. Created 2026-03-04.
@@ -83,7 +83,7 @@ New capabilities ordered by priority for alpha release.
 ### Alpha-Nice-to-Have
 
 - [ ] **File security audit + ClamAV** — Add ClamAV container to docker-compose, scan uploads before storage, configurable file type allowlist, SVG blocking (XSS vector).
-- [ ] **API documentation** — OpenAPI 3.0 spec or handwritten reference for REST v1. Auth guide, endpoint reference, rate limiting docs, sync protocol.
+- [x] **API documentation** — OpenAPI 3.0.3 spec at `docs/api/openapi.yaml`. 63 endpoints, 42 schemas, auth guide, rate limiting headers, sync protocol.
 - [x] **Foundry VTT Sync** — Bidirectional sync between Chronicle and Foundry VTT. Phases 1-4 complete (WebSocket, sync mappings, journal sync, map expansion, EventBus, Map API v1, calendar live sync). Phase 5 (shop entity type + Chronicle inventory widget + relation metadata, Foundry shop widget wiring, RequireAddonAPI permission hardening, E2E testing checklist) complete.
 - [x] **Maps Phase 2** — Layers, drawings, tokens, fog of war. Migration 000042, full CRUD service + repository + REST API handler. Role-based visibility filtering. Percentage-based coordinates for resolution independence.
 - [ ] **Timeline Phase 2B** — Event connections (visual lines between related events), create-from-timeline modal, beautification pass.
