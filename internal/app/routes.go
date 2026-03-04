@@ -686,8 +686,9 @@ func (a *App) RegisterRoutes() {
 	syncMappingSvc := syncapi.NewSyncMappingService(syncMappingRepo)
 	syncMappingHandler := syncapi.NewSyncHandler(syncMappingSvc)
 	_ = syncMappingSvc // Service will also be used by map/entity handlers.
+	mapAPIHandler := syncapi.NewMapAPIHandler(syncService, mapsService, drawingService, campaignService)
 
-	syncapi.RegisterAPIRoutes(e, syncAPIHandler, calendarAPIHandler, mediaAPIHandler, syncMappingHandler, syncService)
+	syncapi.RegisterAPIRoutes(e, syncAPIHandler, calendarAPIHandler, mediaAPIHandler, mapAPIHandler, syncMappingHandler, syncService)
 
 	// Tags widget: campaign-scoped entity tagging (CRUD + entity associations).
 	tagRepo := tags.NewTagRepository(a.DB)

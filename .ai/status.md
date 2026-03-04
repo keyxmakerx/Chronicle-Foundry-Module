@@ -8,11 +8,21 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-04 -- Foundry VTT sync feature (batch 16, Phase 1+2 partial).
+2026-03-04 -- Foundry VTT sync feature (batch 17, Phase 2+3).
 Branch: `claude/foundry-sync-feature-05M5a`.
 
 ## Current Phase
-**Foundry VTT bidirectional sync.** Completed this session (batch 16):
+**Foundry VTT bidirectional sync.** Completed this session (batch 17):
+- **EventBus wiring**: Entity, calendar, and drawing services now emit WebSocket events
+  on all mutations. Each service defines a local `EventPublisher` interface with adapter
+  in routes.go bridging to the WebSocket hub. `NoopPublisher` defaults for tests.
+- **Map REST API v1**: Full external API for map data (`syncapi/map_api_handler.go`):
+  23 new endpoints for maps, drawings, tokens, layers, fog CRUD. Authenticated via API
+  keys with read/write permission levels. IDOR protection via `requireMapInCampaign`.
+- **Build fix**: Fixed `apperror.NewNotFound` two-argument calls in drawing_repository.go
+  and sync_repository.go (was passing type + id, function only accepts message string).
+
+Previously completed (batch 16):
 - WebSocket hub infrastructure (`internal/websocket/`): hub, client, message types,
   multi-authenticator (API key + session cookie), EventBus interface.
 - Sync mapping service: CRUD for `sync_mappings` table tracking Chronicle↔Foundry
@@ -840,11 +850,11 @@ LegendKeeper. Key findings:
   H (secrets) → I (integrations) → J (visualization) → K (delight)
 
 ## Next Session Should
-1. **Phase H continued:** Per-entity permissions, group-based visibility.
-4. **Maps Phase 2 (optional):** Layers, marker groups, nested maps, fog of war.
-5. **Handler-level "view as player":** Extend toggle to filter is_private entities
-   at repository level (currently template-only).
-6. **UX polish:** Entity search typeahead for calendar event + map marker entity linking.
+1. **Foundry sync Phase 4:** Shop entity type (inventory relations, Foundry drag-and-drop).
+2. **Foundry sync testing:** End-to-end verification of WebSocket event flow and API endpoints.
+3. **Permission hardening:** RequireAddon middleware on API routes, sync permission audit.
+4. **Extension documentation:** `.ai.md` for websocket, syncapi, maps drawing subsystem.
+5. **Calendar live sync polish:** Calendar-sync.mjs event CRUD (currently stubbed).
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)
