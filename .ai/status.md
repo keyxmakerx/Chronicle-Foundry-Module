@@ -8,19 +8,22 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-04 -- Bug fixes + QoL media browser enhancements (batch 13).
+2026-03-04 -- Temporary storage limit bypass system (batch 14).
 Branch: `claude/review-codebase-R1WqN`.
 
 ## Current Phase
-**Bug fixes and QoL enhancements.** Completed this session (batch 13):
-- Fixed CleanupOrphans TOCTOU race condition: added 15-minute grace period
-  to avoid deleting files from in-progress uploads
-- Added body size limit (11 MB) on API media upload endpoint to prevent
-  memory exhaustion from oversized payloads
-- Enhanced media browser with drag-and-drop upload support, multi-file
-  selection, and per-file progress bars via XHR upload tracking
-- Alpine.js `mediaUploader` component fully rewritten with queue management,
-  sequential processing, and status indicators per file
+**Temporary storage limit bypass.** Completed this session (batch 14):
+- Migration 000040: bypass columns on user_storage_limits and campaign_storage_limits
+- Model: bypass fields on UserStorageLimit and CampaignStorageLimit with HasActiveBypass()
+- Repository: all queries updated for bypass columns, Set/Clear bypass methods
+- Service: bypass CRUD methods, GetEffectiveLimits applies active bypasses as highest priority
+- Handler: Set/Clear bypass handlers with duration parsing (1h/6h/24h/7d/30d)
+- Routes: 4 new bypass routes (PUT/DELETE for user and campaign)
+- Admin UI: bypass form section (user + campaign), active bypass badges with countdown,
+  revoke buttons, reason display on override cards
+
+Previously completed (batch 13):
+- Bug fixes + QoL media browser enhancements
 
 Previously completed (batch 12):
 - REST API v1 media endpoints for Foundry VTT and external tools
@@ -29,7 +32,6 @@ Previously completed (batch 11):
 - Security hardening: audit logging, concurrent upload limits, disk space checks, orphan cleanup
 
 Remaining from approved media plan:
-- Part 1: Temporary storage limit bypass (admin panel)
 - Part 5e: Media usage indicator in browser (pre-computed reference counts)
 
 Completed (batch 9):
