@@ -87,7 +87,7 @@ New capabilities ordered by priority for alpha release.
 - [ ] **Maps Phase 2** — Layers, marker groups, privacy controls, nested maps (world → continent → city).
 - [ ] **Timeline Phase 2B** — Event connections (visual lines between related events), create-from-timeline modal, beautification pass.
 - [ ] **Campaign export/import** — JSON bundle for backup/migration. Media as separate zip or URL references.
-- [ ] **Image drag-and-drop upload** — Upload widget is click-only. Add drag-and-drop support + upload progress indicator.
+- [x] **Image drag-and-drop upload** — Media browser has drag-and-drop + multi-file upload with per-file progress bars (Alpine.js + XHR). Entity image widget (`image_upload.js`) still click-only.
 - [ ] **Calendar week view** — Only month + timeline views exist. Week view is standard calendar UX expectation.
 - [ ] **Calendar event drag-and-drop** — Can't drag events between dates (standard Google Calendar UX).
 - [ ] **Calendar day view** — No single-day detailed view with time blocks.
