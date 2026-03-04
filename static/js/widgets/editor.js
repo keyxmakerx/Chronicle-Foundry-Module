@@ -31,8 +31,13 @@
   var Editor = TipTap.Editor;
   var StarterKit = TipTap.StarterKit;
   var Placeholder = TipTap.Placeholder;
-  var Link = TipTap.Link;
   var Underline = TipTap.Underline;
+
+  // Use MentionLink (extended Link with entity mention attributes) if
+  // available, otherwise fall back to standard Link. MentionLink preserves
+  // data-mention-id and data-entity-preview through the ProseMirror JSON
+  // round-trip so hover preview cards work after save/reload.
+  var Link = (Chronicle && Chronicle.MentionLink) || TipTap.Link;
 
   // Store editor instances for cleanup.
   var editors = new WeakMap();
@@ -489,7 +494,7 @@
 
     // Menu items: each has an action key, icon, label, and shortcut hint.
     var items = [
-      { action: 'mention',        icon: 'fa-at',              label: 'Mention Entity',  hint: 'Type @' },
+      { action: 'mention',        icon: 'fa-diagram-project', label: 'Link Entity',     hint: 'Type @' },
       { action: 'link',           icon: 'fa-link',            label: 'Insert Link',     hint: '' },
       { action: 'horizontalRule', icon: 'fa-minus',           label: 'Horizontal Rule', hint: '---' },
       { action: 'blockquote',     icon: 'fa-circle-info',     label: 'Callout Block',   hint: '>' },

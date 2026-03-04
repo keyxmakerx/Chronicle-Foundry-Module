@@ -320,8 +320,19 @@
   .chronicle-editor__status--unsaved { @apply text-amber-600; }
   .chronicle-editor__status--error { @apply text-red-600; }
 
-  /* ---- Mention Links in Editor ---- */
-  .chronicle-editor__content a[data-mention-id] {
+  /* ---- Entity Links (mention-style references to other entities) ---- */
+  /* Styled as distinctive inline pills so they stand out from regular links. */
+  .chronicle-editor__content a.entity-link,
+  .prose a.entity-link {
+    @apply text-accent font-medium no-underline cursor-pointer
+           rounded bg-accent/10 px-1 py-0.5
+           hover:bg-accent/20 transition-colors;
+    user-select: all;
+  }
+
+  /* Fallback for entity links rendered without the class (legacy content). */
+  .chronicle-editor__content a[data-mention-id]:not(.entity-link),
+  .prose a[data-mention-id]:not(.entity-link) {
     @apply text-accent font-medium no-underline hover:underline;
   }
 
