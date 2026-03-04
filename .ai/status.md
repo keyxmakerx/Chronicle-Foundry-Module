@@ -8,18 +8,33 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-04 -- Entity link hover fix + codebase review (batch 15).
+2026-03-04 -- Sessions-Calendar integration, RSVP emails, addon gating (batch 16).
 Branch: `claude/review-codebase-R1WqN`.
 
 ## Current Phase
-**Entity link hover fix + codebase review.** Completed this session (batch 15):
-- Fixed entity link hover previews: data-mention-id and data-entity-preview were dropped
-  during ProseMirror JSON round-trip because TipTap's Link mark didn't store them.
-  Created MentionLink (extended Link mark) that preserves these attributes in the schema.
-- Entity links now render as styled pills (bg-accent/10, rounded) distinct from regular links.
-- Renamed "Mention Entity" to "Link Entity" in editor Insert menu.
-- Full codebase health review: all 14 plugins, 16 JS widgets, 40 migrations, 294+ tests
-  passing, zero TODO/FIXME comments, clean lint. Ready for Maps Phase 2 + Foundry sync.
+**Sessions-Calendar integration + RSVP system.** Completed this session (batch 16):
+- **RequireAddon middleware**: Route-level addon gating for calendar, maps, sessions,
+  timeline. Disabled addons now return 404/redirect instead of just hiding sidebar links.
+- **Sessions merged into calendar**: Sessions sidebar link removed. Sessions now
+  accessed via calendar header (dice icon). Sessions require calendar addon.
+- **Sessions on calendar grid**: Real-life mode calendars display session chips
+  (purple, dice icon) on their scheduled dates. Click opens inline session detail
+  modal with RSVP controls (Going/Maybe/Can't).
+- **Recurring sessions**: Weekly, biweekly, monthly, and custom N-week intervals.
+  New DB columns: is_recurring, recurrence_type, recurrence_interval,
+  recurrence_day_of_week, recurrence_end_date. Migration 000041.
+- **Date formatting**: Session dates now display as "Mon, Jan 2, 2006" instead of
+  raw ISO 8601 strings. FormatScheduledDate() helper on Session model.
+- **SMTP HTML email**: Added SendHTMLMail with multipart/alternative MIME support
+  (plain text + HTML variants). Existing SendMail unchanged.
+- **RSVP email system**: Session creation auto-sends HTML invitation emails with
+  one-click accept/decline links. Token-based (7-day expiry, single-use).
+  Public /rsvp/:token endpoint for redemption — no login required.
+- **Discord bot plan**: Documented in ADR-012. Future plugin at internal/plugins/discord/
+  with reaction-based RSVP via bot token + webhook.
+
+Previously completed (batch 15):
+- Entity link hover fix + codebase review
 
 Previously completed (batch 14):
 - Temporary storage limit bypass system for admin panel
