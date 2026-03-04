@@ -249,7 +249,7 @@ templ blockImage(cc *campaigns.CampaignContext, entity *Entity, csrfToken string
 		} else {
 			if cc.MemberRole >= campaigns.RoleScribe {
 				<div
-					class="w-full h-40 bg-surface-alt flex flex-col items-center justify-center cursor-pointer hover:bg-surface-alt transition-colors"
+					class="w-full h-40 bg-surface-alt flex flex-col items-center justify-center cursor-pointer hover:bg-surface transition-colors"
 					data-widget="image-upload"
 					data-endpoint={ fmt.Sprintf("/campaigns/%s/entities/%s/image", cc.Campaign.ID, entity.ID) }
 					data-upload-url="/media/upload"
