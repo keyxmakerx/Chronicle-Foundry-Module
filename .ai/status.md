@@ -8,25 +8,27 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-04 -- Interactive calendar sessions integration (batch 21).
+2026-03-04 -- Entity page widget blocks expansion (batch 22).
 Branch: `claude/interactive-calendar-sessions-UJaq2`.
 
 ## Current Phase
-**Interactive calendar sessions integration.** Completed this session (batch 21):
-- **Calendar sessions modal** — Replaced two redundant session navigation buttons on the
-  calendar page with an interactive sessions modal overlay. Sessions are now managed directly
-  from the calendar (list, create, RSVP) without navigating away.
-- **RSVP inline controls** — Session cards in the modal show inline Going/Maybe/Can't buttons
-  with HTMX-powered updates. User's current RSVP status is highlighted.
-- **Recurring session auto-generation** — When a recurring session is marked complete, the
-  system auto-creates the next occurrence (weekly/biweekly/monthly/custom intervals), copies
-  attendees, and sends RSVP emails via SMTP.
-- **Calendar sessions fragment endpoint** — New `GET /calendar/sessions-fragment` returns
-  HTMX fragment for refreshing the session list after create/RSVP actions.
-- **SMTP verification** — Confirmed RSVP email wiring is correct end-to-end (handler →
-  mailer → SMTP service → one-click token emails).
-- **Repository fix** — Fixed `ListByDateRange` SQL to exclude recurring sessions past
-  their `recurrence_end_date`.
+**Entity page widget blocks expansion.** Completed this session (batch 22):
+- **New entity page blocks** — Added 5 new block types to the entity page template editor:
+  - `timeline` — Lazy-loaded timeline preview with event counts (uses timeline-widget JS)
+  - `map_preview` — Embedded Leaflet map viewer with optional map_id config (uses map-widget JS)
+  - `upcoming_events` — Upcoming calendar events list with configurable limit (uses calendar-widget JS)
+  - `shop_inventory` — Shop inventory management (was renderable but missing from editor palette)
+  - `text_block` — Static rich text / HTML content block with prose styling
+- **Template editor palette** — All new block types appear in the drag-and-drop palette
+  alongside existing content and container blocks.
+- **HTMX lazy-loading** — Timeline, map, and upcoming events blocks use `intersect once`
+  triggers for deferred loading, matching the dashboard block pattern.
+- **Addon gating** — Blocks that depend on addons (calendar, timeline, maps) are gated
+  server-side by addon middleware on their HTMX endpoints.
+
+Previous session (batch 21):
+- Calendar sessions modal, RSVP inline controls, recurring session auto-generation,
+  calendar sessions fragment endpoint, SMTP verification, repository fix.
 
 ### Previous session (batch 20):
 - **Critical: Fixed duplicate migration 000041** — Two different migrations shared number
