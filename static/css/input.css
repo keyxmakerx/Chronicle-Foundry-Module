@@ -120,6 +120,17 @@
     @apply opacity-60 cursor-not-allowed;
     background-color: var(--color-bg-tertiary);
   }
+  /* Show red border after user interaction on invalid required/pattern fields. */
+  .input:user-invalid {
+    @apply border-red-500 focus:ring-red-500/30 focus:border-red-500;
+  }
+  .input-error {
+    @apply border-red-500 focus:ring-red-500/30 focus:border-red-500;
+  }
+  /* Inline validation hint shown below an input. */
+  .field-error {
+    @apply text-xs text-red-600 dark:text-red-400 mt-1;
+  }
 
   /* ---- Links ---- */
   .link {

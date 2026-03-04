@@ -31,13 +31,17 @@ Previously completed (batch 1):
 - README.md finalized (minor accuracy fix for modules list)
 - All 294+ tests passing
 
+Completed (batch 4):
+- Keyboard shortcuts help overlay (press `?`, Mac-aware ⌘/Ctrl)
+- Sessions addon discoverability (cross-link in calendar header)
+- Form validation feedback (CSS `:user-invalid` red borders, inline error hints)
+
 **Next priorities:**
-1. Calendar event detail view + click-to-create on date
-2. Sessions discoverability (auto-enable, calendar cross-linking)
-3. Media management for campaign owners
-4. Editor tables + callout blocks
-5. Search scope expansion (calendar events, timelines, maps, sessions)
-6. Keyboard shortcuts help overlay
+1. Media management for campaign owners
+2. Editor tables + callout blocks (requires TipTap bundle rebuild)
+3. Search scope expansion (calendar events, timelines, maps, sessions)
+4. Mobile sidebar toggle
+5. Entity cloning
 
 ### HTMX Sidebar Conversion + JS Hoisting Fixes — COMPLETE
 Branch: `claude/review-codebase-R1WqN`

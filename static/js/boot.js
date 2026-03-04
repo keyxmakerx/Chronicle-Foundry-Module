@@ -169,6 +169,33 @@
     }
   });
 
+  // --- Form Validation Feedback ---
+  // On invalid submit, show inline .field-error hints below invalid fields
+  // and add .input-error class for red border styling.
+  document.addEventListener('invalid', function (e) {
+    var el = e.target;
+    if (!el.classList.contains('input')) return;
+    el.classList.add('input-error');
+    // Remove existing hint if any.
+    var next = el.nextElementSibling;
+    if (next && next.classList.contains('field-error')) next.remove();
+    // Insert validation message.
+    if (el.validationMessage) {
+      var hint = document.createElement('div');
+      hint.className = 'field-error';
+      hint.textContent = el.validationMessage;
+      el.parentNode.insertBefore(hint, el.nextSibling);
+    }
+  }, true);
+  // Clear error state on input.
+  document.addEventListener('input', function (e) {
+    var el = e.target;
+    if (!el.classList.contains('input-error')) return;
+    el.classList.remove('input-error');
+    var next = el.nextElementSibling;
+    if (next && next.classList.contains('field-error')) next.remove();
+  }, true);
+
   // --- Lifecycle ---
 
   // Mount all widgets on initial page load.
