@@ -21,6 +21,11 @@ type MediaFile struct {
 	UsageType      string            `json:"usage_type"`     // attachment, entity_image, avatar, backdrop.
 	ThumbnailPaths map[string]string `json:"thumbnail_paths"` // size -> filename (e.g., "300" -> "uuid_300.jpg").
 	CreatedAt      time.Time         `json:"created_at"`
+
+	// CampaignIsPublic is populated by FindByID via a LEFT JOIN on campaigns.
+	// nil means the file has no campaign (avatars, backdrops). Used by the
+	// serve handler to enforce access control on private campaign media.
+	CampaignIsPublic *bool `json:"-"`
 }
 
 // UploadInput holds the validated input for creating a media file.

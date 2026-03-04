@@ -100,6 +100,17 @@ func (s *mediaService) Upload(ctx context.Context, input UploadInput) (*MediaFil
 		return nil, apperror.NewBadRequest("file content does not match declared type")
 	}
 
+	// Re-encode the image to strip ALL metadata (EXIF, IPTC, XMP) and
+	// destroy any polyglot payloads. The decode-then-encode pipeline
+	// produces a clean file containing only pixel data (CDR approach).
+	sanitizedBytes, effectiveMime, err := sanitizeImage(input.FileBytes, input.MimeType)
+	if err != nil {
+		return nil, apperror.NewBadRequest("image sanitization failed: " + err.Error())
+	}
+	input.FileBytes = sanitizedBytes
+	input.FileSize = int64(len(sanitizedBytes))
+	input.MimeType = effectiveMime
+
 	// Generate UUID filename in date-based directory.
 	id := generateUUID()
 	now := time.Now().UTC()
@@ -107,14 +118,14 @@ func (s *mediaService) Upload(ctx context.Context, input UploadInput) (*MediaFil
 	ext := MimeToExtension[input.MimeType]
 	filename := id + ext
 
-	// Create directory.
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	// Create directory with restrictive permissions.
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return nil, apperror.NewInternal(fmt.Errorf("creating media directory: %w", err))
 	}
 
-	// Write file to disk.
+	// Write sanitized file to disk with restrictive permissions.
 	fullPath := filepath.Join(dir, filename)
-	if err := os.WriteFile(fullPath, input.FileBytes, 0644); err != nil {
+	if err := os.WriteFile(fullPath, input.FileBytes, 0640); err != nil {
 		return nil, apperror.NewInternal(fmt.Errorf("writing media file: %w", err))
 	}
 
@@ -137,7 +148,7 @@ func (s *mediaService) Upload(ctx context.Context, input UploadInput) (*MediaFil
 		CreatedAt:      now,
 	}
 
-	// Generate thumbnails for images.
+	// Generate thumbnails for images (using sanitized bytes).
 	if file.IsImage() && input.MimeType != "image/gif" {
 		thumbSizes := map[string]int{"300": 300, "800": 800}
 		for sizeLabel, maxDim := range thumbSizes {

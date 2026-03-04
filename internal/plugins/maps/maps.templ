@@ -5,6 +5,7 @@
 package maps
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/keyxmakerx/chronicle/internal/plugins/campaigns"
@@ -56,7 +57,7 @@ templ mapListContent(cc *campaigns.CampaignContext, data MapListData) {
 						if m.HasImage() {
 							<div class="aspect-video bg-surface-alt rounded-md mb-3 overflow-hidden">
 								<img
-									src={ fmt.Sprintf("/media/%s", *m.ImageID) }
+									src={ layouts.MediaURL(ctx, *m.ImageID) }
 									alt={ m.Name }
 									class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
 								/>
@@ -214,6 +215,7 @@ templ mapShowContent(cc *campaigns.CampaignContext, data MapViewData) {
 			var campaignID = window.location.pathname.split('/')[2];
 			var mapID = { templ.JSONString(data.Map.ID) };
 			var imageID = { templ.JSONString(derefStr(data.Map.ImageID)) };
+			var mapImageURL = { templ.JSONString(mapImageSignedURL(ctx, data.Map.ImageID)) };
 			var imageW = { templ.JSONString(fmt.Sprintf("%d", data.Map.ImageWidth)) };
 			var imageH = { templ.JSONString(fmt.Sprintf("%d", data.Map.ImageHeight)) };
 			var isScribe = { templ.JSONString(fmt.Sprintf("%t", data.IsScribe)) } === "true";
@@ -235,7 +237,7 @@ templ mapShowContent(cc *campaigns.CampaignContext, data MapViewData) {
 			// Set image bounds and add overlay if image exists.
 			var bounds = [[0, 0], [h, w]];
 			if (imageID) {
-				L.imageOverlay('/media/' + imageID, bounds).addTo(map);
+				L.imageOverlay(mapImageURL, bounds).addTo(map);
 			}
 			map.fitBounds(bounds);
 
@@ -741,7 +743,7 @@ templ mapSettingsModal(data MapViewData) {
 					<input type="hidden" id="ms-image-width" value={ fmt.Sprintf("%d", data.Map.ImageWidth) }/>
 					<input type="hidden" id="ms-image-height" value={ fmt.Sprintf("%d", data.Map.ImageHeight) }/>
 					if data.Map.HasImage() {
-						<img id="ms-image-preview" src={ fmt.Sprintf("/media/%s", *data.Map.ImageID) } class="w-full rounded-md mb-2 max-h-48 object-contain bg-surface-alt"/>
+						<img id="ms-image-preview" src={ layouts.MediaURL(ctx, *data.Map.ImageID) } class="w-full rounded-md mb-2 max-h-48 object-contain bg-surface-alt"/>
 					} else {
 						<img id="ms-image-preview" src="" class="hidden w-full rounded-md mb-2 max-h-48 object-contain bg-surface-alt"/>
 					}
@@ -777,6 +779,15 @@ func derefStr(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// mapImageSignedURL returns a signed media URL for the map image, or an
+// empty string if imageID is nil. Used to pass the URL to JavaScript.
+func mapImageSignedURL(ctx context.Context, imageID *string) string {
+	if imageID == nil || *imageID == "" {
+		return ""
+	}
+	return layouts.MediaURL(ctx, *imageID)
 }
 
 // mustMarshalMarkers serializes markers to JSON for the JS initialization.

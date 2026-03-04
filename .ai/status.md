@@ -8,11 +8,34 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-04 -- Media management for campaign owners.
+2026-03-04 -- Media security overhaul (Part 3a-3d).
 Branch: `claude/review-codebase-R1WqN`.
 
 ## Current Phase
-**UX hardening.** Completed this session (batch 9):
+**Media security overhaul.** Completed this session (batch 10):
+- HMAC-SHA256 signed URLs for media access (`signed_url.go`)
+- Image re-encoding / Content Disarm & Reconstruction (`sanitize.go`)
+- Per-campaign media access control with defense-in-depth:
+  - Signed URL verification for campaign media
+  - Campaign membership check for private campaigns
+  - Graceful migration: authenticated members can access without signatures
+  - Site admins bypass all checks
+- Security headers on all media responses (nosniff, CSP, X-Frame-Options, etc.)
+- Rate limiting on serve routes (300/min/IP, configurable)
+- Template signed URL helpers (`layouts.MediaURL`, `layouts.MediaThumbURL`)
+- All templates updated to generate signed URLs
+- Upload handler returns signed URLs in responses
+- Config: `MEDIA_SIGNING_SECRET`, `MEDIA_SERVE_RATE_LIMIT` env vars
+- Repository: `FindByID` now LEFT JOINs campaigns for `CampaignIsPublic`
+- File permissions hardened (0640 files, 0750 directories)
+
+Remaining from approved media plan:
+- Part 3e-3i: Audit logging, concurrent upload limiting, disk space monitoring, orphan cleanup
+- Part 2: API v1 media endpoints for Foundry VTT
+- Part 1: Temporary storage limit bypass
+- Part 5: QoL features (drag-drop, progress, multi-upload, usage indicators)
+
+Completed (batch 9):
 - Campaign-scoped media browser:
   - New page at `/campaigns/:id/media` (Owner-only)
   - Grid view with thumbnails, file info overlay on hover, lazy image loading

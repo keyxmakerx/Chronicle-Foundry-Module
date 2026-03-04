@@ -270,6 +270,20 @@ func (a *calendarEraListerAdapter) ListEras(ctx context.Context, calendarID stri
 	return refs, nil
 }
 
+// mediaMemberCheckerAdapter wraps campaigns.CampaignService to implement the
+// media.MemberChecker interface without creating a circular import.
+// Uses background context since membership checks happen on unauthenticated
+// serve requests where the request context may not carry campaign data.
+type mediaMemberCheckerAdapter struct {
+	svc campaigns.CampaignService
+}
+
+// IsCampaignMember checks if the user is a member of the campaign.
+func (a *mediaMemberCheckerAdapter) IsCampaignMember(campaignID, userID string) bool {
+	member, err := a.svc.GetMember(context.Background(), campaignID, userID)
+	return err == nil && member != nil
+}
+
 // storageLimiterAdapter wraps settings.SettingsService to implement the
 // media.StorageLimiter interface without creating a circular import.
 type storageLimiterAdapter struct {
@@ -386,7 +400,29 @@ func (a *App) RegisterRoutes() {
 	mediaRepo := media.NewMediaRepository(a.DB)
 	mediaService := media.NewMediaService(mediaRepo, a.Config.Upload.MediaPath, a.Config.Upload.MaxSize)
 	mediaHandler := media.NewHandler(mediaService)
-	media.RegisterRoutes(e, mediaHandler, authService, a.Config.Upload.MaxSize)
+
+	// Initialize HMAC URL signer for secure media access.
+	// Auto-generate a signing secret on first boot if not configured.
+	signingSecret := a.Config.Upload.SigningSecret
+	if signingSecret == "" {
+		generated, err := media.GenerateSigningSecret()
+		if err != nil {
+			slog.Error("failed to generate media signing secret", slog.Any("error", err))
+		} else {
+			signingSecret = generated
+			slog.Warn("MEDIA_SIGNING_SECRET not set, using auto-generated secret (will change on restart)")
+		}
+	}
+	var urlSigner *media.URLSigner
+	if signingSecret != "" {
+		urlSigner = media.NewURLSigner(signingSecret)
+		mediaHandler.SetURLSigner(urlSigner)
+	}
+
+	// Wire campaign membership checker for private media access control.
+	mediaHandler.SetMemberChecker(&mediaMemberCheckerAdapter{svc: campaignService})
+
+	media.RegisterRoutes(e, mediaHandler, authService, a.Config.Upload.MaxSize, a.Config.Upload.ServeRateLimit)
 	media.RegisterCampaignRoutes(e, mediaHandler, campaignService, authService)
 
 	// Admin plugin: site-wide management (users, campaigns, SMTP settings, storage).
@@ -609,6 +645,16 @@ func (a *App) RegisterRoutes() {
 
 		// Active path for nav highlighting.
 		ctx = layouts.SetActivePath(ctx, c.Request().URL.Path)
+
+		// Signed media URL generators for templates.
+		if urlSigner != nil {
+			ctx = layouts.SetMediaURLFunc(ctx, func(fileID string) string {
+				return urlSigner.Sign(fileID, 1*time.Hour)
+			})
+			ctx = layouts.SetMediaThumbFunc(ctx, func(fileID, size string) string {
+				return urlSigner.SignThumb(fileID, size, 1*time.Hour)
+			})
+		}
 
 		return ctx
 	}

@@ -152,13 +152,13 @@ templ mediaCard(cc *campaigns.CampaignContext, f MediaFile, csrfToken string) {
 	>
 		<!-- Thumbnail -->
 		<a
-			href={ templ.SafeURL(fmt.Sprintf("/media/%s", f.ID)) }
+			href={ templ.SafeURL(layouts.MediaURL(ctx, f.ID)) }
 			target="_blank"
 			class="block aspect-square bg-surface-alt overflow-hidden"
 		>
 			if f.IsImage() {
 				<img
-					src={ fmt.Sprintf("/media/%s/thumb/300", f.ID) }
+					src={ layouts.MediaThumbURL(ctx, f.ID, "300") }
 					alt={ f.OriginalName }
 					class="w-full h-full object-cover"
 					loading="lazy"

@@ -80,11 +80,16 @@ func (r *mediaRepository) Create(ctx context.Context, file *MediaFile) error {
 	return nil
 }
 
-// FindByID retrieves a media file by its UUID.
+// FindByID retrieves a media file by its UUID. LEFT JOINs the campaigns
+// table to populate CampaignIsPublic in a single query, avoiding N+1
+// lookups when the serve handler checks campaign privacy.
 func (r *mediaRepository) FindByID(ctx context.Context, id string) (*MediaFile, error) {
-	query := `SELECT id, campaign_id, uploaded_by, filename, original_name,
-	                 mime_type, file_size, usage_type, thumbnail_paths, created_at
-	          FROM media_files WHERE id = ?`
+	query := `SELECT m.id, m.campaign_id, m.uploaded_by, m.filename, m.original_name,
+	                 m.mime_type, m.file_size, m.usage_type, m.thumbnail_paths, m.created_at,
+	                 c.is_public
+	          FROM media_files m
+	          LEFT JOIN campaigns c ON m.campaign_id = c.id
+	          WHERE m.id = ?`
 
 	file := &MediaFile{}
 	var thumbJSON string
@@ -92,7 +97,7 @@ func (r *mediaRepository) FindByID(ctx context.Context, id string) (*MediaFile, 
 		&file.ID, &file.CampaignID, &file.UploadedBy,
 		&file.Filename, &file.OriginalName, &file.MimeType,
 		&file.FileSize, &file.UsageType, &thumbJSON,
-		&file.CreatedAt,
+		&file.CreatedAt, &file.CampaignIsPublic,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, apperror.NewNotFound("media file not found")

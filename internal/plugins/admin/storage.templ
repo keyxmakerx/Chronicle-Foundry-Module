@@ -194,7 +194,7 @@ templ storageFilesTab(data StoragePageData) {
 									<div class="flex items-center gap-2">
 										if f.IsImage() {
 											<img
-												src={ fmt.Sprintf("/media/%s/thumb/300", f.ID) }
+												src={ layouts.MediaThumbURL(ctx, f.ID, "300") }
 												alt={ f.OriginalName }
 												class="w-8 h-8 rounded object-cover bg-surface-alt"
 											/>
@@ -223,7 +223,7 @@ templ storageFilesTab(data StoragePageData) {
 								<td class="px-4 py-2.5 text-right">
 									<div class="flex items-center justify-end gap-2">
 										<a
-											href={ templ.SafeURL(fmt.Sprintf("/media/%s", f.ID)) }
+											href={ templ.SafeURL(layouts.MediaURL(ctx, f.ID)) }
 											target="_blank"
 											class="text-sm text-accent hover:text-accent-hover transition-colors"
 										>
