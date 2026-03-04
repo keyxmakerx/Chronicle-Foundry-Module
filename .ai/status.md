@@ -8,19 +8,21 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-04 -- Temporary storage limit bypass system (batch 14).
+2026-03-04 -- Entity link hover fix + codebase review (batch 15).
 Branch: `claude/review-codebase-R1WqN`.
 
 ## Current Phase
-**Temporary storage limit bypass.** Completed this session (batch 14):
-- Migration 000040: bypass columns on user_storage_limits and campaign_storage_limits
-- Model: bypass fields on UserStorageLimit and CampaignStorageLimit with HasActiveBypass()
-- Repository: all queries updated for bypass columns, Set/Clear bypass methods
-- Service: bypass CRUD methods, GetEffectiveLimits applies active bypasses as highest priority
-- Handler: Set/Clear bypass handlers with duration parsing (1h/6h/24h/7d/30d)
-- Routes: 4 new bypass routes (PUT/DELETE for user and campaign)
-- Admin UI: bypass form section (user + campaign), active bypass badges with countdown,
-  revoke buttons, reason display on override cards
+**Entity link hover fix + codebase review.** Completed this session (batch 15):
+- Fixed entity link hover previews: data-mention-id and data-entity-preview were dropped
+  during ProseMirror JSON round-trip because TipTap's Link mark didn't store them.
+  Created MentionLink (extended Link mark) that preserves these attributes in the schema.
+- Entity links now render as styled pills (bg-accent/10, rounded) distinct from regular links.
+- Renamed "Mention Entity" to "Link Entity" in editor Insert menu.
+- Full codebase health review: all 14 plugins, 16 JS widgets, 40 migrations, 294+ tests
+  passing, zero TODO/FIXME comments, clean lint. Ready for Maps Phase 2 + Foundry sync.
+
+Previously completed (batch 14):
+- Temporary storage limit bypass system for admin panel
 
 Previously completed (batch 13):
 - Bug fixes + QoL media browser enhancements
