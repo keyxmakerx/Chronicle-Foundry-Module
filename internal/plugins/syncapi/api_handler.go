@@ -500,7 +500,7 @@ func (h *APIHandler) Sync(c echo.Context) error {
 
 		default:
 			result.Status = "error"
-			result.Error = "unknown action: " + change.Action
+			result.Error = "unknown action; expected create, update, or delete"
 		}
 
 		results = append(results, result)

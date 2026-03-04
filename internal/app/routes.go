@@ -419,14 +419,18 @@ func (a *mapEventPublisherAdapter) PublishLayerEvent(eventType string, campaignI
 	a.bus.Publish(ws.NewMessage(ws.MsgLayerUpdated, campaignID, layer.ID, layer))
 }
 
-func (a *mapEventPublisherAdapter) PublishFogEvent(eventType string, campaignID, mapID string) {
+func (a *mapEventPublisherAdapter) PublishFogEvent(eventType string, campaignID, mapID string, region *maps.FogRegion) {
 	if campaignID == "" {
 		return
 	}
-	a.bus.Publish(ws.NewMessage(ws.MsgFogUpdated, campaignID, mapID, map[string]string{
+	payload := map[string]any{
 		"event":  eventType,
 		"map_id": mapID,
-	}))
+	}
+	if region != nil {
+		payload["region"] = region
+	}
+	a.bus.Publish(ws.NewMessage(ws.MsgFogUpdated, campaignID, mapID, payload))
 }
 
 // mediaMemberCheckerAdapter wraps campaigns.CampaignService to implement the

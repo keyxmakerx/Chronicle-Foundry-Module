@@ -313,8 +313,13 @@ func RequireAddonAPI(addonChecker AddonChecker, slug string) echo.MiddlewareFunc
 
 			enabled, err := addonChecker.IsEnabledForCampaign(c.Request().Context(), campaignID, slug)
 			if err != nil {
-				// Fail open for DB errors — don't block API access.
-				return next(c)
+				// Fail closed — block access when addon status cannot be verified.
+				slog.Error("addon check failed",
+					slog.String("campaign_id", campaignID),
+					slog.String("slug", slug),
+					slog.Any("error", err),
+				)
+				return echo.NewHTTPError(http.StatusServiceUnavailable, "temporarily unable to verify addon status")
 			}
 			if !enabled {
 				return echo.NewHTTPError(http.StatusNotFound, slug+" addon is not enabled for this campaign")

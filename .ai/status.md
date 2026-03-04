@@ -8,24 +8,28 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-04 -- Foundry VTT module documentation and security hardening (batch 23).
+2026-03-04 -- Foundry VTT security hardening + fog sync (batch 24).
 Branch: `claude/interactive-calendar-sessions-UJaq2`.
 
 ## Current Phase
-**Foundry VTT module documentation and security hardening.** Completed this session (batch 23):
-- **Documentation** — Created `.ai.md` files for `foundry-module/` and `internal/websocket/`
-  covering architecture, file index, security considerations, and interconnects.
-- **WebSocket origin validation** — Replaced permissive `CheckOrigin: true` with proper
-  origin validation against configured `BaseURL`. API-key-authenticated connections
-  (Foundry VTT) bypass origin checks since the token proves authorization.
-- **Message type validation** — WebSocket readPump now rejects unknown message types
-  before broadcasting, preventing garbage propagation.
-- **Device fingerprint race fix** — Changed async `go BindDevice()` to synchronous call,
-  preventing concurrent requests from racing to bind different devices to the same key.
-- **Pagination clamping** — Sync mapping list endpoint now clamps limit (0-1000) and
-  offset (>=0) to prevent resource exhaustion from extreme values.
-- **API key masking** — Foundry module settings dialog now renders the API key field
-  as a password input via `renderSettingsConfig` hook.
+**Foundry VTT security hardening + fog-of-war sync.** Completed this session (batch 24):
+- **Sync action input sanitization** — Removed user input echo from sync error messages.
+  Now returns generic "unknown action; expected create, update, or delete" instead of
+  reflecting the attacker-supplied action value.
+- **Rate limit bounds validation** — API key creation now clamps rate_limit to 1-10000.
+  Previously accepted any integer including negative values.
+- **Addon API fail-closed** — Changed `RequireAddonAPI` middleware from fail-open to
+  fail-closed. DB errors now return 503 instead of silently allowing access.
+- **Enriched fog WebSocket events** — `PublishFogEvent` now includes the full
+  `FogRegion` struct in the WebSocket payload (not just event type + map ID).
+- **Fog-of-war sync** — Implemented Chronicle → Foundry fog sync in `map-sync.mjs`.
+  Fog regions rendered as semi-transparent polygon drawings on the Foundry scene.
+  Supports create, delete, reset, and full reconciliation. Uses `fogRegionId` flag
+  on Foundry drawings for tracking.
+
+Previous session (batch 23):
+- Foundry module + websocket `.ai.md` docs, WS origin validation, message type
+  validation, device fingerprint race fix, pagination clamping, API key masking.
 
 Previous session (batch 22):
 - Entity page widget blocks expansion (timeline, map_preview, upcoming_events,

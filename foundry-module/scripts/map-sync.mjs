@@ -219,9 +219,148 @@ export class MapSync {
     }
   }
 
+  /**
+   * Handle fog-of-war updates from Chronicle.
+   * Fetches the full fog state and renders regions as semi-transparent
+   * overlay drawings on the active Foundry scene. Chronicle fog regions
+   * are polygon-based overlays, distinct from Foundry's vision-based fog.
+   * @param {object} msg - WebSocket message with fog event data.
+   * @private
+   */
   async _onFogUpdated(msg) {
-    // Fog of war updates will be handled in Phase 5 polish pass.
-    console.log('Chronicle: Fog update received (not yet implemented)', msg);
+    const scene = this._getLinkedScene(msg.campaignId);
+    if (!scene) return;
+
+    const mapId = scene.getFlag(FLAG_SCOPE, 'mapId');
+    if (!mapId) return;
+
+    const event = msg.payload?.event;
+
+    // On reset, remove all Chronicle fog drawings from the scene.
+    if (event === 'reset') {
+      await this._clearFogDrawings(scene);
+      return;
+    }
+
+    // For create events with region data, add the region directly.
+    if (event === 'created' && msg.payload?.region) {
+      await this._addFogRegionToScene(scene, msg.payload.region);
+      return;
+    }
+
+    // Fallback: re-fetch all fog regions and reconcile.
+    try {
+      const regions = await this._api.get(`/maps/${mapId}/fog`);
+      await this._reconcileFogRegions(scene, regions || []);
+    } catch (err) {
+      console.error('Chronicle: Failed to fetch fog regions', err);
+    }
+  }
+
+  /**
+   * Add a single Chronicle fog region as a Drawing on the Foundry scene.
+   * @param {Scene} scene
+   * @param {object} region - Chronicle fog region data.
+   * @private
+   */
+  async _addFogRegionToScene(scene, region) {
+    if (!region?.points) return;
+
+    const dims = scene.dimensions;
+    const points = typeof region.points === 'string'
+      ? JSON.parse(region.points)
+      : region.points;
+
+    if (!Array.isArray(points) || points.length < 3) return;
+
+    // Convert percentage coords to pixel coords for Foundry.
+    const pixelPoints = points.map((p) => [
+      (p.x / 100) * dims.width,
+      (p.y / 100) * dims.height,
+    ]);
+
+    const fillColor = region.is_explored ? '#00000000' : '#000000';
+    const fillAlpha = region.is_explored ? 0 : 0.7;
+
+    this._syncing = true;
+    try {
+      const [created] = await scene.createEmbeddedDocuments('Drawing', [{
+        shape: { type: 'p', points: pixelPoints.flat() },
+        x: 0,
+        y: 0,
+        fillColor,
+        fillAlpha,
+        strokeColor: '#000000',
+        strokeAlpha: 0.3,
+        strokeWidth: 1,
+        flags: { [FLAG_SCOPE]: { fogRegionId: region.id } },
+      }]);
+      if (created) {
+        console.log(`Chronicle: Fog region ${region.id} added to scene`);
+      }
+    } finally {
+      this._syncing = false;
+    }
+  }
+
+  /**
+   * Remove all Chronicle fog overlay drawings from a scene.
+   * @param {Scene} scene
+   * @private
+   */
+  async _clearFogDrawings(scene) {
+    const fogDrawings = scene.drawings.filter(
+      (d) => d.getFlag(FLAG_SCOPE, 'fogRegionId')
+    );
+    if (fogDrawings.length === 0) return;
+
+    this._syncing = true;
+    try {
+      await scene.deleteEmbeddedDocuments(
+        'Drawing',
+        fogDrawings.map((d) => d.id)
+      );
+      console.log(`Chronicle: Cleared ${fogDrawings.length} fog drawings`);
+    } finally {
+      this._syncing = false;
+    }
+  }
+
+  /**
+   * Reconcile fog regions from Chronicle with fog drawings on the scene.
+   * Adds missing regions and removes stale drawings.
+   * @param {Scene} scene
+   * @param {Array} regions - Chronicle fog regions.
+   * @private
+   */
+  async _reconcileFogRegions(scene, regions) {
+    const existingDrawings = scene.drawings.filter(
+      (d) => d.getFlag(FLAG_SCOPE, 'fogRegionId')
+    );
+    const existingIds = new Set(
+      existingDrawings.map((d) => d.getFlag(FLAG_SCOPE, 'fogRegionId'))
+    );
+    const regionIds = new Set(regions.map((r) => r.id));
+
+    // Remove drawings for deleted regions.
+    const toDelete = existingDrawings
+      .filter((d) => !regionIds.has(d.getFlag(FLAG_SCOPE, 'fogRegionId')))
+      .map((d) => d.id);
+
+    // Add drawings for new regions.
+    const toAdd = regions.filter((r) => !existingIds.has(r.id));
+
+    this._syncing = true;
+    try {
+      if (toDelete.length > 0) {
+        await scene.deleteEmbeddedDocuments('Drawing', toDelete);
+      }
+      for (const region of toAdd) {
+        await this._addFogRegionToScene(scene, region);
+      }
+    } finally {
+      this._syncing = false;
+    }
   }
 
   // --- Foundry → Chronicle ---
