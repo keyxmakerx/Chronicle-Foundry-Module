@@ -92,8 +92,8 @@ New capabilities ordered by priority for alpha release.
 - [x] **Calendar week view** — 7-column day grid with event cards, cross-month handling, prev/next/today navigation. View toggle added to all calendar views. 5 tests.
 - [ ] **Calendar event drag-and-drop** — Can't drag events between dates (standard Google Calendar UX).
 - [ ] **Calendar day view** — No single-day detailed view with time blocks.
-- [ ] **Map marker clustering** — Markers don't auto-cluster when zoomed out (Leaflet.markercluster).
-- [ ] **Map marker icon picker** — No predefined POI icons (city, dungeon, tavern, etc.).
+- [x] **Map marker clustering** — Leaflet.markercluster integration on both map widget and full map page. Auto-clustering when >5 markers with custom cluster icons. CDN-loaded.
+- [x] **Map marker icon picker** — Expanded from 18 to 39 POI icons in 8 organized groups (General, Settlements, Fortifications, Dungeons & Ruins, Nature, Maritime, Sacred & Magic, Resources).
 - [ ] **Recent entities sidebar** — No "recently viewed" quick-access list.
 - [ ] **Command palette (Ctrl+Shift+P)** — Quick action palette beyond Ctrl+K search.
 - [ ] **Breadcrumb consistency** — Breadcrumbs exist on entity pages but not calendar/timeline/maps.

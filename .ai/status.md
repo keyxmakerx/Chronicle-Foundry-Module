@@ -8,14 +8,19 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-05 -- Sprint I-3: Calendar Week View complete (batch 29).
+2026-03-05 -- Sprint I-4: Map UX Polish complete (batch 30).
 Branch: `claude/project-review-planning-Yr4CL`.
 
 ## Current Phase
-**Sprint I-3 complete (batch 29).** Calendar week view delivered.
-Ready for Sprint I-4 (Map UX Polish).
+**Sprint I-4 complete (batch 30).** Phase I fully delivered.
+Ready for Phase J (Polish & Infrastructure).
 
-### Summary of Recent Work (batches 25-29)
+### Summary of Recent Work (batches 25-30)
+- **Batch 30**: Sprint I-4 Map UX Polish — Leaflet.markercluster integration for both
+  map widget and full map page (auto-clustering when >5 markers). Expanded POI icon
+  picker from 18 to 39 icons organized in 8 groups (General, Settlements, Fortifications,
+  Dungeons & Ruins, Nature, Maritime, Sacred & Magic, Resources). Custom cluster icon
+  styling. CDN-loaded MarkerCluster CSS + JS.
 - **Batch 29**: Sprint I-3 Calendar Week View — 7-column day grid with event cards.
   Repo: `ListEventsForDateRange`. Handler: `ShowWeek`. Template: `WeekPage/WeekFragment`.
   View toggle (Grid/Week/Timeline) added to all 3 calendar views. Navigation: prev/next/today.
@@ -48,10 +53,10 @@ Ready for Sprint I-4 (Map UX Polish).
 ---
 
 ## Next Session Should
-1. **Timeline Phase 2B** (Sprint I-2) — Event connections, create-from-timeline modal, beautification.
-2. **Calendar week view** (Sprint I-3) — 7-day grid with time blocks.
-3. **Map UX polish** (Sprint I-4) — Marker clustering + POI icon picker.
-4. **Phase J** — Breadcrumbs, editor enhancements, testing, file security.
+1. **Breadcrumbs + Navigation** (Sprint J-1) — Breadcrumbs on calendar/timeline/maps/sessions. Recent entities sidebar widget.
+2. **Editor Enhancements** (Sprint J-2) — Code syntax highlighting, find/replace.
+3. **Testing & Infrastructure** (Sprint J-3) — HTMX edge cases, docker-compose verification, Go doc comments.
+4. **File Security** (Sprint J-4) — ClamAV, MIME allowlist, SVG blocking.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)
@@ -90,3 +95,5 @@ Ready for Sprint I-4 (Map UX Polish).
   code dedup (MemberLister, LIKE escape), OpenAPI 3.0.3 spec (63 endpoints), extension docs
 - **2026-03-05: Sprint I-1 Campaign Export/Import** — Full JSON export/import for campaigns
   (entities, calendar, timelines, sessions, maps, addons, media manifest). 7 adapter services.
+- **2026-03-05: Phase I Core UX** — Sprint I-2 (timeline connections + create-from-timeline),
+  Sprint I-3 (calendar week view), Sprint I-4 (map marker clustering + expanded POI icons).

@@ -1161,6 +1161,25 @@
     bottom: 4px;
   }
 
+  /* Map marker cluster icons */
+  .chronicle-cluster { background: none !important; border: none !important; }
+  .chronicle-cluster-icon {
+    width: 32px;
+    height: 32px;
+    line-height: 32px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    background: rgba(59, 130, 246, 0.85);
+    border-radius: 50%;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    transition: transform 150ms ease;
+  }
+  .chronicle-cluster-icon:hover {
+    transform: scale(1.15);
+  }
+
   /* Event connection lines */
   .timeline-connection-line {
     transition: stroke-opacity 150ms ease;
