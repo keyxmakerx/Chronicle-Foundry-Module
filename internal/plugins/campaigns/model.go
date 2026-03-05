@@ -276,6 +276,7 @@ const (
 	BlockCalendarPreview = "calendar_preview" // Upcoming calendar events.
 	BlockTimelinePreview = "timeline_preview" // Timeline visualization preview.
 	BlockMapPreview      = "map_preview"      // Embedded map viewer.
+	BlockRelationsGraph  = "relations_graph"  // Entity relations force-directed graph.
 
 	// Category dashboard blocks.
 	BlockCategoryHeader = "category_header" // Category name, icon, count, description.
@@ -295,6 +296,7 @@ var ValidBlockTypes = map[string]bool{
 	BlockCalendarPreview: true,
 	BlockTimelinePreview: true,
 	BlockMapPreview:      true,
+	BlockRelationsGraph:  true,
 	BlockCategoryHeader:  true,
 	BlockEntityGrid:     true,
 	BlockSearchBar:      true,

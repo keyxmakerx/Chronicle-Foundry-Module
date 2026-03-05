@@ -66,6 +66,10 @@ func (m *mockRelationRepo) UpdateMetadata(_ context.Context, _ int, _ json.RawMe
 	return nil
 }
 
+func (m *mockRelationRepo) ListByCampaign(_ context.Context, _ string) ([]GraphRelation, error) {
+	return nil, nil
+}
+
 // --- Test Helpers ---
 
 func newTestService(repo *mockRelationRepo) RelationService {

@@ -83,3 +83,47 @@ type RelationTypePair struct {
 	Forward string `json:"forward"`
 	Reverse string `json:"reverse"`
 }
+
+// --- Graph Visualization ---
+
+// GraphRelation is a flattened relation with both source and target entity
+// details for the relations graph visualization. Only forward relations are
+// included (not reverse duplicates).
+type GraphRelation struct {
+	SourceEntityID    string `json:"source_entity_id"`
+	TargetEntityID    string `json:"target_entity_id"`
+	RelationType      string `json:"relation_type"`
+	SourceEntityName  string `json:"source_name"`
+	SourceEntityIcon  string `json:"source_icon"`
+	SourceEntityColor string `json:"source_color"`
+	SourceEntitySlug  string `json:"source_slug"`
+	SourceEntityType  string `json:"source_type"`
+	TargetEntityName  string `json:"target_name"`
+	TargetEntityIcon  string `json:"target_icon"`
+	TargetEntityColor string `json:"target_color"`
+	TargetEntitySlug  string `json:"target_slug"`
+	TargetEntityType  string `json:"target_type"`
+}
+
+// GraphNode represents an entity in the relations graph.
+type GraphNode struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Icon  string `json:"icon"`
+	Color string `json:"color"`
+	Slug  string `json:"slug"`
+	Type  string `json:"type"`
+}
+
+// GraphEdge represents a relation in the relations graph.
+type GraphEdge struct {
+	Source string `json:"source"`
+	Target string `json:"target"`
+	Type   string `json:"type"`
+}
+
+// GraphData is the JSON response for the relations graph API.
+type GraphData struct {
+	Nodes []GraphNode `json:"nodes"`
+	Edges []GraphEdge `json:"edges"`
+}

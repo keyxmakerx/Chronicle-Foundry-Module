@@ -41,6 +41,8 @@ templ DashboardBlockSwitch(cc *CampaignContext, block DashboardBlock, recentEnti
 			@dashTimelinePreview(cc, block.Config)
 		case "map_preview":
 			@dashMapPreview(cc, block.Config)
+		case "relations_graph":
+			@dashRelationsGraph(cc, block.Config)
 	}
 }
 
@@ -324,4 +326,49 @@ func dashMapID(config map[string]any) string {
 		return id
 	}
 	return ""
+}
+
+// dashRelationsGraph renders the entity relations force-directed graph widget.
+// Config: height (int, default 400). Links to the full-page graph view.
+templ dashRelationsGraph(cc *CampaignContext, config map[string]any) {
+	<div>
+		<div class="flex items-center justify-between mb-3">
+			<h2 class="text-sm font-semibold text-fg-secondary uppercase tracking-wider">
+				<i class="fa-solid fa-diagram-project mr-1.5"></i>Relations Graph
+			</h2>
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/relations-graph/page", cc.Campaign.ID)) }
+				class="text-xs text-accent hover:underline"
+			>
+				Full view
+			</a>
+		</div>
+		<div
+			data-widget="relation-graph"
+			data-campaign-id={ cc.Campaign.ID }
+			data-api-url={ fmt.Sprintf("/campaigns/%s/relations-graph", cc.Campaign.ID) }
+			data-height={ fmt.Sprintf("%d", dashGraphHeight(config)) }
+			class="card overflow-hidden rounded-lg"
+		></div>
+	</div>
+}
+
+// dashGraphHeight extracts the graph height from block config (default 400).
+func dashGraphHeight(config map[string]any) int {
+	height := 400
+	if v, ok := config["height"]; ok {
+		switch h := v.(type) {
+		case float64:
+			height = int(h)
+		case int:
+			height = h
+		}
+	}
+	if height < 200 {
+		height = 200
+	}
+	if height > 800 {
+		height = 800
+	}
+	return height
 }

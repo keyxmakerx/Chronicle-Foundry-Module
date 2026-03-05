@@ -8,13 +8,20 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-05 -- Sprint K-4 (Auto-Linking in Editor) complete (batch 38).
+2026-03-05 -- Sprint K-5 (Relations Graph Visualization) complete (batch 39).
 Branch: `claude/project-review-planning-Yr4CL`.
 
 ## Current Phase
-**Phase K: Permissions & Competitive Gap Closers.** Sprint K-4 delivered (batch 38). Next: Sprint K-5 (Relations Graph Visualization).
+**Phase K: Permissions & Competitive Gap Closers — COMPLETE.** All 5 sprints delivered. Next: Phase L (Content Depth & Editor Power).
 
-### Summary of Recent Work (batches 25-38)
+### Summary of Recent Work (batches 25-39)
+- **Batch 39**: Sprint K-5 Relations Graph Visualization — D3.js force-directed graph
+  widget (`relation_graph.js`) with dynamic CDN loading, zoom/pan, drag, node coloring
+  by entity type, edge labels, tooltips, click-to-navigate, type legend. Backend:
+  `ListByCampaign` repository (dedup bi-directional pairs via `source < target`),
+  `GetGraphData` service, `GraphAPI` + `GraphPage` handlers. Standalone page at
+  `/relations-graph/page`. Dashboard block type `relations_graph` with configurable
+  height. Model types: GraphRelation, GraphNode, GraphEdge, GraphData. Phase K complete.
 - **Batch 38**: Sprint K-4 Auto-Linking in Editor — Entity names API endpoint
   (`GET /entity-names`) with Redis caching (5-min TTL). Repository `ListNames`
   method returns lightweight name entries (id, name, slug, type info) sorted by
@@ -110,7 +117,7 @@ Branch: `claude/project-review-planning-Yr4CL`.
 ---
 
 ## Next Session Should
-Continue **Phase K** with Sprint K-5 (Relations Graph Visualization — D3.js force-directed graph, relation-graph API, dashboard block + standalone page). Full post-alpha roadmap (Phases K through O, 25 sprints) documented in `.ai/todo.md`.
+Start **Phase L: Content Depth & Editor Power** with Sprint L-1 (Entity Sub-Notes/Posts UI). Phase K is complete. Full post-alpha roadmap (Phases L through O, 20 sprints) documented in `.ai/todo.md`.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)
@@ -160,3 +167,4 @@ Continue **Phase K** with Sprint K-5 (Relations Graph Visualization — D3.js fo
 - **2026-03-05: Sprint K-2** — Per-entity permissions UI: permissions widget (permissions.js), visibility modes, role/user grants, auto-save. Sync API GetEntity custom visibility fix.
 - **2026-03-05: Sprint K-3** — Group-based visibility: migration 000049 (campaign_groups/members), GroupRepository, GroupService, group CRUD handlers, groups management page + widget, permissions widget group grants, 7 tests.
 - **2026-03-05: Sprint K-4** — Auto-linking in editor: entity names API with Redis caching, auto-link JS module (text scanner, mention link creation), Insert menu + Ctrl+Shift+L shortcut.
+- **2026-03-05: Sprint K-5** — Relations graph visualization: D3.js force-directed graph widget, graph API + standalone page, dashboard block type. Phase K complete.
