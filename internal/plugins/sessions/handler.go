@@ -472,11 +472,14 @@ func (h *Handler) RedeemRSVPToken(c echo.Context) error {
 		return c.HTML(http.StatusOK, rsvpResultHTML("RSVP Failed", msg, false))
 	}
 
-	action := "accepted"
-	if token.Action == RSVPDeclined {
+	var action string
+	switch token.Action {
+	case RSVPDeclined:
 		action = "declined"
-	} else if token.Action == RSVPTentative {
+	case RSVPTentative:
 		action = "marked as maybe"
+	default:
+		action = "accepted"
 	}
 
 	return c.HTML(http.StatusOK, rsvpResultHTML("RSVP Recorded",
