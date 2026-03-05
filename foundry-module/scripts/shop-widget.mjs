@@ -143,7 +143,7 @@ class ShopWindow extends Application {
         .map((r) => ({
           id: r.targetEntityId,
           name: r.targetEntityName || 'Unknown Item',
-          image_path: r.targetEntityIcon ? null : null, // Icons only for now.
+          image_path: null, // Chronicle entities use FA icons, not image URLs.
           icon: r.targetEntityIcon || 'fa-box',
           color: r.targetEntityColor || '#6b7280',
           type: r.targetEntityType || '',

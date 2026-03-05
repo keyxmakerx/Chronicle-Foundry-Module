@@ -113,7 +113,7 @@ New capabilities ordered by priority for alpha release.
 - [x] **Sprint K-3: Module Manifest & Loader Framework** _(Module Framework)_ — ModuleManifest JSON spec (id, name, version, author, license, icon, api_version, status, categories with field schemas, entity presets, tooltip template). ModuleLoader auto-discovers modules from `*/manifest.json`. ModuleRegistry rewrite: `Init(modulesDir)`, global loader. Sandboxed interfaces: Module (`Info/DataProvider/TooltipRenderer`), DataProvider (`List/Get/Search/Categories`), TooltipRenderer, ReferenceItem struct. manifest.json for dnd5e/pathfinder2e/drawsteel. Admin modules page shows author/license/API version. installedAddons updated. 13 tests. ADR-019.
 - [x] **Sprint K-4: Module Data API & Widget Integration** _(Module Framework)_ — JSONProvider (loads category JSON files into memory). D&D 5e module: first concrete Module implementation with 10 SRD spells, tooltip renderer. Factory registry pattern (RegisterFactory/init()). Generic module HTTP handler (Index/CategoryList/ItemDetail/SearchAPI/TooltipAPI). Templ reference pages (module_pages.templ). Module route registration with dynamic addon middleware. ModuleSearcher interface in entity handler, ModuleSearchAdapter. Entity SearchAPI includes module results in @mention/quick search. 20 new tests. ADR-020.
 - [x] **Sprint K-5: Relations Graph Visualization** _(Content)_ — D3.js force-directed graph (`relation_graph.js`). CampaignRelation type + ListByCampaign repo/service. GraphAPI handler (node/edge deduplication). Standalone page `/campaigns/:id/relations` with HTMX fragment. Widget: zoom/pan, click-to-navigate, hover tooltips with edge highlighting, entity type color legend, responsive. Dashboard block `relation_graph`. 5 new tests. Public-capable routes.
-- [ ] **Sprint K-6: Foundry Polish Sprint** _(Foundry VTT)_ — Fix shop icon (always null). Fix fog bidirectional (Foundry→Chronicle push via `canvas.fog` hooks). Connection status UI (sync indicator in Foundry sidebar). SimpleCalendar CRUD hook detection with graceful fallback.
+- [x] **Sprint K-6: Foundry Polish Sprint** _(Foundry VTT)_ — Fixed shop icon null (dead ternary, HBS FA icon rendering). Fog bidirectional sync (dark polygon detection, pixel→percentage conversion, REST push). Connection status UI (event-driven onStateChange, click-to-reconnect, activity flash). SimpleCalendar CRUD hooks (journal hook listeners, SC flag detection, calendar event push).
 
 ### Phase L: Content Depth
 
@@ -386,6 +386,12 @@ Summary of strengths/weaknesses for strategic positioning. Full analysis in `.ai
 - [x] Module slugs (dnd5e, pathfinder2e, drawsteel) added to installedAddons
 - [x] 13 tests: manifest loading/validation (7), loader discovery (6)
 - [x] ADR-019: Manifest-Driven Module Framework
+
+### Sprint K-6: Foundry Polish (2026-03-05, batch 41)
+- [x] Shop icon null fix: removed dead ternary (`r.targetEntityIcon ? null : null`), updated HBS template to render FA icons with entity type colors via `.shop-item-icon` span
+- [x] Connection status UI: added `onStateChange`/`offStateChange` callback system to `api-client.mjs`, replaced 2s polling interval in `module.mjs` with event-driven updates, click-to-reconnect when disconnected, WS activity flash (brief white dot), hover tooltips
+- [x] SimpleCalendar CRUD hooks: journal hook listeners (`createJournalEntry`/`updateJournalEntry`/`deleteJournalEntry`) in `calendar-sync.mjs`, `_extractSimpleCalendarData` extracts date/name from SC flags, push create/update/delete to Chronicle calendar events API, updated `destroy()` cleanup
+- [x] Fog bidirectional sync: `_isFogLikeDrawing` heuristic (polygon + dark fill + alpha > 0.5), `_foundryDrawingToFogRegion` pixel→percentage coordinate conversion, `_handleFogDrawingCreate` pushes POST `/maps/:id/fog`, `_handleFogDrawingDelete` pushes DELETE, drawing hook routing updated
 
 ### Sprint K-4: Module Data API & Widget Integration (2026-03-05, batch 38)
 - [x] `internal/modules/json_provider.go` — JSONProvider implementing DataProvider (loads data/*.json, memory-resident, category-per-file)

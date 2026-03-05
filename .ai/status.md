@@ -8,7 +8,7 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-05 -- Sprint K-5 (Relations Graph Visualization) complete (batch 40).
+2026-03-05 -- Sprint K-6 (Foundry Polish) complete (batch 41).
 Branch: `claude/plan-development-phases-G8Pwf`.
 
 ## Current Phase
@@ -21,9 +21,19 @@ Roadmap reorganized by user impact (batch 39):
 - **Phase N** (Collaboration & Platform): Foundry character sheets, Role-aware dashboards, Invite system, Accessibility, Deployment.
 - **Phase O+** (Backlog): 2FA, command palette, map drawing, Discord bot, bulk ops, etc.
 
-Next sprint: **K-6 (Foundry Polish)**.
+Phase K complete. Next: **Phase L (Content Depth)**, starting with L-1 (Entity Sub-Notes UI).
 
-### Summary of Recent Work (batches 25-40)
+### Summary of Recent Work (batches 25-41)
+- **Batch 41**: Sprint K-6 Foundry Polish — 4 fixes: (1) Shop icon null bug fixed
+  (dead ternary removed, HBS template renders FA icons with entity type colors),
+  (2) Connection status UI (replaced 2s polling with event-driven `onStateChange`
+  callbacks, click-to-reconnect, WS activity flash, tooltips),
+  (3) SimpleCalendar CRUD hooks (journal hook listeners detect SC notes via flag
+  presence, push create/update/delete to Chronicle calendar API, `_extractSimpleCalendarData`
+  helper for SC→Chronicle field mapping),
+  (4) Fog bidirectional sync (Foundry→Chronicle: `_isFogLikeDrawing` detects dark
+  polygons, `_foundryDrawingToFogRegion` converts pixel→percentage coords,
+  `_handleFogDrawingCreate/Delete` push fog regions via REST API).
 - **Batch 40**: Sprint K-5 Relations Graph Visualization — D3.js force-directed graph
   of entity relations. CampaignRelation type + ListByCampaign repo/service method
   (joins both source and target entity details). GraphAPI handler deduplicates
@@ -128,7 +138,7 @@ Next sprint: **K-6 (Foundry Polish)**.
 ---
 
 ## Next Session Should
-Continue **Phase K** with Sprint K-6 (Foundry Polish — shop icon null fix, fog bidirectional sync, connection status UI, SimpleCalendar CRUD hooks). Then Phase L (Content Depth). Full reorganized roadmap (Phases K-O+, 20 sprints by user impact) in `.ai/todo.md`.
+Start **Phase L (Content Depth)** with Sprint L-1 (Entity Sub-Notes/Posts UI). The `entity_posts` table already exists — build the frontend: list below entity entry, create/edit modal with TipTap, per-post visibility, drag-to-reorder, HTMX fragments. Full reorganized roadmap (Phases L-O+, 15 sprints by user impact) in `.ai/todo.md`.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)
@@ -136,9 +146,7 @@ Continue **Phase K** with Sprint K-6 (Foundry Polish — shop icon null fix, fog
   must run before build on a fresh clone
 - Tailwind CSS output (`static/css/app.css`) is gitignored, needs `make tailwind`
 - Tailwind standalone CLI (`tailwindcss`) is v3; do NOT use `npx @tailwindcss/cli` (v4 syntax)
-- Fog-of-war sync is one-way only (Chronicle → Foundry). Foundry → Chronicle planned in Sprint K-5.
-- SimpleCalendar events are limited (managed as journal notes, no CRUD hooks). Improvement planned in Sprint K-5.
-- Foundry shop icon field always returns null. Fix planned in Sprint K-5.
+- Foundry fog sync is now bidirectional but fog drawing detection uses heuristic (dark polygon with alpha > 0.5); not all dark drawings may be fog.
 
 ## Completed Phases
 - **2026-02-19: Phase 0** — Project scaffolding, AI docs, build config
@@ -180,3 +188,4 @@ Continue **Phase K** with Sprint K-6 (Foundry Polish — shop icon null fix, fog
 - **2026-03-05: Sprint K-3** — Module manifest & loader framework: ModuleManifest JSON spec, ModuleLoader auto-discovery, sandboxed Module/DataProvider/TooltipRenderer interfaces, manifest.json for 3 modules, admin page updated, installedAddons wired, 13 tests, ADR-019.
 - **2026-03-05: Sprint K-4** — Module data API & widget integration: JSONProvider (JSON-file DataProvider), D&D 5e module (10 SRD spells, tooltip renderer), factory registry pattern, generic module HTTP handler (5 endpoints), Templ reference pages, dynamic addon middleware, ModuleSearcher in entity search, 20 new tests, ADR-020.
 - **2026-03-05: Sprint K-5** — Relations graph visualization: D3.js force-directed graph, CampaignRelation + ListByCampaign, GraphAPI (node/edge deduplication), standalone page + HTMX fragment, relation_graph.js widget (zoom/pan, click-to-navigate, tooltips, legend), dashboard block, 5 new tests.
+- **2026-03-05: Sprint K-6** — Foundry Polish: shop icon null fix (FA icons with entity colors), connection status UI (event-driven, click-to-reconnect, activity flash), SimpleCalendar CRUD hooks (journal listeners, SC flag detection), fog bidirectional sync (dark polygon heuristic, pixel↔percentage conversion). **Phase K complete.**
