@@ -8,14 +8,18 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-05 -- Sprint I-2: Timeline Phase 2B complete (batch 28).
+2026-03-05 -- Sprint I-3: Calendar Week View complete (batch 29).
 Branch: `claude/project-review-planning-Yr4CL`.
 
 ## Current Phase
-**Sprint I-2 complete (batch 28).** Timeline Phase 2B delivered.
-Ready for Sprint I-3 (Calendar Week View).
+**Sprint I-3 complete (batch 29).** Calendar week view delivered.
+Ready for Sprint I-4 (Map UX Polish).
 
-### Summary of Recent Work (batches 25-28)
+### Summary of Recent Work (batches 25-29)
+- **Batch 29**: Sprint I-3 Calendar Week View — 7-column day grid with event cards.
+  Repo: `ListEventsForDateRange`. Handler: `ShowWeek`. Template: `WeekPage/WeekFragment`.
+  View toggle (Grid/Week/Timeline) added to all 3 calendar views. Navigation: prev/next/today.
+  Cross-month and cross-year boundary handling. 5 unit tests. Route: GET /calendar/week.
 - **Batch 28**: Sprint I-2 Timeline Phase 2B — Event connections (migration 000047,
   model/repo/service/handler, D3 SVG lines/arrows with arrowhead markers, 4 line styles),
   create-from-timeline (double-click empty space opens modal with date pre-filled),

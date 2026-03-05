@@ -133,6 +133,145 @@ func (h *Handler) Show(c echo.Context) error {
 	return middleware.Render(c, http.StatusOK, CalendarPage(cc, data))
 }
 
+// ShowWeek renders the calendar week view.
+// GET /campaigns/:id/calendar/week
+func (h *Handler) ShowWeek(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	ctx := c.Request().Context()
+
+	cal, err := h.svc.GetCalendar(ctx, cc.Campaign.ID)
+	if err != nil {
+		return err
+	}
+	if cal == nil {
+		return c.Redirect(http.StatusSeeOther, "/campaigns/"+cc.Campaign.ID+"/calendar")
+	}
+
+	// Parse year/month/day query params, default to current date.
+	year := cal.CurrentYear
+	month := cal.CurrentMonth
+	day := cal.CurrentDay
+	if q := c.QueryParam("year"); q != "" {
+		if v, err := strconv.Atoi(q); err == nil {
+			year = v
+		}
+	}
+	if q := c.QueryParam("month"); q != "" {
+		if v, err := strconv.Atoi(q); err == nil && v >= 1 && v <= len(cal.Months) {
+			month = v
+		}
+	}
+	if q := c.QueryParam("day"); q != "" {
+		if v, err := strconv.Atoi(q); err == nil && v >= 1 {
+			day = v
+		}
+	}
+
+	// Snap day to week start (find the most recent weekday 0).
+	weekLen := cal.WeekLength()
+	if weekLen == 0 {
+		weekLen = 7
+	}
+	// Calculate absolute day and find the week start.
+	yearLength := cal.YearLength()
+	absDay := year*yearLength
+	for i := 0; i < month-1 && i < len(cal.Months); i++ {
+		absDay += cal.Months[i].Days
+		if cal.IsLeapYear(year) {
+			absDay += cal.Months[i].LeapYearDays
+		}
+	}
+	absDay += day
+	weekdayIdx := absDay % weekLen
+	if weekdayIdx < 0 {
+		weekdayIdx += weekLen
+	}
+	// Move back to weekday 0.
+	startAbsDay := absDay - weekdayIdx
+
+	// Convert absolute day back to year/month/day.
+	startYear := year
+	startMonth := month
+	startDay := day - weekdayIdx
+	// Walk backwards if we went before day 1.
+	for startDay < 1 {
+		startMonth--
+		if startMonth < 1 {
+			startMonth = len(cal.Months)
+			startYear--
+		}
+		startDay += cal.MonthDays(startMonth-1, startYear)
+	}
+
+	// Calculate end date for the week.
+	endYear := startYear
+	endMonth := startMonth
+	endDay := startDay + weekLen - 1
+	monthDays := cal.MonthDays(endMonth-1, endYear)
+	for endDay > monthDays {
+		endDay -= monthDays
+		endMonth++
+		if endMonth > len(cal.Months) {
+			endMonth = 1
+			endYear++
+		}
+		monthDays = cal.MonthDays(endMonth-1, endYear)
+	}
+
+	role := int(cc.MemberRole)
+	userID := auth.GetUserID(c)
+
+	// Fetch events for the date range. If range crosses months, fetch both.
+	var events []Event
+	if startMonth == endMonth && startYear == endYear {
+		events, err = h.svc.ListEventsForDateRange(ctx, cal.ID, startYear, startMonth, startDay, endMonth, endDay, role, userID)
+	} else {
+		// Cross-month week: fetch from startMonth to end of start month, and from month 1 to endDay of endMonth.
+		events1, err1 := h.svc.ListEventsForDateRange(ctx, cal.ID, startYear, startMonth, startDay, startMonth, cal.MonthDays(startMonth-1, startYear), role, userID)
+		if err1 != nil {
+			return err1
+		}
+		events2, err2 := h.svc.ListEventsForDateRange(ctx, cal.ID, endYear, endMonth, 1, endMonth, endDay, role, userID)
+		if err2 != nil {
+			return err2
+		}
+		events = append(events1, events2...)
+	}
+	if err != nil {
+		return err
+	}
+
+	_ = startAbsDay // used for calculation only
+
+	data := WeekViewData{
+		Calendar:   cal,
+		Year:       startYear,
+		MonthIndex: startMonth,
+		StartDay:   startDay,
+		Events:     events,
+		CampaignID: cc.Campaign.ID,
+		UserID:     userID,
+		IsOwner:    cc.MemberRole >= campaigns.RoleOwner,
+		IsScribe:   cc.MemberRole >= campaigns.RoleScribe,
+		CSRFToken:  middleware.GetCSRFToken(c),
+	}
+
+	// For real-life calendars, fetch sessions.
+	if cal.Mode == "reallife" && h.sessionLister != nil {
+		startDate := fmt.Sprintf("%04d-%02d-%02d", startYear, startMonth, startDay)
+		endDate := fmt.Sprintf("%04d-%02d-%02d", endYear, endMonth, endDay)
+		sessions, err := h.sessionLister.ListSessionsForDateRange(ctx, cc.Campaign.ID, startDate, endDate)
+		if err == nil {
+			data.Sessions = sessions
+		}
+	}
+
+	if middleware.IsHTMX(c) {
+		return middleware.Render(c, http.StatusOK, WeekFragment(cc, data))
+	}
+	return middleware.Render(c, http.StatusOK, WeekPage(cc, data))
+}
+
 // SessionsFragment returns the sessions modal content as an HTMX fragment.
 // Used to refresh the session list inside the calendar's sessions overlay.
 // GET /campaigns/:id/calendar/sessions-fragment
@@ -1167,6 +1306,164 @@ type TimelineMonth struct {
 	Index  int
 	Name   string
 	Events []Event
+}
+
+// WeekViewData holds data for the calendar week view.
+type WeekViewData struct {
+	Calendar   *Calendar
+	Year       int
+	MonthIndex int // 1-based month of the week's starting day
+	StartDay   int // 1-based day of the week's starting day
+	Events     []Event
+	Sessions   []CalendarSession
+	CampaignID string
+	UserID     string
+	IsOwner    bool
+	IsScribe   bool
+	CSRFToken  string
+}
+
+// WeekDay represents a single day in the week view.
+type WeekDay struct {
+	Year      int
+	Month     int // 1-based month index
+	Day       int
+	MonthName string
+	Events    []Event
+	Sessions  []CalendarSession
+	IsToday   bool
+	Season    *Season
+}
+
+// WeekDays returns the list of days in this week, each with their events.
+func (d WeekViewData) WeekDays() []WeekDay {
+	cal := d.Calendar
+	weekLen := cal.WeekLength()
+	if weekLen == 0 {
+		weekLen = 7
+	}
+
+	days := make([]WeekDay, 0, weekLen)
+	year := d.Year
+	month := d.MonthIndex
+	day := d.StartDay
+
+	for i := 0; i < weekLen; i++ {
+		// Get month name.
+		monthName := ""
+		if month >= 1 && month <= len(cal.Months) {
+			monthName = cal.Months[month-1].Name
+		}
+
+		// Filter events for this specific date.
+		var dayEvents []Event
+		for _, e := range d.Events {
+			if e.Year == year && e.Month == month && e.Day == day {
+				dayEvents = append(dayEvents, e)
+			}
+		}
+
+		// Filter sessions for this date.
+		var daySessions []CalendarSession
+		target := fmt.Sprintf("%04d-%02d-%02d", year, month, day)
+		for _, s := range d.Sessions {
+			if s.ScheduledDate == target {
+				daySessions = append(daySessions, s)
+			}
+		}
+
+		isToday := year == cal.CurrentYear && month == cal.CurrentMonth && day == cal.CurrentDay
+		season := cal.SeasonForDate(month, day)
+
+		days = append(days, WeekDay{
+			Year:      year,
+			Month:     month,
+			Day:       day,
+			MonthName: monthName,
+			Events:    dayEvents,
+			Sessions:  daySessions,
+			IsToday:   isToday,
+			Season:    season,
+		})
+
+		// Advance to next day.
+		day++
+		monthDays := cal.MonthDays(month-1, year)
+		if day > monthDays {
+			day = 1
+			month++
+			if month > len(cal.Months) {
+				month = 1
+				year++
+			}
+		}
+	}
+	return days
+}
+
+// WeekdayName returns the weekday name for the i-th day of the week (0-based).
+func (d WeekViewData) WeekdayName(i int) string {
+	if i >= 0 && i < len(d.Calendar.Weekdays) {
+		return d.Calendar.Weekdays[i].Name
+	}
+	return ""
+}
+
+// PrevWeek returns year, month, day for the start of the previous week.
+func (d WeekViewData) PrevWeek() (int, int, int) {
+	cal := d.Calendar
+	weekLen := cal.WeekLength()
+	if weekLen == 0 {
+		weekLen = 7
+	}
+	year := d.Year
+	month := d.MonthIndex
+	day := d.StartDay - weekLen
+
+	for day < 1 {
+		month--
+		if month < 1 {
+			month = len(cal.Months)
+			year--
+		}
+		monthDays := cal.MonthDays(month-1, year)
+		day += monthDays
+	}
+	return year, month, day
+}
+
+// NextWeek returns year, month, day for the start of the next week.
+func (d WeekViewData) NextWeek() (int, int, int) {
+	cal := d.Calendar
+	weekLen := cal.WeekLength()
+	if weekLen == 0 {
+		weekLen = 7
+	}
+	year := d.Year
+	month := d.MonthIndex
+	day := d.StartDay + weekLen
+
+	monthDays := cal.MonthDays(month-1, year)
+	for day > monthDays {
+		day -= monthDays
+		month++
+		if month > len(cal.Months) {
+			month = 1
+			year++
+		}
+		monthDays = cal.MonthDays(month-1, year)
+	}
+	return year, month, day
+}
+
+// EndDate returns the year, month, day of the last day in this week.
+func (d WeekViewData) EndDate() (int, int, int) {
+	days := d.WeekDays()
+	if len(days) == 0 {
+		return d.Year, d.MonthIndex, d.StartDay
+	}
+	last := days[len(days)-1]
+	return last.Year, last.Month, last.Day
 }
 
 // daysInGregorianMonth returns the number of days in a Gregorian calendar month.

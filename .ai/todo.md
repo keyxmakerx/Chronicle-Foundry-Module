@@ -89,7 +89,7 @@ New capabilities ordered by priority for alpha release.
 - [x] **Timeline Phase 2B** — Event connections (migration 000047, SVG lines/arrows, 4 styles), create-from-timeline (double-click opens modal with date), visual polish (hover effects, ruler labels, connection CSS). 3 tests.
 - [x] **Campaign export/import** — JSON bundle for backup/migration. Export/import service with adapter pattern for 7 plugins (entities, calendar, timeline, sessions, maps, addons, media). Slug-based cross-references, ID remapping on import. 6 tests.
 - [x] **Image drag-and-drop upload** — Media browser has drag-and-drop + multi-file upload with per-file progress bars (Alpine.js + XHR). Entity image widget (`image_upload.js`) still click-only.
-- [ ] **Calendar week view** — Only month + timeline views exist. Week view is standard calendar UX expectation.
+- [x] **Calendar week view** — 7-column day grid with event cards, cross-month handling, prev/next/today navigation. View toggle added to all calendar views. 5 tests.
 - [ ] **Calendar event drag-and-drop** — Can't drag events between dates (standard Google Calendar UX).
 - [ ] **Calendar day view** — No single-day detailed view with time blocks.
 - [ ] **Map marker clustering** — Markers don't auto-cluster when zoomed out (Leaflet.markercluster).
@@ -363,3 +363,13 @@ Summary of strengths/weaknesses for strategic positioning. Full analysis in `.ai
 - [x] Create-from-timeline: double-click empty space opens modal with date pre-filled
 - [x] Visual polish: connection line CSS (hover), event marker hover effects, ruler labels
 - [x] Tests: 3 unit tests for connection style validation and model fields
+
+### Phase I Sprint 3: Calendar Week View (2026-03-05, batch 29)
+- [x] Repository: `ListEventsForDateRange` with composite date value SQL
+- [x] Service: `ListEventsForDateRange` with per-user visibility filtering
+- [x] Handler: `ShowWeek` with week-start snapping, cross-month event fetching
+- [x] Model: `WeekViewData`, `WeekDay` structs with helper methods (WeekDays, PrevWeek, NextWeek, EndDate)
+- [x] Template: `WeekPage`, `WeekFragment`, `weekContent` with 7-column day grid
+- [x] View toggle: Grid/Week/Timeline button group added to all 3 calendar views
+- [x] Route: GET `/calendar/week` (public-capable)
+- [x] Tests: 5 unit tests for week data helpers (WeekDays, CrossMonth, PrevNext, WeekdayName)
