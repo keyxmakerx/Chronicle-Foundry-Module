@@ -57,7 +57,7 @@ type LayoutEditorEntityType struct {
 // RecentEntityLister returns recently updated entities for the campaign dashboard.
 // Avoids importing the entities package directly.
 type RecentEntityLister interface {
-	ListRecentForDashboard(ctx context.Context, campaignID string, role int, limit int) ([]RecentEntity, error)
+	ListRecentForDashboard(ctx context.Context, campaignID string, role int, userID string, limit int) ([]RecentEntity, error)
 }
 
 // RecentEntity is a minimal entity representation for the dashboard recent pages section.
@@ -237,7 +237,7 @@ func (h *Handler) Show(c echo.Context) error {
 	var recentEntities []RecentEntity
 	if h.recentLister != nil {
 		recentEntities, _ = h.recentLister.ListRecentForDashboard(
-			c.Request().Context(), cc.Campaign.ID, int(cc.MemberRole), 8,
+			c.Request().Context(), cc.Campaign.ID, int(cc.MemberRole), auth.GetUserID(c), 8,
 		)
 	}
 

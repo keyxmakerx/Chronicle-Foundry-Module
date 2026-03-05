@@ -108,7 +108,7 @@ New capabilities ordered by priority for alpha release.
 
 ### Phase K: Permissions & Competitive Gap Closers
 
-- [ ] **Sprint K-1: Per-Entity Permissions Model** — Migration: `entity_permissions` table. Service: `GetEffectivePermission()` merges entity-level grants with role system. `is_private` becomes shorthand for dm_only. Pure backend.
+- [x] **Sprint K-1: Per-Entity Permissions Model** — Migration 000048: `entity_permissions` table + `visibility` column on entities. Models: VisibilityMode, SubjectType, Permission, EntityPermission, EffectivePermission, SetPermissionsInput, PermissionGrant. Repository: EntityPermissionRepository (ListByEntity, SetPermissions, DeleteByEntity, GetEffectivePermission, UpdateVisibility) + visibilityFilter() SQL helper. Service: CheckEntityAccess, SetEntityPermissions, GetEntityPermissions. All list/search/count queries updated with userID param for permission-aware filtering. 13 new unit tests.
 - [ ] **Sprint K-2: Per-Entity Permissions UI** — "Permissions" tab on entity edit page. Visibility selector (everyone/dm_only/custom). User/role picker with view/edit toggles. Entity list + sidebar filter by resolved permissions.
 - [ ] **Sprint K-3: Group-Based Visibility** — Migration: `campaign_groups` + `campaign_group_members`. Permission subject_type gains "group." Groups in Campaign Settings. Entity permission UI gets group selector.
 - [ ] **Sprint K-4: Auto-Linking in Editor** — Backend: entity-names API (Redis-cached). Frontend: TipTap InputRule matches entity names, inline suggestion popup. Per-campaign toggle. Whole-word, case-insensitive, min 3 chars.

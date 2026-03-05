@@ -8,13 +8,24 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-05 -- Post-alpha roadmap planned (Phases K-O, 25 sprints). Alpha phases complete.
+2026-03-05 -- Sprint K-1 (Per-Entity Permissions Model) complete (batch 35).
 Branch: `claude/project-review-planning-Yr4CL`.
 
 ## Current Phase
-**Planning complete.** Alpha phases (H, I, J) fully delivered (batch 34). Post-alpha roadmap (K-O) defined and ready to execute. Next: Sprint K-1 (Per-Entity Permissions Model).
+**Phase K: Permissions & Competitive Gap Closers.** Sprint K-1 delivered (batch 35). Next: Sprint K-2 (Per-Entity Permissions UI).
 
-### Summary of Recent Work (batches 25-34)
+### Summary of Recent Work (batches 25-35)
+- **Batch 35**: Sprint K-1 Per-Entity Permissions Model — Migration 000048
+  (`entity_permissions` table, `visibility` ENUM column on entities). Permission
+  model types (VisibilityMode, SubjectType, Permission, EntityPermission,
+  EffectivePermission, SetPermissionsInput, PermissionGrant). Full
+  EntityPermissionRepository (ListByEntity, SetPermissions transactional,
+  DeleteByEntity, GetEffectivePermission, UpdateVisibility). visibilityFilter()
+  SQL helper handles both legacy is_private and custom permission modes in a
+  single WHERE clause. Service: CheckEntityAccess, SetEntityPermissions,
+  GetEntityPermissions. All entity list/search/count/children/backlinks queries
+  updated with userID parameter across handlers, sync API, export adapters,
+  layout injector, campaign dashboard. 13 new unit tests. Pure backend — no UI.
 - **Batch 34**: Sprint J-4 File Security — ClamAV antivirus integration for upload
   scanning via clamd TCP protocol (INSTREAM). Fail-open when clamd unavailable.
   ClamAV container in docker-compose (clamav/clamav:1.4). CLAMAV_ADDRESS env var.
@@ -71,7 +82,7 @@ Branch: `claude/project-review-planning-Yr4CL`.
 ---
 
 ## Next Session Should
-Begin **Phase K: Permissions & Competitive Gap Closers** starting with Sprint K-1 (Per-Entity Permissions Model — backend only). Full post-alpha roadmap (Phases K through O, 25 sprints) documented in `.ai/todo.md`.
+Continue **Phase K** with Sprint K-2 (Per-Entity Permissions UI — "Permissions" tab on entity edit page, visibility selector, user/role picker with view/edit toggles, entity list + sidebar filter by resolved permissions). Full post-alpha roadmap (Phases K through O, 25 sprints) documented in `.ai/todo.md`.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)
@@ -117,3 +128,4 @@ Begin **Phase K: Permissions & Competitive Gap Closers** starting with Sprint K-
 - **2026-03-05: Sprint J-3** — HTMX verification, `.air.toml`, docker-compose fix, package doc comments.
 - **2026-03-05: Sprint J-4** — ClamAV antivirus scanning, docker-compose ClamAV container.
 - **2026-03-05: ALL PHASES COMPLETE** — H (release readiness), I (core UX), J (polish & infra).
+- **2026-03-05: Sprint K-1** — Per-entity permissions model (backend): migration 000048, model types, permission repository, service methods, visibility filter, 13 tests.

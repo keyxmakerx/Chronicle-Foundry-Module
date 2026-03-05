@@ -66,8 +66,8 @@ type recentEntityListerAdapter struct {
 }
 
 // ListRecentForDashboard returns recently updated entities formatted for the dashboard.
-func (a *recentEntityListerAdapter) ListRecentForDashboard(ctx context.Context, campaignID string, role int, limit int) ([]campaigns.RecentEntity, error) {
-	ents, err := a.svc.ListRecent(ctx, campaignID, role, limit)
+func (a *recentEntityListerAdapter) ListRecentForDashboard(ctx context.Context, campaignID string, role int, userID string, limit int) ([]campaigns.RecentEntity, error) {
+	ents, err := a.svc.ListRecent(ctx, campaignID, role, userID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -573,7 +573,8 @@ func (a *App) RegisterRoutes() {
 	// campaigns so we can pass EntityService as the EntityTypeSeeder).
 	entityTypeRepo := entities.NewEntityTypeRepository(a.DB)
 	entityRepo := entities.NewEntityRepository(a.DB)
-	entityService := entities.NewEntityService(entityRepo, entityTypeRepo)
+	entityPermRepo := entities.NewEntityPermissionRepository(a.DB)
+	entityService := entities.NewEntityService(entityRepo, entityTypeRepo, entityPermRepo)
 
 	// Campaigns plugin: CRUD, membership, ownership transfer.
 	// EntityService is passed as EntityTypeSeeder to seed defaults on campaign creation.
@@ -893,7 +894,12 @@ func (a *App) RegisterRoutes() {
 
 			// Entity counts per type for sidebar badges (use effectiveRole so
 			// "view as player" mode hides private entity counts).
-			if counts, err := entityService.CountByType(reqCtx, cc.Campaign.ID, effectiveRole); err == nil {
+			// Pass user ID for permission-aware entity counts.
+			layoutUserID := ""
+			if session := auth.GetSession(c); session != nil {
+				layoutUserID = session.UserID
+			}
+			if counts, err := entityService.CountByType(reqCtx, cc.Campaign.ID, effectiveRole, layoutUserID); err == nil {
 				ctx = layouts.SetEntityCounts(ctx, counts)
 			}
 

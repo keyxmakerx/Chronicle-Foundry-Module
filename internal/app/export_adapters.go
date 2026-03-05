@@ -73,7 +73,7 @@ func (a *entityExportAdapter) ExportEntities(ctx context.Context, campaignID str
 	const ownerRole = 3
 	page := 1
 	for {
-		ents, _, err := a.entitySvc.List(ctx, campaignID, 0, ownerRole, entities.ListOptions{
+		ents, _, err := a.entitySvc.List(ctx, campaignID, 0, ownerRole, "", entities.ListOptions{
 			Page:    page,
 			PerPage: 100,
 		})

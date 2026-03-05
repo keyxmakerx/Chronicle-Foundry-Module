@@ -49,6 +49,15 @@ func (h *APIHandler) resolveRole(c echo.Context) int {
 	return int(member.Role)
 }
 
+// resolveUserID returns the API key owner's user ID for permission checks.
+func (h *APIHandler) resolveUserID(c echo.Context) string {
+	key := GetAPIKey(c)
+	if key == nil {
+		return ""
+	}
+	return key.UserID
+}
+
 // --- Campaign Info ---
 
 // apiCampaignResponse is the API-safe representation of a campaign.
@@ -147,10 +156,11 @@ func (h *APIHandler) ListEntities(c echo.Context) error {
 		err   error
 	)
 
+	userID := h.resolveUserID(c)
 	if query != "" {
-		items, total, err = h.entitySvc.Search(c.Request().Context(), campaignID, query, typeID, role, opts)
+		items, total, err = h.entitySvc.Search(c.Request().Context(), campaignID, query, typeID, role, userID, opts)
 	} else {
-		items, total, err = h.entitySvc.List(c.Request().Context(), campaignID, typeID, role, opts)
+		items, total, err = h.entitySvc.List(c.Request().Context(), campaignID, typeID, role, userID, opts)
 	}
 	if err != nil {
 		slog.Error("api: failed to list entities", slog.Any("error", err))
@@ -409,8 +419,9 @@ func (h *APIHandler) Sync(c echo.Context) error {
 
 	if req.Since != nil {
 		since := *req.Since
+		syncUserID := h.resolveUserID(c)
 		for page := 1; page <= syncMaxPullPages; page++ {
-			items, total, err := h.entitySvc.List(ctx, campaignID, 0, role, entities.ListOptions{
+			items, total, err := h.entitySvc.List(ctx, campaignID, 0, role, syncUserID, entities.ListOptions{
 				Page:    page,
 				PerPage: syncPageSize,
 			})
