@@ -8,11 +8,20 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-05 -- Sprint L-5 (Calendar Day View) complete (batch 44).
-Branch: `claude/project-review-planning-Yr4CL`.
+2026-03-05 -- Feature parity & completeness audit (batch 45).
+Branch: `claude/audit-feature-parity-2vyXh`.
 
 ## Current Phase
-**Phase L: Content Depth & Editor Power.** Phase L complete (batch 44). Next: Phase M (Game System Modules & Worldbuilding Tools).
+**Between Phase L and M.** Phase L complete (batch 44). Feature parity audit completed (batch 45). Next: Phase M (Game System Modules) or address audit findings.
+
+### Audit Summary (batch 45)
+Created `.ai/audit.md` — comprehensive feature parity and completeness audit covering:
+- **Test coverage**: 530+ tests but 4 plugins have zero tests (maps, sessions, admin, smtp), calendar/timeline have only domain-logic tests. No handler or repository tests anywhere.
+- **Export gaps**: entity_permissions, campaign_groups, entity_posts not exported (data loss on backup).
+- **JS consistency**: 17 widgets still use raw fetch() instead of Chronicle.apiFetch(). Only 2 widgets show toast on error; rest log to console silently. groups.js and relation_graph.js duplicate escHtml().
+- **Feature parity**: Relations lack visibility controls (unlike tags, posts, markers). Notes and posts have no search.
+- **Documentation**: 16 JS widgets lack .ai.md files. Posts Go widget has no .ai.md.
+- 14 new items added to `.ai/todo.md` under "Low (Audit-Discovered)" section.
 
 ### Summary of Recent Work (batches 25-44)
 - **Batch 44**: Sprint L-5 Calendar Day View — Single-day detailed view at

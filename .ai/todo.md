@@ -48,7 +48,26 @@ Known broken or missing things, ordered by severity.
 - [x] **Map marker search** — Fixed: added search input in map header. Client-side filtering dims non-matching markers (opacity 0.15). Enter pans to first match and opens tooltip. Searches name and description.
 - [x] **Timeline event creation from timeline page** — Already implemented: "Create Event" button in header opens modal with full form (name, date, description, category, visibility, color, multi-day, recurrence). POST to standalone-events API.
 
-### Low
+### Low (Audit-Discovered — 2026-03-05)
+
+_See `.ai/audit.md` for the full feature parity & completeness audit._
+
+- [ ] **Export missing entity_permissions** — Campaign export loses custom visibility grants. Need EntityPermission export adapter. `is_private` preserved but custom per-user/role/group grants are lost.
+- [ ] **Export missing campaign_groups** — Campaign export loses group definitions and memberships. Need groups export adapter.
+- [ ] **Export missing entity_posts** — Campaign export loses all entity sub-notes. Need posts export adapter.
+- [ ] **Export missing session_attendees** — Campaign export loses RSVP tracking. ExportSession struct lacks attendees field.
+- [ ] **Relations have no visibility controls** — Unlike tags, posts, calendar events, and markers, relations have zero visibility filtering. At minimum needs `dm_only` flag for parity.
+- [ ] **JS apiFetch migration incomplete** — notes.js (10), attributes.js (5), relations.js (6), tag_picker.js (6) still use raw fetch(). Should migrate to Chronicle.apiFetch() for consistent headers/CSRF/error handling.
+- [ ] **JS error handling silent failures** — notes.js, tag_picker.js, timeline_viz.js, entity_tooltip.js, editor_autolink.js, editor_mention.js, template_editor.js, relation_graph.js all log errors to console without user-facing feedback (toast).
+- [ ] **JS utility duplication** — groups.js and relation_graph.js define local escHtml()/escAttr() instead of using Chronicle.escapeHtml()/escapeAttr(). groups.js also has local apiFetch() wrapper.
+- [ ] **CI -short flag has no effect** — CI runs `go test -short` but no test implements `testing.Short()` skip. Flag is a no-op.
+- [ ] **Maps service tests missing** — 27+ endpoints, 0 tests. Highest priority test gap.
+- [ ] **Sessions service tests missing** — 8+ endpoints, 0 tests.
+- [ ] **Calendar service tests incomplete** — Only 10 domain-logic tests (day/week). 23+ endpoints have no service tests.
+- [ ] **Timeline service tests incomplete** — Only 3 connection tests. 20+ endpoints have no service tests.
+- [ ] **Posts widget missing .ai.md** — Only Go widget without documentation file.
+
+### Low (Original)
 
 - [x] **API endpoints ignore addon disabled state** — RequireAddon middleware gates calendar, maps, sessions, timeline routes. RequireAddonAPI middleware gates API v1 routes (syncapi). Fail-closed on DB errors.
 - [x] **API technical documentation missing** — Created OpenAPI 3.0.3 spec at `docs/api/openapi.yaml` with 63 endpoints, 42 schemas, auth details, and error responses.
