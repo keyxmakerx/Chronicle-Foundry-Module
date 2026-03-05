@@ -333,6 +333,13 @@ templ calendarHeader(cc *campaigns.CampaignContext, data CalendarViewData) {
 					<i class="fa-solid fa-calendar-week text-xs"></i>
 				</a>
 				<a
+					href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar/day?year=%d&month=%d&day=%d", data.CampaignID, data.Year, data.MonthIndex, data.Calendar.CurrentDay)) }
+					class="p-1.5 px-2 text-fg-muted hover:text-fg hover:bg-surface-alt transition-colors"
+					title="Day view"
+				>
+					<i class="fa-solid fa-calendar-day text-xs"></i>
+				</a>
+				<a
 					href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar/timeline?year=%d", data.CampaignID, data.Year)) }
 					class="p-1.5 px-2 text-fg-muted hover:text-fg hover:bg-surface-alt transition-colors"
 					title="Timeline view"
@@ -419,6 +426,12 @@ templ dayCell(data CalendarViewData, day int) {
 		style={ seasonBorderStyle(data.CurrentSeason(day)) }
 		if data.IsScribe {
 			onclick={ templ.ComponentScript{Call: fmt.Sprintf("dayCellClick(event, %d, %d, %d)", data.Year, data.MonthIndex, day)} }
+			data-drop-year={ strconv.Itoa(data.Year) }
+			data-drop-month={ strconv.Itoa(data.MonthIndex) }
+			data-drop-day={ strconv.Itoa(day) }
+			ondragover="handleDragOver(event)"
+			ondragleave="handleDragLeave(event)"
+			ondrop="handleDrop(event)"
 		}
 	>
 		<!-- Day number + add button -->
@@ -466,6 +479,11 @@ templ dayCell(data CalendarViewData, day int) {
 				data-event-category={ derefStr(evt.Category) }
 				data-event-recurring={ strconv.FormatBool(evt.IsRecurring) }
 				data-event-entity-id={ derefStr(evt.EntityID) }
+				if data.IsScribe {
+					draggable="true"
+					ondragstart="handleDragStart(event)"
+					ondragend="handleDragEnd(event)"
+				}
 				onclick="openViewEventModal(this)"
 			>
 				if evt.HasTime() {
@@ -1274,6 +1292,109 @@ templ eventModal(data CalendarViewData) {
 						}
 					});
 
+					// --- Drag-and-Drop for Event Rescheduling ---
+
+					// Handle drag start: store event data and apply visual feedback.
+					window.handleDragStart = function(e) {
+						var el = e.target.closest('button[data-event-id]');
+						if (!el) return;
+						e.dataTransfer.effectAllowed = 'move';
+						e.dataTransfer.setData('text/plain', el.dataset.eventId);
+						// Store the source element for dragend cleanup.
+						el.classList.add('opacity-30');
+						window._dragSource = el;
+					};
+
+					// Handle drag end: remove visual feedback.
+					window.handleDragEnd = function(e) {
+						var el = e.target.closest('button[data-event-id]');
+						if (el) el.classList.remove('opacity-30');
+						window._dragSource = null;
+						// Remove all drop highlights.
+						document.querySelectorAll('.cal-drop-highlight').forEach(function(c) {
+							c.classList.remove('cal-drop-highlight');
+						});
+					};
+
+					// Handle drag over: allow drop and highlight the cell.
+					window.handleDragOver = function(e) {
+						e.preventDefault();
+						e.dataTransfer.dropEffect = 'move';
+						var cell = e.currentTarget;
+						cell.classList.add('cal-drop-highlight');
+					};
+
+					// Handle drag leave: remove highlight.
+					window.handleDragLeave = function(e) {
+						var cell = e.currentTarget;
+						// Only remove if actually leaving the cell (not entering a child).
+						if (!cell.contains(e.relatedTarget)) {
+							cell.classList.remove('cal-drop-highlight');
+						}
+					};
+
+					// Handle drop: move event to new date via PUT API.
+					window.handleDrop = async function(e) {
+						e.preventDefault();
+						var cell = e.currentTarget;
+						cell.classList.remove('cal-drop-highlight');
+
+						var eventId = e.dataTransfer.getData('text/plain');
+						if (!eventId) return;
+
+						var newYear = parseInt(cell.dataset.dropYear, 10);
+						var newMonth = parseInt(cell.dataset.dropMonth, 10);
+						var newDay = parseInt(cell.dataset.dropDay, 10);
+
+						// Find the source event chip to read all data attributes.
+						var src = window._dragSource;
+						if (!src) return;
+
+						// Skip if dropped on the same date.
+						var oldYear = parseInt(src.dataset.eventYear, 10);
+						var oldMonth = parseInt(src.dataset.eventMonth, 10);
+						var oldDay = parseInt(src.dataset.eventDay, 10);
+						if (newYear === oldYear && newMonth === oldMonth && newDay === oldDay) return;
+
+						// Build full event payload (PUT requires all fields).
+						var payload = {
+							name: src.dataset.eventName || '',
+							year: newYear,
+							month: newMonth,
+							day: newDay,
+							visibility: src.dataset.eventVisibility || 'everyone',
+							is_recurring: src.dataset.eventRecurring === 'true'
+						};
+
+						// Optional fields.
+						if (src.dataset.eventDescription) payload.description = src.dataset.eventDescription;
+						if (src.dataset.eventDescriptionHtml) payload.description_html = src.dataset.eventDescriptionHtml;
+						if (src.dataset.eventEntityId) payload.entity_id = src.dataset.eventEntityId;
+						if (src.dataset.eventCategory) payload.category = src.dataset.eventCategory;
+						if (src.dataset.eventVisibilityRules) payload.visibility_rules = src.dataset.eventVisibilityRules;
+						if (src.dataset.eventStartHour) payload.start_hour = parseInt(src.dataset.eventStartHour, 10);
+						if (src.dataset.eventStartMinute) payload.start_minute = parseInt(src.dataset.eventStartMinute, 10);
+						if (src.dataset.eventEndHour) payload.end_hour = parseInt(src.dataset.eventEndHour, 10);
+						if (src.dataset.eventEndMinute) payload.end_minute = parseInt(src.dataset.eventEndMinute, 10);
+						if (src.dataset.eventRecurrenceType) payload.recurrence_type = src.dataset.eventRecurrenceType;
+
+						try {
+							var resp = await fetch('/campaigns/' + campaignID + '/calendar/events/' + eventId, {
+								method: 'PUT',
+								headers: getHeaders(),
+								body: JSON.stringify(payload),
+							});
+							if (resp.ok) {
+								window.location.reload();
+							} else {
+								var data = await resp.json().catch(function() { return {}; });
+								alert(data.message || 'Failed to move event');
+							}
+						} catch (err) {
+							alert('Network error: ' + err.message);
+						}
+					};
+
 					// Click on empty space in a date cell to create event.
 					// Ignores clicks on event chips or buttons (they handle themselves).
 					window.dayCellClick = function(e, year, month, day) {
@@ -1718,7 +1839,7 @@ templ timelineContent(cc *campaigns.CampaignContext, data TimelineViewData) {
 			</a>
 		</div>
 		<div class="flex items-center gap-2">
-			<!-- View toggle: Grid / Week / Timeline -->
+			<!-- View toggle: Grid / Week / Day / Timeline -->
 			<a
 				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar", data.CampaignID)) }
 				class="p-2 rounded-md hover:bg-surface-alt text-fg-secondary hover:text-fg transition-colors"
@@ -1732,6 +1853,13 @@ templ timelineContent(cc *campaigns.CampaignContext, data TimelineViewData) {
 				title="Week view"
 			>
 				<i class="fa-solid fa-calendar-week text-sm"></i>
+			</a>
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar/day?year=%d&month=1&day=1", data.CampaignID, data.Year)) }
+				class="p-2 rounded-md hover:bg-surface-alt text-fg-secondary hover:text-fg transition-colors"
+				title="Day view"
+			>
+				<i class="fa-solid fa-calendar-day text-sm"></i>
 			</a>
 			<span
 				class="p-2 rounded-md bg-accent/10 text-accent"
@@ -1968,7 +2096,7 @@ templ weekContent(cc *campaigns.CampaignContext, data WeekViewData) {
 			</a>
 		</div>
 		<div class="flex items-center gap-2">
-			<!-- View toggle: Grid / Week / Timeline -->
+			<!-- View toggle: Grid / Week / Day / Timeline -->
 			<a
 				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar?year=%d&month=%d", data.CampaignID, data.Year, data.MonthIndex)) }
 				class="p-2 rounded-md hover:bg-surface-alt text-fg-secondary hover:text-fg transition-colors"
@@ -1982,6 +2110,13 @@ templ weekContent(cc *campaigns.CampaignContext, data WeekViewData) {
 			>
 				<i class="fa-solid fa-calendar-week text-sm"></i>
 			</span>
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar/day?year=%d&month=%d&day=%d", data.CampaignID, data.Year, data.MonthIndex, data.StartDay)) }
+				class="p-2 rounded-md hover:bg-surface-alt text-fg-secondary hover:text-fg transition-colors"
+				title="Day view"
+			>
+				<i class="fa-solid fa-calendar-day text-sm"></i>
+			</a>
 			<a
 				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar/timeline?year=%d", data.CampaignID, data.Year)) }
 				class="p-2 rounded-md hover:bg-surface-alt text-fg-secondary hover:text-fg transition-colors"
@@ -2095,3 +2230,229 @@ func weekPrevDay(data WeekViewData) int   { _, _, d := data.PrevWeek(); return d
 func weekNextYear(data WeekViewData) int  { y, _, _ := data.NextWeek(); return y }
 func weekNextMonth(data WeekViewData) int { _, m, _ := data.NextWeek(); return m }
 func weekNextDay(data WeekViewData) int   { _, _, d := data.NextWeek(); return d }
+
+// ============================================================================
+// Day View Templates
+// ============================================================================
+
+// DayPage renders the full calendar day view page.
+templ DayPage(cc *campaigns.CampaignContext, data DayViewData) {
+	@layouts.App(data.Calendar.Name + " - " + data.MonthName() + " " + strconv.Itoa(data.Day)) {
+		<div class="max-w-3xl mx-auto">
+			@dayContent(cc, data)
+		</div>
+	}
+}
+
+// DayFragment renders the day view as an HTMX fragment.
+templ DayFragment(cc *campaigns.CampaignContext, data DayViewData) {
+	<div class="max-w-3xl mx-auto">
+		@dayContent(cc, data)
+	</div>
+}
+
+// dayContent renders the day header, event list, and navigation.
+templ dayContent(cc *campaigns.CampaignContext, data DayViewData) {
+	<nav class="text-xs text-fg-muted mb-3" aria-label="Breadcrumb">
+		<a href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s", data.CampaignID)) } class="hover:text-fg-body">{ cc.Campaign.Name }</a>
+		<span class="mx-1">/</span>
+		<a href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar", data.CampaignID)) } class="hover:text-fg-body">Calendar</a>
+		<span class="mx-1">/</span>
+		<span class="text-fg-secondary">Day</span>
+	</nav>
+	<!-- Header with day nav and view toggle -->
+	<div class="flex items-center justify-between mb-6">
+		<div class="flex items-center gap-3">
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar/day?year=%d&month=%d&day=%d", data.CampaignID, dayPrevYear(data), dayPrevMonth(data), dayPrevDayNum(data))) }
+				class="p-2 rounded-md hover:bg-surface-alt text-fg-secondary hover:text-fg transition-colors"
+				title="Previous day"
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+				</svg>
+			</a>
+			<div>
+				<h1 class="text-xl font-semibold text-fg">
+					{ dayTitle(data) }
+				</h1>
+				if wd := data.WeekdayName(); wd != "" {
+					<p class="text-sm text-fg-muted">{ wd }</p>
+				}
+			</div>
+			if era := data.Calendar.EraForYear(data.Year); era != nil {
+				<span class="text-xs font-medium px-2 py-0.5 rounded-full" style={ fmt.Sprintf("background:%s20;color:%s", era.Color, era.Color) }>
+					<i class="fa-solid fa-landmark mr-0.5 text-[9px]"></i> { era.Name }
+				</span>
+			}
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar/day?year=%d&month=%d&day=%d", data.CampaignID, dayNextYear(data), dayNextMonth(data), dayNextDayNum(data))) }
+				class="p-2 rounded-md hover:bg-surface-alt text-fg-secondary hover:text-fg transition-colors"
+				title="Next day"
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+				</svg>
+			</a>
+			<!-- Today button -->
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar/day", data.CampaignID)) }
+				class="text-xs font-medium px-2.5 py-1 rounded-md border border-edge hover:bg-surface-alt text-fg-secondary hover:text-fg transition-colors"
+				title="Go to today"
+			>
+				Today
+			</a>
+		</div>
+		<div class="flex items-center gap-2">
+			<!-- View toggle: Grid / Week / Day / Timeline -->
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar?year=%d&month=%d", data.CampaignID, data.Year, data.MonthIndex)) }
+				class="p-2 rounded-md hover:bg-surface-alt text-fg-secondary hover:text-fg transition-colors"
+				title="Calendar grid view"
+			>
+				<i class="fa-solid fa-calendar text-sm"></i>
+			</a>
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar/week?year=%d&month=%d&day=%d", data.CampaignID, data.Year, data.MonthIndex, data.Day)) }
+				class="p-2 rounded-md hover:bg-surface-alt text-fg-secondary hover:text-fg transition-colors"
+				title="Week view"
+			>
+				<i class="fa-solid fa-calendar-week text-sm"></i>
+			</a>
+			<span
+				class="p-2 rounded-md bg-accent/10 text-accent"
+				title="Day view"
+			>
+				<i class="fa-solid fa-calendar-day text-sm"></i>
+			</span>
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar/timeline?year=%d", data.CampaignID, data.Year)) }
+				class="p-2 rounded-md hover:bg-surface-alt text-fg-secondary hover:text-fg transition-colors"
+				title="Timeline view"
+			>
+				<i class="fa-solid fa-timeline text-sm"></i>
+			</a>
+			if data.IsOwner {
+				<a
+					href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/calendar/settings", data.CampaignID)) }
+					class="p-2 rounded-md hover:bg-surface-alt text-fg-secondary hover:text-fg transition-colors"
+					title="Calendar settings"
+				>
+					<i class="fa-solid fa-gear text-sm"></i>
+				</a>
+			}
+		</div>
+	</div>
+
+	<!-- Season and special info -->
+	if season := data.Season(); season != nil {
+		<div class="mb-4 flex items-center gap-2 text-sm">
+			<span class="inline-block w-3 h-3 rounded-full" style={ fmt.Sprintf("background:%s", season.Color) }></span>
+			<span class="text-fg-secondary">{ season.Name }</span>
+		</div>
+	}
+
+	<!-- Day content card -->
+	<div class={ "rounded-xl border overflow-hidden", templ.KV("border-accent/30 ring-1 ring-accent/20", data.IsToday()), templ.KV("border-edge", !data.IsToday()) }>
+		<!-- Events section -->
+		<div class="p-6">
+			if len(data.Events) == 0 && len(data.Sessions) == 0 {
+				<div class="text-center py-12">
+					<i class="fa-regular fa-calendar text-3xl text-fg-muted mb-3"></i>
+					<p class="text-fg-secondary">No events on this day</p>
+					if data.IsScribe {
+						<p class="text-xs text-fg-muted mt-1">Click the + button below to add one</p>
+					}
+				</div>
+			}
+
+			<!-- Timed events (sorted by time) -->
+			if len(data.Events) > 0 {
+				<div class="space-y-3">
+					for _, evt := range data.Events {
+						<div class={
+							"flex gap-4 p-4 rounded-lg border transition-colors",
+							templ.KV("border-accent/20 bg-accent/5", evt.Visibility == "everyone"),
+							templ.KV("border-amber-500/20 bg-amber-500/5", evt.Visibility == "dm_only"),
+						}>
+							<!-- Time column -->
+							<div class="shrink-0 w-16 text-right">
+								if evt.HasTime() {
+									<div class="text-sm font-medium text-fg">{ evt.FormatTime() }</div>
+									if evt.EndHour != nil {
+										<div class="text-xs text-fg-muted">{ evt.FormatEndTime() }</div>
+									}
+								} else {
+									<div class="text-xs text-fg-muted mt-0.5">All day</div>
+								}
+							</div>
+							<!-- Event details -->
+							<div class="flex-1 min-w-0">
+								<div class="flex items-center gap-2 mb-1">
+									if evt.Category != nil && *evt.Category != "" {
+										<span class="text-xs opacity-60">{ categoryIcon(data.Calendar.EventCategories, *evt.Category) }</span>
+									}
+									<h3 class="text-sm font-medium text-fg truncate">{ evt.Name }</h3>
+									if evt.IsRecurring {
+										<span class="text-[10px] text-fg-muted bg-surface-alt px-1.5 py-0.5 rounded">yearly</span>
+									}
+									if evt.Visibility == "dm_only" {
+										<i class="fa-solid fa-eye-slash text-[10px] text-amber-400" title="DM only"></i>
+									}
+								</div>
+								if evt.EntityID != nil && evt.EntityName != "" {
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/entities/%s", data.CampaignID, *evt.EntityID)) }
+										class="text-xs text-accent hover:underline flex items-center gap-1 mb-1"
+									>
+										if evt.EntityIcon != "" {
+											<i class={ "fa-solid " + evt.EntityIcon, "text-[10px]" } style={ fmt.Sprintf("color:%s", evt.EntityColor) }></i>
+										}
+										{ evt.EntityName }
+									</a>
+								}
+								if evt.DescriptionHTML != nil && *evt.DescriptionHTML != "" {
+									<div class="text-xs text-fg-secondary mt-1 prose prose-sm max-w-none">
+										@templ.Raw(*evt.DescriptionHTML)
+									</div>
+								} else if evt.Description != nil && *evt.Description != "" {
+									<p class="text-xs text-fg-secondary mt-1 whitespace-pre-wrap">{ *evt.Description }</p>
+								}
+							</div>
+						</div>
+					}
+				</div>
+			}
+
+			<!-- Sessions (real-life calendars only) -->
+			if len(data.Sessions) > 0 {
+				<div class="mt-4 space-y-2">
+					<h4 class="text-xs font-medium text-fg-muted uppercase tracking-wide">Sessions</h4>
+					for _, sess := range data.Sessions {
+						<div class="flex items-center gap-3 p-3 rounded-lg border border-purple-500/20 bg-purple-500/5">
+							<i class="fa-solid fa-dice-d20 text-purple-400"></i>
+							<div class="flex-1">
+								<span class="text-sm font-medium text-fg">{ sess.Name }</span>
+								<span class="text-xs text-fg-muted ml-2">
+									{ fmt.Sprintf("%d/%d attending", sess.AcceptedCount, sess.TotalCount) }
+								</span>
+							</div>
+						</div>
+					}
+				</div>
+			}
+		</div>
+	</div>
+}
+
+// dayTitle returns a display title for the day (e.g. "Kythorn 15, 1492").
+func dayTitle(data DayViewData) string {
+	return fmt.Sprintf("%s %d, %d", data.MonthName(), data.Day, data.Year)
+}
+
+func dayPrevYear(data DayViewData) int    { y, _, _ := data.PrevDay(); return y }
+func dayPrevMonth(data DayViewData) int   { _, m, _ := data.PrevDay(); return m }
+func dayPrevDayNum(data DayViewData) int  { _, _, d := data.PrevDay(); return d }
+func dayNextYear(data DayViewData) int    { y, _, _ := data.NextDay(); return y }
+func dayNextMonth(data DayViewData) int   { _, m, _ := data.NextDay(); return m }
+func dayNextDayNum(data DayViewData) int  { _, _, d := data.NextDay(); return d }

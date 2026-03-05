@@ -254,6 +254,10 @@ func (m *mockEntityRepo) CopyEntityTags(ctx context.Context, sourceEntityID, tar
 	return nil
 }
 
+func (m *mockEntityRepo) ListNames(_ context.Context, _ string, _ int, _ string) ([]EntityNameEntry, error) {
+	return nil, nil
+}
+
 // --- Test Helpers ---
 
 // mockPermissionRepo implements EntityPermissionRepository for testing.
@@ -1108,7 +1112,8 @@ func TestValidSubjectType(t *testing.T) {
 	}{
 		{SubjectRole, true},
 		{SubjectUser, true},
-		{"group", false},
+		{SubjectGroup, true},
+		{"invalid", false},
 		{"", false},
 	}
 	for _, tt := range tests {

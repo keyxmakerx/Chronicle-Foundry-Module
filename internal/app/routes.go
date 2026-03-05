@@ -29,6 +29,7 @@ import (
 	"github.com/keyxmakerx/chronicle/internal/templates/pages"
 	ws "github.com/keyxmakerx/chronicle/internal/websocket"
 	"github.com/keyxmakerx/chronicle/internal/widgets/notes"
+	"github.com/keyxmakerx/chronicle/internal/widgets/posts"
 	"github.com/keyxmakerx/chronicle/internal/widgets/relations"
 	"github.com/keyxmakerx/chronicle/internal/widgets/tags"
 )
@@ -585,6 +586,9 @@ func (a *App) RegisterRoutes() {
 	campaignHandler.SetEntityLister(&entityTypeListerAdapter{svc: entityService})
 	campaignHandler.SetLayoutFetcher(&entityTypeLayoutFetcherAdapter{svc: entityService})
 	campaignHandler.SetRecentEntityLister(&recentEntityListerAdapter{svc: entityService})
+	groupRepo := campaigns.NewGroupRepository(a.DB)
+	groupService := campaigns.NewGroupService(groupRepo)
+	campaignHandler.SetGroupService(groupService)
 	campaigns.RegisterRoutes(e, campaignHandler, campaignService, authService)
 
 	// Discover page (/) -- browse public campaigns. Uses OptionalAuth so
@@ -747,6 +751,12 @@ func (a *App) RegisterRoutes() {
 	relHandler := relations.NewHandler(relService)
 	relations.RegisterRoutes(e, relHandler, campaignService, authService)
 
+	// Posts widget: entity sub-notes with rich text, visibility, and reorder.
+	postRepo := posts.NewPostRepository(a.DB)
+	postService := posts.NewPostService(postRepo)
+	postHandler := posts.NewHandler(postService)
+	posts.RegisterRoutes(e, postHandler, campaignService, authService)
+
 	// REST API v1: versioned endpoints for external clients (Foundry VTT, etc.).
 	// Authenticates via API keys, not browser sessions.
 	syncAPIHandler := syncapi.NewAPIHandler(syncService, entityService, campaignService, relService)
@@ -792,6 +802,9 @@ func (a *App) RegisterRoutes() {
 	entityHandler.SetMapSearcher(mapsService)
 	entityHandler.SetCalendarSearcher(calendarService)
 	entityHandler.SetSessionSearcher(sessionsService)
+	entityHandler.SetMemberLister(campaignService)
+	entityHandler.SetGroupLister(groupService)
+	entityHandler.SetCache(a.Redis)
 	campaignHandler.SetAuditLogger(&campaignAuditAdapter{svc: auditService})
 	tagHandler.SetAuditService(auditService)
 

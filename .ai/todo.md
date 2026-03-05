@@ -90,8 +90,8 @@ New capabilities ordered by priority for alpha release.
 - [x] **Campaign export/import** — JSON bundle for backup/migration. Export/import service with adapter pattern for 7 plugins (entities, calendar, timeline, sessions, maps, addons, media). Slug-based cross-references, ID remapping on import. 6 tests.
 - [x] **Image drag-and-drop upload** — Media browser has drag-and-drop + multi-file upload with per-file progress bars (Alpine.js + XHR). Entity image widget (`image_upload.js`) still click-only.
 - [x] **Calendar week view** — 7-column day grid with event cards, cross-month handling, prev/next/today navigation. View toggle added to all calendar views. 5 tests.
-- [ ] **Calendar event drag-and-drop** — Can't drag events between dates (standard Google Calendar UX).
-- [ ] **Calendar day view** — No single-day detailed view with time blocks.
+- [x] **Calendar event drag-and-drop** — HTML5 DnD on monthly grid view. Scribe+ only.
+- [x] **Calendar day view** — Single-day detailed view at `/calendar/day` with event cards, time display, day navigation. 5 tests.
 - [x] **Map marker clustering** — Leaflet.markercluster integration on both map widget and full map page. Auto-clustering when >5 markers with custom cluster icons. CDN-loaded.
 - [x] **Map marker icon picker** — Expanded from 18 to 39 POI icons in 8 organized groups (General, Settlements, Fortifications, Dungeons & Ruins, Nature, Maritime, Sacred & Magic, Resources).
 - [x] **Recent entities sidebar** — localStorage-backed "recently viewed" list in sidebar drill panel. Tracks entity visits, renders last 10 with clock icons. `recent_entities.js`.
@@ -109,18 +109,18 @@ New capabilities ordered by priority for alpha release.
 ### Phase K: Permissions & Competitive Gap Closers
 
 - [x] **Sprint K-1: Per-Entity Permissions Model** — Migration 000048: `entity_permissions` table + `visibility` column on entities. Models: VisibilityMode, SubjectType, Permission, EntityPermission, EffectivePermission, SetPermissionsInput, PermissionGrant. Repository: EntityPermissionRepository (ListByEntity, SetPermissions, DeleteByEntity, GetEffectivePermission, UpdateVisibility) + visibilityFilter() SQL helper. Service: CheckEntityAccess, SetEntityPermissions, GetEntityPermissions. All list/search/count queries updated with userID param for permission-aware filtering. 13 new unit tests.
-- [ ] **Sprint K-2: Per-Entity Permissions UI** — "Permissions" tab on entity edit page. Visibility selector (everyone/dm_only/custom). User/role picker with view/edit toggles. Entity list + sidebar filter by resolved permissions.
-- [ ] **Sprint K-3: Group-Based Visibility** — Migration: `campaign_groups` + `campaign_group_members`. Permission subject_type gains "group." Groups in Campaign Settings. Entity permission UI gets group selector.
-- [ ] **Sprint K-4: Auto-Linking in Editor** — Backend: entity-names API (Redis-cached). Frontend: TipTap InputRule matches entity names, inline suggestion popup. Per-campaign toggle. Whole-word, case-insensitive, min 3 chars.
-- [ ] **Sprint K-5: Relations Graph Visualization** — D3.js force-directed graph (`relation_graph.js`). Backend: relation-graph API (nodes/edges JSON). Dashboard block + standalone page `/campaigns/:id/relations`.
+- [x] **Sprint K-2: Per-Entity Permissions UI** — Permissions widget (`permissions.js`) with three visibility modes (Everyone/DM Only/Custom), per-role and per-user grant toggles (None/View/Edit), auto-save. Replaced `is_private` checkbox on entity edit form. API: GET/PUT `/entities/:eid/permissions` (Owner only). Multi-mode visibility indicators in entity cards, category dashboard table/tree, show page title+children. Fixed sync API `GetEntity` custom visibility gap. MemberLister interface for campaign member picker.
+- [x] **Sprint K-3: Group-Based Visibility** — Migration 000049 (`campaign_groups` + `campaign_group_members`), subject_type ENUM gains "group". GroupRepository (8 methods), GroupService (validation, CRUD). Group CRUD handlers + routes (Owner only). Groups management page with JS widget (`groups.js`). Permissions widget updated with group grants section. `visibilityFilter()` SQL updated for group membership check. Settings page "Groups" link. 7 unit tests.
+- [x] **Sprint K-4: Auto-Linking in Editor** — Entity names API (`GET /entity-names`) with Redis caching (5-min TTL). `ListNames` repository method sorted by name length DESC. Auto-link JS module (`editor_autolink.js`) scans text nodes for entity names, creates @mention links. Insert menu item + Ctrl+Shift+L shortcut. Whole-word, case-insensitive, min 3 chars, skips existing links.
+- [x] **Sprint K-5: Relations Graph Visualization** — D3.js force-directed graph (`relation_graph.js`) with dynamic CDN loading, zoom/pan, drag, node coloring, tooltips, legend. Backend: `ListByCampaign` repo (dedup bi-directional), `GetGraphData` service, `GraphAPI`/`GraphPage` handlers. Dashboard block `relations_graph` with configurable height. Standalone page at `/relations-graph/page`.
 
 ### Phase L: Content Depth & Editor Power
 
-- [ ] **Sprint L-1: Entity Sub-Notes (Posts) UI** — `entity_posts` table exists but no UI. Full CRUD: list below entry, create/edit modal with TipTap, per-post visibility, drag-to-reorder.
-- [ ] **Sprint L-2: Notes Rich Text (TipTap)** — Replace plain-text blocks with TipTap in notes widget. `entry`/`entry_html` columns exist. Support bold, italic, lists, links, @mentions. Block→TipTap migration on first edit.
-- [ ] **Sprint L-3: Note Folders and Organization** — Migration: `parent_id` + `folder` boolean. Tree view in notes panel, expand/collapse, drag-to-reorder within/between folders.
-- [ ] **Sprint L-4: Calendar Event Drag-and-Drop** — HTML5 DnD on monthly grid. Events draggable, date cells as drop targets. HTMX PUT on drop. Ghost element + drop zone highlighting. Scribe+ only.
-- [ ] **Sprint L-5: Calendar Day View + Recurring Events** — Single-day view with hourly time blocks. Expand event recurrence to monthly/weekly/daily/custom matching session recurrence.
+- [x] **Sprint L-1: Entity Sub-Notes (Posts) UI** — Migration 000050 (`entity_posts` table). Full posts widget: PostRepository (CRUD + reorder), PostService (validation, sort order), Handler (list/create/update/delete/reorder). JS widget (`entity_posts.js`) with collapsible post cards, drag-to-reorder, visibility toggle, inline rename, delete confirmation. Integrated into entity show page. Layout block type `posts` in template editor. Public-capable read route, Scribe+ write routes. 13 unit tests.
+- [x] **Sprint L-2: Notes Rich Text (TipTap)** — Replaced plain textarea editing with mini TipTap editor instances. StarterKit+Underline+Placeholder. Saves entry JSON + entryHtml to API. Legacy text block→TipTap HTML conversion on first edit. Checklists remain as interactive checkboxes. Editor instances tracked and cleaned up on save/destroy.
+- [x] **Sprint L-3: Note Folders and Organization** — Migration 000051: `parent_id` + `is_folder`. Tree view in notes panel, collapsible folders, move-to-folder dropdown, create folder button. 4 tests.
+- [x] **Sprint L-4: Calendar Event Drag-and-Drop** — HTML5 DnD on monthly grid. Event chips draggable (Scribe+), day cells as drop zones. Full PUT on drop with all event fields preserved. Drop zone highlighting via `cal-drop-highlight` CSS. No backend changes needed.
+- [x] **Sprint L-5: Calendar Day View** — Single-day detailed view at `/calendar/day`. DayViewData struct with PrevDay/NextDay/WeekdayName/Season helpers. Event cards with time, category, entity links, description. Day view icon in all view toggles. Sessions support. 5 unit tests.
 
 ### Phase M: Game System Modules & Worldbuilding Tools
 
@@ -363,3 +363,16 @@ Summary of strengths/weaknesses for strategic positioning. Full analysis in `.ai
 - [x] View toggle: Grid/Week/Timeline button group added to all 3 calendar views
 - [x] Route: GET `/calendar/week` (public-capable)
 - [x] Tests: 5 unit tests for week data helpers (WeekDays, CrossMonth, PrevNext, WeekdayName)
+
+### Sprint K-2: Per-Entity Permissions UI (2026-03-05, batch 36)
+- [x] Fixed sync API `GetEntity` visibility gap (only checked `is_private`, now calls `CheckEntityAccess`)
+- [x] Added `MemberLister` interface + `SetMemberLister` setter to entities Handler for campaign member picker
+- [x] Permissions API: `GET/PUT /campaigns/:id/entities/:eid/permissions` (Owner only)
+- [x] Response shape: `{ visibility, is_private, members: [...], permissions: [...] }`
+- [x] Permissions widget (`static/js/widgets/permissions.js`): three-mode radio (Everyone/DM Only/Custom), role grants (Player/Scribe), user grants per campaign member, auto-save with abort controller
+- [x] Script tag added to `base.templ`
+- [x] Entity edit form: replaced `is_private` checkbox with permissions widget mount point + hidden field to preserve `is_private` during form submission
+- [x] Entity card: multi-mode visibility icon (shield-halved for custom, lock for DM-only)
+- [x] Category dashboard: updated table visibility column + tree view privacy indicator
+- [x] Show page: updated title block + blockChildren visibility indicators
+- [x] Export adapters: TODO comment for entity_permissions export

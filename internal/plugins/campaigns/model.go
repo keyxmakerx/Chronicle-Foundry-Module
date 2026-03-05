@@ -276,6 +276,7 @@ const (
 	BlockCalendarPreview = "calendar_preview" // Upcoming calendar events.
 	BlockTimelinePreview = "timeline_preview" // Timeline visualization preview.
 	BlockMapPreview      = "map_preview"      // Embedded map viewer.
+	BlockRelationsGraph  = "relations_graph"  // Entity relations force-directed graph.
 
 	// Category dashboard blocks.
 	BlockCategoryHeader = "category_header" // Category name, icon, count, description.
@@ -295,6 +296,7 @@ var ValidBlockTypes = map[string]bool{
 	BlockCalendarPreview: true,
 	BlockTimelinePreview: true,
 	BlockMapPreview:      true,
+	BlockRelationsGraph:  true,
 	BlockCategoryHeader:  true,
 	BlockEntityGrid:     true,
 	BlockSearchBar:      true,
@@ -406,6 +408,29 @@ func (o ListOptions) Offset() int {
 }
 
 // --- Slug Generation ---
+
+// --- Campaign Groups ---
+
+// CampaignGroup is a named collection of campaign members used for
+// per-entity permission grants (e.g., "Party A can see this entity").
+type CampaignGroup struct {
+	ID          int        `json:"id"`
+	CampaignID  string     `json:"campaign_id"`
+	Name        string     `json:"name"`
+	Description *string    `json:"description,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+	Members     []GroupMemberInfo `json:"members,omitempty"`
+}
+
+// GroupMemberInfo is a campaign member's summary within a group.
+type GroupMemberInfo struct {
+	UserID      string  `json:"user_id"`
+	DisplayName string  `json:"display_name"`
+	Email       string  `json:"email"`
+	Role        Role    `json:"role"`
+	AvatarPath  *string `json:"avatar_path,omitempty"`
+}
 
 // slugPattern matches one or more non-alphanumeric characters for replacement.
 var slugPattern = regexp.MustCompile(`[^a-z0-9]+`)
