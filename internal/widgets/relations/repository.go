@@ -34,9 +34,9 @@ type RelationRepository interface {
 	// UpdateMetadata updates only the metadata JSON column for a relation.
 	UpdateMetadata(ctx context.Context, id int, metadata json.RawMessage) error
 
-	// ListByCampaign returns all relations for a campaign with joined entity
-	// details for both source and target. Used by the relations graph.
-	ListByCampaign(ctx context.Context, campaignID string) ([]CampaignRelation, error)
+	// ListByCampaign returns all relations for a campaign with both source and
+	// target entity details. Used for the relations graph visualization.
+	ListByCampaign(ctx context.Context, campaignID string) ([]GraphRelation, error)
 }
 
 // relationRepository implements RelationRepository using MariaDB with
@@ -209,50 +209,6 @@ func (r *relationRepository) UpdateMetadata(ctx context.Context, id int, metadat
 	return nil
 }
 
-// ListByCampaign returns all relations for a campaign with joined entity details
-// for both source and target entities. Each relation appears once (both forward
-// and reverse are returned from the DB; the handler deduplicates).
-func (r *relationRepository) ListByCampaign(ctx context.Context, campaignID string) ([]CampaignRelation, error) {
-	query := `SELECT er.source_entity_id, se.name, COALESCE(set2.icon, 'fa-file'), COALESCE(set2.color, '#6b7280'),
-	                  se.slug, COALESCE(set2.name, ''),
-	                  er.target_entity_id, te.name, COALESCE(tet.icon, 'fa-file'), COALESCE(tet.color, '#6b7280'),
-	                  te.slug, COALESCE(tet.name, ''),
-	                  er.relation_type
-	           FROM entity_relations er
-	           INNER JOIN entities se ON se.id = er.source_entity_id
-	           LEFT JOIN entity_types set2 ON set2.id = se.entity_type_id
-	           INNER JOIN entities te ON te.id = er.target_entity_id
-	           LEFT JOIN entity_types tet ON tet.id = te.entity_type_id
-	           WHERE er.campaign_id = ?
-	           ORDER BY se.name ASC, te.name ASC`
-
-	rows, err := r.db.QueryContext(ctx, query, campaignID)
-	if err != nil {
-		return nil, fmt.Errorf("listing relations by campaign: %w", err)
-	}
-	defer rows.Close()
-
-	var relations []CampaignRelation
-	for rows.Next() {
-		var cr CampaignRelation
-		if err := rows.Scan(
-			&cr.SourceEntityID, &cr.SourceEntityName, &cr.SourceEntityIcon, &cr.SourceEntityColor,
-			&cr.SourceEntitySlug, &cr.SourceEntityType,
-			&cr.TargetEntityID, &cr.TargetEntityName, &cr.TargetEntityIcon, &cr.TargetEntityColor,
-			&cr.TargetEntitySlug, &cr.TargetEntityType,
-			&cr.RelationType,
-		); err != nil {
-			return nil, fmt.Errorf("scanning campaign relation row: %w", err)
-		}
-		relations = append(relations, cr)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating campaign relation rows: %w", err)
-	}
-
-	return relations, nil
-}
-
 // nullableJSON returns nil for empty/null JSON, or the raw bytes otherwise.
 func nullableJSON(data json.RawMessage) any {
 	if len(data) == 0 || string(data) == "null" {
@@ -265,4 +221,45 @@ func nullableJSON(data json.RawMessage) any {
 // Error code 1062 is ER_DUP_ENTRY for unique constraint violations.
 func isDuplicateEntry(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "Duplicate entry")
+}
+
+// ListByCampaign returns all relations for a campaign with both source and
+// target entity details. Only returns "forward" relations (avoids returning
+// both A→B and B→A for the same relation pair) by using source_entity_id < target_entity_id.
+func (r *relationRepository) ListByCampaign(ctx context.Context, campaignID string) ([]GraphRelation, error) {
+	query := `SELECT er.source_entity_id, er.target_entity_id, er.relation_type,
+	                  es.name, COALESCE(ets.icon, 'fa-file'), COALESCE(ets.color, '#6b7280'),
+	                  es.slug, COALESCE(ets.name, ''),
+	                  et.name, COALESCE(ett.icon, 'fa-file'), COALESCE(ett.color, '#6b7280'),
+	                  et.slug, COALESCE(ett.name, '')
+	           FROM entity_relations er
+	           INNER JOIN entities es ON es.id = er.source_entity_id
+	           INNER JOIN entities et ON et.id = er.target_entity_id
+	           LEFT JOIN entity_types ets ON ets.id = es.entity_type_id
+	           LEFT JOIN entity_types ett ON ett.id = et.entity_type_id
+	           WHERE er.campaign_id = ?
+	             AND er.source_entity_id < er.target_entity_id
+	           ORDER BY er.relation_type ASC`
+
+	rows, err := r.db.QueryContext(ctx, query, campaignID)
+	if err != nil {
+		return nil, fmt.Errorf("listing relations by campaign: %w", err)
+	}
+	defer rows.Close()
+
+	var result []GraphRelation
+	for rows.Next() {
+		var gr GraphRelation
+		if err := rows.Scan(
+			&gr.SourceEntityID, &gr.TargetEntityID, &gr.RelationType,
+			&gr.SourceEntityName, &gr.SourceEntityIcon, &gr.SourceEntityColor,
+			&gr.SourceEntitySlug, &gr.SourceEntityType,
+			&gr.TargetEntityName, &gr.TargetEntityIcon, &gr.TargetEntityColor,
+			&gr.TargetEntitySlug, &gr.TargetEntityType,
+		); err != nil {
+			return nil, fmt.Errorf("scanning graph relation: %w", err)
+		}
+		result = append(result, gr)
+	}
+	return result, rows.Err()
 }

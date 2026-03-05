@@ -8,69 +8,84 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-05 -- Sprint K-6 (Foundry Polish) complete (batch 41).
-Branch: `claude/plan-development-phases-G8Pwf`.
+2026-03-05 -- Sprint L-5 (Calendar Day View) complete (batch 44).
+Branch: `claude/project-review-planning-Yr4CL`.
 
 ## Current Phase
-**Phase K: Permissions UI + Module Foundation.** Sprints K-1 through K-5 complete.
-Roadmap reorganized by user impact (batch 39):
+**Phase L: Content Depth & Editor Power.** Phase L complete (batch 44). Next: Phase M (Game System Modules & Worldbuilding Tools).
 
-- **Phase K** (remaining): K-6 Foundry Polish.
-- **Phase L** (Content Depth): Sub-notes UI, Notes rich text + folders, Auto-linking, Group visibility, Calendar DnD.
-- **Phase M** (Module Ecosystem + Foundry): Module SDK docs, Draw Steel module, Module packaging, Foundry multi-scene.
-- **Phase N** (Collaboration & Platform): Foundry character sheets, Role-aware dashboards, Invite system, Accessibility, Deployment.
-- **Phase O+** (Backlog): 2FA, command palette, map drawing, Discord bot, bulk ops, etc.
-
-Phase K complete. Next: **Phase L (Content Depth)**, starting with L-1 (Entity Sub-Notes UI).
-
-### Summary of Recent Work (batches 25-41)
-- **Batch 41**: Sprint K-6 Foundry Polish — 4 fixes: (1) Shop icon null bug fixed
-  (dead ternary removed, HBS template renders FA icons with entity type colors),
-  (2) Connection status UI (replaced 2s polling with event-driven `onStateChange`
-  callbacks, click-to-reconnect, WS activity flash, tooltips),
-  (3) SimpleCalendar CRUD hooks (journal hook listeners detect SC notes via flag
-  presence, push create/update/delete to Chronicle calendar API, `_extractSimpleCalendarData`
-  helper for SC→Chronicle field mapping),
-  (4) Fog bidirectional sync (Foundry→Chronicle: `_isFogLikeDrawing` detects dark
-  polygons, `_foundryDrawingToFogRegion` converts pixel→percentage coords,
-  `_handleFogDrawingCreate/Delete` push fog regions via REST API).
-- **Batch 40**: Sprint K-5 Relations Graph Visualization — D3.js force-directed graph
-  of entity relations. CampaignRelation type + ListByCampaign repo/service method
-  (joins both source and target entity details). GraphAPI handler deduplicates
-  bidirectional pairs into unique nodes/edges JSON. Standalone graph page at
-  `/campaigns/:id/relations` with HTMX fragment support. `relation_graph.js` widget
-  (force simulation, zoom/pan, click-to-navigate, hover tooltips with edge highlighting,
-  entity type color legend, responsive). Dashboard block `relation_graph` for compact
-  embedded view. 5 new tests. Public-capable routes.
-- **Batch 39**: Roadmap reorganized by user impact. .gitignore cleanup (removed
-  duplicates, added coverage.html + *.log).
-- **Batch 38**: Sprint K-4 Module Data API & Widget Integration — JSONProvider
-  (loads JSON data files into memory, implements DataProvider interface). D&D 5e
-  module: first concrete Module implementation with 10 SRD spells data, tooltip
-  renderer. Factory registry pattern (RegisterFactory/init()) avoids circular imports.
-  Generic module HTTP handler (Index/CategoryList/ItemDetail/SearchAPI/TooltipAPI).
-  Templ reference pages (category grid, item table, item detail with breadcrumbs).
-  Module route registration with dynamic addon middleware (per-module :mod param).
-  ModuleSearcher interface added to entity handler (follows existing searcher pattern).
-  ModuleSearchAdapter searches enabled modules for campaign. Entity SearchAPI includes
-  module results in @mention/quick search. 20 new tests (json_provider). ADR-020.
-- **Batch 37**: Sprint K-3 Module Manifest & Loader Framework — Manifest-driven
-  module system replacing static hardcoded registry. ModuleManifest JSON spec
-  (id, name, version, author, license, api_version, categories with field schemas,
-  entity presets, tooltip template). ModuleLoader auto-discovers modules by
-  scanning `internal/modules/*/manifest.json`. Sandboxed interfaces: Module,
-  DataProvider, TooltipRenderer, ReferenceItem struct. manifest.json files for
-  dnd5e, pathfinder2e, drawsteel. Admin modules page updated to show author,
-  license, API version. Module slugs added to installedAddons. 13 new tests.
-  ADR-019 recorded.
-- **Batch 36**: Sprint K-2 Per-Entity Permissions UI — Visibility section on
-  entity edit page (Alpine.js) with three modes: Everyone/GM Only/Custom
-  Permissions. Custom mode: dynamic permission grant builder with subject type
-  (role/user), subject ID picker, permission level (view/edit), auto-save via
-  API. Handler: GET/PUT `/entities/:eid/permissions`, GET `/entities/members`.
-  Visibility indicators updated across entity cards, table rows, tree view,
-  show page details block. Shield icon for custom permissions, lock for private.
-  MemberLister dependency wired into entity handler.
+### Summary of Recent Work (batches 25-44)
+- **Batch 44**: Sprint L-5 Calendar Day View — Single-day detailed view at
+  `/calendar/day`. DayViewData struct with PrevDay/NextDay/WeekdayName/Season
+  helpers. Full-page template with event cards showing time, category, entity
+  links, description. Day view icon added to all view toggles (Grid/Week/Day/
+  Timeline). Session display for real-life calendars. 5 unit tests. Route:
+  `GET /calendar/day` (Player+).
+- **Batch 43**: Sprint L-4 Calendar Event Drag-and-Drop — HTML5 DnD on monthly
+  grid view. Event chips gain `draggable="true"` (Scribe+ only), day cells become
+  drop zones with `data-drop-year/month/day` attributes. Drag handlers: dragStart
+  captures event ID + applies opacity, dragOver highlights cell, drop reads all
+  event data attributes and sends full PUT to `/calendar/events/:eid` with new
+  date. Visual feedback via `cal-drop-highlight` CSS class (accent ring + tint).
+  Same-date drops ignored. No backend changes needed (existing PUT handler works).
+- **Batch 42**: Sprint L-3 Note Folders — Migration 000051 adds `parent_id` (FK
+  with CASCADE) and `is_folder` columns to notes table. Backend: model, repository,
+  and service updated for folder create/update/move operations. JS widget (`notes.js`)
+  updated with tree view rendering: `buildTree()` groups notes by parentId, folders
+  render as collapsible containers with expand/collapse (persisted in localStorage),
+  child count badges, add-note-in-folder and rename-folder buttons. Move-to-folder
+  dropdown menu on note cards. "New Folder" button in quick-add row. Folder delete
+  with cascade warning. CSS styles for folders, move menu, collapse toggle. 4 new
+  unit tests (create folder, create with parentId, move to folder, move to top level).
+- **Batch 41**: Sprint L-2 Notes Rich Text (TipTap) — Replaced plain textarea
+  editing in notes widget with mini TipTap editor instances. When entering edit
+  mode, creates TipTap editor with StarterKit+Underline+Placeholder, populated
+  from note's `entry` JSON or converted from legacy text blocks to HTML. Saves
+  TipTap content (entry JSON + entryHtml) to API. Legacy block→TipTap conversion
+  on first edit. Checklists remain as interactive checkboxes (separate from TipTap).
+  Editor instances tracked in `miniEditors` map, cleaned up on note save/destroy.
+- **Batch 40**: Sprint L-1 Entity Posts (Sub-Notes) UI — Migration 000050
+  (`entity_posts` table). Full widget: PostRepository (CRUD + reorder),
+  PostService (validation, sort order), Handler (list/create/update/delete/reorder).
+  JS widget (`entity_posts.js`) with collapsible post cards, drag-to-reorder,
+  visibility toggle (DM only), inline rename, delete confirmation. Integrated into
+  entity show page below main entry. Added as layout block type `posts` in
+  template editor. Public-capable read route, Scribe+ write routes. 13 unit tests.
+- **Batch 39**: Sprint K-5 Relations Graph Visualization — D3.js force-directed graph
+  widget (`relation_graph.js`) with dynamic CDN loading, zoom/pan, drag, node coloring
+  by entity type, edge labels, tooltips, click-to-navigate, type legend. Backend:
+  `ListByCampaign` repository (dedup bi-directional pairs via `source < target`),
+  `GetGraphData` service, `GraphAPI` + `GraphPage` handlers. Standalone page at
+  `/relations-graph/page`. Dashboard block type `relations_graph` with configurable
+  height. Model types: GraphRelation, GraphNode, GraphEdge, GraphData. Phase K complete.
+- **Batch 38**: Sprint K-4 Auto-Linking in Editor — Entity names API endpoint
+  (`GET /entity-names`) with Redis caching (5-min TTL). Repository `ListNames`
+  method returns lightweight name entries (id, name, slug, type info) sorted by
+  name length DESC for longest-first matching. Auto-link JS module
+  (`editor_autolink.js`) scans editor text nodes for entity names, creates
+  @mention links with data-mention-id attributes. Integrated into Insert menu
+  ("Auto-link Entities" with wand icon) and Ctrl+Shift+L shortcut. Whole-word,
+  case-insensitive matching, min 3 chars, skips text already inside links.
+  `EntityNameEntry` model type. Handler gains Redis `cache` field.
+- **Batch 37**: Sprint K-3 Group-Based Visibility — Migration 000049
+  (`campaign_groups` + `campaign_group_members` tables, subject_type ENUM gains
+  "group"). Full GroupRepository (8 methods) and GroupService (validation, CRUD).
+  Group CRUD handlers (list/create/get/update/delete groups + add/remove members)
+  with Owner-only routes. Groups management page (`groups.templ`) with JS widget
+  (`groups.js`) — collapsible group cards, member add/remove, inline rename. Entity
+  permissions widget updated with "Group Permissions" section. `visibilityFilter()`
+  SQL extended for group membership subquery. Settings page "Groups" link. 7 unit
+  tests. Entity handler gains `GroupLister` interface for permissions API.
+- **Batch 36**: Sprint K-2 Per-Entity Permissions UI — Permissions widget
+  (`permissions.js`) with three visibility modes (Everyone/DM Only/Custom),
+  per-role and per-user grant toggles (None/View/Edit), auto-save. Replaced
+  `is_private` checkbox on entity edit form. API endpoints: GET/PUT
+  `/entities/:eid/permissions` (Owner only). Multi-mode visibility indicators
+  in entity cards (shield-halved for custom, lock for DM-only), category
+  dashboard table/tree, show page title block + children list. Fixed sync API
+  `GetEntity` to check custom visibility via `CheckEntityAccess`. Added
+  `MemberLister` interface + wiring for campaign member picker. Export TODO for
+  permissions data.
 - **Batch 35**: Sprint K-1 Per-Entity Permissions Model — Migration 000048
   (`entity_permissions` table, `visibility` ENUM column on entities). Permission
   model types (VisibilityMode, SubjectType, Permission, EntityPermission,
@@ -138,7 +153,7 @@ Phase K complete. Next: **Phase L (Content Depth)**, starting with L-1 (Entity S
 ---
 
 ## Next Session Should
-Start **Phase L (Content Depth)** with Sprint L-1 (Entity Sub-Notes/Posts UI). The `entity_posts` table already exists — build the frontend: list below entity entry, create/edit modal with TipTap, per-post visibility, drag-to-reorder, HTMX fragments. Full reorganized roadmap (Phases L-O+, 15 sprints by user impact) in `.ai/todo.md`.
+Continue with **Phase M** (Game System Modules & Worldbuilding Tools). Sprint M-1: D&D 5e Module with SRD data, tooltip API, reference pages. Full post-alpha roadmap (Phases M through O, 15 remaining sprints) documented in `.ai/todo.md`.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)
@@ -146,7 +161,8 @@ Start **Phase L (Content Depth)** with Sprint L-1 (Entity Sub-Notes/Posts UI). T
   must run before build on a fresh clone
 - Tailwind CSS output (`static/css/app.css`) is gitignored, needs `make tailwind`
 - Tailwind standalone CLI (`tailwindcss`) is v3; do NOT use `npx @tailwindcss/cli` (v4 syntax)
-- Foundry fog sync is now bidirectional but fog drawing detection uses heuristic (dark polygon with alpha > 0.5); not all dark drawings may be fog.
+- Fog-of-war sync is one-way only (Chronicle → Foundry). Foundry → Chronicle not implemented.
+- SimpleCalendar events are limited (managed as journal notes, no CRUD hooks).
 
 ## Completed Phases
 - **2026-02-19: Phase 0** — Project scaffolding, AI docs, build config
@@ -184,8 +200,13 @@ Start **Phase L (Content Depth)** with Sprint L-1 (Entity Sub-Notes/Posts UI). T
 - **2026-03-05: Sprint J-4** — ClamAV antivirus scanning, docker-compose ClamAV container.
 - **2026-03-05: ALL PHASES COMPLETE** — H (release readiness), I (core UX), J (polish & infra).
 - **2026-03-05: Sprint K-1** — Per-entity permissions model (backend): migration 000048, model types, permission repository, service methods, visibility filter, 13 tests.
-- **2026-03-05: Sprint K-2** — Per-entity permissions UI: visibility section on edit page (Everyone/GM Only/Custom), permission grant builder, API endpoints, visibility indicators across all views.
-- **2026-03-05: Sprint K-3** — Module manifest & loader framework: ModuleManifest JSON spec, ModuleLoader auto-discovery, sandboxed Module/DataProvider/TooltipRenderer interfaces, manifest.json for 3 modules, admin page updated, installedAddons wired, 13 tests, ADR-019.
-- **2026-03-05: Sprint K-4** — Module data API & widget integration: JSONProvider (JSON-file DataProvider), D&D 5e module (10 SRD spells, tooltip renderer), factory registry pattern, generic module HTTP handler (5 endpoints), Templ reference pages, dynamic addon middleware, ModuleSearcher in entity search, 20 new tests, ADR-020.
-- **2026-03-05: Sprint K-5** — Relations graph visualization: D3.js force-directed graph, CampaignRelation + ListByCampaign, GraphAPI (node/edge deduplication), standalone page + HTMX fragment, relation_graph.js widget (zoom/pan, click-to-navigate, tooltips, legend), dashboard block, 5 new tests.
+- **2026-03-05: Sprint K-2** — Per-entity permissions UI: permissions widget (permissions.js), visibility modes, role/user grants, auto-save. Sync API GetEntity custom visibility fix.
+- **2026-03-05: Sprint K-3** — Group-based visibility: migration 000049 (campaign_groups/members), GroupRepository, GroupService, group CRUD handlers, groups management page + widget, permissions widget group grants, 7 tests.
+- **2026-03-05: Sprint K-4** — Auto-linking in editor: entity names API with Redis caching, auto-link JS module (text scanner, mention link creation), Insert menu + Ctrl+Shift+L shortcut.
+- **2026-03-05: Sprint K-5** — Relations graph visualization: D3.js force-directed graph widget, graph API + standalone page, dashboard block type.
 - **2026-03-05: Sprint K-6** — Foundry Polish: shop icon null fix (FA icons with entity colors), connection status UI (event-driven, click-to-reconnect, activity flash), SimpleCalendar CRUD hooks (journal listeners, SC flag detection), fog bidirectional sync (dark polygon heuristic, pixel↔percentage conversion). **Phase K complete.**
+- **2026-03-05: Sprint L-1** — Entity posts (sub-notes): migration 000050, full widget (model/repo/service/handler), JS widget with collapsible cards, drag-to-reorder, visibility toggle, layout block type.
+- **2026-03-05: Sprint L-2** — Notes rich text: TipTap mini editor instances replace plain textareas, legacy block→TipTap conversion, entry JSON + HTML saved to API.
+- **2026-03-05: Sprint L-3** — Note folders: migration 000051 (parent_id + is_folder), tree view rendering, collapsible folders, move-to-folder, create folder, 4 tests.
+- **2026-03-05: Sprint L-4** — Calendar event drag-and-drop: HTML5 DnD on monthly grid, draggable event chips, drop zone highlighting, full PUT on drop. Pure frontend.
+- **2026-03-05: Sprint L-5** — Calendar day view: single-day detailed view, event cards with time/category/entity/description, day navigation, view toggle icon. Phase L complete.

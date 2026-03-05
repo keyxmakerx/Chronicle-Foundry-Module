@@ -10,8 +10,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/keyxmakerx/chronicle/internal/apperror"
 	"github.com/keyxmakerx/chronicle/internal/middleware"
@@ -58,11 +60,16 @@ type SessionSearcher interface {
 	SearchSessions(ctx context.Context, campaignID, query string) ([]map[string]string, error)
 }
 
-// ModuleSearcher provides module reference content search results for
-// the @mention popup and quick search. Implemented by the modules
-// package and injected via SetModuleSearcher.
-type ModuleSearcher interface {
-	SearchModuleContent(ctx context.Context, campaignID, query string) ([]map[string]string, error)
+// MemberLister retrieves campaign members for the permissions UI.
+// Satisfied by campaigns.CampaignService.
+type MemberLister interface {
+	ListMembers(ctx context.Context, campaignID string) ([]campaigns.CampaignMember, error)
+}
+
+// GroupLister retrieves campaign groups for the permissions UI.
+// Satisfied by campaigns.GroupService.
+type GroupLister interface {
+	ListGroups(ctx context.Context, campaignID string) ([]campaigns.CampaignGroup, error)
 }
 
 // Handler handles HTTP requests for entity operations. Handlers are thin:
@@ -72,12 +79,13 @@ type Handler struct {
 	auditSvc           audit.AuditService
 	tagFetcher         EntityTagFetcher
 	addonSvc           AddonChecker
-	memberLister       campaigns.MemberLister
 	timelineSearcher   TimelineSearcher
 	mapSearcher        MapSearcher
 	calendarSearcher   CalendarSearcher
 	sessionSearcher    SessionSearcher
-	moduleSearcher     ModuleSearcher
+	memberLister       MemberLister
+	groupLister        GroupLister
+	cache              *redis.Client
 }
 
 // NewHandler creates a new entity handler.
@@ -101,12 +109,6 @@ func (h *Handler) SetAddonChecker(svc AddonChecker) {
 // Called after all plugins are wired to avoid initialization order issues.
 func (h *Handler) SetTagFetcher(f EntityTagFetcher) {
 	h.tagFetcher = f
-}
-
-// SetMemberLister sets the campaign member lister for the permissions UI.
-// Called after all plugins are wired to avoid initialization order issues.
-func (h *Handler) SetMemberLister(ml campaigns.MemberLister) {
-	h.memberLister = ml
 }
 
 // SetTimelineSearcher sets the timeline searcher for @mention results.
@@ -133,10 +135,21 @@ func (h *Handler) SetSessionSearcher(ss SessionSearcher) {
 	h.sessionSearcher = ss
 }
 
-// SetModuleSearcher sets the module content searcher for @mention and
-// quick search results. Called after all plugins are wired.
-func (h *Handler) SetModuleSearcher(ms ModuleSearcher) {
-	h.moduleSearcher = ms
+// SetMemberLister sets the member lister for the permissions UI.
+// Called after all plugins are wired to avoid initialization order issues.
+func (h *Handler) SetMemberLister(ml MemberLister) {
+	h.memberLister = ml
+}
+
+// SetGroupLister sets the group lister for the permissions UI.
+// Called after all plugins are wired to avoid initialization order issues.
+func (h *Handler) SetGroupLister(gl GroupLister) {
+	h.groupLister = gl
+}
+
+// SetCache sets the Redis client for API response caching (e.g., entity names).
+func (h *Handler) SetCache(rdb *redis.Client) {
+	h.cache = rdb
 }
 
 // logAudit fires a fire-and-forget audit entry. Errors are logged but
@@ -626,14 +639,6 @@ func (h *Handler) SearchAPI(c echo.Context) error {
 				total += len(sessResults)
 			}
 		}
-		if h.moduleSearcher != nil && query != "" {
-			if modResults, err := h.moduleSearcher.SearchModuleContent(
-				c.Request().Context(), cc.Campaign.ID, query,
-			); err == nil {
-				items = append(items, modResults...)
-				total += len(modResults)
-			}
-		}
 		return c.JSON(http.StatusOK, map[string]any{"results": items, "total": total})
 	}
 
@@ -1033,7 +1038,243 @@ func (h *Handler) UpdatePopupConfigAPI(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 
+// --- Per-Entity Permissions API ---
+
+// permissionsResponse is the JSON response for the GET permissions endpoint.
+type permissionsResponse struct {
+	Visibility  VisibilityMode       `json:"visibility"`
+	IsPrivate   bool                 `json:"is_private"`
+	Members     []permissionsMember  `json:"members"`
+	Groups      []permissionsGroup   `json:"groups"`
+	Permissions []EntityPermission   `json:"permissions"`
+}
+
+// permissionsGroup is a campaign group summary for the permissions UI.
+type permissionsGroup struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+// permissionsMember is a campaign member summary for the permissions UI.
+type permissionsMember struct {
+	UserID      string `json:"user_id"`
+	DisplayName string `json:"display_name"`
+	Email       string `json:"email"`
+	Role        int    `json:"role"`
+	AvatarPath  string `json:"avatar_path,omitempty"`
+}
+
+// setPermissionsRequest is the JSON body for setting entity permissions.
+type setPermissionsRequest struct {
+	Visibility  VisibilityMode    `json:"visibility"`
+	IsPrivate   bool              `json:"is_private"`
+	Permissions []PermissionGrant `json:"permissions"`
+}
+
+// GetPermissionsAPI returns the entity's current visibility mode, campaign
+// members, and permission grants. Owner only.
+// GET /campaigns/:id/entities/:eid/permissions
+func (h *Handler) GetPermissionsAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	if cc == nil {
+		return apperror.NewMissingContext()
+	}
+
+	entityID := c.Param("eid")
+	ctx := c.Request().Context()
+
+	entity, err := h.service.GetByID(ctx, entityID)
+	if err != nil {
+		return err
+	}
+	if entity.CampaignID != cc.Campaign.ID {
+		return apperror.NewNotFound("entity not found")
+	}
+
+	// Fetch current permission grants.
+	grants, err := h.service.GetEntityPermissions(ctx, entityID)
+	if err != nil {
+		return apperror.NewInternal(fmt.Errorf("get entity permissions: %w", err))
+	}
+	if grants == nil {
+		grants = []EntityPermission{}
+	}
+
+	// Fetch campaign members for the picker UI.
+	var members []permissionsMember
+	if h.memberLister != nil {
+		campaignMembers, err := h.memberLister.ListMembers(ctx, cc.Campaign.ID)
+		if err != nil {
+			slog.Error("failed to list campaign members for permissions", slog.Any("error", err))
+		} else {
+			for _, m := range campaignMembers {
+				pm := permissionsMember{
+					UserID:      m.UserID,
+					DisplayName: m.DisplayName,
+					Email:       m.Email,
+					Role:        int(m.Role),
+				}
+				if m.AvatarPath != nil {
+					pm.AvatarPath = *m.AvatarPath
+				}
+				members = append(members, pm)
+			}
+		}
+	}
+	if members == nil {
+		members = []permissionsMember{}
+	}
+
+	// Fetch campaign groups for the group grants selector.
+	var groups []permissionsGroup
+	if h.groupLister != nil {
+		campaignGroups, err := h.groupLister.ListGroups(ctx, cc.Campaign.ID)
+		if err != nil {
+			slog.Error("failed to list campaign groups for permissions", slog.Any("error", err))
+		} else {
+			for _, g := range campaignGroups {
+				groups = append(groups, permissionsGroup{
+					ID:   g.ID,
+					Name: g.Name,
+				})
+			}
+		}
+	}
+	if groups == nil {
+		groups = []permissionsGroup{}
+	}
+
+	return c.JSON(http.StatusOK, permissionsResponse{
+		Visibility:  entity.Visibility,
+		IsPrivate:   entity.IsPrivate,
+		Members:     members,
+		Groups:      groups,
+		Permissions: grants,
+	})
+}
+
+// SetPermissionsAPI updates an entity's visibility mode and permission grants.
+// Owner only.
+// PUT /campaigns/:id/entities/:eid/permissions
+func (h *Handler) SetPermissionsAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	if cc == nil {
+		return apperror.NewMissingContext()
+	}
+
+	entityID := c.Param("eid")
+	ctx := c.Request().Context()
+
+	entity, err := h.service.GetByID(ctx, entityID)
+	if err != nil {
+		return err
+	}
+	if entity.CampaignID != cc.Campaign.ID {
+		return apperror.NewNotFound("entity not found")
+	}
+
+	var req setPermissionsRequest
+	if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
+		return apperror.NewBadRequest("invalid JSON body")
+	}
+
+	if err := h.service.SetEntityPermissions(ctx, entityID, SetPermissionsInput(req)); err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// GetMembersAPI returns campaign members as JSON for the permission user picker.
+// Owner only.
+// GET /campaigns/:id/entities/members
+func (h *Handler) GetMembersAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	if cc == nil {
+		return apperror.NewMissingContext()
+	}
+
+	if h.memberLister == nil {
+		return c.JSON(http.StatusOK, []any{})
+	}
+
+	members, err := h.memberLister.ListMembers(c.Request().Context(), cc.Campaign.ID)
+	if err != nil {
+		return apperror.NewInternal(fmt.Errorf("loading members: %w", err))
+	}
+
+	type memberJSON struct {
+		UserID      string `json:"user_id"`
+		DisplayName string `json:"display_name"`
+		Role        int    `json:"role"`
+	}
+
+	result := make([]memberJSON, 0, len(members))
+	for _, m := range members {
+		result = append(result, memberJSON{
+			UserID:      m.UserID,
+			DisplayName: m.DisplayName,
+			Role:        int(m.Role),
+		})
+	}
+
+	return c.JSON(http.StatusOK, result)
+}
+
 // --- Entity Type CRUD ---
+
+// --- Auto-Linking API ---
+
+// entityNamesCacheTTL is how long entity names are cached in Redis.
+const entityNamesCacheTTL = 5 * time.Minute
+
+// EntityNamesAPI returns a lightweight list of all visible entity names for
+// auto-linking in the editor. Results are cached in Redis for 5 minutes.
+// GET /campaigns/:id/entity-names
+func (h *Handler) EntityNamesAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	if cc == nil {
+		return apperror.NewMissingContext()
+	}
+
+	ctx := c.Request().Context()
+	role := int(cc.MemberRole)
+	userID := auth.GetUserID(c)
+	cacheKey := fmt.Sprintf("entity-names:%s:%d:%s", cc.Campaign.ID, role, userID)
+
+	// Try Redis cache first.
+	if h.cache != nil {
+		cached, err := h.cache.Get(ctx, cacheKey).Result()
+		if err == nil {
+			c.Response().Header().Set("Content-Type", "application/json")
+			c.Response().Header().Set("X-Cache", "HIT")
+			return c.String(http.StatusOK, cached)
+		}
+	}
+
+	names, err := h.service.ListEntityNames(ctx, cc.Campaign.ID, role, userID)
+	if err != nil {
+		return apperror.NewInternal(fmt.Errorf("list entity names: %w", err))
+	}
+	if names == nil {
+		names = []EntityNameEntry{}
+	}
+
+	result, err := json.Marshal(map[string]any{"names": names})
+	if err != nil {
+		return apperror.NewInternal(fmt.Errorf("marshal entity names: %w", err))
+	}
+
+	// Cache in Redis.
+	if h.cache != nil {
+		if err := h.cache.Set(ctx, cacheKey, string(result), entityNamesCacheTTL).Err(); err != nil {
+			slog.Error("failed to cache entity names", slog.Any("error", err))
+		}
+	}
+
+	c.Response().Header().Set("X-Cache", "MISS")
+	return c.JSONBlob(http.StatusOK, result)
+}
 
 // EntityTypesPage renders the entity type management page.
 // GET /campaigns/:id/entity-types
@@ -1539,112 +1780,6 @@ func (h *Handler) ResetCategoryDashboardLayout(c echo.Context) error {
 }
 
 // --- Helpers ---
-
-// --- Per-Entity Permissions API ---
-
-// GetPermissionsAPI returns the current permissions for an entity as JSON.
-// GET /campaigns/:id/entities/:eid/permissions
-func (h *Handler) GetPermissionsAPI(c echo.Context) error {
-	cc := campaigns.GetCampaignContext(c)
-	if cc == nil {
-		return apperror.NewMissingContext()
-	}
-
-	entityID := c.Param("eid")
-	entity, err := h.service.GetByID(c.Request().Context(), entityID)
-	if err != nil {
-		return err
-	}
-	if entity.CampaignID != cc.Campaign.ID {
-		return apperror.NewNotFound("entity not found")
-	}
-
-	perms, err := h.service.GetEntityPermissions(c.Request().Context(), entityID)
-	if err != nil {
-		return apperror.NewInternal(fmt.Errorf("loading permissions: %w", err))
-	}
-
-	// Build grants list from stored permissions.
-	grants := make([]PermissionGrant, 0, len(perms))
-	for _, p := range perms {
-		grants = append(grants, PermissionGrant{
-			SubjectType: p.SubjectType,
-			SubjectID:   p.SubjectID,
-			Permission:  p.Permission,
-		})
-	}
-
-	return c.JSON(http.StatusOK, map[string]any{
-		"visibility":  entity.Visibility,
-		"is_private":  entity.IsPrivate,
-		"permissions": grants,
-	})
-}
-
-// SetPermissionsAPI saves permissions for an entity from JSON.
-// PUT /campaigns/:id/entities/:eid/permissions
-func (h *Handler) SetPermissionsAPI(c echo.Context) error {
-	cc := campaigns.GetCampaignContext(c)
-	if cc == nil {
-		return apperror.NewMissingContext()
-	}
-
-	entityID := c.Param("eid")
-	entity, err := h.service.GetByID(c.Request().Context(), entityID)
-	if err != nil {
-		return err
-	}
-	if entity.CampaignID != cc.Campaign.ID {
-		return apperror.NewNotFound("entity not found")
-	}
-
-	var input SetPermissionsInput
-	if err := json.NewDecoder(c.Request().Body).Decode(&input); err != nil {
-		return apperror.NewBadRequest("invalid JSON body")
-	}
-
-	if err := h.service.SetEntityPermissions(c.Request().Context(), entityID, input); err != nil {
-		return err
-	}
-
-	h.logAudit(c, cc.Campaign.ID, audit.ActionEntityUpdated, entityID, entity.Name)
-	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
-}
-
-// GetMembersAPI returns the campaign members list as JSON for the permission
-// user picker. GET /campaigns/:id/entities/members
-func (h *Handler) GetMembersAPI(c echo.Context) error {
-	cc := campaigns.GetCampaignContext(c)
-	if cc == nil {
-		return apperror.NewMissingContext()
-	}
-
-	if h.memberLister == nil {
-		return c.JSON(http.StatusOK, []any{})
-	}
-
-	members, err := h.memberLister.ListMembers(c.Request().Context(), cc.Campaign.ID)
-	if err != nil {
-		return apperror.NewInternal(fmt.Errorf("loading members: %w", err))
-	}
-
-	type memberJSON struct {
-		UserID      string `json:"user_id"`
-		DisplayName string `json:"display_name"`
-		Role        int    `json:"role"`
-	}
-
-	result := make([]memberJSON, 0, len(members))
-	for _, m := range members {
-		result = append(result, memberJSON{
-			UserID:      m.UserID,
-			DisplayName: m.DisplayName,
-			Role:        int(m.Role),
-		})
-	}
-
-	return c.JSON(http.StatusOK, result)
-}
 
 // parseFieldsFromForm collects field_<key> form parameters and builds a
 // map of field values.

@@ -37,9 +37,9 @@ type RelationService interface {
 	// Used by the shop inventory widget to update price/quantity/stock.
 	UpdateMetadata(ctx context.Context, id int, metadata json.RawMessage) error
 
-	// ListByCampaign returns all relations for a campaign with joined entity
-	// details for both source and target. Used by the relations graph.
-	ListByCampaign(ctx context.Context, campaignID string) ([]CampaignRelation, error)
+	// GetGraphData returns the relations graph data (nodes + edges) for a
+	// campaign. Used by the relations graph visualization widget.
+	GetGraphData(ctx context.Context, campaignID string) (*GraphData, error)
 }
 
 // relationService implements RelationService with validation and
@@ -178,7 +178,56 @@ func (s *relationService) UpdateMetadata(ctx context.Context, id int, metadata j
 	return s.repo.UpdateMetadata(ctx, id, metadata)
 }
 
-// ListByCampaign returns all relations for a campaign with joined entity details.
-func (s *relationService) ListByCampaign(ctx context.Context, campaignID string) ([]CampaignRelation, error) {
-	return s.repo.ListByCampaign(ctx, campaignID)
+// GetGraphData builds the relations graph for a campaign by fetching all
+// relations and deduplicating entities into a node set.
+func (s *relationService) GetGraphData(ctx context.Context, campaignID string) (*GraphData, error) {
+	rels, err := s.repo.ListByCampaign(ctx, campaignID)
+	if err != nil {
+		return nil, fmt.Errorf("listing campaign relations: %w", err)
+	}
+
+	nodeMap := make(map[string]GraphNode)
+	var edges []GraphEdge
+
+	for _, r := range rels {
+		// Add source node if not seen.
+		if _, ok := nodeMap[r.SourceEntityID]; !ok {
+			nodeMap[r.SourceEntityID] = GraphNode{
+				ID:    r.SourceEntityID,
+				Name:  r.SourceEntityName,
+				Icon:  r.SourceEntityIcon,
+				Color: r.SourceEntityColor,
+				Slug:  r.SourceEntitySlug,
+				Type:  r.SourceEntityType,
+			}
+		}
+		// Add target node if not seen.
+		if _, ok := nodeMap[r.TargetEntityID]; !ok {
+			nodeMap[r.TargetEntityID] = GraphNode{
+				ID:    r.TargetEntityID,
+				Name:  r.TargetEntityName,
+				Icon:  r.TargetEntityIcon,
+				Color: r.TargetEntityColor,
+				Slug:  r.TargetEntitySlug,
+				Type:  r.TargetEntityType,
+			}
+		}
+
+		edges = append(edges, GraphEdge{
+			Source: r.SourceEntityID,
+			Target: r.TargetEntityID,
+			Type:   r.RelationType,
+		})
+	}
+
+	nodes := make([]GraphNode, 0, len(nodeMap))
+	for _, n := range nodeMap {
+		nodes = append(nodes, n)
+	}
+
+	if edges == nil {
+		edges = []GraphEdge{}
+	}
+
+	return &GraphData{Nodes: nodes, Edges: edges}, nil
 }

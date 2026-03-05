@@ -8,6 +8,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/keyxmakerx/chronicle/internal/apperror"
+	"github.com/keyxmakerx/chronicle/internal/middleware"
 	"github.com/keyxmakerx/chronicle/internal/plugins/auth"
 	"github.com/keyxmakerx/chronicle/internal/plugins/campaigns"
 )
@@ -157,4 +158,32 @@ func (h *Handler) UpdateRelationMetadata(c echo.Context) error {
 // UI suggestion list (GET /campaigns/:id/relation-types).
 func (h *Handler) GetCommonTypes(c echo.Context) error {
 	return c.JSON(http.StatusOK, h.service.GetCommonTypes())
+}
+
+// GraphAPI returns the relations graph data (nodes + edges) for a campaign
+// as JSON. Used by the D3 force-directed graph widget.
+// GET /campaigns/:id/relations-graph
+func (h *Handler) GraphAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	if cc == nil {
+		return apperror.NewMissingContext()
+	}
+
+	data, err := h.service.GetGraphData(c.Request().Context(), cc.Campaign.ID)
+	if err != nil {
+		return apperror.NewInternal(err)
+	}
+
+	return c.JSON(http.StatusOK, data)
+}
+
+// GraphPage renders the standalone relations graph visualization page.
+// GET /campaigns/:id/relations-graph/page
+func (h *Handler) GraphPage(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	if cc == nil {
+		return apperror.NewMissingContext()
+	}
+
+	return middleware.Render(c, http.StatusOK, GraphPage(cc))
 }

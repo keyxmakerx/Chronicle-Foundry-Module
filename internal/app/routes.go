@@ -27,10 +27,9 @@ import (
 	"github.com/keyxmakerx/chronicle/internal/plugins/timeline"
 	"github.com/keyxmakerx/chronicle/internal/templates/layouts"
 	"github.com/keyxmakerx/chronicle/internal/templates/pages"
-	"github.com/keyxmakerx/chronicle/internal/modules"
-	_ "github.com/keyxmakerx/chronicle/internal/modules/dnd5e" // Register dnd5e module factory.
 	ws "github.com/keyxmakerx/chronicle/internal/websocket"
 	"github.com/keyxmakerx/chronicle/internal/widgets/notes"
+	"github.com/keyxmakerx/chronicle/internal/widgets/posts"
 	"github.com/keyxmakerx/chronicle/internal/widgets/relations"
 	"github.com/keyxmakerx/chronicle/internal/widgets/tags"
 )
@@ -587,6 +586,9 @@ func (a *App) RegisterRoutes() {
 	campaignHandler.SetEntityLister(&entityTypeListerAdapter{svc: entityService})
 	campaignHandler.SetLayoutFetcher(&entityTypeLayoutFetcherAdapter{svc: entityService})
 	campaignHandler.SetRecentEntityLister(&recentEntityListerAdapter{svc: entityService})
+	groupRepo := campaigns.NewGroupRepository(a.DB)
+	groupService := campaigns.NewGroupService(groupRepo)
+	campaignHandler.SetGroupService(groupService)
 	campaigns.RegisterRoutes(e, campaignHandler, campaignService, authService)
 
 	// Discover page (/) -- browse public campaigns. Uses OptionalAuth so
@@ -649,15 +651,6 @@ func (a *App) RegisterRoutes() {
 	media.RegisterRoutes(e, mediaHandler, authService, a.Config.Upload.MaxSize, a.Config.Upload.ServeRateLimit)
 	media.RegisterCampaignRoutes(e, mediaHandler, campaignService, authService)
 
-	// Module registry: auto-discover modules from manifest.json files.
-	// Non-fatal: log warning and continue if modules dir is missing.
-	if err := modules.Init("internal/modules"); err != nil {
-		slog.Warn("module discovery skipped", slog.String("error", err.Error()))
-	}
-
-	// Module reference pages and API (registered after Init so factories run).
-	// Route registration deferred until addonService exists (see below).
-
 	// Admin plugin: site-wide management (users, campaigns, SMTP settings, storage).
 	adminHandler := admin.NewHandler(authRepo, campaignService, smtpService)
 	adminHandler.SetMediaDeps(mediaRepo, mediaService, a.Config.Upload.MaxSize)
@@ -689,10 +682,6 @@ func (a *App) RegisterRoutes() {
 
 	// Wire addon checker into entity handler for conditional attributes rendering.
 	entityHandler.SetAddonChecker(addonService)
-
-	// Module reference pages and search API (needs addonService for per-campaign gating).
-	moduleHandler := modules.NewModuleHandler()
-	modules.RegisterRoutes(e, moduleHandler, addonService, authService, campaignService)
 
 	// Security admin: event logging, session management, user account actions.
 	securityRepo := admin.NewSecurityEventRepository(a.DB)
@@ -762,6 +751,12 @@ func (a *App) RegisterRoutes() {
 	relHandler := relations.NewHandler(relService)
 	relations.RegisterRoutes(e, relHandler, campaignService, authService)
 
+	// Posts widget: entity sub-notes with rich text, visibility, and reorder.
+	postRepo := posts.NewPostRepository(a.DB)
+	postService := posts.NewPostService(postRepo)
+	postHandler := posts.NewHandler(postService)
+	posts.RegisterRoutes(e, postHandler, campaignService, authService)
+
 	// REST API v1: versioned endpoints for external clients (Foundry VTT, etc.).
 	// Authenticates via API keys, not browser sessions.
 	syncAPIHandler := syncapi.NewAPIHandler(syncService, entityService, campaignService, relService)
@@ -807,8 +802,9 @@ func (a *App) RegisterRoutes() {
 	entityHandler.SetMapSearcher(mapsService)
 	entityHandler.SetCalendarSearcher(calendarService)
 	entityHandler.SetSessionSearcher(sessionsService)
-	entityHandler.SetModuleSearcher(modules.NewModuleSearchAdapter(addonService))
 	entityHandler.SetMemberLister(campaignService)
+	entityHandler.SetGroupLister(groupService)
+	entityHandler.SetCache(a.Redis)
 	campaignHandler.SetAuditLogger(&campaignAuditAdapter{svc: auditService})
 	tagHandler.SetAuditService(auditService)
 
