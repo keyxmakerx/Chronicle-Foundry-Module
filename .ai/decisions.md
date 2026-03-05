@@ -533,3 +533,42 @@ sidebar link was confusing — sessions are fundamentally a calendar feature.
 - Disabled addons now return 404/redirect at the route level, not just hidden sidebar links.
 - SMTP service supports both plain text and HTML email variants.
 - Session RSVP tokens stored in session_rsvp_tokens table with FK cascade.
+
+---
+
+## ADR-019: Manifest-Driven Module Framework
+
+**Date:** 2026-03-05
+**Status:** Accepted
+
+**Context:** The module system had a static hardcoded registry listing three
+coming-soon modules with no runtime infrastructure. We need a framework that
+supports auto-discovery, validation, and a sandboxed interface for modules
+to implement without accessing the database or Echo router.
+
+**Decision:** Replace the static registry with a manifest-driven framework:
+
+1. **manifest.json** — Each module declares metadata in a JSON file: id, name,
+   version, author, license, categories, API version, entity presets, etc.
+2. **ModuleLoader** — Scans `internal/modules/*/manifest.json` at startup,
+   validates required fields, logs warnings for invalid manifests without
+   failing startup.
+3. **Module interface** — Sandboxed: `Info() *ModuleManifest`,
+   `DataProvider() DataProvider`, `TooltipRenderer() TooltipRenderer`.
+   Modules can only serve data through these interfaces.
+4. **DataProvider interface** — `List(category)`, `Get(category, id)`,
+   `Search(query)`, `Categories()` returning `ReferenceItem` structs.
+5. **Global Init()** — Called once at startup, populates the singleton registry.
+
+**Alternatives Considered:**
+- Database-stored manifests: adds unnecessary complexity for static content packs.
+- Go struct registration (current approach): no separation of metadata from code,
+  no validation, no path to external module loading.
+
+**Consequences:**
+- Modules are self-describing via manifest.json (human-readable, validatable).
+- Auto-discovery eliminates manual registry maintenance.
+- Sandboxed interfaces prevent modules from accessing infrastructure directly.
+- Admin modules page shows manifest metadata (author, license, API version).
+- Module slugs added to installedAddons for per-campaign enable/disable.
+- K-4 will build HTTP handlers and DataProvider implementations on this foundation.

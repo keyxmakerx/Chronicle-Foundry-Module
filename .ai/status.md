@@ -8,19 +8,28 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-05 -- Sprint K-2 (Per-Entity Permissions UI) complete (batch 36).
+2026-03-05 -- Sprint K-3 (Module Manifest & Loader Framework) complete (batch 37).
 Branch: `claude/plan-development-phases-G8Pwf`.
 
 ## Current Phase
-**Phase K: Permissions UI + Module Foundation.** Sprints K-1 and K-2 delivered. Roadmap organized into 3 interleaved tracks:
+**Phase K: Permissions UI + Module Foundation.** Sprints K-1, K-2, and K-3 delivered. Roadmap organized into 3 interleaved tracks:
 
-1. **Module Framework** — Build sandboxed module pack system before specific game content. K-3 (manifest/loader), K-4 (data API), L-1 (SDK docs), L-5 (packaging), M-4 (Draw Steel).
-2. **Foundry VTT** — Polish existing + add new features. K-5 (bug fixes), L-3 (multi-scene + combat), M-1 (character sheet linking).
+1. **Module Framework** — ~~K-3 (manifest/loader)~~, K-4 (data API), L-1 (SDK docs), L-5 (packaging), M-4 (Draw Steel).
+2. **Foundry VTT** — K-5 (bug fixes), L-3 (multi-scene + combat), M-1 (character sheet linking).
 3. **Permissions + Content** — ~~K-2 (permissions UI)~~, K-6 (relations graph), L-2 (entity posts), L-4 (auto-linking), M-2 (notes rich text), M-3 (group visibility), M-5 (calendar DnD).
 
-Next sprint: **K-3 (Module Manifest & Loader Framework)**.
+Next sprint: **K-4 (Module Data API & Widget Integration)**.
 
-### Summary of Recent Work (batches 25-36)
+### Summary of Recent Work (batches 25-37)
+- **Batch 37**: Sprint K-3 Module Manifest & Loader Framework — Manifest-driven
+  module system replacing static hardcoded registry. ModuleManifest JSON spec
+  (id, name, version, author, license, api_version, categories with field schemas,
+  entity presets, tooltip template). ModuleLoader auto-discovers modules by
+  scanning `internal/modules/*/manifest.json`. Sandboxed interfaces: Module,
+  DataProvider, TooltipRenderer, ReferenceItem struct. manifest.json files for
+  dnd5e, pathfinder2e, drawsteel. Admin modules page updated to show author,
+  license, API version. Module slugs added to installedAddons. 13 new tests.
+  ADR-019 recorded.
 - **Batch 36**: Sprint K-2 Per-Entity Permissions UI — Visibility section on
   entity edit page (Alpine.js) with three modes: Everyone/GM Only/Custom
   Permissions. Custom mode: dynamic permission grant builder with subject type
@@ -96,7 +105,7 @@ Next sprint: **K-3 (Module Manifest & Loader Framework)**.
 ---
 
 ## Next Session Should
-Continue **Phase K** with Sprint K-3 (Module Manifest & Loader Framework — `ModuleManifest` JSON spec, `ModuleLoader`, `ModuleRegistry` rewrite with auto-discovery, sandboxed `Module` interface). Then K-4 (Module Data API & Widget Integration). Full reorganized roadmap (Phases K-M, 15 sprints across 3 tracks) in `.ai/todo.md`.
+Continue **Phase K** with Sprint K-4 (Module Data API & Widget Integration — `DataProvider` implementations, module HTTP handler for reference pages + tooltip API, wire into mentions widget, per-campaign enable/disable via addons). Then K-5 (Foundry Polish Sprint). Full reorganized roadmap (Phases K-M, 15 sprints across 3 tracks) in `.ai/todo.md`.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)
@@ -145,3 +154,4 @@ Continue **Phase K** with Sprint K-3 (Module Manifest & Loader Framework — `Mo
 - **2026-03-05: ALL PHASES COMPLETE** — H (release readiness), I (core UX), J (polish & infra).
 - **2026-03-05: Sprint K-1** — Per-entity permissions model (backend): migration 000048, model types, permission repository, service methods, visibility filter, 13 tests.
 - **2026-03-05: Sprint K-2** — Per-entity permissions UI: visibility section on edit page (Everyone/GM Only/Custom), permission grant builder, API endpoints, visibility indicators across all views.
+- **2026-03-05: Sprint K-3** — Module manifest & loader framework: ModuleManifest JSON spec, ModuleLoader auto-discovery, sandboxed Module/DataProvider/TooltipRenderer interfaces, manifest.json for 3 modules, admin page updated, installedAddons wired, 13 tests, ADR-019.

@@ -1,0 +1,57 @@
+{
+  "id": "drawsteel",
+  "name": "Draw Steel",
+  "description": "Reference content for the Draw Steel RPG by MCDM Productions. Includes abilities, creatures, and ancestries.",
+  "version": "0.1.0",
+  "author": "Chronicle",
+  "license": "CC-BY-4.0",
+  "icon": "fa-bolt",
+  "api_version": "1",
+  "status": "coming_soon",
+  "categories": [
+    {
+      "slug": "abilities",
+      "name": "Abilities",
+      "icon": "fa-bolt",
+      "fields": [
+        { "key": "class", "label": "Class", "type": "string" },
+        { "key": "level", "label": "Level", "type": "number" },
+        { "key": "type", "label": "Type", "type": "string" },
+        { "key": "keywords", "label": "Keywords", "type": "list" }
+      ]
+    },
+    {
+      "slug": "creatures",
+      "name": "Creatures",
+      "icon": "fa-skull",
+      "fields": [
+        { "key": "level", "label": "Level", "type": "number" },
+        { "key": "role", "label": "Role", "type": "string" },
+        { "key": "ev", "label": "EV", "type": "number" }
+      ]
+    },
+    {
+      "slug": "ancestries",
+      "name": "Ancestries",
+      "icon": "fa-users",
+      "fields": [
+        { "key": "size", "label": "Size", "type": "string" },
+        { "key": "speed", "label": "Speed", "type": "number" }
+      ]
+    }
+  ],
+  "entity_presets": [
+    {
+      "slug": "drawsteel-character",
+      "name": "Draw Steel Character",
+      "name_plural": "Draw Steel Characters",
+      "icon": "fa-bolt",
+      "color": "#F59E0B",
+      "fields": [
+        { "key": "class", "label": "Class", "type": "string" },
+        { "key": "level", "label": "Level", "type": "number" },
+        { "key": "ancestry", "label": "Ancestry", "type": "string" }
+      ]
+    }
+  ]
+}

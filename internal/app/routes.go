@@ -27,6 +27,7 @@ import (
 	"github.com/keyxmakerx/chronicle/internal/plugins/timeline"
 	"github.com/keyxmakerx/chronicle/internal/templates/layouts"
 	"github.com/keyxmakerx/chronicle/internal/templates/pages"
+	"github.com/keyxmakerx/chronicle/internal/modules"
 	ws "github.com/keyxmakerx/chronicle/internal/websocket"
 	"github.com/keyxmakerx/chronicle/internal/widgets/notes"
 	"github.com/keyxmakerx/chronicle/internal/widgets/relations"
@@ -646,6 +647,12 @@ func (a *App) RegisterRoutes() {
 
 	media.RegisterRoutes(e, mediaHandler, authService, a.Config.Upload.MaxSize, a.Config.Upload.ServeRateLimit)
 	media.RegisterCampaignRoutes(e, mediaHandler, campaignService, authService)
+
+	// Module registry: auto-discover modules from manifest.json files.
+	// Non-fatal: log warning and continue if modules dir is missing.
+	if err := modules.Init("internal/modules"); err != nil {
+		slog.Warn("module discovery skipped", slog.String("error", err.Error()))
+	}
 
 	// Admin plugin: site-wide management (users, campaigns, SMTP settings, storage).
 	adminHandler := admin.NewHandler(authRepo, campaignService, smtpService)

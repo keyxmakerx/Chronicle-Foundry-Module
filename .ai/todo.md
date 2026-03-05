@@ -110,7 +110,7 @@ New capabilities ordered by priority for alpha release.
 
 - [x] **Sprint K-1: Per-Entity Permissions Model** — Migration 000048: `entity_permissions` table + `visibility` column on entities. Models: VisibilityMode, SubjectType, Permission, EntityPermission, EffectivePermission, SetPermissionsInput, PermissionGrant. Repository: EntityPermissionRepository (ListByEntity, SetPermissions, DeleteByEntity, GetEffectivePermission, UpdateVisibility) + visibilityFilter() SQL helper. Service: CheckEntityAccess, SetEntityPermissions, GetEntityPermissions. All list/search/count queries updated with userID param for permission-aware filtering. 13 new unit tests.
 - [x] **Sprint K-2: Per-Entity Permissions UI** _(Permissions)_ — Visibility section on entity edit page (Alpine.js) with three modes: Everyone/GM Only/Custom. Custom mode: dynamic grant builder (subject type role/user, subject ID picker, permission level view/edit) with auto-save via permissions API. Handler endpoints: GET/PUT `/entities/:eid/permissions` (Owner only), GET `/entities/members` for user picker. Visibility indicators updated across entity cards, table rows, tree view, show page details (shield icon for custom, lock for private). MemberLister wired into entity handler.
-- [ ] **Sprint K-3: Module Manifest & Loader Framework** _(Module Framework)_ — `ModuleManifest` JSON spec (id, name, version, author, license, categories, API version, data types, tooltip templates, entity type presets, field definitions). `ModuleLoader` reads/validates manifests. `ModuleRegistry` rewrite with auto-discovery. Sandboxed `Module` interface: `Info()`, `DataProvider()`, `TooltipRenderer()`. Modules can only register data providers, never access DB/Echo/services directly.
+- [x] **Sprint K-3: Module Manifest & Loader Framework** _(Module Framework)_ — ModuleManifest JSON spec (id, name, version, author, license, icon, api_version, status, categories with field schemas, entity presets, tooltip template). ModuleLoader auto-discovers modules from `*/manifest.json`. ModuleRegistry rewrite: `Init(modulesDir)`, global loader. Sandboxed interfaces: Module (`Info/DataProvider/TooltipRenderer`), DataProvider (`List/Get/Search/Categories`), TooltipRenderer, ReferenceItem struct. manifest.json for dnd5e/pathfinder2e/drawsteel. Admin modules page shows author/license/API version. installedAddons updated. 13 tests. ADR-019.
 - [ ] **Sprint K-4: Module Data API & Widget Integration** _(Module Framework)_ — `DataProvider` interface (List/Get/Search). `ReferenceItem` standard struct. Module HTTP handler: `GET /ref/:moduleID/`, category lists, detail pages, `GET /api/v1/ref/:moduleID/lookup?q=` tooltip API. Wire into `entity_tooltip.js` and `mentions` widget (`@ref:` prefix). Per-campaign enable/disable via existing addons plugin.
 - [ ] **Sprint K-5: Foundry Polish Sprint** _(Foundry VTT)_ — Fix shop icon (always null). Fix fog bidirectional (Foundry→Chronicle push via `canvas.fog` hooks). Connection status UI (sync indicator in Foundry sidebar). SimpleCalendar CRUD hook detection with graceful fallback.
 - [ ] **Sprint K-6: Relations Graph Visualization** _(Content)_ — D3.js force-directed graph (`relation_graph.js`). Backend: relation-graph API (nodes/edges JSON). Node colors by entity type, click-to-navigate. Dashboard block type `relation_graph`. Standalone page `/campaigns/:id/relations`.
@@ -373,3 +373,16 @@ Summary of strengths/weaknesses for strategic positioning. Full analysis in `.ai
 - [x] MemberLister dependency wired into entity handler from app/routes.go
 - [x] Visibility indicators: shield icon (custom) / lock icon (private) across entity cards, table rows, tree view, show page details
 - [x] Non-owners see legacy is_private checkbox only (graceful degradation)
+
+### Sprint K-3: Module Manifest & Loader Framework (2026-03-05, batch 37)
+- [x] `internal/modules/module.go` — Module, DataProvider, TooltipRenderer interfaces + ReferenceItem struct
+- [x] `internal/modules/manifest.go` — ModuleManifest struct with CategoryDef/FieldDef/EntityPresetDef, LoadManifest, ValidateManifest
+- [x] `internal/modules/loader.go` — ModuleLoader with DiscoverAll auto-discovery, Get, All, Dir, Count
+- [x] `internal/modules/registry.go` — Rewritten: Init(modulesDir), global loader, Registry/Find return *ModuleManifest
+- [x] manifest.json files for dnd5e (5 categories, 2 entity presets), pathfinder2e (4 categories), drawsteel (3 categories, 1 entity preset)
+- [x] Scaffolded pathfinder2e/ and drawsteel/ dirs with .ai.md, data/.gitkeep, templates/.gitkeep
+- [x] Admin modules.templ updated for *ModuleManifest (shows author, license, API version, category icons)
+- [x] modules.Init() wired in app/routes.go before admin handler
+- [x] Module slugs (dnd5e, pathfinder2e, drawsteel) added to installedAddons
+- [x] 13 tests: manifest loading/validation (7), loader discovery (6)
+- [x] ADR-019: Manifest-Driven Module Framework

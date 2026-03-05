@@ -2,7 +2,15 @@
 // Modules are game-system content packs (e.g., D&D 5e, Pathfinder) that
 // provide reference data, tooltips, and stat blocks. They are read-only
 // and enabled per campaign via campaign settings.
+//
+// The registry auto-discovers modules by scanning subdirectories for
+// manifest.json files at startup. See ModuleManifest for the JSON spec.
 package modules
+
+import (
+	"fmt"
+	"log/slog"
+)
 
 // Status represents the implementation status of a module.
 type Status string
@@ -15,70 +23,37 @@ const (
 	StatusComingSoon Status = "coming_soon"
 )
 
-// ModuleInfo holds metadata about a registered module.
-type ModuleInfo struct {
-	// ID is the unique machine-readable identifier (e.g., "dnd5e").
-	ID string
+// globalLoader is the singleton module loader initialized by Init().
+var globalLoader *ModuleLoader
 
-	// Name is the human-readable display name.
-	Name string
-
-	// Description is a short summary of what the module provides.
-	Description string
-
-	// Icon is the Font Awesome icon class (e.g., "fa-dragon").
-	Icon string
-
-	// Version is the current version string (empty for unimplemented modules).
-	Version string
-
-	// Status indicates whether the module is available or coming soon.
-	Status Status
-
-	// Categories lists the types of reference content provided.
-	Categories []string
-}
-
-// Registry returns the list of all known modules, both implemented and planned.
-// This is the canonical source of truth for what modules exist in Chronicle.
-func Registry() []ModuleInfo {
-	return []ModuleInfo{
-		{
-			ID:          "dnd5e",
-			Name:        "D&D 5th Edition",
-			Description: "SRD reference content for Dungeons & Dragons 5th Edition. Includes spells, monsters, items, classes, and more from the System Reference Document.",
-			Icon:        "fa-dragon",
-			Version:     "",
-			Status:      StatusComingSoon,
-			Categories:  []string{"Spells", "Monsters", "Items", "Classes", "Races"},
-		},
-		{
-			ID:          "pathfinder2e",
-			Name:        "Pathfinder 2e",
-			Description: "ORC reference content for Pathfinder 2nd Edition. Includes spells, creatures, equipment, ancestries, and class features.",
-			Icon:        "fa-shield-halved",
-			Version:     "",
-			Status:      StatusComingSoon,
-			Categories:  []string{"Spells", "Creatures", "Equipment", "Ancestries"},
-		},
-		{
-			ID:          "drawsteel",
-			Name:        "Draw Steel",
-			Description: "Reference content for the Draw Steel RPG by MCDM Productions. Includes abilities, creatures, and ancestries.",
-			Icon:        "fa-bolt",
-			Version:     "",
-			Status:      StatusComingSoon,
-			Categories:  []string{"Abilities", "Creatures", "Ancestries"},
-		},
+// Init initializes the module registry by scanning the given directory
+// for module subdirectories containing manifest.json files. Must be
+// called once at application startup before any Registry()/Find() calls.
+func Init(modulesDir string) error {
+	globalLoader = NewModuleLoader(modulesDir)
+	if err := globalLoader.DiscoverAll(); err != nil {
+		return fmt.Errorf("module discovery failed: %w", err)
 	}
-}
-
-// Find returns the module info for a given ID, or nil if not found.
-func Find(id string) *ModuleInfo {
-	for _, m := range Registry() {
-		if m.ID == id {
-			return &m
-		}
-	}
+	slog.Info("module registry initialized",
+		slog.Int("count", globalLoader.Count()),
+	)
 	return nil
+}
+
+// Registry returns all discovered module manifests, sorted by name.
+// Returns nil if Init() has not been called.
+func Registry() []*ModuleManifest {
+	if globalLoader == nil {
+		return nil
+	}
+	return globalLoader.All()
+}
+
+// Find returns the manifest for a given module ID, or nil if not found.
+// Returns nil if Init() has not been called.
+func Find(id string) *ModuleManifest {
+	if globalLoader == nil {
+		return nil
+	}
+	return globalLoader.Get(id)
 }

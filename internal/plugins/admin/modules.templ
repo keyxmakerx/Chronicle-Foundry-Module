@@ -1,5 +1,6 @@
 // modules.templ renders the admin module management page.
-// Shows all registered game-system modules with their status and metadata.
+// Shows all registered game-system modules with their status, metadata,
+// and content categories. Modules are auto-discovered from manifest.json files.
 
 package admin
 
@@ -7,11 +8,10 @@ import (
 	"fmt"
 	"github.com/keyxmakerx/chronicle/internal/modules"
 	"github.com/keyxmakerx/chronicle/internal/templates/layouts"
-	"strings"
 )
 
 // AdminModulesPage renders the modules management page.
-templ AdminModulesPage(mods []modules.ModuleInfo) {
+templ AdminModulesPage(mods []*modules.ModuleManifest) {
 	@layouts.App("Modules - Admin") {
 		<div class="max-w-5xl mx-auto space-y-6">
 			<div class="flex items-center justify-between">
@@ -67,7 +67,7 @@ templ AdminModulesPage(mods []modules.ModuleInfo) {
 }
 
 // moduleCard renders a single module as an informational card.
-templ moduleCard(mod modules.ModuleInfo) {
+templ moduleCard(mod *modules.ModuleManifest) {
 	<div class="card p-6 flex flex-col">
 		<!-- Header -->
 		<div class="flex items-start justify-between mb-3">
@@ -94,30 +94,46 @@ templ moduleCard(mod modules.ModuleInfo) {
 				<p class="text-xs font-medium text-fg-muted uppercase tracking-wider mb-2">Content</p>
 				<div class="flex flex-wrap gap-1.5">
 					for _, cat := range mod.Categories {
-						<span class="inline-flex items-center px-2 py-0.5 text-xs rounded-md bg-surface-alt text-fg-secondary">
-							{ cat }
+						<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md bg-surface-alt text-fg-secondary">
+							if cat.Icon != "" {
+								<i class={ "fa-solid " + cat.Icon + " text-[10px]" }></i>
+							}
+							{ cat.Name }
 						</span>
 					}
 				</div>
 			</div>
 		}
 
-		<!-- Version / Status footer -->
-		<div class="pt-3 mt-3 border-t border-edge flex items-center justify-between">
-			if mod.Version != "" {
-				<span class="text-xs text-fg-muted">v{ mod.Version }</span>
-			} else {
-				<span class="text-xs text-fg-muted italic">Not yet released</span>
-			}
-			if mod.Status == modules.StatusAvailable {
-				<span class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-					<i class="fa-solid fa-check mr-1"></i>Ready
-				</span>
-			} else {
-				<span class="text-xs text-fg-muted">
-					<i class="fa-solid fa-clock mr-1"></i>In development
-				</span>
-			}
+		<!-- Metadata footer -->
+		<div class="pt-3 mt-3 border-t border-edge space-y-1">
+			<div class="flex items-center justify-between">
+				if mod.Version != "" {
+					<span class="text-xs text-fg-muted">v{ mod.Version }</span>
+				} else {
+					<span class="text-xs text-fg-muted italic">Not yet released</span>
+				}
+				if mod.Status == modules.StatusAvailable {
+					<span class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+						<i class="fa-solid fa-check mr-1"></i>Ready
+					</span>
+				} else {
+					<span class="text-xs text-fg-muted">
+						<i class="fa-solid fa-clock mr-1"></i>In development
+					</span>
+				}
+			</div>
+			<div class="flex items-center gap-3 text-[11px] text-fg-muted">
+				if mod.Author != "" {
+					<span><i class="fa-solid fa-user mr-1"></i>{ mod.Author }</span>
+				}
+				if mod.License != "" {
+					<span><i class="fa-solid fa-scale-balanced mr-1"></i>{ mod.License }</span>
+				}
+				if mod.APIVersion != "" {
+					<span>API v{ mod.APIVersion }</span>
+				}
+			</div>
 		</div>
 	</div>
 }
@@ -133,9 +149,4 @@ templ moduleStatusBadge(status modules.Status) {
 			Coming Soon
 		</span>
 	}
-}
-
-// formatCategories joins categories with commas for display.
-func formatCategories(cats []string) string {
-	return strings.Join(cats, ", ")
 }
