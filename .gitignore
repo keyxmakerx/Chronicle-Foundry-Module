@@ -21,6 +21,7 @@
 # Output of the go coverage tool
 *.out
 *.prof
+coverage.html
 
 # Go workspace file
 go.work.local
@@ -46,7 +47,6 @@ static/css/app.css
 *.swp
 *.swo
 *~
-.DS_Store
 Thumbs.db
 
 # --- Docker ---
@@ -60,17 +60,16 @@ tmp/
 dist/
 /bin/
 
-# --- OS ---
+# --- OS / System files ---
 .DS_Store
-.DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
 ehthumbs.db
 Desktop.ini
 
-# --- Air (hot reload) ---
-tmp/
+# --- Log files ---
+*.log
 
 # --- Uploads (user-generated content in dev) ---
 uploads/

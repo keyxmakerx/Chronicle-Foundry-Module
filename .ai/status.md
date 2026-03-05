@@ -12,13 +12,16 @@
 Branch: `claude/plan-development-phases-G8Pwf`.
 
 ## Current Phase
-**Phase K: Permissions UI + Module Foundation.** Sprints K-1, K-2, and K-3 delivered. Roadmap organized into 3 interleaved tracks:
+**Phase K: Permissions UI + Module Foundation.** Sprints K-1 through K-4 complete.
+Roadmap reorganized by user impact (batch 39):
 
-1. **Module Framework** — ~~K-3 (manifest/loader)~~, K-4 (data API), L-1 (SDK docs), L-5 (packaging), M-4 (Draw Steel).
-2. **Foundry VTT** — K-5 (bug fixes), L-3 (multi-scene + combat), M-1 (character sheet linking).
-3. **Permissions + Content** — ~~K-2 (permissions UI)~~, K-6 (relations graph), L-2 (entity posts), L-4 (auto-linking), M-2 (notes rich text), M-3 (group visibility), M-5 (calendar DnD).
+- **Phase K** (remaining): K-5 Relations Graph, K-6 Foundry Polish.
+- **Phase L** (Content Depth): Sub-notes UI, Notes rich text + folders, Auto-linking, Group visibility, Calendar DnD.
+- **Phase M** (Module Ecosystem + Foundry): Module SDK docs, Draw Steel module, Module packaging, Foundry multi-scene.
+- **Phase N** (Collaboration & Platform): Foundry character sheets, Role-aware dashboards, Invite system, Accessibility, Deployment.
+- **Phase O+** (Backlog): 2FA, command palette, map drawing, Discord bot, bulk ops, etc.
 
-Next sprint: **K-5 (Foundry Polish Sprint)**.
+Next sprint: **K-5 (Relations Graph Visualization)**.
 
 ### Summary of Recent Work (batches 25-38)
 - **Batch 38**: Sprint K-4 Module Data API & Widget Integration — JSONProvider
@@ -115,7 +118,7 @@ Next sprint: **K-5 (Foundry Polish Sprint)**.
 ---
 
 ## Next Session Should
-Continue **Phase K** with Sprint K-5 (Foundry Polish Sprint — shop icon fix, fog bidirectional sync, connection status UI, SimpleCalendar hooks). Then K-6 (Relations Graph Visualization). Full reorganized roadmap (Phases K-M, 15 sprints across 3 tracks) in `.ai/todo.md`.
+Continue **Phase K** with Sprint K-5 (Relations Graph Visualization — D3.js force-directed graph, relation-graph API, dashboard block). Then K-6 (Foundry Polish). Full reorganized roadmap (Phases K-O+, 20 sprints by user impact) in `.ai/todo.md`.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)
