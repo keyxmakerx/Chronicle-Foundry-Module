@@ -82,7 +82,7 @@ New capabilities ordered by priority for alpha release.
 
 ### Alpha-Nice-to-Have
 
-- [ ] **File security audit + ClamAV** — Add ClamAV container to docker-compose, scan uploads before storage, configurable file type allowlist, SVG blocking (XSS vector).
+- [x] **File security audit + ClamAV** — ClamAV integration via clamd TCP protocol (INSTREAM). Fail-open when unavailable. Docker-compose ClamAV container (clamav/clamav:1.4). CLAMAV_ADDRESS config. 3 tests. SVG already blocked by MIME allowlist. CDR pipeline strips metadata/polyglots.
 - [x] **API documentation** — OpenAPI 3.0.3 spec at `docs/api/openapi.yaml`. 63 endpoints, 42 schemas, auth guide, rate limiting headers, sync protocol.
 - [x] **Foundry VTT Sync** — Bidirectional sync between Chronicle and Foundry VTT. Phases 1-4 complete (WebSocket, sync mappings, journal sync, map expansion, EventBus, Map API v1, calendar live sync). Phase 5 (shop entity type + Chronicle inventory widget + relation metadata, Foundry shop widget wiring, RequireAddonAPI permission hardening, E2E testing checklist) complete.
 - [x] **Maps Phase 2** — Layers, drawings, tokens, fog of war. Migration 000042, full CRUD service + repository + REST API handler. Role-based visibility filtering. Percentage-based coordinates for resolution independence.

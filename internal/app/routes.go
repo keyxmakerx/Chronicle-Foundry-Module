@@ -615,6 +615,11 @@ func (a *App) RegisterRoutes() {
 	// but don't crash -- the rest of the app keeps running.
 	mediaRepo := media.NewMediaRepository(a.DB)
 	mediaService := media.NewMediaService(mediaRepo, a.Config.Upload.MediaPath, a.Config.Upload.MaxSize)
+	// Wire ClamAV virus scanner if configured.
+	if scanner := media.NewClamAVScanner(a.Config.Upload.ClamAVAddress); scanner != nil {
+		mediaService.SetVirusScanner(scanner)
+		slog.Info("ClamAV virus scanning enabled", slog.String("address", a.Config.Upload.ClamAVAddress))
+	}
 	mediaHandler := media.NewHandler(mediaService)
 
 	// Initialize HMAC URL signer for secure media access.

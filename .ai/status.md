@@ -8,14 +8,17 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-05 -- Sprint J-3: Testing & Infrastructure complete (batch 33).
+2026-03-05 -- Sprint J-4: File Security complete (batch 34). ALL PHASES COMPLETE.
 Branch: `claude/project-review-planning-Yr4CL`.
 
 ## Current Phase
-**Sprint J-3 complete (batch 33).** Testing verified, air config created, docker-compose fixed.
-Ready for Sprint J-4 (File Security).
+**All sprints complete (batch 34).** Phases H, I, J fully delivered.
 
-### Summary of Recent Work (batches 25-33)
+### Summary of Recent Work (batches 25-34)
+- **Batch 34**: Sprint J-4 File Security — ClamAV antivirus integration for upload
+  scanning via clamd TCP protocol (INSTREAM). Fail-open when clamd unavailable.
+  ClamAV container in docker-compose (clamav/clamav:1.4). CLAMAV_ADDRESS env var.
+  3 unit tests. SVG blocked by MIME allowlist. CDR strips metadata/polyglots.
 - **Batch 33**: Sprint J-3 Testing & Infrastructure — Verified HTMX edge cases (CSRF
   propagation, double-init prevention, widget cleanup, form tracking all covered by boot.js).
   Created `.air.toml` for hot reload config. Fixed docker-compose.yml em-dash in error
@@ -68,7 +71,7 @@ Ready for Sprint J-4 (File Security).
 ---
 
 ## Next Session Should
-1. **File Security** (Sprint J-4) — ClamAV, MIME allowlist, SVG blocking.
+All planned sprints (H-1 through J-4) are complete. Future work items are in `.ai/todo.md`.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)
@@ -112,3 +115,5 @@ Ready for Sprint J-4 (File Security).
 - **2026-03-05: Sprint J-1** — Breadcrumbs on all non-entity pages, recently viewed entities sidebar widget.
 - **2026-03-05: Sprint J-2** — Code syntax highlighting (lowlight + highlight.js), find/replace bar (Ctrl+F/H).
 - **2026-03-05: Sprint J-3** — HTMX verification, `.air.toml`, docker-compose fix, package doc comments.
+- **2026-03-05: Sprint J-4** — ClamAV antivirus scanning, docker-compose ClamAV container.
+- **2026-03-05: ALL PHASES COMPLETE** — H (release readiness), I (core UX), J (polish & infra).
