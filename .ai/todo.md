@@ -113,6 +113,7 @@ New capabilities ordered by priority for alpha release.
 - [x] **Sprint K-3: Group-Based Visibility** — Migration 000049 (`campaign_groups` + `campaign_group_members`), subject_type ENUM gains "group". GroupRepository (8 methods), GroupService (validation, CRUD). Group CRUD handlers + routes (Owner only). Groups management page with JS widget (`groups.js`). Permissions widget updated with group grants section. `visibilityFilter()` SQL updated for group membership check. Settings page "Groups" link. 7 unit tests.
 - [x] **Sprint K-4: Auto-Linking in Editor** — Entity names API (`GET /entity-names`) with Redis caching (5-min TTL). `ListNames` repository method sorted by name length DESC. Auto-link JS module (`editor_autolink.js`) scans text nodes for entity names, creates @mention links. Insert menu item + Ctrl+Shift+L shortcut. Whole-word, case-insensitive, min 3 chars, skips existing links.
 - [x] **Sprint K-5: Relations Graph Visualization** — D3.js force-directed graph (`relation_graph.js`) with dynamic CDN loading, zoom/pan, drag, node coloring, tooltips, legend. Backend: `ListByCampaign` repo (dedup bi-directional), `GetGraphData` service, `GraphAPI`/`GraphPage` handlers. Dashboard block `relations_graph` with configurable height. Standalone page at `/relations-graph/page`.
+- [x] **Sprint K-6: Foundry Polish Sprint** — Fixed shop icon null (dead ternary, HBS FA icon rendering). Fog bidirectional sync (dark polygon detection, pixel→percentage conversion, REST push). Connection status UI (event-driven onStateChange, click-to-reconnect, activity flash). SimpleCalendar CRUD hooks (journal hook listeners, SC flag detection, calendar event push).
 
 ### Phase L: Content Depth & Editor Power
 
@@ -154,7 +155,7 @@ New capabilities ordered by priority for alpha release.
 - [ ] Collaborative editing presence indicators
 - [ ] Calendar timezone support / print-PDF export
 - [ ] Map hex/square grid overlay / measurement tool
-- [~] Fog of war Foundry→Chronicle push (Chronicle→Foundry done)
+- [x] Fog of war bidirectional sync (Chronicle ↔ Foundry)
 - [ ] Webhook support for external event notifications
 - [ ] Widget inline CSS → CSS classes migration
 - [ ] Reusable modal/dropdown component library

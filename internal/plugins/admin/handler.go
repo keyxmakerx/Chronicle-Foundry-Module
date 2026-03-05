@@ -394,6 +394,9 @@ func (h *Handler) DeleteMedia(c echo.Context) error {
 // Lists all registered game-system modules with their status.
 func (h *Handler) Modules(c echo.Context) error {
 	mods := modules.Registry()
+	if mods == nil {
+		mods = []*modules.ModuleManifest{}
+	}
 	return middleware.Render(c, http.StatusOK, AdminModulesPage(mods))
 }
 

@@ -1185,6 +1185,42 @@ func (h *Handler) SetPermissionsAPI(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 
+// GetMembersAPI returns campaign members as JSON for the permission user picker.
+// Owner only.
+// GET /campaigns/:id/entities/members
+func (h *Handler) GetMembersAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	if cc == nil {
+		return apperror.NewMissingContext()
+	}
+
+	if h.memberLister == nil {
+		return c.JSON(http.StatusOK, []any{})
+	}
+
+	members, err := h.memberLister.ListMembers(c.Request().Context(), cc.Campaign.ID)
+	if err != nil {
+		return apperror.NewInternal(fmt.Errorf("loading members: %w", err))
+	}
+
+	type memberJSON struct {
+		UserID      string `json:"user_id"`
+		DisplayName string `json:"display_name"`
+		Role        int    `json:"role"`
+	}
+
+	result := make([]memberJSON, 0, len(members))
+	for _, m := range members {
+		result = append(result, memberJSON{
+			UserID:      m.UserID,
+			DisplayName: m.DisplayName,
+			Role:        int(m.Role),
+		})
+	}
+
+	return c.JSON(http.StatusOK, result)
+}
+
 // --- Entity Type CRUD ---
 
 // --- Auto-Linking API ---

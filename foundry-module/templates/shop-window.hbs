@@ -23,7 +23,9 @@
             {{#if image_path}}
               <img src="{{image_path}}" alt="{{name}}">
             {{else}}
-              <img src="icons/svg/item-bag.svg" alt="{{name}}">
+              <span class="shop-item-icon" style="background-color: {{color}}20; color: {{color}}">
+                <i class="fa-solid {{icon}}"></i>
+              </span>
             {{/if}}
             <span class="item-name">{{name}}</span>
             {{#if price}}

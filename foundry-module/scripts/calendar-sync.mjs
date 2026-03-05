@@ -127,6 +127,9 @@ export class CalendarSync {
       Hooks.off('calendariaEventDelete', this._boundHandlers.eventDelete);
     } else if (this._calendarModule === 'simple-calendar') {
       Hooks.off('simple-calendar-date-time-change', this._boundHandlers.dateChange);
+      Hooks.off('createJournalEntry', this._boundHandlers.noteCreate);
+      Hooks.off('updateJournalEntry', this._boundHandlers.noteUpdate);
+      Hooks.off('deleteJournalEntry', this._boundHandlers.noteDelete);
     }
     this._boundHandlers = {};
   }
@@ -151,8 +154,15 @@ export class CalendarSync {
     } else if (this._calendarModule === 'simple-calendar') {
       this._boundHandlers.dateChange = this._onSimpleCalendarDateChange.bind(this);
       Hooks.on('simple-calendar-date-time-change', this._boundHandlers.dateChange);
-      // SimpleCalendar does not expose event create/update/delete hooks.
-      // Events are managed through its internal note system (journal entries).
+
+      // SimpleCalendar notes are JournalEntries with SC flags. Detect CRUD
+      // via standard Foundry journal hooks and check for SC flag presence.
+      this._boundHandlers.noteCreate = this._onSimpleCalendarNoteCreate.bind(this);
+      this._boundHandlers.noteUpdate = this._onSimpleCalendarNoteUpdate.bind(this);
+      this._boundHandlers.noteDelete = this._onSimpleCalendarNoteDelete.bind(this);
+      Hooks.on('createJournalEntry', this._boundHandlers.noteCreate);
+      Hooks.on('updateJournalEntry', this._boundHandlers.noteUpdate);
+      Hooks.on('deleteJournalEntry', this._boundHandlers.noteDelete);
     }
   }
 
@@ -341,6 +351,137 @@ export class CalendarSync {
     } catch (err) {
       console.warn('Chronicle: Failed to delete calendar event', err);
     }
+  }
+
+  // --- SimpleCalendar Note CRUD (Foundry → Chronicle) ---
+  // SimpleCalendar notes are JournalEntries with SC flags. We detect note
+  // changes via standard Foundry journal hooks and check for flag presence.
+
+  /**
+   * Handle creation of a JournalEntry that may be a SimpleCalendar note.
+   * Pushes new calendar events to Chronicle.
+   * @param {JournalEntry} journal
+   * @param {object} options
+   * @param {string} userId
+   * @private
+   */
+  async _onSimpleCalendarNoteCreate(journal, options, userId) {
+    if (this._syncing || !game.user.isGM) return;
+    if (userId !== game.user.id) return;
+
+    const scData = this._extractSimpleCalendarData(journal);
+    if (!scData) return;
+
+    try {
+      const result = await this._api.post('/calendar/events', {
+        name: scData.name,
+        year: scData.year,
+        month: scData.month,
+        day: scData.day,
+        description: scData.description,
+        visibility: 'everyone',
+      });
+
+      if (result?.id) {
+        this._storeEventMapping(journal.id, result.id);
+        await journal.setFlag(FLAG_SCOPE, 'calendarEventId', result.id);
+      }
+    } catch (err) {
+      console.error('Chronicle: Failed to push SimpleCalendar note to Chronicle', err);
+    }
+  }
+
+  /**
+   * Handle update of a JournalEntry that may be a SimpleCalendar note.
+   * Pushes event changes to Chronicle.
+   * @param {JournalEntry} journal
+   * @param {object} change
+   * @param {object} options
+   * @param {string} userId
+   * @private
+   */
+  async _onSimpleCalendarNoteUpdate(journal, change, options, userId) {
+    if (this._syncing || !game.user.isGM) return;
+    if (userId !== game.user.id) return;
+
+    const scData = this._extractSimpleCalendarData(journal);
+    if (!scData) return;
+
+    const chronicleId = this._getChronicleEventId(journal.id)
+      || journal.getFlag(FLAG_SCOPE, 'calendarEventId');
+
+    if (!chronicleId) {
+      // Note exists in SC but not in Chronicle — create it.
+      await this._onSimpleCalendarNoteCreate(journal, options, userId);
+      return;
+    }
+
+    try {
+      await this._api.put(`/calendar/events/${chronicleId}`, {
+        name: scData.name,
+        year: scData.year,
+        month: scData.month,
+        day: scData.day,
+        description: scData.description,
+      });
+    } catch (err) {
+      console.error('Chronicle: Failed to update SimpleCalendar note in Chronicle', err);
+    }
+  }
+
+  /**
+   * Handle deletion of a JournalEntry that may be a SimpleCalendar note.
+   * Removes the corresponding Chronicle calendar event.
+   * @param {JournalEntry} journal
+   * @param {object} options
+   * @param {string} userId
+   * @private
+   */
+  async _onSimpleCalendarNoteDelete(journal, options, userId) {
+    if (this._syncing || !game.user.isGM) return;
+    if (userId !== game.user.id) return;
+
+    // Check if this was a SC note we know about.
+    const chronicleId = this._getChronicleEventId(journal.id)
+      || journal.getFlag(FLAG_SCOPE, 'calendarEventId');
+    if (!chronicleId) return;
+
+    try {
+      await this._api.delete(`/calendar/events/${chronicleId}`);
+      this._removeEventMapping(journal.id);
+    } catch (err) {
+      console.warn('Chronicle: Failed to delete SimpleCalendar note from Chronicle', err);
+    }
+  }
+
+  /**
+   * Extract calendar event data from a SimpleCalendar note JournalEntry.
+   * Returns null if the journal is not a SC note.
+   * @param {JournalEntry} journal
+   * @returns {object|null} - { name, year, month, day, description }
+   * @private
+   */
+  _extractSimpleCalendarData(journal) {
+    // SimpleCalendar stores note data under its module flag namespace.
+    const scFlags = journal.flags?.['foundryvtt-simple-calendar']
+      || journal.flags?.['simple-calendar'];
+    if (!scFlags) return null;
+
+    // SC note data includes noteData with startDate.
+    const noteData = scFlags.noteData || scFlags;
+    const startDate = noteData.startDate || noteData;
+
+    // Validate that we have date fields.
+    if (startDate.year === undefined && startDate.month === undefined) return null;
+
+    return {
+      name: journal.name || 'Untitled Event',
+      // SC uses 0-indexed months/days; Chronicle uses 1-indexed.
+      year: startDate.year ?? 0,
+      month: (startDate.month ?? 0) + 1,
+      day: (startDate.day ?? 0) + 1,
+      description: noteData.content || noteData.description || '',
+    };
   }
 
   // --- Adapter Methods (abstract over Calendaria vs SimpleCalendar) ---

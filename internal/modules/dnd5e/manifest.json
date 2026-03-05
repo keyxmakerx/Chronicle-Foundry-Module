@@ -1,0 +1,96 @@
+{
+  "id": "dnd5e",
+  "name": "D&D 5th Edition",
+  "description": "SRD reference content for Dungeons & Dragons 5th Edition. Includes spells, monsters, items, classes, and races from the System Reference Document.",
+  "version": "0.1.0",
+  "author": "Chronicle",
+  "license": "OGL-1.0a",
+  "icon": "fa-dragon",
+  "api_version": "1",
+  "status": "available",
+  "categories": [
+    {
+      "slug": "spells",
+      "name": "Spells",
+      "icon": "fa-wand-sparkles",
+      "fields": [
+        { "key": "level", "label": "Spell Level", "type": "number" },
+        { "key": "school", "label": "School", "type": "string" },
+        { "key": "casting_time", "label": "Casting Time", "type": "string" },
+        { "key": "range", "label": "Range", "type": "string" },
+        { "key": "components", "label": "Components", "type": "string" },
+        { "key": "duration", "label": "Duration", "type": "string" }
+      ]
+    },
+    {
+      "slug": "monsters",
+      "name": "Monsters",
+      "icon": "fa-skull",
+      "fields": [
+        { "key": "cr", "label": "Challenge Rating", "type": "string" },
+        { "key": "type", "label": "Type", "type": "string" },
+        { "key": "size", "label": "Size", "type": "string" },
+        { "key": "alignment", "label": "Alignment", "type": "string" },
+        { "key": "hp", "label": "Hit Points", "type": "string" },
+        { "key": "ac", "label": "Armor Class", "type": "number" }
+      ]
+    },
+    {
+      "slug": "items",
+      "name": "Items",
+      "icon": "fa-gem",
+      "fields": [
+        { "key": "rarity", "label": "Rarity", "type": "string" },
+        { "key": "type", "label": "Type", "type": "string" },
+        { "key": "attunement", "label": "Requires Attunement", "type": "string" }
+      ]
+    },
+    {
+      "slug": "classes",
+      "name": "Classes",
+      "icon": "fa-shield-halved",
+      "fields": [
+        { "key": "hit_die", "label": "Hit Die", "type": "string" },
+        { "key": "primary_ability", "label": "Primary Ability", "type": "string" },
+        { "key": "saving_throws", "label": "Saving Throws", "type": "string" }
+      ]
+    },
+    {
+      "slug": "races",
+      "name": "Races",
+      "icon": "fa-users",
+      "fields": [
+        { "key": "speed", "label": "Speed", "type": "string" },
+        { "key": "size", "label": "Size", "type": "string" },
+        { "key": "ability_bonuses", "label": "Ability Bonuses", "type": "string" }
+      ]
+    }
+  ],
+  "entity_presets": [
+    {
+      "slug": "dnd5e-character",
+      "name": "D&D Character",
+      "name_plural": "D&D Characters",
+      "icon": "fa-hat-wizard",
+      "color": "#7C3AED",
+      "fields": [
+        { "key": "class", "label": "Class", "type": "string" },
+        { "key": "level", "label": "Level", "type": "number" },
+        { "key": "race", "label": "Race", "type": "string" },
+        { "key": "alignment", "label": "Alignment", "type": "string" }
+      ]
+    },
+    {
+      "slug": "dnd5e-creature",
+      "name": "D&D Creature",
+      "name_plural": "D&D Creatures",
+      "icon": "fa-dragon",
+      "color": "#DC2626",
+      "fields": [
+        { "key": "cr", "label": "Challenge Rating", "type": "string" },
+        { "key": "type", "label": "Type", "type": "string" },
+        { "key": "hp", "label": "Hit Points", "type": "string" }
+      ]
+    }
+  ]
+}

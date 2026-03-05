@@ -34,6 +34,9 @@ export class ChronicleAPI {
 
     /** @type {string} Connection state: 'disconnected' | 'connecting' | 'connected'. */
     this.state = 'disconnected';
+
+    /** @type {Set<Function>} Callbacks invoked when connection state changes. */
+    this._stateChangeCallbacks = new Set();
   }
 
   // --- REST API ---
@@ -315,12 +318,39 @@ export class ChronicleAPI {
   }
 
   /**
-   * Update connection state and notify listeners.
+   * Register a callback for connection state changes.
+   * The callback receives the new state string as its argument.
+   * @param {Function} callback - Called with (newState: string).
+   */
+  onStateChange(callback) {
+    this._stateChangeCallbacks.add(callback);
+  }
+
+  /**
+   * Remove a previously registered state change callback.
+   * @param {Function} callback
+   */
+  offStateChange(callback) {
+    this._stateChangeCallbacks.delete(callback);
+  }
+
+  /**
+   * Update connection state and notify registered callbacks.
    * @param {string} state
    * @private
    */
   _setState(state) {
+    const prev = this.state;
     this.state = state;
+    if (prev !== state) {
+      for (const cb of this._stateChangeCallbacks) {
+        try {
+          cb(state);
+        } catch (err) {
+          console.error('Chronicle: State change callback error', err);
+        }
+      }
+    }
   }
 
   /**

@@ -32,6 +32,28 @@
   animation: pulse 1.5s ease-in-out infinite;
 }
 
+.chronicle-sync-status.connecting .status-dot {
+  background-color: #fbbf24;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+/* Brief bright flash when a WS message is received. */
+.chronicle-sync-status .status-dot.activity {
+  background-color: #fff;
+  box-shadow: 0 0 8px #4ade80;
+  transition: background-color 0.1s, box-shadow 0.1s;
+}
+
+/* Clickable when disconnected. */
+.chronicle-sync-status.disconnected {
+  cursor: pointer;
+}
+
+.chronicle-sync-status.disconnected:hover .status-dot {
+  background-color: #f87171;
+  box-shadow: 0 0 4px #ef4444;
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
@@ -83,6 +105,17 @@
   height: 32px;
   border-radius: 2px;
   object-fit: cover;
+}
+
+.chronicle-shop-window .shop-item .shop-item-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 14px;
 }
 
 .chronicle-shop-window .shop-item .item-name {

@@ -375,6 +375,12 @@ export class MapSync {
     const mapId = this._getLinkedMapId(drawing.parent);
     if (!mapId) return;
 
+    // Detect fog-like drawings: dark-filled polygons with high alpha.
+    if (this._isFogLikeDrawing(drawing)) {
+      await this._handleFogDrawingCreate(drawing, mapId);
+      return;
+    }
+
     try {
       const chronicleDrawing = this._foundryDrawingToChronicle(drawing);
       const result = await this._api.post(`/maps/${mapId}/drawings`, chronicleDrawing);
@@ -411,8 +417,17 @@ export class MapSync {
     if (this._syncing || userId !== game.user.id) return;
 
     const mapId = this._getLinkedMapId(drawing.parent);
+    if (!mapId) return;
+
+    // Check if this is a Chronicle fog drawing.
+    const fogRegionId = drawing.getFlag(FLAG_SCOPE, 'fogRegionId');
+    if (fogRegionId) {
+      await this._handleFogDrawingDelete(mapId, fogRegionId);
+      return;
+    }
+
     const drawingId = drawing.getFlag(FLAG_SCOPE, 'drawingId');
-    if (!mapId || !drawingId) return;
+    if (!drawingId) return;
 
     try {
       await this._api.delete(`/maps/${mapId}/drawings/${drawingId}`);
@@ -478,6 +493,135 @@ export class MapSync {
     } catch (err) {
       console.warn('Chronicle: Failed to delete token on Chronicle', err);
     }
+  }
+
+  // --- Fog: Foundry → Chronicle ---
+
+  /**
+   * Determine if a Foundry Drawing looks like a fog region: polygon shape
+   * with a dark fill color and high fill opacity.
+   * @param {DrawingDocument} drawing
+   * @returns {boolean}
+   * @private
+   */
+  _isFogLikeDrawing(drawing) {
+    // Already flagged as a fog region — always treat as fog.
+    if (drawing.getFlag(FLAG_SCOPE, 'fogRegionId')) return true;
+
+    // Must be a polygon.
+    if (drawing.shape?.type !== 'p') return false;
+
+    // Check for dark fill with significant opacity.
+    const alpha = drawing.fillAlpha ?? 0;
+    if (alpha < 0.5) return false;
+
+    const color = drawing.fillColor || '';
+    return this._isDarkColor(color);
+  }
+
+  /**
+   * Check if a hex color string is dark (luminance < 0.15).
+   * @param {string} hex - CSS hex color (#RGB or #RRGGBB).
+   * @returns {boolean}
+   * @private
+   */
+  _isDarkColor(hex) {
+    if (!hex || hex === '#000000' || hex === '#000') return true;
+
+    const match = hex.match(/^#?([0-9a-f]{3,6})$/i);
+    if (!match) return false;
+
+    let r, g, b;
+    const h = match[1];
+    if (h.length === 3) {
+      r = parseInt(h[0] + h[0], 16);
+      g = parseInt(h[1] + h[1], 16);
+      b = parseInt(h[2] + h[2], 16);
+    } else {
+      r = parseInt(h.slice(0, 2), 16);
+      g = parseInt(h.slice(2, 4), 16);
+      b = parseInt(h.slice(4, 6), 16);
+    }
+
+    // Relative luminance.
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance < 0.15;
+  }
+
+  /**
+   * Push a fog-like Foundry drawing to Chronicle as a fog region.
+   * @param {DrawingDocument} drawing
+   * @param {string} mapId
+   * @private
+   */
+  async _handleFogDrawingCreate(drawing, mapId) {
+    try {
+      const fogRegion = this._foundryDrawingToFogRegion(drawing);
+      if (!fogRegion) return;
+
+      const result = await this._api.post(`/maps/${mapId}/fog`, fogRegion);
+
+      if (result?.id) {
+        this._syncing = true;
+        try {
+          await drawing.setFlag(FLAG_SCOPE, 'fogRegionId', result.id);
+        } finally {
+          this._syncing = false;
+        }
+      }
+    } catch (err) {
+      console.error('Chronicle: Failed to push fog region to Chronicle', err);
+    }
+  }
+
+  /**
+   * Delete a Chronicle fog region when its Foundry drawing is removed.
+   * @param {string} mapId
+   * @param {string} fogRegionId
+   * @private
+   */
+  async _handleFogDrawingDelete(mapId, fogRegionId) {
+    try {
+      await this._api.delete(`/maps/${mapId}/fog/${fogRegionId}`);
+      console.log(`Chronicle: Fog region ${fogRegionId} deleted`);
+    } catch (err) {
+      console.warn('Chronicle: Failed to delete fog region from Chronicle', err);
+    }
+  }
+
+  /**
+   * Convert a Foundry polygon Drawing to a Chronicle fog region object.
+   * Translates pixel coordinates to percentage-based coordinates.
+   * @param {DrawingDocument} drawing
+   * @returns {object|null} - Chronicle fog region data, or null if invalid.
+   * @private
+   */
+  _foundryDrawingToFogRegion(drawing) {
+    const scene = drawing.parent;
+    if (!scene) return null;
+
+    const dims = scene.dimensions;
+    const rawPoints = drawing.shape?.points || [];
+    if (rawPoints.length < 6) return null; // Need at least 3 x,y pairs.
+
+    // Foundry stores polygon points as a flat array [x1,y1,x2,y2,...].
+    // Drawing coordinates are relative to drawing.x, drawing.y.
+    const points = [];
+    for (let i = 0; i < rawPoints.length; i += 2) {
+      points.push({
+        x: ((rawPoints[i] + (drawing.x || 0)) / dims.width) * 100,
+        y: ((rawPoints[i + 1] + (drawing.y || 0)) / dims.height) * 100,
+      });
+    }
+
+    // Determine explored state: fully opaque dark = unexplored fog,
+    // semi-transparent = explored (revealed) area.
+    const isExplored = (drawing.fillAlpha ?? 0) < 0.9;
+
+    return {
+      points: JSON.stringify(points),
+      is_explored: isExplored,
+    };
   }
 
   // --- Helpers ---

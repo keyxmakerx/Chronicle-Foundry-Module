@@ -161,8 +161,8 @@ Continue with **Phase M** (Game System Modules & Worldbuilding Tools). Sprint M-
   must run before build on a fresh clone
 - Tailwind CSS output (`static/css/app.css`) is gitignored, needs `make tailwind`
 - Tailwind standalone CLI (`tailwindcss`) is v3; do NOT use `npx @tailwindcss/cli` (v4 syntax)
-- Fog-of-war sync is one-way only (Chronicle → Foundry). Foundry → Chronicle not implemented.
-- SimpleCalendar events are limited (managed as journal notes, no CRUD hooks).
+- Fog-of-war sync is bidirectional (Chronicle ↔ Foundry) using dark-polygon heuristic with pixel↔percentage conversion.
+- SimpleCalendar integration uses journal listeners with SC flag detection for CRUD hooks.
 
 ## Completed Phases
 - **2026-02-19: Phase 0** — Project scaffolding, AI docs, build config
@@ -203,7 +203,8 @@ Continue with **Phase M** (Game System Modules & Worldbuilding Tools). Sprint M-
 - **2026-03-05: Sprint K-2** — Per-entity permissions UI: permissions widget (permissions.js), visibility modes, role/user grants, auto-save. Sync API GetEntity custom visibility fix.
 - **2026-03-05: Sprint K-3** — Group-based visibility: migration 000049 (campaign_groups/members), GroupRepository, GroupService, group CRUD handlers, groups management page + widget, permissions widget group grants, 7 tests.
 - **2026-03-05: Sprint K-4** — Auto-linking in editor: entity names API with Redis caching, auto-link JS module (text scanner, mention link creation), Insert menu + Ctrl+Shift+L shortcut.
-- **2026-03-05: Sprint K-5** — Relations graph visualization: D3.js force-directed graph widget, graph API + standalone page, dashboard block type. Phase K complete.
+- **2026-03-05: Sprint K-5** — Relations graph visualization: D3.js force-directed graph widget, graph API + standalone page, dashboard block type.
+- **2026-03-05: Sprint K-6** — Foundry Polish: shop icon null fix (FA icons with entity colors), connection status UI (event-driven, click-to-reconnect, activity flash), SimpleCalendar CRUD hooks (journal listeners, SC flag detection), fog bidirectional sync (dark polygon heuristic, pixel↔percentage conversion). **Phase K complete.**
 - **2026-03-05: Sprint L-1** — Entity posts (sub-notes): migration 000050, full widget (model/repo/service/handler), JS widget with collapsible cards, drag-to-reorder, visibility toggle, layout block type.
 - **2026-03-05: Sprint L-2** — Notes rich text: TipTap mini editor instances replace plain textareas, legacy block→TipTap conversion, entry JSON + HTML saved to API.
 - **2026-03-05: Sprint L-3** — Note folders: migration 000051 (parent_id + is_folder), tree view rendering, collapsible folders, move-to-folder, create folder, 4 tests.

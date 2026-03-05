@@ -60,7 +60,8 @@ Hooks.on('closeGame', () => {
 
 /**
  * Add a sync status indicator to Foundry's sidebar.
- * Shows connection state (green/yellow/red dot).
+ * Shows connection state (green/yellow/red dot) with click-to-reconnect
+ * and event-driven updates (no polling).
  * @private
  */
 function _addStatusIndicator() {
@@ -74,14 +75,18 @@ function _addStatusIndicator() {
   `;
 
   // Update indicator based on WebSocket state.
-  const updateState = () => {
-    const state = syncManager.api.state;
+  const updateState = (state) => {
+    if (!state) state = syncManager.api.state;
     indicator.className = `chronicle-sync-status ${state}`;
+    indicator.title = _statusTooltip(state);
 
     const text = indicator.querySelector('.status-text');
     switch (state) {
       case 'connected':
         text.textContent = 'Chronicle: Connected';
+        break;
+      case 'connecting':
+        text.textContent = 'Chronicle: Connecting...';
         break;
       case 'reconnecting':
         text.textContent = 'Chronicle: Reconnecting...';
@@ -91,14 +96,50 @@ function _addStatusIndicator() {
     }
   };
 
-  // Poll state every 2 seconds (lightweight, just checks a string).
-  setInterval(updateState, 2000);
+  // Event-driven state updates (no polling).
+  syncManager.api.onStateChange(updateState);
   updateState();
+
+  // Click to reconnect when disconnected.
+  indicator.addEventListener('click', () => {
+    const state = syncManager.api.state;
+    if (state === 'disconnected') {
+      syncManager.api.connect();
+    }
+  });
+
+  // Flash the dot briefly when a WS message arrives (activity indicator).
+  syncManager.api.on('*', () => {
+    const dot = indicator.querySelector('.status-dot');
+    if (dot && syncManager.api.state === 'connected') {
+      dot.classList.add('activity');
+      setTimeout(() => dot.classList.remove('activity'), 300);
+    }
+  });
 
   // Append to sidebar header or player list.
   const sidebar = document.getElementById('sidebar');
   if (sidebar) {
     sidebar.prepend(indicator);
+  }
+}
+
+/**
+ * Return tooltip text for the connection status indicator.
+ * @param {string} state
+ * @returns {string}
+ * @private
+ */
+function _statusTooltip(state) {
+  switch (state) {
+    case 'connected':
+      return 'Connected to Chronicle. Real-time sync active.';
+    case 'connecting':
+      return 'Connecting to Chronicle...';
+    case 'reconnecting':
+      return 'Connection lost. Reconnecting automatically...';
+    default:
+      return 'Disconnected from Chronicle. Click to reconnect.';
   }
 }
 

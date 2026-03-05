@@ -36,6 +36,25 @@ type Relation struct {
 	TargetEntityType  string `json:"targetEntityType,omitempty"`
 }
 
+// CampaignRelation holds a relation row with joined entity details for both
+// source and target entities. Used by the relations graph to build nodes and
+// edges without additional queries.
+type CampaignRelation struct {
+	SourceEntityID    string `json:"sourceEntityId"`
+	SourceEntityName  string `json:"sourceEntityName"`
+	SourceEntityIcon  string `json:"sourceEntityIcon"`
+	SourceEntityColor string `json:"sourceEntityColor"`
+	SourceEntitySlug  string `json:"sourceEntitySlug"`
+	SourceEntityType  string `json:"sourceEntityType"`
+	TargetEntityID    string `json:"targetEntityId"`
+	TargetEntityName  string `json:"targetEntityName"`
+	TargetEntityIcon  string `json:"targetEntityIcon"`
+	TargetEntityColor string `json:"targetEntityColor"`
+	TargetEntitySlug  string `json:"targetEntitySlug"`
+	TargetEntityType  string `json:"targetEntityType"`
+	RelationType      string `json:"relationType"`
+}
+
 // --- Request DTOs (bound from HTTP requests) ---
 
 // CreateRelationRequest holds the data submitted when creating a new relation.
