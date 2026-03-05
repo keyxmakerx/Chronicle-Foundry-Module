@@ -33,6 +33,10 @@ type RelationRepository interface {
 
 	// UpdateMetadata updates only the metadata JSON column for a relation.
 	UpdateMetadata(ctx context.Context, id int, metadata json.RawMessage) error
+
+	// ListByCampaign returns all relations for a campaign with joined entity
+	// details for both source and target. Used by the relations graph.
+	ListByCampaign(ctx context.Context, campaignID string) ([]CampaignRelation, error)
 }
 
 // relationRepository implements RelationRepository using MariaDB with
@@ -203,6 +207,50 @@ func (r *relationRepository) UpdateMetadata(ctx context.Context, id int, metadat
 	}
 
 	return nil
+}
+
+// ListByCampaign returns all relations for a campaign with joined entity details
+// for both source and target entities. Each relation appears once (both forward
+// and reverse are returned from the DB; the handler deduplicates).
+func (r *relationRepository) ListByCampaign(ctx context.Context, campaignID string) ([]CampaignRelation, error) {
+	query := `SELECT er.source_entity_id, se.name, COALESCE(set2.icon, 'fa-file'), COALESCE(set2.color, '#6b7280'),
+	                  se.slug, COALESCE(set2.name, ''),
+	                  er.target_entity_id, te.name, COALESCE(tet.icon, 'fa-file'), COALESCE(tet.color, '#6b7280'),
+	                  te.slug, COALESCE(tet.name, ''),
+	                  er.relation_type
+	           FROM entity_relations er
+	           INNER JOIN entities se ON se.id = er.source_entity_id
+	           LEFT JOIN entity_types set2 ON set2.id = se.entity_type_id
+	           INNER JOIN entities te ON te.id = er.target_entity_id
+	           LEFT JOIN entity_types tet ON tet.id = te.entity_type_id
+	           WHERE er.campaign_id = ?
+	           ORDER BY se.name ASC, te.name ASC`
+
+	rows, err := r.db.QueryContext(ctx, query, campaignID)
+	if err != nil {
+		return nil, fmt.Errorf("listing relations by campaign: %w", err)
+	}
+	defer rows.Close()
+
+	var relations []CampaignRelation
+	for rows.Next() {
+		var cr CampaignRelation
+		if err := rows.Scan(
+			&cr.SourceEntityID, &cr.SourceEntityName, &cr.SourceEntityIcon, &cr.SourceEntityColor,
+			&cr.SourceEntitySlug, &cr.SourceEntityType,
+			&cr.TargetEntityID, &cr.TargetEntityName, &cr.TargetEntityIcon, &cr.TargetEntityColor,
+			&cr.TargetEntitySlug, &cr.TargetEntityType,
+			&cr.RelationType,
+		); err != nil {
+			return nil, fmt.Errorf("scanning campaign relation row: %w", err)
+		}
+		relations = append(relations, cr)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating campaign relation rows: %w", err)
+	}
+
+	return relations, nil
 }
 
 // nullableJSON returns nil for empty/null JSON, or the raw bytes otherwise.

@@ -9,6 +9,7 @@
 //   entity_list    — Filtered entity list by category
 //   text_block     — Custom rich text / HTML content
 //   pinned_pages   — Hand-picked entity cards (placeholder for now)
+//   relation_graph — Force-directed graph of entity relations
 
 package campaigns
 
@@ -41,6 +42,8 @@ templ DashboardBlockSwitch(cc *CampaignContext, block DashboardBlock, recentEnti
 			@dashTimelinePreview(cc, block.Config)
 		case "map_preview":
 			@dashMapPreview(cc, block.Config)
+		case "relation_graph":
+			@dashRelationGraph(cc, block.Config)
 	}
 }
 
@@ -324,4 +327,30 @@ func dashMapID(config map[string]any) string {
 		return id
 	}
 	return ""
+}
+
+// dashRelationGraph renders a compact force-directed graph of entity relations.
+// Mounts the relation-graph JS widget for interactive D3 visualization.
+templ dashRelationGraph(cc *CampaignContext, config map[string]any) {
+	<div
+		data-widget="relation-graph"
+		data-campaign-id={ cc.Campaign.ID }
+		data-api-url={ fmt.Sprintf("/campaigns/%s/relations/graph", cc.Campaign.ID) }
+		data-mode="compact"
+	>
+		<div class="flex items-center justify-between mb-3">
+			<h2 class="text-sm font-semibold text-fg-secondary uppercase tracking-wider">
+				<i class="fa-solid fa-diagram-project mr-1.5"></i>Relations
+			</h2>
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/relations", cc.Campaign.ID)) }
+				class="text-xs text-accent hover:underline"
+			>
+				View graph
+			</a>
+		</div>
+		<div class="card min-h-[300px] overflow-hidden rounded-lg">
+			<div class="px-4 py-3 text-sm text-fg-muted">Loading graph...</div>
+		</div>
+	</div>
 }

@@ -36,6 +36,10 @@ type RelationService interface {
 	// UpdateMetadata updates the metadata JSON for a relation.
 	// Used by the shop inventory widget to update price/quantity/stock.
 	UpdateMetadata(ctx context.Context, id int, metadata json.RawMessage) error
+
+	// ListByCampaign returns all relations for a campaign with joined entity
+	// details for both source and target. Used by the relations graph.
+	ListByCampaign(ctx context.Context, campaignID string) ([]CampaignRelation, error)
 }
 
 // relationService implements RelationService with validation and
@@ -172,4 +176,9 @@ func (s *relationService) GetCommonTypes() []RelationTypePair {
 // UpdateMetadata updates the metadata JSON for a relation.
 func (s *relationService) UpdateMetadata(ctx context.Context, id int, metadata json.RawMessage) error {
 	return s.repo.UpdateMetadata(ctx, id, metadata)
+}
+
+// ListByCampaign returns all relations for a campaign with joined entity details.
+func (s *relationService) ListByCampaign(ctx context.Context, campaignID string) ([]CampaignRelation, error) {
+	return s.repo.ListByCampaign(ctx, campaignID)
 }

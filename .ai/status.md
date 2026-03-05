@@ -8,22 +8,32 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-05 -- Sprint K-4 (Module Data API & Widget Integration) complete (batch 38).
+2026-03-05 -- Sprint K-5 (Relations Graph Visualization) complete (batch 40).
 Branch: `claude/plan-development-phases-G8Pwf`.
 
 ## Current Phase
-**Phase K: Permissions UI + Module Foundation.** Sprints K-1 through K-4 complete.
+**Phase K: Permissions UI + Module Foundation.** Sprints K-1 through K-5 complete.
 Roadmap reorganized by user impact (batch 39):
 
-- **Phase K** (remaining): K-5 Relations Graph, K-6 Foundry Polish.
+- **Phase K** (remaining): K-6 Foundry Polish.
 - **Phase L** (Content Depth): Sub-notes UI, Notes rich text + folders, Auto-linking, Group visibility, Calendar DnD.
 - **Phase M** (Module Ecosystem + Foundry): Module SDK docs, Draw Steel module, Module packaging, Foundry multi-scene.
 - **Phase N** (Collaboration & Platform): Foundry character sheets, Role-aware dashboards, Invite system, Accessibility, Deployment.
 - **Phase O+** (Backlog): 2FA, command palette, map drawing, Discord bot, bulk ops, etc.
 
-Next sprint: **K-5 (Relations Graph Visualization)**.
+Next sprint: **K-6 (Foundry Polish)**.
 
-### Summary of Recent Work (batches 25-38)
+### Summary of Recent Work (batches 25-40)
+- **Batch 40**: Sprint K-5 Relations Graph Visualization — D3.js force-directed graph
+  of entity relations. CampaignRelation type + ListByCampaign repo/service method
+  (joins both source and target entity details). GraphAPI handler deduplicates
+  bidirectional pairs into unique nodes/edges JSON. Standalone graph page at
+  `/campaigns/:id/relations` with HTMX fragment support. `relation_graph.js` widget
+  (force simulation, zoom/pan, click-to-navigate, hover tooltips with edge highlighting,
+  entity type color legend, responsive). Dashboard block `relation_graph` for compact
+  embedded view. 5 new tests. Public-capable routes.
+- **Batch 39**: Roadmap reorganized by user impact. .gitignore cleanup (removed
+  duplicates, added coverage.html + *.log).
 - **Batch 38**: Sprint K-4 Module Data API & Widget Integration — JSONProvider
   (loads JSON data files into memory, implements DataProvider interface). D&D 5e
   module: first concrete Module implementation with 10 SRD spells data, tooltip
@@ -118,7 +128,7 @@ Next sprint: **K-5 (Relations Graph Visualization)**.
 ---
 
 ## Next Session Should
-Continue **Phase K** with Sprint K-5 (Relations Graph Visualization — D3.js force-directed graph, relation-graph API, dashboard block). Then K-6 (Foundry Polish). Full reorganized roadmap (Phases K-O+, 20 sprints by user impact) in `.ai/todo.md`.
+Continue **Phase K** with Sprint K-6 (Foundry Polish — shop icon null fix, fog bidirectional sync, connection status UI, SimpleCalendar CRUD hooks). Then Phase L (Content Depth). Full reorganized roadmap (Phases K-O+, 20 sprints by user impact) in `.ai/todo.md`.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)
@@ -169,3 +179,4 @@ Continue **Phase K** with Sprint K-5 (Relations Graph Visualization — D3.js fo
 - **2026-03-05: Sprint K-2** — Per-entity permissions UI: visibility section on edit page (Everyone/GM Only/Custom), permission grant builder, API endpoints, visibility indicators across all views.
 - **2026-03-05: Sprint K-3** — Module manifest & loader framework: ModuleManifest JSON spec, ModuleLoader auto-discovery, sandboxed Module/DataProvider/TooltipRenderer interfaces, manifest.json for 3 modules, admin page updated, installedAddons wired, 13 tests, ADR-019.
 - **2026-03-05: Sprint K-4** — Module data API & widget integration: JSONProvider (JSON-file DataProvider), D&D 5e module (10 SRD spells, tooltip renderer), factory registry pattern, generic module HTTP handler (5 endpoints), Templ reference pages, dynamic addon middleware, ModuleSearcher in entity search, 20 new tests, ADR-020.
+- **2026-03-05: Sprint K-5** — Relations graph visualization: D3.js force-directed graph, CampaignRelation + ListByCampaign, GraphAPI (node/edge deduplication), standalone page + HTMX fragment, relation_graph.js widget (zoom/pan, click-to-navigate, tooltips, legend), dashboard block, 5 new tests.

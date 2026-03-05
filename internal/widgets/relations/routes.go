@@ -32,4 +32,8 @@ func RegisterRoutes(e *echo.Echo, h *Handler, campaignSvc campaigns.CampaignServ
 	)
 	pub.GET("/entities/:eid/relations", h.ListRelations, campaigns.RequireRole(campaigns.RolePlayer))
 	pub.GET("/relation-types", h.GetCommonTypes, campaigns.RequireRole(campaigns.RolePlayer))
+
+	// Relations graph: standalone page and API for graph data.
+	pub.GET("/relations", h.GraphPage, campaigns.RequireRole(campaigns.RolePlayer))
+	pub.GET("/relations/graph", h.GraphAPI, campaigns.RequireRole(campaigns.RolePlayer))
 }

@@ -12,11 +12,12 @@ import (
 // --- Mock Repository ---
 
 type mockRelationRepo struct {
-	createFn      func(ctx context.Context, rel *Relation) error
-	findByIDFn    func(ctx context.Context, id int) (*Relation, error)
-	listByEntityFn func(ctx context.Context, entityID string) ([]Relation, error)
-	deleteFn      func(ctx context.Context, id int) error
-	findReverseFn func(ctx context.Context, sourceEntityID, targetEntityID, relationType string) (*Relation, error)
+	createFn         func(ctx context.Context, rel *Relation) error
+	findByIDFn       func(ctx context.Context, id int) (*Relation, error)
+	listByEntityFn   func(ctx context.Context, entityID string) ([]Relation, error)
+	deleteFn         func(ctx context.Context, id int) error
+	findReverseFn    func(ctx context.Context, sourceEntityID, targetEntityID, relationType string) (*Relation, error)
+	listByCampaignFn func(ctx context.Context, campaignID string) ([]CampaignRelation, error)
 }
 
 func (m *mockRelationRepo) Create(ctx context.Context, rel *Relation) error {
@@ -64,6 +65,13 @@ func (m *mockRelationRepo) FindReverse(ctx context.Context, sourceEntityID, targ
 
 func (m *mockRelationRepo) UpdateMetadata(_ context.Context, _ int, _ json.RawMessage) error {
 	return nil
+}
+
+func (m *mockRelationRepo) ListByCampaign(ctx context.Context, campaignID string) ([]CampaignRelation, error) {
+	if m.listByCampaignFn != nil {
+		return m.listByCampaignFn(ctx, campaignID)
+	}
+	return nil, nil
 }
 
 // --- Test Helpers ---
