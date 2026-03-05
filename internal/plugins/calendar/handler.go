@@ -272,6 +272,81 @@ func (h *Handler) ShowWeek(c echo.Context) error {
 	return middleware.Render(c, http.StatusOK, WeekPage(cc, data))
 }
 
+// ShowDay renders the calendar day view for a single day.
+// GET /campaigns/:id/calendar/day
+func (h *Handler) ShowDay(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	ctx := c.Request().Context()
+
+	cal, err := h.svc.GetCalendar(ctx, cc.Campaign.ID)
+	if err != nil {
+		return err
+	}
+	if cal == nil {
+		return c.Redirect(http.StatusSeeOther, "/campaigns/"+cc.Campaign.ID+"/calendar")
+	}
+
+	// Parse year/month/day query params, default to current date.
+	year := cal.CurrentYear
+	month := cal.CurrentMonth
+	day := cal.CurrentDay
+	if q := c.QueryParam("year"); q != "" {
+		if v, err := strconv.Atoi(q); err == nil {
+			year = v
+		}
+	}
+	if q := c.QueryParam("month"); q != "" {
+		if v, err := strconv.Atoi(q); err == nil && v >= 1 && v <= len(cal.Months) {
+			month = v
+		}
+	}
+	if q := c.QueryParam("day"); q != "" {
+		if v, err := strconv.Atoi(q); err == nil && v >= 1 {
+			day = v
+		}
+	}
+
+	// Clamp day to valid range for the month.
+	maxDays := cal.MonthDays(month-1, year)
+	if day > maxDays {
+		day = maxDays
+	}
+
+	role := int(cc.MemberRole)
+	userID := auth.GetUserID(c)
+	events, err := h.svc.ListEventsForDateRange(ctx, cal.ID, year, month, day, month, day, role, userID)
+	if err != nil {
+		return err
+	}
+
+	data := DayViewData{
+		Calendar:   cal,
+		Year:       year,
+		MonthIndex: month,
+		Day:        day,
+		Events:     events,
+		CampaignID: cc.Campaign.ID,
+		UserID:     userID,
+		IsOwner:    cc.MemberRole >= campaigns.RoleOwner,
+		IsScribe:   cc.MemberRole >= campaigns.RoleScribe,
+		CSRFToken:  middleware.GetCSRFToken(c),
+	}
+
+	// For real-life calendars, fetch sessions for this day.
+	if cal.Mode == "reallife" && h.sessionLister != nil {
+		dateStr := fmt.Sprintf("%04d-%02d-%02d", year, month, day)
+		sessions, err := h.sessionLister.ListSessionsForDateRange(ctx, cc.Campaign.ID, dateStr, dateStr)
+		if err == nil {
+			data.Sessions = sessions
+		}
+	}
+
+	if middleware.IsHTMX(c) {
+		return middleware.Render(c, http.StatusOK, DayFragment(cc, data))
+	}
+	return middleware.Render(c, http.StatusOK, DayPage(cc, data))
+}
+
 // SessionsFragment returns the sessions modal content as an HTMX fragment.
 // Used to refresh the session list inside the calendar's sessions overlay.
 // GET /campaigns/:id/calendar/sessions-fragment
@@ -1464,6 +1539,95 @@ func (d WeekViewData) EndDate() (int, int, int) {
 	}
 	last := days[len(days)-1]
 	return last.Year, last.Month, last.Day
+}
+
+// DayViewData holds data for the calendar day view.
+type DayViewData struct {
+	Calendar   *Calendar
+	Year       int
+	MonthIndex int // 1-based month
+	Day        int // 1-based day
+	Events     []Event
+	Sessions   []CalendarSession
+	CampaignID string
+	UserID     string
+	IsOwner    bool
+	IsScribe   bool
+	CSRFToken  string
+}
+
+// MonthName returns the name of the current month.
+func (d DayViewData) MonthName() string {
+	if d.MonthIndex >= 1 && d.MonthIndex <= len(d.Calendar.Months) {
+		return d.Calendar.Months[d.MonthIndex-1].Name
+	}
+	return ""
+}
+
+// WeekdayName returns the weekday name for this day.
+func (d DayViewData) WeekdayName() string {
+	weekLen := d.Calendar.WeekLength()
+	if weekLen == 0 {
+		return ""
+	}
+	yearLength := d.Calendar.YearLength()
+	absDay := d.Year*yearLength
+	for i := 0; i < d.MonthIndex-1 && i < len(d.Calendar.Months); i++ {
+		absDay += d.Calendar.Months[i].Days
+		if d.Calendar.IsLeapYear(d.Year) {
+			absDay += d.Calendar.Months[i].LeapYearDays
+		}
+	}
+	absDay += d.Day
+	idx := absDay % weekLen
+	if idx < 0 {
+		idx += weekLen
+	}
+	if idx >= 0 && idx < len(d.Calendar.Weekdays) {
+		return d.Calendar.Weekdays[idx].Name
+	}
+	return ""
+}
+
+// IsToday reports whether this day is the calendar's current date.
+func (d DayViewData) IsToday() bool {
+	return d.Year == d.Calendar.CurrentYear &&
+		d.MonthIndex == d.Calendar.CurrentMonth &&
+		d.Day == d.Calendar.CurrentDay
+}
+
+// Season returns the season for this day, if any.
+func (d DayViewData) Season() *Season {
+	return d.Calendar.SeasonForDate(d.MonthIndex, d.Day)
+}
+
+// PrevDay returns year, month, day for the previous day.
+func (d DayViewData) PrevDay() (int, int, int) {
+	year, month, day := d.Year, d.MonthIndex, d.Day-1
+	if day < 1 {
+		month--
+		if month < 1 {
+			month = len(d.Calendar.Months)
+			year--
+		}
+		day = d.Calendar.MonthDays(month-1, year)
+	}
+	return year, month, day
+}
+
+// NextDay returns year, month, day for the next day.
+func (d DayViewData) NextDay() (int, int, int) {
+	year, month, day := d.Year, d.MonthIndex, d.Day+1
+	maxDays := d.Calendar.MonthDays(month-1, year)
+	if day > maxDays {
+		day = 1
+		month++
+		if month > len(d.Calendar.Months) {
+			month = 1
+			year++
+		}
+	}
+	return year, month, day
 }
 
 // daysInGregorianMonth returns the number of days in a Gregorian calendar month.

@@ -91,7 +91,7 @@ New capabilities ordered by priority for alpha release.
 - [x] **Image drag-and-drop upload** — Media browser has drag-and-drop + multi-file upload with per-file progress bars (Alpine.js + XHR). Entity image widget (`image_upload.js`) still click-only.
 - [x] **Calendar week view** — 7-column day grid with event cards, cross-month handling, prev/next/today navigation. View toggle added to all calendar views. 5 tests.
 - [x] **Calendar event drag-and-drop** — HTML5 DnD on monthly grid view. Scribe+ only.
-- [ ] **Calendar day view** — No single-day detailed view with time blocks.
+- [x] **Calendar day view** — Single-day detailed view at `/calendar/day` with event cards, time display, day navigation. 5 tests.
 - [x] **Map marker clustering** — Leaflet.markercluster integration on both map widget and full map page. Auto-clustering when >5 markers with custom cluster icons. CDN-loaded.
 - [x] **Map marker icon picker** — Expanded from 18 to 39 POI icons in 8 organized groups (General, Settlements, Fortifications, Dungeons & Ruins, Nature, Maritime, Sacred & Magic, Resources).
 - [x] **Recent entities sidebar** — localStorage-backed "recently viewed" list in sidebar drill panel. Tracks entity visits, renders last 10 with clock icons. `recent_entities.js`.
@@ -120,7 +120,7 @@ New capabilities ordered by priority for alpha release.
 - [x] **Sprint L-2: Notes Rich Text (TipTap)** — Replaced plain textarea editing with mini TipTap editor instances. StarterKit+Underline+Placeholder. Saves entry JSON + entryHtml to API. Legacy text block→TipTap HTML conversion on first edit. Checklists remain as interactive checkboxes. Editor instances tracked and cleaned up on save/destroy.
 - [x] **Sprint L-3: Note Folders and Organization** — Migration 000051: `parent_id` + `is_folder`. Tree view in notes panel, collapsible folders, move-to-folder dropdown, create folder button. 4 tests.
 - [x] **Sprint L-4: Calendar Event Drag-and-Drop** — HTML5 DnD on monthly grid. Event chips draggable (Scribe+), day cells as drop zones. Full PUT on drop with all event fields preserved. Drop zone highlighting via `cal-drop-highlight` CSS. No backend changes needed.
-- [ ] **Sprint L-5: Calendar Day View + Recurring Events** — Single-day view with hourly time blocks. Expand event recurrence to monthly/weekly/daily/custom matching session recurrence.
+- [x] **Sprint L-5: Calendar Day View** — Single-day detailed view at `/calendar/day`. DayViewData struct with PrevDay/NextDay/WeekdayName/Season helpers. Event cards with time, category, entity links, description. Day view icon in all view toggles. Sessions support. 5 unit tests.
 
 ### Phase M: Game System Modules & Worldbuilding Tools
 

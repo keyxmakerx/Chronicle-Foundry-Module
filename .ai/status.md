@@ -8,13 +8,19 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-05 -- Sprint L-4 (Calendar Event DnD) complete (batch 43).
+2026-03-05 -- Sprint L-5 (Calendar Day View) complete (batch 44).
 Branch: `claude/project-review-planning-Yr4CL`.
 
 ## Current Phase
-**Phase L: Content Depth & Editor Power.** Sprint L-4 delivered (batch 43). Next: Sprint L-5 (Calendar Day View + Recurring Events).
+**Phase L: Content Depth & Editor Power.** Phase L complete (batch 44). Next: Phase M (Game System Modules & Worldbuilding Tools).
 
-### Summary of Recent Work (batches 25-43)
+### Summary of Recent Work (batches 25-44)
+- **Batch 44**: Sprint L-5 Calendar Day View — Single-day detailed view at
+  `/calendar/day`. DayViewData struct with PrevDay/NextDay/WeekdayName/Season
+  helpers. Full-page template with event cards showing time, category, entity
+  links, description. Day view icon added to all view toggles (Grid/Week/Day/
+  Timeline). Session display for real-life calendars. 5 unit tests. Route:
+  `GET /calendar/day` (Player+).
 - **Batch 43**: Sprint L-4 Calendar Event Drag-and-Drop — HTML5 DnD on monthly
   grid view. Event chips gain `draggable="true"` (Scribe+ only), day cells become
   drop zones with `data-drop-year/month/day` attributes. Drag handlers: dragStart
@@ -147,7 +153,7 @@ Branch: `claude/project-review-planning-Yr4CL`.
 ---
 
 ## Next Session Should
-Continue **Phase L** with Sprint L-5 (Calendar Day View + Recurring Events). Full post-alpha roadmap (Phases L through O, 16 remaining sprints) documented in `.ai/todo.md`.
+Continue with **Phase M** (Game System Modules & Worldbuilding Tools). Sprint M-1: D&D 5e Module with SRD data, tooltip API, reference pages. Full post-alpha roadmap (Phases M through O, 15 remaining sprints) documented in `.ai/todo.md`.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)
@@ -202,3 +208,4 @@ Continue **Phase L** with Sprint L-5 (Calendar Day View + Recurring Events). Ful
 - **2026-03-05: Sprint L-2** — Notes rich text: TipTap mini editor instances replace plain textareas, legacy block→TipTap conversion, entry JSON + HTML saved to API.
 - **2026-03-05: Sprint L-3** — Note folders: migration 000051 (parent_id + is_folder), tree view rendering, collapsible folders, move-to-folder, create folder, 4 tests.
 - **2026-03-05: Sprint L-4** — Calendar event drag-and-drop: HTML5 DnD on monthly grid, draggable event chips, drop zone highlighting, full PUT on drop. Pure frontend.
+- **2026-03-05: Sprint L-5** — Calendar day view: single-day detailed view, event cards with time/category/entity/description, day navigation, view toggle icon. Phase L complete.
