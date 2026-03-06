@@ -233,18 +233,19 @@ type ExportCalendarEvent struct {
 
 // --- Timelines ---
 
-// ExportTimeline captures a timeline with its events and entity groups.
+// ExportTimeline captures a timeline with its events, entity groups, and connections.
 type ExportTimeline struct {
-	Name            string                  `json:"name"`
-	Description     *string                 `json:"description,omitempty"`
-	DescriptionHTML *string                 `json:"description_html,omitempty"`
-	Color           string                  `json:"color"`
-	Icon            string                  `json:"icon"`
-	Visibility      string                  `json:"visibility"`
-	SortOrder       int                     `json:"sort_order"`
-	ZoomDefault     string                  `json:"zoom_default"`
-	Events          []ExportTimelineEvent   `json:"events,omitempty"`
-	EntityGroups    []ExportEntityGroup     `json:"entity_groups,omitempty"`
+	Name            string                    `json:"name"`
+	Description     *string                   `json:"description,omitempty"`
+	DescriptionHTML *string                   `json:"description_html,omitempty"`
+	Color           string                    `json:"color"`
+	Icon            string                    `json:"icon"`
+	Visibility      string                    `json:"visibility"`
+	SortOrder       int                       `json:"sort_order"`
+	ZoomDefault     string                    `json:"zoom_default"`
+	Events          []ExportTimelineEvent     `json:"events,omitempty"`
+	EntityGroups    []ExportEntityGroup       `json:"entity_groups,omitempty"`
+	Connections     []ExportEventConnection   `json:"connections,omitempty"`
 }
 
 // ExportTimelineEvent captures a standalone timeline event.
@@ -280,6 +281,16 @@ type ExportEntityGroup struct {
 	Members   []string `json:"members,omitempty"` // Entity slugs.
 }
 
+// ExportEventConnection captures a connection between two timeline events.
+// Source and target are identified by event index within the same timeline export.
+type ExportEventConnection struct {
+	SourceIndex int     `json:"source_index"` // Index into the timeline's Events slice.
+	TargetIndex int     `json:"target_index"` // Index into the timeline's Events slice.
+	Label       *string `json:"label,omitempty"`
+	Color       *string `json:"color,omitempty"`
+	Style       string  `json:"style"`
+}
+
 // --- Sessions ---
 
 // ExportSession captures a game session.
@@ -298,12 +309,19 @@ type ExportSession struct {
 	RecurrenceInterval int              `json:"recurrence_interval,omitempty"`
 	SortOrder     int                   `json:"sort_order"`
 	Entities      []ExportSessionEntity `json:"entities,omitempty"`
+	Attendees     []ExportAttendee      `json:"attendees,omitempty"`
 }
 
 // ExportSessionEntity captures an entity linked to a session.
 type ExportSessionEntity struct {
 	EntitySlug string `json:"entity_slug"`
 	Role       string `json:"role"`
+}
+
+// ExportAttendee captures a session attendee's RSVP status.
+type ExportAttendee struct {
+	UserID string `json:"user_id"`
+	Status string `json:"status"` // invited, accepted, declined, tentative
 }
 
 // --- Maps ---

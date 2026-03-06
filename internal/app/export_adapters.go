@@ -352,6 +352,8 @@ func (a *timelineExportAdapter) ExportTimelines(ctx context.Context, campaignID 
 		}
 
 		// Export standalone events only (calendar events are in the calendar section).
+		// Build event ID → export index map for connection references.
+		eventIDToIndex := make(map[string]int)
 		events, err := a.svc.ListTimelineEvents(ctx, tl.ID, ownerRole, "")
 		if err == nil {
 			for _, evt := range events {
@@ -365,6 +367,8 @@ func (a *timelineExportAdapter) ExportTimelines(ctx context.Context, campaignID 
 						entitySlug = &s
 					}
 				}
+				idx := len(et.Events)
+				eventIDToIndex[evt.EventID] = idx
 				et.Events = append(et.Events, campaigns.ExportTimelineEvent{
 					Name: evt.EventName, EntitySlug: entitySlug,
 					Year: evt.EventYear, Month: evt.EventMonth, Day: evt.EventDay,
@@ -372,6 +376,44 @@ func (a *timelineExportAdapter) ExportTimelines(ctx context.Context, campaignID 
 					Category: evt.EventCategory, Visibility: evt.EventVisibility,
 					DisplayOrder: evt.DisplayOrder, Label: evt.Label, Color: evt.ColorOverride,
 				})
+			}
+		}
+
+		// Export connections between exported events.
+		connections, err := a.svc.ListConnections(ctx, tl.ID)
+		if err == nil {
+			for _, c := range connections {
+				srcIdx, srcOK := eventIDToIndex[c.SourceID]
+				tgtIdx, tgtOK := eventIDToIndex[c.TargetID]
+				if !srcOK || !tgtOK {
+					continue // Skip connections to non-exported events.
+				}
+				et.Connections = append(et.Connections, campaigns.ExportEventConnection{
+					SourceIndex: srcIdx,
+					TargetIndex: tgtIdx,
+					Label:       c.Label,
+					Color:       c.Color,
+					Style:       c.Style,
+				})
+			}
+		}
+
+		// Export entity groups (swim lanes).
+		groups, err := a.svc.ListEntityGroups(ctx, tl.ID)
+		if err == nil {
+			for _, g := range groups {
+				eg := campaigns.ExportEntityGroup{
+					Name:      g.Name,
+					Color:     g.Color,
+					SortOrder: g.SortOrder,
+				}
+				for _, m := range g.Members {
+					slug := entitySlugLookup(m.EntityID)
+					if slug != "" {
+						eg.Members = append(eg.Members, slug)
+					}
+				}
+				et.EntityGroups = append(et.EntityGroups, eg)
 			}
 		}
 
@@ -420,6 +462,17 @@ func (a *sessionExportAdapter) ExportSessions(ctx context.Context, campaignID st
 				es.Entities = append(es.Entities, campaigns.ExportSessionEntity{
 					EntitySlug: slug,
 					Role:       se.Role,
+				})
+			}
+		}
+
+		// Session attendees (RSVP statuses).
+		attendees, err := a.svc.ListAttendees(ctx, sess.ID)
+		if err == nil {
+			for _, att := range attendees {
+				es.Attendees = append(es.Attendees, campaigns.ExportAttendee{
+					UserID: att.UserID,
+					Status: att.Status,
 				})
 			}
 		}
@@ -1022,6 +1075,24 @@ func (a *sessionImportAdapter) ImportSessions(ctx context.Context, campaignID, u
 				_ = a.svc.LinkEntity(ctx, newSession.ID, entityID, se.Role, campaignID)
 			}
 		}
+
+		// Import attendees. Invite all, then update RSVP status for non-invited.
+		if len(sess.Attendees) > 0 {
+			userIDs := make([]string, 0, len(sess.Attendees))
+			for _, att := range sess.Attendees {
+				userIDs = append(userIDs, att.UserID)
+			}
+			if err := a.svc.InviteAll(ctx, newSession.ID, userIDs); err != nil {
+				slog.Warn("import: invite attendees failed", slog.String("session", sess.Name), slog.Any("error", err))
+			} else {
+				// Update statuses for attendees who responded.
+				for _, att := range sess.Attendees {
+					if att.Status != "invited" {
+						_ = a.svc.UpdateRSVP(ctx, newSession.ID, att.UserID, att.Status)
+					}
+				}
+			}
+		}
 	}
 	return nil
 }
@@ -1056,15 +1127,16 @@ func (a *timelineImportAdapter) ImportTimelines(ctx context.Context, campaignID,
 			continue
 		}
 
-		// Create standalone events.
-		for _, evt := range tl.Events {
+		// Create standalone events and track index → new event ID for connections.
+		eventIndexToID := make(map[int]string, len(tl.Events))
+		for i, evt := range tl.Events {
 			var entityID *string
 			if evt.EntitySlug != nil {
 				if id, ok := idMap.EntitySlugToID[*evt.EntitySlug]; ok {
 					entityID = &id
 				}
 			}
-			_, err := a.svc.CreateStandaloneEvent(ctx, newTimeline.ID, timeline.CreateTimelineEventInput{
+			newEvt, err := a.svc.CreateStandaloneEvent(ctx, newTimeline.ID, timeline.CreateTimelineEventInput{
 				Name:        evt.Name,
 				Description: evt.Description,
 				EntityID:    entityID,
@@ -1088,6 +1160,46 @@ func (a *timelineImportAdapter) ImportTimelines(ctx context.Context, campaignID,
 			})
 			if err != nil {
 				slog.Warn("import: create timeline event failed", slog.String("name", evt.Name), slog.Any("error", err))
+				continue
+			}
+			eventIndexToID[i] = newEvt.ID
+		}
+
+		// Create connections between imported events.
+		for _, conn := range tl.Connections {
+			srcID, srcOK := eventIndexToID[conn.SourceIndex]
+			tgtID, tgtOK := eventIndexToID[conn.TargetIndex]
+			if !srcOK || !tgtOK {
+				continue
+			}
+			_, err := a.svc.CreateConnection(ctx, newTimeline.ID, timeline.CreateConnectionInput{
+				SourceID:   srcID,
+				TargetID:   tgtID,
+				SourceType: "standalone",
+				TargetType: "standalone",
+				Label:      conn.Label,
+				Color:      conn.Color,
+				Style:      conn.Style,
+			})
+			if err != nil {
+				slog.Warn("import: create timeline connection failed", slog.Any("error", err))
+			}
+		}
+
+		// Create entity groups (swim lanes).
+		for _, eg := range tl.EntityGroups {
+			newGroup, err := a.svc.CreateEntityGroup(ctx, newTimeline.ID, timeline.CreateEntityGroupInput{
+				Name:  eg.Name,
+				Color: eg.Color,
+			})
+			if err != nil {
+				slog.Warn("import: create entity group failed", slog.String("name", eg.Name), slog.Any("error", err))
+				continue
+			}
+			for _, memberSlug := range eg.Members {
+				if entityID, ok := idMap.EntitySlugToID[memberSlug]; ok {
+					_ = a.svc.AddGroupMember(ctx, newTimeline.ID, newGroup.ID, entityID)
+				}
 			}
 		}
 	}
