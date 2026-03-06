@@ -8,11 +8,25 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-06 -- Phase R: Logic Extensions (Layer 3/WASM) — ALL SPRINTS COMPLETE (R-1 through R-4).
+2026-03-06 -- Sprint M-1: D&D 5e Module — Data & Tooltip API COMPLETE.
 Branch: `claude/phase-r-logic-extensions-HybRz`.
 
 ## Current Phase
-**Phase R: Logic Extensions (Layer 3/WASM) — COMPLETE.** Full WASM runtime with 16 host functions across 10 capabilities, plugin-to-plugin messaging, example plugins (Rust + Go), Go SDK with mock test harness, comprehensive developer documentation.
+**Phase M: Game System Modules — Sprint M-1 COMPLETE.** D&D 5e module wired with 6 SRD data categories (87 items total), category-specific tooltip rendering, full test coverage.
+
+### Sprint M-1: D&D 5e Module — Data & Tooltip API (COMPLETE)
+- **Module wiring**: `modules.Init("internal/modules")` in main.go with blank import of dnd5e for factory registration, `modules.RegisterRoutes()` in app/routes.go
+- **SRD data files** (6 categories, 87 items):
+  - `spells.json`: 27 spells across levels 0-9 (cantrips through Wish)
+  - `monsters.json`: 14 monsters (Goblin through Lich, CR 1/4 to 21)
+  - `items.json`: 10 magic items (Potion of Healing through Vorpal Sword)
+  - `classes.json`: All 12 SRD classes with hit die, primary ability, saving throws, proficiencies
+  - `races.json`: 9 SRD races with speed, size, ability bonuses, traits, languages
+  - `conditions.json`: All 15 SRD conditions with effect summaries
+- **Manifest**: Added conditions category (slug, name, icon, fields) to dnd5e manifest.json
+- **Tooltip renderer**: Refactored from flat property list to category-specific `writeCategoryProperties()` switch — each category shows only its relevant fields (spell: level/school/casting_time/range/components/duration; monster: cr/type/size/alignment/hp/ac; etc.)
+- **Tests**: 9 tests in dnd5e_test.go — module creation, data loading (6 categories), specific item lookup (6 categories), cross-category search, invalid data dir, supported categories, tooltip rendering (7 cases per category + nil), category isolation
+- **Build**: Full project compiles clean, all module tests pass
 
 ### Sprint R-1: WASM Runtime Integration (COMPLETE)
 - Added Extism Go SDK v1.7.1 + wazero v1.9.0 dependencies
@@ -289,7 +303,8 @@ Created `.ai/audit.md` — comprehensive feature parity and completeness audit c
 - Example test updated to validate dice-roller manifest
 
 ## Next Session Should
-**Phase R is complete.** Next priorities from `.ai/todo.md`:
+**Sprint M-1 is complete.** Next priorities from `.ai/todo.md`:
+- Sprint M-2: D&D 5e Module — Reference Pages (browsable pages at `/modules/dnd5e/`, category cards, searchable lists, stat block detail pages)
 - Quick wins from the UX audit (export button, password change, sort controls, etc.)
 - Phase S+ deferred items (Draw Steel module, whiteboards, offline mode)
 - Test coverage gaps (handler/repository tests for maps, sessions, admin, smtp)

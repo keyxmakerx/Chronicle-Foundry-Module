@@ -154,7 +154,7 @@ _Fill the biggest test gaps — zero-test plugins and incomplete service tests._
 
 ### Phase M: Game System Modules & Worldbuilding Tools
 
-- [ ] **Sprint M-1: D&D 5e Module — Data & Tooltip API** — SRD-legal JSON (spells, monsters, items, conditions, classes, races). Tooltip endpoint. Wire into entity_tooltip widget. Register as addon.
+- [x] **Sprint M-1: D&D 5e Module — Data & Tooltip API** — SRD-legal JSON (spells 27, monsters 14, items 10, classes 12, races 9, conditions 15). Module init wiring, route registration, category-specific tooltip rendering, 9 tests.
 - [ ] **Sprint M-2: D&D 5e Module — Reference Pages** — Browsable pages at `/modules/dnd5e/`. Category cards, searchable lists, formatted stat block detail pages. Quick-search integration.
 - [ ] **Sprint M-3: Pathfinder 2e Module** — ORC-licensed data following D&D 5e pattern. Spells, monsters, ancestries, classes, conditions, feats.
 - [ ] **Sprint M-4: Guided Worldbuilding Prompts** — `worldbuilding_prompts` table. "Writing Prompts" collapsible panel on entity edit page. Default prompt packs per entity type. Owner-customizable.

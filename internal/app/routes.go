@@ -12,6 +12,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/keyxmakerx/chronicle/internal/middleware"
+	"github.com/keyxmakerx/chronicle/internal/modules"
 	"github.com/keyxmakerx/chronicle/internal/extensions"
 	"github.com/keyxmakerx/chronicle/internal/plugins/addons"
 	"github.com/keyxmakerx/chronicle/internal/plugins/admin"
@@ -1124,6 +1125,11 @@ func (a *App) RegisterRoutes() {
 	// Store references for graceful shutdown and auto-loading.
 	a.WASMPluginManager = wasmPluginMgr
 	a.WASMHookDispatcher = wasmHookDispatcher
+
+	// --- Game System Modules ---
+	// Module reference pages and tooltip API, gated by per-campaign addon checks.
+	moduleHandler := modules.NewModuleHandler()
+	modules.RegisterRoutes(e, moduleHandler, addonService, authService, campaignService)
 
 	// Dashboard redirects to campaigns list for authenticated users.
 	e.GET("/dashboard", func(c echo.Context) error {
