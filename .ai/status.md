@@ -8,11 +8,32 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-06 -- Phase Q: Widget Extensions (Layer 2) — Sprints Q-1 and Q-2 COMPLETE.
-Branch: `claude/fix-calendar-shop-widgets-45iz7`.
+2026-03-06 -- Phase R: Logic Extensions (Layer 3/WASM) — Sprint R-1 COMPLETE.
+Branch: `claude/phase-r-logic-extensions-HybRz`.
 
 ## Current Phase
-**Phase Q: Widget Extensions (Layer 2) — Q-1 and Q-2 complete.** Next: Phase R (Logic Extensions Layer 3/WASM) or further Q polish.
+**Phase R: Logic Extensions (Layer 3/WASM) — Sprint R-1 complete.** WASM runtime integration via Extism/wazero is built. Next: Sprint R-2 (Capability-Based Security hardening).
+
+### Sprint R-1: WASM Runtime Integration (COMPLETE)
+- Added Extism Go SDK v1.7.1 + wazero v1.9.0 dependencies
+- **WASM model types** (`wasm_model.go`): WASMPlugin, WASMContribution, WASMCapability, WASMCallRequest/Response, HookEvent, WASMPluginInfo, WASMLimits — full type system for WASM logic extensions
+- **Manifest integration**: Added `WASMPlugins` to `ManifestContributes`, validation for slug/name/file (.wasm required), capabilities (5 types), hooks (8 event types), memory limits (max 256 MB), timeouts (max 300s)
+- **PluginManager** (`wasm_manager.go`): Load/Unload/Reload/Call lifecycle with capability-based host function filtering, timeout enforcement, concurrent-safe plugin map, error state tracking
+- **Host functions** (`wasm_host.go`): 10 host functions across 5 capability groups:
+  - `log`: chronicle_log (with message truncation)
+  - `entity_read`: get_entity, search_entities, list_entity_types
+  - `calendar_read`: get_calendar, list_events
+  - `tag_read`: list_tags
+  - `kv_store`: kv_get, kv_set (64KB limit), kv_delete
+- **Service adapter interfaces**: EntityReader, CalendarReader, TagReader — read-only data access for WASM plugins via adapter pattern
+- **KV store** (`wasm_kvstore.go`): Per-plugin key-value storage backed by existing `extension_data` table (namespace "wasm_kv"), no new DB tables needed
+- **Hook dispatcher** (`wasm_hooks.go`): Fire-and-forget async dispatch to WASM plugins registered for events. 8 convenience methods (DispatchEntityCreated/Updated/Deleted, DispatchCalendarEvent*, DispatchTag*)
+- **WASM handler** (`wasm_handler.go`): Admin endpoints (list/get/reload/stop plugins) + campaign endpoints (list campaign plugins, call plugin function with Scribe+ role)
+- **Routes** (`routes.go`): RegisterWASMAdminRoutes, RegisterWASMCampaignRoutes with proper auth/role middleware
+- **Security**: .wasm added to allowedFileExts, capability-based host function filtering (principle of least privilege), memory/timeout limits, log truncation, KV value size cap
+- **Repository**: Added DeleteDataByKey method for per-key KV deletion
+- **Tests**: 26 new tests — manifest validation (15 cases), model defaults, capabilities, hook types, plugin key generation, serialization, manager lifecycle, security allowlist, zip entry validation, context helpers, log drain/limit
+- **New files**: wasm_model.go, wasm_manager.go, wasm_host.go, wasm_kvstore.go, wasm_hooks.go, wasm_handler.go, wasm_test.go
 
 ### Phase P Summary (Sprints P-1 through P-6)
 - **P-1**: Extension infrastructure — migration 000055 (4 tables), manifest parser/validator, zip security, repository (16 methods), service, handler, routes, config
@@ -232,7 +253,7 @@ Created `.ai/audit.md` — comprehensive feature parity and completeness audit c
 - Example test updated to validate dice-roller manifest
 
 ## Next Session Should
-Continue with **Phase R: Logic Extensions (Layer 3/WASM)** via Extism/wazero, or polish Phase Q further (JS validation for widget scripts, widget sandboxing). Full roadmap in `.ai/todo.md`.
+Continue with **Sprint R-2: Capability-Based Security** — PluginCapabilities model, host function filtering by declared capabilities (already implemented), memory limits (16MB default, already implemented), execution timeouts (30s, already implemented), fuel metering. Rate limiting per plugin. OR wire WASM into app/routes.go with service adapter implementations for EntityReader/CalendarReader/TagReader. Full roadmap in `.ai/todo.md`.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)

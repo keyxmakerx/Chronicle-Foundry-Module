@@ -227,13 +227,13 @@ _Browser-sandboxed JS widgets that extend the UI. See ADR-021._
 - [ ] **Sprint Q-1: Widget Extension API** — `Chronicle.registerWidget(name, {mount, unmount, config})` API in boot.js. Extension widget discovery and auto-mounting. Widget config schema in manifest.
 - [ ] **Sprint Q-2: Widget Extension Distribution** — Allow `.js` files in extension zips (scoped to widget registration pattern). Extension widget blocks appear in template editor palette.
 
-### Phase R: Extension System (Logic Extensions — Layer 3, Future)
+### Phase R: Extension System (Logic Extensions — Layer 3/WASM)
 
-_WASM-sandboxed backend logic via Extism/wazero. See ADR-021. Build only when Layers 1-2 prove insufficient._
+_WASM-sandboxed backend logic via Extism/wazero. See ADR-021._
 
-- [ ] **Sprint R-1: WASM Runtime Integration** — Extism Go SDK + wazero. PluginManager (load/unload/reload). Read-only host functions (get_entity, search_entities, get_calendar, list_events, log). Per-plugin KV store.
-- [ ] **Sprint R-2: Capability-Based Security** — PluginCapabilities model. Host function filtering by declared capabilities. Memory limits (16MB default), execution timeouts (30s), fuel metering. Rate limiting per plugin.
-- [ ] **Sprint R-3: Write Host Functions** — create_event, update_entity_fields, add_tag. Hook system (plugins register for entity/calendar events). Plugin-to-plugin message passing via host.
+- [x] **Sprint R-1: WASM Runtime Integration** — Extism Go SDK v1.7.1 + wazero v1.9.0. PluginManager (load/unload/reload/call). 10 read-only host functions across 5 capability groups (log, entity_read, calendar_read, tag_read, kv_store). Per-plugin KV store via extension_data. WASMHandler with admin + campaign endpoints. HookDispatcher with 8 event types. Manifest integration with validation. 26 tests.
+- [ ] **Sprint R-2: Capability-Based Security Hardening** — Fuel metering for instruction-level limits. Rate limiting per plugin (token bucket). Admin UI for WASM plugin management (templ pages). Wire into app/routes.go with EntityReader/CalendarReader/TagReader adapter implementations.
+- [ ] **Sprint R-3: Write Host Functions** — create_event, update_entity_fields, add_tag. Plugin-to-plugin message passing via host.
 - [ ] **Sprint R-4: Plugin SDK & Developer Tools** — `chronicle-sdk` CLI tool for local testing with mock host functions. Example plugins in Rust, Go/TinyGo, JS. Plugin development documentation.
 
 ### Deferred to Phase S+ (or community contributions)
