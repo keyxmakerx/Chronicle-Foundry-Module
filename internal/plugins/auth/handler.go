@@ -2,8 +2,15 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -299,6 +306,141 @@ func (h *Handler) ResetPassword(c echo.Context) error {
 		return c.NoContent(http.StatusNoContent)
 	}
 	return c.Redirect(http.StatusSeeOther, "/login?reset=success")
+}
+
+// ChangePasswordAPI changes the authenticated user's password (PUT /account/password).
+func (h *Handler) ChangePasswordAPI(c echo.Context) error {
+	userID := GetUserID(c)
+	if userID == "" {
+		return apperror.NewUnauthorized("not authenticated")
+	}
+
+	var req struct {
+		CurrentPassword string `json:"currentPassword"`
+		NewPassword     string `json:"newPassword"`
+		ConfirmPassword string `json:"confirmPassword"`
+	}
+	if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+	}
+
+	if req.NewPassword != req.ConfirmPassword {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "passwords do not match"})
+	}
+
+	if err := h.service.ChangePassword(c.Request().Context(), userID, req.CurrentPassword, req.NewPassword); err != nil {
+		if appErr, ok := err.(*apperror.AppError); ok {
+			return c.JSON(appErr.Code, map[string]string{"error": appErr.Message})
+		}
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to change password"})
+	}
+
+	h.logSecurityEvent(c.Request().Context(), "password.changed", userID, "", c.RealIP(), c.Request().UserAgent(), nil)
+
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// UpdateDisplayNameAPI updates the authenticated user's display name (PUT /account/display-name).
+func (h *Handler) UpdateDisplayNameAPI(c echo.Context) error {
+	userID := GetUserID(c)
+	if userID == "" {
+		return apperror.NewUnauthorized("not authenticated")
+	}
+
+	var req struct {
+		DisplayName string `json:"displayName"`
+	}
+	if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+	}
+
+	if err := h.service.UpdateDisplayName(c.Request().Context(), userID, req.DisplayName); err != nil {
+		if appErr, ok := err.(*apperror.AppError); ok {
+			return c.JSON(appErr.Code, map[string]string{"error": appErr.Message})
+		}
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to update display name"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// UploadAvatarAPI handles avatar image upload for the current user.
+// POST /account/avatar
+func (h *Handler) UploadAvatarAPI(c echo.Context) error {
+	userID := GetUserID(c)
+	if userID == "" {
+		return apperror.NewUnauthorized("not authenticated")
+	}
+
+	file, err := c.FormFile("avatar")
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "no file provided"})
+	}
+
+	// Validate file size (max 2MB).
+	if file.Size > 2*1024*1024 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "avatar must be under 2MB"})
+	}
+
+	// Validate MIME type.
+	contentType := file.Header.Get("Content-Type")
+	if !strings.HasPrefix(contentType, "image/") {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "file must be an image"})
+	}
+
+	// Determine file extension.
+	ext := filepath.Ext(file.Filename)
+	if ext == "" {
+		switch contentType {
+		case "image/png":
+			ext = ".png"
+		case "image/gif":
+			ext = ".gif"
+		case "image/webp":
+			ext = ".webp"
+		default:
+			ext = ".jpg"
+		}
+	}
+
+	// Generate random filename.
+	randBytes := make([]byte, 16)
+	if _, err := rand.Read(randBytes); err != nil {
+		return apperror.NewInternal(fmt.Errorf("generating filename: %w", err))
+	}
+	filename := hex.EncodeToString(randBytes) + ext
+
+	// Ensure avatars directory exists.
+	avatarDir := filepath.Join("uploads", "avatars")
+	if err := os.MkdirAll(avatarDir, 0o755); err != nil {
+		return apperror.NewInternal(fmt.Errorf("creating avatar directory: %w", err))
+	}
+
+	// Save file.
+	src, err := file.Open()
+	if err != nil {
+		return apperror.NewInternal(fmt.Errorf("opening uploaded file: %w", err))
+	}
+	defer func() { _ = src.Close() }()
+
+	destPath := filepath.Join(avatarDir, filename)
+	dst, err := os.Create(destPath)
+	if err != nil {
+		return apperror.NewInternal(fmt.Errorf("creating avatar file: %w", err))
+	}
+	defer func() { _ = dst.Close() }()
+
+	if _, err := io.Copy(dst, src); err != nil {
+		return apperror.NewInternal(fmt.Errorf("saving avatar file: %w", err))
+	}
+
+	// Update user's avatar path.
+	webPath := "/uploads/avatars/" + filename
+	if err := h.service.UpdateAvatarPath(c.Request().Context(), userID, &webPath); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to update avatar"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok", "avatar_path": webPath})
 }
 
 // logSecurityEvent fires a security event if a logger is wired. Fire-and-forget

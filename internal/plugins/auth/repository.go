@@ -27,6 +27,8 @@ type UserRepository interface {
 
 	// User profile.
 	UpdateTimezone(ctx context.Context, userID, timezone string) error
+	UpdateDisplayName(ctx context.Context, userID, displayName string) error
+	UpdateAvatarPath(ctx context.Context, userID string, avatarPath *string) error
 
 	// Admin operations.
 	ListUsers(ctx context.Context, offset, limit int) ([]User, int, error)
@@ -264,6 +266,34 @@ func (r *userRepository) UpdateTimezone(ctx context.Context, userID, timezone st
 	result, err := r.db.ExecContext(ctx, query, tz, userID)
 	if err != nil {
 		return fmt.Errorf("updating timezone: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return apperror.NewNotFound("user not found")
+	}
+	return nil
+}
+
+// UpdateDisplayName sets the display name for a user.
+func (r *userRepository) UpdateDisplayName(ctx context.Context, userID, displayName string) error {
+	query := `UPDATE users SET display_name = ? WHERE id = ?`
+	result, err := r.db.ExecContext(ctx, query, displayName, userID)
+	if err != nil {
+		return fmt.Errorf("updating display name: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return apperror.NewNotFound("user not found")
+	}
+	return nil
+}
+
+// UpdateAvatarPath sets or clears the user's avatar image path.
+func (r *userRepository) UpdateAvatarPath(ctx context.Context, userID string, avatarPath *string) error {
+	query := `UPDATE users SET avatar_path = ? WHERE id = ?`
+	result, err := r.db.ExecContext(ctx, query, avatarPath, userID)
+	if err != nil {
+		return fmt.Errorf("updating avatar path: %w", err)
 	}
 	n, _ := result.RowsAffected()
 	if n == 0 {

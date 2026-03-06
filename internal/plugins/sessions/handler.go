@@ -298,6 +298,33 @@ func (h *Handler) DeleteSessionAPI(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 
+// UpdateRecapAPI saves the session recap (post-session write-up visible to all members).
+// PUT /campaigns/:id/sessions/:sid/recap
+func (h *Handler) UpdateRecapAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	sessionID := c.Param("sid")
+
+	if _, err := h.requireSessionInCampaign(c, sessionID, cc.Campaign.ID); err != nil {
+		return err
+	}
+
+	var req struct {
+		Recap     *string `json:"recap"`
+		RecapHTML *string `json:"recap_html"`
+	}
+	if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+	}
+
+	if err := h.svc.UpdateSessionRecap(c.Request().Context(), sessionID, req.Recap, req.RecapHTML); err != nil {
+		if appErr, ok := err.(*apperror.AppError); ok {
+			return c.JSON(appErr.Code, map[string]string{"error": appErr.Message})
+		}
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "update failed"})
+	}
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}
+
 // --- RSVP ---
 
 // RSVPSession updates the current user's attendance status.
@@ -503,6 +530,35 @@ func rsvpResultHTML(title, message string, success bool) string {
 p{color:#666;margin:0;font-size:.9rem}</style></head><body>
 <div class="card"><div class="icon"><i class="fa-solid ` + icon + `"></i></div>
 <h1>` + title + `</h1><p>` + message + `</p></div></body></html>`
+}
+
+// SidebarRSVP returns an HTMX fragment showing planned sessions with RSVP statuses.
+// GET /campaigns/:id/sidebar/sessions-rsvp
+func (h *Handler) SidebarRSVP(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	ctx := c.Request().Context()
+	userID := auth.GetUserID(c)
+
+	planned, err := h.svc.ListPlannedSessions(ctx, cc.Campaign.ID)
+	if err != nil {
+		slog.Warn("sidebar RSVP: list planned sessions failed", slog.Any("error", err))
+		return c.HTML(http.StatusOK, "") // Graceful degradation: empty sidebar section.
+	}
+
+	if len(planned) == 0 {
+		return c.HTML(http.StatusOK, "") // Nothing to show.
+	}
+
+	// Fetch attendees for each planned session.
+	for i := range planned {
+		attendees, err := h.svc.ListAttendees(ctx, planned[i].ID)
+		if err == nil {
+			planned[i].Attendees = attendees
+		}
+	}
+
+	return middleware.Render(c, http.StatusOK,
+		SidebarSessionsRSVP(cc.Campaign.ID, planned, userID))
 }
 
 // --- Helpers ---

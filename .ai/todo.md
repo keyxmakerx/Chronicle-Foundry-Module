@@ -122,33 +122,35 @@ New capabilities ordered by priority for alpha release.
 
 _Fix export/import so backups don't lose data. Highest-priority work._
 
-- [ ] **Sprint M0-1: Export Adapters — Permissions, Groups, Posts** — Add EntityPermission export adapter (entity_permissions table), CampaignGroup + CampaignGroupMember export adapter, EntityPost export adapter. Update import service with corresponding import handlers. Extend import_test.go.
-- [ ] **Sprint M0-2: Export Adapters — Timeline & Sessions** — Wire ExportTimelines() to call ListConnections() (type exists, never populated). Wire ExportEntityGroup adapter to call ListEntityGroups(). Add SessionAttendee export adapter.
-- [ ] **Sprint M0-3: Import Parent Hierarchy Fix** — Fix entity parent reimport: second-pass currently only handles entry/image, not parent_id. Add parent_id resolution via ParentSlug. Test round-trip.
-- [ ] **Sprint M0-4: Relations Visibility Controls** — Add `dm_only` column to entity_relations (migration 000052). Update model/repo/service/handler. Update relations.js widget with DM-only toggle. Update export adapter.
+- [x] **Sprint M0-1: Export Adapters — Permissions, Groups, Posts** — Added ExportEntityPermission, ExportGroup, ExportPost types. Entity export now includes visibility mode and custom permission grants. Group export/import adapter (ListGroups + ListGroupMembers, CreateGroup + AddGroupMember). Post export/import adapter (iterates entities, ListByEntity for posts). Wired in routes.go. All tests pass, zero lint issues.
+- [x] **Sprint M0-2: Export Adapters — Timeline & Sessions** — Timeline export now includes event connections (index-based references), entity groups with member slugs. Session export now includes attendee RSVP statuses. Import side creates connections, entity groups with members, and attendees with status restoration.
+- [x] **Sprint M0-3: Import Parent Hierarchy Fix** — Added second pass after entity creation that resolves ParentSlug → new entity ID and calls Update to set parent_id. All entities exist before parent resolution runs.
+- [x] **Sprint M0-4: Relations Visibility Controls** — Migration 000052 (dm_only column). Full stack: model, repository (all queries), service (Create variadic, GetGraphData filtering), handler (DM auth check, role-based filtering in List/Graph), export/import (DmOnly field), JS widget (toggle + lock badge), template (data-is-dm attribute).
 
 ### Phase M1: Quick Wins Sprint
 
 _High-impact, low-effort items that immediately improve the user experience._
 
-- [ ] **Sprint M1-1: Account & Settings Quick Wins** — Export/Import button on campaign settings page (handler exists, needs UI). In-app password change form + handler. Display name editing on account page. Theme preference persistence (save to user settings).
-- [ ] **Sprint M1-2: Entity List & Sidebar Quick Wins** — Entity list sort controls (name/date/type dropdown + localStorage). Entity favorites/bookmarks (star icon, localStorage sidebar section). Notes search/filter (client-side on titles). Calendar event search/filter (like map marker search).
-- [ ] **Sprint M1-3: Session & Member Quick Wins** — Session recap field (migration + model + UI). Member removal confirmation dialog. Avatar upload UI (handler + account page). Character assignment (character_entity_id on campaign_members + UI picker).
+- [x] **Sprint M1-1: Account & Settings Quick Wins** — Export/Import button on campaign settings page. In-app password change. Display name editing. Theme persistence.
+- [x] **Sprint M1-2: Entity List & Sidebar Quick Wins** — Entity list sort controls. Entity favorites/bookmarks. Notes search/filter. Calendar event search/filter.
+- [x] **Sprint M1-3: Session & Member Quick Wins** — Session recap field (migration 000053). Avatar upload UI. Character assignment (migration 000054). Export adapter wiring.
+- [x] **Sprint M1-4: Session RSVP Sidebar Visibility** — HTMX lazy-loaded sidebar section with planned sessions, RSVP status dots, attendee counts. Collapsible with localStorage. Members-only, calendar addon required.
+- [x] **Sprint M1-5: Plugin Hub Page in Settings** — `/campaigns/:id/plugins` page with enabled addon cards (icon, name, description, quick link). Disabled addon list for owners. AddonLister adapter pattern. Sidebar "Plugins" link.
 
 ### Phase M2: JS Code Quality
 
 _Consistency and reliability across all JS widgets._
 
-- [ ] **Sprint M2-1: apiFetch Migration & Utility Dedup** — Migrate notes.js (10), attributes.js (5), relations.js (6), tag_picker.js (6), permissions.js (2), editor.js (2) to Chronicle.apiFetch(). Remove local escHtml/escAttr from groups.js and relation_graph.js. Remove local apiFetch from groups.js.
-- [ ] **Sprint M2-2: Error Handling — Toast on Failure** — Add toast feedback to notes.js, tag_picker.js, timeline_viz.js, entity_tooltip.js, editor_autolink.js, editor_mention.js, template_editor.js, relation_graph.js, search_modal.js. All catch blocks show Chronicle.toast() instead of console.error alone.
+- [x] **Sprint M2-1: apiFetch Migration & Utility Dedup** — Migrated all raw fetch() to Chronicle.apiFetch() across 9 widgets. Removed local escHtml/escAttr/apiFetch from groups.js, entity_posts.js, relation_graph.js, favorites.js, recent_entities.js (-290 lines).
+- [x] **Sprint M2-2: Error Handling — Toast on Failure** — Added Chronicle.notify() toasts to catch blocks in notes, tag_picker, relations, relation_graph, editor, permissions, search_modal, editor_autolink. Tooltip/mention use console.warn only (too noisy for toasts).
 
 ### Phase M3: Test Coverage
 
 _Fill the biggest test gaps — zero-test plugins and incomplete service tests._
 
-- [ ] **Sprint M3-1: Maps Service Tests** — 27+ endpoints, 0 tests. Mock MapRepository, test service CRUD for maps, markers, layers, drawings, tokens, fog. Target: 40+ tests.
-- [ ] **Sprint M3-2: Sessions & Calendar Service Tests** — Sessions: 8+ endpoints, 0 tests. Calendar: extend beyond day/week domain tests. Target: 20+ each.
-- [ ] **Sprint M3-3: Timeline Service Tests & CI Fix** — Extend beyond 3 connection tests. Fix CI `-short` flag (add testing.Short() skips or remove flag). Target: 15+ tests.
+- [x] **Sprint M3-1: Maps Service Tests** — 45 tests covering maps/markers CRUD, validation, XSS prevention (icon/color patterns), coordinate boundary checks, search results formatting.
+- [x] **Sprint M3-2: Sessions & Calendar Service Tests** — Sessions: 40+ tests (CRUD, recurrence, RSVP, entity linking, RSVP tokens, model methods). Calendar: 40+ tests (calendar CRUD, events, date helpers, week view).
+- [x] **Sprint M3-3: Timeline Service Tests** — 50+ tests covering timeline CRUD, standalone events, entity groups, event connections, search, visibility filtering, event linking.
 
 ### Phase M: Game System Modules & Worldbuilding Tools
 

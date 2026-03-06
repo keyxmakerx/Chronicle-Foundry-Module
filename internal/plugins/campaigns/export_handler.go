@@ -61,6 +61,13 @@ func (h *ExportHandler) ExportCampaign(c echo.Context) error {
 	return c.Blob(http.StatusOK, "application/json", data)
 }
 
+// ImportCampaignForm renders the import page with a file upload form
+// (GET /campaigns/import).
+func (h *ExportHandler) ImportCampaignForm(c echo.Context) error {
+	csrfToken := middleware.GetCSRFToken(c)
+	return middleware.Render(c, http.StatusOK, ImportCampaignPage(csrfToken))
+}
+
 // ImportCampaign imports a campaign from a JSON file upload (POST /campaigns/import).
 // Creates a new campaign owned by the current user.
 func (h *ExportHandler) ImportCampaign(c echo.Context) error {

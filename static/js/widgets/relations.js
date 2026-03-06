@@ -15,7 +15,6 @@
  *   data-campaign-url - Base URL for entity links,
  *                       e.g. /campaigns/:id
  *   data-editable     - "true" if user can modify relations (Scribe+)
- *   data-csrf-token   - CSRF token for mutating requests
  */
 Chronicle.register('relations', {
   init: function (el, config) {
@@ -29,6 +28,7 @@ Chronicle.register('relations', {
       selectedType: '',
       customType: '',
       customReverseType: '',
+      dmOnly: false,
       isSearching: false,
       isSubmitting: false,
       error: null
@@ -95,21 +95,21 @@ Chronicle.register('relations', {
         '.rel-error { padding: 12px; font-size: 13px; color: #ef4444; background: #fef2f2; border-radius: 6px; margin-bottom: 8px; }',
         '.dark .rel-error { background: #451a1a; }',
         '.rel-label { font-size: 12px; font-weight: 500; color: #6b7280; margin-top: 8px; margin-bottom: 4px; }',
-        '.dark .rel-label { color: #9ca3af; }'
+        '.dark .rel-label { color: #9ca3af; }',
+        '.rel-dm-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; color: #d97706; background: #fef3c7; padding: 1px 6px; border-radius: 4px; margin-left: 4px; }',
+        '.dark .rel-dm-badge { color: #fbbf24; background: #451a03; }',
+        '.rel-dm-toggle { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: #6b7280; cursor: pointer; }',
+        '.dark .rel-dm-toggle { color: #9ca3af; }',
+        '.rel-dm-toggle input { cursor: pointer; }'
       ].join('\n');
       document.head.appendChild(style);
     }
 
     el._relationsState = state;
 
-    var headers = { 'Accept': 'application/json' };
-    if (config.csrfToken) {
-      headers['X-CSRF-Token'] = config.csrfToken;
-    }
-
     // Load relations and common types in parallel.
     var fetches = [
-      fetch(config.relationsEndpoint, { headers: headers }).then(function (r) {
+      Chronicle.apiFetch(config.relationsEndpoint).then(function (r) {
         if (!r.ok) throw new Error('Failed to load relations');
         return r.json();
       })
@@ -118,7 +118,7 @@ Chronicle.register('relations', {
     // Only fetch relation types if editable (needed for the add UI).
     if (config.editable && config.relationTypesEndpoint) {
       fetches.push(
-        fetch(config.relationTypesEndpoint, { headers: headers }).then(function (r) {
+        Chronicle.apiFetch(config.relationTypesEndpoint).then(function (r) {
           if (!r.ok) throw new Error('Failed to load relation types');
           return r.json();
         })
@@ -133,6 +133,7 @@ Chronicle.register('relations', {
       render();
     }).catch(function (err) {
       console.error('[relations] Failed to load:', err);
+      Chronicle.notify('Failed to load relations', 'error');
       state.error = 'Failed to load relations. Please refresh the page.';
       render();
     });
@@ -200,6 +201,7 @@ Chronicle.register('relations', {
             state.selectedType = '';
             state.customType = '';
             state.customReverseType = '';
+            state.dmOnly = false;
             state.searchQuery = '';
             state.searchResults = [];
             render();
@@ -242,6 +244,14 @@ Chronicle.register('relations', {
         badge.className = 'rel-type-badge';
         badge.textContent = rel.targetEntityType;
         nameWrap.appendChild(badge);
+      }
+
+      // Show DM-only badge for DM users viewing DM-only relations.
+      if (rel.dmOnly && config.isDm) {
+        var dmBadge = document.createElement('span');
+        dmBadge.className = 'rel-dm-badge';
+        dmBadge.innerHTML = '<i class="fa-solid fa-lock" style="font-size:8px"></i> DM';
+        nameWrap.appendChild(dmBadge);
       }
       item.appendChild(nameWrap);
 
@@ -400,6 +410,23 @@ Chronicle.register('relations', {
       }
       renderCustomInputs();
 
+      // DM-only toggle (only for DMs).
+      if (config.isDm) {
+        var dmToggle = document.createElement('label');
+        dmToggle.className = 'rel-dm-toggle';
+        var dmCheckbox = document.createElement('input');
+        dmCheckbox.type = 'checkbox';
+        dmCheckbox.checked = state.dmOnly;
+        dmCheckbox.addEventListener('change', function () {
+          state.dmOnly = dmCheckbox.checked;
+        });
+        dmToggle.appendChild(dmCheckbox);
+        var dmLabel = document.createElement('span');
+        dmLabel.innerHTML = '<i class="fa-solid fa-lock" style="font-size:10px"></i> DM-only (hidden from players)';
+        dmToggle.appendChild(dmLabel);
+        modal.appendChild(dmToggle);
+      }
+
       // Action buttons.
       var actions = document.createElement('div');
       actions.className = 'rel-actions';
@@ -492,16 +519,11 @@ Chronicle.register('relations', {
       if (state.isSearching) return;
       state.isSearching = true;
 
-      var searchHeaders = { 'Accept': 'application/json' };
-      if (config.csrfToken) {
-        searchHeaders['X-CSRF-Token'] = config.csrfToken;
-      }
-
       // Use the entity search API endpoint which returns JSON when Accept
       // header includes application/json. Returns { results: [...], total: N }.
       var url = config.entitySearchEndpoint + '?q=' + encodeURIComponent(query);
 
-      fetch(url, { headers: searchHeaders })
+      Chronicle.apiFetch(url)
         .then(function (r) {
           if (!r.ok) throw new Error('Search failed');
           return r.json();
@@ -514,6 +536,7 @@ Chronicle.register('relations', {
         })
         .catch(function (err) {
           console.error('[relations] Search failed:', err);
+          Chronicle.notify('Failed to search entities', 'error');
           state.searchResults = [];
           state.isSearching = false;
           var resultsEl = el.querySelector('.rel-results');
@@ -542,22 +565,14 @@ Chronicle.register('relations', {
         reverseRelationType = parts[1] || parts[0];
       }
 
-      var reqHeaders = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      };
-      if (config.csrfToken) {
-        reqHeaders['X-CSRF-Token'] = config.csrfToken;
-      }
-
-      fetch(config.relationsEndpoint, {
+      Chronicle.apiFetch(config.relationsEndpoint, {
         method: 'POST',
-        headers: reqHeaders,
-        body: JSON.stringify({
+        body: {
           targetEntityId: state.selectedTarget.id,
           relationType: relationType,
-          reverseRelationType: reverseRelationType
-        })
+          reverseRelationType: reverseRelationType,
+          dmOnly: state.dmOnly || false
+        }
       })
         .then(function (r) {
           if (!r.ok) {
@@ -575,6 +590,7 @@ Chronicle.register('relations', {
         })
         .catch(function (err) {
           console.error('[relations] Create failed:', err);
+          Chronicle.notify('Failed to create relation', 'error');
           state.isSubmitting = false;
           state.error = err.message || 'Failed to create relation';
           render();
@@ -583,16 +599,9 @@ Chronicle.register('relations', {
 
     function deleteRelation(relationId) {
       if (!confirm('Remove this relation?')) return;
-      var reqHeaders = {
-        'Accept': 'application/json'
-      };
-      if (config.csrfToken) {
-        reqHeaders['X-CSRF-Token'] = config.csrfToken;
-      }
 
-      fetch(config.relationsEndpoint + '/' + relationId, {
-        method: 'DELETE',
-        headers: reqHeaders
+      Chronicle.apiFetch(config.relationsEndpoint + '/' + relationId, {
+        method: 'DELETE'
       })
         .then(function (r) {
           if (!r.ok) throw new Error('Failed to delete relation');
@@ -600,16 +609,12 @@ Chronicle.register('relations', {
         })
         .catch(function (err) {
           console.error('[relations] Delete failed:', err);
+          Chronicle.notify('Failed to remove relation', 'error');
         });
     }
 
     function loadRelations() {
-      var loadHeaders = { 'Accept': 'application/json' };
-      if (config.csrfToken) {
-        loadHeaders['X-CSRF-Token'] = config.csrfToken;
-      }
-
-      return fetch(config.relationsEndpoint, { headers: loadHeaders })
+      return Chronicle.apiFetch(config.relationsEndpoint)
         .then(function (r) {
           if (!r.ok) throw new Error('Failed to load relations');
           return r.json();
@@ -621,6 +626,7 @@ Chronicle.register('relations', {
         })
         .catch(function (err) {
           console.error('[relations] Reload failed:', err);
+          Chronicle.notify('Failed to load relations', 'error');
         });
     }
 

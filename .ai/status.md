@@ -8,11 +8,27 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-06 -- Comprehensive UX & feature gap audit (batch 46).
-Branch: `claude/audit-feature-parity-2vyXh`.
+2026-03-06 -- Sprint M3: Test coverage complete (batch 54).
+Branch: `claude/plan-project-phases-8CPw5`.
 
 ## Current Phase
-**Between Phase L and M.** Phase L complete (batch 44). Feature parity audit completed (batch 45). Comprehensive UX/feature gap audit completed (batch 46). Next: Phase M (Game System Modules) or address audit/gap findings.
+**Phase M3: Test Coverage — COMPLETE.** Maps (45 tests), Calendar (40+ tests), Sessions (40+ tests), Timeline (50+ tests). Next: M (Game System Modules).
+
+### Sprint M0-4: dm_only Visibility on Entity Relations (batch 48)
+- Migration 000052: `dm_only BOOLEAN NOT NULL DEFAULT FALSE` on `entity_relations`
+- Model: `DmOnly bool` on `Relation`, `CreateRelationRequest`, `GraphRelation`
+- Repository: all queries updated (Create, FindByID, ListByEntity, ListByCampaign)
+- Service: `Create()` accepts variadic `dmOnly`, `GetGraphData()` accepts `includeDmOnly` filter
+- Handler: DM authorization check, role-based filtering in List/Graph endpoints
+- Export: `ExportRelation.DmOnly` field, export/import adapters propagate dm_only
+- JS widget: DM-only toggle in create modal, lock badge on DM-only relations
+- Template: `data-is-dm` attribute on relations widget mount point
+- **Files changed**: migration files, model.go, repository.go, service.go, handler.go, export.go, export_adapters.go, show.templ, relations.js
+
+### Sprint M0-1 through M0-3 (batch 47)
+- M0-1: Export adapters for permissions, groups, posts
+- M0-2: Timeline connections, entity groups, session attendees
+- M0-3: Entity parent hierarchy resolution on import
 
 ### UX & Feature Gap Audit (batch 46)
 Deep audit of player/DM experience, account settings, campaign management, and missing UI surfaces:
@@ -172,7 +188,7 @@ Created `.ai/audit.md` — comprehensive feature parity and completeness audit c
 ---
 
 ## Next Session Should
-Start with **Phase M0: Data Integrity & Export Completeness** (Sprint M0-1: export adapters for permissions, groups, posts). This is the highest-priority work — campaign backups currently lose data. After M0 (4 sprints), proceed to M1 (Quick Wins), M2 (JS Code Quality), M3 (Test Coverage), then original Phase M (Game System Modules). Full 27-sprint roadmap in `.ai/todo.md`.
+Continue with **Phase M: Game System Modules** (Sprint M-1: D&D 5e module — SRD data + tooltip API). Full roadmap in `.ai/todo.md`.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)

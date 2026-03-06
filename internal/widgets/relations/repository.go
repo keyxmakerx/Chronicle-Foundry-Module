@@ -55,12 +55,12 @@ func NewRelationRepository(db *sql.DB) RelationRepository {
 // auto-generated ID on the provided struct.
 func (r *relationRepository) Create(ctx context.Context, rel *Relation) error {
 	query := `INSERT INTO entity_relations
-	           (campaign_id, source_entity_id, target_entity_id, relation_type, reverse_relation_type, created_by, metadata)
-	           VALUES (?, ?, ?, ?, ?, ?, ?)`
+	           (campaign_id, source_entity_id, target_entity_id, relation_type, reverse_relation_type, created_by, metadata, dm_only)
+	           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 
 	result, err := r.db.ExecContext(ctx, query,
 		rel.CampaignID, rel.SourceEntityID, rel.TargetEntityID,
-		rel.RelationType, rel.ReverseRelationType, rel.CreatedBy, nullableJSON(rel.Metadata),
+		rel.RelationType, rel.ReverseRelationType, rel.CreatedBy, nullableJSON(rel.Metadata), rel.DmOnly,
 	)
 	if err != nil {
 		// Check for duplicate relation (same source, target, type).
@@ -82,14 +82,14 @@ func (r *relationRepository) Create(ctx context.Context, rel *Relation) error {
 // FindByID retrieves a single relation by its primary key.
 func (r *relationRepository) FindByID(ctx context.Context, id int) (*Relation, error) {
 	query := `SELECT id, campaign_id, source_entity_id, target_entity_id,
-	                  relation_type, reverse_relation_type, metadata, created_at, created_by
+	                  relation_type, reverse_relation_type, metadata, dm_only, created_at, created_by
 	           FROM entity_relations WHERE id = ?`
 
 	var rel Relation
 	var metaBytes []byte
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&rel.ID, &rel.CampaignID, &rel.SourceEntityID, &rel.TargetEntityID,
-		&rel.RelationType, &rel.ReverseRelationType, &metaBytes, &rel.CreatedAt, &rel.CreatedBy,
+		&rel.RelationType, &rel.ReverseRelationType, &metaBytes, &rel.DmOnly, &rel.CreatedAt, &rel.CreatedBy,
 	)
 	rel.Metadata = metaBytes
 	if err == sql.ErrNoRows {
@@ -106,7 +106,7 @@ func (r *relationRepository) FindByID(ctx context.Context, id int) (*Relation, e
 // target entity name for consistent grouping in the UI.
 func (r *relationRepository) ListByEntity(ctx context.Context, entityID string) ([]Relation, error) {
 	query := `SELECT er.id, er.campaign_id, er.source_entity_id, er.target_entity_id,
-	                  er.relation_type, er.reverse_relation_type, er.metadata,
+	                  er.relation_type, er.reverse_relation_type, er.metadata, er.dm_only,
 	                  er.created_at, er.created_by,
 	                  e.name, COALESCE(et.icon, 'fa-file'), COALESCE(et.color, '#6b7280'),
 	                  e.slug, COALESCE(et.name, '')
@@ -128,7 +128,7 @@ func (r *relationRepository) ListByEntity(ctx context.Context, entityID string) 
 		var metaBytes []byte
 		if err := rows.Scan(
 			&rel.ID, &rel.CampaignID, &rel.SourceEntityID, &rel.TargetEntityID,
-			&rel.RelationType, &rel.ReverseRelationType, &metaBytes,
+			&rel.RelationType, &rel.ReverseRelationType, &metaBytes, &rel.DmOnly,
 			&rel.CreatedAt, &rel.CreatedBy,
 			&rel.TargetEntityName, &rel.TargetEntityIcon, &rel.TargetEntityColor,
 			&rel.TargetEntitySlug, &rel.TargetEntityType,
@@ -227,7 +227,7 @@ func isDuplicateEntry(err error) bool {
 // target entity details. Only returns "forward" relations (avoids returning
 // both A→B and B→A for the same relation pair) by using source_entity_id < target_entity_id.
 func (r *relationRepository) ListByCampaign(ctx context.Context, campaignID string) ([]GraphRelation, error) {
-	query := `SELECT er.source_entity_id, er.target_entity_id, er.relation_type,
+	query := `SELECT er.source_entity_id, er.target_entity_id, er.relation_type, er.dm_only,
 	                  es.name, COALESCE(ets.icon, 'fa-file'), COALESCE(ets.color, '#6b7280'),
 	                  es.slug, COALESCE(ets.name, ''),
 	                  et.name, COALESCE(ett.icon, 'fa-file'), COALESCE(ett.color, '#6b7280'),
@@ -251,7 +251,7 @@ func (r *relationRepository) ListByCampaign(ctx context.Context, campaignID stri
 	for rows.Next() {
 		var gr GraphRelation
 		if err := rows.Scan(
-			&gr.SourceEntityID, &gr.TargetEntityID, &gr.RelationType,
+			&gr.SourceEntityID, &gr.TargetEntityID, &gr.RelationType, &gr.DmOnly,
 			&gr.SourceEntityName, &gr.SourceEntityIcon, &gr.SourceEntityColor,
 			&gr.SourceEntitySlug, &gr.SourceEntityType,
 			&gr.TargetEntityName, &gr.TargetEntityIcon, &gr.TargetEntityColor,

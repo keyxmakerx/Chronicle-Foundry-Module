@@ -17,6 +17,7 @@ import (
 	"github.com/keyxmakerx/chronicle/internal/plugins/media"
 	"github.com/keyxmakerx/chronicle/internal/plugins/sessions"
 	"github.com/keyxmakerx/chronicle/internal/plugins/timeline"
+	"github.com/keyxmakerx/chronicle/internal/widgets/posts"
 	"github.com/keyxmakerx/chronicle/internal/widgets/relations"
 	"github.com/keyxmakerx/chronicle/internal/widgets/tags"
 )
@@ -102,10 +103,7 @@ func (a *entityExportAdapter) ExportEntities(ctx context.Context, campaignID str
 				popupConfig, _ = json.Marshal(e.PopupConfig)
 			}
 
-			// TODO(K-2): Export entity_permissions rows and visibility mode
-			// for entities with custom permissions. Currently only exports
-			// is_private; custom grants are lost on export/import.
-			data.Entities = append(data.Entities, campaigns.ExportEntity{
+			exportEntity := campaigns.ExportEntity{
 				OriginalID:     e.ID,
 				EntityTypeSlug: typeIDToSlug[e.EntityTypeID],
 				Name:           e.Name,
@@ -116,10 +114,27 @@ func (a *entityExportAdapter) ExportEntities(ctx context.Context, campaignID str
 				TypeLabel:      e.TypeLabel,
 				IsPrivate:      e.IsPrivate,
 				IsTemplate:     e.IsTemplate,
+				Visibility:     string(e.Visibility),
 				FieldsData:     fieldsData,
 				FieldOverrides: fieldOverrides,
 				PopupConfig:    popupConfig,
-			})
+			}
+
+			// Export per-entity permissions when visibility is custom.
+			if e.Visibility == entities.VisibilityCustom {
+				perms, err := a.entitySvc.GetEntityPermissions(ctx, e.ID)
+				if err == nil {
+					for _, p := range perms {
+						exportEntity.Permissions = append(exportEntity.Permissions, campaigns.ExportEntityPermission{
+							SubjectType: string(p.SubjectType),
+							SubjectID:   p.SubjectID,
+							Permission:  string(p.Permission),
+						})
+					}
+				}
+			}
+
+			data.Entities = append(data.Entities, exportEntity)
 		}
 
 		page++
@@ -204,6 +219,7 @@ func (a *entityExportAdapter) ExportEntities(ctx context.Context, campaignID str
 				RelationType:        r.RelationType,
 				ReverseRelationType: r.ReverseRelationType,
 				Metadata:            r.Metadata,
+				DmOnly:              r.DmOnly,
 			})
 		}
 	}
@@ -337,6 +353,8 @@ func (a *timelineExportAdapter) ExportTimelines(ctx context.Context, campaignID 
 		}
 
 		// Export standalone events only (calendar events are in the calendar section).
+		// Build event ID → export index map for connection references.
+		eventIDToIndex := make(map[string]int)
 		events, err := a.svc.ListTimelineEvents(ctx, tl.ID, ownerRole, "")
 		if err == nil {
 			for _, evt := range events {
@@ -350,6 +368,8 @@ func (a *timelineExportAdapter) ExportTimelines(ctx context.Context, campaignID 
 						entitySlug = &s
 					}
 				}
+				idx := len(et.Events)
+				eventIDToIndex[evt.EventID] = idx
 				et.Events = append(et.Events, campaigns.ExportTimelineEvent{
 					Name: evt.EventName, EntitySlug: entitySlug,
 					Year: evt.EventYear, Month: evt.EventMonth, Day: evt.EventDay,
@@ -357,6 +377,44 @@ func (a *timelineExportAdapter) ExportTimelines(ctx context.Context, campaignID 
 					Category: evt.EventCategory, Visibility: evt.EventVisibility,
 					DisplayOrder: evt.DisplayOrder, Label: evt.Label, Color: evt.ColorOverride,
 				})
+			}
+		}
+
+		// Export connections between exported events.
+		connections, err := a.svc.ListConnections(ctx, tl.ID)
+		if err == nil {
+			for _, c := range connections {
+				srcIdx, srcOK := eventIDToIndex[c.SourceID]
+				tgtIdx, tgtOK := eventIDToIndex[c.TargetID]
+				if !srcOK || !tgtOK {
+					continue // Skip connections to non-exported events.
+				}
+				et.Connections = append(et.Connections, campaigns.ExportEventConnection{
+					SourceIndex: srcIdx,
+					TargetIndex: tgtIdx,
+					Label:       c.Label,
+					Color:       c.Color,
+					Style:       c.Style,
+				})
+			}
+		}
+
+		// Export entity groups (swim lanes).
+		groups, err := a.svc.ListEntityGroups(ctx, tl.ID)
+		if err == nil {
+			for _, g := range groups {
+				eg := campaigns.ExportEntityGroup{
+					Name:      g.Name,
+					Color:     g.Color,
+					SortOrder: g.SortOrder,
+				}
+				for _, m := range g.Members {
+					slug := entitySlugLookup(m.EntityID)
+					if slug != "" {
+						eg.Members = append(eg.Members, slug)
+					}
+				}
+				et.EntityGroups = append(et.EntityGroups, eg)
 			}
 		}
 
@@ -387,6 +445,8 @@ func (a *sessionExportAdapter) ExportSessions(ctx context.Context, campaignID st
 			Summary:            sess.Summary,
 			Notes:              sess.Notes,
 			NotesHTML:          sess.NotesHTML,
+			Recap:              sess.Recap,
+			RecapHTML:          sess.RecapHTML,
 			ScheduledDate:      sess.ScheduledDate,
 			CalendarYear:       sess.CalendarYear,
 			CalendarMonth:      sess.CalendarMonth,
@@ -405,6 +465,17 @@ func (a *sessionExportAdapter) ExportSessions(ctx context.Context, campaignID st
 				es.Entities = append(es.Entities, campaigns.ExportSessionEntity{
 					EntitySlug: slug,
 					Role:       se.Role,
+				})
+			}
+		}
+
+		// Session attendees (RSVP statuses).
+		attendees, err := a.svc.ListAttendees(ctx, sess.ID)
+		if err == nil {
+			for _, att := range attendees {
+				es.Attendees = append(es.Attendees, campaigns.ExportAttendee{
+					UserID: att.UserID,
+					Status: att.Status,
 				})
 			}
 		}
@@ -748,6 +819,59 @@ func (a *entityImportAdapter) ImportEntities(ctx context.Context, campaignID, us
 				}
 			}
 		}
+
+		// Apply entity permissions and visibility mode.
+		if e.Visibility == string(entities.VisibilityCustom) && len(e.Permissions) > 0 {
+			grants := make([]entities.PermissionGrant, 0, len(e.Permissions))
+			for _, p := range e.Permissions {
+				grants = append(grants, entities.PermissionGrant{
+					SubjectType: entities.SubjectType(p.SubjectType),
+					SubjectID:   p.SubjectID,
+					Permission:  entities.Permission(p.Permission),
+				})
+			}
+			err := a.entitySvc.SetEntityPermissions(ctx, newEntity.ID, entities.SetPermissionsInput{
+				Visibility:  entities.VisibilityCustom,
+				Permissions: grants,
+			})
+			if err != nil {
+				slog.Warn("import: set entity permissions failed", slog.String("entity", e.Name), slog.Any("error", err))
+			}
+		}
+	}
+
+	// 2b. Resolve parent references (second pass: all entities now exist).
+	for _, e := range data.Entities {
+		if e.ParentSlug == nil {
+			continue
+		}
+		entityNewID, ok := entitySlugToNewID[e.Slug]
+		if !ok {
+			continue
+		}
+		parentNewID, ok := entitySlugToNewID[*e.ParentSlug]
+		if !ok {
+			slog.Warn("import: parent entity not found", slog.String("entity", e.Name), slog.String("parent_slug", *e.ParentSlug))
+			continue
+		}
+
+		var fieldsData map[string]any
+		if len(e.FieldsData) > 0 {
+			_ = json.Unmarshal(e.FieldsData, &fieldsData)
+		}
+
+		_, err := a.entitySvc.Update(ctx, entityNewID, entities.UpdateEntityInput{
+			Name:       e.Name,
+			TypeLabel:  ptrString(e.TypeLabel),
+			ParentID:   parentNewID,
+			IsPrivate:  e.IsPrivate,
+			Entry:      ptrString(e.Entry),
+			ImagePath:  ptrString(e.ImagePath),
+			FieldsData: fieldsData,
+		})
+		if err != nil {
+			slog.Warn("import: set parent failed", slog.String("entity", e.Name), slog.Any("error", err))
+		}
 	}
 
 	// 3. Create tags.
@@ -798,7 +922,7 @@ func (a *entityImportAdapter) ImportEntities(ctx context.Context, campaignID, us
 			continue
 		}
 		_, err := a.relationSvc.Create(ctx, campaignID, sourceID, targetID,
-			r.RelationType, r.ReverseRelationType, userID, r.Metadata)
+			r.RelationType, r.ReverseRelationType, userID, r.Metadata, r.DmOnly)
 		if err != nil {
 			slog.Warn("import: create relation failed",
 				slog.String("source", r.SourceEntitySlug),
@@ -982,10 +1106,33 @@ func (a *sessionImportAdapter) ImportSessions(ctx context.Context, campaignID, u
 			})
 		}
 
+		// Apply recap if present.
+		if sess.Recap != nil || sess.RecapHTML != nil {
+			_ = a.svc.UpdateSessionRecap(ctx, newSession.ID, sess.Recap, sess.RecapHTML)
+		}
+
 		// Link entities (LinkEntity requires campaignID for IDOR checks).
 		for _, se := range sess.Entities {
 			if entityID, ok := idMap.EntitySlugToID[se.EntitySlug]; ok {
 				_ = a.svc.LinkEntity(ctx, newSession.ID, entityID, se.Role, campaignID)
+			}
+		}
+
+		// Import attendees. Invite all, then update RSVP status for non-invited.
+		if len(sess.Attendees) > 0 {
+			userIDs := make([]string, 0, len(sess.Attendees))
+			for _, att := range sess.Attendees {
+				userIDs = append(userIDs, att.UserID)
+			}
+			if err := a.svc.InviteAll(ctx, newSession.ID, userIDs); err != nil {
+				slog.Warn("import: invite attendees failed", slog.String("session", sess.Name), slog.Any("error", err))
+			} else {
+				// Update statuses for attendees who responded.
+				for _, att := range sess.Attendees {
+					if att.Status != "invited" {
+						_ = a.svc.UpdateRSVP(ctx, newSession.ID, att.UserID, att.Status)
+					}
+				}
 			}
 		}
 	}
@@ -1022,15 +1169,16 @@ func (a *timelineImportAdapter) ImportTimelines(ctx context.Context, campaignID,
 			continue
 		}
 
-		// Create standalone events.
-		for _, evt := range tl.Events {
+		// Create standalone events and track index → new event ID for connections.
+		eventIndexToID := make(map[int]string, len(tl.Events))
+		for i, evt := range tl.Events {
 			var entityID *string
 			if evt.EntitySlug != nil {
 				if id, ok := idMap.EntitySlugToID[*evt.EntitySlug]; ok {
 					entityID = &id
 				}
 			}
-			_, err := a.svc.CreateStandaloneEvent(ctx, newTimeline.ID, timeline.CreateTimelineEventInput{
+			newEvt, err := a.svc.CreateStandaloneEvent(ctx, newTimeline.ID, timeline.CreateTimelineEventInput{
 				Name:        evt.Name,
 				Description: evt.Description,
 				EntityID:    entityID,
@@ -1054,6 +1202,46 @@ func (a *timelineImportAdapter) ImportTimelines(ctx context.Context, campaignID,
 			})
 			if err != nil {
 				slog.Warn("import: create timeline event failed", slog.String("name", evt.Name), slog.Any("error", err))
+				continue
+			}
+			eventIndexToID[i] = newEvt.ID
+		}
+
+		// Create connections between imported events.
+		for _, conn := range tl.Connections {
+			srcID, srcOK := eventIndexToID[conn.SourceIndex]
+			tgtID, tgtOK := eventIndexToID[conn.TargetIndex]
+			if !srcOK || !tgtOK {
+				continue
+			}
+			_, err := a.svc.CreateConnection(ctx, newTimeline.ID, timeline.CreateConnectionInput{
+				SourceID:   srcID,
+				TargetID:   tgtID,
+				SourceType: "standalone",
+				TargetType: "standalone",
+				Label:      conn.Label,
+				Color:      conn.Color,
+				Style:      conn.Style,
+			})
+			if err != nil {
+				slog.Warn("import: create timeline connection failed", slog.Any("error", err))
+			}
+		}
+
+		// Create entity groups (swim lanes).
+		for _, eg := range tl.EntityGroups {
+			newGroup, err := a.svc.CreateEntityGroup(ctx, newTimeline.ID, timeline.CreateEntityGroupInput{
+				Name:  eg.Name,
+				Color: eg.Color,
+			})
+			if err != nil {
+				slog.Warn("import: create entity group failed", slog.String("name", eg.Name), slog.Any("error", err))
+				continue
+			}
+			for _, memberSlug := range eg.Members {
+				if entityID, ok := idMap.EntitySlugToID[memberSlug]; ok {
+					_ = a.svc.AddGroupMember(ctx, newTimeline.ID, newGroup.ID, entityID)
+				}
 			}
 		}
 	}
@@ -1211,6 +1399,149 @@ func (a *addonImportAdapter) ImportAddons(ctx context.Context, campaignID, userI
 			if err := json.Unmarshal(ad.Config, &config); err == nil {
 				_ = a.svc.UpdateCampaignConfig(ctx, campaignID, addon.ID, config)
 			}
+		}
+	}
+	return nil
+}
+
+// --- Group Export/Import Adapters ---
+
+// groupExportAdapter implements campaigns.GroupExporter.
+type groupExportAdapter struct {
+	svc campaigns.GroupService
+}
+
+// ExportGroups gathers campaign groups with their member user IDs.
+func (a *groupExportAdapter) ExportGroups(ctx context.Context, campaignID string) ([]campaigns.ExportGroup, error) {
+	groups, err := a.svc.ListGroups(ctx, campaignID)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []campaigns.ExportGroup
+	for _, g := range groups {
+		eg := campaigns.ExportGroup{
+			Name:        g.Name,
+			Description: g.Description,
+		}
+
+		members, err := a.svc.ListGroupMembers(ctx, g.ID)
+		if err == nil {
+			for _, m := range members {
+				eg.MemberIDs = append(eg.MemberIDs, m.UserID)
+			}
+		}
+
+		result = append(result, eg)
+	}
+
+	return result, nil
+}
+
+// groupImportAdapter implements campaigns.GroupImporter.
+type groupImportAdapter struct {
+	svc campaigns.GroupService
+}
+
+// ImportGroups creates campaign groups from import data.
+// Member user IDs that don't exist on the target instance are skipped.
+func (a *groupImportAdapter) ImportGroups(ctx context.Context, campaignID string, data []campaigns.ExportGroup) error {
+	for _, g := range data {
+		newGroup, err := a.svc.CreateGroup(ctx, campaignID, g.Name, g.Description)
+		if err != nil {
+			slog.Warn("import: create group failed", slog.String("name", g.Name), slog.Any("error", err))
+			continue
+		}
+
+		for _, userID := range g.MemberIDs {
+			if err := a.svc.AddGroupMember(ctx, newGroup.ID, userID); err != nil {
+				slog.Warn("import: add group member skipped (user may not exist)",
+					slog.String("group", g.Name), slog.String("user_id", userID))
+			}
+		}
+	}
+	return nil
+}
+
+// --- Post Export/Import Adapters ---
+
+// postExportAdapter implements campaigns.PostExporter.
+type postExportAdapter struct {
+	postSvc   posts.PostService
+	entitySvc entities.EntityService
+}
+
+// ExportPosts gathers all entity posts for a campaign. Iterates all entities
+// and collects their posts.
+func (a *postExportAdapter) ExportPosts(ctx context.Context, campaignID string, entitySlugLookup func(string) string) ([]campaigns.ExportPost, error) {
+	// Paginate through all entities to collect their IDs.
+	const ownerRole = 3
+	var result []campaigns.ExportPost
+	page := 1
+
+	for {
+		ents, _, err := a.entitySvc.List(ctx, campaignID, 0, ownerRole, "", entities.ListOptions{
+			Page:    page,
+			PerPage: 100,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if len(ents) == 0 {
+			break
+		}
+
+		for _, e := range ents {
+			entityPosts, err := a.postSvc.ListByEntity(ctx, e.ID, true)
+			if err != nil {
+				continue
+			}
+
+			slug := entitySlugLookup(e.ID)
+			if slug == "" {
+				continue
+			}
+
+			for _, p := range entityPosts {
+				result = append(result, campaigns.ExportPost{
+					EntitySlug: slug,
+					Name:       p.Name,
+					Entry:      p.Entry,
+					EntryHTML:  p.EntryHTML,
+					IsPrivate:  p.IsPrivate,
+					SortOrder:  p.SortOrder,
+				})
+			}
+		}
+
+		page++
+	}
+
+	return result, nil
+}
+
+// postImportAdapter implements campaigns.PostImporter.
+type postImportAdapter struct {
+	svc posts.PostService
+}
+
+// ImportPosts creates entity posts from import data, resolving entity slugs
+// to new IDs via the IDMap.
+func (a *postImportAdapter) ImportPosts(ctx context.Context, campaignID, userID string, data []campaigns.ExportPost, idMap *campaigns.IDMap) error {
+	for _, p := range data {
+		entityID, ok := idMap.EntitySlugToID[p.EntitySlug]
+		if !ok {
+			slog.Warn("import: post entity not found", slog.String("entity_slug", p.EntitySlug), slog.String("post", p.Name))
+			continue
+		}
+
+		_, err := a.svc.Create(ctx, campaignID, entityID, userID, p.Name, posts.CreatePostRequest{
+			Entry:     p.Entry,
+			EntryHTML: p.EntryHTML,
+			IsPrivate: p.IsPrivate,
+		})
+		if err != nil {
+			slog.Warn("import: create post failed", slog.String("post", p.Name), slog.Any("error", err))
 		}
 	}
 	return nil

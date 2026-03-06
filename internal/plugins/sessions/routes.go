@@ -22,6 +22,7 @@ func RegisterRoutes(e *echo.Echo, h *Handler,
 	cg.POST("/sessions", h.CreateSession, campaigns.RequireRole(campaigns.RoleScribe))
 	cg.PUT("/sessions/:sid", h.UpdateSessionAPI, campaigns.RequireRole(campaigns.RoleScribe))
 	cg.DELETE("/sessions/:sid", h.DeleteSessionAPI, campaigns.RequireRole(campaigns.RoleOwner))
+	cg.PUT("/sessions/:sid/recap", h.UpdateRecapAPI, campaigns.RequireRole(campaigns.RoleScribe))
 	cg.POST("/sessions/:sid/rsvp", h.RSVPSession, campaigns.RequireRole(campaigns.RolePlayer))
 	cg.POST("/sessions/:sid/entities", h.LinkEntityAPI, campaigns.RequireRole(campaigns.RoleScribe))
 	cg.DELETE("/sessions/:sid/entities/:eid", h.UnlinkEntityAPI, campaigns.RequireRole(campaigns.RoleScribe))
@@ -34,6 +35,7 @@ func RegisterRoutes(e *echo.Echo, h *Handler,
 	)
 	pub.GET("/sessions", h.ListSessions, campaigns.RequireRole(campaigns.RolePlayer))
 	pub.GET("/sessions/:sid", h.ShowSession, campaigns.RequireRole(campaigns.RolePlayer))
+	pub.GET("/sidebar/sessions-rsvp", h.SidebarRSVP, campaigns.RequireRole(campaigns.RolePlayer))
 
 	// RSVP token redemption — public endpoint, no auth required.
 	// Token itself is the credential (emailed to the user).

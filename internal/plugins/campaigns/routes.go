@@ -38,6 +38,7 @@ func RegisterRoutes(e *echo.Echo, h *Handler, svc CampaignService, authSvc auth.
 
 	// All members.
 	cg.GET("/members", h.Members, RequireRole(RolePlayer))
+	cg.GET("/plugins", h.PluginHub, RequireRole(RolePlayer))
 
 	// Owner-only routes.
 	cg.GET("/edit", h.EditForm, RequireRole(RoleOwner))
@@ -63,6 +64,7 @@ func RegisterRoutes(e *echo.Echo, h *Handler, svc CampaignService, authSvc auth.
 	cg.POST("/members", h.AddMember, RequireRole(RoleOwner))
 	cg.DELETE("/members/:uid", h.RemoveMember, RequireRole(RoleOwner))
 	cg.PUT("/members/:uid/role", h.UpdateRole, RequireRole(RoleOwner))
+	cg.PUT("/members/:uid/character", h.UpdateMemberCharacterAPI, RequireRole(RoleOwner))
 
 	// Ownership transfer (Owner only).
 	cg.GET("/transfer", h.TransferForm, RequireRole(RoleOwner))
@@ -85,6 +87,7 @@ func RegisterRoutes(e *echo.Echo, h *Handler, svc CampaignService, authSvc auth.
 func RegisterExportRoutes(e *echo.Echo, eh *ExportHandler, svc CampaignService, authSvc auth.AuthService) {
 	// Import creates a new campaign (auth only, no campaign scope needed).
 	authed := e.Group("", auth.RequireAuth(authSvc))
+	authed.GET("/campaigns/import", eh.ImportCampaignForm)
 	authed.POST("/campaigns/import", eh.ImportCampaign)
 
 	// Export requires campaign owner access.

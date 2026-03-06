@@ -30,6 +30,8 @@ type CampaignExport struct {
 	Tags       []ExportTag           `json:"tags"`
 	EntityTags []ExportEntityTag     `json:"entity_tags"`
 	Relations  []ExportRelation      `json:"relations"`
+	Groups     []ExportGroup         `json:"groups,omitempty"`
+	Posts      []ExportPost          `json:"posts,omitempty"`
 	Calendar   *ExportCalendarData   `json:"calendar,omitempty"`
 	Timelines  []ExportTimeline      `json:"timelines,omitempty"`
 	Sessions   []ExportSession       `json:"sessions,omitempty"`
@@ -88,11 +90,13 @@ type ExportEntity struct {
 	ImagePath      *string         `json:"image_path,omitempty"`
 	ParentSlug     *string         `json:"parent_slug,omitempty"`
 	TypeLabel      *string         `json:"type_label,omitempty"`
-	IsPrivate      bool            `json:"is_private"`
-	IsTemplate     bool            `json:"is_template"`
-	FieldsData     json.RawMessage `json:"fields_data,omitempty"`
-	FieldOverrides json.RawMessage `json:"field_overrides,omitempty"`
-	PopupConfig    json.RawMessage `json:"popup_config,omitempty"`
+	IsPrivate      bool                     `json:"is_private"`
+	IsTemplate     bool                     `json:"is_template"`
+	Visibility     string                   `json:"visibility,omitempty"`
+	Permissions    []ExportEntityPermission  `json:"permissions,omitempty"`
+	FieldsData     json.RawMessage          `json:"fields_data,omitempty"`
+	FieldOverrides json.RawMessage          `json:"field_overrides,omitempty"`
+	PopupConfig    json.RawMessage          `json:"popup_config,omitempty"`
 }
 
 // --- Tags ---
@@ -121,6 +125,7 @@ type ExportRelation struct {
 	RelationType        string          `json:"relation_type"`
 	ReverseRelationType string          `json:"reverse_relation_type"`
 	Metadata            json.RawMessage `json:"metadata,omitempty"`
+	DmOnly              bool            `json:"dm_only,omitempty"`
 }
 
 // --- Calendar ---
@@ -229,18 +234,19 @@ type ExportCalendarEvent struct {
 
 // --- Timelines ---
 
-// ExportTimeline captures a timeline with its events and entity groups.
+// ExportTimeline captures a timeline with its events, entity groups, and connections.
 type ExportTimeline struct {
-	Name            string                  `json:"name"`
-	Description     *string                 `json:"description,omitempty"`
-	DescriptionHTML *string                 `json:"description_html,omitempty"`
-	Color           string                  `json:"color"`
-	Icon            string                  `json:"icon"`
-	Visibility      string                  `json:"visibility"`
-	SortOrder       int                     `json:"sort_order"`
-	ZoomDefault     string                  `json:"zoom_default"`
-	Events          []ExportTimelineEvent   `json:"events,omitempty"`
-	EntityGroups    []ExportEntityGroup     `json:"entity_groups,omitempty"`
+	Name            string                    `json:"name"`
+	Description     *string                   `json:"description,omitempty"`
+	DescriptionHTML *string                   `json:"description_html,omitempty"`
+	Color           string                    `json:"color"`
+	Icon            string                    `json:"icon"`
+	Visibility      string                    `json:"visibility"`
+	SortOrder       int                       `json:"sort_order"`
+	ZoomDefault     string                    `json:"zoom_default"`
+	Events          []ExportTimelineEvent     `json:"events,omitempty"`
+	EntityGroups    []ExportEntityGroup       `json:"entity_groups,omitempty"`
+	Connections     []ExportEventConnection   `json:"connections,omitempty"`
 }
 
 // ExportTimelineEvent captures a standalone timeline event.
@@ -276,6 +282,16 @@ type ExportEntityGroup struct {
 	Members   []string `json:"members,omitempty"` // Entity slugs.
 }
 
+// ExportEventConnection captures a connection between two timeline events.
+// Source and target are identified by event index within the same timeline export.
+type ExportEventConnection struct {
+	SourceIndex int     `json:"source_index"` // Index into the timeline's Events slice.
+	TargetIndex int     `json:"target_index"` // Index into the timeline's Events slice.
+	Label       *string `json:"label,omitempty"`
+	Color       *string `json:"color,omitempty"`
+	Style       string  `json:"style"`
+}
+
 // --- Sessions ---
 
 // ExportSession captures a game session.
@@ -284,6 +300,8 @@ type ExportSession struct {
 	Summary       *string               `json:"summary,omitempty"`
 	Notes         *string               `json:"notes,omitempty"`
 	NotesHTML     *string               `json:"notes_html,omitempty"`
+	Recap         *string               `json:"recap,omitempty"`
+	RecapHTML     *string               `json:"recap_html,omitempty"`
 	ScheduledDate *string               `json:"scheduled_date,omitempty"`
 	CalendarYear  *int                  `json:"calendar_year,omitempty"`
 	CalendarMonth *int                  `json:"calendar_month,omitempty"`
@@ -294,12 +312,19 @@ type ExportSession struct {
 	RecurrenceInterval int              `json:"recurrence_interval,omitempty"`
 	SortOrder     int                   `json:"sort_order"`
 	Entities      []ExportSessionEntity `json:"entities,omitempty"`
+	Attendees     []ExportAttendee      `json:"attendees,omitempty"`
 }
 
 // ExportSessionEntity captures an entity linked to a session.
 type ExportSessionEntity struct {
 	EntitySlug string `json:"entity_slug"`
 	Role       string `json:"role"`
+}
+
+// ExportAttendee captures a session attendee's RSVP status.
+type ExportAttendee struct {
+	UserID string `json:"user_id"`
+	Status string `json:"status"` // invited, accepted, declined, tentative
 }
 
 // --- Maps ---
@@ -411,6 +436,38 @@ type ExportAddon struct {
 	Slug    string          `json:"slug"`
 	Enabled bool            `json:"enabled"`
 	Config  json.RawMessage `json:"config,omitempty"`
+}
+
+// --- Groups ---
+
+// ExportGroup captures a campaign group with its member user IDs.
+// Member IDs are user UUIDs; they are only meaningful if the same users
+// exist on the import target instance.
+type ExportGroup struct {
+	Name        string   `json:"name"`
+	Description *string  `json:"description,omitempty"`
+	MemberIDs   []string `json:"member_ids,omitempty"`
+}
+
+// --- Entity Permissions ---
+
+// ExportEntityPermission captures a single permission grant on an entity.
+type ExportEntityPermission struct {
+	SubjectType string `json:"subject_type"` // "role", "user", "group"
+	SubjectID   string `json:"subject_id"`
+	Permission  string `json:"permission"` // "view", "edit"
+}
+
+// --- Posts ---
+
+// ExportPost captures an entity sub-note (post).
+type ExportPost struct {
+	EntitySlug string          `json:"entity_slug"`
+	Name       string          `json:"name"`
+	Entry      json.RawMessage `json:"entry,omitempty"`
+	EntryHTML  *string         `json:"entry_html,omitempty"`
+	IsPrivate  bool            `json:"is_private"`
+	SortOrder  int             `json:"sort_order"`
 }
 
 // --- Media Manifest ---
