@@ -134,6 +134,8 @@ _High-impact, low-effort items that immediately improve the user experience._
 - [ ] **Sprint M1-1: Account & Settings Quick Wins** — Export/Import button on campaign settings page (handler exists, needs UI). In-app password change form + handler. Display name editing on account page. Theme preference persistence (save to user settings).
 - [ ] **Sprint M1-2: Entity List & Sidebar Quick Wins** — Entity list sort controls (name/date/type dropdown + localStorage). Entity favorites/bookmarks (star icon, localStorage sidebar section). Notes search/filter (client-side on titles). Calendar event search/filter (like map marker search).
 - [ ] **Sprint M1-3: Session & Member Quick Wins** — Session recap field (migration + model + UI). Member removal confirmation dialog. Avatar upload UI (handler + account page). Character assignment (character_entity_id on campaign_members + UI picker).
+- [ ] **Sprint M1-4: Session RSVP Sidebar Visibility** — Sessions sidebar menu shows a collapsible sub-menu with RSVP statuses per session. Visible to owners and campaign members only (not public visitors on public campaigns). All members can see each other's RSVP statuses. Collapsed by default to save sidebar space.
+- [ ] **Sprint M1-5: Plugin Hub Page in Settings** — Dedicated management/settings page with links to Maps, Calendars, Timelines, Sessions, etc. (restoring the old sidebar navigation pattern as a settings sub-page). Quick access to all enabled campaign plugins from one place.
 
 ### Phase M2: JS Code Quality
 
