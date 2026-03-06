@@ -34,8 +34,8 @@ type BlockRenderContext struct {
 // BlockRenderer returns a templ.Component for the given block context.
 type BlockRenderer func(ctx BlockRenderContext) templ.Component
 
-// blockEntry pairs metadata with the renderer.
-type blockEntry struct {
+// registeredBlock pairs metadata with the renderer.
+type registeredBlock struct {
 	meta     BlockMeta
 	renderer BlockRenderer
 }
@@ -44,14 +44,14 @@ type blockEntry struct {
 // Safe for concurrent reads after startup (writes happen only during init).
 type BlockRegistry struct {
 	mu      sync.RWMutex
-	entries map[string]blockEntry
+	entries map[string]registeredBlock
 	order   []string // insertion order for stable palette ordering
 }
 
 // NewBlockRegistry creates an empty registry.
 func NewBlockRegistry() *BlockRegistry {
 	return &BlockRegistry{
-		entries: make(map[string]blockEntry),
+		entries: make(map[string]registeredBlock),
 	}
 }
 
@@ -64,7 +64,7 @@ func (r *BlockRegistry) Register(meta BlockMeta, renderer BlockRenderer) {
 	if _, exists := r.entries[meta.Type]; !exists {
 		r.order = append(r.order, meta.Type)
 	}
-	r.entries[meta.Type] = blockEntry{meta: meta, renderer: renderer}
+	r.entries[meta.Type] = registeredBlock{meta: meta, renderer: renderer}
 }
 
 // IsValid returns true if blockType is a registered block type.

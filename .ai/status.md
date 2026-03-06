@@ -22,12 +22,13 @@ Branch: `claude/fix-calendar-shop-widgets-45iz7`.
 - **Content extension deep dive**: Complete manifest schema design (`manifest.json`), 7 content categories (calendar presets, entity type templates, entity packs, tag collections, marker icon packs, theme variants, relation type templates), storage design (hybrid: write to existing tables + `extension_records` provenance tracking), installation/uninstall lifecycle, API endpoints (admin + per-campaign), security (file type validation, path traversal prevention, SVG sanitization, size limits).
 - **Migration**: 3 new tables designed (`extensions`, `campaign_extensions`, `extension_records` + `extension_assets`).
 
-### Entity Block Registry (batch 55)
+### Entity Block Registry (batch 55-56)
 - **Bug fix**: `validBlockTypes` in entities/service.go was missing most block types, causing "invalid block type" errors for shop_inventory, calendar, timeline, etc.
 - **Architecture**: Replaced hardcoded block type lists with a self-registering `BlockRegistry`. Plugins register their block types at startup; validation, rendering, and the template editor palette all derive from the registry.
 - **New files**: `entities/block_registry.go` (registry types + config helpers), `entities/block_registry_core.go` (core block registrations), `calendar/blocks.templ`, `timeline/blocks.templ`, `maps/blocks.templ` (plugin block renderers moved to owning plugin packages).
 - **Modified**: `entities/show.templ` (switch → registry dispatch), `entities/service.go` (registry-based validation), `entities/handler.go` (block-types API), `entities/routes.go` (new endpoint), `app/routes.go` (registry wiring), `template_editor.js` (fetches block types from API), `template_editor.templ` + `entity_type_config.templ` (added data-campaign-id).
 - **API**: `GET /campaigns/:id/entity-types/block-types` — returns available block types filtered by campaign addons.
+- **Build fix**: Renamed `blockEntry` struct to `registeredBlock` in `block_registry.go` to resolve naming collision with `blockEntry` templ function in `show.templ`.
 
 ### Sprint M0-4: dm_only Visibility on Entity Relations (batch 48)
 - Migration 000052: `dm_only BOOLEAN NOT NULL DEFAULT FALSE` on `entity_relations`
