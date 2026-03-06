@@ -173,6 +173,48 @@ New capabilities ordered by priority for alpha release.
 - [ ] **Sprint O-4: Bulk Operations & Persistent Filters** — Multi-select entity lists with batch actions (tag, move, visibility, delete). Persistent filters per category in localStorage.
 - [ ] **Sprint O-5: Editor Import/Export & Additional Themes** — Markdown import/export via `goldmark`. Sepia + high-contrast themes. Custom accent color picker.
 
+### Quick Wins (Small but Impactful)
+
+- [ ] **Export/Import button on campaign settings** — Handler exists (`GET /export`, `POST /import`), just needs a visible link/button on campaign settings page.
+- [ ] **In-app password change** — Account page only has forgot-password email flow. Add change-password form + handler (verify old password, set new).
+- [ ] **Display name editing** — Account page shows display name read-only. Add edit form + handler.
+- [ ] **Avatar upload UI** — `avatar_path` column exists in users table, media service supports `UsageAvatar`, but no upload handler or UI.
+- [ ] **Entity list sort controls** — No sort by name/date/type. Add sort dropdown with persistence (localStorage).
+- [ ] **Notes search/filter** — Client-side filter on note titles in notes panel.
+- [ ] **Calendar event search/filter** — Client-side filter within calendar views (like map marker search).
+- [ ] **Entity favorites/bookmarks** — Star icon on entity cards, localStorage-backed favorites section at top of sidebar.
+- [ ] **Session recap field** — Add `recap` text field to session model for post-session summaries.
+- [ ] **Recurring calendar events (beyond yearly)** — Sessions support weekly/biweekly/monthly, but calendar events only support yearly. Add matching recurrence options.
+
+### Player & DM Experience Gaps (Audit — 2026-03-06)
+
+_Discovered during comprehensive feature parity audit across all UI surfaces._
+
+**Player-Facing:**
+- [ ] **Character assignment** — No way to link campaign members to their character entities. Needs `player_character` mapping or field on campaign_members.
+- [ ] **Entity tag/field filtering** — Entity list only has type tabs. No filter by tag, custom field value, or visibility mode.
+- [ ] **Entity print/PDF export** — No per-entity print stylesheet or PDF generation.
+- [ ] **Share link for entities** — Campaign-level public mode exists but no per-entity shareable links.
+
+**DM Tools:**
+- [ ] **Soft delete / entity archive** — Entities are hard-deleted only. Add `archived_at` column or trash/recycle bin pattern.
+- [ ] **Bulk entity operations** — No multi-select for batch tag/delete/visibility changes. (Phase O-4 planned but not built.)
+- [ ] **Map measurement tool** — Can't measure distance between markers. Leaflet supports this via plugins.
+- [ ] **Map fog of war native UI** — Backend exists for Foundry sync but no Chronicle-native fog controls.
+- [ ] **Initiative tracker** — No combat ordering tool for session management.
+- [ ] **Session prep checklist** — No per-session task list for DM prep items.
+- [ ] **NPC quick generator** — Random name/trait generator for improvisation.
+
+**Account & Settings:**
+- [ ] **Theme preference persistence** — Dark mode toggle exists but no explicit preference storage in user settings.
+- [ ] **Account deletion** — No self-service account removal option.
+- [ ] **2FA/TOTP implementation** — DB columns (`totp_secret`, `totp_enabled`) exist but feature is incomplete (Phase N-3).
+
+**Campaign Management:**
+- [ ] **Invite link/code system** — Members must be added by email. No shareable invite links or join codes. (Phase N-2 planned.)
+- [ ] **Member removal confirmation** — No warning dialog or reason field when kicking members.
+- [ ] **Member activity tracking** — No last-seen, activity feed, or engagement metrics.
+
 ### Deferred to Phase P+ (or community contributions)
 
 - [ ] Draw Steel module
@@ -180,7 +222,7 @@ New capabilities ordered by priority for alpha release.
 - [ ] Offline mode / service worker caching
 - [ ] Collaborative editing presence indicators
 - [ ] Calendar timezone support / print-PDF export
-- [ ] Map hex/square grid overlay / measurement tool
+- [ ] Map hex/square grid overlay
 - [x] Fog of war bidirectional sync (Chronicle ↔ Foundry)
 - [ ] Webhook support for external event notifications
 - [ ] Widget inline CSS → CSS classes migration
@@ -188,9 +230,11 @@ New capabilities ordered by priority for alpha release.
 - [ ] Toast notification grouping
 - [ ] Entity image gallery (multi-image carousel)
 - [ ] Entity version history UI (view diff / restore)
-- [ ] Timeline search/filter + zoom-to-era
-- [ ] Notes search/filter
 - [ ] Dice roller widget
+- [ ] Encounter difficulty calculator
+- [ ] Family tree / genealogy builder
+- [ ] Cross-campaign search
+- [ ] Mobile-optimized modals (full-screen on small screens)
 
 ---
 

@@ -8,11 +8,21 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-05 -- Feature parity & completeness audit (batch 45).
+2026-03-06 -- Comprehensive UX & feature gap audit (batch 46).
 Branch: `claude/audit-feature-parity-2vyXh`.
 
 ## Current Phase
-**Between Phase L and M.** Phase L complete (batch 44). Feature parity audit completed (batch 45). Next: Phase M (Game System Modules) or address audit findings.
+**Between Phase L and M.** Phase L complete (batch 44). Feature parity audit completed (batch 45). Comprehensive UX/feature gap audit completed (batch 46). Next: Phase M (Game System Modules) or address audit/gap findings.
+
+### UX & Feature Gap Audit (batch 46)
+Deep audit of player/DM experience, account settings, campaign management, and missing UI surfaces:
+- **Account gaps**: No in-app password change (only email reset), display name read-only after registration, avatar infrastructure exists (DB column + media service) but no upload UI, 2FA DB columns exist but incomplete.
+- **Player experience**: No entity favorites/bookmarks, no sort controls on entity lists, no tag/field filtering, no character assignment to campaign members, no session recap field, no dice roller.
+- **DM tools**: No soft delete/archive (hard delete only), no bulk entity operations, no map measurement/drawing/fog UI (backend exists for Foundry sync), no initiative tracker, no session prep checklist.
+- **Campaign settings**: Export/import handlers exist but no visible button on settings page, no invite link system (email-add only), no member kick confirmation dialog.
+- **Quick wins identified**: 10 small-but-impactful items added to todo.md (export button, password change, sort controls, notes search, calendar search, favorites, etc.).
+- **17 new items** added to `.ai/todo.md` under "Quick Wins" and "Player & DM Experience Gaps" sections.
+- Fixed errcheck lint errors in `json_provider_test.go` (2 unchecked `os.WriteFile` calls that failed CI).
 
 ### Audit Summary (batch 45)
 Created `.ai/audit.md` — comprehensive feature parity and completeness audit covering:
@@ -162,7 +172,7 @@ Created `.ai/audit.md` — comprehensive feature parity and completeness audit c
 ---
 
 ## Next Session Should
-Continue with **Phase M** (Game System Modules & Worldbuilding Tools). Sprint M-1: D&D 5e Module with SRD data, tooltip API, reference pages. Full post-alpha roadmap (Phases M through O, 15 remaining sprints) documented in `.ai/todo.md`.
+Continue with **Phase M** (Game System Modules & Worldbuilding Tools). Sprint M-1: D&D 5e Module with SRD data, tooltip API, reference pages. Alternatively, address quick-win items from batch 46 audit (export button, password change, sort controls). Full post-alpha roadmap (Phases M through O, 15 remaining sprints + 27 audit items) documented in `.ai/todo.md`.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)
