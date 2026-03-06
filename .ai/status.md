@@ -172,7 +172,7 @@ Created `.ai/audit.md` — comprehensive feature parity and completeness audit c
 ---
 
 ## Next Session Should
-Continue with **Phase M** (Game System Modules & Worldbuilding Tools). Sprint M-1: D&D 5e Module with SRD data, tooltip API, reference pages. Alternatively, address quick-win items from batch 46 audit (export button, password change, sort controls). Full post-alpha roadmap (Phases M through O, 15 remaining sprints + 27 audit items) documented in `.ai/todo.md`.
+Start with **Phase M0: Data Integrity & Export Completeness** (Sprint M0-1: export adapters for permissions, groups, posts). This is the highest-priority work — campaign backups currently lose data. After M0 (4 sprints), proceed to M1 (Quick Wins), M2 (JS Code Quality), M3 (Test Coverage), then original Phase M (Game System Modules). Full 27-sprint roadmap in `.ai/todo.md`.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)
