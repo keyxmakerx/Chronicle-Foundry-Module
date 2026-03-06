@@ -20,7 +20,7 @@ management gaps to low-severity hardening opportunities.
 
 **Findings by Severity:**
 - Critical: 0
-- High: 1
+- High: 2
 - Medium: 5
 - Low: 8
 - Informational: 5
@@ -45,6 +45,31 @@ every user's session.
 look up the full token server-side by scanning the user's session set, or introduce
 a separate session ID (not the auth token) for management purposes. The `SessionInfo`
 struct already has a `TokenHint` field — use a hash-based lookup instead.
+
+### H-2: Stored XSS via Session RecapHTML
+
+**File:** `internal/plugins/sessions/handler.go:311-319`
+**Issue:** The `UpdateRecapAPI` handler accepts `recap_html` from a JSON request body
+and passes it directly through the service (`service.go:239-240`) to the repository
+(`repository.go:213-226`) without calling `sanitize.HTML()`. The stored HTML is then
+rendered via `@templ.Raw(*session.RecapHTML)` at `sessions.templ:296`.
+
+This is a **stored XSS vulnerability**. Any user with Scribe+ role can inject arbitrary
+JavaScript that executes for all campaign members viewing the session page.
+
+**Recommendation:** Sanitize `RecapHTML` in the service layer before storage:
+```go
+func (s *sessionService) UpdateSessionRecap(ctx context.Context, id string, recap, recapHTML *string) error {
+    if recapHTML != nil && *recapHTML != "" {
+        sanitized := sanitize.HTML(*recapHTML)
+        recapHTML = &sanitized
+    }
+    return s.repo.UpdateRecap(ctx, id, recap, recapHTML)
+}
+```
+
+Note: Dashboard text blocks ARE properly sanitized (`campaigns/service.go:602-605`),
+but sessions RecapHTML was missed.
 
 ---
 
@@ -299,6 +324,7 @@ validation. No injection issues found.
 | ID  | Severity | Effort | Priority |
 |-----|----------|--------|----------|
 | H-1 | High     | Low    | **Fix immediately** |
+| H-2 | High     | Low    | **Fix immediately** |
 | M-1 | Medium   | Low    | Fix this sprint |
 | M-4 | Medium   | Low    | Fix this sprint |
 | M-5 | Medium   | Low    | Fix this sprint |
