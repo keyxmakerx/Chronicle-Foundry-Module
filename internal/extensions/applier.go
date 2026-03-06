@@ -129,6 +129,11 @@ func (a *contentApplier) Apply(ctx context.Context, campaignID string, ext *Exte
 		a.registerThemes(ctx, campaignID, ext.ID, ext.ExtID, c.Themes)
 	}
 
+	// Register widgets.
+	if len(c.Widgets) > 0 {
+		a.registerWidgets(ctx, campaignID, ext.ID, ext.ExtID, c.Widgets)
+	}
+
 	return nil
 }
 
@@ -316,6 +321,46 @@ func (a *contentApplier) registerThemes(
 
 		slog.Info("registered theme",
 			slog.String("theme", theme.Name),
+		)
+	}
+}
+
+// registerWidgets stores widget metadata in extension_data so the app
+// can discover and inject extension widget scripts into campaign pages.
+func (a *contentApplier) registerWidgets(
+	ctx context.Context,
+	campaignID, extensionID, extID string,
+	widgets []WidgetContribution,
+) {
+	for _, w := range widgets {
+		data, err := json.Marshal(map[string]any{
+			"slug":        w.Slug,
+			"name":        w.Name,
+			"description": w.Description,
+			"icon":        w.Icon,
+			"script_url":  "/extensions/" + extID + "/assets/" + w.File,
+			"config":      w.Config,
+		})
+		if err != nil {
+			continue
+		}
+
+		if err := a.repo.SetData(ctx, &ExtensionData{
+			CampaignID:  campaignID,
+			ExtensionID: extensionID,
+			Namespace:   "widgets",
+			DataKey:     w.Slug,
+			DataValue:   json.RawMessage(data),
+		}); err != nil {
+			slog.Warn("failed to register widget",
+				slog.String("widget", w.Slug),
+				slog.Any("error", err),
+			)
+		}
+
+		slog.Info("registered extension widget",
+			slog.String("widget", w.Name),
+			slog.String("slug", w.Slug),
 		)
 	}
 }

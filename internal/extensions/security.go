@@ -20,8 +20,9 @@ const (
 	DefaultMaxEntityPack    = 10000              // Max entities in a pack.
 )
 
-// allowedFileExts is the strict allowlist of file extensions for Layer 1
-// content extensions. No executable content is permitted.
+// allowedFileExts is the strict allowlist of file extensions for extensions.
+// Layer 1 (content) extensions use JSON/CSS/images. Layer 2 (widget)
+// extensions additionally use .js files that register via Chronicle.registerWidget().
 var allowedFileExts = map[string]bool{
 	".json": true,
 	".css":  true,
@@ -32,6 +33,7 @@ var allowedFileExts = map[string]bool{
 	".jpeg": true,
 	".txt":  true,
 	".md":   true,
+	".js":   true,
 }
 
 // ValidateZipEntry checks that a zip entry path is safe (no traversal,

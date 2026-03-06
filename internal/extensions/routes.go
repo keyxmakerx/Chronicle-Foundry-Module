@@ -31,6 +31,7 @@ func RegisterCampaignRoutes(e *echo.Echo, h *Handler, campaignSvc campaigns.Camp
 	g.GET("", h.ListCampaignExtensions)
 	g.GET("/marker-icons", h.ListMarkerIcons)
 	g.GET("/themes", h.ListThemes)
+	g.GET("/widgets", h.ListWidgets)
 	g.GET("/:extID/preview", h.PreviewExtension)
 
 	// Owner-only operations.

@@ -61,6 +61,7 @@ type ManifestContributes struct {
 	MarkerIconPacks     []MarkerIconPack     `json:"marker_icon_packs,omitempty"`
 	Themes              []Theme              `json:"themes,omitempty"`
 	ReferenceData       []ReferenceDataPack  `json:"reference_data,omitempty"`
+	Widgets             []WidgetContribution `json:"widgets,omitempty"`
 }
 
 // EntityTypeTemplate is a pre-configured entity type with fields.
@@ -157,6 +158,29 @@ type ReferenceCategory struct {
 	Name string `json:"name"`
 	Icon string `json:"icon,omitempty"`
 	File string `json:"file"` // Relative path to JSON file.
+}
+
+// WidgetContribution declares a browser-side widget that an extension provides.
+// Widget JS files are loaded into campaign pages when the extension is enabled.
+// Widgets register via Chronicle.registerWidget() and mount to data-widget elements.
+type WidgetContribution struct {
+	Slug        string              `json:"slug"`
+	Name        string              `json:"name"`
+	Description string              `json:"description,omitempty"`
+	Icon        string              `json:"icon,omitempty"`         // FontAwesome class.
+	File        string              `json:"file"`                   // Relative path to JS file.
+	Config      []WidgetConfigField `json:"config,omitempty"`       // Configurable data-* attributes.
+}
+
+// WidgetConfigField describes a configuration option exposed via data-* attributes
+// on the widget's DOM element.
+type WidgetConfigField struct {
+	Key         string   `json:"key"`
+	Label       string   `json:"label"`
+	Type        string   `json:"type"`                     // "string", "number", "boolean", "select".
+	Default     string   `json:"default,omitempty"`
+	Options     []string `json:"options,omitempty"`         // For type "select".
+	Description string   `json:"description,omitempty"`
 }
 
 // extIDPattern validates extension IDs: lowercase alphanumeric + hyphens, 3-64 chars.
@@ -307,6 +331,24 @@ func validateContributes(c *ManifestContributes) error {
 			if err := validateFilePath(cat.File); err != nil {
 				return fmt.Errorf("reference_data[%d].categories[%d].file: %w", i, j, err)
 			}
+		}
+	}
+
+	for i, w := range c.Widgets {
+		if w.Slug == "" {
+			return fmt.Errorf("widgets[%d]: slug is required", i)
+		}
+		if w.Name == "" {
+			return fmt.Errorf("widgets[%d]: name is required", i)
+		}
+		if w.File == "" {
+			return fmt.Errorf("widgets[%d]: file is required", i)
+		}
+		if err := validateFilePath(w.File); err != nil {
+			return fmt.Errorf("widgets[%d].file: %w", i, err)
+		}
+		if !strings.HasSuffix(strings.ToLower(w.File), ".js") {
+			return fmt.Errorf("widgets[%d].file: must be a .js file", i)
 		}
 	}
 

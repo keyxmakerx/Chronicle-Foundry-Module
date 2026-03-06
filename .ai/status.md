@@ -8,11 +8,11 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-06 -- Phase P: Content Extensions (Layer 1) — ALL SPRINTS COMPLETE.
+2026-03-06 -- Phase Q: Widget Extensions (Layer 2) — Sprint Q-1 COMPLETE.
 Branch: `claude/fix-calendar-shop-widgets-45iz7`.
 
 ## Current Phase
-**Phase P: Content Extensions (Layer 1) — COMPLETE.** Next: Phase Q (Widget Extensions Layer 2).
+**Phase Q: Widget Extensions (Layer 2) — Sprint Q-1 complete.** Next: Sprint Q-2 (Widget Extension Distribution).
 
 ### Phase P Summary (Sprints P-1 through P-6)
 - **P-1**: Extension infrastructure — migration 000055 (4 tables), manifest parser/validator, zip security, repository (16 methods), service, handler, routes, config
@@ -209,8 +209,20 @@ Created `.ai/audit.md` — comprehensive feature parity and completeness audit c
 
 ---
 
+### Sprint Q-1: Widget Extension API (COMPLETE)
+- Added `WidgetContribution` type to `ManifestContributes` with slug, name, description, icon, file, config fields
+- Added `WidgetConfigField` type for configurable data-* attributes (key, label, type, default, options)
+- Validation in `validateContributes()`: slug, name, file required; file must be `.js`; path traversal blocked
+- `.js` files added to `allowedFileExts` allowlist in security.go and asset serving handler
+- Widget registration in `applier.go`: stores widget metadata in `extension_data` (namespace "widgets") with script URLs
+- New handler: `ListWidgets` (GET /campaigns/:id/extensions/widgets) — returns all enabled extension widgets
+- New handler: `GetWidgetScriptURLs` — used by layout injector to discover widget scripts
+- Layout integration: `SetExtWidgetScripts`/`GetExtWidgetScripts` in data.go, `<script>` injection in base.templ
+- Layout injector in app/routes.go wires extension widget script discovery per campaign
+- Tests updated: security test accepts .js, manifest test covers widget validation (6 new cases)
+
 ## Next Session Should
-Continue with **Phase Q: Widget Extensions (Layer 2)** — browser-sandboxed JS widgets that can render custom UI. Then Phase R (Logic Extensions Layer 3/WASM). Full roadmap in `.ai/todo.md`.
+Continue with **Sprint Q-2: Widget Extension Distribution** — allow widget JS to be included in extension zips, widget blocks appear in template editor palette, example widget extension. Then Phase R (Logic Extensions Layer 3/WASM). Full roadmap in `.ai/todo.md`.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)

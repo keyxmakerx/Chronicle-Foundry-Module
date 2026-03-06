@@ -192,6 +192,47 @@ func TestValidateContributes(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "widget valid",
+			c: &ManifestContributes{
+				Widgets: []WidgetContribution{{Slug: "dice-roller", Name: "Dice Roller", File: "widgets/dice.js"}},
+			},
+		},
+		{
+			name: "widget missing slug",
+			c: &ManifestContributes{
+				Widgets: []WidgetContribution{{Name: "Dice Roller", File: "widgets/dice.js"}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "widget missing name",
+			c: &ManifestContributes{
+				Widgets: []WidgetContribution{{Slug: "dice-roller", File: "widgets/dice.js"}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "widget missing file",
+			c: &ManifestContributes{
+				Widgets: []WidgetContribution{{Slug: "dice-roller", Name: "Dice Roller"}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "widget non-js file",
+			c: &ManifestContributes{
+				Widgets: []WidgetContribution{{Slug: "dice-roller", Name: "Dice Roller", File: "widgets/dice.css"}},
+			},
+			wantErr: true,
+		},
+		{
+			name: "widget path traversal",
+			c: &ManifestContributes{
+				Widgets: []WidgetContribution{{Slug: "dice-roller", Name: "Dice Roller", File: "../evil.js"}},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {

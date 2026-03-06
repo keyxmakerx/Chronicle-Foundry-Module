@@ -1038,6 +1038,11 @@ func (a *App) RegisterRoutes() {
 				}
 				ctx = layouts.SetEnabledAddons(ctx, enabledSlugs)
 			}
+
+			// Extension widget scripts for campaign pages.
+			if widgetURLs := extHandler.GetWidgetScriptURLs(reqCtx, cc.Campaign.ID); len(widgetURLs) > 0 {
+				ctx = layouts.SetExtWidgetScripts(ctx, widgetURLs)
+			}
 		}
 
 		// CSRF token for forms.

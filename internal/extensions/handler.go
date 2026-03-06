@@ -1,6 +1,7 @@
 package extensions
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -377,6 +378,69 @@ func (h *Handler) ListThemes(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]any{"themes": allThemes})
 }
 
+// ListWidgets returns all extension widgets for a campaign.
+// GET /campaigns/:id/extensions/widgets
+func (h *Handler) ListWidgets(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	if cc == nil {
+		return apperror.NewMissingContext()
+	}
+
+	exts, err := h.svc.ListForCampaign(c.Request().Context(), cc.Campaign.ID)
+	if err != nil {
+		return err
+	}
+
+	var allWidgets []json.RawMessage
+	for _, ext := range exts {
+		if !ext.Enabled {
+			continue
+		}
+		data, err := h.svc.ListData(c.Request().Context(), cc.Campaign.ID, ext.ExtensionID, "widgets")
+		if err != nil {
+			continue
+		}
+		for _, d := range data {
+			allWidgets = append(allWidgets, d.DataValue)
+		}
+	}
+
+	if allWidgets == nil {
+		allWidgets = []json.RawMessage{}
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{"widgets": allWidgets})
+}
+
+// GetWidgetScriptURLs returns the script URLs for all enabled extension widgets
+// in a campaign. Used by the layout injector to inject <script> tags.
+func (h *Handler) GetWidgetScriptURLs(ctx context.Context, campaignID string) []string {
+	exts, err := h.svc.ListForCampaign(ctx, campaignID)
+	if err != nil {
+		return nil
+	}
+
+	var urls []string
+	for _, ext := range exts {
+		if !ext.Enabled {
+			continue
+		}
+		data, err := h.svc.ListData(ctx, campaignID, ext.ExtensionID, "widgets")
+		if err != nil {
+			continue
+		}
+		for _, d := range data {
+			var w struct {
+				ScriptURL string `json:"script_url"`
+			}
+			if err := json.Unmarshal(d.DataValue, &w); err == nil && w.ScriptURL != "" {
+				urls = append(urls, w.ScriptURL)
+			}
+		}
+	}
+	return urls
+}
+
 // ServeAsset serves static assets from an extension's directory.
 // GET /extensions/:extID/assets/*filepath
 func (h *Handler) ServeAsset(c echo.Context) error {
@@ -398,6 +462,7 @@ func (h *Handler) ServeAsset(c echo.Context) error {
 	allowedAssets := map[string]bool{
 		".svg": true, ".png": true, ".webp": true,
 		".jpg": true, ".jpeg": true, ".css": true,
+		".js": true,
 	}
 	if !allowedAssets[ext] {
 		return apperror.NewBadRequest("file type not allowed")
