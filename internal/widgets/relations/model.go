@@ -23,8 +23,9 @@ type Relation struct {
 	SourceEntityID      string    `json:"sourceEntityId"`
 	TargetEntityID      string    `json:"targetEntityId"`
 	RelationType        string    `json:"relationType"`
-	ReverseRelationType string    `json:"reverseRelationType"`
+	ReverseRelationType string          `json:"reverseRelationType"`
 	Metadata            json.RawMessage `json:"metadata,omitempty"`
+	DmOnly              bool            `json:"dmOnly"`
 	CreatedAt           time.Time       `json:"createdAt"`
 	CreatedBy           string          `json:"createdBy"`
 
@@ -64,6 +65,7 @@ type CreateRelationRequest struct {
 	RelationType        string          `json:"relationType"`
 	ReverseRelationType string          `json:"reverseRelationType"`
 	Metadata            json.RawMessage `json:"metadata,omitempty"`
+	DmOnly              bool            `json:"dmOnly"`
 }
 
 // UpdateRelationMetadataRequest holds the data for updating relation metadata.
@@ -112,6 +114,7 @@ type GraphRelation struct {
 	SourceEntityID    string `json:"source_entity_id"`
 	TargetEntityID    string `json:"target_entity_id"`
 	RelationType      string `json:"relation_type"`
+	DmOnly            bool   `json:"dm_only"`
 	SourceEntityName  string `json:"source_name"`
 	SourceEntityIcon  string `json:"source_icon"`
 	SourceEntityColor string `json:"source_color"`

@@ -43,6 +43,17 @@ func (h *Handler) ListRelations(c echo.Context) error {
 		return err
 	}
 
+	// Filter dm_only relations for non-DM users.
+	if cc.MemberRole != campaigns.RoleOwner && !cc.IsSiteAdmin {
+		filtered := make([]Relation, 0, len(relations))
+		for _, r := range relations {
+			if !r.DmOnly {
+				filtered = append(filtered, r)
+			}
+		}
+		relations = filtered
+	}
+
 	// Return empty array instead of null when no relations exist.
 	if relations == nil {
 		relations = []Relation{}
@@ -75,6 +86,12 @@ func (h *Handler) CreateRelation(c echo.Context) error {
 
 	userID := auth.GetUserID(c)
 
+	// Only DMs (owners) and site admins can create DM-only relations.
+	dmOnly := req.DmOnly
+	if dmOnly && cc.MemberRole != campaigns.RoleOwner && !cc.IsSiteAdmin {
+		dmOnly = false
+	}
+
 	rel, err := h.service.Create(
 		c.Request().Context(),
 		cc.Campaign.ID,
@@ -84,6 +101,7 @@ func (h *Handler) CreateRelation(c echo.Context) error {
 		req.ReverseRelationType,
 		userID,
 		req.Metadata,
+		dmOnly,
 	)
 	if err != nil {
 		return err
@@ -169,7 +187,8 @@ func (h *Handler) GraphAPI(c echo.Context) error {
 		return apperror.NewMissingContext()
 	}
 
-	data, err := h.service.GetGraphData(c.Request().Context(), cc.Campaign.ID)
+	includeDmOnly := cc.MemberRole == campaigns.RoleOwner || cc.IsSiteAdmin
+	data, err := h.service.GetGraphData(c.Request().Context(), cc.Campaign.ID, includeDmOnly)
 	if err != nil {
 		return apperror.NewInternal(err)
 	}

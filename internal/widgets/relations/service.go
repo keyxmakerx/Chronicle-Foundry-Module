@@ -16,7 +16,7 @@ type RelationService interface {
 	// Create validates input and creates a bi-directional relation between
 	// two entities. Both the forward (A→B) and reverse (B→A) directions are
 	// created atomically. Returns the forward relation.
-	Create(ctx context.Context, campaignID, sourceEntityID, targetEntityID, relationType, reverseRelationType, createdBy string, metadata json.RawMessage) (*Relation, error)
+	Create(ctx context.Context, campaignID, sourceEntityID, targetEntityID, relationType, reverseRelationType, createdBy string, metadata json.RawMessage, dmOnly ...bool) (*Relation, error)
 
 	// ListByEntity returns all relations originating from the given entity,
 	// enriched with target entity display data.
@@ -39,7 +39,8 @@ type RelationService interface {
 
 	// GetGraphData returns the relations graph data (nodes + edges) for a
 	// campaign. Used by the relations graph visualization widget.
-	GetGraphData(ctx context.Context, campaignID string) (*GraphData, error)
+	// When includeDmOnly is false, dm_only relations are excluded from the graph.
+	GetGraphData(ctx context.Context, campaignID string, includeDmOnly bool) (*GraphData, error)
 }
 
 // relationService implements RelationService with validation and
@@ -65,7 +66,7 @@ func NewRelationService(repo RelationRepository) RelationService {
 //
 // If the reverse already exists (e.g., due to a prior incomplete creation),
 // the duplicate is silently ignored via the unique constraint.
-func (s *relationService) Create(ctx context.Context, campaignID, sourceEntityID, targetEntityID, relationType, reverseRelationType, createdBy string, metadata json.RawMessage) (*Relation, error) {
+func (s *relationService) Create(ctx context.Context, campaignID, sourceEntityID, targetEntityID, relationType, reverseRelationType, createdBy string, metadata json.RawMessage, dmOnly ...bool) (*Relation, error) {
 	// Validate: no self-relations.
 	if sourceEntityID == targetEntityID {
 		return nil, apperror.NewBadRequest("an entity cannot have a relation with itself")
@@ -91,6 +92,12 @@ func (s *relationService) Create(ctx context.Context, campaignID, sourceEntityID
 		return nil, apperror.NewBadRequest("reverse relation type must be 100 characters or fewer")
 	}
 
+	// Resolve the variadic dmOnly parameter.
+	isDmOnly := false
+	if len(dmOnly) > 0 {
+		isDmOnly = dmOnly[0]
+	}
+
 	// Create forward relation: source → target.
 	forward := &Relation{
 		CampaignID:          campaignID,
@@ -99,6 +106,7 @@ func (s *relationService) Create(ctx context.Context, campaignID, sourceEntityID
 		RelationType:        relationType,
 		ReverseRelationType: reverseRelationType,
 		Metadata:            metadata,
+		DmOnly:              isDmOnly,
 		CreatedBy:           createdBy,
 	}
 	if err := s.repo.Create(ctx, forward); err != nil {
@@ -114,6 +122,7 @@ func (s *relationService) Create(ctx context.Context, campaignID, sourceEntityID
 		TargetEntityID:      sourceEntityID,
 		RelationType:        reverseRelationType,
 		ReverseRelationType: relationType,
+		DmOnly:              isDmOnly,
 		CreatedBy:           createdBy,
 	}
 	if err := s.repo.Create(ctx, reverse); err != nil {
@@ -180,7 +189,7 @@ func (s *relationService) UpdateMetadata(ctx context.Context, id int, metadata j
 
 // GetGraphData builds the relations graph for a campaign by fetching all
 // relations and deduplicating entities into a node set.
-func (s *relationService) GetGraphData(ctx context.Context, campaignID string) (*GraphData, error) {
+func (s *relationService) GetGraphData(ctx context.Context, campaignID string, includeDmOnly bool) (*GraphData, error) {
 	rels, err := s.repo.ListByCampaign(ctx, campaignID)
 	if err != nil {
 		return nil, fmt.Errorf("listing campaign relations: %w", err)
@@ -190,6 +199,10 @@ func (s *relationService) GetGraphData(ctx context.Context, campaignID string) (
 	var edges []GraphEdge
 
 	for _, r := range rels {
+		// Skip dm_only relations for non-DM users.
+		if r.DmOnly && !includeDmOnly {
+			continue
+		}
 		// Add source node if not seen.
 		if _, ok := nodeMap[r.SourceEntityID]; !ok {
 			nodeMap[r.SourceEntityID] = GraphNode{

@@ -29,6 +29,7 @@ Chronicle.register('relations', {
       selectedType: '',
       customType: '',
       customReverseType: '',
+      dmOnly: false,
       isSearching: false,
       isSubmitting: false,
       error: null
@@ -95,7 +96,12 @@ Chronicle.register('relations', {
         '.rel-error { padding: 12px; font-size: 13px; color: #ef4444; background: #fef2f2; border-radius: 6px; margin-bottom: 8px; }',
         '.dark .rel-error { background: #451a1a; }',
         '.rel-label { font-size: 12px; font-weight: 500; color: #6b7280; margin-top: 8px; margin-bottom: 4px; }',
-        '.dark .rel-label { color: #9ca3af; }'
+        '.dark .rel-label { color: #9ca3af; }',
+        '.rel-dm-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; color: #d97706; background: #fef3c7; padding: 1px 6px; border-radius: 4px; margin-left: 4px; }',
+        '.dark .rel-dm-badge { color: #fbbf24; background: #451a03; }',
+        '.rel-dm-toggle { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: #6b7280; cursor: pointer; }',
+        '.dark .rel-dm-toggle { color: #9ca3af; }',
+        '.rel-dm-toggle input { cursor: pointer; }'
       ].join('\n');
       document.head.appendChild(style);
     }
@@ -200,6 +206,7 @@ Chronicle.register('relations', {
             state.selectedType = '';
             state.customType = '';
             state.customReverseType = '';
+            state.dmOnly = false;
             state.searchQuery = '';
             state.searchResults = [];
             render();
@@ -242,6 +249,14 @@ Chronicle.register('relations', {
         badge.className = 'rel-type-badge';
         badge.textContent = rel.targetEntityType;
         nameWrap.appendChild(badge);
+      }
+
+      // Show DM-only badge for DM users viewing DM-only relations.
+      if (rel.dmOnly && config.isDm) {
+        var dmBadge = document.createElement('span');
+        dmBadge.className = 'rel-dm-badge';
+        dmBadge.innerHTML = '<i class="fa-solid fa-lock" style="font-size:8px"></i> DM';
+        nameWrap.appendChild(dmBadge);
       }
       item.appendChild(nameWrap);
 
@@ -400,6 +415,23 @@ Chronicle.register('relations', {
       }
       renderCustomInputs();
 
+      // DM-only toggle (only for DMs).
+      if (config.isDm) {
+        var dmToggle = document.createElement('label');
+        dmToggle.className = 'rel-dm-toggle';
+        var dmCheckbox = document.createElement('input');
+        dmCheckbox.type = 'checkbox';
+        dmCheckbox.checked = state.dmOnly;
+        dmCheckbox.addEventListener('change', function () {
+          state.dmOnly = dmCheckbox.checked;
+        });
+        dmToggle.appendChild(dmCheckbox);
+        var dmLabel = document.createElement('span');
+        dmLabel.innerHTML = '<i class="fa-solid fa-lock" style="font-size:10px"></i> DM-only (hidden from players)';
+        dmToggle.appendChild(dmLabel);
+        modal.appendChild(dmToggle);
+      }
+
       // Action buttons.
       var actions = document.createElement('div');
       actions.className = 'rel-actions';
@@ -556,7 +588,8 @@ Chronicle.register('relations', {
         body: JSON.stringify({
           targetEntityId: state.selectedTarget.id,
           relationType: relationType,
-          reverseRelationType: reverseRelationType
+          reverseRelationType: reverseRelationType,
+          dmOnly: state.dmOnly || false
         })
       })
         .then(function (r) {

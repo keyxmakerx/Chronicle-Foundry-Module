@@ -125,6 +125,7 @@ type ExportRelation struct {
 	RelationType        string          `json:"relation_type"`
 	ReverseRelationType string          `json:"reverse_relation_type"`
 	Metadata            json.RawMessage `json:"metadata,omitempty"`
+	DmOnly              bool            `json:"dm_only,omitempty"`
 }
 
 // --- Calendar ---

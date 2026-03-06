@@ -389,6 +389,9 @@ templ blockRelations(cc *campaigns.CampaignContext, entity *Entity, csrfToken st
 		if cc.MemberRole >= campaigns.RoleScribe {
 			data-editable="true"
 		}
+		if cc.MemberRole == campaigns.RoleOwner || cc.IsSiteAdmin {
+			data-is-dm="true"
+		}
 		data-csrf-token={ csrfToken }
 	></div>
 }

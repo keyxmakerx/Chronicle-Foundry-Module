@@ -219,6 +219,7 @@ func (a *entityExportAdapter) ExportEntities(ctx context.Context, campaignID str
 				RelationType:        r.RelationType,
 				ReverseRelationType: r.ReverseRelationType,
 				Metadata:            r.Metadata,
+				DmOnly:              r.DmOnly,
 			})
 		}
 	}
@@ -919,7 +920,7 @@ func (a *entityImportAdapter) ImportEntities(ctx context.Context, campaignID, us
 			continue
 		}
 		_, err := a.relationSvc.Create(ctx, campaignID, sourceID, targetID,
-			r.RelationType, r.ReverseRelationType, userID, r.Metadata)
+			r.RelationType, r.ReverseRelationType, userID, r.Metadata, r.DmOnly)
 		if err != nil {
 			slog.Warn("import: create relation failed",
 				slog.String("source", r.SourceEntitySlug),
