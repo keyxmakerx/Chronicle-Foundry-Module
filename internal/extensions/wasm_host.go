@@ -891,7 +891,7 @@ func (h *HostEnvironment) buildSendMessageFunction() extism.HostFunction {
 
 			// Dispatch asynchronously — fire and forget.
 			go func() {
-				callCtx := ctx
+				var callCtx context.Context
 				if campaignID := h.getCampaignIDFromContext(ctx); campaignID != "" {
 					callCtx = WithCampaignID(context.Background(), campaignID)
 				} else {
