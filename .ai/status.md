@@ -8,11 +8,18 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-06 -- Sprint M-1: D&D 5e Module — Data & Tooltip API COMPLETE.
+2026-03-06 -- Generic module framework + Sprint M-1 D&D 5e data COMPLETE.
 Branch: `claude/phase-r-logic-extensions-HybRz`.
 
 ## Current Phase
-**Phase M: Game System Modules — Sprint M-1 COMPLETE.** D&D 5e module wired with 6 SRD data categories (87 items total), category-specific tooltip rendering, full test coverage.
+**Phase M: Game System Modules — Sprint M-1 COMPLETE + Generic Module Framework.** Any game system can now be added with just a `manifest.json` + data files — zero custom Go code required.
+
+### Generic Module Framework (COMPLETE)
+- **GenericTooltipRenderer** (`generic_tooltip.go`): Reads field definitions from the manifest's `categories[].fields[]` to render tooltips. Shows only manifest-declared fields in manifest-defined order. Works for any game system.
+- **GenericModule** (`generic_module.go`): Wraps JSONProvider + GenericTooltipRenderer. Implements the Module interface with zero game-system-specific code.
+- **Auto-instantiation** (`loader.go`): When a module directory has `manifest.json` + `data/` but no registered Go factory, the loader automatically creates a GenericModule instance. New game systems work by just dropping files.
+- **Tests**: 6 new tests — generic renderer (supported categories, render with manifest fields, field filtering, field ordering, nil item), generic module end-to-end, loader auto-instantiation.
+- **D&D 5e** retains its custom `TooltipRenderer` as an override for richer formatting, but could also work with the generic renderer.
 
 ### Sprint M-1: D&D 5e Module — Data & Tooltip API (COMPLETE)
 - **Module wiring**: `modules.Init("internal/modules")` in main.go with blank import of dnd5e for factory registration, `modules.RegisterRoutes()` in app/routes.go
@@ -24,8 +31,8 @@ Branch: `claude/phase-r-logic-extensions-HybRz`.
   - `races.json`: 9 SRD races with speed, size, ability bonuses, traits, languages
   - `conditions.json`: All 15 SRD conditions with effect summaries
 - **Manifest**: Added conditions category (slug, name, icon, fields) to dnd5e manifest.json
-- **Tooltip renderer**: Refactored from flat property list to category-specific `writeCategoryProperties()` switch — each category shows only its relevant fields (spell: level/school/casting_time/range/components/duration; monster: cr/type/size/alignment/hp/ac; etc.)
-- **Tests**: 9 tests in dnd5e_test.go — module creation, data loading (6 categories), specific item lookup (6 categories), cross-category search, invalid data dir, supported categories, tooltip rendering (7 cases per category + nil), category isolation
+- **Tooltip renderer**: Category-specific `writeCategoryProperties()` switch — each category shows only its relevant fields
+- **Tests**: 9 tests in dnd5e_test.go
 - **Build**: Full project compiles clean, all module tests pass
 
 ### Sprint R-1: WASM Runtime Integration (COMPLETE)
