@@ -909,6 +909,35 @@ func (a *App) RegisterRoutes() {
 	exportHandler := campaigns.NewExportHandler(exportSvc)
 	campaigns.RegisterExportRoutes(e, exportHandler, campaignService, authService)
 
+	// --- Content Extension Applier ---
+	// Wire the content applier now that entity and tag services are available.
+	// The applier creates campaign content (entity types, tags, etc.) when an
+	// extension is enabled, with provenance tracking for clean removal.
+	extApplier := extensions.NewContentApplier(
+		a.Config.ExtensionsPath,
+		extRepo,
+		extensions.NewEntityTypeAdapter(func(ctx context.Context, campaignID string, name, namePlural, icon, color string) (int, string, error) {
+			et, err := entityService.CreateEntityType(ctx, campaignID, entities.CreateEntityTypeInput{
+				Name:       name,
+				NamePlural: namePlural,
+				Icon:       icon,
+				Color:      color,
+			})
+			if err != nil {
+				return 0, "", err
+			}
+			return et.ID, et.Slug, nil
+		}),
+		extensions.NewTagAdapter(func(ctx context.Context, campaignID string, name, color string, dmOnly bool) (int, error) {
+			t, err := tagService.Create(ctx, campaignID, name, color, dmOnly)
+			if err != nil {
+				return 0, err
+			}
+			return t.ID, nil
+		}),
+	)
+	extService.SetApplier(extApplier)
+
 	// Dashboard redirects to campaigns list for authenticated users.
 	e.GET("/dashboard", func(c echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, "/campaigns")

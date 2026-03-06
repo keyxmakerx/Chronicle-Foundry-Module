@@ -37,12 +37,16 @@ type ExtensionService interface {
 	// Extension data.
 	SetData(ctx context.Context, campaignID, extensionID, namespace, key string, value json.RawMessage) error
 	ListData(ctx context.Context, campaignID, extensionID, namespace string) ([]ExtensionData, error)
+
+	// Configuration.
+	SetApplier(applier ContentApplier)
 }
 
 // extensionService implements ExtensionService.
 type extensionService struct {
-	repo       ExtensionRepository
-	extDir     string // Root directory for extension files (e.g., "data/extensions").
+	repo    ExtensionRepository
+	extDir  string         // Root directory for extension files (e.g., "data/extensions").
+	applier ContentApplier // Optional content applier for campaign enable.
 }
 
 // NewExtensionService creates a new extension service.
@@ -51,6 +55,13 @@ func NewExtensionService(repo ExtensionRepository, extDir string) ExtensionServi
 		repo:   repo,
 		extDir: extDir,
 	}
+}
+
+// SetApplier configures the content applier for applying extension content
+// when enabled for a campaign. Called during app startup after all services
+// are wired.
+func (s *extensionService) SetApplier(applier ContentApplier) {
+	s.applier = applier
 }
 
 // Install processes a zip upload: extracts, validates, and registers the extension.
@@ -324,7 +335,7 @@ func (s *extensionService) ListForCampaign(ctx context.Context, campaignID strin
 	return s.repo.ListForCampaign(ctx, campaignID)
 }
 
-// EnableForCampaign enables an extension for a campaign.
+// EnableForCampaign enables an extension for a campaign and applies its content.
 func (s *extensionService) EnableForCampaign(ctx context.Context, campaignID, extID, userID string) error {
 	ext, err := s.repo.FindByExtID(ctx, extID)
 	if err != nil {
@@ -347,7 +358,31 @@ func (s *extensionService) EnableForCampaign(ctx context.Context, campaignID, ex
 		EnabledBy:       &userID,
 	}
 
-	return s.repo.EnableForCampaign(ctx, ce)
+	if err := s.repo.EnableForCampaign(ctx, ce); err != nil {
+		return err
+	}
+
+	// Apply extension content to the campaign if an applier is configured.
+	if s.applier != nil {
+		var manifest ExtensionManifest
+		if err := json.Unmarshal(ext.Manifest, &manifest); err != nil {
+			slog.Warn("failed to parse manifest for content application",
+				slog.String("ext_id", ext.ExtID),
+				slog.Any("error", err),
+			)
+			return nil // Extension is enabled even if apply fails.
+		}
+
+		if err := s.applier.Apply(ctx, campaignID, ext, &manifest); err != nil {
+			slog.Warn("content application had errors",
+				slog.String("ext_id", ext.ExtID),
+				slog.Any("error", err),
+			)
+			// Don't fail the enable — extension is enabled, content partially applied.
+		}
+	}
+
+	return nil
 }
 
 // DisableForCampaign disables an extension for a campaign (keeps imported data).
