@@ -34,6 +34,9 @@ type SMTPService interface {
 
 	// TestConnection verifies SMTP connectivity with current settings.
 	TestConnection(ctx context.Context) error
+
+	// SendTestEmail sends a test email to the given address using current settings.
+	SendTestEmail(ctx context.Context, to string) error
 }
 
 // smtpService implements SMTPService.
@@ -391,58 +394,109 @@ func (s *smtpService) TestConnection(ctx context.Context) error {
 
 // testStartTLS tests connectivity with optional STARTTLS.
 func (s *smtpService) testStartTLS(addr, host, username, password string, useTLS bool) error {
+	slog.Info("smtp test: connecting", slog.String("addr", addr), slog.Bool("starttls", useTLS))
+
 	conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
 	if err != nil {
-		return apperror.NewBadRequest(fmt.Sprintf("could not connect to %s: %v", addr, err))
+		slog.Warn("smtp test: TCP connect failed", slog.String("addr", addr), slog.Any("error", err))
+		return apperror.NewBadRequest(fmt.Sprintf("Could not connect to %s. Verify the host and port are correct and that the server is reachable.", addr))
 	}
 	defer conn.Close()
 
+	slog.Info("smtp test: TCP connected, starting SMTP handshake")
 	client, err := gosmtp.NewClient(conn, host)
 	if err != nil {
-		return apperror.NewBadRequest(fmt.Sprintf("SMTP handshake failed: %v", err))
+		slog.Warn("smtp test: SMTP handshake failed", slog.Any("error", err))
+		return apperror.NewBadRequest(fmt.Sprintf("Connected to %s but SMTP handshake failed: %v. Verify this is an SMTP server.", addr, err))
 	}
 	defer client.Close()
 
 	if useTLS {
+		slog.Info("smtp test: starting TLS upgrade")
 		tlsConfig := &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}
 		if err := client.StartTLS(tlsConfig); err != nil {
-			return apperror.NewBadRequest(fmt.Sprintf("STARTTLS failed: %v", err))
+			slog.Warn("smtp test: STARTTLS failed", slog.Any("error", err))
+			return apperror.NewBadRequest(fmt.Sprintf("STARTTLS failed on port %s: %v. Try switching to SSL/TLS (port 465) or None if your server doesn't support STARTTLS.", addr, err))
 		}
 	}
 
 	if username != "" {
+		slog.Info("smtp test: authenticating", slog.String("username", username))
 		auth := gosmtp.PlainAuth("", username, password, host)
 		if err := client.Auth(auth); err != nil {
-			return apperror.NewBadRequest(fmt.Sprintf("authentication failed: %v", err))
+			slog.Warn("smtp test: authentication failed", slog.String("username", username), slog.Any("error", err))
+			return apperror.NewBadRequest(fmt.Sprintf("Authentication failed: %v. Verify your username and password. Some providers require app-specific passwords.", err))
 		}
 	}
 
+	slog.Info("smtp test: connection successful")
 	return client.Quit()
 }
 
 // testSSL tests connectivity with implicit SSL/TLS.
 func (s *smtpService) testSSL(addr, host, username, password string) error {
+	slog.Info("smtp test: connecting with SSL", slog.String("addr", addr))
+
 	tlsConfig := &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}
 	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 10 * time.Second}, "tcp", addr, tlsConfig)
 	if err != nil {
-		return apperror.NewBadRequest(fmt.Sprintf("could not connect to %s (SSL): %v", addr, err))
+		slog.Warn("smtp test: SSL connect failed", slog.String("addr", addr), slog.Any("error", err))
+		return apperror.NewBadRequest(fmt.Sprintf("SSL connection to %s failed: %v. Try STARTTLS (port 587) if your server doesn't support implicit SSL.", addr, err))
 	}
 	defer conn.Close()
 
+	slog.Info("smtp test: SSL connected, starting SMTP handshake")
 	client, err := gosmtp.NewClient(conn, host)
 	if err != nil {
-		return apperror.NewBadRequest(fmt.Sprintf("SMTP handshake failed: %v", err))
+		slog.Warn("smtp test: SMTP handshake failed over SSL", slog.Any("error", err))
+		return apperror.NewBadRequest(fmt.Sprintf("SSL connected to %s but SMTP handshake failed: %v. Verify this is an SMTP server on this port.", addr, err))
 	}
 	defer client.Close()
 
 	if username != "" {
+		slog.Info("smtp test: authenticating", slog.String("username", username))
 		auth := gosmtp.PlainAuth("", username, password, host)
 		if err := client.Auth(auth); err != nil {
-			return apperror.NewBadRequest(fmt.Sprintf("authentication failed: %v", err))
+			slog.Warn("smtp test: authentication failed", slog.String("username", username), slog.Any("error", err))
+			return apperror.NewBadRequest(fmt.Sprintf("Authentication failed: %v. Verify your username and password. Some providers require app-specific passwords.", err))
 		}
 	}
 
+	slog.Info("smtp test: SSL connection successful")
 	return client.Quit()
+}
+
+// SendTestEmail sends a test email to the given address using current SMTP settings.
+// This verifies the full send pipeline (DNS, connect, TLS, auth, delivery).
+func (s *smtpService) SendTestEmail(ctx context.Context, to string) error {
+	if to == "" {
+		return apperror.NewBadRequest("recipient email address is required")
+	}
+	if _, err := mail.ParseAddress(to); err != nil {
+		return apperror.NewBadRequest("invalid recipient email address")
+	}
+
+	subject := "Chronicle SMTP Test"
+	body := fmt.Sprintf("This is a test email from Chronicle.\n\nIf you are reading this, your SMTP configuration is working correctly.\n\nSent at: %s",
+		time.Now().UTC().Format(time.RFC1123Z))
+
+	if err := s.SendMail(ctx, []string{to}, subject, body); err != nil {
+		// Wrap the raw SMTP error with actionable guidance.
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "STARTTLS") || strings.Contains(errMsg, "TLS") {
+			return apperror.NewBadRequest(fmt.Sprintf("TLS error: %s. Try switching to SSL (port 465) or check your server's TLS requirements.", errMsg))
+		}
+		if strings.Contains(errMsg, "authenticating") || strings.Contains(errMsg, "AUTH") {
+			return apperror.NewBadRequest(fmt.Sprintf("Authentication failed: %s. Verify your username and password.", errMsg))
+		}
+		if strings.Contains(errMsg, "connecting") || strings.Contains(errMsg, "dial") {
+			return apperror.NewBadRequest(fmt.Sprintf("Connection failed: %s. Verify the host and port are correct.", errMsg))
+		}
+		return apperror.NewBadRequest(fmt.Sprintf("Failed to send test email: %s", errMsg))
+	}
+
+	slog.Info("test email sent successfully", slog.String("to", to))
+	return nil
 }
 
 // validateSMTPHost rejects SMTP hosts that resolve to private/reserved IP

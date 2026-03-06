@@ -383,17 +383,6 @@ templ AdminSidebarNav() {
 				Storage
 			</a>
 			<a
-				href="/admin/plugins"
-				class={ sidebarNavLink,
-					templ.KV(sidebarNavActive, isPathPrefix(ctx, "/admin/plugins")),
-					templ.KV(sidebarNavInactive, !isPathPrefix(ctx, "/admin/plugins")) }
-			>
-				<span class="w-4 h-4 mr-3 shrink-0 flex items-center justify-center">
-					<i class="fa-solid fa-cubes text-xs"></i>
-				</span>
-				Plugins
-			</a>
-			<a
 				href="/admin/addons"
 				class={ sidebarNavLink,
 					templ.KV(sidebarNavActive, isPathPrefix(ctx, "/admin/addons")),
@@ -402,7 +391,7 @@ templ AdminSidebarNav() {
 				<span class="w-4 h-4 mr-3 shrink-0 flex items-center justify-center">
 					<i class="fa-solid fa-plug text-xs"></i>
 				</span>
-				Extensions
+				Features
 			</a>
 			<a
 				href="/admin/extensions"
@@ -414,6 +403,17 @@ templ AdminSidebarNav() {
 					<i class="fa-solid fa-puzzle-piece text-xs"></i>
 				</span>
 				Content Packs
+			</a>
+			<a
+				href="/admin/modules"
+				class={ sidebarNavLink,
+					templ.KV(sidebarNavActive, isPathPrefix(ctx, "/admin/modules")),
+					templ.KV(sidebarNavInactive, !isPathPrefix(ctx, "/admin/modules")) }
+			>
+				<span class="w-4 h-4 mr-3 shrink-0 flex items-center justify-center">
+					<i class="fa-solid fa-dice-d20 text-xs"></i>
+				</span>
+				Game Systems
 			</a>
 			<a
 				href="/admin/api"

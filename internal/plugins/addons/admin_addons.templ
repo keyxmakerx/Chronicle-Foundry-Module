@@ -1,6 +1,6 @@
-// admin_addons.templ renders the admin extension management page.
-// Shows all registered extensions (active, planned, deprecated) with controls
-// to change status and register new extensions.
+// admin_addons.templ renders the admin features management page.
+// Shows all registered features (active, planned, deprecated) with controls
+// to change status and register new features.
 
 package addons
 
@@ -11,13 +11,13 @@ import (
 
 // AdminAddonsPageTempl renders the full admin extensions management page.
 templ AdminAddonsPageTempl(addons []Addon, csrfToken string) {
-	@layouts.App("Extensions - Admin") {
+	@layouts.App("Features - Admin") {
 		<div class="max-w-5xl mx-auto space-y-6">
 			<div class="flex items-center justify-between">
 				<div>
-					<h1 class="text-2xl font-bold text-fg">Extensions</h1>
+					<h1 class="text-2xl font-bold text-fg">Features</h1>
 					<p class="text-sm text-fg-secondary mt-1">
-						Manage installable extensions — game modules, widgets, and integrations.
+						Manage optional features — calendar, maps, timeline, and more.
 						Campaign owners can enable or disable these per campaign.
 					</p>
 				</div>
@@ -70,7 +70,7 @@ templ AdminAddonsPageTempl(addons []Addon, csrfToken string) {
 
 			// Create new extension form.
 			<div class="card p-6">
-				<h2 class="text-lg font-semibold text-fg mb-4">Register New Extension</h2>
+				<h2 class="text-lg font-semibold text-fg mb-4">Register New Feature</h2>
 				<form
 					method="POST"
 					action="/admin/addons"
@@ -111,7 +111,7 @@ templ AdminAddonsPageTempl(addons []Addon, csrfToken string) {
 						<input type="text" id="author" name="author" class="input w-full" placeholder="Chronicle"/>
 					</div>
 					<div class="md:col-span-2 flex justify-end">
-						<button type="submit" class="btn-primary text-sm">Register Extension</button>
+						<button type="submit" class="btn-primary text-sm">Register Feature</button>
 					</div>
 				</form>
 			</div>
@@ -123,14 +123,14 @@ templ AdminAddonsPageTempl(addons []Addon, csrfToken string) {
 						<i class="fa-solid fa-circle-info text-accent"></i>
 					</span>
 					<div>
-						<h3 class="text-sm font-semibold text-fg mb-1">About Extensions</h3>
+						<h3 class="text-sm font-semibold text-fg mb-1">About Features</h3>
 						<p class="text-sm text-fg-secondary leading-relaxed">
-							Extensions add optional features to Chronicle. <strong>Game Modules</strong> add system content,
-							<strong>Widgets</strong> add new UI components, and <strong>Integrations</strong> connect
-							Chronicle to external services like Foundry VTT or other tools.
+							Features add optional capabilities to Chronicle campaigns. They include tools like
+							<strong>Calendar</strong>, <strong>Maps</strong>, <strong>Timeline</strong>, and
+							<strong>Integrations</strong> that connect Chronicle to external services.
 						</p>
 						<p class="text-sm text-fg-secondary leading-relaxed mt-2">
-							Only active extensions can be enabled by campaign owners. Set an extension to planned while
+							Only active features can be enabled by campaign owners. Set a feature to planned while
 							it's being developed, or deprecated when it's being phased out.
 						</p>
 					</div>
@@ -213,7 +213,7 @@ templ adminAddonCard(a Addon, csrfToken string) {
 						</button>
 					</form>
 				}
-				<form method="POST" hx-delete={ fmt.Sprintf("/admin/addons/%d", a.ID) } hx-confirm="Delete this extension? This will also remove it from all campaigns." class="inline">
+				<form method="POST" hx-delete={ fmt.Sprintf("/admin/addons/%d", a.ID) } hx-confirm="Delete this feature? This will also remove it from all campaigns." class="inline">
 					<input type="hidden" name="csrf_token" value={ csrfToken }/>
 					<button type="submit" class="text-xs text-red-500 hover:text-red-600 ml-1" title="Delete">
 						<i class="fa-solid fa-trash"></i>

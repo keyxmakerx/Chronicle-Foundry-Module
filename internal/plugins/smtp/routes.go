@@ -8,4 +8,5 @@ func RegisterRoutes(adminGroup *echo.Group, h *Handler) {
 	adminGroup.GET("/smtp", h.Settings)
 	adminGroup.PUT("/smtp", h.UpdateSettings)
 	adminGroup.POST("/smtp/test", h.TestConnection)
+	adminGroup.POST("/smtp/send-test", h.SendTestEmail)
 }

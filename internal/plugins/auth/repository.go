@@ -30,6 +30,11 @@ type UserRepository interface {
 	UpdateDisplayName(ctx context.Context, userID, displayName string) error
 	UpdateAvatarPath(ctx context.Context, userID string, avatarPath *string) error
 
+	// Email change verification.
+	SetPendingEmail(ctx context.Context, userID, pendingEmail, tokenHash string, expiresAt time.Time) error
+	FindByEmailVerifyToken(ctx context.Context, tokenHash string) (userID, pendingEmail string, expiresAt time.Time, err error)
+	ConfirmEmailChange(ctx context.Context, userID, newEmail string) error
+
 	// Admin operations.
 	ListUsers(ctx context.Context, offset, limit int) ([]User, int, error)
 	UpdateIsAdmin(ctx context.Context, id string, isAdmin bool) error
@@ -354,6 +359,54 @@ func (r *userRepository) MarkResetTokenUsed(ctx context.Context, tokenHash strin
 	_, err := r.db.ExecContext(ctx, query, tokenHash)
 	if err != nil {
 		return fmt.Errorf("marking reset token used: %w", err)
+	}
+	return nil
+}
+
+// --- Email Change Verification ---
+
+// SetPendingEmail stores a pending email change request with a verification token.
+func (r *userRepository) SetPendingEmail(ctx context.Context, userID, pendingEmail, tokenHash string, expiresAt time.Time) error {
+	query := `UPDATE users SET pending_email = ?, email_verify_token = ?, email_verify_expires = ? WHERE id = ?`
+	result, err := r.db.ExecContext(ctx, query, pendingEmail, tokenHash, expiresAt, userID)
+	if err != nil {
+		return fmt.Errorf("setting pending email: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return apperror.NewNotFound("user not found")
+	}
+	return nil
+}
+
+// FindByEmailVerifyToken looks up a user by their email verification token hash.
+// Returns the user ID, pending email, and token expiry.
+func (r *userRepository) FindByEmailVerifyToken(ctx context.Context, tokenHash string) (string, string, time.Time, error) {
+	query := `SELECT id, pending_email, email_verify_expires FROM users WHERE email_verify_token = ?`
+	var userID string
+	var pendingEmail string
+	var expiresAt time.Time
+	err := r.db.QueryRowContext(ctx, query, tokenHash).Scan(&userID, &pendingEmail, &expiresAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", time.Time{}, apperror.NewNotFound("invalid or expired verification link")
+	}
+	if err != nil {
+		return "", "", time.Time{}, fmt.Errorf("finding email verify token: %w", err)
+	}
+	return userID, pendingEmail, expiresAt, nil
+}
+
+// ConfirmEmailChange atomically updates the user's email and clears the pending
+// email verification fields.
+func (r *userRepository) ConfirmEmailChange(ctx context.Context, userID, newEmail string) error {
+	query := `UPDATE users SET email = ?, pending_email = NULL, email_verify_token = NULL, email_verify_expires = NULL WHERE id = ?`
+	result, err := r.db.ExecContext(ctx, query, newEmail, userID)
+	if err != nil {
+		return fmt.Errorf("confirming email change: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return apperror.NewNotFound("user not found")
 	}
 	return nil
 }

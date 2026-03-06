@@ -1,5 +1,5 @@
-// campaign_addons.templ renders the per-campaign extension settings page.
-// Campaign owners use this to enable/disable extensions for their campaign.
+// campaign_addons.templ renders the per-campaign features & content packs page.
+// Campaign owners use this to enable/disable features for their campaign.
 
 package addons
 
@@ -10,13 +10,13 @@ import (
 
 // CampaignAddonsPageTempl renders the full campaign addons settings page.
 templ CampaignAddonsPageTempl(campaignID string, addons []CampaignAddon, csrfToken string) {
-	@layouts.App("Extensions") {
+	@layouts.App("Features & Content Packs") {
 		<div class="max-w-3xl mx-auto space-y-6">
 			<div class="flex items-center justify-between">
 				<div>
-					<h1 class="text-2xl font-bold text-fg">Extensions</h1>
+					<h1 class="text-2xl font-bold text-fg">Features & Content Packs</h1>
 					<p class="text-sm text-fg-secondary mt-1">
-						Enable or disable extensions for this campaign.
+						Enable or disable features and content packs for this campaign.
 					</p>
 				</div>
 				<a href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/edit", campaignID)) } class="btn-secondary text-sm">
@@ -35,10 +35,11 @@ templ CampaignAddonsPageTempl(campaignID string, addons []CampaignAddon, csrfTok
 						<i class="fa-solid fa-circle-info text-accent"></i>
 					</span>
 					<div>
-						<h3 class="text-sm font-semibold text-fg mb-1">About Extensions</h3>
+						<h3 class="text-sm font-semibold text-fg mb-1">About Features & Content Packs</h3>
 						<p class="text-sm text-fg-secondary leading-relaxed">
-							Extensions add new features to your campaign. Toggle them on or off at any time.
-							Disabling an extension does not delete its data — you can re-enable it later.
+							Features add optional capabilities to your campaign like calendars, maps, and timelines.
+							Content packs provide pre-made entity types, tag sets, and reference data.
+							Toggle them on or off at any time — disabling does not delete your data.
 						</p>
 					</div>
 				</div>
@@ -53,7 +54,7 @@ templ CampaignAddonsListFragment(campaignID string, addons []CampaignAddon, csrf
 	if countCampaignAddonsByCategory(addons, CategoryPlugin) > 0 {
 		<div class="mb-6">
 			<h2 class="section-header mb-3">
-				<i class="fa-solid fa-cube mr-2 text-fg-muted"></i>Plugins
+				<i class="fa-solid fa-cube mr-2 text-fg-muted"></i>Features
 			</h2>
 			<div class="space-y-2">
 				for _, a := range addons {
@@ -68,7 +69,7 @@ templ CampaignAddonsListFragment(campaignID string, addons []CampaignAddon, csrf
 	if countCampaignAddonsByCategory(addons, CategoryModule) > 0 {
 		<div class="mb-6">
 			<h2 class="section-header mb-3">
-				<i class="fa-solid fa-book-open mr-2 text-fg-muted"></i>Game Modules
+				<i class="fa-solid fa-dice-d20 mr-2 text-fg-muted"></i>Game Systems
 			</h2>
 			<div class="space-y-2">
 				for _, a := range addons {
@@ -112,7 +113,7 @@ templ CampaignAddonsListFragment(campaignID string, addons []CampaignAddon, csrf
 
 	if len(addons) == 0 {
 		<div class="card p-8 text-center">
-			<p class="text-fg-muted">No extensions available yet.</p>
+			<p class="text-fg-muted">No features available yet.</p>
 		</div>
 	}
 

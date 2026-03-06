@@ -81,7 +81,7 @@ templ CustomizePage(cc *CampaignContext, entityTypes []SettingsEntityType, csrfT
 					:class="tab === 'extensions' ? 'text-accent border-accent' : 'text-fg-secondary border-transparent hover:text-fg hover:border-edge'"
 					@click="tab = 'extensions'"
 				>
-					<i class="fa-solid fa-plug mr-1.5 text-xs"></i> Extensions
+					<i class="fa-solid fa-plug mr-1.5 text-xs"></i> Features & Packs
 				</button>
 			</div>
 
@@ -323,9 +323,9 @@ templ navigationTab(cc *CampaignContext, entityTypes []SettingsEntityType, csrfT
 templ extensionsTab(cc *CampaignContext, entityTypes []SettingsEntityType, csrfToken string) {
 	<div class="space-y-6">
 		<div>
-			<h2 class="text-base font-semibold text-fg mb-0.5">Extensions</h2>
+			<h2 class="text-base font-semibold text-fg mb-0.5">Features & Content Packs</h2>
 			<p class="text-xs text-fg-secondary">
-				Enable or disable extensions for this campaign. Disabling an extension does not delete its data.
+				Enable or disable features and content packs for this campaign. Disabling does not delete your data.
 			</p>
 		</div>
 
@@ -469,6 +469,7 @@ templ LayoutEditorFragment(cc *CampaignContext, et *LayoutEditorEntityType, csrf
 			class="flex-1 overflow-hidden"
 			data-widget="template-editor"
 			data-endpoint={ fmt.Sprintf("/campaigns/%s/entity-types/%d/layout", cc.Campaign.ID, et.ID) }
+			data-campaign-id={ cc.Campaign.ID }
 			data-layout={ et.LayoutJSON }
 			data-fields={ et.FieldsJSON }
 			data-entity-type-name={ et.Name }

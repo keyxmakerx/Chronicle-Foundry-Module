@@ -344,6 +344,13 @@
     }
   });
 
+  // Clear all dirty sources when HTMX triggers a redirect (HX-Redirect).
+  // This prevents false "unsaved changes" warnings on successful form
+  // submissions that redirect to a new page.
+  document.addEventListener('htmx:beforeRedirect', function () {
+    dirtySources = {};
+  });
+
   // Clear form dirty sources when HTMX swaps out tracked forms.
   document.addEventListener('htmx:beforeSwap', function (event) {
     if (event.detail && event.detail.target) {
