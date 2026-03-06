@@ -8,11 +8,19 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-06 -- Entity block registry: self-registering plugin block types.
+2026-03-06 -- ADR-021: Layered third-party extension strategy research & design.
 Branch: `claude/fix-calendar-shop-widgets-45iz7`.
 
 ## Current Phase
 **Phase M3: Test Coverage — COMPLETE.** Maps (45 tests), Calendar (40+ tests), Sessions (40+ tests), Timeline (50+ tests). Next: M (Game System Modules).
+
+### Extension System Research (batch 56)
+- **ADR-021**: Layered third-party extension strategy recorded in `.ai/decisions.md`.
+- **Research**: Analyzed WordPress, Grafana, Discourse, Obsidian, Foundry VTT, Shopify plugin architectures plus Go-specific approaches (HashiCorp go-plugin, WASM/Extism/wazero, GopherLua).
+- **Decision**: Three layers — (1) Content Extensions (manifest-only, no code), (2) Widget Extensions (browser-sandboxed JS), (3) Logic Extensions (WASM via Extism/wazero, future).
+- **WASM deep dive**: Complete technical design for Extism Go SDK integration — host functions, plugin lifecycle, security model (capability-based permissions, memory limits, execution timeouts), plugin development in Rust/Go/JS, performance characteristics (~1-10μs per call). Instance-per-call model, separate `hostapi` package for stable API contract.
+- **Content extension deep dive**: Complete manifest schema design (`manifest.json`), 7 content categories (calendar presets, entity type templates, entity packs, tag collections, marker icon packs, theme variants, relation type templates), storage design (hybrid: write to existing tables + `extension_records` provenance tracking), installation/uninstall lifecycle, API endpoints (admin + per-campaign), security (file type validation, path traversal prevention, SVG sanitization, size limits).
+- **Migration**: 3 new tables designed (`extensions`, `campaign_extensions`, `extension_records` + `extension_assets`).
 
 ### Entity Block Registry (batch 55)
 - **Bug fix**: `validBlockTypes` in entities/service.go was missing most block types, causing "invalid block type" errors for shop_inventory, calendar, timeline, etc.
