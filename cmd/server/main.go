@@ -79,6 +79,11 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
+		// Unload all WASM plugins before stopping the server.
+		if application.WASMPluginManager != nil {
+			application.WASMPluginManager.UnloadAll(ctx)
+		}
+
 		if err := application.Echo.Shutdown(ctx); err != nil {
 			slog.Error("server forced shutdown", slog.Any("error", err))
 		}

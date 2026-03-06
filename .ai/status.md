@@ -8,11 +8,11 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-06 -- Phase R: Logic Extensions (Layer 3/WASM) — Sprint R-1 COMPLETE.
+2026-03-06 -- Phase R: Logic Extensions (Layer 3/WASM) — Sprints R-1 and R-2 COMPLETE.
 Branch: `claude/phase-r-logic-extensions-HybRz`.
 
 ## Current Phase
-**Phase R: Logic Extensions (Layer 3/WASM) — Sprint R-1 complete.** WASM runtime integration via Extism/wazero is built. Next: Sprint R-2 (Capability-Based Security hardening).
+**Phase R: Logic Extensions (Layer 3/WASM) — R-1 and R-2 complete.** Full WASM runtime integration wired into app with service adapters, auto-loading, graceful shutdown, admin UI. Next: Sprint R-3 (Write Host Functions) or R-4 (Plugin SDK).
 
 ### Sprint R-1: WASM Runtime Integration (COMPLETE)
 - Added Extism Go SDK v1.7.1 + wazero v1.9.0 dependencies
@@ -34,6 +34,16 @@ Branch: `claude/phase-r-logic-extensions-HybRz`.
 - **Repository**: Added DeleteDataByKey method for per-key KV deletion
 - **Tests**: 26 new tests — manifest validation (15 cases), model defaults, capabilities, hook types, plugin key generation, serialization, manager lifecycle, security allowlist, zip entry validation, context helpers, log drain/limit
 - **New files**: wasm_model.go, wasm_manager.go, wasm_host.go, wasm_kvstore.go, wasm_hooks.go, wasm_handler.go, wasm_test.go
+
+### Sprint R-2: App Wiring & Admin UI (COMPLETE)
+- **App wiring** (`app/routes.go`): EntityReader, CalendarReader, TagReader adapters with JSON serialization closures wrapping concrete services. KV store backed by extension_data. PluginManager, HookDispatcher, WASMHandler all instantiated and registered
+- **Adapters** (`wasm_adapters.go`): NewWASMEntityAdapter, NewWASMCalendarAdapter, NewWASMTagAdapter — closure-based adapters avoiding direct plugin imports
+- **Auto-loading**: Content applier now auto-loads WASM plugins when extensions are enabled (SetWASMLoader interface on ContentApplier)
+- **Graceful shutdown**: main.go unloads all WASM plugins before stopping server
+- **App struct**: WASMPluginManager + WASMHookDispatcher fields for lifecycle management
+- **Admin UI**: Extension detail page now shows Widgets and WASM Plugins in the contributes section (capabilities as violet badges, hooks as amber badges)
+- **Tests**: 12 new tests — adapter delegates (entity/calendar/tag), capability-based host function filtering (8 cases), call context lifecycle, unload/reload/call error paths
+- **New files**: wasm_adapters.go, wasm_adapters_test.go
 
 ### Phase P Summary (Sprints P-1 through P-6)
 - **P-1**: Extension infrastructure — migration 000055 (4 tables), manifest parser/validator, zip security, repository (16 methods), service, handler, routes, config
@@ -253,7 +263,7 @@ Created `.ai/audit.md` — comprehensive feature parity and completeness audit c
 - Example test updated to validate dice-roller manifest
 
 ## Next Session Should
-Continue with **Sprint R-2: Capability-Based Security** — PluginCapabilities model, host function filtering by declared capabilities (already implemented), memory limits (16MB default, already implemented), execution timeouts (30s, already implemented), fuel metering. Rate limiting per plugin. OR wire WASM into app/routes.go with service adapter implementations for EntityReader/CalendarReader/TagReader. Full roadmap in `.ai/todo.md`.
+Continue with **Sprint R-3: Write Host Functions** — create_event, update_entity_fields, add_tag host functions with write capability. Plugin-to-plugin messaging. OR **Sprint R-4: Plugin SDK** — CLI tool for local testing, example plugins in Rust/Go/JS. Full roadmap in `.ai/todo.md`.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)
