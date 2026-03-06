@@ -8,19 +8,22 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-06 -- ADR-021: Layered third-party extension strategy research & design.
+2026-03-06 -- Sprint P-1: Content Extension Infrastructure complete.
 Branch: `claude/fix-calendar-shop-widgets-45iz7`.
 
 ## Current Phase
-**Phase M3: Test Coverage — COMPLETE.** Maps (45 tests), Calendar (40+ tests), Sessions (40+ tests), Timeline (50+ tests). Next: M (Game System Modules).
+**Phase P: Content Extensions (Layer 1).** Sprint P-1 complete. Next: Sprint P-2 (Admin Extension Management UI).
+
+### Sprint P-1: Extension Infrastructure (batch 57) — COMPLETE
+- **Migration 000055**: 4 tables — `extensions`, `campaign_extensions`, `extension_provenance`, `extension_data`
+- **Package `internal/extensions/`**: Complete extension system with model, manifest parser/validator, security (zip extraction, path traversal prevention, file type allowlist, CSS/SVG sanitization), repository (16 methods), service (install/uninstall/update/rescan + per-campaign enable/disable), handler (admin + campaign HTTP endpoints), templ templates, routes
+- **Config**: Added `ExtensionsPath` to config with `EXTENSIONS_PATH` env var
+- **Wiring**: Extension service/handler/routes integrated in `app/routes.go`
+- **Build**: Clean — 0 lint issues, all tests pass
 
 ### Extension System Research (batch 56)
 - **ADR-021**: Layered third-party extension strategy recorded in `.ai/decisions.md`.
-- **Research**: Analyzed WordPress, Grafana, Discourse, Obsidian, Foundry VTT, Shopify plugin architectures plus Go-specific approaches (HashiCorp go-plugin, WASM/Extism/wazero, GopherLua).
 - **Decision**: Three layers — (1) Content Extensions (manifest-only, no code), (2) Widget Extensions (browser-sandboxed JS), (3) Logic Extensions (WASM via Extism/wazero, future).
-- **WASM deep dive**: Complete technical design for Extism Go SDK integration — host functions, plugin lifecycle, security model (capability-based permissions, memory limits, execution timeouts), plugin development in Rust/Go/JS, performance characteristics (~1-10μs per call). Instance-per-call model, separate `hostapi` package for stable API contract.
-- **Content extension deep dive**: Complete manifest schema design (`manifest.json`), 7 content categories (calendar presets, entity type templates, entity packs, tag collections, marker icon packs, theme variants, relation type templates), storage design (hybrid: write to existing tables + `extension_records` provenance tracking), installation/uninstall lifecycle, API endpoints (admin + per-campaign), security (file type validation, path traversal prevention, SVG sanitization, size limits).
-- **Migration**: 3 new tables designed (`extensions`, `campaign_extensions`, `extension_records` + `extension_assets`).
 
 ### Entity Block Registry (batch 55-56)
 - **Bug fix**: `validBlockTypes` in entities/service.go was missing most block types, causing "invalid block type" errors for shop_inventory, calendar, timeline, etc.
@@ -204,7 +207,7 @@ Created `.ai/audit.md` — comprehensive feature parity and completeness audit c
 ---
 
 ## Next Session Should
-Continue with **Phase M: Game System Modules** (Sprint M-1: D&D 5e module — SRD data + tooltip API). Full roadmap in `.ai/todo.md`.
+Continue with **Phase P: Content Extensions** — Sprint P-2 (Admin Extension Management UI polish), then P-3 through P-6 (content type applicators), Q (Widget Extensions Layer 2), R (Logic Extensions Layer 3/WASM). Full roadmap in `.ai/todo.md`.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)
