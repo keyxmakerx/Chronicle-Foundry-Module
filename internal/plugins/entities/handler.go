@@ -85,6 +85,7 @@ type Handler struct {
 	sessionSearcher    SessionSearcher
 	memberLister       MemberLister
 	groupLister        GroupLister
+	blockRegistry      *BlockRegistry
 	cache              *redis.Client
 }
 
@@ -103,6 +104,12 @@ func (h *Handler) SetAuditService(svc audit.AuditService) {
 // Called after all plugins are wired to avoid initialization order issues.
 func (h *Handler) SetAddonChecker(svc AddonChecker) {
 	h.addonSvc = svc
+}
+
+// SetBlockRegistry sets the block registry for the block-types API endpoint.
+// Called after all plugins have registered their block types.
+func (h *Handler) SetBlockRegistry(reg *BlockRegistry) {
+	h.blockRegistry = reg
 }
 
 // SetTagFetcher sets the tag fetcher for populating entity tags in list views.
@@ -1427,6 +1434,23 @@ func (h *Handler) DeleteEntityType(c echo.Context) error {
 }
 
 // --- Template Editor ---
+
+// BlockTypesAPI returns the available block types for the template editor,
+// filtered by which addons are enabled for the current campaign.
+// GET /campaigns/:id/entity-types/block-types
+func (h *Handler) BlockTypesAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	if cc == nil {
+		return apperror.NewMissingContext()
+	}
+
+	if h.blockRegistry == nil {
+		return c.JSON(http.StatusOK, []BlockMeta{})
+	}
+
+	types := h.blockRegistry.TypesForCampaign(c.Request().Context(), cc.Campaign.ID, h.addonSvc)
+	return c.JSON(http.StatusOK, types)
+}
 
 // TemplateEditor renders the visual template editor for an entity type.
 // GET /campaigns/:id/entity-types/:etid/template

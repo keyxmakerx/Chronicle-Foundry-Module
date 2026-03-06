@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/a-h/templ"
 	"github.com/labstack/echo/v4"
 
 	"github.com/keyxmakerx/chronicle/internal/middleware"
@@ -830,6 +831,48 @@ func (a *App) RegisterRoutes() {
 	entityHandler.SetMemberLister(campaignService)
 	entityHandler.SetGroupLister(groupService)
 	entityHandler.SetCache(a.Redis)
+
+	// --- Entity Block Registry ---
+	// Create the block registry and let each plugin register its block types.
+	// This drives validation, rendering, and the template editor palette.
+	blockRegistry := entities.NewBlockRegistry()
+	entities.RegisterCoreBlocks(blockRegistry)
+
+	// Calendar plugin blocks (requires "calendar" addon).
+	blockRegistry.Register(entities.BlockMeta{
+		Type: "calendar", Label: "Calendar", Icon: "fa-calendar-days",
+		Description: "Entity calendar events", Addon: "calendar",
+	}, func(ctx entities.BlockRenderContext) templ.Component {
+		return calendar.BlockCalendarEvents(ctx.CC, ctx.Entity.ID)
+	})
+	blockRegistry.Register(entities.BlockMeta{
+		Type: "upcoming_events", Label: "Upcoming Events", Icon: "fa-calendar-check",
+		Description: "Upcoming calendar events list", Addon: "calendar",
+	}, func(ctx entities.BlockRenderContext) templ.Component {
+		return calendar.BlockUpcomingEvents(ctx.CC, entities.BlockConfigLimit(ctx.Block.Config, "limit", 5))
+	})
+
+	// Timeline plugin blocks (requires "timeline" addon).
+	blockRegistry.Register(entities.BlockMeta{
+		Type: "timeline", Label: "Timeline", Icon: "fa-timeline",
+		Description: "Timeline preview with events", Addon: "timeline",
+	}, func(ctx entities.BlockRenderContext) templ.Component {
+		return timeline.BlockTimeline(ctx.CC)
+	})
+
+	// Maps plugin blocks (requires "maps" addon).
+	blockRegistry.Register(entities.BlockMeta{
+		Type: "map_preview", Label: "Map", Icon: "fa-map",
+		Description: "Embedded map viewer", Addon: "maps",
+	}, func(ctx entities.BlockRenderContext) templ.Component {
+		return maps.BlockMapPreview(ctx.CC, entities.BlockConfigString(ctx.Block.Config, "map_id"))
+	})
+
+	// Set the registry on the entity service (validation) and as the global (rendering).
+	entityService.SetBlockRegistry(blockRegistry)
+	entities.SetGlobalBlockRegistry(blockRegistry)
+	entityHandler.SetBlockRegistry(blockRegistry)
+
 	campaignHandler.SetAuditLogger(&campaignAuditAdapter{svc: auditService})
 	campaignHandler.SetAddonLister(&addonListerAdapter{svc: addonService})
 	tagHandler.SetAuditService(auditService)

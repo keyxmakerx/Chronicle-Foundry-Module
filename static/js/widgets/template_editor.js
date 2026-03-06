@@ -17,6 +17,7 @@ Chronicle.register('template-editor', {
   init(el) {
     this.el = el;
     this.endpoint = el.dataset.endpoint;
+    this.campaignId = el.dataset.campaignId;
     this.entityTypeName = el.dataset.entityTypeName;
     this.csrfToken = el.dataset.csrfToken;
     try {
@@ -41,12 +42,45 @@ Chronicle.register('template-editor', {
       this.layout = this.defaultLayout();
     }
 
+    // Block types are fetched from the API (filtered by campaign addons).
+    // Start with an empty list and load asynchronously.
+    this.blockTypes = [];
+    this._loadBlockTypes();
+
     this.render();
     this.bindSave();
   },
 
-  /** Available block types that can be dragged from the palette. */
-  blockTypes: [
+  /** Fetch available block types from the API. Re-renders the palette once loaded. */
+  _loadBlockTypes() {
+    var self = this;
+    if (!this.campaignId) {
+      console.warn('[template-editor] No campaign ID, using fallback block types');
+      this.blockTypes = this._fallbackBlockTypes;
+      return;
+    }
+    Chronicle.apiFetch('/campaigns/' + this.campaignId + '/entity-types/block-types')
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (types) {
+        if (types && types.length > 0) {
+          // Map API response to the format the editor expects.
+          self.blockTypes = types.map(function (t) {
+            return { type: t.type, label: t.label, icon: t.icon, desc: t.description, container: !!t.container };
+          });
+        } else {
+          self.blockTypes = self._fallbackBlockTypes;
+        }
+        // Re-render the palette with the loaded block types.
+        self.render();
+      })
+      .catch(function () {
+        self.blockTypes = self._fallbackBlockTypes;
+        self.render();
+      });
+  },
+
+  /** Fallback block types used when the API is unavailable. */
+  _fallbackBlockTypes: [
     { type: 'title',        label: 'Title',        icon: 'fa-heading',       desc: 'Entity name and actions' },
     { type: 'image',        label: 'Image',         icon: 'fa-image',         desc: 'Header image with upload' },
     { type: 'entry',        label: 'Rich Text',     icon: 'fa-align-left',    desc: 'Main content editor' },
@@ -55,10 +89,6 @@ Chronicle.register('template-editor', {
     { type: 'tags',         label: 'Tags',          icon: 'fa-tags',          desc: 'Tag picker widget' },
     { type: 'relations',    label: 'Relations',     icon: 'fa-link',          desc: 'Entity relation links' },
     { type: 'divider',      label: 'Divider',       icon: 'fa-minus',         desc: 'Horizontal separator' },
-    { type: 'calendar',     label: 'Calendar',      icon: 'fa-calendar-days', desc: 'Entity calendar events' },
-    { type: 'upcoming_events', label: 'Upcoming Events', icon: 'fa-calendar-check', desc: 'Upcoming calendar events list' },
-    { type: 'timeline',     label: 'Timeline',      icon: 'fa-timeline',      desc: 'Timeline preview with events' },
-    { type: 'map_preview',  label: 'Map',           icon: 'fa-map',           desc: 'Embedded map viewer' },
     { type: 'shop_inventory', label: 'Shop Inventory', icon: 'fa-store',      desc: 'Shop items with prices' },
     { type: 'posts',        label: 'Posts',         icon: 'fa-layer-group',   desc: 'Sub-notes and additional content sections' },
     { type: 'text_block',   label: 'Text Block',    icon: 'fa-align-left',    desc: 'Custom static HTML content' },
@@ -167,6 +197,9 @@ Chronicle.register('template-editor', {
 
   /** Check whether a block type is a container that holds sub-blocks. */
   isContainer(type) {
+    // Derive from blockTypes if loaded from API, fall back to hardcoded list.
+    var bt = this.blockTypes.find(function (b) { return b.type === type; });
+    if (bt) return !!bt.container;
     return this.containerTypes.includes(type);
   },
 
