@@ -170,5 +170,31 @@ templ SMTPFormComponent(settings *SMTPSettings, csrfToken, errMsg, successMsg st
 				Cancel
 			</a>
 		</div>
+		<!-- Send Test Email -->
+		<div class="pt-4 border-t border-edge">
+			<label class="block text-sm font-medium text-fg-body mb-2">Send Test Email</label>
+			<div class="flex items-center gap-3">
+				<input
+					type="email"
+					name="test_email"
+					placeholder="recipient@example.com"
+					class="input flex-1"
+				/>
+				<button
+					type="button"
+					hx-post="/admin/smtp/send-test"
+					hx-target="#smtp-form-container"
+					hx-swap="innerHTML"
+					hx-include="closest form"
+					hx-headers={ fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, csrfToken) }
+					class="btn-secondary whitespace-nowrap"
+				>
+					Send Test
+				</button>
+			</div>
+			<p class="text-xs text-fg-muted mt-1">
+				Sends a real email to verify the full delivery pipeline.
+			</p>
+		</div>
 	</form>
 }

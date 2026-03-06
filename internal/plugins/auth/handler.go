@@ -446,6 +446,57 @@ func (h *Handler) UploadAvatarAPI(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok", "avatar_path": webPath})
 }
 
+// RequestEmailChangeAPI initiates an email change (PUT /account/email).
+// Requires the user's current password for security.
+func (h *Handler) RequestEmailChangeAPI(c echo.Context) error {
+	userID := GetUserID(c)
+	if userID == "" {
+		return apperror.NewUnauthorized("not authenticated")
+	}
+
+	var req struct {
+		NewEmail        string `json:"newEmail"`
+		CurrentPassword string `json:"currentPassword"`
+	}
+	if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+	}
+
+	if err := h.service.RequestEmailChange(c.Request().Context(), userID, req.NewEmail, req.CurrentPassword); err != nil {
+		if appErr, ok := err.(*apperror.AppError); ok {
+			return c.JSON(appErr.Code, map[string]string{"error": appErr.Message})
+		}
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to initiate email change"})
+	}
+
+	h.logSecurityEvent(c.Request().Context(), "email.change_requested", userID, "", c.RealIP(), c.Request().UserAgent(), map[string]any{"new_email": req.NewEmail})
+
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok", "message": "Verification email sent to " + req.NewEmail})
+}
+
+// ConfirmEmailChange handles the verification link click (GET /account/email/verify?token=...).
+// On success, redirects to login since all sessions are invalidated.
+func (h *Handler) ConfirmEmailChange(c echo.Context) error {
+	token := c.QueryParam("token")
+	if token == "" {
+		return c.Redirect(http.StatusSeeOther, "/account")
+	}
+
+	if err := h.service.ConfirmEmailChange(c.Request().Context(), token); err != nil {
+		// Render a simple error page for invalid/expired tokens.
+		csrfToken := middleware.GetCSRFToken(c)
+		errMsg := "invalid or expired verification link"
+		if appErr, ok := err.(*apperror.AppError); ok {
+			errMsg = appErr.Message
+		}
+		return middleware.Render(c, http.StatusOK, EmailVerifyResultPage(false, errMsg, csrfToken))
+	}
+
+	h.logSecurityEvent(c.Request().Context(), "email.change_confirmed", "", "", c.RealIP(), c.Request().UserAgent(), nil)
+
+	return middleware.Render(c, http.StatusOK, EmailVerifyResultPage(true, "", ""))
+}
+
 // logSecurityEvent fires a security event if a logger is wired. Fire-and-forget
 // so auth operations are never blocked by logging failures.
 func (h *Handler) logSecurityEvent(ctx context.Context, eventType, userID, actorID, ip, userAgent string, details map[string]any) {

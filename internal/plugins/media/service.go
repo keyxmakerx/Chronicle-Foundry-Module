@@ -40,8 +40,6 @@ type MediaService interface {
 	FilePath(file *MediaFile) string
 	ThumbnailPath(file *MediaFile, size string) string
 	SetStorageLimiter(limiter StorageLimiter)
-	SetVirusScanner(scanner VirusScanner)
-
 	// ListCampaignMedia returns paginated media files for a campaign.
 	ListCampaignMedia(ctx context.Context, campaignID string, page, perPage int) ([]MediaFile, int, error)
 
@@ -102,9 +100,8 @@ type mediaService struct {
 	repo      MediaRepository
 	mediaPath string         // Root directory for file storage.
 	maxSize   int64          // Maximum file size in bytes (static fallback).
-	limiter   StorageLimiter // Dynamic storage limits from settings plugin. May be nil.
-	scanner   VirusScanner   // Optional ClamAV scanner. May be nil (scanning disabled).
-	sem       *uploadSemaphore
+	limiter StorageLimiter // Dynamic storage limits from settings plugin. May be nil.
+	sem     *uploadSemaphore
 }
 
 // NewMediaService creates a new media service.
@@ -121,12 +118,6 @@ func NewMediaService(repo MediaRepository, mediaPath string, maxSize int64) Medi
 // Called after all plugins are wired to avoid initialization order issues.
 func (s *mediaService) SetStorageLimiter(limiter StorageLimiter) {
 	s.limiter = limiter
-}
-
-// SetVirusScanner sets the optional antivirus scanner. When set, uploaded
-// files are scanned before being written to disk.
-func (s *mediaService) SetVirusScanner(scanner VirusScanner) {
-	s.scanner = scanner
 }
 
 // Upload validates, stores, and records a new media file.
@@ -171,13 +162,6 @@ func (s *mediaService) Upload(ctx context.Context, input UploadInput) (*MediaFil
 	input.FileSize = int64(len(sanitizedBytes))
 	input.MimeType = effectiveMime
 
-	// Scan for malware if ClamAV is configured.
-	if s.scanner != nil {
-		if err := s.scanner.Scan(input.FileBytes, input.OriginalName); err != nil {
-			return nil, err
-		}
-	}
-
 	// Generate UUID filename in date-based directory.
 	id := generateUUID()
 	now := time.Now().UTC()
@@ -187,6 +171,11 @@ func (s *mediaService) Upload(ctx context.Context, input UploadInput) (*MediaFil
 
 	// Create directory with restrictive permissions.
 	if err := os.MkdirAll(dir, 0750); err != nil {
+		slog.Error("failed to create media directory",
+			slog.String("dir", dir),
+			slog.String("campaign_id", input.CampaignID),
+			slog.Any("error", err),
+		)
 		return nil, apperror.NewInternal(fmt.Errorf("creating media directory: %w", err))
 	}
 
@@ -198,6 +187,13 @@ func (s *mediaService) Upload(ctx context.Context, input UploadInput) (*MediaFil
 	// Write sanitized file to disk with restrictive permissions.
 	fullPath := filepath.Join(dir, filename)
 	if err := os.WriteFile(fullPath, input.FileBytes, 0640); err != nil {
+		slog.Error("failed to write media file to disk",
+			slog.String("path", fullPath),
+			slog.String("campaign_id", input.CampaignID),
+			slog.String("mime_type", input.MimeType),
+			slog.Int64("size", input.FileSize),
+			slog.Any("error", err),
+		)
 		return nil, apperror.NewInternal(fmt.Errorf("writing media file: %w", err))
 	}
 
@@ -245,6 +241,11 @@ func (s *mediaService) Upload(ctx context.Context, input UploadInput) (*MediaFil
 		for _, thumbFile := range file.ThumbnailPaths {
 			_ = os.Remove(filepath.Join(s.mediaPath, thumbFile))
 		}
+		slog.Error("failed to save media record to database",
+			slog.String("file_id", id),
+			slog.String("campaign_id", input.CampaignID),
+			slog.Any("error", err),
+		)
 		return nil, apperror.NewInternal(fmt.Errorf("saving media record: %w", err))
 	}
 

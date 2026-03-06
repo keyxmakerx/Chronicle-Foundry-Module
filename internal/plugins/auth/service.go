@@ -74,6 +74,10 @@ type AuthService interface {
 	UpdateAvatarPath(ctx context.Context, userID string, avatarPath *string) error
 	ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error
 
+	// Email change with verification.
+	RequestEmailChange(ctx context.Context, userID, newEmail, currentPassword string) error
+	ConfirmEmailChange(ctx context.Context, token string) error
+
 	// Admin session management.
 	ListAllSessions(ctx context.Context) ([]SessionInfo, error)
 	DestroyAllUserSessions(ctx context.Context, userID string) (int, error)
@@ -613,6 +617,129 @@ func (s *authService) ChangePassword(ctx context.Context, userID, currentPasswor
 	// Invalidate all existing sessions so any compromised session is terminated.
 	// The caller is responsible for creating a fresh session for the current user.
 	s.destroyUserSessions(ctx, userID)
+	return nil
+}
+
+// --- Email Change ---
+
+// emailVerifyTokenBytes is the number of random bytes in an email verification token.
+const emailVerifyTokenBytes = 32
+
+// emailVerifyExpiry is how long an email verification link stays valid.
+const emailVerifyExpiry = 24 * time.Hour
+
+// RequestEmailChange initiates an email change by verifying the user's password,
+// checking uniqueness of the new email, generating a verification token, and
+// sending a verification link to the NEW email address.
+func (s *authService) RequestEmailChange(ctx context.Context, userID, newEmail, currentPassword string) error {
+	newEmail = strings.ToLower(strings.TrimSpace(newEmail))
+	if newEmail == "" {
+		return apperror.NewBadRequest("email address is required")
+	}
+
+	// Verify current password first.
+	user, err := s.repo.FindByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if !verifyPassword(currentPassword, user.PasswordHash) {
+		return apperror.NewBadRequest("current password is incorrect")
+	}
+
+	// Don't allow changing to the same email.
+	if newEmail == user.Email {
+		return apperror.NewBadRequest("this is already your current email address")
+	}
+
+	// Check if the new email is already taken.
+	exists, err := s.repo.EmailExists(ctx, newEmail)
+	if err != nil {
+		return apperror.NewInternal(fmt.Errorf("checking email: %w", err))
+	}
+	if exists {
+		return apperror.NewConflict("an account with this email already exists")
+	}
+
+	// Generate verification token.
+	tokenBytes := make([]byte, emailVerifyTokenBytes)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return apperror.NewInternal(fmt.Errorf("generating verification token: %w", err))
+	}
+	plainToken := hex.EncodeToString(tokenBytes)
+	tokenHash := hashToken(plainToken)
+	expiresAt := time.Now().UTC().Add(emailVerifyExpiry)
+
+	// Store pending email and token hash.
+	if err := s.repo.SetPendingEmail(ctx, userID, newEmail, tokenHash, expiresAt); err != nil {
+		return apperror.NewInternal(fmt.Errorf("storing pending email: %w", err))
+	}
+
+	// Send verification email to the NEW address.
+	if s.mail != nil && s.mail.IsConfigured(ctx) {
+		link := fmt.Sprintf("%s/account/email/verify?token=%s", s.baseURL, plainToken)
+		body := fmt.Sprintf(
+			"An email change was requested for your Chronicle account.\n\n"+
+				"Click the link below to confirm your new email address:\n%s\n\n"+
+				"This link expires in 24 hours. If you did not request this change, you can safely ignore this email.",
+			link,
+		)
+		if err := s.mail.SendMail(ctx, []string{newEmail}, "Verify Your New Email — Chronicle", body); err != nil {
+			slog.Warn("failed to send email verification",
+				slog.String("user_id", userID),
+				slog.String("new_email", newEmail),
+				slog.Any("error", err),
+			)
+			return apperror.NewInternal(fmt.Errorf("sending verification email: %w", err))
+		}
+	} else {
+		slog.Warn("SMTP not configured; email verification link not sent",
+			slog.String("user_id", userID),
+			slog.String("new_email", newEmail),
+		)
+		return apperror.NewBadRequest("SMTP is not configured — cannot send verification email")
+	}
+
+	slog.Info("email change requested",
+		slog.String("user_id", userID),
+		slog.String("new_email", newEmail),
+	)
+	return nil
+}
+
+// ConfirmEmailChange validates the verification token and updates the user's email.
+// Invalidates all sessions to force re-login with the new email.
+func (s *authService) ConfirmEmailChange(ctx context.Context, token string) error {
+	tokenHash := hashToken(token)
+
+	userID, pendingEmail, expiresAt, err := s.repo.FindByEmailVerifyToken(ctx, tokenHash)
+	if err != nil {
+		return apperror.NewBadRequest("invalid or expired verification link")
+	}
+	if time.Now().UTC().After(expiresAt) {
+		return apperror.NewBadRequest("this verification link has expired")
+	}
+
+	// Final uniqueness check (another user could have taken the email in the meantime).
+	exists, err := s.repo.EmailExists(ctx, pendingEmail)
+	if err != nil {
+		return apperror.NewInternal(fmt.Errorf("checking email: %w", err))
+	}
+	if exists {
+		return apperror.NewConflict("this email address is now taken by another account")
+	}
+
+	// Update the email and clear pending fields.
+	if err := s.repo.ConfirmEmailChange(ctx, userID, pendingEmail); err != nil {
+		return apperror.NewInternal(fmt.Errorf("confirming email change: %w", err))
+	}
+
+	// Invalidate all sessions — user must re-login with the new email.
+	s.destroyUserSessions(ctx, userID)
+
+	slog.Info("email change confirmed",
+		slog.String("user_id", userID),
+		slog.String("new_email", pendingEmail),
+	)
 	return nil
 }
 

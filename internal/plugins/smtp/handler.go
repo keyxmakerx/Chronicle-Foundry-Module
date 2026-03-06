@@ -81,3 +81,33 @@ func (h *Handler) TestConnection(c echo.Context) error {
 	}
 	return middleware.Render(c, http.StatusOK, SMTPSettingsPage(settings, csrfToken, ""))
 }
+
+// SendTestEmail sends a test email to a specified address (POST /admin/smtp/send-test).
+func (h *Handler) SendTestEmail(c echo.Context) error {
+	to := c.FormValue("test_email")
+	if to == "" {
+		to = c.QueryParam("to")
+	}
+
+	if err := h.service.SendTestEmail(c.Request().Context(), to); err != nil {
+		settings, _ := h.service.GetSettings(c.Request().Context())
+		csrfToken := middleware.GetCSRFToken(c)
+		errMsg := "send failed"
+		if appErr, ok := err.(*apperror.AppError); ok {
+			errMsg = appErr.Message
+		}
+		if middleware.IsHTMX(c) {
+			return middleware.Render(c, http.StatusOK, SMTPFormComponent(settings, csrfToken, errMsg, ""))
+		}
+		return middleware.Render(c, http.StatusOK, SMTPSettingsPage(settings, csrfToken, errMsg))
+	}
+
+	settings, _ := h.service.GetSettings(c.Request().Context())
+	csrfToken := middleware.GetCSRFToken(c)
+
+	successMsg := "Test email sent to " + to + "!"
+	if middleware.IsHTMX(c) {
+		return middleware.Render(c, http.StatusOK, SMTPFormComponent(settings, csrfToken, "", successMsg))
+	}
+	return middleware.Render(c, http.StatusOK, SMTPSettingsPage(settings, csrfToken, ""))
+}

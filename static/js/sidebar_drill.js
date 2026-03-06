@@ -66,9 +66,30 @@
       isDrilled = true;
     }
 
-    // Close drill-down on hx-boost navigation (user navigated away).
+    // On hx-boost navigation, refresh the drill panel content if still
+    // relevant (same category), or close it if user navigated away.
+    // This ensures entity counts and recent items stay current after
+    // entity creation, deletion, or page navigation.
     window.addEventListener('chronicle:navigated', function () {
-      if (isDrilled) drillOut();
+      if (!isDrilled) return;
+      var currentPath = window.location.pathname;
+      var links = catList.querySelectorAll('.sidebar-category-link');
+      var matched = false;
+      for (var i = 0; i < links.length; i++) {
+        var catUrl = links[i].getAttribute('data-cat-url');
+        if (catUrl && currentPath.indexOf(catUrl) === 0) {
+          var drillUrl = links[i].getAttribute('data-drill-url');
+          if (drillUrl) {
+            htmx.ajax('GET', drillUrl, {
+              target: '#sidebar-cat-content',
+              swap: 'innerHTML'
+            });
+          }
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) drillOut();
     });
   }
 
