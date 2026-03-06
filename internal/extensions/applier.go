@@ -7,6 +7,7 @@ package extensions
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"strconv"
 )
@@ -118,6 +119,16 @@ func (a *contentApplier) Apply(ctx context.Context, campaignID string, ext *Exte
 		)
 	}
 
+	// Register marker icon packs.
+	if len(c.MarkerIconPacks) > 0 {
+		a.registerMarkerIconPacks(ctx, campaignID, ext.ID, ext.ExtID, c.MarkerIconPacks)
+	}
+
+	// Register themes.
+	if len(c.Themes) > 0 {
+		a.registerThemes(ctx, campaignID, ext.ID, ext.ExtID, c.Themes)
+	}
+
 	return nil
 }
 
@@ -212,5 +223,100 @@ func (a *contentApplier) applyTagCollections(
 	}
 
 	return nil
+}
+
+// registerMarkerIconPacks stores marker icon pack metadata in extension_data
+// so the map widget can query available custom marker icons.
+func (a *contentApplier) registerMarkerIconPacks(
+	ctx context.Context,
+	campaignID, extensionID, extID string,
+	packs []MarkerIconPack,
+) {
+	for _, pack := range packs {
+		// Build the icon list with asset URLs.
+		type iconEntry struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+			URL  string `json:"url"`
+		}
+		icons := make([]iconEntry, 0, len(pack.Icons))
+		for _, icon := range pack.Icons {
+			icons = append(icons, iconEntry{
+				ID:   extID + ":" + icon.ID,
+				Name: icon.Name,
+				URL:  "/extensions/" + extID + "/assets/" + icon.File,
+			})
+		}
+
+		data, err := json.Marshal(map[string]any{
+			"slug":  pack.Slug,
+			"name":  pack.Name,
+			"icons": icons,
+		})
+		if err != nil {
+			continue
+		}
+
+		if err := a.repo.SetData(ctx, &ExtensionData{
+			CampaignID:  campaignID,
+			ExtensionID: extensionID,
+			Namespace:   "marker_icons",
+			DataKey:     pack.Slug,
+			DataValue:   json.RawMessage(data),
+		}); err != nil {
+			slog.Warn("failed to register marker icon pack",
+				slog.String("pack", pack.Slug),
+				slog.Any("error", err),
+			)
+		}
+
+		slog.Info("registered marker icon pack",
+			slog.String("pack", pack.Name),
+			slog.Int("icons", len(pack.Icons)),
+		)
+	}
+}
+
+// registerThemes stores theme metadata in extension_data so the app can
+// load extension theme CSS when the extension is enabled.
+func (a *contentApplier) registerThemes(
+	ctx context.Context,
+	campaignID, extensionID, extID string,
+	themes []Theme,
+) {
+	for _, theme := range themes {
+		previewURL := ""
+		if theme.Preview != "" {
+			previewURL = "/extensions/" + extID + "/assets/" + theme.Preview
+		}
+
+		data, err := json.Marshal(map[string]any{
+			"slug":        theme.Slug,
+			"name":        theme.Name,
+			"description": theme.Description,
+			"css_url":     "/extensions/" + extID + "/assets/" + theme.File,
+			"preview_url": previewURL,
+		})
+		if err != nil {
+			continue
+		}
+
+		if err := a.repo.SetData(ctx, &ExtensionData{
+			CampaignID:  campaignID,
+			ExtensionID: extensionID,
+			Namespace:   "themes",
+			DataKey:     theme.Slug,
+			DataValue:   json.RawMessage(data),
+		}); err != nil {
+			slog.Warn("failed to register theme",
+				slog.String("theme", theme.Slug),
+				slog.Any("error", err),
+			)
+		}
+
+		slog.Info("registered theme",
+			slog.String("theme", theme.Name),
+		)
+	}
 }
 

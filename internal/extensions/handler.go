@@ -1,6 +1,7 @@
 package extensions
 
 import (
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -304,6 +305,76 @@ func (h *Handler) DisableExtension(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, map[string]string{"status": "disabled"})
+}
+
+// ListMarkerIcons returns all extension marker icon packs for a campaign.
+// GET /campaigns/:id/extensions/marker-icons
+func (h *Handler) ListMarkerIcons(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	if cc == nil {
+		return apperror.NewMissingContext()
+	}
+
+	// Get all enabled extensions for the campaign.
+	exts, err := h.svc.ListForCampaign(c.Request().Context(), cc.Campaign.ID)
+	if err != nil {
+		return err
+	}
+
+	// Collect marker icon data from all enabled extensions.
+	var allIcons []json.RawMessage
+	for _, ext := range exts {
+		if !ext.Enabled {
+			continue
+		}
+		data, err := h.svc.ListData(c.Request().Context(), cc.Campaign.ID, ext.ExtensionID, "marker_icons")
+		if err != nil {
+			continue
+		}
+		for _, d := range data {
+			allIcons = append(allIcons, d.DataValue)
+		}
+	}
+
+	if allIcons == nil {
+		allIcons = []json.RawMessage{}
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{"icon_packs": allIcons})
+}
+
+// ListThemes returns all extension themes for a campaign.
+// GET /campaigns/:id/extensions/themes
+func (h *Handler) ListThemes(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	if cc == nil {
+		return apperror.NewMissingContext()
+	}
+
+	exts, err := h.svc.ListForCampaign(c.Request().Context(), cc.Campaign.ID)
+	if err != nil {
+		return err
+	}
+
+	var allThemes []json.RawMessage
+	for _, ext := range exts {
+		if !ext.Enabled {
+			continue
+		}
+		data, err := h.svc.ListData(c.Request().Context(), cc.Campaign.ID, ext.ExtensionID, "themes")
+		if err != nil {
+			continue
+		}
+		for _, d := range data {
+			allThemes = append(allThemes, d.DataValue)
+		}
+	}
+
+	if allThemes == nil {
+		allThemes = []json.RawMessage{}
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{"themes": allThemes})
 }
 
 // ServeAsset serves static assets from an extension's directory.
