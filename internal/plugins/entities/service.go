@@ -757,7 +757,10 @@ const (
 var validBlockTypes = map[string]bool{
 	"title": true, "image": true, "entry": true,
 	"attributes": true, "details": true, "divider": true,
-	"posts": true,
+	"posts": true, "tags": true, "relations": true,
+	"shop_inventory": true, "calendar": true, "timeline": true,
+	"map_preview": true, "upcoming_events": true, "text_block": true,
+	"two_column": true, "three_column": true, "tabs": true, "section": true,
 }
 
 // UpdateEntityTypeLayout validates and persists a new layout for an entity type.
