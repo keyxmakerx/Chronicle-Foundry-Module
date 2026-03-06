@@ -441,6 +441,52 @@ func (h *Handler) GetWidgetScriptURLs(ctx context.Context, campaignID string) []
 	return urls
 }
 
+// WidgetBlockInfo describes an extension widget for use as a layout block.
+// Returned by GetWidgetBlockInfos for consumption by the entities block registry adapter.
+type WidgetBlockInfo struct {
+	Slug        string `json:"slug"`
+	Name        string `json:"name"`
+	Icon        string `json:"icon"`
+	Description string `json:"description"`
+}
+
+// GetWidgetBlockInfos returns metadata for all enabled extension widgets
+// in a campaign, suitable for populating the template editor's block palette.
+func (h *Handler) GetWidgetBlockInfos(ctx context.Context, campaignID string) []WidgetBlockInfo {
+	exts, err := h.svc.ListForCampaign(ctx, campaignID)
+	if err != nil {
+		return nil
+	}
+
+	var blocks []WidgetBlockInfo
+	for _, ext := range exts {
+		if !ext.Enabled {
+			continue
+		}
+		data, err := h.svc.ListData(ctx, campaignID, ext.ExtensionID, "widgets")
+		if err != nil {
+			continue
+		}
+		for _, d := range data {
+			var w struct {
+				Slug        string `json:"slug"`
+				Name        string `json:"name"`
+				Icon        string `json:"icon"`
+				Description string `json:"description"`
+			}
+			if err := json.Unmarshal(d.DataValue, &w); err == nil && w.Slug != "" {
+				blocks = append(blocks, WidgetBlockInfo{
+					Slug:        w.Slug,
+					Name:        w.Name,
+					Icon:        w.Icon,
+					Description: w.Description,
+				})
+			}
+		}
+	}
+	return blocks
+}
+
 // ServeAsset serves static assets from an extension's directory.
 // GET /extensions/:extID/assets/*filepath
 func (h *Handler) ServeAsset(c echo.Context) error {

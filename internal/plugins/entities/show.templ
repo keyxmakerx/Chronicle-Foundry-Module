@@ -397,6 +397,22 @@ templ blockDivider() {
 	<hr class="border-edge my-2"/>
 }
 
+// blockExtWidget renders a mount point for an extension widget.
+// The widget slug comes from block config and maps to a JS widget
+// registered via Chronicle.register() by the extension's script.
+templ blockExtWidget(cc *campaigns.CampaignContext, entity *Entity, block TemplateBlock) {
+	if widgetSlug := BlockConfigString(block.Config, "widget_slug"); widgetSlug != "" {
+		<div
+			data-widget={ widgetSlug }
+			data-campaign-id={ cc.Campaign.ID }
+			data-entity-id={ entity.ID }
+			class="ext-widget-block"
+		></div>
+	} else {
+		<div class="text-fg-muted text-sm italic py-2">Extension widget not configured</div>
+	}
+}
+
 // blockPosts renders the entity posts (sub-notes) widget mount point.
 // Posts are additional named content sections displayed below the main entry.
 templ blockPosts(cc *campaigns.CampaignContext, entity *Entity, csrfToken string) {

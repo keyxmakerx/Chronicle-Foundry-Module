@@ -543,6 +543,36 @@ func sessionsToCalendarSessions(sess []sessions.Session, userID string) []calend
 	return result
 }
 
+// widgetBlockListerAdapter bridges extensions.Handler to entities.WidgetBlockLister.
+// Converts extension widget metadata into entity block metadata for the template editor.
+type widgetBlockListerAdapter struct {
+	extHandler *extensions.Handler
+}
+
+// GetWidgetBlockMetas returns extension widget blocks as entity block metadata.
+func (a *widgetBlockListerAdapter) GetWidgetBlockMetas(ctx context.Context, campaignID string) []entities.BlockMeta {
+	infos := a.extHandler.GetWidgetBlockInfos(ctx, campaignID)
+	if len(infos) == 0 {
+		return nil
+	}
+
+	metas := make([]entities.BlockMeta, 0, len(infos))
+	for _, info := range infos {
+		icon := info.Icon
+		if icon == "" {
+			icon = "fa-puzzle-piece"
+		}
+		metas = append(metas, entities.BlockMeta{
+			Type:        "ext_widget",
+			Label:       info.Name,
+			Icon:        icon,
+			Description: info.Description,
+			WidgetSlug:  info.Slug,
+		})
+	}
+	return metas
+}
+
 // RegisterRoutes sets up all application routes. It registers public routes
 // directly and delegates to each plugin's route registration function.
 //
@@ -882,6 +912,7 @@ func (a *App) RegisterRoutes() {
 	entityService.SetBlockRegistry(blockRegistry)
 	entities.SetGlobalBlockRegistry(blockRegistry)
 	entityHandler.SetBlockRegistry(blockRegistry)
+	entityHandler.SetWidgetBlockLister(&widgetBlockListerAdapter{extHandler: extHandler})
 
 	campaignHandler.SetAuditLogger(&campaignAuditAdapter{svc: auditService})
 	campaignHandler.SetAddonLister(&addonListerAdapter{svc: addonService})

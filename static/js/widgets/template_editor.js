@@ -65,7 +65,9 @@ Chronicle.register('template-editor', {
         if (types && types.length > 0) {
           // Map API response to the format the editor expects.
           self.blockTypes = types.map(function (t) {
-            return { type: t.type, label: t.label, icon: t.icon, desc: t.description, container: !!t.container };
+            var bt = { type: t.type, label: t.label, icon: t.icon, desc: t.description, container: !!t.container };
+            if (t.widget_slug) bt.widget_slug = t.widget_slug;
+            return bt;
           });
         } else {
           self.blockTypes = self._fallbackBlockTypes;
@@ -168,7 +170,9 @@ Chronicle.register('template-editor', {
       </div>
     `;
     item.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/plain', JSON.stringify({ source: 'palette', type: bt.type }));
+      var dragData = { source: 'palette', type: bt.type };
+      if (bt.widget_slug) dragData.widget_slug = bt.widget_slug;
+      e.dataTransfer.setData('text/plain', JSON.stringify(dragData));
       e.dataTransfer.effectAllowed = 'copyMove';
       item.classList.add('opacity-50');
     });
@@ -214,13 +218,25 @@ Chronicle.register('template-editor', {
       <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">Components</h3>
     `;
 
-    // Separate content blocks from layout/container blocks for grouped display.
-    const contentBlocks = this.blockTypes.filter(bt => !bt.container);
+    // Separate content blocks, extension widgets, and layout/container blocks.
+    const contentBlocks = this.blockTypes.filter(bt => !bt.container && !bt.widget_slug);
+    const extWidgetBlocks = this.blockTypes.filter(bt => !!bt.widget_slug);
     const layoutBlocks = this.blockTypes.filter(bt => bt.container);
 
     contentBlocks.forEach(bt => {
       palette.appendChild(this.createPaletteItem(bt));
     });
+
+    // Extension widget blocks section (only if any are available).
+    if (extWidgetBlocks.length > 0) {
+      const extHeader = document.createElement('h3');
+      extHeader.className = 'text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3 mt-5';
+      extHeader.textContent = 'Extension Widgets';
+      palette.appendChild(extHeader);
+      extWidgetBlocks.forEach(bt => {
+        palette.appendChild(this.createPaletteItem(bt));
+      });
+    }
 
     // Layout blocks section header.
     const layoutHeader = document.createElement('h3');
@@ -1305,7 +1321,9 @@ Chronicle.register('template-editor', {
 
     if (data.source === 'palette') {
       // New block from palette.
-      const newBlock = { id: this.uid('blk'), type: data.type, config: {} };
+      var config = {};
+      if (data.widget_slug) config.widget_slug = data.widget_slug;
+      const newBlock = { id: this.uid('blk'), type: data.type, config: config };
       targetBlocks.splice(insertIdx, 0, newBlock);
     } else if (data.source === 'subblock') {
       // Moving between sub-block zones.
@@ -1344,6 +1362,7 @@ Chronicle.register('template-editor', {
       // Add new block from palette at the indicated position.
       // Container blocks get their default config with sub-block arrays.
       const config = this.defaultBlockConfig(data.type);
+      if (data.widget_slug) config.widget_slug = data.widget_slug;
       const block = { id: this.uid('blk'), type: data.type, config };
       this.layout.rows[targetRowIdx].columns[targetColIdx].blocks.splice(insertIdx, 0, block);
     } else if (data.source === 'canvas') {

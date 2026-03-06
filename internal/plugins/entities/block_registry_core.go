@@ -85,6 +85,16 @@ func RegisterCoreBlocks(r *BlockRegistry) {
 		return blockTextBlock(ctx.Block.Config)
 	})
 
+	// Extension widget block — generic mount point for extension-provided JS widgets.
+	// The widget slug is stored in block config and used as the data-widget attribute.
+	// Not shown in the palette directly (extension widgets appear as individual block types).
+	r.Register(BlockMeta{
+		Type: "ext_widget", Label: "Extension Widget", Icon: "fa-puzzle-piece",
+		Description: "Widget provided by an extension",
+	}, func(ctx BlockRenderContext) templ.Component {
+		return blockExtWidget(ctx.CC, ctx.Entity, ctx.Block)
+	})
+
 	// Container layout types — rendered by the template editor JS, not by
 	// server-side templ. Registered here so they pass validation.
 	r.Register(BlockMeta{

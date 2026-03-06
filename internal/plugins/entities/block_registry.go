@@ -20,6 +20,7 @@ type BlockMeta struct {
 	Description string `json:"description"`
 	Addon       string `json:"addon,omitempty"`          // Required addon slug; empty = always available.
 	Container   bool   `json:"container,omitempty"`      // True for layout containers (two_column, tabs, etc.).
+	WidgetSlug  string `json:"widget_slug,omitempty"`    // For ext_widget blocks: the extension widget slug.
 }
 
 // BlockRenderContext holds the data available to every block renderer.

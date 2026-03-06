@@ -8,11 +8,11 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-06 -- Phase Q: Widget Extensions (Layer 2) — Sprint Q-1 COMPLETE.
+2026-03-06 -- Phase Q: Widget Extensions (Layer 2) — Sprints Q-1 and Q-2 COMPLETE.
 Branch: `claude/fix-calendar-shop-widgets-45iz7`.
 
 ## Current Phase
-**Phase Q: Widget Extensions (Layer 2) — Sprint Q-1 complete.** Next: Sprint Q-2 (Widget Extension Distribution).
+**Phase Q: Widget Extensions (Layer 2) — Q-1 and Q-2 complete.** Next: Phase R (Logic Extensions Layer 3/WASM) or further Q polish.
 
 ### Phase P Summary (Sprints P-1 through P-6)
 - **P-1**: Extension infrastructure — migration 000055 (4 tables), manifest parser/validator, zip security, repository (16 methods), service, handler, routes, config
@@ -221,8 +221,18 @@ Created `.ai/audit.md` — comprehensive feature parity and completeness audit c
 - Layout injector in app/routes.go wires extension widget script discovery per campaign
 - Tests updated: security test accepts .js, manifest test covers widget validation (6 new cases)
 
+### Sprint Q-2: Widget Extension Distribution (COMPLETE)
+- `ext_widget` block type registered in block registry with generic renderer (`blockExtWidget` templ)
+- `BlockMeta.WidgetSlug` field added for template editor to identify extension widgets
+- `WidgetBlockLister` interface in entities handler, wired via `widgetBlockListerAdapter`
+- `BlockTypesAPI` now appends extension widget blocks from enabled extensions
+- `GetWidgetBlockInfos` method on extensions handler returns widget metadata
+- Template editor JS updated: palette shows "Extension Widgets" section, drag data includes `widget_slug`, drop handlers set `config.widget_slug`
+- Example extension: `dice-roller` with `widgets/dice-roller.js` — d4-d100 roller with history, nat1/natMax highlighting
+- Example test updated to validate dice-roller manifest
+
 ## Next Session Should
-Continue with **Sprint Q-2: Widget Extension Distribution** — allow widget JS to be included in extension zips, widget blocks appear in template editor palette, example widget extension. Then Phase R (Logic Extensions Layer 3/WASM). Full roadmap in `.ai/todo.md`.
+Continue with **Phase R: Logic Extensions (Layer 3/WASM)** via Extism/wazero, or polish Phase Q further (JS validation for widget scripts, widget sandboxing). Full roadmap in `.ai/todo.md`.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)

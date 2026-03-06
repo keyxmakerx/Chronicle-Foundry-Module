@@ -13,6 +13,7 @@ func TestExampleExtensionManifests(t *testing.T) {
 	}{
 		{"harptos-calendar", "../../extensions/harptos-calendar/manifest.json"},
 		{"dnd5e-character-sheet", "../../extensions/dnd5e-character-sheet/manifest.json"},
+		{"dice-roller", "../../extensions/dice-roller/manifest.json"},
 	}
 
 	for _, ex := range examples {
