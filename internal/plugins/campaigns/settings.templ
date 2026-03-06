@@ -162,7 +162,30 @@ templ CampaignSettingsPage(cc *CampaignContext, transfer *OwnershipTransfer, ent
 				</p>
 			</div>
 
-			// Transfer ownership section.
+			// Data export & import.
+		<div class="card p-6 mb-6">
+			<h2 class="text-lg font-semibold text-fg mb-2">Data Export &amp; Import</h2>
+			<p class="text-sm text-fg-secondary mb-4">
+				Export your entire campaign as a JSON file for backup or migration. Import a previously exported campaign file.
+			</p>
+			<div class="flex items-center gap-3">
+				<a
+					href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/export", cc.Campaign.ID)) }
+					class="btn-primary text-sm inline-flex items-center gap-1.5"
+					download
+				>
+					<i class="fa-solid fa-download text-xs"></i> Export Campaign
+				</a>
+				<a
+					href="/campaigns/import"
+					class="btn-secondary text-sm inline-flex items-center gap-1.5"
+				>
+					<i class="fa-solid fa-upload text-xs"></i> Import Campaign
+				</a>
+			</div>
+		</div>
+
+		// Transfer ownership section.
 			<div class="card p-6 mb-6">
 				<h2 class="text-lg font-semibold text-fg mb-4">Transfer Ownership</h2>
 

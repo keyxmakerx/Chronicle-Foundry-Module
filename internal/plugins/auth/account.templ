@@ -1,5 +1,5 @@
 // account.templ renders the user account settings page where users can
-// configure personal preferences like timezone.
+// configure personal preferences like display name, password, and timezone.
 
 package auth
 
@@ -16,17 +16,66 @@ templ AccountPage(user *User, csrfToken string, timezones []string) {
 				<h1 class="text-2xl font-bold text-fg">Account Settings</h1>
 				<p class="text-sm text-fg-secondary mt-1">Manage your personal preferences.</p>
 			</div>
-			<!-- Profile Info (read-only) -->
-			<div class="card p-6 mb-6">
+			<!-- Profile Info -->
+			<div class="card p-6 mb-6" x-data={ profileData(user, csrfToken) }>
 				<h2 class="text-lg font-semibold text-fg mb-4">Profile</h2>
 				<div class="space-y-3">
 					<div>
 						<label class="block text-sm font-medium text-fg-secondary mb-0.5">Display Name</label>
-						<p class="text-sm text-fg">{ user.DisplayName }</p>
+						<div class="flex items-center gap-2">
+							<input
+								type="text"
+								x-model="displayName"
+								class="input flex-1"
+								maxlength="100"
+								minlength="2"
+							/>
+							<button
+								type="button"
+								class="btn-primary text-sm"
+								x-bind:disabled="savingName || displayName === originalName"
+								@click="saveDisplayName()"
+							>
+								<span x-show="!savingName">Save</span>
+								<span x-show="savingName">...</span>
+							</button>
+						</div>
+						<p x-show="nameMsg" x-transition class="text-xs mt-1" x-bind:class="nameError ? 'text-red-500' : 'text-green-500'" x-text="nameMsg"></p>
 					</div>
 					<div>
 						<label class="block text-sm font-medium text-fg-secondary mb-0.5">Email</label>
 						<p class="text-sm text-fg">{ user.Email }</p>
+					</div>
+				</div>
+			</div>
+			<!-- Change Password -->
+			<div class="card p-6 mb-6" x-data={ passwordData(csrfToken) }>
+				<h2 class="text-lg font-semibold text-fg mb-4">Change Password</h2>
+				<div class="space-y-3">
+					<div>
+						<label class="block text-sm font-medium text-fg-body mb-1" for="current-password">Current Password</label>
+						<input type="password" id="current-password" x-model="currentPassword" class="input w-full" autocomplete="current-password"/>
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-fg-body mb-1" for="new-password">New Password</label>
+						<input type="password" id="new-password" x-model="newPassword" class="input w-full" minlength="8" autocomplete="new-password"/>
+						<p class="text-xs text-fg-muted mt-0.5">Minimum 8 characters.</p>
+					</div>
+					<div>
+						<label class="block text-sm font-medium text-fg-body mb-1" for="confirm-password">Confirm New Password</label>
+						<input type="password" id="confirm-password" x-model="confirmPassword" class="input w-full" autocomplete="new-password"/>
+					</div>
+					<div class="flex items-center justify-end gap-2 pt-2 border-t border-edge">
+						<span x-show="pwMsg" x-transition class="text-xs" x-bind:class="pwError ? 'text-red-500' : 'text-green-500'" x-text="pwMsg"></span>
+						<button
+							type="button"
+							class="btn-primary text-sm"
+							x-bind:disabled="savingPw || !currentPassword || !newPassword || !confirmPassword"
+							@click="changePassword()"
+						>
+							<span x-show="!savingPw">Change Password</span>
+							<span x-show="savingPw">Saving...</span>
+						</button>
 					</div>
 				</div>
 			</div>
@@ -52,7 +101,7 @@ templ AccountPage(user *User, csrfToken string, timezones []string) {
 					<button
 						type="button"
 						class="btn-primary text-sm"
-						:disabled="saving"
+						x-bind:disabled="saving"
 						@click={ fmt.Sprintf(`
 							saving = true; saved = false; error = '';
 							fetch('/account/timezone', {
@@ -72,6 +121,54 @@ templ AccountPage(user *User, csrfToken string, timezones []string) {
 			</div>
 		</div>
 	}
+}
+
+// profileData returns the Alpine.js x-data JSON for the profile editor.
+func profileData(user *User, csrfToken string) string {
+	return fmt.Sprintf(`{
+		displayName: %q,
+		originalName: %q,
+		savingName: false,
+		nameMsg: '',
+		nameError: false,
+		csrf: %q,
+		saveDisplayName() {
+			this.savingName = true; this.nameMsg = ''; this.nameError = false;
+			fetch('/account/display-name', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': this.csrf },
+				credentials: 'same-origin',
+				body: JSON.stringify({ displayName: this.displayName })
+			}).then(r => r.json().then(d => { if (!r.ok) throw new Error(d.error || 'Failed'); this.originalName = this.displayName; this.nameMsg = 'Saved'; this.nameError = false; setTimeout(() => this.nameMsg = '', 3000); }))
+			.catch(e => { this.nameMsg = e.message; this.nameError = true; })
+			.finally(() => { this.savingName = false; });
+		}
+	}`, user.DisplayName, user.DisplayName, csrfToken)
+}
+
+// passwordData returns the Alpine.js x-data JSON for the password change form.
+func passwordData(csrfToken string) string {
+	return fmt.Sprintf(`{
+		currentPassword: '',
+		newPassword: '',
+		confirmPassword: '',
+		savingPw: false,
+		pwMsg: '',
+		pwError: false,
+		csrf: %q,
+		changePassword() {
+			if (this.newPassword !== this.confirmPassword) { this.pwMsg = 'Passwords do not match'; this.pwError = true; return; }
+			this.savingPw = true; this.pwMsg = ''; this.pwError = false;
+			fetch('/account/password', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': this.csrf },
+				credentials: 'same-origin',
+				body: JSON.stringify({ currentPassword: this.currentPassword, newPassword: this.newPassword, confirmPassword: this.confirmPassword })
+			}).then(r => r.json().then(d => { if (!r.ok) throw new Error(d.error || 'Failed'); this.pwMsg = 'Password changed'; this.pwError = false; this.currentPassword = ''; this.newPassword = ''; this.confirmPassword = ''; setTimeout(() => this.pwMsg = '', 3000); }))
+			.catch(e => { this.pwMsg = e.message; this.pwError = true; })
+			.finally(() => { this.savingPw = false; });
+		}
+	}`, csrfToken)
 }
 
 // timezoneData returns the Alpine.js x-data JSON for the timezone selector.

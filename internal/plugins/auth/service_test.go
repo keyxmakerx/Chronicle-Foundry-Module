@@ -131,6 +131,10 @@ func (m *mockUserRepo) UpdateTimezone(ctx context.Context, userID, timezone stri
 	return nil
 }
 
+func (m *mockUserRepo) UpdateDisplayName(ctx context.Context, userID, displayName string) error {
+	return nil
+}
+
 // --- Mock Mail Sender ---
 
 // mockMailSender implements MailSender for testing.

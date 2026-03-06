@@ -85,6 +85,7 @@ func RegisterRoutes(e *echo.Echo, h *Handler, svc CampaignService, authSvc auth.
 func RegisterExportRoutes(e *echo.Echo, eh *ExportHandler, svc CampaignService, authSvc auth.AuthService) {
 	// Import creates a new campaign (auth only, no campaign scope needed).
 	authed := e.Group("", auth.RequireAuth(authSvc))
+	authed.GET("/campaigns/import", eh.ImportCampaignForm)
 	authed.POST("/campaigns/import", eh.ImportCampaign)
 
 	// Export requires campaign owner access.

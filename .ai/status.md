@@ -8,20 +8,27 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-06 -- Sprint M0-1: Export adapters for permissions, groups, posts (batch 47).
+2026-03-06 -- Sprint M0-4: dm_only visibility on entity relations (batch 48).
 Branch: `claude/plan-project-phases-8CPw5`.
 
 ## Current Phase
-**Phase M0: Data Integrity & Export Completeness.** Sprint M0-1 complete. Next: Sprint M0-2 (timeline connections, entity groups, session attendees export).
+**Phase M0: Data Integrity & Export Completeness — COMPLETE.** All 4 sprints done. Next: Phase M1 (Quick Wins).
 
-### Sprint M0-1: Export Adapters — Permissions, Groups, Posts (batch 47)
-- Added `ExportEntityPermission`, `ExportGroup`, `ExportPost` types to `export.go`
-- Entity export now includes `visibility` mode and custom permission grants for entities with `VisibilityCustom`
-- New `GroupExporter`/`GroupImporter` adapter interfaces + implementations (groups + member user IDs)
-- New `PostExporter`/`PostImporter` adapter interfaces + implementations (iterates entities, collects sub-notes)
-- Entity import now restores custom permissions via `SetEntityPermissions()`
-- Wired all adapters in `routes.go`. All tests pass, zero lint issues.
-- **Files changed**: `export.go`, `export_service.go`, `export_adapters.go`, `routes.go`
+### Sprint M0-4: dm_only Visibility on Entity Relations (batch 48)
+- Migration 000052: `dm_only BOOLEAN NOT NULL DEFAULT FALSE` on `entity_relations`
+- Model: `DmOnly bool` on `Relation`, `CreateRelationRequest`, `GraphRelation`
+- Repository: all queries updated (Create, FindByID, ListByEntity, ListByCampaign)
+- Service: `Create()` accepts variadic `dmOnly`, `GetGraphData()` accepts `includeDmOnly` filter
+- Handler: DM authorization check, role-based filtering in List/Graph endpoints
+- Export: `ExportRelation.DmOnly` field, export/import adapters propagate dm_only
+- JS widget: DM-only toggle in create modal, lock badge on DM-only relations
+- Template: `data-is-dm` attribute on relations widget mount point
+- **Files changed**: migration files, model.go, repository.go, service.go, handler.go, export.go, export_adapters.go, show.templ, relations.js
+
+### Sprint M0-1 through M0-3 (batch 47)
+- M0-1: Export adapters for permissions, groups, posts
+- M0-2: Timeline connections, entity groups, session attendees
+- M0-3: Entity parent hierarchy resolution on import
 
 ### UX & Feature Gap Audit (batch 46)
 Deep audit of player/DM experience, account settings, campaign management, and missing UI surfaces:
@@ -181,7 +188,7 @@ Created `.ai/audit.md` — comprehensive feature parity and completeness audit c
 ---
 
 ## Next Session Should
-Start with **Phase M0: Data Integrity & Export Completeness** (Sprint M0-1: export adapters for permissions, groups, posts). This is the highest-priority work — campaign backups currently lose data. After M0 (4 sprints), proceed to M1 (Quick Wins), M2 (JS Code Quality), M3 (Test Coverage), then original Phase M (Game System Modules). Full 27-sprint roadmap in `.ai/todo.md`.
+Start with **Phase M1: Quick Wins**. Phase M0 (Data Integrity) is complete. M1 has 5 sprints: M1-1 (export button + notes search), M1-2 (entity sort/filter controls), M1-3 (favorites/bookmarks), M1-4 (RSVP sidebar visibility), M1-5 (plugin hub page). Full roadmap in `.ai/todo.md`.
 
 ## Known Issues Right Now
 - `make dev` requires `air` to be installed (`go install github.com/air-verse/air@latest`)

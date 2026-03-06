@@ -70,6 +70,8 @@ type AuthService interface {
 	// User profile.
 	GetUser(ctx context.Context, userID string) (*User, error)
 	UpdateTimezone(ctx context.Context, userID, timezone string) error
+	UpdateDisplayName(ctx context.Context, userID, displayName string) error
+	ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error
 
 	// Admin session management.
 	ListAllSessions(ctx context.Context) ([]SessionInfo, error)
@@ -537,6 +539,49 @@ func (s *authService) UpdateTimezone(ctx context.Context, userID, timezone strin
 		}
 	}
 	return s.repo.UpdateTimezone(ctx, userID, timezone)
+}
+
+// UpdateDisplayName sets the user's display name with validation.
+func (s *authService) UpdateDisplayName(ctx context.Context, userID, displayName string) error {
+	displayName = strings.TrimSpace(displayName)
+	if displayName == "" {
+		return apperror.NewBadRequest("display name is required")
+	}
+	if len(displayName) < 2 {
+		return apperror.NewBadRequest("display name must be at least 2 characters")
+	}
+	if len(displayName) > 100 {
+		return apperror.NewBadRequest("display name must be at most 100 characters")
+	}
+	return s.repo.UpdateDisplayName(ctx, userID, displayName)
+}
+
+// ChangePassword verifies the current password and sets a new one.
+func (s *authService) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error {
+	user, err := s.repo.FindByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	// Verify current password.
+	if !verifyPassword(currentPassword, user.PasswordHash) {
+		return apperror.NewBadRequest("current password is incorrect")
+	}
+
+	// Validate new password.
+	if len(newPassword) < 8 {
+		return apperror.NewBadRequest("new password must be at least 8 characters")
+	}
+	if len(newPassword) > 128 {
+		return apperror.NewBadRequest("new password must be at most 128 characters")
+	}
+
+	// Hash and store.
+	hash, err := hashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("hashing new password: %w", err)
+	}
+	return s.repo.UpdatePassword(ctx, userID, hash)
 }
 
 // --- Password Hashing (argon2id) ---
