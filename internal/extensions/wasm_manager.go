@@ -59,7 +59,7 @@ func (pm *PluginManager) Load(ctx context.Context, extID string, contrib WASMCon
 
 	// Unload existing instance if present.
 	if existing, ok := pm.plugins[key]; ok {
-		existing.plugin.Close(ctx)
+		_ = existing.plugin.Close(ctx)
 		if existing.cancel != nil {
 			existing.cancel()
 		}
@@ -173,7 +173,7 @@ func (pm *PluginManager) Unload(ctx context.Context, extID, slug string) error {
 	}
 
 	if lp.plugin != nil {
-		lp.plugin.Close(ctx)
+		_ = lp.plugin.Close(ctx)
 	}
 	if lp.cancel != nil {
 		lp.cancel()
@@ -195,7 +195,7 @@ func (pm *PluginManager) UnloadAll(ctx context.Context) {
 
 	for key, lp := range pm.plugins {
 		if lp.plugin != nil {
-			lp.plugin.Close(ctx)
+			_ = lp.plugin.Close(ctx)
 		}
 		if lp.cancel != nil {
 			lp.cancel()
