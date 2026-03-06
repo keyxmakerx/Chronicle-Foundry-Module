@@ -1,0 +1,131 @@
+package extensions
+
+import (
+	"github.com/keyxmakerx/chronicle/internal/templates/layouts"
+	"github.com/keyxmakerx/chronicle/internal/plugins/campaigns"
+)
+
+// adminExtensionListPage renders the full admin extensions management page.
+templ adminExtensionListPage(exts []Extension) {
+	@layouts.App("Content Extensions - Admin") {
+		<div class="max-w-5xl mx-auto space-y-6">
+			@adminExtensionListFragment(exts)
+		</div>
+	}
+}
+
+// adminExtensionListFragment renders the extension list content (for HTMX swap).
+templ adminExtensionListFragment(exts []Extension) {
+	<div class="admin-extensions">
+		<div class="flex items-center justify-between mb-6">
+			<h2 class="text-2xl font-bold">Content Extensions</h2>
+			<div class="flex gap-2">
+				<button
+					class="btn btn-secondary btn-sm"
+					hx-post="/admin/extensions/rescan"
+					hx-swap="none"
+				>
+					<i class="fa-solid fa-rotate"></i> Rescan
+				</button>
+				<label class="btn btn-primary btn-sm cursor-pointer">
+					<i class="fa-solid fa-upload"></i> Install
+					<input
+						type="file"
+						name="file"
+						accept=".zip,.chronicle-ext"
+						class="hidden"
+						hx-post="/admin/extensions/install"
+						hx-encoding="multipart/form-data"
+						hx-target=".admin-extensions"
+						hx-swap="outerHTML"
+					/>
+				</label>
+			</div>
+		</div>
+
+		if len(exts) == 0 {
+			<div class="text-center py-12 text-muted">
+				<i class="fa-solid fa-puzzle-piece text-4xl mb-4"></i>
+				<p>No extensions installed.</p>
+				<p class="text-sm mt-2">Upload a <code>.chronicle-ext</code> file or place extension directories in <code>data/extensions/</code>.</p>
+			</div>
+		} else {
+			<div class="grid gap-4">
+				for _, ext := range exts {
+					<div class="card p-4">
+						<div class="flex items-center justify-between">
+							<div>
+								<h3 class="font-semibold text-lg">{ ext.Name }</h3>
+								<p class="text-sm text-muted">{ ext.ExtID } v{ ext.Version }</p>
+								<p class="text-sm mt-1">{ ext.Description }</p>
+							</div>
+							<div class="flex items-center gap-2">
+								if ext.Status == StatusActive {
+									<span class="badge badge-success">Active</span>
+								} else {
+									<span class="badge badge-muted">Disabled</span>
+								}
+								<button
+									class="btn btn-danger btn-sm"
+									hx-delete={ "/admin/extensions/" + ext.ExtID }
+									hx-target=".admin-extensions"
+									hx-swap="outerHTML"
+									hx-confirm={ "Uninstall " + ext.Name + "? This will remove the extension from all campaigns." }
+								>
+									<i class="fa-solid fa-trash"></i>
+								</button>
+							</div>
+						</div>
+					</div>
+				}
+			</div>
+		}
+	</div>
+}
+
+// campaignExtensionListFragment renders extensions for a campaign's plugins page.
+templ campaignExtensionListFragment(cc *campaigns.CampaignContext, exts []CampaignExtension) {
+	<div class="campaign-extensions" id="campaign-extensions">
+		<h3 class="text-lg font-semibold mb-4">
+			<i class="fa-solid fa-puzzle-piece mr-2"></i>Content Extensions
+		</h3>
+
+		if len(exts) == 0 {
+			<p class="text-muted text-sm">No content extensions available. Ask your site admin to install extensions.</p>
+		} else {
+			<div class="grid gap-3">
+				for _, ext := range exts {
+					<div class="card p-3">
+						<div class="flex items-center justify-between">
+							<div>
+								<span class="font-medium">{ ext.ExtName }</span>
+								<span class="text-xs text-muted ml-2">v{ ext.ExtVersion }</span>
+							</div>
+							<div>
+								if ext.Enabled {
+									<button
+										class="btn btn-secondary btn-sm"
+										hx-post={ "/campaigns/" + cc.Campaign.ID + "/extensions/" + ext.ExtID + "/disable" }
+										hx-target="#campaign-extensions"
+										hx-swap="outerHTML"
+									>
+										Disable
+									</button>
+								} else {
+									<button
+										class="btn btn-primary btn-sm"
+										hx-post={ "/campaigns/" + cc.Campaign.ID + "/extensions/" + ext.ExtID + "/enable" }
+										hx-target="#campaign-extensions"
+										hx-swap="outerHTML"
+									>
+										Enable
+									</button>
+								}
+							</div>
+						</div>
+					</div>
+				}
+			</div>
+		}
+	</div>
+}

@@ -12,6 +12,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/keyxmakerx/chronicle/internal/middleware"
+	"github.com/keyxmakerx/chronicle/internal/extensions"
 	"github.com/keyxmakerx/chronicle/internal/plugins/addons"
 	"github.com/keyxmakerx/chronicle/internal/plugins/admin"
 	"github.com/keyxmakerx/chronicle/internal/plugins/audit"
@@ -708,6 +709,15 @@ func (a *App) RegisterRoutes() {
 
 	// Wire addon checker into entity handler for conditional attributes rendering.
 	entityHandler.SetAddonChecker(addonService)
+
+	// Content extensions: user-installable content packs (calendar presets,
+	// entity type templates, entity packs, tag collections, marker icons, themes).
+	extRepo := extensions.NewExtensionRepository(a.DB)
+	extService := extensions.NewExtensionService(extRepo, a.Config.ExtensionsPath)
+	extHandler := extensions.NewHandler(extService, a.Config.ExtensionsPath)
+	extensions.RegisterAdminRoutes(adminGroup, extHandler)
+	extensions.RegisterCampaignRoutes(e, extHandler, campaignService, authService)
+	extensions.RegisterAssetRoutes(e, extHandler)
 
 	// Security admin: event logging, session management, user account actions.
 	securityRepo := admin.NewSecurityEventRepository(a.DB)
