@@ -33,50 +33,11 @@
 | P | Extension System — Content Extensions (Layer 1) | 2026-03-07 |
 | Q | Extension System — Widget Extensions (Layer 2) | 2026-03-07 |
 | R | Extension System — Logic Extensions / WASM (Layer 3) | 2026-03-07 |
+| S | Data Integrity & Admin Tooling (ADRs 024-026) | 2026-03-08 |
 
 ---
 
 ## Upcoming Phases
-
-### Phase S: Data Integrity & Admin Tooling
-
-_Fix orphaned data, cascade gaps, and give admins visibility into DB health.
-Priority: Immediate — data safety._
-
-#### Sprint S-1: Campaign Deletion Cleanup (ADR-025)
-
-| Item | Description |
-|------|-------------|
-| API key cascade fix | Migration: FK `campaign_id → campaigns(id) ON DELETE CASCADE` on `api_keys`. `api_request_log` gets `ON DELETE SET NULL` (audit retention). |
-| Media file disk cleanup | Before SQL DELETE, query `media_files WHERE campaign_id = ?`, delete physical files (main + thumbnails), then delete DB rows. Replaces `ON DELETE SET NULL`. |
-| Multi-step delete service | Refactor `campaigns/service.go Delete()`: media cleanup → WASM hook dispatch (`campaign.deleted`) → SQL DELETE (cascades handle rest). |
-| Orphan extension cleanup | After campaign delete, check uploaded extensions only enabled for that campaign. If no other campaign uses it, queue uninstall. |
-
-**Key files:** `db/migrations/000058_*.sql`, `campaigns/service.go`, `campaigns/repository.go`, `media/service.go`
-
-#### Sprint S-2: Extension Migration System (ADR-024)
-
-| Item | Description |
-|------|-------------|
-| Schema tracking table | Migration: `extension_schema_versions` (extension_id, version, applied_at). |
-| Per-extension migration runner | Separate from core golang-migrate. Reads `migrations/` from extension zip. |
-| Namespaced table enforcement | SQL validator: only `CREATE/ALTER TABLE ext_<slug>_*` allowed. Rejects operations on core tables. |
-| Install/uninstall lifecycle | Install: run `up` migrations. Uninstall: run `down` in reverse, drop all `ext_<slug>_*`, delete tracking rows. Disable/enable: no-op (data preserved). |
-
-**Key files:** `extensions/service.go`, `extensions/migration_runner.go` (new), `extensions/sql_validator.go` (new)
-
-#### Sprint S-3: Admin Data Hygiene Dashboard (ADR-026)
-
-| Item | Description |
-|------|-------------|
-| Orphan detection queries | Read-only scans: orphaned media (campaign_id NULL, not avatars), stale filesystem files (no DB record), orphaned API keys, stale extension provenance. |
-| Data Hygiene admin page | `/admin/data-hygiene` with summary stats cards (disk vs DB usage delta, orphan counts), diagnostic results table. |
-| Guarded cleanup actions | Purge orphaned media (blocked if entity-referenced), purge stale files, purge orphaned API keys. All logged to `security_events`. |
-| Safety guardrails | Cannot delete referenced media or active-campaign extensions. Confirmation dialog with affected item count. Admin audit trail. |
-
-**Key files:** `admin/handler.go`, `admin/repository.go`, `admin/templates/data_hygiene.templ` (new), `admin/routes.go`, `media/repository.go`
-
----
 
 ### Phase T: Game System Modules & Worldbuilding Tools
 
@@ -239,12 +200,7 @@ modals.
 ## Recommended Execution Order
 
 ```
-S-1 (campaign deletion)  ─┐
-S-2 (extension migrations) ├── Data safety first
-S-3 (data hygiene)        ─┘
-        │
-        ▼
-T-1 (D&D 5e pages) ──── Content depth
+T-1 (D&D 5e pages) ──── Content depth (Ctrl+K integration remaining)
         │
         ▼
 U-2 (invite system) ──── Collaboration unlock

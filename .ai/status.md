@@ -363,8 +363,13 @@ Created `.ai/audit.md` — comprehensive feature parity and completeness audit c
 - **New API**: `GET /campaigns/:id/entities/types` — returns entity types as JSON for widget dropdowns (used by shop widget create flow).
 - **Media Gallery as Addon**: The existing media plugin (`internal/plugins/media/`) is now properly registered as the `media-gallery` addon. Campaign media browser routes (`/campaigns/:id/media*`) are gated behind `RequireAddon("media-gallery")`. Sidebar "Media" link conditionally shown via `IsAddonEnabled`. Base upload/serve routes remain ungated (avatars, backdrops work regardless). Migration 000057 updates addon description and sets status to active. Future expansion: albums, tagging, lightbox.
 
+### Sprint T-1: D&D 5e Reference Pages (COMPLETE)
+- Module handler, routes, shared templates (`module_pages.templ`), and all D&D 5e data files were already built in earlier sprints
+- **New**: Wired `ModuleSearchAdapter` into entity handler `SearchAPI` so Ctrl+K quick search now returns game system module results alongside entity/timeline/map/calendar/session results
+- **Files modified**: `entities/handler.go` (added `ModuleSearcher` interface + field + setter + search call), `app/routes.go` (wired adapter)
+
 ## Next Session Should
-- **Sprint T-1: D&D 5e Reference Pages** — browsable SRD reference pages (spells, monsters, items, etc.)
+- **Sprint T-2: Pathfinder 2e Module** — ORC-licensed data using GenericModule auto-instantiation
 - **Sprint U-2: Invite System** — campaign invite links for easier player onboarding
 - **Sprint V-1: Quick Capture** — Obsidian-style notes rapid entry
 - See `.ai/phases.md` for full execution order
