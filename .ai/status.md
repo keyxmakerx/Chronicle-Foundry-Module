@@ -349,10 +349,11 @@ Created `.ai/audit.md` — comprehensive feature parity and completeness audit c
 - **Media Gallery as Addon**: The existing media plugin (`internal/plugins/media/`) is now properly registered as the `media-gallery` addon. Campaign media browser routes (`/campaigns/:id/media*`) are gated behind `RequireAddon("media-gallery")`. Sidebar "Media" link conditionally shown via `IsAddonEnabled`. Base upload/serve routes remain ungated (avatars, backdrops work regardless). Migration 000057 updates addon description and sets status to active. Future expansion: albums, tagging, lightbox.
 
 ## Next Session Should
+- **Campaign deletion cleanup** (ADR-025) — media file disk cleanup, API key FK cascade fix, multi-step delete service
+- **Extension migration system** (ADR-024) — per-extension schema tracking, namespaced `ext_*` tables, install/uninstall lifecycle
 - Sprint M-2: D&D 5e Module — Reference Pages (browsable pages at `/modules/dnd5e/`)
 - Obsidian-style notes (see `.ai/obsidian-notes-plan.md`)
 - Quick wins from the UX audit (export button, sort controls, etc.)
-- Phase S+ deferred items (Draw Steel module, whiteboards, offline mode)
 - Test coverage gaps (handler/repository tests for maps, sessions, admin, smtp)
 
 ## Known Issues Right Now

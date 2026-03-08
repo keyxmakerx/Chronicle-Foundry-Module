@@ -218,6 +218,15 @@ _Lower-priority items to pick up during related sprints or as standalone tasks._
 - [ ] **Toast notification grouping** — Duplicate toasts stack separately instead of grouping.
 - [ ] **Entity image gallery** — Only one image per entity; no carousel/gallery for multiple images.
 
+### Campaign Deletion Cleanup (ADR-025)
+
+_Fix orphaned data when campaigns are deleted. See ADR-025._
+
+- [ ] **Campaign media cleanup** — Before SQL DELETE, query + delete physical media files (main + thumbnails) from disk, then delete DB rows. Replace `ON DELETE SET NULL` with proper cleanup. Migration to add FK CASCADE to api_keys.
+- [ ] **API key cascade fix** — Migration to add `FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE` to `api_keys`. `api_request_log` gets `ON DELETE SET NULL` (audit retention).
+- [ ] **Campaign delete service refactor** — Convert single-SQL delete to multi-step service operation: media cleanup → extension hook dispatch → SQL DELETE (cascades handle the rest). WASM plugins receive `campaign.deleted` hook event.
+- [ ] **Orphan extension cleanup** — Background job: after campaign delete, check uploaded extensions only enabled for that campaign. If no other campaign uses the extension, queue uninstall (drop `ext_*` tables, remove zip).
+
 ### Phase P: Extension System (Content Extensions — Layer 1)
 
 _Declarative content packs: no code execution, manifest-only. See ADR-021._
@@ -228,6 +237,15 @@ _Declarative content packs: no code execution, manifest-only. See ADR-021._
 - [ ] **Sprint P-4: Content Appliers** — Calendar preset applier (replaces calendar config). Entity type template applier (creates entity type). Entity preset applier (creates entities). Tag collection applier (merge). Provenance tracking in extension_records for clean uninstall.
 - [ ] **Sprint P-5: Marker Icons & Themes** — Marker icon pack registration (namespaced IDs). Theme variant registration (CSS custom property overrides). Asset serving endpoint (`GET /extensions/:ext_id/assets/*path`).
 - [ ] **Sprint P-6: Example Extensions** — Forgotten Realms Calendar (Harptos) pack. D&D 5e Character Sheet entity type template. Sample monster pack. Package as reference implementations for extension authors.
+
+### Extension Migration System (ADR-024)
+
+_Dynamic schema for uploaded extensions. See ADR-024._
+
+- [ ] **Extension schema tracking** — New `extension_schema_versions` table (extension_id, version, applied_at). Per-extension migration runner separate from core golang-migrate.
+- [ ] **Namespaced table enforcement** — Extension migrations can only create/alter `ext_<slug>_*` tables. SQL validator rejects operations on core tables. Validation runs before execution.
+- [ ] **Install/uninstall lifecycle** — On install: run extension's `up` migrations. On uninstall: run `down` migrations in reverse, drop all `ext_<slug>_*` tables, delete tracking rows. On disable: no-op (data preserved). On enable: no-op (data preserved).
+- [ ] **Extension migration in manifest** — Extensions declare `migrations/` directory in zip with numbered SQL files. Manifest parser validates migration file naming and SQL safety.
 
 ### Phase Q: Extension System (Widget Extensions — Layer 2)
 
