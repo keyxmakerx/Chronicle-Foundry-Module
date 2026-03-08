@@ -54,9 +54,9 @@ The `templates/` subdirectory contains templates for creating new documentation:
 - `module-ai.md.tmpl` -- Copy this when creating a new module's `.ai.md` file
 - `decision-record.md.tmpl` -- Copy this format when adding a new ADR entry
 
-## Module-Level Documentation
+## Extension-Level Documentation
 
-Each module at `internal/modules/<name>/` contains an `.ai.md` file describing
-that module's purpose, internal structure, dependencies, routes, business rules,
-and current implementation state. These are the files to read when you are about
-to work on a specific module.
+Each plugin (`internal/plugins/<name>/`), module (`internal/modules/<name>/`), and
+widget (`internal/widgets/<name>/`) contains an `.ai.md` file describing its purpose,
+internal structure, dependencies, routes, business rules, and current implementation
+state. These are the files to read when you are about to work on a specific extension.

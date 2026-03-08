@@ -486,7 +486,7 @@ is designed for geographic tile-based rendering and is unsuitable for time-axis 
 
 ---
 
-## ADR-012: Sessions-Calendar Integration and RSVP Email System
+## ADR-023: Sessions-Calendar Integration and RSVP Email System
 
 **Date:** 2026-03-04
 **Status:** Accepted
