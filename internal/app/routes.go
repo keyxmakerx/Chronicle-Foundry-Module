@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/a-h/templ"
@@ -1141,8 +1142,13 @@ func (a *App) RegisterRoutes() {
 
 	// --- Game System Modules ---
 	// Module reference pages and tooltip API, gated by per-campaign addon checks.
+	// Custom module manager stores per-campaign uploads under media/modules/.
+	campaignModuleMgr := modules.NewCampaignModuleManager(filepath.Join(a.Config.Upload.MediaPath, "modules"))
 	moduleHandler := modules.NewModuleHandler()
+	moduleHandler.SetCampaignModules(campaignModuleMgr)
 	modules.RegisterRoutes(e, moduleHandler, addonService, authService, campaignService)
+	campaignModuleHandler := modules.NewCampaignModuleHandler(campaignModuleMgr)
+	modules.RegisterCustomModuleRoutes(e, campaignModuleHandler, authService, campaignService)
 
 	// Dashboard redirects to campaigns list for authenticated users.
 	e.GET("/dashboard", func(c echo.Context) error {

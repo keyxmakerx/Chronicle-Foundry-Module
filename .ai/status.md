@@ -375,6 +375,16 @@ Created `.ai/audit.md` — comprehensive feature parity and completeness audit c
 - **All ORC-licensed**: Content from Player Core and GM Core only
 - **Auto-features**: Reference pages, tooltips, and Ctrl+K search all work via GenericModule infrastructure
 
+### Custom Game System Upload (2026-03-09)
+- **CampaignModuleManager** (`campaign_modules.go`): Per-campaign custom module storage under `media/modules/<campaignID>/`. ZIP upload with validation (manifest + data/*.json), security checks (path traversal, size limits), auto-prefixes ID with `custom-` to avoid collisions. Discovers existing uploads on startup. Install/Uninstall lifecycle.
+- **CampaignModuleHandler** (`campaign_handler.go`): Upload (POST), delete (DELETE), and status (GET) endpoints at `/campaigns/:id/modules/upload|custom`. Owner-only. Returns HTMX fragments for inline UI updates.
+- **Module handler updated**: `resolveModule` now checks campaign-specific custom modules after global registry. All 5 handler methods use the new resolution path.
+- **Route middleware updated**: `requireModuleAddon` now also checks if the requested module is the campaign's custom module (bypasses addon check).
+- **UI**: Custom Game System section on campaign addons page with upload form (empty state) or installed module info card with Browse/Remove buttons. HTMX-powered upload and delete with inline swap.
+- **Templ component**: `CustomModuleSection` renders the upload/manage UI.
+- **App wiring**: `CampaignModuleManager` initialized at startup under `media/modules/`, wired into module handler and custom module routes.
+- **Files**: `campaign_modules.go`, `campaign_handler.go`, `custom_module.templ` (new), `handler.go`, `routes.go`, `campaign_addons.templ`, `app/routes.go`
+
 ### Bug Fixes Round 3 (2026-03-09)
 - **Single Game System per Campaign**: Game systems (module category) are now mutually exclusive — enabling one auto-disables any other active game system for that campaign. Service logs the swap. Campaign addons page shows explanatory text.
 - **"Register New Feature" Restyled**: The admin features page form was confusing (created empty DB records with no backing code). Restyled as a collapsed `<details>` element with red/warning styling, danger icon, and clear warnings. Renamed to "Manual DB Record (Advanced)". Removed "Module" from category dropdown (game systems come from code, not DB forms). Button changed from "Register Feature" to "Create DB Record".

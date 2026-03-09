@@ -12,21 +12,45 @@ import (
 )
 
 // ModuleHandler serves reference pages and JSON API endpoints for any
-// module. It is stateless — module data is looked up from the global
-// registry on each request.
-type ModuleHandler struct{}
+// module. It checks both global built-in modules and per-campaign custom
+// modules uploaded by campaign owners.
+type ModuleHandler struct {
+	campaignModules *CampaignModuleManager
+}
 
 // NewModuleHandler creates a new module handler.
 func NewModuleHandler() *ModuleHandler {
 	return &ModuleHandler{}
 }
 
+// SetCampaignModules wires the per-campaign custom module manager.
+func (h *ModuleHandler) SetCampaignModules(mgr *CampaignModuleManager) {
+	h.campaignModules = mgr
+}
+
 // resolveModule extracts the :mod param and looks up the live module.
-// Returns the module or writes a 404 error response.
-func resolveModule(c echo.Context) Module {
+// Checks global registry first, then campaign-specific custom modules.
+func (h *ModuleHandler) resolveModule(c echo.Context) Module {
 	modID := c.Param("mod")
-	mod := FindModule(modID)
-	return mod
+
+	// Check global built-in modules first.
+	if mod := FindModule(modID); mod != nil {
+		return mod
+	}
+
+	// Check campaign-specific custom modules.
+	if h.campaignModules != nil {
+		cc := campaigns.GetCampaignContext(c)
+		if cc != nil {
+			if mod := h.campaignModules.GetModule(cc.Campaign.ID); mod != nil {
+				if mod.Info().ID == modID {
+					return mod
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 // Index lists all categories for a module.
@@ -37,7 +61,7 @@ func (h *ModuleHandler) Index(c echo.Context) error {
 		return apperror.NewMissingContext()
 	}
 
-	mod := resolveModule(c)
+	mod := h.resolveModule(c)
 	if mod == nil {
 		return apperror.NewNotFound("module not found")
 	}
@@ -76,7 +100,7 @@ func (h *ModuleHandler) CategoryList(c echo.Context) error {
 		return apperror.NewMissingContext()
 	}
 
-	mod := resolveModule(c)
+	mod := h.resolveModule(c)
 	if mod == nil {
 		return apperror.NewNotFound("module not found")
 	}
@@ -119,7 +143,7 @@ func (h *ModuleHandler) ItemDetail(c echo.Context) error {
 		return apperror.NewMissingContext()
 	}
 
-	mod := resolveModule(c)
+	mod := h.resolveModule(c)
 	if mod == nil {
 		return apperror.NewNotFound("module not found")
 	}
@@ -163,7 +187,7 @@ func (h *ModuleHandler) SearchAPI(c echo.Context) error {
 		return apperror.NewMissingContext()
 	}
 
-	mod := resolveModule(c)
+	mod := h.resolveModule(c)
 	if mod == nil {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "module not found"})
 	}
@@ -206,7 +230,7 @@ func (h *ModuleHandler) TooltipAPI(c echo.Context) error {
 		return apperror.NewMissingContext()
 	}
 
-	mod := resolveModule(c)
+	mod := h.resolveModule(c)
 	if mod == nil {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "module not found"})
 	}
