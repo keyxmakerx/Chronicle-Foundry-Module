@@ -6,6 +6,14 @@
 -- Before adding FK on api_keys, clean up any orphaned rows that reference
 -- deleted campaigns (otherwise the FK constraint creation will fail).
 
+-- Fix collation: migration 000016 omitted COLLATE, so these tables may have
+-- inherited the server default (e.g. utf8mb4_uca1400_ai_ci on newer MariaDB).
+-- Convert to utf8mb4_unicode_ci to match the rest of the schema before adding FKs.
+ALTER TABLE api_keys CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE api_request_log CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE api_security_events CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE api_ip_blocklist CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 DELETE FROM api_keys WHERE campaign_id NOT IN (SELECT id FROM campaigns);
 
 ALTER TABLE api_keys

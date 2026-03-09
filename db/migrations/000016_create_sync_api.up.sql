@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
     KEY idx_api_keys_user (user_id),
     KEY idx_api_keys_campaign (campaign_id),
     KEY idx_api_keys_active (is_active)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- API request log: records every API call for auditing and monitoring.
 -- No foreign key to api_keys — logs are retained after key deletion for audit trail.
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS api_request_log (
     KEY idx_api_log_created (created_at),
     KEY idx_api_log_ip (ip_address),
     KEY idx_api_log_status (status_code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- API security events: tracks blocked requests, rate limit hits, auth failures.
 -- Used by admin dashboard for security monitoring.
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS api_security_events (
     KEY idx_security_ip (ip_address),
     KEY idx_security_created (created_at),
     KEY idx_security_resolved (resolved)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- IP blocklist: admin-managed list of blocked IPs.
 -- Checked on every API request before processing.
@@ -80,4 +80,4 @@ CREATE TABLE IF NOT EXISTS api_ip_blocklist (
     expires_at  DATETIME     DEFAULT NULL,                        -- Optional auto-expiry (NULL = permanent).
     created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY idx_blocklist_ip (ip_address)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
