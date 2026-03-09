@@ -196,6 +196,14 @@ func (m *mockCampaignRepo) UpdateDashboardLayout(ctx context.Context, campaignID
 	return nil
 }
 
+func (m *mockCampaignRepo) UpdateBackdropPath(ctx context.Context, campaignID string, path *string) error {
+	return nil
+}
+
+func (m *mockCampaignRepo) UpdateSettings(ctx context.Context, campaignID, settingsJSON string) error {
+	return nil
+}
+
 func (m *mockCampaignRepo) TransferOwnership(ctx context.Context, campaignID, fromUserID, toUserID string) error {
 	if m.transferOwnershipFn != nil {
 		return m.transferOwnershipFn(ctx, campaignID, fromUserID, toUserID)

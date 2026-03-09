@@ -265,6 +265,23 @@ func (c *Campaign) ParseDashboardLayout() *DashboardLayout {
 	return &layout
 }
 
+// CampaignSettings holds campaign-level configuration stored as JSON in
+// the campaigns.settings column. Accent color, display preferences, etc.
+type CampaignSettings struct {
+	AccentColor string `json:"accent_color,omitempty"` // Hex color, e.g. "#6366f1".
+}
+
+// ParseSettings parses the campaign's settings JSON into a CampaignSettings
+// struct. Returns a zero-value struct if parsing fails or settings are empty.
+func (c *Campaign) ParseSettings() CampaignSettings {
+	var s CampaignSettings
+	if c.Settings == "" || c.Settings == "{}" {
+		return s
+	}
+	_ = json.Unmarshal([]byte(c.Settings), &s)
+	return s
+}
+
 // Supported dashboard block types. Each maps to a Templ component that knows
 // how to render the block with its config. Used by both campaign and category
 // dashboard editors.

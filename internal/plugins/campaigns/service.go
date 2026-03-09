@@ -48,6 +48,10 @@ type CampaignService interface {
 	CancelTransfer(ctx context.Context, campaignID string) error
 	GetPendingTransfer(ctx context.Context, campaignID string) (*OwnershipTransfer, error)
 
+	// Backdrop and branding
+	UpdateBackdropPath(ctx context.Context, campaignID string, path *string) error
+	UpdateAccentColor(ctx context.Context, campaignID string, color string) error
+
 	// Sidebar configuration
 	UpdateSidebarConfig(ctx context.Context, campaignID string, config SidebarConfig) error
 	GetSidebarConfig(ctx context.Context, campaignID string) (*SidebarConfig, error)
@@ -591,6 +595,30 @@ func (s *campaignService) GetPendingTransfer(ctx context.Context, campaignID str
 const maxSidebarConfigEntries = 100
 
 // UpdateSidebarConfig updates the campaign's sidebar configuration. Validates
+// UpdateBackdropPath sets or clears the campaign's backdrop image path.
+func (s *campaignService) UpdateBackdropPath(ctx context.Context, campaignID string, path *string) error {
+	return s.repo.UpdateBackdropPath(ctx, campaignID, path)
+}
+
+// UpdateAccentColor sets the campaign's accent color. Accepts a hex color
+// string (e.g. "#6366f1") or empty string to reset to default.
+func (s *campaignService) UpdateAccentColor(ctx context.Context, campaignID string, color string) error {
+	campaign, err := s.repo.FindByID(ctx, campaignID)
+	if err != nil {
+		return err
+	}
+
+	settings := campaign.ParseSettings()
+	settings.AccentColor = color
+
+	settingsJSON, err := json.Marshal(settings)
+	if err != nil {
+		return apperror.NewInternal(fmt.Errorf("marshaling settings: %w", err))
+	}
+
+	return s.repo.UpdateSettings(ctx, campaignID, string(settingsJSON))
+}
+
 // array sizes and persists as JSON.
 func (s *campaignService) UpdateSidebarConfig(ctx context.Context, campaignID string, config SidebarConfig) error {
 	if len(config.EntityTypeOrder) > maxSidebarConfigEntries {

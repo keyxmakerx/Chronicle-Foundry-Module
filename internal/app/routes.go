@@ -162,6 +162,29 @@ func (a *addonListerAdapter) ListForPluginHub(ctx context.Context, campaignID st
 	return result, nil
 }
 
+// backdropUploaderAdapter wraps the media service to implement the
+// campaigns.MediaUploader interface for backdrop image uploads.
+type backdropUploaderAdapter struct {
+	svc media.MediaService
+}
+
+// UploadBackdrop uploads an image via the media service with backdrop usage type.
+func (a *backdropUploaderAdapter) UploadBackdrop(ctx context.Context, campaignID, userID string, fileBytes []byte, originalName, mimeType string) (string, error) {
+	mf, err := a.svc.Upload(ctx, media.UploadInput{
+		CampaignID:   campaignID,
+		UploadedBy:   userID,
+		OriginalName: originalName,
+		MimeType:     mimeType,
+		FileSize:     int64(len(fileBytes)),
+		UsageType:    media.UsageBackdrop,
+		FileBytes:    fileBytes,
+	})
+	if err != nil {
+		return "", err
+	}
+	return mf.Filename, nil
+}
+
 // entityTagFetcherAdapter wraps tags.TagService to implement the
 // entities.EntityTagFetcher interface for batch tag loading in list views.
 type entityTagFetcherAdapter struct {
@@ -927,6 +950,7 @@ func (a *App) RegisterRoutes() {
 
 	campaignHandler.SetAuditLogger(&campaignAuditAdapter{svc: auditService})
 	campaignHandler.SetAddonLister(&addonListerAdapter{svc: addonService})
+	campaignHandler.SetMediaUploader(&backdropUploaderAdapter{svc: mediaService})
 	tagHandler.SetAuditService(auditService)
 
 	// --- Campaign Export/Import ---
@@ -1173,6 +1197,11 @@ func (a *App) RegisterRoutes() {
 		if cc := campaigns.GetCampaignContext(c); cc != nil {
 			ctx = layouts.SetCampaignID(ctx, cc.Campaign.ID)
 			ctx = layouts.SetCampaignName(ctx, cc.Campaign.Name)
+
+			// Accent color from campaign settings.
+			if accentColor := cc.Campaign.ParseSettings().AccentColor; accentColor != "" {
+				ctx = layouts.SetAccentColor(ctx, accentColor)
+			}
 
 			// "View as player" override: when an owner has the toggle active,
 			// templates see RolePlayer instead of RoleOwner. Access control
