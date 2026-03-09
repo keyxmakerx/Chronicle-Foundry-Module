@@ -102,7 +102,7 @@ func (s *addonService) GetBySlug(ctx context.Context, slug string) (*Addon, erro
 
 // validCategories enumerates allowed addon categories for input validation.
 // Must stay in sync with the ENUM on addons.category in the database.
-// See migration 000027 for the ALTER TABLE that added 'plugin'.
+// See db/migrations/000001_baseline.up.sql for the current ENUM definition.
 var validCategories = map[AddonCategory]bool{
 	CategorySystem:      true,
 	CategoryWidget:      true,

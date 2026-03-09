@@ -246,14 +246,22 @@ if campaign.CreatedBy != userID {
 // TODO(auth): Implement login rate limiting
 ```
 
-### SQL Migration Headers
+### Two-Tier Schema System (ADR-028)
+
+Chronicle uses a **plugin-isolated database schema architecture**:
+
+- **Core schema** (`db/migrations/`): Single baseline migration with all core tables.
+  Runs via golang-migrate on startup. Failure is fatal.
+- **Plugin schema** (`internal/plugins/<name>/migrations/`): Each built-in plugin
+  has its own numbered migration files. Runs via `RunPluginMigrations()` after core
+  migrations. Failure disables that plugin; app continues serving.
 
 ```sql
--- Migration: 000002_create_campaigns
--- Description: Creates campaigns table for worldbuilding containers.
--- Related: ADR-001
+-- Core migration example: db/migrations/000001_baseline.up.sql
+CREATE TABLE IF NOT EXISTS campaigns ( ... );
 
-CREATE TABLE campaigns ( ... );
+-- Plugin migration example: internal/plugins/calendar/migrations/001_calendar_tables.up.sql
+CREATE TABLE IF NOT EXISTS calendars ( ... );
 ```
 
 ### Migration Safety Rules
@@ -270,6 +278,8 @@ CREATE TABLE campaigns ( ... );
    migration must revert all rows using that value BEFORE removing it from the ENUM.
 5. **Validation tests**: `internal/database/migrate_test.go` validates ENUM values
    in migration SQL. Update the valid sets there when adding new ENUM values.
+6. **Plugin tables**: Plugin tables belong in `internal/plugins/<name>/migrations/`,
+   not in `db/migrations/`. Plugin schema failures degrade gracefully (ADR-028).
 
 ### Anti-Patterns (AVOID)
 

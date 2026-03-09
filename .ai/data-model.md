@@ -55,7 +55,10 @@ User --< CampaignMember >-- Campaign
 
 ## Tables
 
-> Tables marked with **(implemented)** have migrations written. Others are planned.
+> All tables below are implemented. Core tables live in `db/migrations/000001_baseline.up.sql`.
+> Plugin tables live in `internal/plugins/<name>/migrations/`. See ADR-028 for the
+> plugin-isolated schema architecture. Historical migration numbers (000NNN) are
+> preserved in column notes for traceability but those files no longer exist.
 
 ### users (implemented -- migration 000001)
 | Column | Type | Constraints | Notes |
@@ -895,62 +898,24 @@ User --< CampaignMember >-- Campaign
 - `extension_provenance`: INDEX on (campaign_id, extension_id), INDEX on (table_name, record_id)
 - `extension_data`: UNIQUE on (campaign_id, extension_id, namespace, data_key)
 
-## Migration Log
+## Migration Structure (ADR-028)
 
-| # | File | Description | Date Applied |
-|---|------|-------------|-------------|
-| 1 | 000001_create_users | Users table with auth fields | 2026-02-19 |
-| 2 | 000002_create_campaigns | Campaigns, campaign_members, ownership_transfers | 2026-02-19 |
-| 3 | 000003_create_smtp_settings | SMTP settings singleton table | 2026-02-19 |
-| 4 | 000004_create_entities | Entity types + entities tables | 2026-02-19 |
-| 5 | 000005_create_media | Media files table + campaigns.backdrop_path | 2026-02-19 |
-| 6 | 000006_sidebar_config | campaigns.sidebar_config JSON column | 2026-02-19 |
-| 7 | 000007_entity_type_layout | entity_types.layout_json JSON column | 2026-02-19 |
-| 8 | 000008_entity_posts | Entity sub-posts table | 2026-02-19 |
-| 9 | 000009_tags | Tags + entity_tags tables | 2026-02-19 |
-| 10 | 000010_relations | Entity relations table | 2026-02-19 |
-| 11 | 000011_audit_log | Audit logging table | 2026-02-19 |
-| 12 | 000012_storage_settings | Storage settings + per-user/campaign limits | 2026-02-19 |
-| 13 | 000013_entity_type_dashboards | description + pinned_entity_ids on entity_types | 2026-02-20 |
-| 14 | 000014_field_overrides | field_overrides JSON on entities | 2026-02-20 |
-| 15 | 000015_addons | Addons + campaign_addons tables (11 seeds) | 2026-02-20 |
-| 16 | 000016_api_keys | API keys, request log, security events, IP blocklist | 2026-02-20 |
-| 17 | 000017_notes | Notes table (per-user, per-campaign) | 2026-02-20 |
-| 18 | 000018_activate_notes_addon | Activates player-notes addon | 2026-02-20 |
-| 19 | 000019_fix_addon_statuses | Fixes addon status mismatches | 2026-02-20 |
-| 20 | 000020_password_reset_tokens | Password reset tokens table | 2026-02-22 |
-| 21 | 000021_dashboard_layouts | dashboard_layout on campaigns + entity_types | 2026-02-22 |
-| 22 | 000022_notes_collaboration | Shared notes, locking, versions (is_shared, locked_by/at, entry/entry_html, note_versions) | 2026-02-24 |
-| 23 | 000023_entity_popup_config | popup_config JSON on entities for hover preview settings | 2026-02-24 |
-| 24 | 000024_security_admin | security_events table + users.is_disabled column | 2026-02-25 |
-| 25 | 000025_attributes_addon | Registers "attributes" addon in addons table | 2026-02-25 |
-| 26 | 000026_rename_notes_addon | Renames "player-notes" to "notes", adds new "player-notes" planned addon | 2026-02-25 |
-| 27 | 000027_calendar_plugin | Calendar tables (calendars, months, weekdays, moons, seasons, events) + addon | 2026-02-25 |
-| 28 | 000028_calendar_v2_device_fingerprint | Leap years, event end dates, season colors, event categories, device fingerprint on api_keys | 2026-02-25 |
-| 29 | 000029_maps_plugin | Maps + map_markers tables + addon registration | 2026-02-28 |
-| 30 | 000030_calendar_time_system | Time system on calendars (hours/min/sec config, current time) + event times | 2026-03-01 |
-| 31 | 000031_calendar_mode_timezone | Calendar mode column (fantasy/reallife) + user timezone | 2026-03-01 |
-| 32 | 000032_sessions_plugin | Sessions, session_attendees, session_entities tables + addon | 2026-03-01 |
-| 33 | 000033_calendar_eras_weather | calendar_eras table + season weather_effect column | 2026-03-01 |
-| 34 | 000034_calendar_event_rich_text | Add description_html column to calendar_events | 2026-03-01 |
-| 35 | 000035_timeline_plugin | timelines, timeline_event_links, timeline_entity_groups/members tables + addon | 2026-03-02 |
-| 36 | 000036_timeline_standalone_events | timeline_events table, calendar_id nullable on timelines | 2026-03-02 |
-| 37 | 000037_event_visibility_rules | visibility_rules JSON on calendar_events + timeline_events | 2026-03-02 |
-| 38 | 000038_tag_visibility | dm_only on tags + index | 2026-03-02 |
-| 39 | 000039_calendar_event_categories | calendar_event_categories table | 2026-03-02 |
-| 40 | 000040_storage_bypass | Bypass columns on user/campaign storage limits | 2026-03-03 |
-| 41 | 000041_session_recurrence_and_rsvp_tokens | Recurrence on sessions + session_rsvp_tokens table | 2026-03-04 |
-| 44 | 000044_sync_mappings | sync_mappings table for Foundry VTT sync | 2026-03-04 |
-| 45 | 000045_map_expansion | map_layers, map_drawings, map_tokens, map_fog + expansion columns on maps | 2026-03-04 |
-| 46 | 000046_relation_metadata | metadata JSON on entity_relations | 2026-03-04 |
-| 47 | 000047_timeline_event_connections | timeline_event_connections table | 2026-03-05 |
-| 48 | 000048_entity_permissions | entity_permissions table + visibility on entities | 2026-03-05 |
-| 49 | 000049_campaign_groups | campaign_groups + campaign_group_members + group subject type | 2026-03-05 |
-| 50 | 000050_entity_posts | entity_posts table (replaces placeholder from 000008) | 2026-03-06 |
-| 51 | 000051_notes_folders | parent_id + is_folder on notes | 2026-03-06 |
-| 52 | 000052_relations_dm_only | dm_only on entity_relations | 2026-03-06 |
-| 53 | 000053_session_recap | recap + recap_html on sessions | 2026-03-07 |
-| 54 | 000054_character_assignment | character_entity_id on campaign_members | 2026-03-07 |
-| 55 | 000055_content_extensions | extensions, campaign_extensions, extension_provenance, extension_data | 2026-03-07 |
-| 56 | 000056_email_change_verification | pending_email, email_verify_token/expires on users | 2026-03-07 |
-| 57 | 000057_media_gallery_addon | media-gallery addon → active + plugin category | 2026-03-08 |
+Schema is split into two tiers. See `internal/database/plugin_schema.go` for the
+plugin migration runner and `internal/database/plugin_health.go` for the health
+registry that tracks which plugins have healthy schemas.
+
+### Core Schema (fatal on failure)
+
+| File | Tables |
+|------|--------|
+| `db/migrations/000001_baseline.up.sql` | All core tables: users, campaigns, campaign_members, ownership_transfers, smtp_settings, entity_types, entities, media_files, tags, entity_tags, entity_relations, entity_permissions, entity_posts, entity_aliases, notes, note_versions, audit_log, site_settings, security_events, password_reset_tokens, addons, campaign_addons, campaign_groups, campaign_group_members, extensions, campaign_extensions, extension_provenance, extension_data, extension_schema_versions, plugin_schema_versions, user_storage_limits, campaign_storage_limits |
+
+### Plugin Schema (graceful degradation on failure)
+
+| Plugin | Migration Dir | Tables |
+|--------|--------------|--------|
+| calendar | `internal/plugins/calendar/migrations/` | calendars, calendar_months, calendar_weekdays, calendar_moons, calendar_seasons, calendar_events, calendar_event_categories, calendar_eras |
+| maps | `internal/plugins/maps/migrations/` | maps, map_markers, map_layers, map_drawings, map_tokens, map_fog |
+| sessions | `internal/plugins/sessions/migrations/` | sessions, session_entities, session_attendees, session_rsvp_tokens |
+| timeline | `internal/plugins/timeline/migrations/` | timelines, timeline_event_links, timeline_entity_groups, timeline_entity_group_members, timeline_events, timeline_event_connections |
+| syncapi | `internal/plugins/syncapi/migrations/` | api_keys, api_request_log, sync_mappings |

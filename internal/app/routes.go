@@ -367,6 +367,7 @@ type calendarEventPublisherAdapter struct {
 	bus ws.EventBus
 }
 
+// PublishCalendarEvent translates calendar domain events into WebSocket messages.
 func (a *calendarEventPublisherAdapter) PublishCalendarEvent(eventType, campaignID, resourceID string, payload any) {
 	if campaignID == "" {
 		return
@@ -393,6 +394,7 @@ type entityEventPublisherAdapter struct {
 	bus ws.EventBus
 }
 
+// PublishEntityEvent translates entity domain events into WebSocket messages.
 func (a *entityEventPublisherAdapter) PublishEntityEvent(eventType, campaignID, entityID string, entity *entities.Entity) {
 	if campaignID == "" {
 		return
@@ -417,6 +419,7 @@ type mapEventPublisherAdapter struct {
 	bus ws.EventBus
 }
 
+// PublishDrawingEvent translates map drawing domain events into WebSocket messages.
 func (a *mapEventPublisherAdapter) PublishDrawingEvent(eventType string, campaignID string, drawing *maps.Drawing) {
 	if campaignID == "" {
 		return
@@ -435,6 +438,7 @@ func (a *mapEventPublisherAdapter) PublishDrawingEvent(eventType string, campaig
 	a.bus.Publish(ws.NewMessage(msgType, campaignID, drawing.ID, drawing))
 }
 
+// PublishTokenEvent translates map token domain events into WebSocket messages.
 func (a *mapEventPublisherAdapter) PublishTokenEvent(eventType string, campaignID string, token *maps.Token) {
 	if campaignID == "" {
 		return
@@ -453,6 +457,7 @@ func (a *mapEventPublisherAdapter) PublishTokenEvent(eventType string, campaignI
 	a.bus.Publish(ws.NewMessage(msgType, campaignID, token.ID, token))
 }
 
+// PublishTokenPositionEvent broadcasts a token position update via WebSocket.
 func (a *mapEventPublisherAdapter) PublishTokenPositionEvent(campaignID, tokenID string, x, y float64) {
 	if campaignID == "" {
 		return
@@ -463,6 +468,7 @@ func (a *mapEventPublisherAdapter) PublishTokenPositionEvent(campaignID, tokenID
 	}))
 }
 
+// PublishLayerEvent broadcasts a map layer update via WebSocket.
 func (a *mapEventPublisherAdapter) PublishLayerEvent(eventType string, campaignID string, layer *maps.Layer) {
 	if campaignID == "" {
 		return
@@ -470,6 +476,7 @@ func (a *mapEventPublisherAdapter) PublishLayerEvent(eventType string, campaignI
 	a.bus.Publish(ws.NewMessage(ws.MsgLayerUpdated, campaignID, layer.ID, layer))
 }
 
+// PublishFogEvent broadcasts a fog-of-war update via WebSocket.
 func (a *mapEventPublisherAdapter) PublishFogEvent(eventType string, campaignID, mapID string, region *maps.FogRegion) {
 	if campaignID == "" {
 		return
