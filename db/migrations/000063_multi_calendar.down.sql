@@ -8,6 +8,9 @@ ALTER TABLE sessions DROP COLUMN calendar_id;
 ALTER TABLE calendars DROP COLUMN is_default;
 ALTER TABLE calendars DROP COLUMN sort_order;
 
--- 3. Drop the regular index and restore the UNIQUE constraint.
+-- 3. Drop the FK, drop the regular index, restore the UNIQUE constraint, re-add FK.
+ALTER TABLE calendars DROP FOREIGN KEY fk_calendars_campaign;
 ALTER TABLE calendars DROP INDEX idx_calendars_campaign;
 ALTER TABLE calendars ADD UNIQUE KEY idx_calendars_campaign (campaign_id);
+ALTER TABLE calendars ADD CONSTRAINT fk_calendars_campaign
+    FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE;
