@@ -63,7 +63,7 @@
           })
           .catch(function (err) {
             console.error('[EntityPosts] Create error:', err);
-            Chronicle.toast('Failed to create post', 'error');
+            Chronicle.notify('Failed to create post', 'error');
           });
       }
 
@@ -85,7 +85,7 @@
           })
           .catch(function (err) {
             console.error('[EntityPosts] Update error:', err);
-            Chronicle.toast('Failed to update post', 'error');
+            Chronicle.notify('Failed to update post', 'error');
           });
       }
 
@@ -100,7 +100,7 @@
           })
           .catch(function (err) {
             console.error('[EntityPosts] Delete error:', err);
-            Chronicle.toast('Failed to delete post', 'error');
+            Chronicle.notify('Failed to delete post', 'error');
           });
       }
 
@@ -208,6 +208,7 @@
         if (isExpanded) {
           h += '<div class="border-t border-edge">';
           if (post.entryHtml) {
+            // entryHtml is sanitized server-side via sanitize.HTML() before storage.
             h += '<div class="px-4 py-3 prose prose-sm dark:prose-invert max-w-none">' + post.entryHtml + '</div>';
           } else {
             h += '<div class="px-4 py-3 text-sm text-fg-muted italic">No content yet.</div>';

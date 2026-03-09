@@ -324,6 +324,40 @@ Chronicle.register('notes', {
       });
     }
 
+    // --- External Events ---
+    // Listen for note-created events (from quick capture modal) to refresh.
+    var _onNoteCreated = function () { if (state.open) loadNotes(); };
+    window.addEventListener('chronicle:note-created', _onNoteCreated);
+
+    // Listen for open-note events (from search modal / session journal) to
+    // open the panel and scroll to a specific note.
+    var _onOpenNote = function (e) {
+      var noteId = e.detail && e.detail.noteId;
+      if (!noteId) return;
+      // Open panel if closed.
+      if (!state.open) {
+        state.open = true;
+        panel.classList.remove('notes-panel-hidden');
+        fab.classList.add('notes-fab-hidden');
+      }
+      // Switch to "All" tab and reload notes, then highlight the target note.
+      state.tab = 'all';
+      tabBtns.forEach(function (b) {
+        b.classList.toggle('notes-tab-active', b.getAttribute('data-tab') === 'all');
+      });
+      loadNotes();
+      // After reload, try to scroll to and highlight the note.
+      setTimeout(function () {
+        var noteEl = panel.querySelector('[data-note-id="' + noteId + '"]');
+        if (noteEl) {
+          noteEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          noteEl.classList.add('note-highlight');
+          setTimeout(function () { noteEl.classList.remove('note-highlight'); }, 2000);
+        }
+      }, 500);
+    };
+    window.addEventListener('chronicle:open-note', _onOpenNote);
+
     // --- API Functions ---
 
     function apiUrl(path) {
@@ -1410,6 +1444,8 @@ Chronicle.register('notes', {
     el._notesPanel = panel;
     el._notesMiniEditors = miniEditors;
     el._notesNavHandler = onNavigated;
+    el._notesOnCreated = _onNoteCreated;
+    el._notesOnOpenNote = _onOpenNote;
   },
 
   /**
@@ -1421,6 +1457,15 @@ Chronicle.register('notes', {
     if (el._notesNavHandler) {
       window.removeEventListener('chronicle:navigated', el._notesNavHandler);
       delete el._notesNavHandler;
+    }
+    // Remove external event listeners.
+    if (el._notesOnCreated) {
+      window.removeEventListener('chronicle:note-created', el._notesOnCreated);
+      delete el._notesOnCreated;
+    }
+    if (el._notesOnOpenNote) {
+      window.removeEventListener('chronicle:open-note', el._notesOnOpenNote);
+      delete el._notesOnOpenNote;
     }
     // Release any held lock and stop heartbeat.
     if (el._notesState) {

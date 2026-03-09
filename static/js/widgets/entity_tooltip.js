@@ -290,11 +290,7 @@
     });
 
     // Fetch preview data.
-    fetch(previewURL, {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' },
-      credentials: 'same-origin'
-    })
+    Chronicle.apiFetch(previewURL)
       .then(function (res) {
         if (!res.ok) throw new Error('Preview fetch failed: ' + res.status);
         return res.json();

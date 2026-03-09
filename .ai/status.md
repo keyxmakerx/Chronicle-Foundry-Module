@@ -8,19 +8,26 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-09 -- Modules→Systems rename, campaign customization (backdrop/accent), dashboard blocks (7 new types), map Phase 2 objects, documentation update.
-Branch: `claude/review-work-plan-hT8UX`.
+2026-03-09 -- Documentation & backlog update. Verified 3-phase security hardening plan fully complete (all items implemented or intentionally excluded — ClamAV evaluated and removed in favor of CDR/magic-byte/MIME pipeline). Added feature request: Session Journal audio attachments (Sprint V-5) — upload, share/private visibility, inline player. Marked Sprint V-1 complete in todo.md. Previously: Sprint V-1 (Quick Capture, Session Journal, Slash Commands), competitive gap analysis, phase reordering.
+Branch: `claude/dynamic-database-setup-1QSPA`.
 
 ## Phase & Sprint Plan
-See `.ai/phases.md` for the full roadmap. Phases S through W organized by theme:
-- **S**: Data Integrity & Admin Tooling (ADRs 024-026)
+See `.ai/phases.md` for the full roadmap. Phases organized by priority:
+- **V**: Obsidian-Style Notes & Discovery ← CURRENT
+- **W**: Polish, Ecosystem & Delight
 - **T**: Game System Modules & Worldbuilding Tools
 - **U**: Collaboration & Platform Maturity
-- **V**: Obsidian-Style Notes & Discovery
-- **W**: Polish, Ecosystem & Delight
 
 ## Current Phase
-**Phase S (Data Integrity & Admin Tooling) — COMPLETE.**
+**Phase V (Obsidian-Style Notes & Discovery) — Sprint V-1 COMPLETE.**
+
+### Sprint V-1: Quick Capture, Session Journal & Slash Commands (COMPLETE)
+- **Slash command menu** (`editor_slash.js`): TipTap `/` trigger shows command palette with 9 block commands (3 heading levels, bullet/numbered list, callout, table, horizontal rule, code block). Filters as user types, keyboard navigation, follows mention extension pattern.
+- **Quick capture modal** (`quick_capture.js`): Ctrl+Shift+N opens lightweight modal with auto-timestamped title + content area. Creates campaign-wide note via existing notes API. Ctrl+Enter to submit.
+- **Session Journal** (`quick_capture.js`): Topbar "Journal" button creates or opens "Session Journal - YYYY-MM-DD" note. Finds existing journal by title match, creates new if none exists. Opens notes panel with highlight animation.
+- **Notes in Ctrl+K** (`search_modal.js`): Quick search now fetches notes in parallel with entities. Notes filtered client-side by title, appended to results with sticky-note icon. Selecting a note opens the notes panel via `chronicle:open-note` event.
+- **Notes panel events** (`notes.js`): Added `chronicle:note-created` (refresh) and `chronicle:open-note` (open + scroll-to) event handlers with cleanup in destroy.
+- **Shortcuts help** (`shortcuts_help.js`): Added Ctrl+Shift+N and `/` to help overlay.
 
 ### Generic Module Framework (COMPLETE)
 - **GenericTooltipRenderer** (`generic_tooltip.go`): Reads field definitions from the manifest's `categories[].fields[]` to render tooltips. Shows only manifest-declared fields in manifest-defined order. Works for any game system.

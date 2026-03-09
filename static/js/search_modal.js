@@ -179,18 +179,47 @@
     var campaignId = getCampaignId();
     if (!campaignId) return;
 
-    var url = '/campaigns/' + encodeURIComponent(campaignId) +
+    var entityUrl = '/campaigns/' + encodeURIComponent(campaignId) +
               '/entities/search?q=' + encodeURIComponent(query);
+    var notesUrl = '/campaigns/' + encodeURIComponent(campaignId) + '/notes';
 
-    fetch(url, {
-      headers: { 'Accept': 'application/json' },
-      signal: abortController.signal
-    })
-      .then(function (res) { return res.json(); })
-      .then(function (data) {
-        results = data.results || [];
+    var signal = abortController.signal;
+
+    // Fetch entities and notes in parallel. Notes are filtered client-side.
+    Promise.all([
+      Chronicle.apiFetch(entityUrl, { signal: signal }).then(function (r) { return r.json(); }),
+      Chronicle.apiFetch(notesUrl, { signal: signal }).then(function (r) { return r.json(); }).catch(function () { return []; }),
+    ])
+      .then(function (responses) {
+        var entityData = responses[0];
+        var allNotes = responses[1] || [];
+
+        // Filter notes by title match (case-insensitive).
+        var queryLower = query.toLowerCase();
+        var matchingNotes = allNotes.filter(function (n) {
+          return !n.isFolder && n.title && n.title.toLowerCase().indexOf(queryLower) !== -1;
+        });
+
+        // Build unified results: entities first, then notes.
+        results = (entityData.results || []).slice();
+        var entityTotal = entityData.total || results.length;
+
+        // Append matching notes as search results (max 5).
+        for (var i = 0; i < Math.min(matchingNotes.length, 5); i++) {
+          var note = matchingNotes[i];
+          results.push({
+            url: '#note:' + note.id,
+            name: note.title,
+            type_name: 'Note',
+            type_icon: 'fa-solid fa-sticky-note',
+            type_color: note.color || '#7c3aed',
+            _isNote: true,
+            _noteId: note.id,
+          });
+        }
+
         activeIndex = results.length > 0 ? 0 : -1;
-        renderResults(data.total || 0);
+        renderResults(entityTotal + matchingNotes.length);
       })
       .catch(function (err) {
         if (err.name !== 'AbortError') {
@@ -342,6 +371,16 @@
 
   function navigateTo(url) {
     close();
+
+    // Note results use a special URL format: #note:<id>
+    if (url && url.indexOf('#note:') === 0) {
+      var noteId = url.substring(6);
+      window.dispatchEvent(new CustomEvent('chronicle:open-note', {
+        detail: { noteId: noteId },
+      }));
+      return;
+    }
+
     window.location.href = url;
   }
 

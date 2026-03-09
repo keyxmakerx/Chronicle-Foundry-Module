@@ -50,7 +50,7 @@
       }
 
       function loadAndRender() {
-        fetch(apiUrl, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+        Chronicle.apiFetch(apiUrl)
           .then(function (r) { return r.json(); })
           .then(function (data) { render(data); })
           .catch(function (err) {

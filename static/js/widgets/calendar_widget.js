@@ -189,7 +189,7 @@
         })
         .catch(function (err) {
           console.error('[calendar-widget] Quick add failed:', err);
-          Chronicle.toast('Failed to create event', 'error');
+          Chronicle.notify('Failed to create event', 'error');
         });
     },
 

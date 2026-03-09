@@ -13,7 +13,6 @@
  *   data-icon            -- Current icon class
  *   data-color           -- Current color hex
  *   data-fields          -- JSON array of field definitions
- *   data-csrf-token      -- CSRF token
  */
 (function () {
   'use strict';
@@ -40,9 +39,11 @@
   ];
 
   Chronicle.register('entity-type-editor', {
+    destroy: function (el) {
+      el.innerHTML = '';
+    },
     init: function (el, config) {
       var endpoint = config.endpoint;
-      var csrfToken = config.csrfToken;
       var currentName = el.getAttribute('data-name') || '';
       var currentNamePlural = el.getAttribute('data-name-plural') || '';
       var currentIcon = el.getAttribute('data-icon') || 'fa-circle';
@@ -311,13 +312,9 @@
           };
         }
 
-        fetch(endpoint, {
+        Chronicle.apiFetch(endpoint, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': csrfToken
-          },
-          body: JSON.stringify(payload)
+          body: payload
         })
         .then(function (res) {
           if (!res.ok) {

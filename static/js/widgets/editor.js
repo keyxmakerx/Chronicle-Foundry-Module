@@ -150,14 +150,20 @@
         },
       };
 
-      // We store a reference to the mention extension here so the keydown
-      // handler closure can access it. It will be set after editor creation.
+      // We store references to extensions here so the keydown handler
+      // closure can access them. They will be set after editor creation.
       var mentionExtRef = { current: null };
+      var slashExtRef = { current: null };
 
-      if (canEdit && campaignId && Chronicle.MentionExtension) {
+      if (canEdit) {
         editorProps.handleKeyDown = function (view, event) {
-          if (mentionExtRef.current) {
-            return mentionExtRef.current.onKeyDown(null, event);
+          // Let mention popup handle keys first (if active).
+          if (mentionExtRef.current && mentionExtRef.current.onKeyDown(null, event)) {
+            return true;
+          }
+          // Then let slash command popup handle keys (if active).
+          if (slashExtRef.current && slashExtRef.current.onKeyDown(null, event)) {
+            return true;
           }
           return false;
         };
@@ -184,6 +190,16 @@
         mentionExtRef.current = mentionExt;
       }
 
+      // --- Slash Command Extension ---
+      // Initialize slash command menu if the module is loaded. Typing "/"
+      // at the start of a line opens a command palette for block insertion.
+      var slashExt = null;
+      if (canEdit && Chronicle.SlashCommands) {
+        slashExt = Chronicle.SlashCommands();
+        slashExt.onCreate(editor);
+        slashExtRef.current = slashExt;
+      }
+
       // Track state.
       var state = {
         editor: editor,
@@ -196,6 +212,7 @@
         toolbar: toolbar,
         headerEl: headerEl,
         mentionExt: mentionExt,
+        slashExt: slashExt,
         canEdit: canEdit,
         isEditing: false, // tracks current edit mode state
         el: el,
@@ -221,6 +238,14 @@
       if (mentionExt) {
         editor.on('update', function () {
           mentionExt.onUpdate(editor);
+        });
+      }
+
+      // Wire slash command extension into editor update events to detect
+      // the "/" trigger and show the command palette.
+      if (slashExt) {
+        editor.on('update', function () {
+          slashExt.onUpdate(editor);
         });
       }
 
@@ -262,6 +287,11 @@
       // Clean up mention extension popup and listeners.
       if (state.mentionExt) {
         state.mentionExt.onDestroy();
+      }
+
+      // Clean up slash command extension popup.
+      if (state.slashExt) {
+        state.slashExt.onDestroy();
       }
 
       // Clean up insert menu global click listener to prevent memory leaks.

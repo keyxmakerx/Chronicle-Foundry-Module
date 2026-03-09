@@ -185,22 +185,26 @@ _Fix orphaned data, cascade gaps, and admin DB visibility. See `.ai/phases.md`._
 - [ ] **Sprint U-4: Accessibility Audit (WCAG 2.1 AA)** — ARIA labels, focus traps, skip-to-content, color contrast 4.5:1, keyboard nav, screen reader announcements, axe-core scanning.
 - [ ] **Sprint U-5: Infrastructure & Deployment** — Docker-compose full stack verification with health checks. Makefile full-stack target. `CONTRIBUTING.md`. CI against docker-compose.
 
-### Phase V: Obsidian-Style Notes & Discovery
+### Phase V: Obsidian-Style Notes & Discovery ← NEXT
 
-_Quick capture, backlinks, enhanced graph. See `.ai/obsidian-notes-plan.md`._
+_Quick capture, backlinks, enhanced graph, editor power-ups. See `.ai/obsidian-notes-plan.md` and `.ai/competitive-gap-analysis.md`._
 
-- [ ] **Sprint V-1: Quick Capture & Session Journal** — Quick-capture modal (Ctrl+Shift+N), "Session Journal" topbar button, player notes in quick search.
-- [ ] **Sprint V-2: Backlinks Panel** — "Referenced By" on entity show pages, `entry_html` mention scan, context snippets, Redis caching.
+- [x] **Sprint V-1: Quick Capture, Session Journal & Slash Commands** — Quick-capture modal (Ctrl+Shift+N), "Session Journal" topbar button, player notes in quick search. TipTap slash command menu (`/` trigger) for headings, lists, callouts, tables, images, code blocks.
+- [ ] **Sprint V-1.5: Inline Secrets / DM-Only Blocks in Editor** — Custom TipTap node for inline secret content. Visible to Owner/Scribe, hidden from Players. Lock icon + border in edit mode. Stripped from read-mode HTML for unauthorized roles. Competitive gap vs World Anvil/LegendKeeper/Kanka.
+- [ ] **Sprint V-2: Backlinks Panel & Entity Aliases** — "Referenced By" on entity show pages, `entry_html` mention scan, context snippets, Redis caching. Entity aliases (migration) for multiple canonical names per entity in auto-linking and search.
 - [ ] **Sprint V-3: Content Templates** — Pre-fill editor with structured content (Session Recap, etc.). Template picker in create flow + editor insert.
-- [ ] **Sprint V-4: Enhanced Graph View** — @mention links in graph, entity type/tag filtering, local graph (N hops), clustering, orphan detection.
+- [ ] **Sprint V-4: Enhanced Graph View & Cover Images** — @mention links in graph, entity type/tag filtering, local graph (N hops), clustering, orphan detection. Cover/banner image layout block type for entity pages.
+- [ ] **Sprint V-5: Session Journal Audio Attachments** — Audio file upload support in Session Journal notes. Users can attach audio recordings (voice memos, session recordings, ambient tracks) to session notes. Privacy controls: share audio with session participants (public to group) or keep private (visible only to uploader). Media plugin integration for storage/serving. Allowed MIME types: audio/mpeg, audio/ogg, audio/wav, audio/webm. Inline audio player in note view. Migration for audio attachment metadata.
 
 ### Phase W: Polish, Ecosystem & Delight
 
 - [ ] **Sprint W-1: Command Palette & Saved Filters** — Ctrl+Shift+P action palette with fuzzy search. Saved entity list filter presets as sidebar links in `saved_filters` table.
-- [ ] **Sprint W-2: Map Drawing Tools** — Leaflet.Draw integration (freehand, polygons, circles, rectangles, text). Uses existing `map_drawings` table. Per-drawing visibility, color/opacity.
+- [ ] **Sprint W-2: Map Drawing Tools, Regions & Measurement** — Leaflet.Draw integration (freehand, polygons, circles, rectangles, text). Uses existing `map_drawings` table. Per-drawing visibility, color/opacity. Also: map regions (polygon fills/strokes/labels), measurement/distance tool, map embed layout block for entity pages.
+- [ ] **Sprint W-2.5: Nested / Linked Maps** — Click marker to open sub-map. `linked_map_id` on markers. Breadcrumb navigation between map levels. Competitive gap vs World Anvil/LegendKeeper.
 - [ ] **Sprint W-3: Discord Bot Integration** — Plugin at `internal/plugins/discord/`. Bot token config. Webhook session notifications. Reaction-based RSVP per ADR-012.
-- [ ] **Sprint W-4: Bulk Operations & Persistent Filters** — Multi-select entity lists with batch actions (tag, move, visibility, delete). Persistent filters per category in localStorage.
-- [ ] **Sprint W-5: Editor Import/Export & Additional Themes** — Markdown import/export via `goldmark`. Sepia + high-contrast themes. Custom accent color picker.
+- [ ] **Sprint W-4: Bulk Operations & Persistent Filters** — Multi-select entity lists with batch actions (tag, move, visibility, delete). Persistent filters per category in localStorage. Entity tag/field filtering on list pages.
+- [ ] **Sprint W-5: Editor Import/Export & Additional Themes** — Markdown import/export via `goldmark`. Sepia + high-contrast themes. Custom accent color picker. Embed media blocks (video/audio URLs) in editor.
+- [ ] **Sprint W-6: Timeline List View & Meter Blocks** — Simple chronological list view alongside D3 viz. Meter/tracker layout block type for numeric values (HP, spell slots) with bar/circle/dot styles.
 
 ### Backlog: Remaining Audit Items (address opportunistically)
 
@@ -312,6 +316,28 @@ Summary of strengths/weaknesses for strategic positioning. Full analysis in `.ai
 - Obsidian users cobble TTRPG workflows from community plugins (Fantasy Calendar, Leaflet, TTRPG plugin). Chronicle offers purpose-built calendar/maps/timelines/entity types as first-class features.
 - Chronicle has multi-user campaign sharing built-in; Obsidian is single-user.
 - Obsidian's plugin ecosystem (1000+) is aspirational — Chronicle's addon system is the foundation for similar extensibility.
+
+---
+
+## 4. Technical Debt (Future Refactoring)
+
+Items identified during the 2026-03-09 codebase audit. Not urgent — document for future sessions.
+
+### Handler File Sizes
+Large handler files that could benefit from splitting if they grow further:
+- [ ] `entities/handler.go` (1,983 lines) — consider splitting entity type CRUD into separate handler
+- [ ] `calendar/handler.go` (1,687 lines) — consider splitting event vs calendar CRUD
+- [ ] `campaigns/handler.go` (1,245 lines) — consider splitting members/settings into separate handler
+
+### Service Interface Sizes
+Interfaces with 30+ methods that could be split into role-based sub-interfaces:
+- [ ] `CampaignService` (40 methods) — could split: CampaignCRUD + CampaignMembers + CampaignSettings
+- [ ] `EntityService` (38 methods) — could split: EntityCRUD + EntityTypeService + EntityPermissions
+- [ ] `TimelineService` (30 methods) — could split: TimelineCRUD + TimelineEvents + TimelineConnections
+
+### Inline CSS in JS Widgets
+Six widgets inject `<style>` elements dynamically. Working correctly (ID-based dedup) but could be moved to `input.css`:
+- [ ] `permissions.js`, `shop_inventory.js`, `tag_picker.js`, `entity_tooltip.js`, `relations.js`, `template_editor.js`
 
 ---
 

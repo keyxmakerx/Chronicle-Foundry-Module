@@ -38,10 +38,7 @@
     }
 
     var url = '/campaigns/' + campaignId + '/entity-names';
-    fetchInFlight[campaignId] = fetch(url, {
-      headers: { 'Accept': 'application/json' },
-      credentials: 'same-origin'
-    })
+    fetchInFlight[campaignId] = Chronicle.apiFetch(url)
       .then(function (resp) {
         if (!resp.ok) throw new Error('Failed to fetch entity names');
         return resp.json();

@@ -19,7 +19,6 @@ Chronicle.register('template-editor', {
     this.endpoint = el.dataset.endpoint;
     this.campaignId = el.dataset.campaignId;
     this.entityTypeName = el.dataset.entityTypeName;
-    this.csrfToken = el.dataset.csrfToken;
     try {
       this.fields = JSON.parse(el.dataset.fields || '[]');
     } catch (e) {
@@ -1495,13 +1494,9 @@ Chronicle.register('template-editor', {
     try {
       // Strip transient UI state before sending to the server.
       const cleanLayout = this.cleanLayoutForSave(this.layout);
-      const res = await fetch(this.endpoint, {
+      const res = await Chronicle.apiFetch(this.endpoint, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': this.csrfToken,
-        },
-        body: JSON.stringify({ layout: cleanLayout }),
+        body: { layout: cleanLayout },
       });
 
       if (!res.ok) {
