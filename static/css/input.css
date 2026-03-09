@@ -623,6 +623,59 @@
     transform: translateX(0) !important;
   }
 
+  /* ---- Desktop Sidebar Auto-Collapse ---- */
+
+  /* When mouse leaves sidebar, it collapses to a narrow icon strip.
+     Hovering the strip re-expands to full width. Uses transition on
+     the <aside> element controlled by Alpine.js. */
+  .sidebar-collapsed {
+    width: 48px !important;
+    overflow: hidden !important;
+    min-width: 48px !important;
+  }
+
+  /* Hide text labels, section headers, counts, and other non-icon content
+     when sidebar is collapsed to icon strip. */
+  .sidebar-collapsed .sidebar-text-content,
+  .sidebar-collapsed .sidebar-cat-list-label,
+  .sidebar-collapsed .sidebar-hide-collapsed,
+  .sidebar-collapsed a > span.flex-1,
+  .sidebar-collapsed a > svg.ml-1,
+  .sidebar-collapsed a > span.ml-auto {
+    display: none;
+  }
+
+  /* Compact link padding for icon strip in collapsed state. */
+  .sidebar-collapsed nav a,
+  .sidebar-collapsed [hx-boost] a {
+    padding-left: 12px;
+    padding-right: 12px;
+    justify-content: center;
+  }
+
+  /* Remove icon margin when there's no text next to it. */
+  .sidebar-collapsed a > span:first-child,
+  .sidebar-collapsed a > svg:first-child {
+    margin-right: 0;
+  }
+
+  /* Explicit icon sizing: icons must stay 16x16 in all states. */
+  .sidebar-collapsed a > span:first-child {
+    width: 16px !important;
+    height: 16px !important;
+    flex-shrink: 0;
+  }
+  .sidebar-collapsed a > svg:first-child {
+    width: 16px !important;
+    height: 16px !important;
+    flex-shrink: 0;
+  }
+
+  /* Pin button visibility: only show when expanded. */
+  .sidebar-collapsed .sidebar-pin-btn {
+    display: none;
+  }
+
   /* ---- Drill-Down Sidebar (Overlay + Icon-Only) ---- */
 
   /* When drilled into a category, the main category list collapses to
@@ -634,7 +687,7 @@
   .sidebar-icon-only {
     @apply cursor-pointer;
     position: relative;
-    width: 32px !important;
+    width: 48px !important;
     overflow: hidden !important;
     pointer-events: auto;
     border-top: 1px solid rgba(107, 114, 128, 0.3);
@@ -651,14 +704,17 @@
 
   /* Compact link padding for icon strip. */
   .sidebar-icon-only a {
-    padding-left: 8px;
-    padding-right: 8px;
+    padding-left: 12px;
+    padding-right: 12px;
     justify-content: center;
   }
 
-  /* Icons should center in the narrow strip. */
+  /* Icons should center in the narrow strip and stay 16x16. */
   .sidebar-icon-only a > span:first-child {
     margin-right: 0;
+    width: 16px !important;
+    height: 16px !important;
+    flex-shrink: 0;
   }
 
   /* Gradient shadow overlay: gives the "paper casting shadow" effect
@@ -669,7 +725,7 @@
     top: 0;
     right: 0;
     bottom: 0;
-    width: 32px;
+    width: 48px;
     background: linear-gradient(to left, rgba(0, 0, 0, 0.35), transparent);
     pointer-events: none;
     z-index: 5;
@@ -690,6 +746,18 @@
     transform: translateX(0);
     /* Paper shadow on left edge — looks like the panel is layered on top. */
     box-shadow: -6px 0 16px -4px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Skeleton shimmer for loading states. */
+  .skeleton-shimmer {
+    background: linear-gradient(90deg, rgba(75, 85, 99, 0.3) 25%, rgba(75, 85, 99, 0.5) 50%, rgba(75, 85, 99, 0.3) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 4px;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
   }
 
   /* --- Notes Widget --- */

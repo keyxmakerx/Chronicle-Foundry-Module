@@ -8,7 +8,7 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-09 -- Sprint V-2 (Backlinks Panel & Entity Aliases). Fixed migration 060 bug (bad ENUM rename). Added entity_aliases table (migration 061), alias CRUD (repo/service/handler), aliases widget JS, backlinks HTMX lazy-load with Redis caching, context snippets in backlinks, search/auto-linker alias integration. Also marked Sprint V-1.5 (Inline Secrets) as complete (was already implemented). 11 new tests, all passing.
+2026-03-09 -- Sidebar Navigation Overhaul. Added auto-collapse sidebar with pin/unpin (Alpine.js + CSS), fixed icon shrinking in collapsed state (48px strip, explicit 16x16 icons), prefetch-on-hover for category drill-down, skeleton shimmer loading, restructured drill panel layout (compact action bar, section headers), collapsible tree view for entity hierarchy (sidebar_tree.js), drag-and-drop reorder + reparent with new API endpoint, sort_order migration (000062).
 Branch: `claude/review-project-plans-ZIfD6`.
 
 ## Phase & Sprint Plan
