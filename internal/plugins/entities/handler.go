@@ -616,6 +616,18 @@ func (h *Handler) SearchAPI(c echo.Context) error {
 	opts := DefaultListOptions()
 	opts.PerPage = 20
 
+	// Sidebar drill panel loads all pages for a category. Use a higher
+	// limit so categories aren't silently truncated at 20.
+	isSidebar := c.QueryParam("sidebar") == "1"
+	if isSidebar {
+		opts.PerPage = 200
+	}
+
+	// Pagination: allow callers to request a specific page.
+	if p, _ := strconv.Atoi(c.QueryParam("page")); p > 1 {
+		opts.Page = p
+	}
+
 	// Check if the caller wants JSON (used by the editor @mention widget).
 	wantsJSON := strings.Contains(c.Request().Header.Get("Accept"), "application/json")
 
