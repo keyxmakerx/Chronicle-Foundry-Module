@@ -8,7 +8,7 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-08 -- Phase S complete (Data Integrity & Admin Tooling). All 3 sprints implemented.
+2026-03-09 -- Bug fix round 3: single game system per campaign, admin failover restyle, alert→toast conversion.
 Branch: `claude/review-work-plan-hT8UX`.
 
 ## Phase & Sprint Plan
@@ -375,10 +375,22 @@ Created `.ai/audit.md` — comprehensive feature parity and completeness audit c
 - **All ORC-licensed**: Content from Player Core and GM Core only
 - **Auto-features**: Reference pages, tooltips, and Ctrl+K search all work via GenericModule infrastructure
 
+### Bug Fixes Round 3 (2026-03-09)
+- **Single Game System per Campaign**: Game systems (module category) are now mutually exclusive — enabling one auto-disables any other active game system for that campaign. Service logs the swap. Campaign addons page shows explanatory text.
+- **"Register New Feature" Restyled**: The admin features page form was confusing (created empty DB records with no backing code). Restyled as a collapsed `<details>` element with red/warning styling, danger icon, and clear warnings. Renamed to "Manual DB Record (Advanced)". Removed "Module" from category dropdown (game systems come from code, not DB forms). Button changed from "Register Feature" to "Create DB Record".
+- **Alert() → Toast Conversion**: All 23 raw `alert()` calls across the codebase converted to `Chronicle.notify()` toasts:
+  - Calendar plugin (6 calls): save/move/delete event errors + network errors
+  - Maps plugin (10 calls): marker save/delete, settings save, upload, map delete + network errors
+  - Sessions plugin (1 call): recap save error
+  - Settings plugin (2 calls): user ID / campaign ID validation
+  - Image upload widget (3 calls): file type/size validation, upload error
+  - Shop inventory widget (1 call): item creation error
+- **Files modified**: `addons/service.go` (mutual exclusivity), `addons/admin_addons.templ` (failover restyle), `addons/campaign_addons.templ` (info text), `calendar/calendar.templ`, `maps/maps.templ`, `sessions/sessions.templ`, `settings/storage_settings.templ`, `image_upload.js`, `shop_inventory.js`
+
 ## Next Session Should
-- **Sprint T-3: Guided Worldbuilding Prompts** — Writing prompts panel on entity edit page
 - **Sprint U-2: Invite System** — campaign invite links for easier player onboarding
 - **Sprint V-1: Quick Capture** — Obsidian-style notes rapid entry
+- **Sprint T-3: Guided Worldbuilding Prompts** — Writing prompts panel on entity edit page (deferred)
 - See `.ai/phases.md` for full execution order
 
 ## Known Issues Right Now

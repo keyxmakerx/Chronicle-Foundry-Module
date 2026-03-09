@@ -272,7 +272,9 @@ func (s *addonService) ListForCampaign(ctx context.Context, campaignID string) (
 	return addons, nil
 }
 
-// EnableForCampaign enables an addon for a campaign.
+// EnableForCampaign enables an addon for a campaign. Game systems (module
+// category) are mutually exclusive — enabling one auto-disables any other
+// active game system for that campaign.
 func (s *addonService) EnableForCampaign(ctx context.Context, campaignID string, addonID int, userID string) error {
 	// Verify addon exists, is active, and has backing code.
 	addon, err := s.repo.FindByID(ctx, addonID)
@@ -284,6 +286,26 @@ func (s *addonService) EnableForCampaign(ctx context.Context, campaignID string,
 	}
 	if !IsInstalled(addon.Slug) {
 		return apperror.NewBadRequest("cannot enable: extension code is not installed")
+	}
+
+	// Game systems are mutually exclusive — disable any other enabled module.
+	if addon.Category == CategoryModule {
+		campaignAddons, err := s.repo.ListForCampaign(ctx, campaignID)
+		if err != nil {
+			return apperror.NewInternal(fmt.Errorf("listing campaign addons: %w", err))
+		}
+		for _, ca := range campaignAddons {
+			if ca.AddonCategory == CategoryModule && ca.Enabled && ca.AddonID != addonID {
+				if err := s.repo.DisableForCampaign(ctx, campaignID, ca.AddonID); err != nil {
+					return apperror.NewInternal(fmt.Errorf("disabling previous game system: %w", err))
+				}
+				slog.Info("auto-disabled game system (mutual exclusivity)",
+					slog.String("campaign_id", campaignID),
+					slog.String("disabled_slug", ca.AddonSlug),
+					slog.String("replacing_with", addon.Slug),
+				)
+			}
+		}
 	}
 
 	if err := s.repo.EnableForCampaign(ctx, campaignID, addonID, userID); err != nil {

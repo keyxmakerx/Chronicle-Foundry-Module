@@ -340,7 +340,7 @@ templ SessionDetailPage(cc *campaigns.CampaignContext, session *Session, csrfTok
 									body: JSON.stringify({recap: text, recap_html: html})
 								}).then(function(r) {
 									if (r.ok) { location.reload(); }
-									else { alert('Failed to save recap'); }
+									else { Chronicle.notify('Failed to save recap', 'error'); }
 								});
 							}
 						</script>

@@ -71,6 +71,9 @@ templ CampaignAddonsListFragment(campaignID string, addons []CampaignAddon, csrf
 			<h2 class="section-header mb-3">
 				<i class="fa-solid fa-dice-d20 mr-2 text-fg-muted"></i>Game Systems
 			</h2>
+			<p class="text-xs text-fg-muted mb-2">
+				Only one game system can be active at a time. Enabling a new one will automatically disable the current one.
+			</p>
 			<div class="space-y-2">
 				for _, a := range addons {
 					if a.AddonCategory == CategoryModule {
