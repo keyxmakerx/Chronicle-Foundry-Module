@@ -300,6 +300,10 @@ const (
 	BlockCalendarFull    = "calendar_full"    // Full interactive calendar grid view.
 	BlockTimelineFull    = "timeline_full"    // Full timeline visualization with D3.
 	BlockRelationsGraphFull = "relations_graph_full" // Large relations graph view.
+	BlockMapFull         = "map_full"         // Full interactive map viewer with Phase 2 objects.
+	BlockSessionTracker  = "session_tracker"  // Upcoming sessions with RSVP status.
+	BlockActivityFeed    = "activity_feed"    // Recent campaign activity log.
+	BlockSyncStatus      = "sync_status"      // Foundry VTT sync health/status.
 
 	// Category dashboard blocks.
 	BlockCategoryHeader = "category_header" // Category name, icon, count, description.
@@ -323,6 +327,10 @@ var ValidBlockTypes = map[string]bool{
 	BlockCalendarFull:    true,
 	BlockTimelineFull:    true,
 	BlockRelationsGraphFull: true,
+	BlockMapFull:         true,
+	BlockSessionTracker:  true,
+	BlockActivityFeed:    true,
+	BlockSyncStatus:      true,
 	BlockCategoryHeader:  true,
 	BlockEntityGrid:     true,
 	BlockSearchBar:      true,
