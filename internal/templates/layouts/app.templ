@@ -728,6 +728,26 @@ templ Topbar() {
 						<span class="text-[9px] mr-0.5">&#8984;</span>K
 					</kbd>
 				</button>
+				if IsAuthenticated(ctx) {
+					<!-- Quick capture trigger (opens Ctrl+Shift+N modal) -->
+					<button
+						onclick="Chronicle.openQuickCapture()"
+						class="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm text-fg-muted hover:text-fg hover:bg-surface-alt transition-colors"
+						title="Quick note (Ctrl+Shift+N)"
+					>
+						<i class="fa-solid fa-bolt text-xs"></i>
+						<span class="hidden lg:inline">Note</span>
+					</button>
+					<!-- Session Journal trigger -->
+					<button
+						onclick="Chronicle.openSessionJournal()"
+						class="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm text-fg-muted hover:text-fg hover:bg-surface-alt transition-colors"
+						title="Session Journal"
+					>
+						<i class="fa-solid fa-book-open text-xs"></i>
+						<span class="hidden lg:inline">Journal</span>
+					</button>
+				}
 			}
 		</div>
 

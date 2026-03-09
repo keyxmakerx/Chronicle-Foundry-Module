@@ -39,13 +39,13 @@
 
 ## Upcoming Phases
 
-### Phase V: Obsidian-Style Notes & Discovery ← NEXT
+### Phase V: Obsidian-Style Notes & Discovery ← CURRENT
 
 _Quick capture, backlinks, enhanced graph, content templates, editor power-ups.
 Priority: **Highest** — DM workflow & competitive parity with LegendKeeper/Obsidian.
 See `.ai/obsidian-notes-plan.md` and `.ai/competitive-gap-analysis.md` for details._
 
-#### Sprint V-1: Quick Capture, Session Journal & Slash Commands
+#### Sprint V-1: Quick Capture, Session Journal & Slash Commands ✅
 
 Quick-capture modal (Ctrl+Shift+N) creates a timestamped note instantly.
 "Session Journal" button in topbar: append to today's journal entry. Add player
@@ -55,7 +55,8 @@ notes to Ctrl+K quick search results.
 bulleted/numbered list, callout, table, image, horizontal rule, code block.
 Inspired by LegendKeeper's `/secret`, `/layout`, `/help` pattern.
 
-**Key files:** `static/js/widgets/editor.js`, topbar template, notes widget
+**Key files:** `static/js/widgets/editor_slash.js`, `static/js/quick_capture.js`,
+`static/js/search_modal.js`, `static/js/widgets/notes.js`, topbar template
 
 #### Sprint V-1.5: Inline Secrets / DM-Only Blocks in Editor (NEW)
 
