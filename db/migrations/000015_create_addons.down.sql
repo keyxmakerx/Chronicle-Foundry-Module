@@ -1,2 +1,0 @@
-DROP TABLE IF EXISTS campaign_addons;
-DROP TABLE IF EXISTS addons;

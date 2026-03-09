@@ -1,0 +1,27 @@
+package components
+
+// PluginUnavailable renders a banner/page for a degraded plugin.
+// Shown when a plugin's schema migration failed and the feature is disabled.
+templ PluginUnavailable(pluginName string) {
+	<div class="flex flex-col items-center justify-center py-20 px-6">
+		<div class="max-w-md w-full bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-8 text-center">
+			<div class="text-4xl mb-4">
+				<i class="fa-solid fa-triangle-exclamation text-yellow-500"></i>
+			</div>
+			<h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+				{ pluginName } is temporarily unavailable
+			</h2>
+			<p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+				This feature encountered a database error and has been disabled.
+				Contact your server administrator for assistance.
+			</p>
+			<a
+				href="javascript:history.back()"
+				class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
+			>
+				<i class="fa-solid fa-arrow-left mr-2"></i>
+				Go Back
+			</a>
+		</div>
+	</div>
+}

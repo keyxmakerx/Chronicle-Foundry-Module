@@ -975,3 +975,47 @@ failing the entire search.
 - During DB outages, disabled addons may briefly appear enabled (routes accessible).
 - This is acceptable because the underlying service calls will fail anyway.
 - API routes use stricter fail-closed behavior (ADR-025 batch 24).
+
+---
+
+## ADR-028: Plugin-Isolated Database Schema Architecture
+
+**Date:** 2026-03-09
+**Status:** Accepted
+
+**Context:** Chronicle had 63 sequential migration files mixing core tables with
+plugin tables. A bad migration in any plugin (e.g., Error 1553 from migration
+000063) crashed the entire app and left the DB in a dirty state requiring manual
+recovery. Bandaid solutions (migrate_preflight.go, lint tests) caught some issues
+but couldn't prevent all classes of failures. The goal: plugin failures should
+never break the app, and user-installable extensions need safe schema isolation.
+
+**Decision:** Two-tier schema system:
+- **Tier 1 (Core):** Single baseline migration (`db/migrations/000001_baseline`)
+  with all core tables. Runs via golang-migrate. Failure is fatal.
+- **Tier 2 (Plugins):** Each built-in plugin has its own `migrations/` directory
+  (`internal/plugins/<name>/migrations/`). Runs via custom `RunPluginMigrations()`
+  after core migrations. Failure disables that plugin; app continues serving.
+
+Plugin health tracked in `PluginHealthRegistry` (thread-safe in-memory). Routes
+are conditionally registered based on `IsHealthy()`. Degraded plugins show a
+"Feature unavailable" banner via `plugin_unavailable.templ`.
+
+Version tracking uses `plugin_schema_versions` table (separate from
+`extension_schema_versions` used by user-installed extensions). SQL validation
+is skipped for trusted built-in plugins but enforced for user extensions via
+`ValidateExtensionSQL()` + `ext_<slug>_` prefix requirement.
+
+**Alternatives considered:**
+- Keep all migrations together + better preflight checks: still single point of
+  failure, doesn't scale to user-installable extensions.
+- Per-plugin databases: too complex, cross-plugin FKs become impossible.
+- Wrap each migration in a savepoint: MariaDB doesn't support transactional DDL.
+
+**Consequences:**
+- Plugin schema failures degrade gracefully instead of crashing the app.
+- Each plugin's schema is independently versioned and can evolve separately.
+- Cross-plugin FK dependencies require ordered plugin migration execution
+  (calendar before sessions/timeline).
+- Removed migrate_preflight.go and bandaid lint tests from migrate_test.go.
+- Fresh DB only — no backward compatibility with the old 63-migration sequence.

@@ -1,2 +1,0 @@
-DROP TABLE IF EXISTS entity_tags;
-DROP TABLE IF EXISTS tags;

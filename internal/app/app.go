@@ -17,6 +17,7 @@ import (
 
 	"github.com/keyxmakerx/chronicle/internal/apperror"
 	"github.com/keyxmakerx/chronicle/internal/config"
+	"github.com/keyxmakerx/chronicle/internal/database"
 	"github.com/keyxmakerx/chronicle/internal/extensions"
 	"github.com/keyxmakerx/chronicle/internal/middleware"
 	"github.com/keyxmakerx/chronicle/internal/templates/pages"
@@ -44,11 +45,15 @@ type App struct {
 	// WASMHookDispatcher dispatches events to WASM plugins.
 	// Set during route registration; nil until then.
 	WASMHookDispatcher *extensions.HookDispatcher
+
+	// PluginHealth tracks which built-in plugins have healthy schemas.
+	// Used during route registration to skip degraded plugins.
+	PluginHealth *database.PluginHealthRegistry
 }
 
 // New creates a new App instance with the given dependencies and configures
 // the Echo server with global middleware and error handling.
-func New(cfg *config.Config, db *sql.DB, rdb *redis.Client) *App {
+func New(cfg *config.Config, db *sql.DB, rdb *redis.Client, pluginHealth *database.PluginHealthRegistry) *App {
 	e := echo.New()
 
 	// Disable Echo's default banner and startup message -- we log our own.
@@ -67,10 +72,11 @@ func New(cfg *config.Config, db *sql.DB, rdb *redis.Client) *App {
 	})
 
 	app := &App{
-		Config: cfg,
-		DB:     db,
-		Redis:  rdb,
-		Echo:   e,
+		Config:       cfg,
+		DB:           db,
+		Redis:        rdb,
+		Echo:         e,
+		PluginHealth: pluginHealth,
 	}
 
 	// Register global middleware in order of execution.
