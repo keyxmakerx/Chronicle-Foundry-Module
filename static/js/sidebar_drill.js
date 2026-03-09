@@ -2,11 +2,10 @@
  * sidebar_drill.js -- Two-Stage Slide-Over Category Panel
  *
  * When a category is clicked, the panel slides over in two stages:
- *   Stage 1: Panel appears at left:48px, category icons still visible (~500ms)
+ *   Stage 1: Panel appears at left:48px, category icons briefly visible (~500ms)
  *   Stage 2: Panel slides to left:0, fully covering the icon strip
  *
- * Hovering the left edge of the panel (peek zone) reveals the icon strip
- * so users can click a different category without using Back.
+ * Back button returns to the category list. No peek/hover behavior.
  *
  * Prefetch: hovers on category links trigger a background fetch after 100ms.
  * On click, prefetched content is swapped instantly if available.
@@ -16,10 +15,8 @@
 
   var catList = null;
   var catPanel = null;
-  var peekZone = null;
   var isDrilled = false;
   var stage2Timer = null;
-  var isPeeking = false;
 
   // Prefetch cache: Map<drillUrl, htmlString>
   var prefetchCache = {};
@@ -31,7 +28,6 @@
   function init() {
     catList = document.getElementById('sidebar-cat-list');
     catPanel = document.getElementById('sidebar-category');
-    peekZone = document.getElementById('sidebar-peek-zone');
 
     if (!catList || !catPanel) return;
 
@@ -65,34 +61,6 @@
         ensureSidebarExpanded();
         loadAndDrill(link);
       });
-    });
-
-    // Peek zone: hovering the left edge reveals the icon strip.
-    if (peekZone) {
-      peekZone.addEventListener('mouseenter', function () {
-        if (!isDrilled) return;
-        startPeek();
-      });
-    }
-
-    // When mouse leaves the sidebar entirely, end peek.
-    var sidebar = document.getElementById('sidebar');
-    if (sidebar) {
-      sidebar.addEventListener('mouseleave', function () {
-        if (isPeeking) endPeek();
-      });
-    }
-
-    // Clicking an icon in the cat-list while peeking switches categories.
-    catList.addEventListener('click', function (e) {
-      if (!isDrilled || !isPeeking) return;
-
-      var link = e.target.closest('.sidebar-category-link');
-      if (!link) return;
-
-      e.preventDefault();
-      e.stopPropagation();
-      loadAndDrill(link);
     });
 
     // Auto-drill: if server pre-rendered the active state, mark as drilled.
@@ -147,12 +115,13 @@
       });
     }
 
-    // Stage 1: slide in, icons visible.
+    // Stage 1: slide in, icons briefly visible.
     drillIn();
   }
 
   /**
-   * Stage 1: slide panel in (icons still visible at left:48px).
+   * Stage 1: slide panel in (icons visible at left:48px for 500ms).
+   * Stage 2: slide to left:0 after delay.
    */
   function drillIn() {
     if (!catList || !catPanel) return;
@@ -164,11 +133,9 @@
     }
 
     isDrilled = true;
-    isPeeking = false;
     catList.classList.add('sidebar-icon-only');
     catPanel.classList.add('sidebar-drill-active');
     catPanel.classList.remove('sidebar-drill-full');
-    catPanel.classList.remove('sidebar-drill-peeking');
 
     // Stage 2: after 500ms, slide to fully cover icons.
     stage2Timer = setTimeout(function () {
@@ -189,29 +156,9 @@
     }
 
     isDrilled = false;
-    isPeeking = false;
     catList.classList.remove('sidebar-icon-only');
     catPanel.classList.remove('sidebar-drill-active');
     catPanel.classList.remove('sidebar-drill-full');
-    catPanel.classList.remove('sidebar-drill-peeking');
-  }
-
-  /**
-   * Start peeking: reveal the icon strip behind the panel.
-   */
-  function startPeek() {
-    if (!catPanel) return;
-    isPeeking = true;
-    catPanel.classList.add('sidebar-drill-peeking');
-  }
-
-  /**
-   * End peeking: panel covers icons again.
-   */
-  function endPeek() {
-    if (!catPanel) return;
-    isPeeking = false;
-    catPanel.classList.remove('sidebar-drill-peeking');
   }
 
   /**
@@ -234,7 +181,7 @@
     init();
   }
 
-  // Expose drillOut for the back button (used via onclick or event delegation).
+  // Expose drillOut for the back button (used via onclick).
   window.Chronicle = window.Chronicle || {};
   window.Chronicle.drillOut = function () {
     drillOut();
