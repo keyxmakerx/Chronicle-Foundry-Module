@@ -11,6 +11,9 @@
  *
  * Auto-drill on page load is handled server-side: the Templ template pre-renders
  * the panel content and applies CSS classes when the URL matches a category.
+ *
+ * Prefetch: hovers on category links trigger a background fetch after 100ms.
+ * On click, prefetched content is swapped instantly if available.
  */
 (function () {
   'use strict';
@@ -18,6 +21,10 @@
   var catList = null;
   var catPanel = null;
   var isDrilled = false;
+
+  // Prefetch cache: Map<drillUrl, htmlString>
+  var prefetchCache = {};
+  var prefetchTimers = {};
 
   /**
    * Initialize the drill-down sidebar.
@@ -32,15 +39,49 @@
     // but we need to preventDefault (to avoid navigation) and toggle CSS.
     var links = catList.querySelectorAll('.sidebar-category-link');
     links.forEach(function (link) {
+      // Prefetch on hover with 100ms debounce.
+      link.addEventListener('mouseenter', function () {
+        var drillUrl = link.getAttribute('data-drill-url');
+        if (!drillUrl || prefetchCache[drillUrl]) return;
+        prefetchTimers[drillUrl] = setTimeout(function () {
+          fetch(drillUrl, { headers: { 'HX-Request': 'true' } })
+            .then(function (resp) { return resp.ok ? resp.text() : null; })
+            .then(function (html) { if (html) prefetchCache[drillUrl] = html; })
+            .catch(function () { /* ignore prefetch failures */ });
+        }, 100);
+      });
+
+      link.addEventListener('mouseleave', function () {
+        var drillUrl = link.getAttribute('data-drill-url');
+        if (prefetchTimers[drillUrl]) {
+          clearTimeout(prefetchTimers[drillUrl]);
+          delete prefetchTimers[drillUrl];
+        }
+      });
+
       link.addEventListener('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
+
+        // Ensure sidebar is expanded when drilling into a category.
+        ensureSidebarExpanded();
+
         drillIn();
-        // Trigger the HTMX fetch manually since we prevented default.
-        htmx.ajax('GET', link.getAttribute('data-drill-url'), {
-          target: '#sidebar-cat-content',
-          swap: 'innerHTML'
-        });
+
+        var drillUrl = link.getAttribute('data-drill-url');
+        var target = document.getElementById('sidebar-cat-content');
+
+        // Use prefetched content if available, otherwise fetch via HTMX.
+        if (drillUrl && prefetchCache[drillUrl] && target) {
+          target.innerHTML = prefetchCache[drillUrl];
+          htmx.process(target);
+          delete prefetchCache[drillUrl];
+        } else {
+          htmx.ajax('GET', drillUrl, {
+            target: '#sidebar-cat-content',
+            swap: 'innerHTML'
+          });
+        }
       });
     });
 
@@ -73,12 +114,12 @@
     window.addEventListener('chronicle:navigated', function () {
       if (!isDrilled) return;
       var currentPath = window.location.pathname;
-      var links = catList.querySelectorAll('.sidebar-category-link');
+      var navLinks = catList.querySelectorAll('.sidebar-category-link');
       var matched = false;
-      for (var i = 0; i < links.length; i++) {
-        var catUrl = links[i].getAttribute('data-cat-url');
+      for (var i = 0; i < navLinks.length; i++) {
+        var catUrl = navLinks[i].getAttribute('data-cat-url');
         if (catUrl && currentPath.indexOf(catUrl) === 0) {
-          var drillUrl = links[i].getAttribute('data-drill-url');
+          var drillUrl = navLinks[i].getAttribute('data-drill-url');
           if (drillUrl) {
             htmx.ajax('GET', drillUrl, {
               target: '#sidebar-cat-content',
@@ -91,6 +132,21 @@
       }
       if (!matched) drillOut();
     });
+  }
+
+  /**
+   * Ensure sidebar is expanded when interacting with drill content.
+   * Sets Alpine.js hovered state to true so sidebar doesn't collapse mid-interaction.
+   */
+  function ensureSidebarExpanded() {
+    var sidebar = document.getElementById('sidebar');
+    if (sidebar && sidebar.__x) {
+      sidebar.__x.$data.hovered = true;
+    } else if (sidebar && sidebar._x_dataStack) {
+      // Alpine v3 approach
+      var data = sidebar._x_dataStack[0];
+      if (data) data.hovered = true;
+    }
   }
 
   /**

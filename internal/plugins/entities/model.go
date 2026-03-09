@@ -220,6 +220,7 @@ type Entity struct {
 	EntryHTML      *string         `json:"entry_html,omitempty"` // Pre-rendered HTML from entry.
 	ImagePath      *string         `json:"image_path,omitempty"`
 	ParentID       *string         `json:"parent_id,omitempty"`
+	SortOrder      int             `json:"sort_order"`            // Manual ordering within parent/category (0 = default).
 	TypeLabel      *string         `json:"type_label,omitempty"` // Freeform subtype (e.g., "City" for a Location).
 	IsPrivate      bool            `json:"is_private"`
 	Visibility     VisibilityMode  `json:"visibility"`
@@ -394,6 +395,8 @@ func (o ListOptions) OrderByClause() string {
 		return "ORDER BY e.updated_at DESC"
 	case "created":
 		return "ORDER BY e.created_at DESC"
+	case "manual":
+		return "ORDER BY e.sort_order ASC, e.name ASC"
 	default:
 		return "ORDER BY e.name ASC"
 	}

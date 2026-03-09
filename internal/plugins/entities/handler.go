@@ -733,6 +733,32 @@ func (h *Handler) SearchAPI(c echo.Context) error {
 	return middleware.Render(c, http.StatusOK, SearchResultsFragment(results, total, cc))
 }
 
+// --- Reorder API (sidebar tree drag-and-drop) ---
+
+// ReorderAPI updates an entity's parent and sort order for sidebar tree reordering.
+// PUT /campaigns/:id/entities/:eid/reorder
+func (h *Handler) ReorderAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	if cc == nil {
+		return apperror.NewForbidden("no campaign context")
+	}
+	entityID := c.Param("eid")
+
+	var input struct {
+		ParentID *string `json:"parent_id"`
+		SortOrder int    `json:"sort_order"`
+	}
+	if err := c.Bind(&input); err != nil {
+		return apperror.NewValidation("invalid request body")
+	}
+
+	if err := h.service.ReorderEntity(c.Request().Context(), entityID, input.ParentID, input.SortOrder); err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}
+
 // --- Quick Create API (JSON endpoint for shop widget) ---
 
 // QuickCreateAPI creates a new entity from a JSON request and returns its data.

@@ -35,6 +35,7 @@ type EntityService interface {
 	// Hierarchy
 	GetChildren(ctx context.Context, entityID string, role int, userID string) ([]Entity, error)
 	GetAncestors(ctx context.Context, entityID string) ([]Entity, error)
+	ReorderEntity(ctx context.Context, entityID string, parentID *string, sortOrder int) error
 
 	// Backlinks
 	GetBacklinks(ctx context.Context, entityID string, role int, userID string) ([]Entity, error)
@@ -392,6 +393,17 @@ func (s *entityService) GetAncestors(ctx context.Context, entityID string) ([]En
 		return nil, apperror.NewInternal(fmt.Errorf("finding ancestors: %w", err))
 	}
 	return ancestors, nil
+}
+
+// ReorderEntity updates an entity's parent and sort order for sidebar tree reordering.
+func (s *entityService) ReorderEntity(ctx context.Context, entityID string, parentID *string, sortOrder int) error {
+	if err := s.entities.UpdateParent(ctx, entityID, parentID); err != nil {
+		return apperror.NewInternal(fmt.Errorf("updating parent: %w", err))
+	}
+	if err := s.entities.UpdateSortOrder(ctx, entityID, sortOrder); err != nil {
+		return apperror.NewInternal(fmt.Errorf("updating sort order: %w", err))
+	}
+	return nil
 }
 
 // GetBacklinks returns entities that reference the given entity via @mention

@@ -82,15 +82,35 @@ var sidebarNavInactive = "text-sidebar-text hover:bg-sidebar-hover hover:text-si
 templ Sidebar() {
 	<aside
 		id="sidebar"
+		x-data="{ pinned: localStorage.getItem('chronicle-sidebar-pinned') !== 'false', hovered: false }"
+		x-init="$nextTick(() => { if (!pinned) hovered = false })"
+		@mouseenter="hovered = true"
+		@mouseleave="hovered = false"
 		class="fixed inset-y-0 left-0 z-40 w-64 bg-sidebar-bg text-sidebar-text flex flex-col
-		       -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out
+		       -translate-x-full md:translate-x-0 transition-all duration-300 ease-in-out
 		       md:static md:z-auto md:shrink-0"
-		:class="sidebarOpen ? 'sidebar-mobile-open shadow-2xl' : ''"
+		:class="[
+			sidebarOpen ? 'sidebar-mobile-open shadow-2xl' : '',
+			(!pinned && !hovered) ? 'sidebar-collapsed' : ''
+		]"
 	>
-		<!-- Logo / Brand -->
-		<a href="/campaigns" class="h-16 flex items-center px-4 border-b border-gray-700 hover:bg-sidebar-hover transition-colors shrink-0">
-			<span class="text-xl font-bold text-white tracking-tight">Chronicle</span>
-		</a>
+		<!-- Logo / Brand + Pin Toggle -->
+		<div class="h-16 flex items-center px-4 border-b border-gray-700 shrink-0">
+			<a href="/campaigns" class="flex items-center flex-1 hover:opacity-80 transition-opacity">
+				<span class="text-xl font-bold text-white tracking-tight sidebar-hide-collapsed">Chronicle</span>
+				<span class="hidden items-center justify-center w-4 h-4" :class="{ '!flex': !pinned && !hovered }">
+					<i class="fa-solid fa-book-open text-white text-sm"></i>
+				</span>
+			</a>
+			<!-- Pin/unpin button (visible only when expanded) -->
+			<button
+				class="sidebar-pin-btn w-6 h-6 flex items-center justify-center rounded text-gray-500 hover:text-white hover:bg-gray-700 transition-colors"
+				@click.stop="pinned = !pinned; localStorage.setItem('chronicle-sidebar-pinned', pinned)"
+				:title="pinned ? 'Unpin sidebar' : 'Pin sidebar open'"
+			>
+				<i class="fa-solid fa-thumbtack text-xs transition-transform" :class="{ 'rotate-45 text-gray-600': !pinned }"></i>
+			</button>
+		</div>
 
 		if InCampaign(ctx) {
 			<!-- Zone 1: Global nav (static, always visible) -->
@@ -186,7 +206,7 @@ templ Sidebar() {
 					<!-- Category sub-panel (overlay, slides in from right) -->
 					<div
 						id="sidebar-category"
-						class={ "absolute top-0 bottom-0 right-0 left-8 bg-sidebar-bg border-t border-gray-600 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col",
+						class={ "absolute top-0 bottom-0 right-0 left-12 bg-sidebar-bg border-t border-gray-600 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col",
 							templ.KV("sidebar-cat-active", activeDrillSlug(ctx) != "") }
 					>
 						<!-- Back button -->
@@ -548,35 +568,31 @@ templ SidebarDrillPanel(campaignID string, et SidebarEntityType, count int) {
 	</div>
 	<!-- Navigation content (scrollable) -->
 	<nav class="flex-1 py-3 overflow-y-auto">
-		<!-- View all link -->
-		<a
-			href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/%s", campaignID, et.Slug)) }
-			class="flex items-center px-4 py-2 text-sm transition-colors text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-active"
-		>
-			<span class="w-4 h-4 mr-3 shrink-0 flex items-center justify-center">
-				<i class="fa-solid fa-th-large text-xs" style={ fmt.Sprintf("color: %s", et.Color) }></i>
-			</span>
-			<span class="flex-1">View All { et.NamePlural }</span>
-		</a>
-		<!-- New page link -->
-		<a
-			href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/entities/new", campaignID)) }
-			class="flex items-center px-4 py-2 text-sm transition-colors text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-active"
-		>
-			<span class="w-4 h-4 mr-3 shrink-0 flex items-center justify-center">
-				<i class="fa-solid fa-plus text-xs text-gray-400"></i>
-			</span>
-			<span class="flex-1">New Page</span>
-		</a>
-		<!-- Divider -->
-		<div class="my-2 mx-4 border-t border-gray-700/50"></div>
+		<!-- Action bar: View All + New Page as compact inline buttons -->
+		<div class="flex items-center gap-2 px-4 mb-2">
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/%s", campaignID, et.Slug)) }
+				class="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium rounded-md bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+			>
+				<i class="fa-solid fa-th-large text-[10px]" style={ fmt.Sprintf("color: %s", et.Color) }></i>
+				View All
+			</a>
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/entities/new", campaignID)) }
+				class="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border text-gray-300 hover:text-white transition-colors"
+				style={ fmt.Sprintf("border-color: %s40; background-color: %s15; hover:background-color: %s30", et.Color, et.Color, et.Color) }
+			>
+				<i class="fa-solid fa-plus text-[10px]"></i>
+				New
+			</a>
+		</div>
 		<!-- Quick search (HTMX-powered, uses entity type ID for correct filtering) -->
-		<div class="px-4 mb-2">
+		<div class="px-4 mb-3">
 			<div class="relative">
 				<input
 					type="search"
 					placeholder={ fmt.Sprintf("Search %s...", et.NamePlural) }
-					class="w-full px-3 py-1.5 pl-8 text-xs rounded-md bg-gray-800 border border-gray-700 text-gray-300 placeholder-gray-500 focus:outline-none focus:border-gray-500 transition-colors"
+					class="w-full px-3 py-2 pl-8 text-xs rounded-md bg-gray-800 border border-gray-700 text-gray-300 placeholder-gray-500 focus:outline-none focus:border-gray-500 transition-colors"
 					hx-get={ fmt.Sprintf("/campaigns/%s/entities/search?type=%d&sidebar=1", campaignID, et.ID) }
 					hx-trigger="keyup changed delay:300ms"
 					hx-target="#sidebar-cat-results"
@@ -587,6 +603,10 @@ templ SidebarDrillPanel(campaignID string, et SidebarEntityType, count int) {
 				<i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 text-[10px] pointer-events-none"></i>
 			</div>
 		</div>
+		<!-- Pages section header -->
+		<div class="px-4 mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-600">
+			<i class="fa-solid fa-file-lines mr-0.5"></i> Pages
+		</div>
 		<!-- Search results / page listing (auto-loads all pages on panel open) -->
 		<div id="sidebar-cat-results">
 			<div
@@ -594,16 +614,24 @@ templ SidebarDrillPanel(campaignID string, et SidebarEntityType, count int) {
 				hx-trigger="load"
 				hx-swap="outerHTML"
 			>
-				<div class="px-4 py-2 text-xs text-gray-500 italic">Loading...</div>
+				<!-- Skeleton shimmer while entity list loads -->
+				<div class="px-4 py-2 space-y-2">
+					<div class="skeleton-shimmer h-4 w-3/4"></div>
+					<div class="skeleton-shimmer h-4 w-1/2"></div>
+					<div class="skeleton-shimmer h-4 w-2/3"></div>
+					<div class="skeleton-shimmer h-4 w-3/5"></div>
+				</div>
 			</div>
 		</div>
 		<!-- Favorites section (populated by favorites.js) -->
-		<div id="sidebar-cat-favorites-header" class="px-4 mt-2 mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-600" style="display:none">
+		<div id="sidebar-cat-favorites-header" class="px-4 mt-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-600" style="display:none">
 			<i class="fa-solid fa-star text-amber-400 mr-0.5"></i> Favorites
 		</div>
 		<div id="sidebar-cat-favorites"></div>
 		<!-- Recent pages section -->
-		<div class="px-4 mt-2 mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-600">Recent</div>
+		<div class="px-4 mt-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-600">
+			<i class="fa-solid fa-clock mr-0.5"></i> Recent
+		</div>
 		<div id="sidebar-cat-recent" class="text-xs text-gray-500 px-4 py-2 italic">
 			No recently viewed pages
 		</div>

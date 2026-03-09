@@ -240,6 +240,10 @@ func (m *mockEntityRepo) UpdateParent(ctx context.Context, entityID string, pare
 	return nil
 }
 
+func (m *mockEntityRepo) UpdateSortOrder(ctx context.Context, entityID string, sortOrder int) error {
+	return nil
+}
+
 func (m *mockEntityRepo) FindBacklinks(ctx context.Context, entityID string, role int, userID string) ([]Entity, error) {
 	if m.findBacklinksFn != nil {
 		return m.findBacklinksFn(ctx, entityID, role, userID)

@@ -456,6 +456,9 @@ type EntityRepository interface {
 	// UpdateParent sets or clears an entity's parent_id.
 	UpdateParent(ctx context.Context, entityID string, parentID *string) error
 
+	// UpdateSortOrder sets an entity's manual sort order within its parent/category.
+	UpdateSortOrder(ctx context.Context, entityID string, sortOrder int) error
+
 	// FindBacklinks returns entities whose entry_html contains a @mention link
 	// pointing to the given entity. Respects visibility filtering.
 	FindBacklinks(ctx context.Context, entityID string, role int, userID string) ([]Entity, error)
@@ -497,13 +500,13 @@ func (r *entityRepository) Create(ctx context.Context, entity *Entity) error {
 	}
 
 	query := `INSERT INTO entities (id, campaign_id, entity_type_id, name, slug, entry, entry_html,
-	          image_path, parent_id, type_label, is_private, is_template, fields_data, created_by, created_at, updated_at)
-	          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	          image_path, parent_id, sort_order, type_label, is_private, is_template, fields_data, created_by, created_at, updated_at)
+	          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	_, err = r.db.ExecContext(ctx, query,
 		entity.ID, entity.CampaignID, entity.EntityTypeID,
 		entity.Name, entity.Slug, entity.Entry, entity.EntryHTML,
-		entity.ImagePath, entity.ParentID, entity.TypeLabel,
+		entity.ImagePath, entity.ParentID, entity.SortOrder, entity.TypeLabel,
 		entity.IsPrivate, entity.IsTemplate, fieldsJSON,
 		entity.CreatedBy, entity.CreatedAt, entity.UpdatedAt,
 	)
@@ -515,7 +518,7 @@ func (r *entityRepository) Create(ctx context.Context, entity *Entity) error {
 
 // entitySelectColumns is the standard column list for entity queries with joined type info.
 const entitySelectColumns = `e.id, e.campaign_id, e.entity_type_id, e.name, e.slug,
-	                 e.entry, e.entry_html, e.image_path, e.parent_id, e.type_label,
+	                 e.entry, e.entry_html, e.image_path, e.parent_id, e.sort_order, e.type_label,
 	                 e.is_private, e.visibility, e.is_template, e.fields_data, e.field_overrides, e.popup_config,
 	                 e.created_by, e.created_at, e.updated_at,
 	                 et.name, et.icon, et.color, et.slug`
@@ -547,7 +550,7 @@ func (r *entityRepository) scanEntity(row *sql.Row) (*Entity, error) {
 	var fieldsRaw, overridesRaw, popupRaw []byte
 	err := row.Scan(
 		&e.ID, &e.CampaignID, &e.EntityTypeID, &e.Name, &e.Slug,
-		&e.Entry, &e.EntryHTML, &e.ImagePath, &e.ParentID, &e.TypeLabel,
+		&e.Entry, &e.EntryHTML, &e.ImagePath, &e.ParentID, &e.SortOrder, &e.TypeLabel,
 		&e.IsPrivate, &e.Visibility, &e.IsTemplate, &fieldsRaw, &overridesRaw, &popupRaw,
 		&e.CreatedBy, &e.CreatedAt, &e.UpdatedAt,
 		&e.TypeName, &e.TypeIcon, &e.TypeColor, &e.TypeSlug,
@@ -588,12 +591,12 @@ func (r *entityRepository) Update(ctx context.Context, entity *Entity) error {
 	}
 
 	query := `UPDATE entities SET name = ?, slug = ?, entry = ?, entry_html = ?,
-	          type_label = ?, parent_id = ?, is_private = ?, fields_data = ?, updated_at = ?
+	          type_label = ?, parent_id = ?, sort_order = ?, is_private = ?, fields_data = ?, updated_at = ?
 	          WHERE id = ?`
 
 	result, err := r.db.ExecContext(ctx, query,
 		entity.Name, entity.Slug, entity.Entry, entity.EntryHTML,
-		entity.TypeLabel, entity.ParentID, entity.IsPrivate, fieldsJSON, entity.UpdatedAt,
+		entity.TypeLabel, entity.ParentID, entity.SortOrder, entity.IsPrivate, fieldsJSON, entity.UpdatedAt,
 		entity.ID,
 	)
 	if err != nil {
@@ -962,7 +965,7 @@ func (r *entityRepository) FindChildren(ctx context.Context, parentID string, ro
 	          FROM entities e
 	          INNER JOIN entity_types et ON et.id = e.entity_type_id
 	          %s
-	          ORDER BY e.name`, where)
+	          ORDER BY e.sort_order ASC, e.name ASC`, where)
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -987,7 +990,7 @@ func (r *entityRepository) FindChildren(ctx context.Context, parentID string, ro
 func (r *entityRepository) FindAncestors(ctx context.Context, entityID string) ([]Entity, error) {
 	query := `WITH RECURSIVE ancestors AS (
 	    SELECT e.id, e.campaign_id, e.entity_type_id, e.name, e.slug,
-	           e.entry, e.entry_html, e.image_path, e.parent_id, e.type_label,
+	           e.entry, e.entry_html, e.image_path, e.parent_id, e.sort_order, e.type_label,
 	           e.is_private, e.visibility, e.is_template, e.fields_data, e.field_overrides, e.popup_config,
 	           e.created_by, e.created_at, e.updated_at,
 	           1 AS depth
@@ -995,7 +998,7 @@ func (r *entityRepository) FindAncestors(ctx context.Context, entityID string) (
 	    WHERE e.id = (SELECT parent_id FROM entities WHERE id = ?)
 	    UNION ALL
 	    SELECT e.id, e.campaign_id, e.entity_type_id, e.name, e.slug,
-	           e.entry, e.entry_html, e.image_path, e.parent_id, e.type_label,
+	           e.entry, e.entry_html, e.image_path, e.parent_id, e.sort_order, e.type_label,
 	           e.is_private, e.visibility, e.is_template, e.fields_data, e.field_overrides, e.popup_config,
 	           e.created_by, e.created_at, e.updated_at,
 	           a.depth + 1
@@ -1004,7 +1007,7 @@ func (r *entityRepository) FindAncestors(ctx context.Context, entityID string) (
 	    WHERE a.depth < 20
 	)
 	SELECT a.id, a.campaign_id, a.entity_type_id, a.name, a.slug,
-	       a.entry, a.entry_html, a.image_path, a.parent_id, a.type_label,
+	       a.entry, a.entry_html, a.image_path, a.parent_id, a.sort_order, a.type_label,
 	       a.is_private, a.visibility, a.is_template, a.fields_data, a.field_overrides, a.popup_config,
 	       a.created_by, a.created_at, a.updated_at,
 	       et.name, et.icon, et.color, et.slug
@@ -1035,6 +1038,24 @@ func (r *entityRepository) UpdateParent(ctx context.Context, entityID string, pa
 	result, err := r.db.ExecContext(ctx, query, parentID, entityID)
 	if err != nil {
 		return fmt.Errorf("updating entity parent: %w", err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
+	if rows == 0 {
+		return apperror.NewNotFound("entity not found")
+	}
+	return nil
+}
+
+// UpdateSortOrder sets an entity's manual sort order within its parent/category.
+func (r *entityRepository) UpdateSortOrder(ctx context.Context, entityID string, sortOrder int) error {
+	query := `UPDATE entities SET sort_order = ?, updated_at = NOW() WHERE id = ?`
+	result, err := r.db.ExecContext(ctx, query, sortOrder, entityID)
+	if err != nil {
+		return fmt.Errorf("updating entity sort order: %w", err)
 	}
 
 	rows, err := result.RowsAffected()
@@ -1130,7 +1151,7 @@ func (r *entityRepository) scanEntityRow(rows *sql.Rows) (*Entity, error) {
 	var fieldsRaw, overridesRaw, popupRaw []byte
 	err := rows.Scan(
 		&e.ID, &e.CampaignID, &e.EntityTypeID, &e.Name, &e.Slug,
-		&e.Entry, &e.EntryHTML, &e.ImagePath, &e.ParentID, &e.TypeLabel,
+		&e.Entry, &e.EntryHTML, &e.ImagePath, &e.ParentID, &e.SortOrder, &e.TypeLabel,
 		&e.IsPrivate, &e.Visibility, &e.IsTemplate, &fieldsRaw, &overridesRaw, &popupRaw,
 		&e.CreatedBy, &e.CreatedAt, &e.UpdatedAt,
 		&e.TypeName, &e.TypeIcon, &e.TypeColor, &e.TypeSlug,
