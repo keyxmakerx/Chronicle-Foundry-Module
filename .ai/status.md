@@ -8,8 +8,8 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-09 -- Full-page Journal + Category nav redesign. Added full-page journal view at `/campaigns/:id/journal` with two-panel Obsidian-like layout (note tree sidebar + TipTap editor). Journal link in sidebar nav (gated on notes addon). Notes FAB hidden on journal page to avoid sync conflicts. Removed "Session Journal" topbar button. Redesigned sidebar drill panel: merged header + action bar, clickable category name replaces "View All", count as pill badge. Entity tree now has folder/page icons, guide lines, smooth transitions, and distinct reorder vs reparent drag-and-drop feedback.
-Branch: `claude/fix-journal-button-placement-UF4hD`.
+2026-03-09 -- Multi-calendar Sprint 1 complete. Dropped UNIQUE constraint on calendars.campaign_id, added sort_order/is_default columns with migration backfill. Added calendar_id FK to sessions. Repository: ListByCampaignID, GetDefaultByCampaignID, SetDefault. Service: removed single-calendar validation, auto-set first as default, ListCalendars/SetDefaultCalendar, search spans all calendars, default promotion on deletion. Previous session: full-page journal, category nav redesign, sidebar tree with drag-and-drop.
+Branch: `claude/fix-journal-button-placement-UF4hD`. Next: Sprint 2 — handler/route restructuring (`/calendar` → `/calendars/:calId`).
 
 ## Phase & Sprint Plan
 See `.ai/phases.md` for the full roadmap. Phases organized by priority:
