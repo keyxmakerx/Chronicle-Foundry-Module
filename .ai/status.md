@@ -8,8 +8,8 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-09 -- Modules→Systems rename, campaign customization (backdrop/accent), dashboard blocks (7 new types), map Phase 2 objects, documentation update.
-Branch: `claude/review-work-plan-hT8UX`.
+2026-03-09 -- Fix collation mismatch in API table migrations (000016, 000058). Migration 000016 was missing COLLATE=utf8mb4_unicode_ci on 4 tables, causing Error 1267 on newer MariaDB when migration 000058 adds FK constraints.
+Branch: `claude/dynamic-database-setup-1QSPA`.
 
 ## Phase & Sprint Plan
 See `.ai/phases.md` for the full roadmap. Phases S through W organized by theme:
