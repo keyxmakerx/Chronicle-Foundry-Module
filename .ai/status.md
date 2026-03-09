@@ -8,7 +8,7 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-09 -- Sprint V-1: Quick Capture, Session Journal & Slash Commands. Added TipTap slash command menu (`/` trigger in editor with 9 block commands), quick-capture modal (Ctrl+Shift+N for instant note creation), Session Journal button in topbar (creates/opens daily journal note), and player notes in Ctrl+K search (parallel note search alongside entities). Previously: 3-phase security hardening, competitive gap analysis, phase reordering (V/W before T/U).
+2026-03-09 -- Documentation & backlog update. Verified 3-phase security hardening plan fully complete (all items implemented or intentionally excluded — ClamAV evaluated and removed in favor of CDR/magic-byte/MIME pipeline). Added feature request: Session Journal audio attachments (Sprint V-5) — upload, share/private visibility, inline player. Marked Sprint V-1 complete in todo.md. Previously: Sprint V-1 (Quick Capture, Session Journal, Slash Commands), competitive gap analysis, phase reordering.
 Branch: `claude/dynamic-database-setup-1QSPA`.
 
 ## Phase & Sprint Plan
