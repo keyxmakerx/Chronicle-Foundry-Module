@@ -315,6 +315,28 @@ Summary of strengths/weaknesses for strategic positioning. Full analysis in `.ai
 
 ---
 
+## 4. Technical Debt (Future Refactoring)
+
+Items identified during the 2026-03-09 codebase audit. Not urgent — document for future sessions.
+
+### Handler File Sizes
+Large handler files that could benefit from splitting if they grow further:
+- [ ] `entities/handler.go` (1,983 lines) — consider splitting entity type CRUD into separate handler
+- [ ] `calendar/handler.go` (1,687 lines) — consider splitting event vs calendar CRUD
+- [ ] `campaigns/handler.go` (1,245 lines) — consider splitting members/settings into separate handler
+
+### Service Interface Sizes
+Interfaces with 30+ methods that could be split into role-based sub-interfaces:
+- [ ] `CampaignService` (40 methods) — could split: CampaignCRUD + CampaignMembers + CampaignSettings
+- [ ] `EntityService` (38 methods) — could split: EntityCRUD + EntityTypeService + EntityPermissions
+- [ ] `TimelineService` (30 methods) — could split: TimelineCRUD + TimelineEvents + TimelineConnections
+
+### Inline CSS in JS Widgets
+Six widgets inject `<style>` elements dynamically. Working correctly (ID-based dedup) but could be moved to `input.css`:
+- [ ] `permissions.js`, `shop_inventory.js`, `tag_picker.js`, `entity_tooltip.js`, `relations.js`, `template_editor.js`
+
+---
+
 ## Completed Sprints
 
 ### Phase 0: Project Scaffolding (2026-02-19)

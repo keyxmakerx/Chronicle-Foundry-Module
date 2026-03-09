@@ -40,7 +40,7 @@ func (h *Handler) Index(c echo.Context) error {
 		CSRFToken:  middleware.GetCSRFToken(c),
 	}
 
-	if c.Request().Header.Get("HX-Request") != "" {
+	if middleware.IsHTMX(c) {
 		return middleware.Render(c, http.StatusOK, MapListFragment(cc, data))
 	}
 	return middleware.Render(c, http.StatusOK, MapListPage(cc, data))
@@ -92,7 +92,7 @@ func (h *Handler) Show(c echo.Context) error {
 		IsScribe:   cc.MemberRole >= campaigns.RoleScribe,
 	}
 
-	if c.Request().Header.Get("HX-Request") != "" {
+	if middleware.IsHTMX(c) {
 		return middleware.Render(c, http.StatusOK, MapShowFragment(cc, data))
 	}
 	return middleware.Render(c, http.StatusOK, MapShowPage(cc, data))

@@ -182,10 +182,7 @@
     var url = '/campaigns/' + encodeURIComponent(campaignId) +
               '/entities/search?q=' + encodeURIComponent(query);
 
-    fetch(url, {
-      headers: { 'Accept': 'application/json' },
-      signal: abortController.signal
-    })
+    Chronicle.apiFetch(url, { signal: abortController.signal })
       .then(function (res) { return res.json(); })
       .then(function (data) {
         results = data.results || [];

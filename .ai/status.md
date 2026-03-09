@@ -8,7 +8,7 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-09 -- Fix collation mismatch in API table migrations (000016, 000058). Migration 000016 was missing COLLATE=utf8mb4_unicode_ci on 4 tables, causing Error 1267 on newer MariaDB when migration 000058 adds FK constraints.
+2026-03-09 -- Codebase cleanup audit. Fixed Chronicle.toast() bug (undefined function), standardized 8 raw fetch() calls to Chronicle.apiFetch(), added missing widget destroy() method, replaced 4 raw HX-Request header checks with middleware.IsHTMX(). Documented tech debt items in .ai/todo.md.
 Branch: `claude/dynamic-database-setup-1QSPA`.
 
 ## Phase & Sprint Plan

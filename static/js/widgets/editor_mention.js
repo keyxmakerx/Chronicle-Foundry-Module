@@ -314,12 +314,7 @@
       '/entities/search?q=' +
       encodeURIComponent(query);
 
-    fetch(url, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-      credentials: 'same-origin',
-      signal: this.abortController.signal,
-    })
+    Chronicle.apiFetch(url, { signal: this.abortController.signal })
       .then(function (res) {
         if (!res.ok) throw new Error('Search failed: ' + res.status);
         return res.json();

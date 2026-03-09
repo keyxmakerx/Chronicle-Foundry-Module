@@ -311,7 +311,7 @@ var _impl = {
    */
   _loadData: function() {
     var self = this;
-    fetch(this.apiUrl)
+    Chronicle.apiFetch(this.apiUrl)
       .then(function(r) { return r.json(); })
       .then(function(data) {
         self.timeline = data.timeline;

@@ -67,7 +67,7 @@ func (h *Handler) Index(c echo.Context) error {
 		CSRFToken:  middleware.GetCSRFToken(c),
 	}
 
-	if c.Request().Header.Get("HX-Request") != "" {
+	if middleware.IsHTMX(c) {
 		return middleware.Render(c, http.StatusOK, TimelineListFragment(cc, data))
 	}
 	return middleware.Render(c, http.StatusOK, TimelineListPage(cc, data))
@@ -128,7 +128,7 @@ func (h *Handler) Show(c echo.Context) error {
 		Members:      members,
 	}
 
-	if c.Request().Header.Get("HX-Request") != "" {
+	if middleware.IsHTMX(c) {
 		return middleware.Render(c, http.StatusOK, TimelineShowFragment(cc, data))
 	}
 	return middleware.Render(c, http.StatusOK, TimelineShowPage(cc, data))

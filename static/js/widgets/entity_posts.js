@@ -63,7 +63,7 @@
           })
           .catch(function (err) {
             console.error('[EntityPosts] Create error:', err);
-            Chronicle.toast('Failed to create post', 'error');
+            Chronicle.notify('Failed to create post', 'error');
           });
       }
 
@@ -85,7 +85,7 @@
           })
           .catch(function (err) {
             console.error('[EntityPosts] Update error:', err);
-            Chronicle.toast('Failed to update post', 'error');
+            Chronicle.notify('Failed to update post', 'error');
           });
       }
 
@@ -100,7 +100,7 @@
           })
           .catch(function (err) {
             console.error('[EntityPosts] Delete error:', err);
-            Chronicle.toast('Failed to delete post', 'error');
+            Chronicle.notify('Failed to delete post', 'error');
           });
       }
 
