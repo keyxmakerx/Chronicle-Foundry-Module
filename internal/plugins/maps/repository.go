@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
+	"github.com/keyxmakerx/chronicle/internal/permissions"
 )
 
 // MapRepository defines persistence operations for maps and markers.
@@ -170,10 +172,10 @@ func (r *mapRepo) DeleteMarker(ctx context.Context, id string) error {
 }
 
 // ListMarkers returns all markers for a map, filtered by role.
-// role >= 3 (Owner) sees dm_only markers; others see only 'everyone'.
+// Owners see dm_only markers; others see only 'everyone'.
 func (r *mapRepo) ListMarkers(ctx context.Context, mapID string, role int) ([]Marker, error) {
 	visFilter := "AND m.visibility = 'everyone'"
-	if role >= 3 {
+	if permissions.CanSeeDmOnly(role) {
 		visFilter = ""
 	}
 

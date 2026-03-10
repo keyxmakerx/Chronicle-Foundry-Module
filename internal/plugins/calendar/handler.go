@@ -701,6 +701,12 @@ func (h *Handler) CreateEventAPI(c echo.Context) error {
 		}
 	}
 
+	// Only Owners can create dm_only events; Scribes default to 'everyone'.
+	visibility := req.Visibility
+	if visibility == "dm_only" && cc.MemberRole < campaigns.RoleOwner && !cc.IsSiteAdmin {
+		visibility = "everyone"
+	}
+
 	evt, err := h.svc.CreateEvent(ctx, cal.ID, CreateEventInput{
 		Name:            req.Name,
 		Description:     req.Description,
@@ -718,7 +724,7 @@ func (h *Handler) CreateEventAPI(c echo.Context) error {
 		EndMinute:       req.EndMinute,
 		IsRecurring:     req.IsRecurring,
 		RecurrenceType:  req.RecurrenceType,
-		Visibility:      req.Visibility,
+		Visibility:      visibility,
 		VisibilityRules: req.VisibilityRules,
 		Category:        req.Category,
 		CreatedBy:       userID,
@@ -783,6 +789,12 @@ func (h *Handler) UpdateEventAPI(c echo.Context) error {
 		return apperror.NewBadRequest("invalid request")
 	}
 
+	// Only Owners can set dm_only visibility; Scribes default to 'everyone'.
+	visibility := req.Visibility
+	if visibility == "dm_only" && cc.MemberRole < campaigns.RoleOwner && !cc.IsSiteAdmin {
+		visibility = "everyone"
+	}
+
 	return h.svc.UpdateEvent(ctx, eventID, UpdateEventInput{
 		Name:            req.Name,
 		Description:     req.Description,
@@ -800,7 +812,7 @@ func (h *Handler) UpdateEventAPI(c echo.Context) error {
 		EndMinute:       req.EndMinute,
 		IsRecurring:     req.IsRecurring,
 		RecurrenceType:  req.RecurrenceType,
-		Visibility:      req.Visibility,
+		Visibility:      visibility,
 		VisibilityRules: req.VisibilityRules,
 		Category:        req.Category,
 	})

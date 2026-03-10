@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/keyxmakerx/chronicle/internal/apperror"
+	"github.com/keyxmakerx/chronicle/internal/permissions"
 )
 
 // --- EntityType Repository ---
@@ -742,13 +743,13 @@ func (r *entityRepository) SlugExists(ctx context.Context, campaignID, slug stri
 
 // visibilityFilter returns the WHERE clause fragment and args that enforce
 // entity visibility based on the viewer's role, user ID, and the entity's
-// visibility mode. Owners (role >= 3) see everything — returns empty string.
+// visibility mode. Owners see everything — returns empty string.
 //
 // For non-owners, the filter handles two visibility modes:
 //   - "default": uses the legacy is_private flag (Scribe+ sees all, Player sees public only)
 //   - "custom": checks entity_permissions for explicit grants to the user or their role level
 func visibilityFilter(role int, userID string) (string, []any) {
-	if role >= 3 {
+	if role >= permissions.RoleOwner {
 		return "", nil
 	}
 

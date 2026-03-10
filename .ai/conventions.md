@@ -281,6 +281,48 @@ CREATE TABLE IF NOT EXISTS calendars ( ... );
 6. **Plugin tables**: Plugin tables belong in `internal/plugins/<name>/migrations/`,
    not in `db/migrations/`. Plugin schema failures degrade gracefully (ADR-028).
 
+### Permission Model
+
+Chronicle uses a hierarchical role system. The `internal/permissions` package
+provides shared constants (`RoleOwner`, `RoleScribe`, `RolePlayer`) and
+helper functions (`CanSeeDmOnly`, `CanSetDmOnly`) for services/repos that
+cannot import `campaigns` due to circular deps.
+
+**Role hierarchy:** Admin (site) > Owner (campaign) > Scribe > Player > Public
+
+**Permission matrix:**
+
+| Resource | View | Create | Edit | Delete | Toggle dm_only |
+|----------|------|--------|------|--------|----------------|
+| Campaign | Player | (site) | Owner | Owner | -- |
+| Entity types | Player | Owner | Owner | Owner | -- |
+| Entities | Player* | Scribe | Scribe | Owner | Owner |
+| Entity permissions | Owner | Owner | Owner | Owner | -- |
+| Tags | Player | Scribe | Scribe | Scribe | Owner |
+| Relations | Player | Scribe | Scribe | Scribe | Owner |
+| Calendar | Player | Owner | Owner | Owner | -- |
+| Calendar events | Player* | Scribe | Scribe | Owner | Owner |
+| Timeline | Player | Owner | Owner | Owner | Owner |
+| Timeline events | Player* | Scribe | Scribe | Scribe | Owner |
+| Maps | Player | Owner | Owner | Owner | -- |
+| Markers | Player* | Scribe | Scribe | Owner | Owner |
+| Drawings | Player* | Scribe | Scribe | Owner | -- |
+| Tokens | Player* | Scribe | Scribe | Owner | -- |
+| Layers | Player | Owner | Owner | Owner | -- |
+| Fog of war | Owner | Owner | -- | Owner | -- |
+| Sessions | Player | Scribe | Scribe | Owner | -- |
+| Notes | Player+ | Player+ | Player+ | Player+ | -- |
+| Groups | Owner | Owner | Owner | Owner | -- |
+
+\* Player sees content unless dm_only or custom permissions restrict it.
+\+ Notes: own notes only; shared notes visible to all campaign members.
+
+**dm_only rules:**
+- Only Owners can create or toggle dm_only on any resource
+- Only Owners can see dm_only content (default; Phase 2 adds per-campaign config)
+- Handlers silently strip dm_only from non-Owner requests (not a 403)
+- Use `permissions.CanSeeDmOnly(role)` / `permissions.CanSetDmOnly(role)` for checks
+
 ### Anti-Patterns (AVOID)
 
 ```go

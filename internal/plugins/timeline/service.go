@@ -9,6 +9,7 @@ import (
 	"regexp"
 
 	"github.com/keyxmakerx/chronicle/internal/apperror"
+	"github.com/keyxmakerx/chronicle/internal/permissions"
 	"github.com/keyxmakerx/chronicle/internal/sanitize"
 )
 
@@ -211,7 +212,7 @@ func (s *timelineService) ListTimelines(ctx context.Context, campaignID string, 
 	}
 
 	// Apply per-user visibility rules (Owners always see everything).
-	if role < 3 && userID != "" {
+	if !permissions.CanSeeDmOnly(role) && userID != "" {
 		filtered := timelines[:0]
 		for _, t := range timelines {
 			if canUserView(t.Visibility, t.VisibilityRules, role, userID) {
@@ -356,7 +357,7 @@ func (s *timelineService) ListTimelineEvents(ctx context.Context, timelineID str
 	sortEventLinks(events)
 
 	// Apply per-user event link visibility rules (Owners always see everything).
-	if role < 3 && userID != "" {
+	if !permissions.CanSeeDmOnly(role) && userID != "" {
 		filtered := events[:0]
 		for _, el := range events {
 			vis := el.EffectiveVisibility()
@@ -764,11 +765,11 @@ func (s *timelineService) ListCalendarEras(ctx context.Context, calendarID strin
 // --- Visibility Helpers ---
 
 // canUserView checks whether a user can see an item based on its base visibility
-// and per-user JSON rules. Owners (role >= 3) always see everything and should
-// be checked before calling this function.
+// and per-user JSON rules. Owners always see everything and should be checked
+// before calling this function.
 func canUserView(baseVisibility string, visRulesJSON *string, role int, userID string) bool {
-	// Base visibility: dm_only requires role >= 3 (Owner).
-	if baseVisibility == "dm_only" && role < 3 {
+	// Base visibility: dm_only requires Owner role.
+	if baseVisibility == "dm_only" && !permissions.CanSeeDmOnly(role) {
 		return false
 	}
 

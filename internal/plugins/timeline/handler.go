@@ -323,6 +323,12 @@ func (h *Handler) CreateStandaloneEventAPI(c echo.Context) error {
 		return apperror.NewBadRequest("invalid request")
 	}
 
+	// Only Owners can create dm_only events; Scribes default to 'everyone'.
+	visibility := req.Visibility
+	if visibility == "dm_only" && cc.MemberRole < campaigns.RoleOwner && !cc.IsSiteAdmin {
+		visibility = "everyone"
+	}
+
 	e, err := h.svc.CreateStandaloneEvent(ctx, timelineID, CreateTimelineEventInput{
 		Name:            req.Name,
 		Description:     req.Description,
@@ -341,7 +347,7 @@ func (h *Handler) CreateStandaloneEventAPI(c echo.Context) error {
 		IsRecurring:     req.IsRecurring,
 		RecurrenceType:  req.RecurrenceType,
 		Category:        req.Category,
-		Visibility:      req.Visibility,
+		Visibility:      visibility,
 		Label:           req.Label,
 		Color:           req.Color,
 		CreatedBy:       userID,
@@ -390,6 +396,12 @@ func (h *Handler) UpdateStandaloneEventAPI(c echo.Context) error {
 		return apperror.NewBadRequest("invalid request")
 	}
 
+	// Only Owners can set dm_only visibility; Scribes default to 'everyone'.
+	visibility := req.Visibility
+	if visibility == "dm_only" && cc.MemberRole < campaigns.RoleOwner && !cc.IsSiteAdmin {
+		visibility = "everyone"
+	}
+
 	if err := h.svc.UpdateStandaloneEvent(ctx, timelineID, eventID, UpdateTimelineEventInput{
 		Name:            req.Name,
 		Description:     req.Description,
@@ -408,7 +420,7 @@ func (h *Handler) UpdateStandaloneEventAPI(c echo.Context) error {
 		IsRecurring:     req.IsRecurring,
 		RecurrenceType:  req.RecurrenceType,
 		Category:        req.Category,
-		Visibility:      req.Visibility,
+		Visibility:      visibility,
 		Label:           req.Label,
 		Color:           req.Color,
 	}); err != nil {

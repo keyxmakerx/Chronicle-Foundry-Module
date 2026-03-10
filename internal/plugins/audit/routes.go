@@ -9,7 +9,7 @@ import (
 
 // RegisterRoutes sets up all audit-related routes on the given Echo instance.
 // All routes are campaign-scoped and require authentication plus campaign
-// membership. The activity page is restricted to campaign owners (role >= 3).
+// membership. The activity page is restricted to campaign owners (RoleOwner).
 func RegisterRoutes(e *echo.Echo, h *Handler, campaignSvc campaigns.CampaignService, authSvc auth.AuthService) {
 	// Campaign-scoped routes requiring authentication and membership.
 	cg := e.Group("/campaigns/:id",

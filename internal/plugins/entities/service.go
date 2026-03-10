@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/keyxmakerx/chronicle/internal/apperror"
+	"github.com/keyxmakerx/chronicle/internal/permissions"
 	"github.com/keyxmakerx/chronicle/internal/plugins/campaigns"
 	"github.com/keyxmakerx/chronicle/internal/sanitize"
 )
@@ -995,10 +996,10 @@ func (s *entityService) SetEntityPermissions(ctx context.Context, entityID strin
 // CheckEntityAccess resolves whether a user can view/edit a specific entity.
 // For "default" visibility, uses the legacy is_private + role check.
 // For "custom" visibility, queries entity_permissions.
-// Owners (role >= 3) always have full access.
+// Owners always have full access.
 func (s *entityService) CheckEntityAccess(ctx context.Context, entityID string, role int, userID string) (*EffectivePermission, error) {
 	// Owners always have full access.
-	if role >= 3 {
+	if role >= permissions.RoleOwner {
 		return &EffectivePermission{CanView: true, CanEdit: true}, nil
 	}
 

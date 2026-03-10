@@ -8,8 +8,8 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-09 -- **Plugin-isolated database schema architecture complete.** Replaced all 63 incremental migration files with a two-tier schema system: single core baseline (`db/migrations/000001_baseline`) for core tables (fatal on failure), plus per-plugin migration directories (`internal/plugins/<name>/migrations/`) that run independently at startup. Plugin migration failures degrade gracefully — the app continues serving with that feature disabled and a banner shown to users. New files: `plugin_schema.go` (migration runner), `plugin_health.go` (health registry), `plugin_unavailable.templ` (degraded UI). Each of the 5 built-in plugins (calendar, maps, sessions, timeline, syncapi) has its own `migrations/` dir. Routes are conditionally registered based on plugin health. Removed `migrate_preflight.go` and bandaid lint tests from `migrate_test.go`. All tests pass.
-Branch: `claude/fix-journal-button-placement-UF4hD`. Next: Sprint 3 — calendar list UI polish, calendar switcher in views, Sprint 4 — sessions calendar FK integration.
+2026-03-10 -- **Unified permission model (Phase 1).** Created `internal/permissions/role.go` package with shared role constants (`RoleOwner`, `RoleScribe`, `RolePlayer`) and helper functions (`CanSeeDmOnly`, `CanSetDmOnly`) to eliminate ~30 magic number `role >= 3` occurrences across calendar, timeline, maps, entities, syncapi, and app/routes. Fixed dm_only inconsistencies: tags now match relations pattern (Owner-only for both visibility and creation). Added Owner-only guards on dm_only creation in calendar events, timeline standalone events, and map markers — Scribes can no longer set dm_only on content they create. Added permission matrix to `.ai/conventions.md`. JS magic numbers in `permissions.js` replaced with named `ROLE_OWNER` constant. Phase 2 (configurable per-campaign dm_only grants) deferred — `CanSeeDmOnly`/`CanSetDmOnly` are the single-point-of-change for that.
+Branch: `claude/fix-journal-button-placement-UF4hD`.
 
 ## Phase & Sprint Plan
 See `.ai/phases.md` for the full roadmap. Phases organized by priority:

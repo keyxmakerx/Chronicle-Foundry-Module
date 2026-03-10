@@ -49,14 +49,14 @@ func (h *Handler) logAudit(c echo.Context, campaignID, action, tagName string) {
 	}
 }
 
-// canSeeDmOnly returns true if the current user's role is Scribe or higher,
-// meaning they can see dm_only tags.
+// canSeeDmOnly returns true if the current user's role permits viewing dm_only
+// tags. Currently Owner-only (will be configurable per-campaign in Phase 2).
 func canSeeDmOnly(cc *campaigns.CampaignContext) bool {
-	return cc.MemberRole >= campaigns.RoleScribe
+	return cc.MemberRole >= campaigns.RoleOwner || cc.IsSiteAdmin
 }
 
 // ListTags returns all tags for a campaign as JSON (GET /campaigns/:id/tags).
-// Players see only public tags; Scribes and Owners see all tags including dm_only.
+// Players and Scribes see only public tags; Owners see all tags including dm_only.
 func (h *Handler) ListTags(c echo.Context) error {
 	cc := campaigns.GetCampaignContext(c)
 	if cc == nil {
@@ -88,7 +88,13 @@ func (h *Handler) CreateTag(c echo.Context) error {
 		return apperror.NewBadRequest("invalid JSON body")
 	}
 
-	tag, err := h.service.Create(c.Request().Context(), cc.Campaign.ID, req.Name, req.Color, req.DmOnly)
+	// Only Owners and site admins can create dm_only tags.
+	dmOnly := req.DmOnly
+	if dmOnly && cc.MemberRole < campaigns.RoleOwner && !cc.IsSiteAdmin {
+		dmOnly = false
+	}
+
+	tag, err := h.service.Create(c.Request().Context(), cc.Campaign.ID, req.Name, req.Color, dmOnly)
 	if err != nil {
 		return err
 	}
@@ -124,7 +130,13 @@ func (h *Handler) UpdateTag(c echo.Context) error {
 		return apperror.NewBadRequest("invalid JSON body")
 	}
 
-	tag, err := h.service.Update(c.Request().Context(), tagID, req.Name, req.Color, req.DmOnly)
+	// Only Owners and site admins can set the dm_only flag on tags.
+	dmOnly := req.DmOnly
+	if dmOnly && cc.MemberRole < campaigns.RoleOwner && !cc.IsSiteAdmin {
+		dmOnly = false
+	}
+
+	tag, err := h.service.Update(c.Request().Context(), tagID, req.Name, req.Color, dmOnly)
 	if err != nil {
 		return err
 	}

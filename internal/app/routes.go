@@ -13,6 +13,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/keyxmakerx/chronicle/internal/middleware"
+	"github.com/keyxmakerx/chronicle/internal/permissions"
 	"github.com/keyxmakerx/chronicle/internal/systems"
 	"github.com/keyxmakerx/chronicle/internal/extensions"
 	"github.com/keyxmakerx/chronicle/internal/plugins/addons"
@@ -274,7 +275,7 @@ func (a *calendarEventListerAdapter) ListEventsForCalendar(ctx context.Context, 
 	refs := make([]timeline.CalendarEventRef, 0, len(events))
 	for _, ev := range events {
 		// Apply role-based visibility filter (dm_only = Owner only).
-		if role < 3 && ev.Visibility == "dm_only" {
+		if !permissions.CanSeeDmOnly(role) && ev.Visibility == "dm_only" {
 			continue
 		}
 		refs = append(refs, timeline.CalendarEventRef{

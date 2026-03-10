@@ -251,6 +251,12 @@ func (h *Handler) CreateMarkerAPI(c echo.Context) error {
 		}
 	}
 
+	// Only Owners can create dm_only markers; Scribes default to 'everyone'.
+	visibility := req.Visibility
+	if visibility == "dm_only" && cc.MemberRole < campaigns.RoleOwner && !cc.IsSiteAdmin {
+		visibility = "everyone"
+	}
+
 	mk, err := h.svc.CreateMarker(ctx, CreateMarkerInput{
 		MapID:       mapID,
 		Name:        req.Name,
@@ -260,7 +266,7 @@ func (h *Handler) CreateMarkerAPI(c echo.Context) error {
 		Icon:        req.Icon,
 		Color:       req.Color,
 		EntityID:    req.EntityID,
-		Visibility:  req.Visibility,
+		Visibility:  visibility,
 		CreatedBy:   userID,
 	})
 	if err != nil {
@@ -296,6 +302,12 @@ func (h *Handler) UpdateMarkerAPI(c echo.Context) error {
 		return apperror.NewBadRequest("invalid request")
 	}
 
+	// Only Owners can set dm_only visibility; Scribes default to 'everyone'.
+	visibility := req.Visibility
+	if visibility == "dm_only" && cc.MemberRole < campaigns.RoleOwner && !cc.IsSiteAdmin {
+		visibility = "everyone"
+	}
+
 	return h.svc.UpdateMarker(ctx, markerID, UpdateMarkerInput{
 		Name:        req.Name,
 		Description: req.Description,
@@ -304,7 +316,7 @@ func (h *Handler) UpdateMarkerAPI(c echo.Context) error {
 		Icon:        req.Icon,
 		Color:       req.Color,
 		EntityID:    req.EntityID,
-		Visibility:  req.Visibility,
+		Visibility:  visibility,
 	})
 }
 
