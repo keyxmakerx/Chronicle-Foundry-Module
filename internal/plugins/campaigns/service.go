@@ -67,6 +67,7 @@ type CampaignService interface {
 	AdminAddMember(ctx context.Context, campaignID, userID string, role Role) error
 
 	// Lifecycle hooks — set after construction to avoid circular initialization.
+	SetContentTemplateSeeder(seeder ContentTemplateSeeder)
 	SetMediaCleaner(cleaner MediaCleaner)
 	SetHookDispatcher(dispatcher CampaignHookDispatcher)
 }
@@ -100,10 +101,11 @@ type campaignService struct {
 	repo           CampaignRepository
 	users          UserFinder
 	mail           MailService            // May be nil if SMTP is not configured.
-	seeder         EntityTypeSeeder       // Seeds default entity types on campaign creation. May be nil.
-	mediaCleaner   MediaCleaner           // Cleans up media files on campaign delete. May be nil.
-	hookDispatcher CampaignHookDispatcher // Dispatches WASM lifecycle events. May be nil.
-	baseURL        string
+	seeder           EntityTypeSeeder       // Seeds default entity types on campaign creation. May be nil.
+	templateSeeder   ContentTemplateSeeder  // Seeds default content templates on campaign creation. May be nil.
+	mediaCleaner     MediaCleaner           // Cleans up media files on campaign delete. May be nil.
+	hookDispatcher   CampaignHookDispatcher // Dispatches WASM lifecycle events. May be nil.
+	baseURL          string
 }
 
 // NewCampaignService creates a new campaign service with the given dependencies.
@@ -116,6 +118,12 @@ func NewCampaignService(repo CampaignRepository, users UserFinder, mail MailServ
 		seeder:  seeder,
 		baseURL: baseURL,
 	}
+}
+
+// SetContentTemplateSeeder sets the seeder for default content templates.
+// Called after all plugins are wired to avoid initialization order issues.
+func (s *campaignService) SetContentTemplateSeeder(seeder ContentTemplateSeeder) {
+	s.templateSeeder = seeder
 }
 
 // SetMediaCleaner sets the media cleaner for campaign deletion cleanup.
@@ -191,6 +199,16 @@ func (s *campaignService) Create(ctx context.Context, userID string, input Creat
 		if err := s.seeder.SeedDefaults(ctx, campaign.ID); err != nil {
 			// Non-fatal: campaign is still usable without default types.
 			slog.Warn("failed to seed default entity types",
+				slog.String("campaign_id", campaign.ID),
+				slog.Any("error", err),
+			)
+		}
+	}
+
+	// Seed default content templates for the new campaign.
+	if s.templateSeeder != nil {
+		if err := s.templateSeeder.SeedDefaults(ctx, campaign.ID); err != nil {
+			slog.Warn("failed to seed default content templates",
 				slog.String("campaign_id", campaign.ID),
 				slog.Any("error", err),
 			)

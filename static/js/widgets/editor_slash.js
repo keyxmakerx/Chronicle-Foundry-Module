@@ -296,6 +296,13 @@
       // Delete the /query text first.
       editor.chain().focus().deleteRange({ from: from, to: to }).run();
 
+      // Custom handler for dynamically added commands (e.g., Insert Template).
+      if (cmd.customHandler) {
+        closeSlash();
+        cmd.customHandler(editor);
+        return;
+      }
+
       // Apply the block command.
       switch (cmd.id) {
         case 'heading1':
@@ -438,4 +445,21 @@
    * into the editor lifecycle alongside the mention extension.
    */
   Chronicle.SlashCommands = createSlashExtension;
+
+  /**
+   * Add a custom command to the slash menu. Commands added this way appear
+   * after the built-in commands. Commands with a `customHandler` function
+   * bypass the default executeCommand switch and call the handler directly.
+   *
+   * @param {Object} cmd - Command with id, label, icon, keywords, description.
+   *   Optional: customHandler(editor) called instead of built-in switch.
+   */
+  Chronicle.SlashCommands.addCommand = function (cmd) {
+    if (!cmd || !cmd.id) return;
+    // Avoid duplicates.
+    for (var i = 0; i < COMMANDS.length; i++) {
+      if (COMMANDS[i].id === cmd.id) return;
+    }
+    COMMANDS.push(cmd);
+  };
 })();

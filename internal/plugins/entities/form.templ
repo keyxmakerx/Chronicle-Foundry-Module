@@ -91,6 +91,21 @@ templ EntityCreateFormComponent(cc *campaigns.CampaignContext, entityTypes []Ent
 				/>
 			</div>
 
+			// Content template picker (loads templates for the selected entity type).
+			<div
+				id="template-picker"
+				data-campaign-id={ cc.Campaign.ID }
+				class="hidden"
+			>
+				<label for="template_id" class="block text-sm font-medium text-fg-body mb-1">
+					<i class="fa-solid fa-file-lines text-fg-muted mr-1"></i>Content Template (optional)
+				</label>
+				<select id="template_id" name="template_id" class="input w-full">
+					<option value="0">Blank — start from scratch</option>
+				</select>
+				<p class="mt-1 text-xs text-fg-secondary">Pre-fill the editor with a structured template.</p>
+			</div>
+
 			<div>
 				<label for="type_label" class="block text-sm font-medium text-fg-body mb-1">Descriptor (optional)</label>
 				<input

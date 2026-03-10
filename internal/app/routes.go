@@ -705,6 +705,14 @@ func (a *App) RegisterRoutes() {
 	entityHandler := entities.NewHandler(entityService)
 	entities.RegisterRoutes(e, entityHandler, campaignService, authService)
 
+	// Content template routes (entity content blueprints).
+	contentTemplateRepo := entities.NewContentTemplateRepository(a.DB)
+	contentTemplateService := entities.NewContentTemplateService(contentTemplateRepo, entityTypeRepo)
+	contentTemplateHandler := entities.NewContentTemplateHandler(contentTemplateService)
+	entities.RegisterContentTemplateRoutes(e, contentTemplateHandler, campaignService, authService)
+	campaignService.SetContentTemplateSeeder(contentTemplateService)
+	entityHandler.SetContentTemplateService(contentTemplateService)
+
 	// Media plugin: file upload, storage, thumbnailing, serving.
 	// Graceful degradation: if the media directory can't be created, log a warning
 	// but don't crash -- the rest of the app keeps running.

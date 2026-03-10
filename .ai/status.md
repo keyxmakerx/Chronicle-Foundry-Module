@@ -8,6 +8,21 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
+2026-03-10 -- **Sprint V-3: Content Templates (COMPLETE).**
+
+12. **Content templates migration**: `content_templates` table with campaign_id FK, entity_type_id FK, TipTap JSON/HTML content, icon, sort order, and global flag.
+
+13. **Content template CRUD**: `ContentTemplateRepository` (Create, FindByID, ListForCampaign, ListForCampaignAndType, Update, Delete), `ContentTemplateService` (validation, CRUD, SeedDefaults), `ContentTemplateHandler` (REST API: GET/POST/PUT/DELETE at `/content-templates`).
+
+14. **Template picker on entity create form**: Dropdown appears when entity type is selected, populated via API. Selected template content is applied to the entity entry after creation.
+
+15. **Editor slash command**: `/template` or `/insert template` in the editor shows a floating menu of available templates. Selecting one inserts the template's ProseMirror content at the cursor position.
+
+16. **Default templates**: Four built-in templates (Session Recap, NPC Profile, Location, Quest Log) are seeded on campaign creation via `ContentTemplateSeeder` interface.
+
+17. **Customization Hub tab**: "Content Templates" tab shows all campaign templates with create/edit/delete for campaign-scoped templates. Built-in templates show read-only badge.
+
+### Previous Update
 2026-03-10 -- **Cleanup & consolidation pass after bug fixes.**
 
 7. **JSON injection fix**: HX-Trigger header in `CreateEntityType` error path used string concatenation to build JSON. Replaced with `json.Marshal()` to prevent malformed JSON from error messages containing special characters.

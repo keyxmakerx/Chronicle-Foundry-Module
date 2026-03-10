@@ -99,6 +99,7 @@ type Handler struct {
 	memberLister       MemberLister
 	groupLister        GroupLister
 	widgetBlockLister  WidgetBlockLister
+	contentTemplateSvc ContentTemplateService
 	blockRegistry      *BlockRegistry
 	cache              *redis.Client
 }
@@ -106,6 +107,12 @@ type Handler struct {
 // NewHandler creates a new entity handler.
 func NewHandler(service EntityService) *Handler {
 	return &Handler{service: service}
+}
+
+// SetContentTemplateService sets the content template service for applying
+// templates during entity creation.
+func (h *Handler) SetContentTemplateService(svc ContentTemplateService) {
+	h.contentTemplateSvc = svc
 }
 
 // SetAuditService sets the audit service for recording entity mutations.
@@ -377,6 +384,14 @@ func (h *Handler) Create(c echo.Context) error {
 			errMsg = appErr.Message
 		}
 		return middleware.Render(c, http.StatusOK, EntityNewPage(cc, entityTypes, req.EntityTypeID, nil, csrfToken, errMsg))
+	}
+
+	// Apply content template if one was selected.
+	if req.TemplateID > 0 && h.contentTemplateSvc != nil {
+		tmpl, tmplErr := h.contentTemplateSvc.GetByID(c.Request().Context(), req.TemplateID)
+		if tmplErr == nil && tmpl.ContentJSON != "" {
+			_ = h.service.UpdateEntry(c.Request().Context(), entity.ID, tmpl.ContentJSON, tmpl.ContentHTML)
+		}
 	}
 
 	h.logAudit(c, cc.Campaign.ID, audit.ActionEntityCreated, entity.ID, entity.Name)

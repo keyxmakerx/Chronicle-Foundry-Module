@@ -340,6 +340,7 @@ type CreateEntityRequest struct {
 	TypeLabel    string `json:"type_label" form:"type_label"`
 	ParentID     string `json:"parent_id" form:"parent_id"`
 	IsPrivate    bool   `json:"is_private" form:"is_private"`
+	TemplateID   int    `json:"template_id" form:"template_id"` // Optional content template to pre-fill.
 }
 
 // UpdateEntityRequest holds the data submitted by the entity edit form.
