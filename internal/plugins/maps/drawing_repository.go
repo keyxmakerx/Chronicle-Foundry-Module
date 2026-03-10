@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 
 	"github.com/keyxmakerx/chronicle/internal/apperror"
+	"github.com/keyxmakerx/chronicle/internal/permissions"
 )
 
 // DrawingRepository defines persistence for map drawings, tokens, layers, and fog.
@@ -129,7 +130,7 @@ func (r *drawingRepo) ListDrawings(ctx context.Context, mapID string, role int) 
 			stroke_width, fill_color, fill_alpha, text_content, font_size,
 			rotation, visibility, created_by, foundry_id, created_at, updated_at
 		FROM map_drawings WHERE map_id = ?`
-	if role < 3 { // Non-owners don't see dm_only drawings.
+	if !permissions.CanSeeDmOnly(role) { // Non-owners don't see dm_only drawings.
 		query += ` AND visibility != 'dm_only'`
 	}
 	query += ` ORDER BY created_at ASC`
@@ -290,7 +291,7 @@ func (r *drawingRepo) ListTokens(ctx context.Context, mapID string, role int) ([
 			vision_enabled, vision_range, elevation, sort_order,
 			status_effects, flags, foundry_id, created_by, created_at, updated_at
 		FROM map_tokens WHERE map_id = ?`
-	if role < 3 { // Non-owners don't see hidden tokens.
+	if !permissions.CanSeeDmOnly(role) { // Non-owners don't see hidden tokens.
 		query += ` AND is_hidden = FALSE`
 	}
 	query += ` ORDER BY sort_order ASC, created_at ASC`

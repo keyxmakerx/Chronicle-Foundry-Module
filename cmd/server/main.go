@@ -54,6 +54,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	// --- Run Plugin Migrations ---
+	// Each plugin runs its own schema migrations independently. Failures
+	// disable the plugin instead of crashing the app.
+	pluginHealth := database.NewPluginHealthRegistry()
+	pluginResults := database.RunPluginMigrations(db, database.RegisteredPlugins())
+	for _, r := range pluginResults {
+		pluginHealth.Register(r.Slug, r.Healthy, r.Error, r.Version)
+	}
+	if degraded := pluginHealth.DegradedPlugins(); len(degraded) > 0 {
+		slog.Warn("some plugins are degraded — features disabled",
+			slog.Any("plugins", degraded),
+		)
+	}
+
 	// --- Connect to Redis ---
 	rdb, err := database.NewRedis(cfg.Redis)
 	if err != nil {
@@ -71,7 +85,7 @@ func main() {
 	}
 
 	// --- Create Application ---
-	application := app.New(cfg, db, rdb)
+	application := app.New(cfg, db, rdb, pluginHealth)
 
 	// Register all routes (public, plugin, system, widget, API).
 	application.RegisterRoutes()

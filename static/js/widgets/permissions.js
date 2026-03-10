@@ -9,6 +9,9 @@
  *   data-endpoint  - Permissions API endpoint (GET/PUT), e.g. /campaigns/:id/entities/:eid/permissions
  *   data-editable  - "true" if user can modify permissions (Owner only)
  */
+// Role constants matching Go permissions.RoleOwner.
+var ROLE_OWNER = 3;
+
 Chronicle.register('permissions', {
   init: function (el, config) {
     var state = {
@@ -223,7 +226,7 @@ Chronicle.register('permissions', {
         });
 
         // User grants section.
-        var nonOwnerMembers = state.members.filter(function (m) { return m.role < 3; });
+        var nonOwnerMembers = state.members.filter(function (m) { return m.role < ROLE_OWNER; });
         if (nonOwnerMembers.length > 0) {
           var userHeader = document.createElement('div');
           userHeader.className = 'perm-section-header';
@@ -260,7 +263,7 @@ Chronicle.register('permissions', {
         }
 
         // Owner members (greyed out).
-        var owners = state.members.filter(function (m) { return m.role >= 3; });
+        var owners = state.members.filter(function (m) { return m.role >= ROLE_OWNER; });
         if (owners.length > 0) {
           owners.forEach(function (member) {
             var row = document.createElement('div');

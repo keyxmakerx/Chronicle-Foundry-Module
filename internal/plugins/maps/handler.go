@@ -79,8 +79,14 @@ func (h *Handler) Show(c echo.Context) error {
 		return err
 	}
 
-	role := int(cc.MemberRole)
-	markers, err := h.svc.ListMarkers(c.Request().Context(), mapID, role)
+	role := cc.VisibilityRole()
+	userID := ""
+	if session := c.Get("session"); session != nil {
+		if s, ok := session.(interface{ GetUserID() string }); ok {
+			userID = s.GetUserID()
+		}
+	}
+	markers, err := h.svc.ListMarkers(c.Request().Context(), mapID, role, userID)
 	if err != nil {
 		return err
 	}
@@ -230,14 +236,15 @@ func (h *Handler) CreateMarkerAPI(c echo.Context) error {
 	}
 
 	var req struct {
-		Name        string  `json:"name"`
-		Description *string `json:"description"`
-		X           float64 `json:"x"`
-		Y           float64 `json:"y"`
-		Icon        string  `json:"icon"`
-		Color       string  `json:"color"`
-		EntityID    *string `json:"entity_id"`
-		Visibility  string  `json:"visibility"`
+		Name            string  `json:"name"`
+		Description     *string `json:"description"`
+		X               float64 `json:"x"`
+		Y               float64 `json:"y"`
+		Icon            string  `json:"icon"`
+		Color           string  `json:"color"`
+		EntityID        *string `json:"entity_id"`
+		Visibility      string  `json:"visibility"`
+		VisibilityRules *string `json:"visibility_rules"`
 	}
 	if err := c.Bind(&req); err != nil {
 		return apperror.NewBadRequest("invalid request")
@@ -251,17 +258,29 @@ func (h *Handler) CreateMarkerAPI(c echo.Context) error {
 		}
 	}
 
+	// Only Owners can create dm_only markers; Scribes default to 'everyone'.
+	visibility := req.Visibility
+	if visibility == "dm_only" && cc.MemberRole < campaigns.RoleOwner && !cc.IsSiteAdmin {
+		visibility = "everyone"
+	}
+	// Only Owners can set per-player visibility rules.
+	var visRules *string
+	if cc.MemberRole >= campaigns.RoleOwner || cc.IsSiteAdmin {
+		visRules = req.VisibilityRules
+	}
+
 	mk, err := h.svc.CreateMarker(ctx, CreateMarkerInput{
-		MapID:       mapID,
-		Name:        req.Name,
-		Description: req.Description,
-		X:           req.X,
-		Y:           req.Y,
-		Icon:        req.Icon,
-		Color:       req.Color,
-		EntityID:    req.EntityID,
-		Visibility:  req.Visibility,
-		CreatedBy:   userID,
+		MapID:           mapID,
+		Name:            req.Name,
+		Description:     req.Description,
+		X:               req.X,
+		Y:               req.Y,
+		Icon:            req.Icon,
+		Color:           req.Color,
+		EntityID:        req.EntityID,
+		Visibility:      visibility,
+		VisibilityRules: visRules,
+		CreatedBy:       userID,
 	})
 	if err != nil {
 		return err
@@ -283,28 +302,41 @@ func (h *Handler) UpdateMarkerAPI(c echo.Context) error {
 	}
 
 	var req struct {
-		Name        string  `json:"name"`
-		Description *string `json:"description"`
-		X           float64 `json:"x"`
-		Y           float64 `json:"y"`
-		Icon        string  `json:"icon"`
-		Color       string  `json:"color"`
-		EntityID    *string `json:"entity_id"`
-		Visibility  string  `json:"visibility"`
+		Name            string  `json:"name"`
+		Description     *string `json:"description"`
+		X               float64 `json:"x"`
+		Y               float64 `json:"y"`
+		Icon            string  `json:"icon"`
+		Color           string  `json:"color"`
+		EntityID        *string `json:"entity_id"`
+		Visibility      string  `json:"visibility"`
+		VisibilityRules *string `json:"visibility_rules"`
 	}
 	if err := c.Bind(&req); err != nil {
 		return apperror.NewBadRequest("invalid request")
 	}
 
+	// Only Owners can set dm_only visibility; Scribes default to 'everyone'.
+	visibility := req.Visibility
+	if visibility == "dm_only" && cc.MemberRole < campaigns.RoleOwner && !cc.IsSiteAdmin {
+		visibility = "everyone"
+	}
+	// Only Owners can set per-player visibility rules.
+	var visRules *string
+	if cc.MemberRole >= campaigns.RoleOwner || cc.IsSiteAdmin {
+		visRules = req.VisibilityRules
+	}
+
 	return h.svc.UpdateMarker(ctx, markerID, UpdateMarkerInput{
-		Name:        req.Name,
-		Description: req.Description,
-		X:           req.X,
-		Y:           req.Y,
-		Icon:        req.Icon,
-		Color:       req.Color,
-		EntityID:    req.EntityID,
-		Visibility:  req.Visibility,
+		Name:            req.Name,
+		Description:     req.Description,
+		X:               req.X,
+		Y:               req.Y,
+		Icon:            req.Icon,
+		Color:           req.Color,
+		EntityID:        req.EntityID,
+		Visibility:      visibility,
+		VisibilityRules: visRules,
 	})
 }
 

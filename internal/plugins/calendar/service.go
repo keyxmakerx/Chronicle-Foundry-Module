@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/keyxmakerx/chronicle/internal/apperror"
+	"github.com/keyxmakerx/chronicle/internal/permissions"
 	"github.com/keyxmakerx/chronicle/internal/sanitize"
 )
 
@@ -997,9 +998,9 @@ func (s *calendarService) ListAllEvents(ctx context.Context, calendarID string) 
 // --- Visibility Helpers ---
 
 // filterEventsByUser applies per-user visibility rules to a slice of events.
-// Owners (role >= 3) always see everything and are not filtered.
+// Owners always see everything and are not filtered.
 func filterEventsByUser(events []Event, role int, userID string) []Event {
-	if role >= 3 || userID == "" {
+	if permissions.CanSeeDmOnly(role) || userID == "" {
 		return events
 	}
 	filtered := events[:0]
@@ -1012,11 +1013,11 @@ func filterEventsByUser(events []Event, role int, userID string) []Event {
 }
 
 // canUserView checks whether a user can see an event based on its base visibility
-// and per-user JSON rules. Owners (role >= 3) always see everything and should
-// be checked before calling this function.
+// and per-user JSON rules. Owners always see everything and should be checked
+// before calling this function.
 func canUserView(baseVisibility string, visRulesJSON *string, role int, userID string) bool {
 	// Base visibility: dm_only requires Owner role.
-	if baseVisibility == "dm_only" && role < 3 {
+	if baseVisibility == "dm_only" && !permissions.CanSeeDmOnly(role) {
 		return false
 	}
 

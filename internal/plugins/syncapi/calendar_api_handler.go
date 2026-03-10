@@ -10,6 +10,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/keyxmakerx/chronicle/internal/apperror"
+	"github.com/keyxmakerx/chronicle/internal/permissions"
 	"github.com/keyxmakerx/chronicle/internal/plugins/calendar"
 )
 
@@ -157,9 +158,9 @@ func (h *CalendarAPIHandler) GetEvent(c echo.Context) error {
 		return apperror.NewNotFound("event not found")
 	}
 
-	// Visibility check: dm_only events require owner-level role.
+	// Visibility check: dm_only events require Owner role.
 	role := h.resolveRole(c)
-	if evt.Visibility == "dm_only" && role < 3 {
+	if evt.Visibility == "dm_only" && !permissions.CanSeeDmOnly(role) {
 		return apperror.NewNotFound("event not found")
 	}
 

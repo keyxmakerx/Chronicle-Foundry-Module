@@ -8,8 +8,17 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-09 -- Multi-calendar Sprint 2 complete. Full route restructuring from `/calendar` to `/calendars/:calId`. Handler rewrite: all handlers extract calId param, IDOR protection via requireCalendarInCampaign, new Index handler (list/redirect/setup), EmbedCalendar/UpcomingEvents/CreateEvent support fallback to default calendar for dashboard blocks. New calendar_list.templ with card grid. All templ/JS URL references updated across calendar, campaigns, entities, timeline plugins. Sync API: added ListCalendars endpoint, kept old `/calendar` routes for Foundry backward compat. calendarListerAdapter now uses ListCalendars. Tests fixed for multi-calendar (removed single-calendar constraint test, updated mocks).
-Branch: `claude/fix-journal-button-placement-UF4hD`. Next: Sprint 3 — calendar list UI polish, calendar switcher in views, Sprint 4 — sessions calendar FK integration.
+2026-03-10 -- **Per-player visibility + Co-DM grants (Phase 2 complete).** Implemented per-player content sharing across all content types:
+
+1. **Maps**: Added `visibility_rules` JSON column to `map_markers` and `map_drawings` (migration 002). Updated repository to filter with `JSON_CONTAINS` for non-owners. Updated `ListMarkers` signature to include `userID` for per-player filtering.
+
+2. **Notes**: Added `shared_with` JSON column to notes (migration 000002). Three sharing modes: Private, Everyone, Specific Players. Full UI with member picker popover in `notes.js`. New `/notes/members` endpoint for fetching campaign members.
+
+3. **Co-DM Grants**: Added `DmGrantIDs []string` to `CampaignSettings` and `IsDmGranted bool` to `CampaignContext`. Middleware resolves grants on every request. `CanSeeDmOnly(role, ...dmGranted)` accepts optional variadic bool. New `VisibilityRole()` method on CampaignContext returns Owner-level for dm-granted users (view-only, not create). All handlers updated to use `cc.VisibilityRole()` for visibility filtering. `PUT/GET /campaigns/:id/dm-grants` endpoints. Settings page has Alpine.js member picker for granting DM privileges. DM-granted users can see dm_only content but cannot create/toggle dm_only flags.
+
+4. **Timeline/Calendar UI**: Visibility dropdowns already had "Specific Players" option with visibility_rules backend — confirmed working.
+
+Branch: `claude/fix-journal-button-placement-UF4hD`.
 
 ## Phase & Sprint Plan
 See `.ai/phases.md` for the full roadmap. Phases organized by priority:

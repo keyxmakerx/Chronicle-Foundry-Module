@@ -13,6 +13,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/keyxmakerx/chronicle/internal/middleware"
+	"github.com/keyxmakerx/chronicle/internal/permissions"
 	"github.com/keyxmakerx/chronicle/internal/systems"
 	"github.com/keyxmakerx/chronicle/internal/extensions"
 	"github.com/keyxmakerx/chronicle/internal/plugins/addons"
@@ -274,7 +275,7 @@ func (a *calendarEventListerAdapter) ListEventsForCalendar(ctx context.Context, 
 	refs := make([]timeline.CalendarEventRef, 0, len(events))
 	for _, ev := range events {
 		// Apply role-based visibility filter (dm_only = Owner only).
-		if role < 3 && ev.Visibility == "dm_only" {
+		if !permissions.CanSeeDmOnly(role) && ev.Visibility == "dm_only" {
 			continue
 		}
 		refs = append(refs, timeline.CalendarEventRef{
@@ -367,6 +368,7 @@ type calendarEventPublisherAdapter struct {
 	bus ws.EventBus
 }
 
+// PublishCalendarEvent translates calendar domain events into WebSocket messages.
 func (a *calendarEventPublisherAdapter) PublishCalendarEvent(eventType, campaignID, resourceID string, payload any) {
 	if campaignID == "" {
 		return
@@ -393,6 +395,7 @@ type entityEventPublisherAdapter struct {
 	bus ws.EventBus
 }
 
+// PublishEntityEvent translates entity domain events into WebSocket messages.
 func (a *entityEventPublisherAdapter) PublishEntityEvent(eventType, campaignID, entityID string, entity *entities.Entity) {
 	if campaignID == "" {
 		return
@@ -417,6 +420,7 @@ type mapEventPublisherAdapter struct {
 	bus ws.EventBus
 }
 
+// PublishDrawingEvent translates map drawing domain events into WebSocket messages.
 func (a *mapEventPublisherAdapter) PublishDrawingEvent(eventType string, campaignID string, drawing *maps.Drawing) {
 	if campaignID == "" {
 		return
@@ -435,6 +439,7 @@ func (a *mapEventPublisherAdapter) PublishDrawingEvent(eventType string, campaig
 	a.bus.Publish(ws.NewMessage(msgType, campaignID, drawing.ID, drawing))
 }
 
+// PublishTokenEvent translates map token domain events into WebSocket messages.
 func (a *mapEventPublisherAdapter) PublishTokenEvent(eventType string, campaignID string, token *maps.Token) {
 	if campaignID == "" {
 		return
@@ -453,6 +458,7 @@ func (a *mapEventPublisherAdapter) PublishTokenEvent(eventType string, campaignI
 	a.bus.Publish(ws.NewMessage(msgType, campaignID, token.ID, token))
 }
 
+// PublishTokenPositionEvent broadcasts a token position update via WebSocket.
 func (a *mapEventPublisherAdapter) PublishTokenPositionEvent(campaignID, tokenID string, x, y float64) {
 	if campaignID == "" {
 		return
@@ -463,6 +469,7 @@ func (a *mapEventPublisherAdapter) PublishTokenPositionEvent(campaignID, tokenID
 	}))
 }
 
+// PublishLayerEvent broadcasts a map layer update via WebSocket.
 func (a *mapEventPublisherAdapter) PublishLayerEvent(eventType string, campaignID string, layer *maps.Layer) {
 	if campaignID == "" {
 		return
@@ -470,6 +477,7 @@ func (a *mapEventPublisherAdapter) PublishLayerEvent(eventType string, campaignI
 	a.bus.Publish(ws.NewMessage(ws.MsgLayerUpdated, campaignID, layer.ID, layer))
 }
 
+// PublishFogEvent broadcasts a fog-of-war update via WebSocket.
 func (a *mapEventPublisherAdapter) PublishFogEvent(eventType string, campaignID, mapID string, region *maps.FogRegion) {
 	if campaignID == "" {
 		return
@@ -798,48 +806,67 @@ func (a *App) RegisterRoutes() {
 	syncRepo := syncapi.NewSyncAPIRepository(a.DB)
 	syncService := syncapi.NewSyncAPIService(syncRepo)
 	syncHandler := syncapi.NewHandler(syncService)
-	syncapi.RegisterAdminRoutes(adminGroup, syncHandler)
-	syncapi.RegisterCampaignRoutes(e, syncHandler, campaignService, authService)
+	if a.PluginHealth.IsHealthy("syncapi") {
+		syncapi.RegisterAdminRoutes(adminGroup, syncHandler)
+		syncapi.RegisterCampaignRoutes(e, syncHandler, campaignService, authService)
+	} else {
+		slog.Warn("syncapi plugin degraded — routes not registered")
+	}
 
 	// Calendar plugin: custom fantasy calendar with months, moons, events.
 	// Created early so the sync API can reference calendarService.
+	// Service is always created (other plugins reference it), but routes
+	// are only registered if the calendar schema is healthy.
 	calendarRepo := calendar.NewCalendarRepository(a.DB)
 	calendarService := calendar.NewCalendarService(calendarRepo)
 	calendarHandler := calendar.NewHandler(calendarService)
 	calendarHandler.SetAddonService(addonService)
-	calendar.RegisterRoutes(e, calendarHandler, campaignService, authService, addonService)
+	if a.PluginHealth.IsHealthy("calendar") {
+		calendar.RegisterRoutes(e, calendarHandler, campaignService, authService, addonService)
+	} else {
+		slog.Warn("calendar plugin degraded — routes not registered")
+	}
 
 	// Maps plugin: interactive maps with Leaflet.js, pin markers, entity linking.
+	// Services created unconditionally (sync API references drawingService).
 	mapsRepo := maps.NewMapRepository(a.DB)
 	mapsService := maps.NewMapService(mapsRepo)
 	mapsHandler := maps.NewHandler(mapsService)
-	maps.RegisterRoutes(e, mapsHandler, campaignService, authService, addonService)
-
-	// Map expansion: drawings, tokens, layers, fog of war for real-time map sync.
 	drawingRepo := maps.NewDrawingRepository(a.DB)
 	drawingService := maps.NewDrawingService(drawingRepo)
-	drawingHandler := maps.NewDrawingHandler(mapsService, drawingService)
-	maps.RegisterDrawingRoutes(e, drawingHandler, campaignService, authService, addonService)
+	if a.PluginHealth.IsHealthy("maps") {
+		maps.RegisterRoutes(e, mapsHandler, campaignService, authService, addonService)
+		drawingHandler := maps.NewDrawingHandler(mapsService, drawingService)
+		maps.RegisterDrawingRoutes(e, drawingHandler, campaignService, authService, addonService)
+	} else {
+		slog.Warn("maps plugin degraded — routes not registered")
+	}
 
 	// Sessions plugin: game session scheduling, linked entities, RSVP tracking.
 	// Entity campaign checker prevents cross-campaign entity linking (IDOR).
-	// Sessions require the calendar addon (integrated into calendar UI).
 	sessionsRepo := sessions.NewSessionRepository(a.DB)
 	sessionsService := sessions.NewSessionService(sessionsRepo, &entityCampaignCheckerAdapter{svc: entityService})
 	sessionsHandler := sessions.NewHandler(sessionsService)
 	sessionsHandler.SetMemberLister(campaignService)
 	sessionsHandler.SetMailSender(smtpService, a.Config.BaseURL)
-	sessions.RegisterRoutes(e, sessionsHandler, campaignService, authService, addonService)
-
-	// Wire sessions into calendar for grid display (real-life mode).
-	calendarHandler.SetSessionLister(&sessionListerAdapter{svc: sessionsService})
+	if a.PluginHealth.IsHealthy("sessions") {
+		sessions.RegisterRoutes(e, sessionsHandler, campaignService, authService, addonService)
+		// Wire sessions into calendar for grid display (real-life mode).
+		calendarHandler.SetSessionLister(&sessionListerAdapter{svc: sessionsService})
+	} else {
+		slog.Warn("sessions plugin degraded — routes not registered")
+	}
 
 	// Timeline plugin: interactive visual timelines with zoom levels and entity grouping.
 	timelineRepo := timeline.NewTimelineRepository(a.DB)
 	timelineSvc := timeline.NewTimelineService(timelineRepo, &calendarListerAdapter{svc: calendarService}, &calendarEventListerAdapter{svc: calendarService}, &calendarEraListerAdapter{svc: calendarService})
 	timelineHandler := timeline.NewHandler(timelineSvc)
 	timelineHandler.SetMemberLister(campaignService)
-	timeline.RegisterRoutes(e, timelineHandler, campaignService, authService, addonService)
+	if a.PluginHealth.IsHealthy("timeline") {
+		timeline.RegisterRoutes(e, timelineHandler, campaignService, authService, addonService)
+	} else {
+		slog.Warn("timeline plugin degraded — routes not registered")
+	}
 
 	// Relations widget: bi-directional entity linking. Created before REST API
 	// so it can be injected into the API handler for shop inventory support.
@@ -870,7 +897,9 @@ func (a *App) RegisterRoutes() {
 	_ = syncMappingSvc // Service will also be used by map/entity handlers.
 	mapAPIHandler := syncapi.NewMapAPIHandler(syncService, mapsService, drawingService, campaignService)
 
-	syncapi.RegisterAPIRoutes(e, syncAPIHandler, calendarAPIHandler, mediaAPIHandler, mapAPIHandler, syncMappingHandler, syncService, addonService)
+	if a.PluginHealth.IsHealthy("syncapi") {
+		syncapi.RegisterAPIRoutes(e, syncAPIHandler, calendarAPIHandler, mediaAPIHandler, mapAPIHandler, syncMappingHandler, syncService, addonService)
+	}
 
 	// Tags widget: campaign-scoped entity tagging (CRUD + entity associations).
 	tagRepo := tags.NewTagRepository(a.DB)
@@ -882,6 +911,7 @@ func (a *App) RegisterRoutes() {
 	noteRepo := notes.NewNoteRepository(a.DB)
 	noteService := notes.NewNoteService(noteRepo)
 	noteHandler := notes.NewHandler(noteService)
+	noteHandler.SetMemberLister(campaignService)
 	notes.RegisterRoutes(e, noteHandler, campaignService, authService)
 
 	// Relations widget routes already registered above (before REST API v1).

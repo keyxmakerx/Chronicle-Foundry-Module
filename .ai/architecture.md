@@ -180,7 +180,7 @@ chronicle/
 │           └── error.templ
 │
 ├── db/
-│   ├── migrations/                   # Sequential SQL migration files
+│   ├── migrations/                   # Core schema baseline (fatal on failure)
 │   └── queries/                      # Raw SQL query files (reference)
 │
 ├── static/

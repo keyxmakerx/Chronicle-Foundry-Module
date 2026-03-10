@@ -133,7 +133,7 @@ func (h *Handler) Show(c echo.Context) error {
 		}
 	}
 
-	role := int(cc.MemberRole)
+	role := cc.VisibilityRole()
 	userID := auth.GetUserID(c)
 	events, err := h.svc.ListEventsForMonth(ctx, cal.ID, year, month, role, userID)
 	if err != nil {
@@ -214,7 +214,7 @@ func (h *Handler) EmbedCalendar(c echo.Context) error {
 		}
 	}
 
-	role := int(cc.MemberRole)
+	role := cc.VisibilityRole()
 	userID := auth.GetUserID(c)
 	events, err := h.svc.ListEventsForMonth(ctx, cal.ID, year, month, role, userID)
 	if err != nil {
@@ -319,7 +319,7 @@ func (h *Handler) ShowWeek(c echo.Context) error {
 		monthDays = cal.MonthDays(endMonth-1, endYear)
 	}
 
-	role := int(cc.MemberRole)
+	role := cc.VisibilityRole()
 	userID := auth.GetUserID(c)
 
 	// Fetch events for the date range. If range crosses months, fetch both.
@@ -411,7 +411,7 @@ func (h *Handler) ShowDay(c echo.Context) error {
 		day = maxDays
 	}
 
-	role := int(cc.MemberRole)
+	role := cc.VisibilityRole()
 	userID := auth.GetUserID(c)
 	events, err := h.svc.ListEventsForDateRange(ctx, cal.ID, year, month, day, month, day, role, userID)
 	if err != nil {
@@ -701,6 +701,12 @@ func (h *Handler) CreateEventAPI(c echo.Context) error {
 		}
 	}
 
+	// Only Owners can create dm_only events; Scribes default to 'everyone'.
+	visibility := req.Visibility
+	if visibility == "dm_only" && cc.MemberRole < campaigns.RoleOwner && !cc.IsSiteAdmin {
+		visibility = "everyone"
+	}
+
 	evt, err := h.svc.CreateEvent(ctx, cal.ID, CreateEventInput{
 		Name:            req.Name,
 		Description:     req.Description,
@@ -718,7 +724,7 @@ func (h *Handler) CreateEventAPI(c echo.Context) error {
 		EndMinute:       req.EndMinute,
 		IsRecurring:     req.IsRecurring,
 		RecurrenceType:  req.RecurrenceType,
-		Visibility:      req.Visibility,
+		Visibility:      visibility,
 		VisibilityRules: req.VisibilityRules,
 		Category:        req.Category,
 		CreatedBy:       userID,
@@ -783,6 +789,12 @@ func (h *Handler) UpdateEventAPI(c echo.Context) error {
 		return apperror.NewBadRequest("invalid request")
 	}
 
+	// Only Owners can set dm_only visibility; Scribes default to 'everyone'.
+	visibility := req.Visibility
+	if visibility == "dm_only" && cc.MemberRole < campaigns.RoleOwner && !cc.IsSiteAdmin {
+		visibility = "everyone"
+	}
+
 	return h.svc.UpdateEvent(ctx, eventID, UpdateEventInput{
 		Name:            req.Name,
 		Description:     req.Description,
@@ -800,7 +812,7 @@ func (h *Handler) UpdateEventAPI(c echo.Context) error {
 		EndMinute:       req.EndMinute,
 		IsRecurring:     req.IsRecurring,
 		RecurrenceType:  req.RecurrenceType,
-		Visibility:      req.Visibility,
+		Visibility:      visibility,
 		VisibilityRules: req.VisibilityRules,
 		Category:        req.Category,
 	})
@@ -1041,7 +1053,7 @@ func (h *Handler) EntityEventsFragment(c echo.Context) error {
 		return c.NoContent(http.StatusOK)
 	}
 
-	role := int(cc.MemberRole)
+	role := cc.VisibilityRole()
 	userID := auth.GetUserID(c)
 	events, err := h.svc.ListEventsForEntity(ctx, entityID, role, userID)
 	if err != nil {
@@ -1087,7 +1099,7 @@ func (h *Handler) UpcomingEventsFragment(c echo.Context) error {
 		}
 	}
 
-	role := int(cc.MemberRole)
+	role := cc.VisibilityRole()
 	userID := auth.GetUserID(c)
 	events, err := h.svc.ListUpcomingEvents(ctx, cal.ID, limit, role, userID)
 	if err != nil {
@@ -1117,7 +1129,7 @@ func (h *Handler) ShowTimeline(c echo.Context) error {
 		}
 	}
 
-	role := int(cc.MemberRole)
+	role := cc.VisibilityRole()
 	userID := auth.GetUserID(c)
 	events, err := h.svc.ListEventsForYear(ctx, cal.ID, year, role, userID)
 	if err != nil {

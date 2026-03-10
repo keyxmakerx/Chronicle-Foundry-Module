@@ -25,7 +25,7 @@ func NewHandler(service AuditService) *Handler {
 
 // Activity renders the campaign activity page showing audit stats and a
 // timeline of recent actions (GET /campaigns/:id/activity). Restricted to
-// campaign owners (role >= 3) via route middleware.
+// campaign owners (RoleOwner) via route middleware.
 func (h *Handler) Activity(c echo.Context) error {
 	cc := campaigns.GetCampaignContext(c)
 	if cc == nil {

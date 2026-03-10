@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/keyxmakerx/chronicle/internal/apperror"
+	"github.com/keyxmakerx/chronicle/internal/permissions"
 )
 
 // TimelineRepository defines persistence operations for timelines and related data.
@@ -106,10 +107,10 @@ func (r *timelineRepo) GetByID(ctx context.Context, id string) (*Timeline, error
 }
 
 // List returns all timelines for a campaign, filtered by role-based visibility.
-// role >= 3 (Owner) sees dm_only timelines; others see only 'everyone'.
+// Owners see dm_only timelines; others see only 'everyone'.
 func (r *timelineRepo) List(ctx context.Context, campaignID string, role int) ([]Timeline, error) {
 	visFilter := "AND t.visibility = 'everyone'"
-	if role >= 3 {
+	if permissions.CanSeeDmOnly(role) {
 		visFilter = ""
 	}
 
@@ -169,7 +170,7 @@ func (r *timelineRepo) Delete(ctx context.Context, id string) error {
 // Search returns timelines matching a name query, filtered by role-based visibility.
 func (r *timelineRepo) Search(ctx context.Context, campaignID, query string, role int) ([]Timeline, error) {
 	visFilter := "AND t.visibility = 'everyone'"
-	if role >= 3 {
+	if permissions.CanSeeDmOnly(role) {
 		visFilter = ""
 	}
 
@@ -268,7 +269,7 @@ func (r *timelineRepo) UnlinkEvent(ctx context.Context, timelineID, eventID stri
 // Filtered by role-based visibility on the underlying calendar event.
 func (r *timelineRepo) ListEventLinks(ctx context.Context, timelineID string, role int) ([]EventLink, error) {
 	visFilter := "AND ce.visibility = 'everyone'"
-	if role >= 3 {
+	if permissions.CanSeeDmOnly(role) {
 		visFilter = ""
 	}
 
@@ -408,7 +409,7 @@ func (r *timelineRepo) DeleteEvent(ctx context.Context, eventID string) error {
 // ListStandaloneEvents returns all standalone events for a timeline, filtered by role.
 func (r *timelineRepo) ListStandaloneEvents(ctx context.Context, timelineID string, role int) ([]TimelineEvent, error) {
 	visFilter := "AND te.visibility = 'everyone'"
-	if role >= 3 {
+	if permissions.CanSeeDmOnly(role) {
 		visFilter = ""
 	}
 

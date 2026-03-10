@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
+	"github.com/keyxmakerx/chronicle/internal/permissions"
 )
 
 // CalendarRepository defines persistence operations for calendars and events.
@@ -529,9 +531,9 @@ func (r *calendarRepo) DeleteEvent(ctx context.Context, id string) error {
 // ListEventsForMonth returns all events for a specific month, filtered by role.
 // Recurring events that match the month (any year) are included.
 func (r *calendarRepo) ListEventsForMonth(ctx context.Context, calendarID string, year, month int, role int) ([]Event, error) {
-	// role >= 3 (Owner) sees dm_only events; others see only 'everyone'.
+	// Owners see all events including dm_only; others see only 'everyone'.
 	visFilter := "AND e.visibility = 'everyone'"
-	if role >= 3 {
+	if permissions.CanSeeDmOnly(role) {
 		visFilter = ""
 	}
 
@@ -556,7 +558,7 @@ func (r *calendarRepo) ListEventsForMonth(ctx context.Context, calendarID string
 // ListEventsForYear returns all events for a specific year, filtered by role.
 func (r *calendarRepo) ListEventsForYear(ctx context.Context, calendarID string, year int, role int) ([]Event, error) {
 	visFilter := "AND e.visibility = 'everyone'"
-	if role >= 3 {
+	if permissions.CanSeeDmOnly(role) {
 		visFilter = ""
 	}
 
@@ -582,7 +584,7 @@ func (r *calendarRepo) ListEventsForYear(ctx context.Context, calendarID string,
 // Also includes yearly recurring events that fall in the range.
 func (r *calendarRepo) ListEventsForDateRange(ctx context.Context, calendarID string, year, startMonth, startDay, endMonth, endDay int, role int) ([]Event, error) {
 	visFilter := "AND e.visibility = 'everyone'"
-	if role >= 3 {
+	if permissions.CanSeeDmOnly(role) {
 		visFilter = ""
 	}
 
@@ -614,7 +616,7 @@ func (r *calendarRepo) ListEventsForDateRange(ctx context.Context, calendarID st
 // Used for the reverse entity-event lookup on entity pages.
 func (r *calendarRepo) ListEventsForEntity(ctx context.Context, entityID string, role int) ([]Event, error) {
 	visFilter := "AND e.visibility = 'everyone'"
-	if role >= 3 {
+	if permissions.CanSeeDmOnly(role) {
 		visFilter = ""
 	}
 
@@ -638,7 +640,7 @@ func (r *calendarRepo) ListEventsForEntity(ctx context.Context, entityID string,
 // chronologically. Includes recurring yearly events for upcoming months.
 func (r *calendarRepo) ListUpcomingEvents(ctx context.Context, calendarID string, year, month, day int, role int, limit int) ([]Event, error) {
 	visFilter := "AND e.visibility = 'everyone'"
-	if role >= 3 {
+	if permissions.CanSeeDmOnly(role) {
 		visFilter = ""
 	}
 
@@ -709,7 +711,7 @@ func (r *calendarRepo) UpdateEventVisibility(ctx context.Context, eventID string
 // SearchEvents returns events matching a name query, filtered by role-based visibility.
 func (r *calendarRepo) SearchEvents(ctx context.Context, calendarID, query string, role int) ([]Event, error) {
 	visFilter := "AND e.visibility = 'everyone'"
-	if role >= 3 {
+	if permissions.CanSeeDmOnly(role) {
 		visFilter = ""
 	}
 
