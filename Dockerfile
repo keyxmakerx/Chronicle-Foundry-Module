@@ -46,8 +46,10 @@ FROM alpine:3.20
 # dropping privileges in the entrypoint.
 RUN apk add --no-cache ca-certificates tzdata su-exec
 
-# Create non-root user for runtime security.
-RUN adduser -D -H -s /sbin/nologin chronicle
+# Create non-root user with a fixed UID/GID for predictable bind-mount
+# ownership. Host dirs must be owned by this UID for non-root operation.
+RUN addgroup -g 1000 chronicle \
+    && adduser -D -H -s /sbin/nologin -G chronicle -u 1000 chronicle
 
 # Copy the compiled binary.
 COPY --from=builder /chronicle /usr/local/bin/chronicle
@@ -58,7 +60,7 @@ COPY --from=builder /src/static /app/static
 # Copy database migrations for auto-migration on startup.
 COPY --from=builder /src/db/migrations /app/db/migrations
 
-# Create persistent data directory owned by the non-root user.
+# Create persistent data directory owned by the chronicle user.
 # Media uploads go under /app/data/media (matches MEDIA_PATH default "./data/media").
 # Mount a volume at /app/data to persist media across container rebuilds.
 RUN mkdir -p /app/data/media && chown -R chronicle:chronicle /app/data
