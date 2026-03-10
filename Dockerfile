@@ -46,12 +46,7 @@ FROM alpine:3.20
 RUN apk add --no-cache ca-certificates tzdata
 
 # Create non-root user for runtime security.
-# PUID/PGID let you match the host directory owner when using bind mounts.
-# Build with: docker build --build-arg PUID=$(id -u) --build-arg PGID=$(id -g) .
-ARG PUID=1000
-ARG PGID=1000
-RUN addgroup -g "$PGID" chronicle \
-    && adduser -D -H -s /sbin/nologin -G chronicle -u "$PUID" chronicle
+RUN adduser -D -H -s /sbin/nologin chronicle
 
 # Copy the compiled binary.
 COPY --from=builder /chronicle /usr/local/bin/chronicle

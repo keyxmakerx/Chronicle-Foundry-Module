@@ -19,12 +19,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        # Match container UID/GID to the host user that owns the bind-mount
-        # directory. Override in .env or shell: PUID=$(id -u) PGID=$(id -g)
-        PUID: ${PUID:-1000}
-        PGID: ${PGID:-1000}
     container_name: chronicle
+    # Match the host directory owner for bind-mount permissions.
+    # Set PUID/PGID as environment variables (default: 1000).
+    user: "${PUID:-1000}:${PGID:-1000}"
     ports:
       - "8080:8080"
     restart: unless-stopped
