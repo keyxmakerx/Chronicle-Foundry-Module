@@ -82,7 +82,7 @@ Chronicle includes a Foundry VTT module for bidirectional sync between your Chro
 
 **Install in Foundry VTT:**
 ```
-https://github.com/keyxmakerx/Chronicle/releases/latest/download/module.json
+https://raw.githubusercontent.com/keyxmakerx/Chronicle/main/foundry-module/module.json
 ```
 
 Supports [Calendaria](https://foundryvtt.com/packages/calendaria) and [Simple Calendar](https://foundryvtt.com/packages/foundryvtt-simple-calendar) for calendar sync.
