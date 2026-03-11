@@ -153,11 +153,13 @@ func (a *addonListerAdapter) ListForPluginHub(ctx context.Context, campaignID st
 	result := make([]campaigns.PluginHubAddon, len(addonList))
 	for i, ca := range addonList {
 		result[i] = campaigns.PluginHubAddon{
-			Slug:     ca.AddonSlug,
-			Name:     ca.AddonName,
-			Icon:     ca.AddonIcon,
-			Category: string(ca.AddonCategory),
-			Enabled:  ca.Enabled,
+			AddonID:   ca.AddonID,
+			Slug:      ca.AddonSlug,
+			Name:      ca.AddonName,
+			Icon:      ca.AddonIcon,
+			Category:  string(ca.AddonCategory),
+			Enabled:   ca.Enabled,
+			Installed: ca.Installed,
 		}
 	}
 	return result, nil
@@ -604,6 +606,64 @@ func (a *widgetBlockListerAdapter) GetWidgetBlockMetas(ctx context.Context, camp
 	return metas
 }
 
+// mentionLinkAdapter wraps entities.EntityService to implement the
+// relations.MentionLinkProvider interface, supplying @mention link data
+// for the graph visualization without creating a circular import.
+type mentionLinkAdapter struct {
+	svc entities.EntityService
+}
+
+// GetMentionLinksForGraph returns @mention references across a campaign for
+// the relations graph. Converts between entity and relations package types.
+func (a *mentionLinkAdapter) GetMentionLinksForGraph(ctx context.Context, campaignID string, includeDmOnly bool, userID string) ([]relations.MentionLinkData, error) {
+	// Determine role for visibility filtering: DM sees everything, others
+	// see only entities they have access to.
+	role := permissions.RolePlayer
+	if includeDmOnly {
+		role = permissions.RoleOwner
+	}
+
+	links, err := a.svc.GetMentionLinks(ctx, campaignID, role, userID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]relations.MentionLinkData, len(links))
+	for i, l := range links {
+		result[i] = relations.MentionLinkData{
+			SourceEntityID: l.SourceEntityID,
+			TargetEntityID: l.TargetEntityID,
+		}
+	}
+	return result, nil
+}
+
+// entityTypeListerForGraphAdapter wraps entities.EntityService to implement the
+// relations.EntityTypeListerForGraph interface for the graph filter dropdown.
+type entityTypeListerForGraphAdapter struct {
+	svc entities.EntityService
+}
+
+// ListEntityTypesForGraph returns entity types as lightweight summaries.
+func (a *entityTypeListerForGraphAdapter) ListEntityTypesForGraph(ctx context.Context, campaignID string) ([]relations.EntityTypeSummary, error) {
+	etypes, err := a.svc.GetEntityTypes(ctx, campaignID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]relations.EntityTypeSummary, 0, len(etypes))
+	for _, et := range etypes {
+		if !et.Enabled {
+			continue
+		}
+		result = append(result, relations.EntityTypeSummary{
+			Slug:  et.Slug,
+			Name:  et.Name,
+			Color: et.Color,
+			Icon:  et.Icon,
+		})
+	}
+	return result, nil
+}
+
 // RegisterRoutes sets up all application routes. It registers public routes
 // directly and delegates to each plugin's route registration function.
 //
@@ -702,6 +762,14 @@ func (a *App) RegisterRoutes() {
 	// Entity routes (campaign-scoped, registered after campaign service exists).
 	entityHandler := entities.NewHandler(entityService)
 	entities.RegisterRoutes(e, entityHandler, campaignService, authService)
+
+	// Content template routes (entity content blueprints).
+	contentTemplateRepo := entities.NewContentTemplateRepository(a.DB)
+	contentTemplateService := entities.NewContentTemplateService(contentTemplateRepo, entityTypeRepo)
+	contentTemplateHandler := entities.NewContentTemplateHandler(contentTemplateService)
+	entities.RegisterContentTemplateRoutes(e, contentTemplateHandler, campaignService, authService)
+	campaignService.SetContentTemplateSeeder(contentTemplateService)
+	entityHandler.SetContentTemplateService(contentTemplateService)
 
 	// Media plugin: file upload, storage, thumbnailing, serving.
 	// Graceful degradation: if the media directory can't be created, log a warning
@@ -872,7 +940,9 @@ func (a *App) RegisterRoutes() {
 	// so it can be injected into the API handler for shop inventory support.
 	relRepo := relations.NewRelationRepository(a.DB)
 	relService := relations.NewRelationService(relRepo)
+	relService.SetMentionLinkProvider(&mentionLinkAdapter{svc: entityService})
 	relHandler := relations.NewHandler(relService)
+	relHandler.SetEntityTypeLister(&entityTypeListerForGraphAdapter{svc: entityService})
 	relations.RegisterRoutes(e, relHandler, campaignService, authService)
 
 	// Posts widget: entity sub-notes with rich text, visibility, and reorder.
@@ -1228,9 +1298,26 @@ func (a *App) RegisterRoutes() {
 			ctx = layouts.SetCampaignID(ctx, cc.Campaign.ID)
 			ctx = layouts.SetCampaignName(ctx, cc.Campaign.Name)
 
-			// Accent color from campaign settings.
-			if accentColor := cc.Campaign.ParseSettings().AccentColor; accentColor != "" {
-				ctx = layouts.SetAccentColor(ctx, accentColor)
+			// Campaign visual customization from settings.
+			campaignSettings := cc.Campaign.ParseSettings()
+			if campaignSettings.AccentColor != "" {
+				ctx = layouts.SetAccentColor(ctx, campaignSettings.AccentColor)
+			}
+			if campaignSettings.BrandName != "" {
+				ctx = layouts.SetBrandName(ctx, campaignSettings.BrandName)
+			}
+			if campaignSettings.BrandLogo != "" {
+				ctx = layouts.SetBrandLogo(ctx, campaignSettings.BrandLogo)
+			}
+			if campaignSettings.TopbarStyle != nil {
+				ctx = layouts.SetTopbarStyle(ctx, &layouts.TopbarStyleData{
+					Mode:         campaignSettings.TopbarStyle.Mode,
+					Color:        campaignSettings.TopbarStyle.Color,
+					GradientFrom: campaignSettings.TopbarStyle.GradientFrom,
+					GradientTo:   campaignSettings.TopbarStyle.GradientTo,
+					GradientDir:  campaignSettings.TopbarStyle.GradientDir,
+					ImagePath:    campaignSettings.TopbarStyle.ImagePath,
+				})
 			}
 
 			// "View as player" override: when an owner has the toggle active,

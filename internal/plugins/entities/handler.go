@@ -99,6 +99,7 @@ type Handler struct {
 	memberLister       MemberLister
 	groupLister        GroupLister
 	widgetBlockLister  WidgetBlockLister
+	contentTemplateSvc ContentTemplateService
 	blockRegistry      *BlockRegistry
 	cache              *redis.Client
 }
@@ -106,6 +107,12 @@ type Handler struct {
 // NewHandler creates a new entity handler.
 func NewHandler(service EntityService) *Handler {
 	return &Handler{service: service}
+}
+
+// SetContentTemplateService sets the content template service for applying
+// templates during entity creation.
+func (h *Handler) SetContentTemplateService(svc ContentTemplateService) {
+	h.contentTemplateSvc = svc
 }
 
 // SetAuditService sets the audit service for recording entity mutations.
@@ -377,6 +384,14 @@ func (h *Handler) Create(c echo.Context) error {
 			errMsg = appErr.Message
 		}
 		return middleware.Render(c, http.StatusOK, EntityNewPage(cc, entityTypes, req.EntityTypeID, nil, csrfToken, errMsg))
+	}
+
+	// Apply content template if one was selected.
+	if req.TemplateID > 0 && h.contentTemplateSvc != nil {
+		tmpl, tmplErr := h.contentTemplateSvc.GetByID(c.Request().Context(), req.TemplateID)
+		if tmplErr == nil && tmpl.ContentJSON != "" {
+			_ = h.service.UpdateEntry(c.Request().Context(), entity.ID, tmpl.ContentJSON, tmpl.ContentHTML)
+		}
 	}
 
 	h.logAudit(c, cc.Campaign.ID, audit.ActionEntityCreated, entity.ID, entity.Name)
@@ -1099,6 +1114,39 @@ func (h *Handler) UpdateImageAPI(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 
+// UpdateCoverImageAPI updates the entity's cover/banner image path.
+// PUT /campaigns/:id/entities/:eid/cover-image
+func (h *Handler) UpdateCoverImageAPI(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	if cc == nil {
+		return apperror.NewMissingContext()
+	}
+
+	entityID := c.Param("eid")
+
+	// IDOR protection.
+	entity, err := h.service.GetByID(c.Request().Context(), entityID)
+	if err != nil {
+		return err
+	}
+	if entity.CampaignID != cc.Campaign.ID {
+		return apperror.NewNotFound("entity not found")
+	}
+
+	var body struct {
+		ImagePath string `json:"image_path"`
+	}
+	if err := json.NewDecoder(c.Request().Body).Decode(&body); err != nil {
+		return apperror.NewBadRequest("invalid JSON body")
+	}
+
+	if err := h.service.UpdateCoverImage(c.Request().Context(), entityID, body.ImagePath); err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}
+
 // --- Preview API ---
 
 // htmlTagPattern matches HTML tags for stripping in entry excerpts.
@@ -1515,11 +1563,26 @@ func (h *Handler) CreateEntityType(c echo.Context) error {
 	et, err := h.service.CreateEntityType(c.Request().Context(), cc.Campaign.ID, input)
 	if err != nil {
 		entityTypes, _ := h.service.GetEntityTypes(c.Request().Context(), cc.Campaign.ID)
-		counts, _ := h.service.CountByType(c.Request().Context(), cc.Campaign.ID, int(cc.MemberRole), auth.GetUserID(c))
+		role := cc.VisibilityRole()
+		counts, _ := h.service.CountByType(c.Request().Context(), cc.Campaign.ID, role, auth.GetUserID(c))
 		csrfToken := middleware.GetCSRFToken(c)
 		errMsg := "failed to create entity type"
 		if appErr, ok := err.(*apperror.AppError); ok {
 			errMsg = appErr.Message
+		}
+		// Return partial for HTMX requests so the swap target (#entity-type-list) gets correct content.
+		// Use HX-Trigger to show a toast notification with the error message.
+		if middleware.IsHTMX(c) {
+			c.Response().Header().Set("HX-Retarget", "#entity-type-list")
+			c.Response().Header().Set("HX-Reswap", "innerHTML")
+			triggerData := map[string]any{
+				"chronicle:notify": map[string]string{"message": errMsg, "type": "error"},
+			}
+			if triggerJSON, err := json.Marshal(triggerData); err == nil {
+				c.Response().Header().Set("HX-Trigger", string(triggerJSON))
+			}
+			return middleware.Render(c, http.StatusOK,
+				EntityTypeListContent(cc, entityTypes, counts, csrfToken))
 		}
 		return middleware.Render(c, http.StatusOK,
 			EntityTypesManagePage(cc, entityTypes, counts, csrfToken, errMsg))

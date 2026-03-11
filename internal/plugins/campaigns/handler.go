@@ -81,11 +81,13 @@ type AuditLogger interface {
 
 // PluginHubAddon is a minimal addon representation for the plugin hub page.
 type PluginHubAddon struct {
-	Slug     string
-	Name     string
-	Icon     string
-	Category string
-	Enabled  bool
+	AddonID   int
+	Slug      string
+	Name      string
+	Icon      string
+	Category  string
+	Enabled   bool
+	Installed bool // Whether backing code exists (for showing Coming Soon vs toggle).
 }
 
 // AddonLister lists addons for the plugin hub page. Avoids importing the addons
@@ -464,6 +466,72 @@ func (h *Handler) UpdateAccentColorAPI(c echo.Context) error {
 	return c.Redirect(http.StatusSeeOther, "/campaigns/"+cc.Campaign.ID+"/settings")
 }
 
+// UpdateBrandingAPI handles PUT /campaigns/:id/branding. Sets the campaign's
+// custom brand name and optional logo path.
+func (h *Handler) UpdateBrandingAPI(c echo.Context) error {
+	cc := GetCampaignContext(c)
+	if cc == nil {
+		return apperror.NewMissingContext()
+	}
+
+	if cc.MemberRole < RoleOwner {
+		return apperror.NewForbidden("only campaign owners can change branding")
+	}
+
+	var req struct {
+		BrandName string `json:"brand_name"`
+		BrandLogo string `json:"brand_logo"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return apperror.NewBadRequest("invalid request body")
+	}
+
+	if err := h.service.UpdateBranding(c.Request().Context(), cc.Campaign.ID, req.BrandName, req.BrandLogo); err != nil {
+		return err
+	}
+
+	h.logAudit(c, cc.Campaign.ID, "campaign.branding.updated", map[string]any{
+		"brand_name": req.BrandName,
+		"brand_logo": req.BrandLogo,
+	})
+
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// UpdateTopbarStyleAPI handles PUT /campaigns/:id/topbar-style. Sets the
+// campaign's topbar visual customization (solid color, gradient, or image).
+func (h *Handler) UpdateTopbarStyleAPI(c echo.Context) error {
+	cc := GetCampaignContext(c)
+	if cc == nil {
+		return apperror.NewMissingContext()
+	}
+
+	if cc.MemberRole < RoleOwner {
+		return apperror.NewForbidden("only campaign owners can change topbar style")
+	}
+
+	var style TopbarStyle
+	if err := c.Bind(&style); err != nil {
+		return apperror.NewBadRequest("invalid request body")
+	}
+
+	// Empty mode means clear/reset.
+	var stylePtr *TopbarStyle
+	if style.Mode != "" {
+		stylePtr = &style
+	}
+
+	if err := h.service.UpdateTopbarStyle(c.Request().Context(), cc.Campaign.ID, stylePtr); err != nil {
+		return err
+	}
+
+	h.logAudit(c, cc.Campaign.ID, "campaign.topbar_style.updated", map[string]any{
+		"mode": style.Mode,
+	})
+
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}
+
 // UpdateDmGrantsAPI handles PUT /campaigns/:id/dm-grants. Sets which users
 // are granted visibility of dm_only content (co-DM privileges).
 func (h *Handler) UpdateDmGrantsAPI(c echo.Context) error {
@@ -553,7 +621,8 @@ func (h *Handler) PluginHub(c echo.Context) error {
 	}
 
 	isOwner := cc.MemberRole >= RoleOwner
-	return middleware.Render(c, http.StatusOK, PluginHubPage(cc, addons, isOwner))
+	csrfToken := middleware.GetCSRFToken(c)
+	return middleware.Render(c, http.StatusOK, PluginHubPage(cc, addons, isOwner, csrfToken))
 }
 
 // --- Customization Hub ---

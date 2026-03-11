@@ -21,6 +21,10 @@
   var INDENT_PX = 14;
   var STORAGE_KEY_PREFIX = 'chronicle-tree-collapsed-';
 
+  // Track the current container for the reorg-changed listener (IIFE-scoped
+  // so the listener is registered once, not per initTree call).
+  var currentTreeContainer = null;
+
   /**
    * Initialize the tree for a freshly loaded entity list.
    * Reads the flat list of .sidebar-tree-item links, builds a parent-child
@@ -239,6 +243,39 @@
   }
 
   /**
+   * Check if entity reorg mode is active.
+   */
+  function isReorgActive(container) {
+    return container.hasAttribute('data-reorg-active');
+  }
+
+  /**
+   * Toggle draggable state on tree items based on reorg mode.
+   */
+  function updateDraggable(container, enabled) {
+    var nodes = container.querySelectorAll('.sidebar-tree-node');
+    nodes.forEach(function (node) {
+      var item = node.querySelector('.sidebar-tree-item');
+      if (item) {
+        if (enabled) {
+          item.setAttribute('draggable', 'true');
+          // Add drag handle if not present.
+          if (!node.querySelector('.reorg-drag-handle')) {
+            var handle = document.createElement('span');
+            handle.className = 'reorg-drag-handle w-3 h-3 flex items-center justify-center shrink-0 text-gray-500 cursor-grab mr-1';
+            handle.innerHTML = '<i class="fa-solid fa-grip-vertical text-[8px]"></i>';
+            item.insertBefore(handle, item.firstChild);
+          }
+        } else {
+          item.removeAttribute('draggable');
+          var handle = node.querySelector('.reorg-drag-handle');
+          if (handle) handle.remove();
+        }
+      }
+    });
+  }
+
+  /**
    * Setup drag-and-drop for reordering and reparenting.
    *
    * Drop zones are determined by mouse position relative to the target node:
@@ -247,6 +284,8 @@
    *
    * Visual feedback differs: reorder shows an indigo line between items,
    * reparent highlights the target with a left-border accent.
+   *
+   * Drag events only fire when reorg mode is active (data-reorg-active).
    */
   function setupDragAndDrop(container, campaignId) {
     var dragSrcId = null;
@@ -257,7 +296,16 @@
     dropIndicator.className = 'sidebar-drop-indicator';
     dropIndicator.style.display = 'none';
 
+    // Store container reference for the IIFE-scoped reorg listener.
+    currentTreeContainer = container;
+
+    // Check initial state (in case reorg was active before tree init).
+    if (isReorgActive(container)) {
+      updateDraggable(container, true);
+    }
+
     container.addEventListener('dragstart', function (e) {
+      if (!isReorgActive(container)) return;
       var item = e.target.closest('.sidebar-tree-item');
       if (!item) return;
       dragSrcId = item.getAttribute('data-entity-id');
@@ -276,6 +324,7 @@
     });
 
     container.addEventListener('dragover', function (e) {
+      if (!isReorgActive(container)) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
 
@@ -309,6 +358,7 @@
     });
 
     container.addEventListener('drop', function (e) {
+      if (!isReorgActive(container)) return;
       e.preventDefault();
       hideDropIndicator();
       clearDropTargets(container);
@@ -357,6 +407,96 @@
         targets[i].classList.remove('sidebar-drop-reparent');
       }
     }
+
+    // --- Touch Drag-and-Drop for mobile entity reordering ---
+    var TOUCH_THRESHOLD = 10;
+    var touchState = { src: null, srcId: null, ghost: null, startX: 0, startY: 0, started: false };
+
+    container.addEventListener('touchstart', function (e) {
+      if (!isReorgActive(container)) return;
+      var item = e.target.closest('.sidebar-tree-item');
+      if (!item) return;
+      var touch = e.touches[0];
+      touchState.src = item.closest('.sidebar-tree-node');
+      touchState.srcId = item.getAttribute('data-entity-id');
+      touchState.startX = touch.clientX;
+      touchState.startY = touch.clientY;
+      touchState.started = false;
+    }, { passive: false });
+
+    container.addEventListener('touchmove', function (e) {
+      if (!touchState.src) return;
+      var touch = e.touches[0];
+      var dx = touch.clientX - touchState.startX;
+      var dy = touch.clientY - touchState.startY;
+
+      if (!touchState.started) {
+        if (Math.abs(dx) + Math.abs(dy) < TOUCH_THRESHOLD) return;
+        touchState.started = true;
+        e.preventDefault();
+        touchState.ghost = touchState.src.cloneNode(true);
+        touchState.ghost.style.cssText = 'position:fixed;pointer-events:none;z-index:9999;opacity:0.7;width:' + touchState.src.offsetWidth + 'px';
+        document.body.appendChild(touchState.ghost);
+        touchState.src.style.opacity = '0.3';
+      }
+
+      if (touchState.started) {
+        e.preventDefault();
+        touchState.ghost.style.left = touch.clientX + 'px';
+        touchState.ghost.style.top = (touch.clientY - 16) + 'px';
+
+        clearDropTargets(container);
+        hideDropIndicator();
+        var el = document.elementFromPoint(touch.clientX, touch.clientY);
+        var target = el ? el.closest('.sidebar-tree-node') : null;
+        if (target && target !== touchState.src) {
+          var rect = target.getBoundingClientRect();
+          var thirdY = rect.top + rect.height / 3;
+          if (touch.clientY < thirdY) {
+            showDropIndicator(target, 'before');
+          } else {
+            target.classList.add('sidebar-drop-reparent');
+          }
+        }
+      }
+    }, { passive: false });
+
+    container.addEventListener('touchend', function (e) {
+      if (!touchState.src || !touchState.started) {
+        touchState.src = null;
+        return;
+      }
+
+      hideDropIndicator();
+      clearDropTargets(container);
+
+      var lastTouch = e.changedTouches[0];
+      var el = document.elementFromPoint(lastTouch.clientX, lastTouch.clientY);
+      var target = el ? el.closest('.sidebar-tree-node') : null;
+
+      if (target && target !== touchState.src) {
+        var targetId = target.getAttribute('data-entity-id');
+        var rect = target.getBoundingClientRect();
+        var thirdY = rect.top + rect.height / 3;
+
+        if (lastTouch.clientY < thirdY) {
+          var targetParentId = target.getAttribute('data-parent-id') || null;
+          var sortOrder = calculateSortOrder(target, 'before');
+          reorderEntity(campaignId, touchState.srcId, targetParentId, sortOrder);
+        } else {
+          reorderEntity(campaignId, touchState.srcId, targetId, 0);
+        }
+      }
+
+      // Cleanup.
+      if (touchState.ghost && touchState.ghost.parentNode) {
+        touchState.ghost.parentNode.removeChild(touchState.ghost);
+      }
+      if (touchState.src) touchState.src.style.opacity = '';
+      touchState.src = null;
+      touchState.ghost = null;
+      touchState.started = false;
+    });
   }
 
   /**
@@ -375,14 +515,15 @@
     if (position === 'before') {
       if (targetIdx === 0) {
         // Placing before the first sibling: use target's order - 1 (min 0).
-        var targetOrder = parseInt(targetNode.querySelector('.sidebar-tree-item')?.getAttribute('data-sort-order') || '0', 10);
+        var targetEl = targetNode.querySelector('.sidebar-tree-item');
+        var targetOrder = parseInt(targetEl ? targetEl.getAttribute('data-sort-order') : '0', 10);
         return Math.max(0, targetOrder - 1);
       }
       // Place between previous sibling and target.
       var prevItem = siblings[targetIdx - 1].querySelector('.sidebar-tree-item');
       var targetItem = targetNode.querySelector('.sidebar-tree-item');
-      var prevOrder = parseInt(prevItem?.getAttribute('data-sort-order') || '0', 10);
-      var targetOrder2 = parseInt(targetItem?.getAttribute('data-sort-order') || '0', 10);
+      var prevOrder = parseInt(prevItem ? prevItem.getAttribute('data-sort-order') : '0', 10);
+      var targetOrder2 = parseInt(targetItem ? targetItem.getAttribute('data-sort-order') : '0', 10);
       // Use midpoint if there's room, otherwise server re-normalizes.
       if (targetOrder2 > prevOrder + 1) {
         return Math.floor((prevOrder + targetOrder2) / 2);
@@ -402,9 +543,13 @@
       sort_order: sortOrder
     };
 
+    var csrfToken = Chronicle.getCsrf();
+    var headers = { 'Content-Type': 'application/json' };
+    if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+
     fetch('/campaigns/' + campaignId + '/entities/' + entityId + '/reorder', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       body: JSON.stringify(body)
     })
     .then(function (resp) {
@@ -425,6 +570,15 @@
       console.error('sidebar_tree: reorder failed', err);
     });
   }
+
+  // Single IIFE-scoped listener for reorg mode changes. Uses
+  // currentTreeContainer (updated by setupDragAndDrop on each initTree)
+  // so the listener is never duplicated across HTMX re-inits.
+  document.addEventListener('chronicle:reorg-changed', function (e) {
+    if (currentTreeContainer) {
+      updateDraggable(currentTreeContainer, e.detail && e.detail.active);
+    }
+  });
 
   // Inject CSS for guide lines (uses custom property set per-node).
   var style = document.createElement('style');

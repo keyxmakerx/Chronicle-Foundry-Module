@@ -8,6 +8,66 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
+2026-03-11 -- **Sprint W-0.5: Visual Customization (IN PROGRESS).**
+
+25. Starting W-0.5: Per-campaign brand name/logo, topbar color/gradient/image customization, visual editor Appearance tab in Customization Hub. Also fixing 3 bugs from W-0 (event listener leak in sidebar_tree.js, touch listener cleanup in sidebar_reorg.js, ES2020 optional chaining compat) and updating stale entity/campaign documentation.
+
+### Previous Update
+2026-03-11 -- **Sprint W-0: Nav Menu Reorg Mode (COMPLETE).**
+
+24. W-0 complete: Sidebar reorg mode toggle button (Owner-only, grip icon next to "Categories" header), inline category drag-to-reorder with visibility toggles, conditional entity drag-and-drop (only active in reorg mode), touch D&D support for mobile, `data-entity-type-id` on category links, auto-exit on navigation. New file `sidebar_reorg.js`. Modified `sidebar_tree.js` to gate D&D behind `data-reorg-active`. Relations `.ai.md` updated with graph visualization features.
+
+### Previous Update
+2026-03-10 -- **Sprint V-4: Enhanced Graph View & Cover Images (COMPLETE).**
+
+18. **@Mention edges in graph**: `FindAllMentionLinks()` in entity repository scans `entry_html` for `data-mention-id` attributes across a campaign. `MentionLink` model. `GetMentionLinks()` service method. `MentionLinkProvider` interface bridges entities→relations without circular imports. Mention edges appear as dashed purple lines in the D3 graph.
+
+19. **Graph API filtering**: `GetFilteredGraphData()` with `GraphFilter` struct supporting `types` (entity type slugs), `search` (name match), `focus`+`hops` (BFS local/ego graph), `include_mentions`, `include_orphans`. BFS subgraph extraction via `bfsSubgraph()`. `GraphEdge.Kind` field distinguishes "relation" vs "mention" edges.
+
+20. **Graph UI enhancements**: Updated `relation_graph.js` with: filter toolbar (type multi-select, search input, mention toggle, orphan toggle), dashed mention edges with purple color, node sizing by connection count, type-based clustering via `d3.forceX/forceY`, orphan nodes with dotted borders, enhanced legend showing edge types and orphan indicator.
+
+21. **Graph page template updates**: `GraphPage` handler now fetches entity types for filter dropdown. Template passes entity types as JSON via `data-entity-types` attribute. `EntityTypeListerForGraph` interface with adapter.
+
+22. **Cover image layout block**: Migration `000004_cover_image` adds `cover_image_path` column to entities. `cover_image` block type registered in block registry. `blockCoverImage()` templ component with configurable height (sm/md/lg) and overlay (none/gradient/dark). `UpdateCoverImageAPI` endpoint at `PUT /campaigns/:id/entities/:eid/cover-image`. Reuses `image-upload` widget for upload.
+
+23. **Local graph block**: `local_graph` block type registered in block registry. `blockLocalGraph()` renders a mini `relation-graph` widget with `data-focus-entity` and `data-hops` attributes for ego-graph mode on entity profile pages.
+
+### Previous Update
+2026-03-10 -- **Sprint V-3: Content Templates (COMPLETE).**
+
+12-17. Content templates: migration, CRUD, template picker, editor slash command, default templates, Customization Hub tab.
+
+### Previous Update
+2026-03-10 -- **Cleanup & consolidation pass after bug fixes.**
+
+7. **JSON injection fix**: HX-Trigger header in `CreateEntityType` error path used string concatenation to build JSON. Replaced with `json.Marshal()` to prevent malformed JSON from error messages containing special characters.
+
+8. **Orphaned addon settings page removed**: Deleted `/addons/settings` route, `CampaignAddonsPage` handler, and `CampaignAddonsPageTempl` template — all superseded by the unified Plugin Hub at `/plugins`. Fragment route (`/addons/fragment`) kept for Customization Hub.
+
+9. **Fallback redirect updated**: `ToggleCampaignAddon` non-HTMX fallback now redirects to `/plugins` instead of the removed `/addons/settings`.
+
+10. **Dead HTMX attributes cleaned**: Removed `hx-target`/`hx-swap` from Plugin Hub toggle forms since the handler always responds with `HX-Redirect` (the swap targets were never used).
+
+11. **ADR-029 recorded**: Features page consolidation decision documented in `.ai/decisions.md`.
+
+### Previous Update
+2026-03-10 -- **Bug fixes & UX improvements (navbar, features page, entity templates).**
+
+1. **Drag-and-drop CSRF fix**: `sidebar_tree.js` reorderEntity() was using raw `fetch()` without CSRF token, causing 403 on drag-drop reorder. Added `Chronicle.getCsrf()` header.
+
+2. **Nav menu lag fix**: `sidebar_drill.js` category switching caused stale content flash. Now shows loading spinner immediately and uses prefetch cache for instant swaps.
+
+3. **Entity template creation fix**: `entity_types.templ` form lacked `hx-target`/`hx-swap`, causing broken page when HTMX swapped full page into form. Added proper targeting, partial response on error, and `chronicle:notify` HX-Trigger support in notifications.js.
+
+4. **Features page consolidation**: Merged Plugin Hub (read-only) and Addon Settings (management) into a single Features page at `/campaigns/:id/plugins`. Owners see inline enable/disable toggles. Added `AddonID` and `Installed` fields to `PluginHubAddon`. Settings page link now points to `/plugins`. Toggle handler supports `redirect_to=plugins` for redirect after toggle.
+
+5. **Quick notes discoverability**: After creating a quick note, toast now includes a clickable "View in Journal" link. Added `html` option to `Chronicle.notify()`.
+
+6. **Fully hideable navbar**: Added sidebar hide button (double-angle-left icon) next to pin button. When hidden, sidebar fully disappears (0px width). Floating restore button appears at top-left. State persists in `localStorage`.
+
+Branch: `claude/fix-navbar-features-page-8RZuE`.
+
+### Previous Update
 2026-03-10 -- **Per-player visibility + Co-DM grants (Phase 2 complete).** Implemented per-player content sharing across all content types:
 
 1. **Maps**: Added `visibility_rules` JSON column to `map_markers` and `map_drawings` (migration 002). Updated repository to filter with `JSON_CONTAINS` for non-owners. Updated `ListMarkers` signature to include `userID` for per-player filtering.

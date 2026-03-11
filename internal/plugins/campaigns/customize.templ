@@ -78,6 +78,20 @@ templ CustomizePage(cc *CampaignContext, entityTypes []SettingsEntityType, csrfT
 				</button>
 				<button
 					class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
+					:class="tab === 'content-templates' ? 'text-accent border-accent' : 'text-fg-secondary border-transparent hover:text-fg hover:border-edge'"
+					@click="tab = 'content-templates'"
+				>
+					<i class="fa-solid fa-file-lines mr-1.5 text-xs"></i> Content Templates
+				</button>
+				<button
+					class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
+					:class="tab === 'appearance' ? 'text-accent border-accent' : 'text-fg-secondary border-transparent hover:text-fg hover:border-edge'"
+					@click="tab = 'appearance'"
+				>
+					<i class="fa-solid fa-palette mr-1.5 text-xs"></i> Appearance
+				</button>
+				<button
+					class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
 					:class="tab === 'extensions' ? 'text-accent border-accent' : 'text-fg-secondary border-transparent hover:text-fg hover:border-edge'"
 					@click="tab = 'extensions'"
 				>
@@ -108,6 +122,20 @@ templ CustomizePage(cc *CampaignContext, entityTypes []SettingsEntityType, csrfT
 				<div x-show="tab === 'navigation'" x-cloak class="h-full overflow-y-auto">
 					<div class="max-w-3xl mx-auto px-6 py-4">
 						@navigationTab(cc, entityTypes, csrfToken)
+					</div>
+				</div>
+
+				<!-- Content Templates tab: manage content templates for entity creation -->
+				<div x-show="tab === 'content-templates'" x-cloak class="h-full overflow-y-auto">
+					<div class="max-w-3xl mx-auto px-6 py-4">
+						@contentTemplatesTab(cc, csrfToken)
+					</div>
+				</div>
+
+				<!-- Appearance tab: branding, topbar, and accent color customization -->
+				<div x-show="tab === 'appearance'" x-cloak class="h-full overflow-y-auto">
+					<div class="max-w-3xl mx-auto px-6 py-4">
+						@appearanceTab(cc, csrfToken)
 					</div>
 				</div>
 
@@ -475,5 +503,230 @@ templ LayoutEditorFragment(cc *CampaignContext, et *LayoutEditorEntityType, csrf
 			data-entity-type-name={ et.Name }
 			data-csrf-token={ csrfToken }
 		></div>
+	</div>
+}
+
+// contentTemplatesTab renders the content template management interface.
+// Templates are loaded via HTMX from the entities plugin's API.
+templ contentTemplatesTab(cc *CampaignContext, csrfToken string) {
+	<div class="space-y-4">
+		<div class="flex items-center justify-between">
+			<div>
+				<h2 class="text-base font-semibold text-fg mb-0.5">Content Templates</h2>
+				<p class="text-xs text-fg-secondary">
+					Pre-fill the editor when creating new pages. Templates appear in the create form and the editor's "/" menu.
+				</p>
+			</div>
+		</div>
+
+		// Template list and management (Alpine.js powered).
+		<div
+			x-data={ fmt.Sprintf(`{
+				templates: [],
+				loading: true,
+				editing: null,
+				creating: false,
+				form: { name: '', description: '', icon: 'fa-file-lines', entity_type_id: 0, content_json: '', content_html: '' },
+				async load() {
+					this.loading = true;
+					try {
+						var resp = await fetch('/campaigns/%s/content-templates', {
+							headers: { 'Accept': 'application/json' }
+						});
+						if (resp.ok) this.templates = await resp.json();
+					} finally { this.loading = false; }
+				},
+				async save() {
+					var url = '/campaigns/%s/content-templates';
+					var method = 'POST';
+					if (this.editing) {
+						url += '/' + this.editing;
+						method = 'PUT';
+					}
+					if (!this.form.content_json) {
+						this.form.content_json = '{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Start writing..."}]}]}';
+						this.form.content_html = '<p>Start writing...</p>';
+					}
+					var resp = await fetch(url, {
+						method: method,
+						headers: {
+							'Content-Type': 'application/json',
+							'X-CSRF-Token': '%s'
+						},
+						credentials: 'same-origin',
+						body: JSON.stringify(this.form)
+					});
+					if (resp.ok) {
+						this.editing = null;
+						this.creating = false;
+						this.form = { name: '', description: '', icon: 'fa-file-lines', entity_type_id: 0, content_json: '', content_html: '' };
+						this.load();
+						Chronicle.notify('Template saved.', 'success');
+					} else {
+						Chronicle.notify('Failed to save template.', 'error');
+					}
+				},
+				async remove(id) {
+					if (!confirm('Delete this template?')) return;
+					var resp = await fetch('/campaigns/%s/content-templates/' + id, {
+						method: 'DELETE',
+						headers: { 'X-CSRF-Token': '%s' },
+						credentials: 'same-origin'
+					});
+					if (resp.ok) {
+						this.load();
+						Chronicle.notify('Template deleted.', 'success');
+					}
+				},
+				edit(t) {
+					this.editing = t.id;
+					this.creating = true;
+					this.form = {
+						name: t.name,
+						description: t.description,
+						icon: t.icon,
+						entity_type_id: t.entity_type_id || 0,
+						content_json: t.content_json,
+						content_html: t.content_html
+					};
+				},
+				cancel() {
+					this.editing = null;
+					this.creating = false;
+					this.form = { name: '', description: '', icon: 'fa-file-lines', entity_type_id: 0, content_json: '', content_html: '' };
+				}
+			}`, cc.Campaign.ID, cc.Campaign.ID, csrfToken, cc.Campaign.ID, csrfToken) }
+			x-init="load()"
+		>
+			// Loading state.
+			<div x-show="loading" class="card p-6 text-center">
+				<i class="fa-solid fa-spinner fa-spin text-fg-muted"></i>
+				<span class="text-sm text-fg-muted ml-2">Loading templates...</span>
+			</div>
+
+			// Template list.
+			<div x-show="!loading && !creating" x-cloak>
+				<div class="space-y-2 mb-4">
+					<template x-for="t in templates" x-bind:key="t.id">
+						<div class="card p-4 flex items-center gap-3">
+							<span class="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
+								<i class="fa-solid text-accent text-sm" x-bind:class="t.icon || 'fa-file-lines'"></i>
+							</span>
+							<div class="flex-1 min-w-0">
+								<div class="font-medium text-sm text-fg truncate" x-text="t.name"></div>
+								<div class="text-xs text-fg-muted truncate" x-text="t.description || 'No description'"></div>
+								<div x-show="t.entity_type_name" class="text-[10px] text-fg-muted mt-0.5">
+									<i class="fa-solid fa-folder-open mr-0.5"></i>
+									<span x-text="t.entity_type_name"></span>
+								</div>
+							</div>
+							<div class="flex items-center gap-1 shrink-0">
+								<template x-if="!t.is_global">
+									<button
+										@click="edit(t)"
+										class="w-7 h-7 flex items-center justify-center rounded text-fg-muted hover:text-accent hover:bg-accent/10 transition-colors"
+										title="Edit"
+									>
+										<i class="fa-solid fa-pen text-xs"></i>
+									</button>
+								</template>
+								<template x-if="!t.is_global">
+									<button
+										@click="remove(t.id)"
+										class="w-7 h-7 flex items-center justify-center rounded text-fg-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+										title="Delete"
+									>
+										<i class="fa-solid fa-trash text-xs"></i>
+									</button>
+								</template>
+								<template x-if="t.is_global">
+									<span class="text-[10px] text-fg-muted bg-surface-alt px-2 py-0.5 rounded-full">Built-in</span>
+								</template>
+							</div>
+						</div>
+					</template>
+				</div>
+
+				<div x-show="templates.length === 0 && !loading" class="card p-6 text-center">
+					<i class="fa-solid fa-file-lines text-2xl text-fg-muted mb-2"></i>
+					<p class="text-sm text-fg-secondary">No content templates yet.</p>
+				</div>
+
+				<button
+					@click="creating = true"
+					class="btn-primary text-sm"
+				>
+					<i class="fa-solid fa-plus mr-1.5"></i> New Template
+				</button>
+			</div>
+
+			// Create / Edit form.
+			<div x-show="creating" x-cloak>
+				<div class="card p-6 space-y-4">
+					<h3 class="text-sm font-semibold text-fg" x-text="editing ? 'Edit Template' : 'New Template'"></h3>
+
+					<div>
+						<label class="block text-sm font-medium text-fg-body mb-1">Name</label>
+						<input
+							type="text"
+							x-model="form.name"
+							class="input w-full"
+							placeholder="e.g., Session Recap, NPC Profile"
+							maxlength="200"
+						/>
+					</div>
+
+					<div>
+						<label class="block text-sm font-medium text-fg-body mb-1">Description (optional)</label>
+						<input
+							type="text"
+							x-model="form.description"
+							class="input w-full"
+							placeholder="Brief description of what this template is for"
+							maxlength="500"
+						/>
+					</div>
+
+					<div>
+						<label class="block text-sm font-medium text-fg-body mb-1">Icon</label>
+						<select x-model="form.icon" class="input w-full">
+							<option value="fa-file-lines">File</option>
+							<option value="fa-scroll">Scroll</option>
+							<option value="fa-user">Person</option>
+							<option value="fa-location-dot">Location</option>
+							<option value="fa-list-check">Checklist</option>
+							<option value="fa-dragon">Dragon</option>
+							<option value="fa-shield-halved">Shield</option>
+							<option value="fa-book">Book</option>
+							<option value="fa-map">Map</option>
+							<option value="fa-crown">Crown</option>
+							<option value="fa-skull">Skull</option>
+							<option value="fa-wand-magic-sparkles">Magic</option>
+						</select>
+					</div>
+
+					<div>
+						<label class="block text-sm font-medium text-fg-body mb-1">Content (TipTap JSON)</label>
+						<textarea
+							x-model="form.content_json"
+							class="input w-full h-32 font-mono text-xs"
+							placeholder='{"type":"doc","content":[...]}'
+						></textarea>
+						<p class="mt-1 text-xs text-fg-secondary">
+							Paste TipTap/ProseMirror document JSON. To get this, create the template content in
+							any entity's editor, then copy the entry JSON from the browser developer tools.
+						</p>
+					</div>
+
+					<div class="flex items-center gap-3">
+						<button @click="save()" class="btn-primary text-sm">
+							<i class="fa-solid fa-check mr-1.5"></i>
+							<span x-text="editing ? 'Update' : 'Create'"></span>
+						</button>
+						<button @click="cancel()" class="btn-secondary text-sm">Cancel</button>
+					</div>
+				</div>
+			</div>
+		</div>
 	</div>
 }

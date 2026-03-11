@@ -51,6 +51,10 @@ type CampaignService interface {
 	// Backdrop and branding
 	UpdateBackdropPath(ctx context.Context, campaignID string, path *string) error
 	UpdateAccentColor(ctx context.Context, campaignID string, color string) error
+	// UpdateBranding sets the campaign's custom brand name and logo path.
+	UpdateBranding(ctx context.Context, campaignID, brandName, brandLogo string) error
+	// UpdateTopbarStyle sets the campaign's topbar visual customization.
+	UpdateTopbarStyle(ctx context.Context, campaignID string, style *TopbarStyle) error
 	UpdateDmGrants(ctx context.Context, campaignID string, userIDs []string) error
 
 	// Sidebar configuration
@@ -67,6 +71,7 @@ type CampaignService interface {
 	AdminAddMember(ctx context.Context, campaignID, userID string, role Role) error
 
 	// Lifecycle hooks — set after construction to avoid circular initialization.
+	SetContentTemplateSeeder(seeder ContentTemplateSeeder)
 	SetMediaCleaner(cleaner MediaCleaner)
 	SetHookDispatcher(dispatcher CampaignHookDispatcher)
 }
@@ -100,10 +105,11 @@ type campaignService struct {
 	repo           CampaignRepository
 	users          UserFinder
 	mail           MailService            // May be nil if SMTP is not configured.
-	seeder         EntityTypeSeeder       // Seeds default entity types on campaign creation. May be nil.
-	mediaCleaner   MediaCleaner           // Cleans up media files on campaign delete. May be nil.
-	hookDispatcher CampaignHookDispatcher // Dispatches WASM lifecycle events. May be nil.
-	baseURL        string
+	seeder           EntityTypeSeeder       // Seeds default entity types on campaign creation. May be nil.
+	templateSeeder   ContentTemplateSeeder  // Seeds default content templates on campaign creation. May be nil.
+	mediaCleaner     MediaCleaner           // Cleans up media files on campaign delete. May be nil.
+	hookDispatcher   CampaignHookDispatcher // Dispatches WASM lifecycle events. May be nil.
+	baseURL          string
 }
 
 // NewCampaignService creates a new campaign service with the given dependencies.
@@ -116,6 +122,12 @@ func NewCampaignService(repo CampaignRepository, users UserFinder, mail MailServ
 		seeder:  seeder,
 		baseURL: baseURL,
 	}
+}
+
+// SetContentTemplateSeeder sets the seeder for default content templates.
+// Called after all plugins are wired to avoid initialization order issues.
+func (s *campaignService) SetContentTemplateSeeder(seeder ContentTemplateSeeder) {
+	s.templateSeeder = seeder
 }
 
 // SetMediaCleaner sets the media cleaner for campaign deletion cleanup.
@@ -191,6 +203,16 @@ func (s *campaignService) Create(ctx context.Context, userID string, input Creat
 		if err := s.seeder.SeedDefaults(ctx, campaign.ID); err != nil {
 			// Non-fatal: campaign is still usable without default types.
 			slog.Warn("failed to seed default entity types",
+				slog.String("campaign_id", campaign.ID),
+				slog.Any("error", err),
+			)
+		}
+	}
+
+	// Seed default content templates for the new campaign.
+	if s.templateSeeder != nil {
+		if err := s.templateSeeder.SeedDefaults(ctx, campaign.ID); err != nil {
+			slog.Warn("failed to seed default content templates",
 				slog.String("campaign_id", campaign.ID),
 				slog.Any("error", err),
 			)
@@ -618,6 +640,90 @@ func (s *campaignService) UpdateAccentColor(ctx context.Context, campaignID stri
 	}
 
 	return s.repo.UpdateSettings(ctx, campaignID, string(settingsJSON))
+}
+
+// UpdateBranding sets the campaign's custom brand name and logo path.
+// Brand name max 40 chars. Empty strings clear the respective fields.
+func (s *campaignService) UpdateBranding(ctx context.Context, campaignID, brandName, brandLogo string) error {
+	if len(brandName) > 40 {
+		return apperror.NewBadRequest("brand name must be 40 characters or fewer")
+	}
+	if len(brandLogo) > 255 {
+		return apperror.NewBadRequest("brand logo path too long")
+	}
+
+	campaign, err := s.repo.FindByID(ctx, campaignID)
+	if err != nil {
+		return err
+	}
+
+	settings := campaign.ParseSettings()
+	settings.BrandName = brandName
+	settings.BrandLogo = brandLogo
+
+	settingsJSON, err := json.Marshal(settings)
+	if err != nil {
+		return apperror.NewInternal(fmt.Errorf("marshaling settings: %w", err))
+	}
+
+	return s.repo.UpdateSettings(ctx, campaignID, string(settingsJSON))
+}
+
+// UpdateTopbarStyle sets the campaign's topbar visual customization.
+// Nil style clears the customization (reverts to default).
+func (s *campaignService) UpdateTopbarStyle(ctx context.Context, campaignID string, style *TopbarStyle) error {
+	if style != nil {
+		// Validate mode.
+		switch style.Mode {
+		case "solid", "gradient", "image", "":
+			// ok
+		default:
+			return apperror.NewBadRequest("invalid topbar mode, expected solid, gradient, or image")
+		}
+		// Validate color values are valid hex (e.g. "#6366f1") or empty.
+		for _, color := range []string{style.Color, style.GradientFrom, style.GradientTo} {
+			if color != "" && !isValidHexColor(color) {
+				return apperror.NewBadRequest("invalid color format, expected #RRGGBB")
+			}
+		}
+		// Validate gradient direction.
+		if style.GradientDir != "" {
+			switch style.GradientDir {
+			case "to-r", "to-br", "to-b":
+				// ok
+			default:
+				return apperror.NewBadRequest("invalid gradient direction")
+			}
+		}
+	}
+
+	campaign, err := s.repo.FindByID(ctx, campaignID)
+	if err != nil {
+		return err
+	}
+
+	settings := campaign.ParseSettings()
+	settings.TopbarStyle = style
+
+	settingsJSON, err := json.Marshal(settings)
+	if err != nil {
+		return apperror.NewInternal(fmt.Errorf("marshaling settings: %w", err))
+	}
+
+	return s.repo.UpdateSettings(ctx, campaignID, string(settingsJSON))
+}
+
+// isValidHexColor checks that s is a 7-character hex color (#RRGGBB).
+func isValidHexColor(s string) bool {
+	if len(s) != 7 || s[0] != '#' {
+		return false
+	}
+	for _, c := range s[1:] {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+	return true
 }
 
 // UpdateDmGrants sets which users are granted dm_only content visibility.

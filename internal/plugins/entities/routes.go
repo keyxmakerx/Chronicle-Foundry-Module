@@ -36,6 +36,7 @@ func RegisterRoutes(e *echo.Echo, h *Handler, campaignSvc campaigns.CampaignServ
 
 	// Image API.
 	cg.PUT("/entities/:eid/image", h.UpdateImageAPI, campaigns.RequireRole(campaigns.RoleScribe))
+	cg.PUT("/entities/:eid/cover-image", h.UpdateCoverImageAPI, campaigns.RequireRole(campaigns.RoleScribe))
 
 	// Popup preview config API (Scribe+).
 	cg.PUT("/entities/:eid/popup-config", h.UpdatePopupConfigAPI, campaigns.RequireRole(campaigns.RoleScribe))
@@ -82,6 +83,8 @@ func RegisterRoutes(e *echo.Echo, h *Handler, campaignSvc campaigns.CampaignServ
 
 	// Block types API — returns available block types filtered by campaign addons.
 	cg.GET("/entity-types/block-types", h.BlockTypesAPI, campaigns.RequireRole(campaigns.RoleOwner))
+
+	// Content template routes are registered separately via RegisterContentTemplateRoutes.
 
 	// Entity type layout/color/dashboard API (Owner only).
 	cg.GET("/entity-types/:etid/layout", h.GetEntityTypeLayout, campaigns.RequireRole(campaigns.RoleOwner))

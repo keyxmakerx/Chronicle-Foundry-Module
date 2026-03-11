@@ -18,7 +18,7 @@ templ App(title string) {
 	@Base(title) {
 		<!-- Global HTMX loading indicator (thin bar at top of viewport) -->
 		<div id="htmx-indicator" class="htmx-indicator"></div>
-		<div class="flex h-screen overflow-hidden" x-data="{ sidebarOpen: false }" @chronicle:navigated.window="sidebarOpen = false">
+		<div class="flex h-screen overflow-hidden" x-data="{ sidebarOpen: false, sidebarHidden: localStorage.getItem('chronicle-sidebar-hidden') === 'true' }" @chronicle:navigated.window="sidebarOpen = false">
 			<!-- Mobile backdrop -->
 			<div
 				x-show="sidebarOpen"
@@ -35,6 +35,20 @@ templ App(title string) {
 
 			<!-- Sidebar -->
 			@Sidebar()
+
+			<!-- Floating button to restore hidden sidebar -->
+			<button
+				x-show="sidebarHidden"
+				x-transition:enter="transition-opacity duration-300 delay-300"
+				x-transition:enter-start="opacity-0"
+				x-transition:enter-end="opacity-100"
+				@click="sidebarHidden = false; localStorage.setItem('chronicle-sidebar-hidden', 'false')"
+				class="fixed top-3 left-3 z-50 w-8 h-8 flex items-center justify-center rounded-lg bg-sidebar-bg text-sidebar-text shadow-lg hover:bg-sidebar-hover transition-colors"
+				title="Show sidebar"
+				x-cloak
+			>
+				<i class="fa-solid fa-angles-right text-xs"></i>
+			</button>
 
 			<!-- Main content area -->
 			<div class="flex-1 flex flex-col overflow-hidden min-w-0">
@@ -92,8 +106,13 @@ templ Sidebar() {
 		       md:static md:z-auto md:shrink-0"
 		:class="[
 			sidebarOpen ? 'sidebar-mobile-open shadow-2xl' : '',
-			(!pinned && !hovered) ? 'sidebar-collapsed' : ''
+			(!pinned && !hovered) ? 'sidebar-collapsed' : '',
+			sidebarHidden ? 'sidebar-fully-hidden' : ''
 		]"
+		x-show="!sidebarHidden"
+		x-transition:leave="transition-transform duration-300 ease-in-out"
+		x-transition:leave-start="translate-x-0"
+		x-transition:leave-end="-translate-x-full"
 	>
 		<!-- Logo / Brand + Pin Toggle -->
 		<div class="h-16 flex items-center px-4 border-b border-gray-700 shrink-0">
@@ -110,6 +129,14 @@ templ Sidebar() {
 				:title="pinned ? 'Unpin sidebar' : 'Pin sidebar open'"
 			>
 				<i class="fa-solid fa-thumbtack text-xs transition-transform" :class="{ 'rotate-45 text-gray-600': !pinned }"></i>
+			</button>
+			<!-- Hide sidebar button (visible only when expanded) -->
+			<button
+				class="sidebar-pin-btn w-6 h-6 flex items-center justify-center rounded text-gray-500 hover:text-white hover:bg-gray-700 transition-colors ml-0.5"
+				@click.stop="sidebarHidden = true; localStorage.setItem('chronicle-sidebar-hidden', 'true')"
+				title="Hide sidebar"
+			>
+				<i class="fa-solid fa-angles-left text-xs"></i>
 			</button>
 		</div>
 
@@ -134,12 +161,23 @@ templ Sidebar() {
 			<div class="flex-1 flex flex-col min-h-0 overflow-hidden">
 				<!-- Campaign header + Dashboard (static within zone) -->
 				<div class="shrink-0 pt-3" hx-boost="true" hx-target="#main-content" hx-select="#main-content" hx-swap="innerHTML show:window:top">
-					<div class="px-4 mb-1">
+					<div class="px-4 mb-1 flex items-center gap-2">
+						if GetBrandLogo(ctx) != "" {
+							<img
+								src={ MediaURL(ctx, GetBrandLogo(ctx)) }
+								alt=""
+								class="w-5 h-5 rounded object-cover shrink-0"
+							/>
+						}
 						<a
 							href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s", GetCampaignID(ctx))) }
-							class="text-xs font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-300 transition-colors"
+							class="text-xs font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-300 transition-colors truncate"
 						>
-							{ GetCampaignName(ctx) }
+							if GetBrandName(ctx) != "" {
+								{ GetBrandName(ctx) }
+							} else {
+								{ GetCampaignName(ctx) }
+							}
 						</a>
 					</div>
 					<a
@@ -180,11 +218,22 @@ templ Sidebar() {
 						hx-select="#main-content"
 						hx-swap="innerHTML show:window:top"
 					>
-						<div class="px-4 mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500 sidebar-cat-list-label">
-							Categories
+						<div class="px-4 mb-2 flex items-center justify-between sidebar-cat-list-label">
+							<span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Categories</span>
+							if GetCampaignRole(ctx) >= 3 {
+								<button
+									id="sidebar-reorg-toggle"
+									type="button"
+									class="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:text-gray-300 hover:bg-white/10 transition-colors"
+									data-campaign-id={ GetCampaignID(ctx) }
+									title="Reorder sidebar"
+								>
+									<i class="fa-solid fa-grip-vertical text-[10px]"></i>
+								</button>
+							}
 						</div>
 						for _, et := range GetEntityTypes(ctx) {
-							@entityTypeLink(et.Slug, et.NamePlural, et.Color, et.Icon, GetEntityCount(ctx, et.ID))
+							@entityTypeLink(et.Slug, et.NamePlural, et.Color, et.Icon, GetEntityCount(ctx, et.ID), et.ID)
 						}
 						<a
 							href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/entities", GetCampaignID(ctx))) }
@@ -528,7 +577,7 @@ templ DefaultSidebarNav() {
 
 // entityTypeLink renders a single category link in the sidebar icon list.
 // Clicking triggers the slide-over panel via sidebar_drill.js.
-templ entityTypeLink(slug string, label string, color string, icon string, count int) {
+templ entityTypeLink(slug string, label string, color string, icon string, count int, typeID int) {
 	<a
 		href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/%s", GetCampaignID(ctx), slug)) }
 		hx-boost="false"
@@ -538,6 +587,7 @@ templ entityTypeLink(slug string, label string, color string, icon string, count
 			templ.KV(sidebarNavInactive, !isPathPrefix(ctx, fmt.Sprintf("/campaigns/%s/%s", GetCampaignID(ctx), slug))) }
 		data-cat-slug={ slug }
 		data-cat-url={ fmt.Sprintf("/campaigns/%s/%s", GetCampaignID(ctx), slug) }
+		data-entity-type-id={ strconv.Itoa(typeID) }
 	>
 		<span class="w-4 h-4 mr-3 shrink-0 flex items-center justify-center">
 			if icon != "" {
@@ -691,7 +741,10 @@ templ customNavLink(link SidebarLink) {
 // Topbar renders the top navigation bar with search, campaign breadcrumb,
 // dark mode toggle, and user menu.
 templ Topbar() {
-	<header class="h-16 bg-surface border-b border-edge flex items-center justify-between px-3 md:px-6 shrink-0">
+	<header
+		class="h-16 bg-surface border-b border-edge flex items-center justify-between px-3 md:px-6 shrink-0"
+		style={ topbarInlineStyle(ctx) }
+	>
 		<!-- Left: Hamburger + Campaign selector + Search -->
 		<div class="flex items-center space-x-2 md:space-x-4 min-w-0">
 			<!-- Mobile hamburger -->
@@ -889,6 +942,44 @@ func isPathPrefix(ctx context.Context, prefix string) bool {
 // an external-link icon.
 func isExternalURL(url string) bool {
 	return strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")
+}
+
+// topbarInlineStyle generates inline CSS for the topbar based on campaign
+// visual customization settings. Returns empty string for default styling.
+func topbarInlineStyle(ctx context.Context) string {
+	style := GetTopbarStyle(ctx)
+	if style == nil || style.Mode == "" {
+		return ""
+	}
+	switch style.Mode {
+	case "solid":
+		if style.Color != "" {
+			return fmt.Sprintf("background-color: %s; border-color: transparent;", style.Color)
+		}
+	case "gradient":
+		dir := style.GradientDir
+		if dir == "" {
+			dir = "to right"
+		}
+		// Convert shorthand to CSS gradient direction.
+		switch dir {
+		case "to-r":
+			dir = "to right"
+		case "to-br":
+			dir = "to bottom right"
+		case "to-b":
+			dir = "to bottom"
+		}
+		if style.GradientFrom != "" && style.GradientTo != "" {
+			return fmt.Sprintf("background: linear-gradient(%s, %s, %s); border-color: transparent;", dir, style.GradientFrom, style.GradientTo)
+		}
+	case "image":
+		if style.ImagePath != "" {
+			url := MediaURL(ctx, style.ImagePath)
+			return fmt.Sprintf("background-image: url('%s'); background-size: cover; background-position: center; border-color: transparent;", url)
+		}
+	}
+	return ""
 }
 
 // userInitials returns the first two initials of the user's display name
