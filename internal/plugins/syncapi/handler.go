@@ -111,6 +111,11 @@ func (h *Handler) CreateKey(c echo.Context) error {
 	}
 
 	// Render the key creation result showing the plaintext key once.
+	// For HTMX requests, return just the content fragment to avoid injecting
+	// a full page (with duplicate navbar) inside the existing layout.
+	if middleware.IsHTMX(c) {
+		return middleware.Render(c, http.StatusOK, KeyCreatedFragmentTempl(cc.Campaign.ID, result))
+	}
 	csrfToken := middleware.GetCSRFToken(c)
 	return middleware.Render(c, http.StatusOK, KeyCreatedTempl(cc.Campaign.ID, result, csrfToken))
 }
