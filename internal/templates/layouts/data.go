@@ -39,7 +39,8 @@ const (
 	keyAccentColor       ctxKey = "layout_accent_color"
 	keyBrandName         ctxKey = "layout_brand_name"
 	keyBrandLogo         ctxKey = "layout_brand_logo"
-	keyTopbarStyle       ctxKey = "layout_topbar_style"
+	keyTopbarStyle           ctxKey = "layout_topbar_style"
+	keyDegradedPluginCount   ctxKey = "layout_degraded_plugin_count"
 )
 
 // SidebarEntityType holds the minimum entity type info needed for sidebar
@@ -469,6 +470,18 @@ func SetTopbarStyle(ctx context.Context, style *TopbarStyleData) context.Context
 func GetTopbarStyle(ctx context.Context) *TopbarStyleData {
 	style, _ := ctx.Value(keyTopbarStyle).(*TopbarStyleData)
 	return style
+}
+
+// SetDegradedPluginCount stores the number of unhealthy plugins in the context.
+// Used by the admin sidebar to show a warning badge on the Database link.
+func SetDegradedPluginCount(ctx context.Context, count int) context.Context {
+	return context.WithValue(ctx, keyDegradedPluginCount, count)
+}
+
+// GetDegradedPluginCount returns the number of unhealthy plugins, or 0.
+func GetDegradedPluginCount(ctx context.Context) int {
+	count, _ := ctx.Value(keyDegradedPluginCount).(int)
+	return count
 }
 
 // EscapeJSONString escapes a string for safe embedding inside a JSON

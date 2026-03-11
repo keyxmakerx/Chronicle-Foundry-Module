@@ -2,14 +2,32 @@ package admin
 
 import (
 	"fmt"
+	"strings"
 	"github.com/keyxmakerx/chronicle/internal/templates/layouts"
 )
 
 // AdminDashboardPage renders the admin overview with high-level stats.
-templ AdminDashboardPage(userCount, campaignCount, mediaFileCount int, totalStorageBytes int64, smtpConfigured bool, addonCount int, securityStats *SecurityStats) {
+templ AdminDashboardPage(userCount, campaignCount, mediaFileCount int, totalStorageBytes int64, smtpConfigured bool, addonCount int, securityStats *SecurityStats, degradedPlugins []string) {
 	@layouts.App("Admin Dashboard") {
 		<div class="max-w-5xl mx-auto space-y-6">
 			<h1 class="text-2xl font-bold text-fg">Admin Dashboard</h1>
+
+			<!-- Degraded Plugin Alert Banner -->
+			if len(degradedPlugins) > 0 {
+				<a href="/admin/database" class="flex items-start gap-3 p-4 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors">
+					<i class="fa-solid fa-triangle-exclamation text-red-500 mt-0.5 shrink-0"></i>
+					<div>
+						<p class="text-sm font-semibold text-red-700 dark:text-red-400">
+							{ fmt.Sprintf("%d", len(degradedPlugins)) } plugin(s) need attention
+						</p>
+						<p class="text-xs text-red-600/80 dark:text-red-400/70 mt-0.5">
+							{ strings.Join(degradedPlugins, ", ") } &mdash; pending migrations or schema errors.
+							Click to view the Database Explorer.
+						</p>
+					</div>
+					<i class="fa-solid fa-arrow-right text-red-400 mt-0.5 ml-auto shrink-0"></i>
+				</a>
+			}
 
 			<!-- Stats Cards -->
 			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -116,8 +134,16 @@ templ AdminDashboardPage(userCount, campaignCount, mediaFileCount int, totalStor
 							<i class="fa-solid fa-database text-slate-500"></i>
 						</span>
 					</div>
-					<p class="text-lg font-semibold text-fg mt-2">Schema Explorer</p>
-					<p class="text-xs text-fg-muted mt-1 group-hover:text-accent transition-colors">Tables &amp; migrations &rarr;</p>
+					if len(degradedPlugins) > 0 {
+						<p class="text-lg font-semibold text-amber-600 dark:text-amber-400 mt-2">
+							{ fmt.Sprintf("%d", len(degradedPlugins)) } plugin(s) degraded
+						</p>
+						<p class="text-xs text-fg-muted mt-1">Pending migrations or errors</p>
+					} else {
+						<p class="text-lg font-semibold text-emerald-600 dark:text-emerald-400 mt-2">All Healthy</p>
+						<p class="text-xs text-fg-muted mt-1">All migrations applied</p>
+					}
+					<p class="text-xs text-fg-muted group-hover:text-accent transition-colors">Schema explorer &rarr;</p>
 				</a>
 				<!-- SMTP -->
 				<a href="/admin/smtp" class="card hover:shadow-md transition-shadow group">

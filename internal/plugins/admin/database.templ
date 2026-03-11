@@ -48,6 +48,39 @@ templ AdminDatabasePage(statuses []PluginMigrationStatus, tableCount int, csrfTo
 				</div>
 			}
 
+			<!-- Migration History Timeline -->
+			if hasMigrationHistory(statuses) {
+				<details class="group">
+					<summary class="text-xs text-fg-muted cursor-pointer hover:text-fg-secondary">
+						<i class="fa-solid fa-clock-rotate-left mr-1"></i>
+						Migration History
+						<i class="fa-solid fa-chevron-down text-[10px] ml-1 transition-transform group-open:rotate-180"></i>
+					</summary>
+					<div class="mt-3 card p-0 overflow-hidden">
+						<table class="w-full text-xs">
+							<thead>
+								<tr class="border-b border-edge text-left text-fg-muted bg-surface-alt/50">
+									<th class="px-4 py-2">Plugin</th>
+									<th class="px-4 py-2">Version</th>
+									<th class="px-4 py-2">Applied At</th>
+								</tr>
+							</thead>
+							<tbody>
+								for _, s := range statuses {
+									for _, h := range s.History {
+										<tr class="border-b border-edge last:border-b-0">
+											<td class="px-4 py-1.5 font-medium text-fg capitalize">{ s.Slug }</td>
+											<td class="px-4 py-1.5 text-fg-secondary">v{ fmt.Sprintf("%d", h.Version) }</td>
+											<td class="px-4 py-1.5 text-fg-muted font-mono">{ h.AppliedAt }</td>
+										</tr>
+									}
+								}
+							</tbody>
+						</table>
+					</div>
+				</details>
+			}
+
 			<!-- Schema Diagram -->
 			<div class="card p-0 overflow-hidden">
 				<div class="px-5 py-3 border-b border-edge flex items-center justify-between">
@@ -101,6 +134,16 @@ templ migrationStatusCard(s PluginMigrationStatus) {
 func hasPendingMigrations(statuses []PluginMigrationStatus) bool {
 	for _, s := range statuses {
 		if s.Pending > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// hasMigrationHistory returns true if any plugin has migration history entries.
+func hasMigrationHistory(statuses []PluginMigrationStatus) bool {
+	for _, s := range statuses {
+		if len(s.History) > 0 {
 			return true
 		}
 	}

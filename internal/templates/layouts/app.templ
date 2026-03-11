@@ -524,6 +524,11 @@ templ AdminSidebarNav() {
 					<i class="fa-solid fa-database text-xs"></i>
 				</span>
 				Database
+				if GetDegradedPluginCount(ctx) > 0 {
+					<span class="ml-auto inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-red-500 rounded-full">
+						{ fmt.Sprintf("%d", GetDegradedPluginCount(ctx)) }
+					</span>
+				}
 			</a>
 			<a
 				href="/admin/smtp"

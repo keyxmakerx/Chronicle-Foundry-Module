@@ -214,7 +214,18 @@ func (h *Handler) Dashboard(c echo.Context) error {
 		securityStats, _ = h.securityService.GetStats(ctx)
 	}
 
-	return middleware.Render(c, http.StatusOK, AdminDashboardPage(userCount, campaignCount, mediaFileCount, totalStorageBytes, smtpConfigured, addonCount, securityStats))
+	// Check for degraded plugins to show alert banner.
+	var degradedPlugins []string
+	if h.databaseExplorer != nil {
+		statuses, _ := h.databaseExplorer.GetMigrationStatus(ctx)
+		for _, s := range statuses {
+			if !s.Healthy || s.Pending > 0 {
+				degradedPlugins = append(degradedPlugins, s.Slug)
+			}
+		}
+	}
+
+	return middleware.Render(c, http.StatusOK, AdminDashboardPage(userCount, campaignCount, mediaFileCount, totalStorageBytes, smtpConfigured, addonCount, securityStats, degradedPlugins))
 }
 
 // --- Users ---

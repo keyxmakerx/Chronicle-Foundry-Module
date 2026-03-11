@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/keyxmakerx/chronicle/internal/database"
 )
@@ -62,12 +63,19 @@ type ForeignKeyInfo struct {
 
 // PluginMigrationStatus describes the migration state of a single plugin.
 type PluginMigrationStatus struct {
-	Slug           string `json:"slug"`
-	CurrentVersion int    `json:"currentVersion"`
-	LatestVersion  int    `json:"latestVersion"`
-	Pending        int    `json:"pending"`
-	Healthy        bool   `json:"healthy"`
-	Error          string `json:"error,omitempty"`
+	Slug           string             `json:"slug"`
+	CurrentVersion int                `json:"currentVersion"`
+	LatestVersion  int                `json:"latestVersion"`
+	Pending        int                `json:"pending"`
+	Healthy        bool               `json:"healthy"`
+	Error          string             `json:"error,omitempty"`
+	History        []MigrationHistory `json:"history,omitempty"`
+}
+
+// MigrationHistory records when a specific migration version was applied.
+type MigrationHistory struct {
+	Version   int    `json:"version"`
+	AppliedAt string `json:"appliedAt"` // RFC3339
 }
 
 // databaseExplorer implements DatabaseExplorer with direct DB access.
@@ -242,10 +250,44 @@ func (e *databaseExplorer) GetMigrationStatus(ctx context.Context) ([]PluginMigr
 			status.Pending = 0
 		}
 
+		// Fetch applied migration timestamps.
+		history, err := e.getMigrationHistory(ctx, p.Slug)
+		if err != nil {
+			slog.Warn("failed to read migration history",
+				slog.String("plugin", p.Slug),
+				slog.Any("error", err),
+			)
+		}
+		status.History = history
+
 		statuses = append(statuses, status)
 	}
 
 	return statuses, nil
+}
+
+// getMigrationHistory returns the applied migration versions and timestamps for a plugin.
+func (e *databaseExplorer) getMigrationHistory(ctx context.Context, slug string) ([]MigrationHistory, error) {
+	rows, err := e.db.QueryContext(ctx,
+		`SELECT version, applied_at FROM plugin_schema_versions WHERE plugin_slug = ? ORDER BY version`,
+		slug,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var history []MigrationHistory
+	for rows.Next() {
+		var h MigrationHistory
+		var appliedAt time.Time
+		if err := rows.Scan(&h.Version, &appliedAt); err != nil {
+			return nil, err
+		}
+		h.AppliedAt = appliedAt.Format(time.RFC3339)
+		history = append(history, h)
+	}
+	return history, rows.Err()
 }
 
 // ApplyPendingMigrations runs all pending plugin migrations and updates the

@@ -1295,6 +1295,11 @@ func (a *App) RegisterRoutes() {
 			ctx = layouts.SetUserName(ctx, session.Name)
 			ctx = layouts.SetUserEmail(ctx, session.Email)
 			ctx = layouts.SetIsAdmin(ctx, session.IsAdmin)
+
+			// Inject degraded plugin count for admin sidebar badge.
+			if session.IsAdmin {
+				ctx = layouts.SetDegradedPluginCount(ctx, len(a.PluginHealth.DegradedPlugins()))
+			}
 		}
 
 		// Campaign info from campaign middleware.

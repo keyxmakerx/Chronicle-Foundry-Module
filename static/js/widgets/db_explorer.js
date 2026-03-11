@@ -88,6 +88,15 @@
           return;
         }
 
+        // Search bar.
+        var searchBar = document.createElement('div');
+        searchBar.className = 'flex items-center gap-2 px-4 py-2 border-b border-edge';
+        searchBar.innerHTML = '<i class="fa-solid fa-search text-xs text-fg-muted"></i>' +
+          '<input type="text" class="bg-transparent border-none outline-none text-sm text-fg flex-1" ' +
+          'placeholder="Search tables or columns..." data-db-search />' +
+          '<span class="text-xs text-fg-muted" data-db-search-count></span>';
+        el.appendChild(searchBar);
+
         var width = el.clientWidth || 900;
         var height = 600;
 
@@ -304,6 +313,61 @@
             detail.classList.add('hidden');
           }
         });
+
+        // Table/column search — highlights matching nodes and dims others.
+        var searchInput = el.querySelector('[data-db-search]');
+        var searchCount = el.querySelector('[data-db-search-count]');
+        var searchTimer = null;
+        if (searchInput) {
+          searchInput.addEventListener('input', function () {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(function () {
+              var q = searchInput.value.trim().toLowerCase();
+              if (!q) {
+                // Reset: show all nodes at full opacity.
+                nodeGroups.attr('opacity', 1);
+                links.attr('opacity', 1);
+                linkLabels.attr('opacity', 1);
+                if (searchCount) searchCount.textContent = '';
+                return;
+              }
+
+              var matchCount = 0;
+              var matchSet = {};
+              nodeGroups.each(function (d) {
+                // Match table name or any column name.
+                var match = d.name.toLowerCase().indexOf(q) >= 0;
+                if (!match && d.columns) {
+                  for (var i = 0; i < d.columns.length; i++) {
+                    if (d.columns[i].name.toLowerCase().indexOf(q) >= 0) {
+                      match = true;
+                      break;
+                    }
+                  }
+                }
+                matchSet[d.id] = match;
+                if (match) matchCount++;
+                d3.select(this).attr('opacity', match ? 1 : 0.15);
+              });
+
+              // Dim edges not connecting matched nodes.
+              links.attr('opacity', function (d) {
+                var src = typeof d.source === 'object' ? d.source.id : d.source;
+                var tgt = typeof d.target === 'object' ? d.target.id : d.target;
+                return (matchSet[src] || matchSet[tgt]) ? 0.6 : 0.05;
+              });
+              linkLabels.attr('opacity', function (d) {
+                var src = typeof d.source === 'object' ? d.source.id : d.source;
+                var tgt = typeof d.target === 'object' ? d.target.id : d.target;
+                return (matchSet[src] || matchSet[tgt]) ? 0.8 : 0.05;
+              });
+
+              if (searchCount) {
+                searchCount.textContent = matchCount + ' / ' + nodes.length;
+              }
+            }, 150);
+          });
+        }
 
         // Simulation tick.
         simulation.on('tick', function () {
