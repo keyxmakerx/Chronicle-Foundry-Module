@@ -10,6 +10,16 @@
 ## Last Updated
 2026-03-11 -- **Sprint W-0.5: Visual Customization + Admin DB Explorer (IN PROGRESS).**
 
+28. **Customization Hub & Features page bug fixes.** Five issues resolved:
+    - **Settings page deduplication**: Removed backdrop upload and accent color picker from campaign settings page — appearance customization now lives exclusively in the Customization Hub's Appearance tab.
+    - **Accent color page refresh fix**: `UpdateAccentColorAPI` no longer sends `HX-Refresh: true`, preventing the full page reload that navigated users away from the Appearance tab.
+    - **Draft+Save model for appearance**: Appearance tab now uses a local draft model — brand name, accent color, and topbar style changes preview instantly but are only persisted when the user clicks "Save Changes". Backdrop upload remains immediate (file upload requires server storage).
+    - **Features tab removed from Customization Hub**: The "Features & Packs" tab was removed; features are managed exclusively on the dedicated Plugin Hub page (`/plugins`). The per-category Attributes editor was moved into the Categories tab where it fits naturally.
+    - **Plugin Hub in-place toggle**: Feature enable/disable on the Plugin Hub now uses `HX-Trigger: plugin-hub-refresh` instead of `HX-Redirect`, enabling instant in-place list refresh via a new `/plugins/fragment` endpoint.
+
+### Previous Update
+2026-03-11 -- **Sprint W-0.5: Visual Customization + Admin DB Explorer (IN PROGRESS).**
+
 27. **Fix: Embed plugin migrations in binary (ADR-030).** Root cause of entity page errors and DB Explorer showing 0/0: plugin migrations used relative filesystem paths (`internal/plugins/*/migrations/`) that only resolve when the binary's CWD is the project root. In Docker, the binary runs from `/app` so migration directories were never found, tables were never created, and entity pages crashed. Fix: each plugin now embeds its `migrations/*.sql` via Go's `embed.FS`. `PluginSchema.MigrationsDir` (string) replaced with `MigrationsFS` (`fs.FS`). `RegisteredPlugins()` moved from `database` package to `cmd/server/main.go` to avoid import cycles (database can't import plugin packages). `PluginSchemas` stored on `App` struct and passed to `DatabaseExplorer` for on-demand re-migration. New `embed.go` files in calendar, maps, sessions, timeline, syncapi plugins.
 
 ### Previous Update
