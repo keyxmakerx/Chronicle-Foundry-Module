@@ -85,6 +85,13 @@ templ CustomizePage(cc *CampaignContext, entityTypes []SettingsEntityType, csrfT
 				</button>
 				<button
 					class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
+					:class="tab === 'appearance' ? 'text-accent border-accent' : 'text-fg-secondary border-transparent hover:text-fg hover:border-edge'"
+					@click="tab = 'appearance'"
+				>
+					<i class="fa-solid fa-palette mr-1.5 text-xs"></i> Appearance
+				</button>
+				<button
+					class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
 					:class="tab === 'extensions' ? 'text-accent border-accent' : 'text-fg-secondary border-transparent hover:text-fg hover:border-edge'"
 					@click="tab = 'extensions'"
 				>
@@ -122,6 +129,13 @@ templ CustomizePage(cc *CampaignContext, entityTypes []SettingsEntityType, csrfT
 				<div x-show="tab === 'content-templates'" x-cloak class="h-full overflow-y-auto">
 					<div class="max-w-3xl mx-auto px-6 py-4">
 						@contentTemplatesTab(cc, csrfToken)
+					</div>
+				</div>
+
+				<!-- Appearance tab: branding, topbar, and accent color customization -->
+				<div x-show="tab === 'appearance'" x-cloak class="h-full overflow-y-auto">
+					<div class="max-w-3xl mx-auto px-6 py-4">
+						@appearanceTab(cc, csrfToken)
 					</div>
 				</div>
 

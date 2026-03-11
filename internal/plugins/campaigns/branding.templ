@@ -1,9 +1,12 @@
-// branding.templ renders the backdrop upload section and accent color picker
-// for campaign settings.
+// branding.templ renders the backdrop upload section, accent color picker,
+// and appearance customization tab for campaign settings.
 
 package campaigns
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/keyxmakerx/chronicle/internal/templates/layouts"
+)
 
 // BackdropUploadSection renders the backdrop image upload/remove UI fragment.
 // Used as both the initial render and the HTMX swap target after upload/remove.
@@ -122,4 +125,149 @@ templ AccentColorPicker(campaignID string, currentColor string, csrfToken string
 			<p class="text-[10px] text-fg-muted">Using default theme color</p>
 		}
 	</div>
+}
+
+// appearanceTab renders the visual customization editor in the Customization Hub.
+// Contains: faux site outline, brand name/logo, accent color, and topbar styling.
+templ appearanceTab(cc *CampaignContext, csrfToken string) {
+	<h2 class="text-base font-semibold text-fg mb-1">Appearance</h2>
+	<p class="text-xs text-fg-secondary mb-6">Customize the visual style of your campaign.</p>
+
+	<div
+		data-widget="appearance-editor"
+		data-campaign-id={ cc.Campaign.ID }
+		data-csrf={ csrfToken }
+		data-brand-name={ cc.Campaign.ParseSettings().BrandName }
+		data-brand-logo={ cc.Campaign.ParseSettings().BrandLogo }
+		data-accent-color={ cc.Campaign.ParseSettings().AccentColor }
+		data-topbar-style={ topbarStyleJSON(cc.Campaign.ParseSettings().TopbarStyle) }
+	>
+		<!-- Faux site outline preview -->
+		<div class="rounded-lg border border-edge overflow-hidden mb-6 bg-bg-secondary">
+			<div class="flex">
+				<!-- Faux sidebar -->
+				<div class="w-12 bg-[#1a1c23] shrink-0 flex flex-col items-center py-3 gap-2">
+					<div class="w-5 h-5 rounded bg-gray-600"></div>
+					<div class="w-5 h-5 rounded bg-gray-700"></div>
+					<div class="w-5 h-5 rounded bg-gray-700"></div>
+				</div>
+				<!-- Faux main area -->
+				<div class="flex-1 flex flex-col min-h-[160px]">
+					<!-- Faux topbar (reflects live customization) -->
+					<div
+						id="appearance-preview-topbar"
+						class="h-8 bg-surface border-b border-edge flex items-center px-3"
+					>
+						<span class="text-[10px] text-fg-muted font-medium" id="appearance-preview-brand">
+							if cc.Campaign.ParseSettings().BrandName != "" {
+								{ cc.Campaign.ParseSettings().BrandName }
+							} else {
+								{ cc.Campaign.Name }
+							}
+						</span>
+					</div>
+					<!-- Faux content -->
+					<div class="flex-1 p-4">
+						<div class="w-3/4 h-2 bg-edge rounded mb-2"></div>
+						<div class="w-1/2 h-2 bg-edge rounded mb-4"></div>
+						<div class="grid grid-cols-2 gap-2">
+							<div class="h-8 bg-edge rounded"></div>
+							<div class="h-8 bg-edge rounded"></div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Brand name -->
+		<div class="card p-4 mb-4">
+			<h3 class="text-sm font-semibold text-fg mb-2">
+				<i class="fa-solid fa-tag text-xs mr-1.5 text-fg-muted"></i> Brand Name
+			</h3>
+			<p class="text-xs text-fg-secondary mb-3">Replace the campaign name in the sidebar with a custom brand name.</p>
+			<div class="flex gap-2">
+				<input
+					type="text"
+					id="appearance-brand-name"
+					class="input text-sm flex-1"
+					placeholder={ cc.Campaign.Name }
+					maxlength="40"
+					value={ cc.Campaign.ParseSettings().BrandName }
+				/>
+				<button
+					type="button"
+					id="appearance-brand-clear"
+					class="btn-secondary text-xs px-3"
+					title="Clear brand name"
+				>
+					<i class="fa-solid fa-xmark"></i>
+				</button>
+			</div>
+		</div>
+
+		<!-- Accent color -->
+		<div class="card p-4 mb-4">
+			<h3 class="text-sm font-semibold text-fg mb-2">
+				<i class="fa-solid fa-droplet text-xs mr-1.5 text-fg-muted"></i> Accent Color
+			</h3>
+			<p class="text-xs text-fg-secondary mb-3">Theme color used for buttons, links, and highlights.</p>
+			@AccentColorPicker(cc.Campaign.ID, cc.Campaign.ParseSettings().AccentColor, csrfToken)
+		</div>
+
+		<!-- Topbar style -->
+		<div class="card p-4 mb-4">
+			<h3 class="text-sm font-semibold text-fg mb-2">
+				<i class="fa-solid fa-paintbrush text-xs mr-1.5 text-fg-muted"></i> Top Bar Style
+			</h3>
+			<p class="text-xs text-fg-secondary mb-3">Customize the top navigation bar appearance.</p>
+			<div class="flex gap-2 mb-3" id="appearance-topbar-mode">
+				<button type="button" data-mode="" class="btn-secondary text-xs px-3 py-1.5">Default</button>
+				<button type="button" data-mode="solid" class="btn-secondary text-xs px-3 py-1.5">Solid Color</button>
+				<button type="button" data-mode="gradient" class="btn-secondary text-xs px-3 py-1.5">Gradient</button>
+			</div>
+			<!-- Solid color options -->
+			<div id="appearance-topbar-solid" class="hidden space-y-2">
+				<label class="text-xs text-fg-secondary">Color</label>
+				<input type="color" id="appearance-topbar-color" class="w-10 h-8 rounded border border-edge cursor-pointer"/>
+			</div>
+			<!-- Gradient options -->
+			<div id="appearance-topbar-gradient" class="hidden space-y-2">
+				<div class="flex gap-3">
+					<div>
+						<label class="text-xs text-fg-secondary block mb-1">From</label>
+						<input type="color" id="appearance-topbar-gradient-from" class="w-10 h-8 rounded border border-edge cursor-pointer"/>
+					</div>
+					<div>
+						<label class="text-xs text-fg-secondary block mb-1">To</label>
+						<input type="color" id="appearance-topbar-gradient-to" class="w-10 h-8 rounded border border-edge cursor-pointer"/>
+					</div>
+					<div class="flex-1">
+						<label class="text-xs text-fg-secondary block mb-1">Direction</label>
+						<select id="appearance-topbar-gradient-dir" class="input text-xs py-1.5">
+							<option value="to-r">Left to Right</option>
+							<option value="to-br">Top-Left to Bottom-Right</option>
+							<option value="to-b">Top to Bottom</option>
+						</select>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// topbarStyleJSON serializes a TopbarStyle to a JSON data attribute value.
+func topbarStyleJSON(style *TopbarStyle) string {
+	if style == nil {
+		return "{}"
+	}
+	// Manual construction to avoid importing encoding/json in templ file.
+	return fmt.Sprintf(
+		`{"mode":"%s","color":"%s","gradient_from":"%s","gradient_to":"%s","gradient_dir":"%s","image_path":"%s"}`,
+		layouts.EscapeJSONString(style.Mode),
+		layouts.EscapeJSONString(style.Color),
+		layouts.EscapeJSONString(style.GradientFrom),
+		layouts.EscapeJSONString(style.GradientTo),
+		layouts.EscapeJSONString(style.GradientDir),
+		layouts.EscapeJSONString(style.ImagePath),
+	)
 }

@@ -5,7 +5,10 @@
 // Data flow: Handler/Middleware → Echo Context → LayoutInjector → Go Context → Templ
 package layouts
 
-import "context"
+import (
+	"context"
+	"strings"
+)
 
 // ctxKey is a private type for context keys to prevent collisions.
 type ctxKey string
@@ -34,6 +37,9 @@ const (
 	keyMediaThumbFunc    ctxKey = "layout_media_thumb_func"
 	keyExtWidgetScripts  ctxKey = "layout_ext_widget_scripts"
 	keyAccentColor       ctxKey = "layout_accent_color"
+	keyBrandName         ctxKey = "layout_brand_name"
+	keyBrandLogo         ctxKey = "layout_brand_logo"
+	keyTopbarStyle       ctxKey = "layout_topbar_style"
 )
 
 // SidebarEntityType holds the minimum entity type info needed for sidebar
@@ -419,4 +425,57 @@ func SetAccentColor(ctx context.Context, color string) context.Context {
 func GetAccentColor(ctx context.Context) string {
 	color, _ := ctx.Value(keyAccentColor).(string)
 	return color
+}
+
+// SetBrandName stores the campaign's custom brand name in the context.
+func SetBrandName(ctx context.Context, name string) context.Context {
+	return context.WithValue(ctx, keyBrandName, name)
+}
+
+// GetBrandName returns the campaign's custom brand name, or empty string for default.
+func GetBrandName(ctx context.Context) string {
+	name, _ := ctx.Value(keyBrandName).(string)
+	return name
+}
+
+// SetBrandLogo stores the campaign's brand logo media path in the context.
+func SetBrandLogo(ctx context.Context, path string) context.Context {
+	return context.WithValue(ctx, keyBrandLogo, path)
+}
+
+// GetBrandLogo returns the campaign's brand logo path, or empty string if none.
+func GetBrandLogo(ctx context.Context) string {
+	path, _ := ctx.Value(keyBrandLogo).(string)
+	return path
+}
+
+// TopbarStyleData holds topbar visual customization for template rendering.
+// Defined here to avoid importing the campaigns package.
+type TopbarStyleData struct {
+	Mode         string
+	Color        string
+	GradientFrom string
+	GradientTo   string
+	GradientDir  string
+	ImagePath    string
+}
+
+// SetTopbarStyle stores the campaign's topbar style in the context.
+func SetTopbarStyle(ctx context.Context, style *TopbarStyleData) context.Context {
+	return context.WithValue(ctx, keyTopbarStyle, style)
+}
+
+// GetTopbarStyle returns the campaign's topbar style, or nil for default.
+func GetTopbarStyle(ctx context.Context) *TopbarStyleData {
+	style, _ := ctx.Value(keyTopbarStyle).(*TopbarStyleData)
+	return style
+}
+
+// EscapeJSONString escapes a string for safe embedding inside a JSON
+// double-quoted value. Only handles the characters that could break
+// the JSON structure (backslash and double-quote).
+func EscapeJSONString(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `"`, `\"`)
+	return s
 }

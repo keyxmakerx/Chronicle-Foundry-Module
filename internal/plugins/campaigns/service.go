@@ -51,6 +51,8 @@ type CampaignService interface {
 	// Backdrop and branding
 	UpdateBackdropPath(ctx context.Context, campaignID string, path *string) error
 	UpdateAccentColor(ctx context.Context, campaignID string, color string) error
+	UpdateBranding(ctx context.Context, campaignID, brandName, brandLogo string) error
+	UpdateTopbarStyle(ctx context.Context, campaignID string, style *TopbarStyle) error
 	UpdateDmGrants(ctx context.Context, campaignID string, userIDs []string) error
 
 	// Sidebar configuration
@@ -629,6 +631,59 @@ func (s *campaignService) UpdateAccentColor(ctx context.Context, campaignID stri
 
 	settings := campaign.ParseSettings()
 	settings.AccentColor = color
+
+	settingsJSON, err := json.Marshal(settings)
+	if err != nil {
+		return apperror.NewInternal(fmt.Errorf("marshaling settings: %w", err))
+	}
+
+	return s.repo.UpdateSettings(ctx, campaignID, string(settingsJSON))
+}
+
+// UpdateBranding sets the campaign's custom brand name and logo path.
+// Brand name max 40 chars. Empty strings clear the respective fields.
+func (s *campaignService) UpdateBranding(ctx context.Context, campaignID, brandName, brandLogo string) error {
+	if len(brandName) > 40 {
+		return apperror.NewBadRequest("brand name must be 40 characters or fewer")
+	}
+
+	campaign, err := s.repo.FindByID(ctx, campaignID)
+	if err != nil {
+		return err
+	}
+
+	settings := campaign.ParseSettings()
+	settings.BrandName = brandName
+	settings.BrandLogo = brandLogo
+
+	settingsJSON, err := json.Marshal(settings)
+	if err != nil {
+		return apperror.NewInternal(fmt.Errorf("marshaling settings: %w", err))
+	}
+
+	return s.repo.UpdateSettings(ctx, campaignID, string(settingsJSON))
+}
+
+// UpdateTopbarStyle sets the campaign's topbar visual customization.
+// Nil style clears the customization (reverts to default).
+func (s *campaignService) UpdateTopbarStyle(ctx context.Context, campaignID string, style *TopbarStyle) error {
+	if style != nil {
+		// Validate mode.
+		switch style.Mode {
+		case "solid", "gradient", "image", "":
+			// ok
+		default:
+			return apperror.NewBadRequest("invalid topbar mode, expected solid, gradient, or image")
+		}
+	}
+
+	campaign, err := s.repo.FindByID(ctx, campaignID)
+	if err != nil {
+		return err
+	}
+
+	settings := campaign.ParseSettings()
+	settings.TopbarStyle = style
 
 	settingsJSON, err := json.Marshal(settings)
 	if err != nil {

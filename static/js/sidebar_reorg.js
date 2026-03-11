@@ -183,18 +183,27 @@
         }
       }
 
-      // Category drag events.
-      link.addEventListener('dragstart', onCatDragStart);
-      link.addEventListener('dragover', onCatDragOver);
-      link.addEventListener('dragenter', onCatDragEnter);
-      link.addEventListener('dragleave', onCatDragLeave);
-      link.addEventListener('drop', onCatDrop);
-      link.addEventListener('dragend', onCatDragEnd);
+      // Category drag events — store refs on element for cleanup.
+      link._reorgDragStart = onCatDragStart.bind(link);
+      link._reorgDragOver = onCatDragOver.bind(link);
+      link._reorgDragEnter = onCatDragEnter.bind(link);
+      link._reorgDragLeave = onCatDragLeave.bind(link);
+      link._reorgDrop = onCatDrop.bind(link);
+      link._reorgDragEnd = onCatDragEnd.bind(link);
+      link.addEventListener('dragstart', link._reorgDragStart);
+      link.addEventListener('dragover', link._reorgDragOver);
+      link.addEventListener('dragenter', link._reorgDragEnter);
+      link.addEventListener('dragleave', link._reorgDragLeave);
+      link.addEventListener('drop', link._reorgDrop);
+      link.addEventListener('dragend', link._reorgDragEnd);
 
-      // Touch events for mobile.
-      link.addEventListener('touchstart', onCatTouchStart, { passive: false });
-      link.addEventListener('touchmove', onCatTouchMove, { passive: false });
-      link.addEventListener('touchend', onCatTouchEnd);
+      // Touch events for mobile — store refs for cleanup.
+      link._reorgTouchStart = onCatTouchStart.bind(link);
+      link._reorgTouchMove = onCatTouchMove.bind(link);
+      link._reorgTouchEnd = onCatTouchEnd.bind(link);
+      link.addEventListener('touchstart', link._reorgTouchStart, { passive: false });
+      link.addEventListener('touchmove', link._reorgTouchMove, { passive: false });
+      link.addEventListener('touchend', link._reorgTouchEnd);
     });
   }
 
@@ -342,9 +351,20 @@
       var toggle = link.querySelector('.reorg-visibility-toggle');
       if (toggle) toggle.remove();
 
-      // Remove event listeners by cloning (simplest cleanup).
-      // Note: not needed since deactivate removes draggable attr,
-      // and drag events won't fire without draggable.
+      // Remove all event listeners added during activation.
+      if (link._reorgDragStart) {
+        link.removeEventListener('dragstart', link._reorgDragStart);
+        link.removeEventListener('dragover', link._reorgDragOver);
+        link.removeEventListener('dragenter', link._reorgDragEnter);
+        link.removeEventListener('dragleave', link._reorgDragLeave);
+        link.removeEventListener('drop', link._reorgDrop);
+        link.removeEventListener('dragend', link._reorgDragEnd);
+      }
+      if (link._reorgTouchStart) {
+        link.removeEventListener('touchstart', link._reorgTouchStart);
+        link.removeEventListener('touchmove', link._reorgTouchMove);
+        link.removeEventListener('touchend', link._reorgTouchEnd);
+      }
     });
   }
 

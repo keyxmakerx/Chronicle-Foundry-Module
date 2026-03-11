@@ -161,12 +161,23 @@ templ Sidebar() {
 			<div class="flex-1 flex flex-col min-h-0 overflow-hidden">
 				<!-- Campaign header + Dashboard (static within zone) -->
 				<div class="shrink-0 pt-3" hx-boost="true" hx-target="#main-content" hx-select="#main-content" hx-swap="innerHTML show:window:top">
-					<div class="px-4 mb-1">
+					<div class="px-4 mb-1 flex items-center gap-2">
+						if GetBrandLogo(ctx) != "" {
+							<img
+								src={ MediaURL(ctx, GetBrandLogo(ctx)) }
+								alt=""
+								class="w-5 h-5 rounded object-cover shrink-0"
+							/>
+						}
 						<a
 							href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s", GetCampaignID(ctx))) }
-							class="text-xs font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-300 transition-colors"
+							class="text-xs font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-300 transition-colors truncate"
 						>
-							{ GetCampaignName(ctx) }
+							if GetBrandName(ctx) != "" {
+								{ GetBrandName(ctx) }
+							} else {
+								{ GetCampaignName(ctx) }
+							}
 						</a>
 					</div>
 					<a
@@ -730,7 +741,10 @@ templ customNavLink(link SidebarLink) {
 // Topbar renders the top navigation bar with search, campaign breadcrumb,
 // dark mode toggle, and user menu.
 templ Topbar() {
-	<header class="h-16 bg-surface border-b border-edge flex items-center justify-between px-3 md:px-6 shrink-0">
+	<header
+		class="h-16 bg-surface border-b border-edge flex items-center justify-between px-3 md:px-6 shrink-0"
+		style={ topbarInlineStyle(ctx) }
+	>
 		<!-- Left: Hamburger + Campaign selector + Search -->
 		<div class="flex items-center space-x-2 md:space-x-4 min-w-0">
 			<!-- Mobile hamburger -->
@@ -928,6 +942,46 @@ func isPathPrefix(ctx context.Context, prefix string) bool {
 // an external-link icon.
 func isExternalURL(url string) bool {
 	return strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")
+}
+
+// topbarInlineStyle generates inline CSS for the topbar based on campaign
+// visual customization settings. Returns empty string for default styling.
+func topbarInlineStyle(ctx context.Context) string {
+	style := GetTopbarStyle(ctx)
+	if style == nil || style.Mode == "" {
+		return ""
+	}
+	switch style.Mode {
+	case "solid":
+		if style.Color != "" {
+			return fmt.Sprintf("background-color: %s; border-color: transparent;", style.Color)
+		}
+	case "gradient":
+		dir := style.GradientDir
+		if dir == "" {
+			dir = "to right"
+		}
+		// Convert shorthand to CSS gradient direction.
+		switch dir {
+		case "to-r":
+			dir = "to right"
+		case "to-br":
+			dir = "to bottom right"
+		case "to-b":
+			dir = "to bottom"
+		case "to-bl":
+			dir = "to bottom left"
+		}
+		if style.GradientFrom != "" && style.GradientTo != "" {
+			return fmt.Sprintf("background: linear-gradient(%s, %s, %s); border-color: transparent;", dir, style.GradientFrom, style.GradientTo)
+		}
+	case "image":
+		if style.ImagePath != "" {
+			url := MediaURL(ctx, style.ImagePath)
+			return fmt.Sprintf("background-image: url('%s'); background-size: cover; background-position: center; border-color: transparent;", url)
+		}
+	}
+	return ""
 }
 
 // userInitials returns the first two initials of the user's display name

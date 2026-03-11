@@ -1298,9 +1298,26 @@ func (a *App) RegisterRoutes() {
 			ctx = layouts.SetCampaignID(ctx, cc.Campaign.ID)
 			ctx = layouts.SetCampaignName(ctx, cc.Campaign.Name)
 
-			// Accent color from campaign settings.
-			if accentColor := cc.Campaign.ParseSettings().AccentColor; accentColor != "" {
-				ctx = layouts.SetAccentColor(ctx, accentColor)
+			// Campaign visual customization from settings.
+			campaignSettings := cc.Campaign.ParseSettings()
+			if campaignSettings.AccentColor != "" {
+				ctx = layouts.SetAccentColor(ctx, campaignSettings.AccentColor)
+			}
+			if campaignSettings.BrandName != "" {
+				ctx = layouts.SetBrandName(ctx, campaignSettings.BrandName)
+			}
+			if campaignSettings.BrandLogo != "" {
+				ctx = layouts.SetBrandLogo(ctx, campaignSettings.BrandLogo)
+			}
+			if campaignSettings.TopbarStyle != nil {
+				ctx = layouts.SetTopbarStyle(ctx, &layouts.TopbarStyleData{
+					Mode:         campaignSettings.TopbarStyle.Mode,
+					Color:        campaignSettings.TopbarStyle.Color,
+					GradientFrom: campaignSettings.TopbarStyle.GradientFrom,
+					GradientTo:   campaignSettings.TopbarStyle.GradientTo,
+					GradientDir:  campaignSettings.TopbarStyle.GradientDir,
+					ImagePath:    campaignSettings.TopbarStyle.ImagePath,
+				})
 			}
 
 			// "View as player" override: when an owner has the toggle active,

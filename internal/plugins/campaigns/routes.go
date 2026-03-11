@@ -61,6 +61,8 @@ func RegisterRoutes(e *echo.Echo, h *Handler, svc CampaignService, authSvc auth.
 	cg.POST("/backdrop", h.UploadBackdrop, RequireRole(RoleOwner))
 	cg.DELETE("/backdrop", h.RemoveBackdrop, RequireRole(RoleOwner))
 	cg.PUT("/accent-color", h.UpdateAccentColorAPI, RequireRole(RoleOwner))
+	cg.PUT("/branding", h.UpdateBrandingAPI, RequireRole(RoleOwner))
+	cg.PUT("/topbar-style", h.UpdateTopbarStyleAPI, RequireRole(RoleOwner))
 
 	// DM grants (Owner only).
 	cg.GET("/dm-grants", h.GetDmGrantsAPI, RequireRole(RoleOwner))

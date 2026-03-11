@@ -280,8 +280,21 @@ func (c *Campaign) ParseDashboardLayout() *DashboardLayout {
 // CampaignSettings holds campaign-level configuration stored as JSON in
 // the campaigns.settings column. Accent color, display preferences, etc.
 type CampaignSettings struct {
-	AccentColor string   `json:"accent_color,omitempty"`   // Hex color, e.g. "#6366f1".
-	DmGrantIDs  []string `json:"dm_grant_ids,omitempty"`   // User IDs granted dm_only visibility.
+	AccentColor  string       `json:"accent_color,omitempty"`   // Hex color, e.g. "#6366f1".
+	DmGrantIDs   []string     `json:"dm_grant_ids,omitempty"`   // User IDs granted dm_only visibility.
+	BrandName    string       `json:"brand_name,omitempty"`     // Custom sidebar brand name (replaces campaign name).
+	BrandLogo    string       `json:"brand_logo,omitempty"`     // Media path for brand logo image.
+	TopbarStyle  *TopbarStyle `json:"topbar_style,omitempty"`   // Topbar visual customization.
+}
+
+// TopbarStyle configures the visual appearance of the campaign's top navigation bar.
+type TopbarStyle struct {
+	Mode         string `json:"mode"`                       // "solid", "gradient", or "image".
+	Color        string `json:"color,omitempty"`             // Hex color for solid mode.
+	GradientFrom string `json:"gradient_from,omitempty"`     // Start color for gradient mode.
+	GradientTo   string `json:"gradient_to,omitempty"`       // End color for gradient mode.
+	GradientDir  string `json:"gradient_dir,omitempty"`      // Direction: "to-r", "to-br", etc.
+	ImagePath    string `json:"image_path,omitempty"`        // Media path for background image.
 }
 
 // ParseSettings parses the campaign's settings JSON into a CampaignSettings

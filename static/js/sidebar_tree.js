@@ -21,6 +21,10 @@
   var INDENT_PX = 14;
   var STORAGE_KEY_PREFIX = 'chronicle-tree-collapsed-';
 
+  // Track the current container for the reorg-changed listener (IIFE-scoped
+  // so the listener is registered once, not per initTree call).
+  var currentTreeContainer = null;
+
   /**
    * Initialize the tree for a freshly loaded entity list.
    * Reads the flat list of .sidebar-tree-item links, builds a parent-child
@@ -292,10 +296,8 @@
     dropIndicator.className = 'sidebar-drop-indicator';
     dropIndicator.style.display = 'none';
 
-    // Listen for reorg mode changes.
-    document.addEventListener('chronicle:reorg-changed', function (e) {
-      updateDraggable(container, e.detail && e.detail.active);
-    });
+    // Store container reference for the IIFE-scoped reorg listener.
+    currentTreeContainer = container;
 
     // Check initial state (in case reorg was active before tree init).
     if (isReorgActive(container)) {
@@ -513,14 +515,15 @@
     if (position === 'before') {
       if (targetIdx === 0) {
         // Placing before the first sibling: use target's order - 1 (min 0).
-        var targetOrder = parseInt(targetNode.querySelector('.sidebar-tree-item')?.getAttribute('data-sort-order') || '0', 10);
+        var targetEl = targetNode.querySelector('.sidebar-tree-item');
+        var targetOrder = parseInt(targetEl ? targetEl.getAttribute('data-sort-order') : '0', 10);
         return Math.max(0, targetOrder - 1);
       }
       // Place between previous sibling and target.
       var prevItem = siblings[targetIdx - 1].querySelector('.sidebar-tree-item');
       var targetItem = targetNode.querySelector('.sidebar-tree-item');
-      var prevOrder = parseInt(prevItem?.getAttribute('data-sort-order') || '0', 10);
-      var targetOrder2 = parseInt(targetItem?.getAttribute('data-sort-order') || '0', 10);
+      var prevOrder = parseInt(prevItem ? prevItem.getAttribute('data-sort-order') : '0', 10);
+      var targetOrder2 = parseInt(targetItem ? targetItem.getAttribute('data-sort-order') : '0', 10);
       // Use midpoint if there's room, otherwise server re-normalizes.
       if (targetOrder2 > prevOrder + 1) {
         return Math.floor((prevOrder + targetOrder2) / 2);
@@ -567,6 +570,15 @@
       console.error('sidebar_tree: reorder failed', err);
     });
   }
+
+  // Single IIFE-scoped listener for reorg mode changes. Uses
+  // currentTreeContainer (updated by setupDragAndDrop on each initTree)
+  // so the listener is never duplicated across HTMX re-inits.
+  document.addEventListener('chronicle:reorg-changed', function (e) {
+    if (currentTreeContainer) {
+      updateDraggable(currentTreeContainer, e.detail && e.detail.active);
+    }
+  });
 
   // Inject CSS for guide lines (uses custom property set per-node).
   var style = document.createElement('style');

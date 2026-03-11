@@ -8,9 +8,14 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-10 -- **Sprint W-0: Nav Menu Reorg Mode (IN PROGRESS).**
+2026-03-11 -- **Sprint W-0.5: Visual Customization (IN PROGRESS).**
 
-24. Starting W-0: Sidebar reorg mode toggle button, inline category reorder, conditional entity drag-and-drop, touch support for mobile. Primarily frontend work — existing APIs (`PUT /sidebar-config`, `PUT /entities/:eid/reorder`) already support reordering. Also updating stale relations widget documentation.
+25. Starting W-0.5: Per-campaign brand name/logo, topbar color/gradient/image customization, visual editor Appearance tab in Customization Hub. Also fixing 3 bugs from W-0 (event listener leak in sidebar_tree.js, touch listener cleanup in sidebar_reorg.js, ES2020 optional chaining compat) and updating stale entity/campaign documentation.
+
+### Previous Update
+2026-03-11 -- **Sprint W-0: Nav Menu Reorg Mode (COMPLETE).**
+
+24. W-0 complete: Sidebar reorg mode toggle button (Owner-only, grip icon next to "Categories" header), inline category drag-to-reorder with visibility toggles, conditional entity drag-and-drop (only active in reorg mode), touch D&D support for mobile, `data-entity-type-id` on category links, auto-exit on navigation. New file `sidebar_reorg.js`. Modified `sidebar_tree.js` to gate D&D behind `data-reorg-active`. Relations `.ai.md` updated with graph visualization features.
 
 ### Previous Update
 2026-03-10 -- **Sprint V-4: Enhanced Graph View & Cover Images (COMPLETE).**
