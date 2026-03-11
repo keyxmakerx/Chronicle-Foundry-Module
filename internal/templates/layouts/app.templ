@@ -659,6 +659,17 @@ templ SidebarDrillPanel(campaignID string, et SidebarEntityType, count int) {
 					>{ strconv.Itoa(count) }</span>
 				}
 			</a>
+			<!-- Reorg toggle for owners (delegates to main sidebar-reorg-toggle) -->
+			if GetCampaignRole(ctx) >= 3 {
+				<button
+					type="button"
+					class="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:text-gray-300 hover:bg-white/10 transition-colors shrink-0"
+					title="Reorder pages"
+					onclick="var t=document.getElementById('sidebar-reorg-toggle');if(t)t.click();"
+				>
+					<i class="fa-solid fa-grip-vertical text-[10px]"></i>
+				</button>
+			}
 			<!-- New entity button -->
 			<a
 				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/entities/new", campaignID)) }
