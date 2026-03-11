@@ -515,6 +515,22 @@ templ AdminSidebarNav() {
 				Security
 			</a>
 			<a
+				href="/admin/database"
+				class={ sidebarNavLink,
+					templ.KV(sidebarNavActive, isPathPrefix(ctx, "/admin/database")),
+					templ.KV(sidebarNavInactive, !isPathPrefix(ctx, "/admin/database")) }
+			>
+				<span class="w-4 h-4 mr-3 shrink-0 flex items-center justify-center">
+					<i class="fa-solid fa-database text-xs"></i>
+				</span>
+				Database
+				if GetDegradedPluginCount(ctx) > 0 {
+					<span class="ml-auto inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-red-500 rounded-full">
+						{ fmt.Sprintf("%d", GetDegradedPluginCount(ctx)) }
+					</span>
+				}
+			</a>
+			<a
 				href="/admin/smtp"
 				class={ sidebarNavLink,
 					templ.KV(sidebarNavActive, isPathPrefix(ctx, "/admin/smtp")),
