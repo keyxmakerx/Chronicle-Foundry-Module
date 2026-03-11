@@ -26,6 +26,25 @@ templ OwnerKeysPageTempl(campaignID string, keys []APIKey, stats *APIStats, csrf
 				</a>
 			</div>
 
+			// Campaign ID for Foundry VTT module configuration.
+			<div class="card p-4 flex items-center justify-between gap-4">
+				<div class="min-w-0">
+					<p class="text-sm font-medium text-fg">Campaign ID</p>
+					<p class="text-xs text-fg-muted">Use this when configuring the Foundry VTT module.</p>
+				</div>
+				<div class="flex items-center gap-2 shrink-0">
+					<code class="px-3 py-1.5 bg-surface-alt rounded text-sm font-mono text-fg select-all" id="campaign-id-value">{ campaignID }</code>
+					<button
+						type="button"
+						onclick="navigator.clipboard.writeText(document.getElementById('campaign-id-value').textContent.trim()).then(() => { this.innerHTML = '<i class=\'fa-solid fa-check text-emerald-500\'></i>'; setTimeout(() => { this.innerHTML = '<i class=\'fa-solid fa-copy\'></i>'; }, 2000); })"
+						class="btn-secondary text-sm px-3 py-2 shrink-0"
+						title="Copy to clipboard"
+					>
+						<i class="fa-solid fa-copy"></i>
+					</button>
+				</div>
+			</div>
+
 			// Quick stats.
 			if stats != nil {
 				<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -69,6 +88,8 @@ templ OwnerKeysPageTempl(campaignID string, keys []APIKey, stats *APIStats, csrf
 					method="POST"
 					action={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/api-keys", campaignID)) }
 					hx-post={ fmt.Sprintf("/campaigns/%s/api-keys", campaignID) }
+					hx-target="#main-content"
+					hx-swap="innerHTML show:window:top"
 					class="space-y-4"
 				>
 					<input type="hidden" name="csrf_token" value={ csrfToken }/>
@@ -193,56 +214,67 @@ templ ownerKeyRow(campaignID string, k APIKey, csrfToken string) {
 	</div>
 }
 
-// KeyCreatedTempl renders the one-time key display after creation.
+// KeyCreatedTempl renders the one-time key display after creation (full page).
 templ KeyCreatedTempl(campaignID string, result *CreateAPIKeyResult, csrfToken string) {
 	@layouts.App("Key Created") {
-		<div class="max-w-2xl mx-auto space-y-6">
-			<div class="card p-6">
-				<div class="flex items-center gap-3 mb-4">
-					<span class="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-						<i class="fa-solid fa-check text-emerald-600 dark:text-emerald-400"></i>
-					</span>
-					<div>
-						<h1 class="text-xl font-bold text-fg">API Key Created</h1>
-						<p class="text-sm text-fg-secondary">{ result.Key.Name }</p>
-					</div>
-				</div>
+		@keyCreatedContent(campaignID, result)
+	}
+}
 
-				<div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-4">
-					<p class="text-sm font-semibold text-amber-700 dark:text-amber-400 mb-2">
-						<i class="fa-solid fa-triangle-exclamation mr-1"></i>
-						Copy this key now — it will not be shown again!
-					</p>
-					<div class="flex items-center gap-2">
-						<code class="flex-1 p-3 bg-white dark:bg-gray-900 rounded text-sm font-mono text-fg break-all select-all" id="api-key-value">
-							{ result.RawKey }
-						</code>
-						<button
-							onclick="navigator.clipboard.writeText(document.getElementById('api-key-value').textContent.trim())"
-							class="btn-secondary text-sm shrink-0"
-						>
-							<i class="fa-solid fa-copy mr-1"></i> Copy
-						</button>
-					</div>
-				</div>
+// KeyCreatedFragmentTempl renders the one-time key display as an HTMX fragment
+// (no layout wrapper) for inline replacement after form submission.
+templ KeyCreatedFragmentTempl(campaignID string, result *CreateAPIKeyResult) {
+	@keyCreatedContent(campaignID, result)
+}
 
-				<div class="text-sm text-fg-secondary space-y-1">
-					<p><strong>Prefix:</strong> <code class="text-xs font-mono">{ result.Key.KeyPrefix }</code></p>
-					<p><strong>Permissions:</strong> { formatPermissions(result.Key.Permissions) }</p>
-					<p><strong>Rate Limit:</strong> { fmt.Sprintf("%d", result.Key.RateLimit) } req/min</p>
-					if result.Key.ExpiresAt != nil {
-						<p><strong>Expires:</strong> { result.Key.ExpiresAt.Format("Jan 2, 2006") }</p>
-					}
-				</div>
-
-				<div class="mt-6">
-					<a href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/api-keys", campaignID)) } class="btn-primary text-sm">
-						Back to API Keys
-					</a>
+// keyCreatedContent is the inner content shared by full-page and fragment variants.
+templ keyCreatedContent(campaignID string, result *CreateAPIKeyResult) {
+	<div class="max-w-2xl mx-auto space-y-6">
+		<div class="card p-6">
+			<div class="flex items-center gap-3 mb-4">
+				<span class="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+					<i class="fa-solid fa-check text-emerald-600 dark:text-emerald-400"></i>
+				</span>
+				<div>
+					<h1 class="text-xl font-bold text-fg">API Key Created</h1>
+					<p class="text-sm text-fg-secondary">{ result.Key.Name }</p>
 				</div>
 			</div>
+
+			<div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-4">
+				<p class="text-sm font-semibold text-amber-700 dark:text-amber-400 mb-2">
+					<i class="fa-solid fa-triangle-exclamation mr-1"></i>
+					Copy this key now — it will not be shown again!
+				</p>
+				<div class="flex items-center gap-2">
+					<code class="flex-1 p-3 bg-white dark:bg-gray-900 rounded text-sm font-mono text-fg break-all select-all" id="api-key-value">
+						{ result.RawKey }
+					</code>
+					<button
+						onclick="navigator.clipboard.writeText(document.getElementById('api-key-value').textContent.trim())"
+						class="btn-secondary text-sm shrink-0"
+					>
+						<i class="fa-solid fa-copy mr-1"></i> Copy
+					</button>
+				</div>
+			</div>
+
+			<div class="text-sm text-fg-secondary space-y-1">
+				<p><strong>Prefix:</strong> <code class="text-xs font-mono">{ result.Key.KeyPrefix }</code></p>
+				<p><strong>Permissions:</strong> { formatPermissions(result.Key.Permissions) }</p>
+				<p><strong>Rate Limit:</strong> { fmt.Sprintf("%d", result.Key.RateLimit) } req/min</p>
+				if result.Key.ExpiresAt != nil {
+					<p><strong>Expires:</strong> { result.Key.ExpiresAt.Format("Jan 2, 2006") }</p>
+				}
+			</div>
+
+			<div class="mt-6">
+				<a href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/api-keys", campaignID)) } class="btn-primary text-sm">
+					Back to API Keys
+				</a>
+			</div>
 		</div>
-	}
+	</div>
 }
 
 // formatPermissions formats permission list for display.

@@ -156,6 +156,29 @@ templ CampaignSettingsPage(cc *CampaignContext, transfer *OwnershipTransfer, ent
 						Install the Chronicle Sync module in Foundry VTT to sync journals, maps, tokens, and calendars
 						with this campaign in real-time.
 					</p>
+					<div class="mb-4">
+						<label class="block text-sm font-medium text-fg-body mb-1">Campaign ID</label>
+						<div class="flex items-center gap-2">
+							<input
+								type="text"
+								readonly
+								value={ cc.Campaign.ID }
+								class="input w-full font-mono text-sm bg-surface-alt"
+								id="foundry-campaign-id"
+							/>
+							<button
+								type="button"
+								onclick="navigator.clipboard.writeText(document.getElementById('foundry-campaign-id').value).then(() => { this.innerHTML = '<i class=\'fa-solid fa-check text-emerald-500\'></i>'; setTimeout(() => { this.innerHTML = '<i class=\'fa-solid fa-copy\'></i>'; }, 2000); })"
+								class="btn-secondary text-sm px-3 py-2 shrink-0"
+								title="Copy to clipboard"
+							>
+								<i class="fa-solid fa-copy"></i>
+							</button>
+						</div>
+						<p class="text-xs text-fg-muted mt-2">
+							Enter this ID in the Foundry VTT module settings as the <strong>Campaign ID</strong>.
+						</p>
+					</div>
 					<div>
 						<label class="block text-sm font-medium text-fg-body mb-1">Module Install URL</label>
 						<div class="flex items-center gap-2">
