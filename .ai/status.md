@@ -8,7 +8,23 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-12 -- **Sprint F-4 done + F-4.5 planned.**
+2026-03-12 -- **Phase & sprint plan reorg.**
+
+36. **Phase & Sprint Plan Reorg.**
+    - Rewrote `.ai/phases.md` with 6 phases in new priority order based on owner direction:
+      (1) Foundry Completion & QoL (F-4.5, F-QoL, F-5),
+      (2) System Modularity & Owner Experience (X-1 through X-5 — new phase),
+      (3) Maps & Spatial (W-2, W-2.5),
+      (4) Collaboration & Polish (U-series, W-1, W-4),
+      (5) Content & Integrations (T-3/4, W-3/5/6),
+      (6) Foundry Advanced (F-6, F-7).
+    - Added new Phase X sprints to `todo.md`: X-1 (upload UX wizard), X-2 (auto entity presets),
+      X-3 (system-provided widgets), X-4 (system diagnostics), X-5 (character sheet blocks).
+    - Added F-QoL sprint (Foundry sync diagnostics & error handling).
+    - Key insight: the system framework needs end-to-end validation that a non-technical
+      owner can upload a custom system and get full functionality (presets, tooltips,
+      Foundry sync, widgets, character sheets) without manual setup.
+    - Next up: Sprint F-4.5 (generic system adapter).
 
 35. **F-4.5 planning: Generic System Adapter & Dynamic Matching.**
     - Identified that F-4's `SYSTEM_MAP` and `_loadAdapter()` switch are hardcoded to only dnd5e/pf2e/drawsteel. Custom-uploaded game systems can't participate in character sync despite having the server infrastructure (entity presets, `CharacterPreset()` helper, campaign system upload).
