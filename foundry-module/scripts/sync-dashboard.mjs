@@ -1,22 +1,24 @@
 /**
  * Chronicle Sync - Sync Dashboard
  *
- * Tabbed Application window for managing all Chronicle sync operations.
+ * Tabbed ApplicationV2 window for managing all Chronicle sync operations.
  * Provides visibility into sync state, per-entity/type controls, map linking,
  * calendar sync, and connection status with activity log.
  *
- * Accessed via the sidebar control button (GM only).
+ * Accessed via the sidebar status indicator or scene controls button (GM only).
  */
 
 import { getSetting, setSetting } from './settings.mjs';
 
 const FLAG_SCOPE = 'chronicle-sync';
+const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**
  * SyncDashboard is the main sync management UI.
- * Extends Foundry's Application class with tab support.
+ * Extends Foundry's ApplicationV2 with HandlebarsApplicationMixin for
+ * template rendering and tab support.
  */
-export class SyncDashboard extends Application {
+export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @type {SyncDashboard|null} Singleton instance. */
   static _instance = null;
 
@@ -28,22 +30,39 @@ export class SyncDashboard extends Application {
     return SyncDashboard._instance;
   }
 
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      id: 'chronicle-sync-dashboard',
+  static DEFAULT_OPTIONS = {
+    id: 'chronicle-sync-dashboard',
+    classes: ['chronicle-dashboard'],
+    window: {
       title: 'Chronicle Sync',
-      template: 'modules/chronicle-sync/templates/sync-dashboard.hbs',
+      icon: 'fa-solid fa-rotate',
+      resizable: true,
+    },
+    position: {
       width: 620,
       height: 700,
-      resizable: true,
-      classes: ['chronicle-dashboard'],
-      tabs: [{
-        navSelector: '.dashboard-tabs',
-        contentSelector: '.dashboard-content',
-        initial: 'entities',
-      }],
-    });
-  }
+    },
+    actions: {
+      refresh: SyncDashboard.#onRefresh,
+      'pull-entity': SyncDashboard.#onPullEntityAction,
+      'push-journal': SyncDashboard.#onPushJournalAction,
+      'pull-all': SyncDashboard.#onPullAllAction,
+      'push-all': SyncDashboard.#onPushAllAction,
+      'toggle-visibility': SyncDashboard.#onToggleVisibilityAction,
+      'unlink-scene': SyncDashboard.#onUnlinkSceneAction,
+      'pull-date': SyncDashboard.#onPullDateAction,
+      'push-date': SyncDashboard.#onPushDateAction,
+      reconnect: SyncDashboard.#onReconnectAction,
+      'clear-log': SyncDashboard.#onClearLogAction,
+      'open-settings': SyncDashboard.#onOpenSettingsAction,
+    },
+  };
+
+  static PARTS = {
+    dashboard: {
+      template: 'modules/chronicle-sync/templates/sync-dashboard.hbs',
+    },
+  };
 
   constructor(options = {}) {
     super(options);
@@ -62,6 +81,9 @@ export class SyncDashboard extends Application {
 
     /** @type {string} Current search filter text. */
     this._searchFilter = '';
+
+    /** @type {string} Currently active tab. */
+    this._activeTab = 'entities';
   }
 
   /**
@@ -82,7 +104,7 @@ export class SyncDashboard extends Application {
   // ---------------------------------------------------------------------------
 
   /** @override */
-  async getData() {
+  async _prepareContext(options = {}) {
     if (!this._syncManager || !this.api) {
       return { configured: false };
     }
@@ -122,6 +144,7 @@ export class SyncDashboard extends Application {
       configured: true,
       loading: this._loading,
       searchFilter: this._searchFilter,
+      activeTab: this._activeTab,
 
       // Entities tab.
       entityGroups,
@@ -501,114 +524,191 @@ export class SyncDashboard extends Application {
   }
 
   // ---------------------------------------------------------------------------
-  // Event Handlers
+  // Render hooks
   // ---------------------------------------------------------------------------
 
-  /** @override */
-  activateListeners(html) {
-    super.activateListeners(html);
+  /**
+   * Post-render DOM setup: tabs, search input, select dropdowns,
+   * type header collapse, checkbox toggles.
+   * @param {object} context
+   * @param {object} options
+   */
+  _onRender(context, options) {
+    const el = this.element;
+    if (!el) return;
 
-    // Search input.
-    html.find('.dashboard-search').on('input', (e) => {
-      this._searchFilter = e.target.value;
-      this.render(false);
+    // --- Tab navigation ---
+    this._initTabs(el);
+
+    // --- Search input ---
+    const search = el.querySelector('.dashboard-search');
+    if (search) {
+      search.addEventListener('input', (e) => {
+        this._searchFilter = e.target.value;
+        this.render({ force: true });
+      });
+    }
+
+    // --- Entity type header collapse/expand ---
+    el.querySelectorAll('.entity-type-header').forEach((header) => {
+      header.addEventListener('click', (e) => {
+        // Ignore clicks on the sync toggle button inside the header.
+        if (e.target.closest('.type-sync-toggle')) return;
+
+        const typeId = Number(header.dataset.typeId);
+        if (this._collapsedTypes.has(typeId)) {
+          this._collapsedTypes.delete(typeId);
+        } else {
+          this._collapsedTypes.add(typeId);
+        }
+        this.render({ force: true });
+      });
     });
 
-    // Refresh button.
-    html.find('[data-action="refresh"]').on('click', () => {
-      this._cache = { entityTypes: null, entities: null, maps: null, calendar: null };
-      this.render(false);
+    // --- Type sync toggle ---
+    el.querySelectorAll('.type-sync-toggle').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const typeId = Number(btn.dataset.typeId);
+        this._onToggleType(typeId);
+      });
     });
 
-    // Entity type header toggle (collapse/expand).
-    html.find('.entity-type-header').on('click', (e) => {
-      const typeId = Number(e.currentTarget.dataset.typeId);
-      if (this._collapsedTypes.has(typeId)) {
-        this._collapsedTypes.delete(typeId);
-      } else {
-        this._collapsedTypes.add(typeId);
-      }
-      this.render(false);
+    // --- Entity sync checkbox ---
+    el.querySelectorAll('.entity-sync-toggle').forEach((checkbox) => {
+      checkbox.addEventListener('change', (e) => {
+        const entityId = e.currentTarget.dataset.entityId;
+        this._onToggleEntity(entityId, e.currentTarget.checked);
+      });
     });
 
-    // Type sync toggle.
-    html.find('.type-sync-toggle').on('click', (e) => {
-      e.stopPropagation();
-      const typeId = Number(e.currentTarget.dataset.typeId);
-      this._onToggleType(typeId);
+    // --- Map link/unlink selects ---
+    el.querySelectorAll('[data-action="link-scene"]').forEach((select) => {
+      select.addEventListener('change', (e) => {
+        const mapId = e.currentTarget.dataset.mapId;
+        const sceneId = e.currentTarget.value;
+        if (sceneId) this._onLinkScene(mapId, sceneId);
+      });
     });
 
-    // Entity sync toggle.
-    html.find('.entity-sync-toggle').on('change', (e) => {
-      const entityId = e.currentTarget.dataset.entityId;
-      this._onToggleEntity(entityId, e.currentTarget.checked);
+    el.querySelectorAll('[data-action="link-map"]').forEach((select) => {
+      select.addEventListener('change', (e) => {
+        const sceneId = e.currentTarget.dataset.sceneId;
+        const mapId = e.currentTarget.value;
+        if (mapId) this._onLinkScene(mapId, sceneId);
+      });
+    });
+  }
+
+  /**
+   * Initialize tab navigation with CSS class toggling.
+   * ApplicationV2 doesn't auto-manage CSS-based tabs from the template,
+   * so we handle it manually.
+   * @param {HTMLElement} el
+   * @private
+   */
+  _initTabs(el) {
+    const tabs = el.querySelectorAll('.dashboard-tabs .item');
+    const panels = el.querySelectorAll('.dashboard-content .tab');
+
+    // Apply the stored active tab.
+    tabs.forEach((tab) => {
+      const tabName = tab.dataset.tab;
+      tab.classList.toggle('active', tabName === this._activeTab);
+    });
+    panels.forEach((panel) => {
+      const tabName = panel.dataset.tab;
+      panel.classList.toggle('active', tabName === this._activeTab);
     });
 
-    // Pull entity from Chronicle.
-    html.find('[data-action="pull-entity"]').on('click', (e) => {
-      const entityId = e.currentTarget.dataset.entityId;
-      this._onPullEntity(entityId);
-    });
+    // Listen for tab clicks.
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', (e) => {
+        e.preventDefault();
+        const tabName = tab.dataset.tab;
+        this._activeTab = tabName;
 
-    // Push journal to Chronicle.
-    html.find('[data-action="push-journal"]').on('click', (e) => {
-      const journalId = e.currentTarget.dataset.journalId;
-      this._onPushJournal(journalId);
-    });
-
-    // Pull all Chronicle-only entities.
-    html.find('[data-action="pull-all"]').on('click', () => this._onPullAll());
-
-    // Push all Foundry-only journals.
-    html.find('[data-action="push-all"]').on('click', () => this._onPushAll());
-
-    // Toggle entity visibility.
-    html.find('[data-action="toggle-visibility"]').on('click', (e) => {
-      const entityId = e.currentTarget.dataset.entityId;
-      const isPrivate = e.currentTarget.dataset.isPrivate === 'true';
-      this._onToggleVisibility(entityId, isPrivate);
-    });
-
-    // Map link/unlink.
-    html.find('[data-action="link-scene"]').on('change', (e) => {
-      const mapId = e.currentTarget.dataset.mapId;
-      const sceneId = e.currentTarget.value;
-      if (sceneId) this._onLinkScene(mapId, sceneId);
-    });
-
-    html.find('[data-action="link-map"]').on('change', (e) => {
-      const sceneId = e.currentTarget.dataset.sceneId;
-      const mapId = e.currentTarget.value;
-      if (mapId) this._onLinkScene(mapId, sceneId);
-    });
-
-    html.find('[data-action="unlink-scene"]').on('click', (e) => {
-      const sceneId = e.currentTarget.dataset.sceneId;
-      this._onUnlinkScene(sceneId);
-    });
-
-    // Calendar actions.
-    html.find('[data-action="pull-date"]').on('click', () => this._onPullDate());
-    html.find('[data-action="push-date"]').on('click', () => this._onPushDate());
-
-    // Status actions.
-    html.find('[data-action="reconnect"]').on('click', () => {
-      this.api?.connect();
-      setTimeout(() => this.render(false), 1000);
-    });
-
-    html.find('[data-action="clear-log"]').on('click', () => {
-      this._syncManager?.clearActivityLog();
-      this.render(false);
-    });
-
-    html.find('[data-action="open-settings"]').on('click', () => {
-      game.settings.sheet.render(true);
+        tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tabName));
+        panels.forEach(p => p.classList.toggle('active', p.dataset.tab === tabName));
+      });
     });
   }
 
   // ---------------------------------------------------------------------------
-  // Actions
+  // Action handlers (ApplicationV2 actions pattern)
+  // Called with `this` bound to the application instance by Foundry.
+  // ---------------------------------------------------------------------------
+
+  /** Refresh button: invalidate caches and re-render. */
+  static #onRefresh() {
+    this._cache = { entityTypes: null, entities: null, maps: null, calendar: null };
+    this.render({ force: true });
+  }
+
+  /** Pull a single entity from Chronicle. */
+  static #onPullEntityAction(event, target) {
+    const entityId = target.dataset.entityId;
+    this._onPullEntity(entityId);
+  }
+
+  /** Push a Foundry journal to Chronicle. */
+  static #onPushJournalAction(event, target) {
+    const journalId = target.dataset.journalId;
+    this._onPushJournal(journalId);
+  }
+
+  /** Pull all Chronicle-only entities. */
+  static #onPullAllAction() {
+    this._onPullAll();
+  }
+
+  /** Push all Foundry-only journals. */
+  static #onPushAllAction() {
+    this._onPushAll();
+  }
+
+  /** Toggle entity visibility (public/private). */
+  static #onToggleVisibilityAction(event, target) {
+    const entityId = target.dataset.entityId;
+    const isPrivate = target.dataset.isPrivate === 'true';
+    this._onToggleVisibility(entityId, isPrivate);
+  }
+
+  /** Unlink a scene from its Chronicle map. */
+  static #onUnlinkSceneAction(event, target) {
+    const sceneId = target.dataset.sceneId;
+    this._onUnlinkScene(sceneId);
+  }
+
+  /** Pull calendar date from Chronicle. */
+  static #onPullDateAction() {
+    this._onPullDate();
+  }
+
+  /** Push calendar date to Chronicle. */
+  static #onPushDateAction() {
+    this._onPushDate();
+  }
+
+  /** Reconnect WebSocket. */
+  static #onReconnectAction() {
+    this.api?.connect();
+    setTimeout(() => this.render({ force: true }), 1000);
+  }
+
+  /** Clear the activity log. */
+  static #onClearLogAction() {
+    this._syncManager?.clearActivityLog();
+    this.render({ force: true });
+  }
+
+  /** Open Foundry module settings. */
+  static #onOpenSettingsAction() {
+    game.settings.sheet.render(true);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Actions (business logic)
   // ---------------------------------------------------------------------------
 
   /**
@@ -625,7 +725,7 @@ export class SyncDashboard extends Application {
       exclusions.excludedTypes.push(typeId);
     }
     await this._saveExclusions(exclusions);
-    this.render(false);
+    this.render({ force: true });
   }
 
   /**
@@ -663,7 +763,7 @@ export class SyncDashboard extends Application {
       }
 
       this._cache.entities = null; // Invalidate cache.
-      this.render(false);
+      this.render({ force: true });
     } catch (err) {
       console.error('Chronicle Dashboard: Pull failed', err);
       ui.notifications.error(`Failed to pull entity: ${err.message}`);
@@ -704,7 +804,7 @@ export class SyncDashboard extends Application {
       }
 
       this._cache.entities = null;
-      this.render(false);
+      this.render({ force: true });
     } catch (err) {
       console.error('Chronicle Dashboard: Push failed', err);
       ui.notifications.error(`Failed to push journal: ${err.message}`);
@@ -722,7 +822,7 @@ export class SyncDashboard extends Application {
     });
     if (!confirmed) return;
 
-    const data = await this.getData();
+    const data = await this._prepareContext();
     let count = 0;
     for (const group of data.entityGroups) {
       for (const entity of group.entities) {
@@ -777,7 +877,7 @@ export class SyncDashboard extends Application {
       }
 
       this._cache.entities = null;
-      this.render(false);
+      this.render({ force: true });
     } catch (err) {
       console.error('Chronicle Dashboard: Visibility toggle failed', err);
     }
@@ -806,7 +906,7 @@ export class SyncDashboard extends Application {
 
       this._logActivity('link', `Linked scene "${scene.name}" to map`);
       this._cache.maps = null;
-      this.render(false);
+      this.render({ force: true });
 
       ui.notifications.info(`Chronicle: Scene "${scene.name}" linked to map.`);
     } catch (err) {
@@ -827,7 +927,7 @@ export class SyncDashboard extends Application {
     await scene.unsetFlag(FLAG_SCOPE, 'mapId');
     this._logActivity('unlink', `Unlinked scene "${scene.name}"`);
     this._cache.maps = null;
-    this.render(false);
+    this.render({ force: true });
 
     ui.notifications.info(`Chronicle: Scene "${scene.name}" unlinked.`);
   }
@@ -841,7 +941,7 @@ export class SyncDashboard extends Application {
     if (calSync && typeof calSync.onInitialSync === 'function') {
       await calSync.onInitialSync();
       this._logActivity('pull', 'Pulled calendar date from Chronicle');
-      this.render(false);
+      this.render({ force: true });
     }
   }
 
@@ -863,7 +963,7 @@ export class SyncDashboard extends Application {
         minute: localDate.minute || 0,
       });
       this._logActivity('push', 'Pushed calendar date to Chronicle');
-      this.render(false);
+      this.render({ force: true });
     } catch (err) {
       console.error('Chronicle Dashboard: Push date failed', err);
     }
@@ -885,6 +985,6 @@ export class SyncDashboard extends Application {
   /** Force refresh all data and re-render. */
   refresh() {
     this._cache = { entityTypes: null, entities: null, maps: null, calendar: null };
-    this.render(false);
+    this.render({ force: true });
   }
 }

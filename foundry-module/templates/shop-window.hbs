@@ -5,6 +5,10 @@
     <div class="shop-header">
       {{#if entity.image_path}}
         <img src="{{entity.image_path}}" alt="{{shopName}}">
+      {{else}}
+        <span class="shop-header-icon" style="background-color: {{entity.color}}20; color: {{entity.color}}">
+          <i class="fa-solid {{entity.icon}}"></i>
+        </span>
       {{/if}}
       <div>
         <h3>{{shopName}}</h3>

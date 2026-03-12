@@ -75,7 +75,7 @@ Hooks.on('getSceneControlButtons', (controls) => {
       icon: 'fa-solid fa-rotate',
       button: true,
       onClick: () => {
-        if (dashboard) dashboard.render(true);
+        if (dashboard) dashboard.render({ force: true });
       },
     }],
   });
@@ -135,7 +135,7 @@ function _addStatusIndicator() {
 
   // Click to open the sync dashboard.
   indicator.addEventListener('click', () => {
-    if (dashboard) dashboard.render(true);
+    if (dashboard) dashboard.render({ force: true });
   });
 
   // Flash the dot briefly when a WS message arrives (activity indicator).
@@ -184,7 +184,7 @@ Hooks.once('ready', () => {
       syncManager,
       dashboard,
       getAPI: () => syncManager?.api,
-      openDashboard: () => dashboard?.render(true),
+      openDashboard: () => dashboard?.render({ force: true }),
     };
   }
 });
