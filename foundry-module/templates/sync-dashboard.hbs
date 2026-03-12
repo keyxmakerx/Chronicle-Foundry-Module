@@ -17,6 +17,9 @@
     <a class="item" data-tab="entities">
       <i class="fa-solid fa-book"></i> Entities
     </a>
+    <a class="item" data-tab="shops">
+      <i class="fa-solid fa-store"></i> Shops
+    </a>
     <a class="item" data-tab="maps">
       <i class="fa-solid fa-map"></i> Maps
     </a>
@@ -149,6 +152,64 @@
         {{/unless}}
         {{/unless}}
       </div>
+    </div>
+
+    {{!-- ================================================================= --}}
+    {{!-- SHOPS TAB                                                         --}}
+    {{!-- ================================================================= --}}
+    <div class="tab" data-tab="shops" data-group="primary">
+      {{#if shops.length}}
+      <div class="shop-list">
+        {{#each shops}}
+        <div class="shop-row {{#if synced}}synced{{/if}}">
+          <div class="shop-info">
+            <span class="shop-row-icon" style="background-color: {{../shopTypeColor}}20; color: {{../shopTypeColor}}">
+              <i class="fa-solid {{../shopTypeIcon}}"></i>
+            </span>
+            <div class="shop-details">
+              <span class="shop-name">{{name}}</span>
+              {{#if shopType}}
+              <span class="shop-subtype">{{shopType}}</span>
+              {{/if}}
+              {{#if shopKeeper}}
+              <span class="shop-keeper"><i class="fa-solid fa-user"></i> {{shopKeeper}}</span>
+              {{/if}}
+            </div>
+          </div>
+          <div class="shop-actions">
+            {{#if isPrivate}}
+            <span class="shop-private-badge" title="Private (DM only)">
+              <i class="fa-solid fa-lock"></i>
+            </span>
+            {{/if}}
+            {{#if synced}}
+            <span class="shop-synced-badge">
+              <i class="fa-solid fa-check"></i> Synced
+            </span>
+            {{/if}}
+            <button type="button" class="dashboard-btn btn-sm"
+                    data-action="open-shop"
+                    data-entity-id="{{id}}"
+                    data-shop-name="{{name}}">
+              <i class="fa-solid fa-door-open"></i> Open
+            </button>
+          </div>
+        </div>
+        {{/each}}
+      </div>
+      {{else}}
+      <div class="dashboard-empty-tab">
+        {{#if shopTypeExists}}
+        <i class="fa-solid fa-store fa-2x"></i>
+        <p>No shops found in this campaign.</p>
+        <p class="hint">Create shop entities in Chronicle to see them here.</p>
+        {{else}}
+        <i class="fa-solid fa-store fa-2x"></i>
+        <p>No shop entity type found.</p>
+        <p class="hint">Add a "Shop" entity type to your campaign in Chronicle.</p>
+        {{/if}}
+      </div>
+      {{/if}}
     </div>
 
     {{!-- ================================================================= --}}

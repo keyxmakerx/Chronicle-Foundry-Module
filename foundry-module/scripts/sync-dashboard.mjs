@@ -55,6 +55,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       reconnect: SyncDashboard.#onReconnectAction,
       'clear-log': SyncDashboard.#onClearLogAction,
       'open-settings': SyncDashboard.#onOpenSettingsAction,
+      'open-shop': SyncDashboard.#onOpenShopAction,
     },
   };
 
@@ -129,6 +130,14 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       console.error('Chronicle Dashboard: Failed to load maps', err);
     }
 
+    // Build shops tab data.
+    let shopData = { shops: [] };
+    try {
+      shopData = await this._buildShopData();
+    } catch (err) {
+      console.error('Chronicle Dashboard: Failed to load shops', err);
+    }
+
     // Build calendar tab data.
     let calendarData = { available: false };
     try {
@@ -151,6 +160,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       foundryOnlyJournals,
       hasChronicleOnly: entityGroups.some(g => g.entities.some(e => e.status === 'chronicle-only')),
       hasFoundryOnly: foundryOnlyJournals.length > 0,
+
+      // Shops tab.
+      ...shopData,
 
       // Maps tab.
       ...mapData,
@@ -347,6 +359,72 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       unlinkedScenes,
       availableScenes: unlinkedScenes,
       availableMaps: chronicles.filter(m => !scenesByMapId.has(m.id)),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Shop data
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Build shops tab data: all shop-type entities from Chronicle with
+   * inventory counts and sync status.
+   * @returns {Promise<object>}
+   * @private
+   */
+  async _buildShopData() {
+    // Ensure entity types are cached.
+    if (!this._cache.entityTypes) {
+      this._cache.entityTypes = await this.api.get('/entity-types');
+    }
+    const types = this._cache.entityTypes || [];
+
+    // Find the shop entity type by slug or name.
+    const shopType = types.find(t =>
+      t.slug === 'shop' || t.name?.toLowerCase() === 'shop'
+    );
+
+    if (!shopType) {
+      return { shops: [], shopTypeExists: false };
+    }
+
+    // Ensure entities are cached.
+    if (!this._cache.entities) {
+      // Trigger entity cache population via _buildEntityGroups path.
+      await this._buildEntityGroups(this._getExclusions());
+    }
+    const allEntities = this._cache.entities || [];
+
+    // Filter to shop entities.
+    const shopEntities = allEntities.filter(e => e.entity_type_id === shopType.id);
+
+    // Index Foundry journals by entityId flag.
+    const journalsByEntityId = new Map();
+    for (const j of game.journal.contents) {
+      const eid = j.getFlag(FLAG_SCOPE, 'entityId');
+      if (eid) journalsByEntityId.set(eid, j);
+    }
+
+    const shops = shopEntities.map(entity => {
+      const journal = journalsByEntityId.get(entity.id);
+      const fields = entity.fields_data || {};
+
+      return {
+        id: entity.id,
+        name: entity.name,
+        shopType: fields.shop_type || '',
+        shopKeeper: fields.shop_keeper || '',
+        synced: !!journal,
+        journalId: journal?.id ?? null,
+        isPrivate: entity.is_private ?? false,
+      };
+    });
+
+    return {
+      shops,
+      shopTypeExists: true,
+      shopTypeIcon: shopType.icon || 'fa-store',
+      shopTypeColor: shopType.color || '#f97316',
     };
   }
 
@@ -705,6 +783,18 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Open Foundry module settings. */
   static #onOpenSettingsAction() {
     game.settings.sheet.render(true);
+  }
+
+  /** Open a shop window via the ShopWidget module. */
+  static #onOpenShopAction(event, target) {
+    const entityId = target.dataset.entityId;
+    const shopName = target.dataset.shopName || 'Shop';
+    const shopWidget = this._syncManager?._modules?.find(
+      m => m.constructor?.name === 'ShopWidget'
+    );
+    if (shopWidget) {
+      shopWidget.openShop(entityId, shopName);
+    }
   }
 
   // ---------------------------------------------------------------------------
