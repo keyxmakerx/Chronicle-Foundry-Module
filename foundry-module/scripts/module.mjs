@@ -133,12 +133,9 @@ function _addStatusIndicator() {
   syncManager.api.onStateChange(updateState);
   updateState();
 
-  // Click to reconnect when disconnected.
+  // Click to open the sync dashboard.
   indicator.addEventListener('click', () => {
-    const state = syncManager.api.state;
-    if (state === 'disconnected') {
-      syncManager.api.connect();
-    }
+    if (dashboard) dashboard.render(true);
   });
 
   // Flash the dot briefly when a WS message arrives (activity indicator).

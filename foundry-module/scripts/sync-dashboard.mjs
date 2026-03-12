@@ -29,7 +29,7 @@ export class SyncDashboard extends Application {
   }
 
   static get defaultOptions() {
-    return mergeObject(super.defaultOptions, {
+    return foundry.utils.mergeObject(super.defaultOptions, {
       id: 'chronicle-sync-dashboard',
       title: 'Chronicle Sync',
       template: 'modules/chronicle-sync/templates/sync-dashboard.hbs',
@@ -431,7 +431,7 @@ export class SyncDashboard extends Application {
    */
   _buildStatusData() {
     const state = this.api?.state ?? 'disconnected';
-    const activityLog = this._syncManager?._activityLog ?? [];
+    const activityLog = this._syncManager?.getActivityLog() ?? [];
 
     // Compute stats from Foundry documents.
     const syncedEntities = game.journal.contents.filter(
@@ -448,7 +448,7 @@ export class SyncDashboard extends Application {
       lastSyncTime: getSetting('lastSyncTime') || 'Never',
       syncedEntities,
       linkedScenes,
-      activityLog: activityLog.slice(-50).reverse(),
+      activityLog: activityLog.slice(0, 50),
     };
   }
 
@@ -598,9 +598,7 @@ export class SyncDashboard extends Application {
     });
 
     html.find('[data-action="clear-log"]').on('click', () => {
-      if (this._syncManager?._activityLog) {
-        this._syncManager._activityLog = [];
-      }
+      this._syncManager?.clearActivityLog();
       this.render(false);
     });
 
@@ -881,13 +879,7 @@ export class SyncDashboard extends Application {
    * @param {string} message
    */
   _logActivity(type, message) {
-    if (this._syncManager?._activityLog) {
-      this._syncManager._activityLog.push({
-        time: Date.now(),
-        type,
-        message,
-      });
-    }
+    this._syncManager?.logActivity(type, message);
   }
 
   /** Force refresh all data and re-render. */
