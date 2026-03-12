@@ -8,7 +8,12 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-12 -- **Sprint F-4: Actor ↔ Entity Sync.**
+2026-03-12 -- **Sprint F-4 done + F-4.5 planned.**
+
+35. **F-4.5 planning: Generic System Adapter & Dynamic Matching.**
+    - Identified that F-4's `SYSTEM_MAP` and `_loadAdapter()` switch are hardcoded to only dnd5e/pf2e/drawsteel. Custom-uploaded game systems can't participate in character sync despite having the server infrastructure (entity presets, `CharacterPreset()` helper, campaign system upload).
+    - Planned F-4.5 sprint: add `foundry_system_id` to system manifest, add `foundry_path` + `foundry_writable` annotations on character preset field definitions, new `GET /systems/:id/character-fields` API endpoint, new `generic-adapter.mjs` that reads field definitions from API and auto-generates field mappings. dnd5e/pf2e remain as overrides.
+    - Updated `.ai/todo.md`, `foundry-module/.ai.md` (known limitations + F-4.5 plan), and Phase F master plan with full F-4.5 sprint spec.
 
 34. **Sprint F-4: Actor ↔ Entity Sync (DONE).**
     - **actor-sync.mjs** — New `ActorSync` module class. Bidirectional sync between Foundry Actors (type: character) and Chronicle character entities. Registers `createActor`/`updateActor`/`deleteActor` hooks. Handles `entity.created/updated/deleted` WS messages filtered by character type. Uses `_syncing` guard. `_onCharacterDeleted()` unlinks (unsets flags) rather than deleting Actor.
