@@ -8,7 +8,33 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-11 -- **Foundry module review — bug fixes and feature completion.**
+2026-03-12 -- **Sprint F-4 done + F-4.5 planned.**
+
+35. **F-4.5 planning: Generic System Adapter & Dynamic Matching.**
+    - Identified that F-4's `SYSTEM_MAP` and `_loadAdapter()` switch are hardcoded to only dnd5e/pf2e/drawsteel. Custom-uploaded game systems can't participate in character sync despite having the server infrastructure (entity presets, `CharacterPreset()` helper, campaign system upload).
+    - Planned F-4.5 sprint: add `foundry_system_id` to system manifest, add `foundry_path` + `foundry_writable` annotations on character preset field definitions, new `GET /systems/:id/character-fields` API endpoint, new `generic-adapter.mjs` that reads field definitions from API and auto-generates field mappings. dnd5e/pf2e remain as overrides.
+    - Updated `.ai/todo.md`, `foundry-module/.ai.md` (known limitations + F-4.5 plan), and Phase F master plan with full F-4.5 sprint spec.
+
+34. **Sprint F-4: Actor ↔ Entity Sync (DONE).**
+    - **actor-sync.mjs** — New `ActorSync` module class. Bidirectional sync between Foundry Actors (type: character) and Chronicle character entities. Registers `createActor`/`updateActor`/`deleteActor` hooks. Handles `entity.created/updated/deleted` WS messages filtered by character type. Uses `_syncing` guard. `_onCharacterDeleted()` unlinks (unsets flags) rather than deleting Actor.
+    - **System adapters** — `adapters/dnd5e-adapter.mjs` maps 15 D&D 5e fields (ability scores, HP, AC, speed, level, class, race, alignment, proficiency_bonus). `adapters/pf2e-adapter.mjs` maps PF2e fields (ability mods, HP, AC, perception, ancestry, heritage); only pushes HP/name back to Foundry (PF2e derives most values from items/rules).
+    - **Dashboard Characters tab** — New tab in sync dashboard showing synced/unlinked actors with Push button for manual push. Empty states for no actors, disabled sync, no system match.
+    - **module.mjs** — Registered `ActorSync` as sync module.
+    - **TESTING.md** — Added 30+ character sync test items covering both directions, dashboard, adapters, edge cases.
+    - **Next:** F-5 (NPC Viewer / Hall) or F-6 (Armory / Inventory).
+
+33. **Sprint F-3: System detection & character field templates (DONE).**
+    - **Server: Manifest expansion** — dnd5e character preset expanded from 4 to 15 fields (added ability scores, HP, AC, speed, proficiency_bonus). New pf2e character preset with 15 PF2e-specific fields (ancestry, heritage, ability mods, perception, etc). Added `CharacterPreset()` method on `SystemManifest`.
+    - **Server: Systems API** — New `GET /api/v1/campaigns/:id/systems` endpoint returning all registered systems with `enabled` flag per campaign (via `AddonChecker`). `addonChecker` injected into `APIHandler` via `SetAddonChecker()`.
+    - **Foundry: System detection** — `SYSTEM_MAP` maps Foundry `game.system.id` → Chronicle system IDs (`dnd5e`, `pf2e`, `drawsteel`). `SyncManager._detectSystem()` queries systems API on start, stores matched system in `detectedSystem` setting. New `syncCharacters` boolean setting (gated on system match).
+    - **Foundry: Dashboard** — Status tab shows Foundry system, Chronicle system match (green check/red X), and character sync availability.
+    - **Next:** F-4 (Actor ↔ Entity Sync) — new `actor-sync.mjs` with system-specific adapters.
+
+32. **Foundry enhancements — planning + F-1/F-2 implementation.**
+    - **Planning:** Captured Phase F roadmap (F-1 through F-7) in `.ai/todo.md` and `foundry-module/.ai.md`.
+    - **F-1: Journal sync fidelity (DONE):** Multi-page sync — entity content with h1/h2 headings splits into separate Foundry pages via `_splitByHeadings()`. Multiple Foundry pages concatenate back into single Chronicle entry via `_collectTextPages()`. `_syncPagesToJournal()` adds/updates/removes pages incrementally. Ownership change hook now pushes `is_private` on every update.
+    - **F-2: Granular permission mapping (DONE):** New syncapi endpoints `GET/PUT /entities/:eid/permissions` wrapping existing `EntityService.GetEntityPermissions` / `SetEntityPermissions`. Foundry module: `_buildOwnership()` fetches Chronicle permissions and maps role grants to Foundry default ownership levels (custom visibility player view→OBSERVER, player edit→OWNER, no player grant→NONE). `_pushPermissions()` reverse-maps Foundry ownership changes to Chronicle visibility/permission updates. User-specific grants stored but not mapped (needs user ID mapping table — deferred). TESTING.md updated with multi-page and permission test items.
+    - **Remaining planned:** F-3 (system detection), F-4 (actor sync), F-5 (NPC hall), F-6 (armory/inventory), F-7 (shop enhancements).
 
 31. **Foundry module review.** Comprehensive code review of the Foundry VTT sync module found 13 issues. Fixed 9 (deferred ApplicationV2 upgrade):
     - **Runtime bugs**: Shop window `{{json}}` helper crash (replaced with data-item-id lookup), drawing coordinate conversion missing percentage↔pixel (tokens had it, drawings didn't), fog reconciliation `_syncing` flag corruption (extracted `_createFogDrawingData`, batch creates), entity_type_id:0 invalid in syncapi handler (added first-type fallback).

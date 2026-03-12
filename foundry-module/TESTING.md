@@ -33,6 +33,24 @@ Requires a running Chronicle instance and Foundry VTT with the chronicle-sync mo
 - [ ] Edit JournalEntry page content -> Entity entry updates
 - [ ] Delete JournalEntry -> Entity deleted in Chronicle
 
+### Multi-Page Sync
+- [ ] Entity with h1/h2 headings creates multiple Foundry journal pages
+- [ ] Entity without headings creates single "Content" page
+- [ ] Multi-page Foundry journal concatenates into single Chronicle entry
+- [ ] Updating entity content adds/removes/updates pages correctly
+- [ ] Page titles match heading text (HTML stripped)
+- [ ] Pre-heading content creates "Overview" page
+
+### Permission Sync
+- [ ] Private entity (is_private=true) creates journal with default ownership NONE
+- [ ] Public entity (is_private=false) creates journal with default ownership OBSERVER
+- [ ] Custom visibility entity fetches permissions and maps role grants to ownership
+- [ ] Custom visibility with player view grant → default OBSERVER
+- [ ] Custom visibility with no player grant → default NONE
+- [ ] Changing journal ownership in Foundry pushes is_private to Chronicle
+- [ ] Changing journal ownership pushes visibility/permissions to Chronicle API
+- [ ] Permission API failure falls back to binary is_private mapping
+
 ### Edge Cases
 - [ ] Rapid successive edits don't create duplicate entities
 - [ ] Sync guard prevents infinite loops (edit in A, syncs to B, doesn't re-sync to A)
@@ -129,6 +147,52 @@ Requires a running Chronicle instance and Foundry VTT with the chronicle-sync mo
 - [ ] Disabled maps addon -> Maps API returns 404
 - [ ] Private entities hidden from non-owner API keys
 - [ ] Rate limiting enforced (60 req/min default)
+
+## Character Sync (Actor ↔ Entity)
+
+### Prerequisites
+- [ ] Game system matches a Chronicle system (dnd5e or pf2e)
+- [ ] "Sync Characters" enabled in module settings
+- [ ] Character entity type exists in Chronicle campaign
+
+### Chronicle -> Foundry
+- [ ] Create character entity in Chronicle -> Actor (type: character) created in Foundry
+- [ ] Update character entity fields -> Actor system data updates (ability scores, HP)
+- [ ] Update character entity name -> Actor name updates
+- [ ] Delete character entity -> Actor unlinked (flags removed) but NOT deleted
+
+### Foundry -> Chronicle
+- [ ] Create character Actor in Foundry -> Entity created in Chronicle with mapped fields
+- [ ] Update Actor ability scores -> Chronicle entity fields_data updates
+- [ ] Update Actor HP -> Chronicle entity hp_current/hp_max update
+- [ ] Update Actor name -> Chronicle entity name updates
+- [ ] Delete Actor -> Chronicle entity deleted
+
+### Dashboard - Characters Tab
+- [ ] Characters tab visible in sync dashboard
+- [ ] System badge shows matched system name
+- [ ] Synced actors show green check with "Synced" label
+- [ ] Unlinked actors show "Not linked" with Push button
+- [ ] Push button creates Chronicle entity and links actor
+- [ ] Empty state shown when no character actors exist
+- [ ] Disabled state shown when syncCharacters is off
+- [ ] No-system state shown when game system doesn't match
+
+### System Adapters
+- [ ] D&D 5e: All 6 ability scores sync (str, dex, con, int, wis, cha)
+- [ ] D&D 5e: HP current/max syncs bidirectionally
+- [ ] D&D 5e: AC, speed, level, class, race, alignment, proficiency_bonus push to Chronicle
+- [ ] PF2e: Ability mods sync to Chronicle (str_mod through cha_mod)
+- [ ] PF2e: HP syncs bidirectionally
+- [ ] PF2e: Only HP and name sync back from Chronicle (derived values protected)
+- [ ] PF2e: ancestry, heritage, class, level, perception, speed push to Chronicle
+
+### Edge Cases
+- [ ] Actor sync disabled when no system adapter available
+- [ ] Sync guard prevents infinite loops (change in A doesn't re-trigger back to A)
+- [ ] Only character-type actors processed (NPCs, vehicles ignored)
+- [ ] Only current user's changes pushed (other users' changes ignored)
+- [ ] Pre-existing actors can be manually pushed via dashboard Push button
 
 ## Error Recovery
 

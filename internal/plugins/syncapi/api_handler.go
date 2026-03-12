@@ -12,6 +12,7 @@ import (
 	"github.com/keyxmakerx/chronicle/internal/apperror"
 	"github.com/keyxmakerx/chronicle/internal/plugins/campaigns"
 	"github.com/keyxmakerx/chronicle/internal/plugins/entities"
+	"github.com/keyxmakerx/chronicle/internal/systems"
 	"github.com/keyxmakerx/chronicle/internal/widgets/relations"
 )
 
@@ -19,10 +20,11 @@ import (
 // External clients (Foundry VTT, custom scripts) use these endpoints to
 // read and write campaign data programmatically via API key authentication.
 type APIHandler struct {
-	syncSvc     SyncAPIService
-	entitySvc   entities.EntityService
-	campaignSvc campaigns.CampaignService
-	relationSvc relations.RelationService
+	syncSvc      SyncAPIService
+	entitySvc    entities.EntityService
+	campaignSvc  campaigns.CampaignService
+	relationSvc  relations.RelationService
+	addonChecker AddonChecker
 }
 
 // NewAPIHandler creates a new API handler with the required service dependencies.
@@ -562,4 +564,135 @@ func (h *APIHandler) ListEntityRelations(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, rels)
+}
+
+// --- Entity Permissions ---
+
+// permissionsAPIResponse is the JSON response for entity permission queries.
+type permissionsAPIResponse struct {
+	Visibility  entities.VisibilityMode    `json:"visibility"`
+	IsPrivate   bool                       `json:"is_private"`
+	Permissions []entities.EntityPermission `json:"permissions"`
+}
+
+// GetEntityPermissions returns the visibility mode and permission grants for an entity.
+// GET /api/v1/campaigns/:id/entities/:entityID/permissions
+func (h *APIHandler) GetEntityPermissions(c echo.Context) error {
+	entityID := c.Param("entityID")
+	ctx := c.Request().Context()
+
+	entity, err := h.entitySvc.GetByID(ctx, entityID)
+	if err != nil {
+		return apperror.NewNotFound("entity not found")
+	}
+
+	// Verify entity belongs to the API key's campaign.
+	if entity.CampaignID != c.Param("id") {
+		return apperror.NewNotFound("entity not found")
+	}
+
+	grants, err := h.entitySvc.GetEntityPermissions(ctx, entityID)
+	if err != nil {
+		slog.Error("fetching entity permissions",
+			slog.String("entity_id", entityID),
+			slog.String("error", err.Error()))
+		return apperror.NewInternal(fmt.Errorf("failed to fetch permissions"))
+	}
+
+	if grants == nil {
+		grants = []entities.EntityPermission{}
+	}
+
+	return c.JSON(http.StatusOK, permissionsAPIResponse{
+		Visibility:  entity.Visibility,
+		IsPrivate:   entity.IsPrivate,
+		Permissions: grants,
+	})
+}
+
+// SetEntityPermissions updates the visibility mode and permission grants for an entity.
+// PUT /api/v1/campaigns/:id/entities/:entityID/permissions
+func (h *APIHandler) SetEntityPermissions(c echo.Context) error {
+	entityID := c.Param("entityID")
+	ctx := c.Request().Context()
+	role := h.resolveRole(c)
+
+	entity, err := h.entitySvc.GetByID(ctx, entityID)
+	if err != nil {
+		return apperror.NewNotFound("entity not found")
+	}
+
+	// Verify entity belongs to the API key's campaign.
+	if entity.CampaignID != c.Param("id") {
+		return apperror.NewNotFound("entity not found")
+	}
+
+	// Only campaign owners can modify permissions.
+	if role < int(campaigns.RoleOwner) {
+		return apperror.NewForbidden("only campaign owners can modify entity permissions")
+	}
+
+	var input entities.SetPermissionsInput
+	if err := c.Bind(&input); err != nil {
+		return apperror.NewBadRequest("invalid request body")
+	}
+
+	if err := h.entitySvc.SetEntityPermissions(ctx, entityID, input); err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// SetAddonChecker injects the addon checker for system-aware endpoints.
+// Called after construction because the addon service is wired separately.
+func (h *APIHandler) SetAddonChecker(ac AddonChecker) {
+	h.addonChecker = ac
+}
+
+// --- Systems ---
+
+// systemInfoResponse is the API-safe representation of a game system.
+type systemInfoResponse struct {
+	ID                 string `json:"id"`
+	Name               string `json:"name"`
+	Status             string `json:"status"`
+	HasCharacterFields bool   `json:"has_character_fields"`
+	Enabled            bool   `json:"enabled"`
+}
+
+// ListSystems returns game systems available for the campaign.
+// Includes built-in systems from the global registry with an enabled flag
+// based on per-campaign addon state. Used by the Foundry module to detect
+// whether the current game system matches a Chronicle system.
+// GET /api/v1/campaigns/:id/systems
+func (h *APIHandler) ListSystems(c echo.Context) error {
+	campaignID := c.Param("id")
+	ctx := c.Request().Context()
+
+	registry := systems.Registry()
+	result := make([]systemInfoResponse, 0, len(registry))
+
+	for _, manifest := range registry {
+		enabled := false
+		if h.addonChecker != nil {
+			ok, err := h.addonChecker.IsEnabledForCampaign(ctx, campaignID, manifest.ID)
+			if err == nil && ok {
+				enabled = true
+			}
+		}
+
+		result = append(result, systemInfoResponse{
+			ID:                 manifest.ID,
+			Name:               manifest.Name,
+			Status:             string(manifest.Status),
+			HasCharacterFields: manifest.CharacterPreset() != nil,
+			Enabled:            enabled,
+		})
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{
+		"data":  result,
+		"total": len(result),
+	})
 }

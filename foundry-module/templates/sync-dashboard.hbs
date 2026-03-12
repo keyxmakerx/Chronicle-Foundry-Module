@@ -17,8 +17,14 @@
     <a class="item" data-tab="entities">
       <i class="fa-solid fa-book"></i> Entities
     </a>
+    <a class="item" data-tab="shops">
+      <i class="fa-solid fa-store"></i> Shops
+    </a>
     <a class="item" data-tab="maps">
       <i class="fa-solid fa-map"></i> Maps
+    </a>
+    <a class="item" data-tab="characters">
+      <i class="fa-solid fa-users"></i> Characters
     </a>
     <a class="item" data-tab="calendar">
       <i class="fa-solid fa-calendar"></i> Calendar
@@ -152,6 +158,64 @@
     </div>
 
     {{!-- ================================================================= --}}
+    {{!-- SHOPS TAB                                                         --}}
+    {{!-- ================================================================= --}}
+    <div class="tab" data-tab="shops" data-group="primary">
+      {{#if shops.length}}
+      <div class="shop-list">
+        {{#each shops}}
+        <div class="shop-row {{#if synced}}synced{{/if}}">
+          <div class="shop-info">
+            <span class="shop-row-icon" style="background-color: {{../shopTypeColor}}20; color: {{../shopTypeColor}}">
+              <i class="fa-solid {{../shopTypeIcon}}"></i>
+            </span>
+            <div class="shop-details">
+              <span class="shop-name">{{name}}</span>
+              {{#if shopType}}
+              <span class="shop-subtype">{{shopType}}</span>
+              {{/if}}
+              {{#if shopKeeper}}
+              <span class="shop-keeper"><i class="fa-solid fa-user"></i> {{shopKeeper}}</span>
+              {{/if}}
+            </div>
+          </div>
+          <div class="shop-actions">
+            {{#if isPrivate}}
+            <span class="shop-private-badge" title="Private (DM only)">
+              <i class="fa-solid fa-lock"></i>
+            </span>
+            {{/if}}
+            {{#if synced}}
+            <span class="shop-synced-badge">
+              <i class="fa-solid fa-check"></i> Synced
+            </span>
+            {{/if}}
+            <button type="button" class="dashboard-btn btn-sm"
+                    data-action="open-shop"
+                    data-entity-id="{{id}}"
+                    data-shop-name="{{name}}">
+              <i class="fa-solid fa-door-open"></i> Open
+            </button>
+          </div>
+        </div>
+        {{/each}}
+      </div>
+      {{else}}
+      <div class="dashboard-empty-tab">
+        {{#if shopTypeExists}}
+        <i class="fa-solid fa-store fa-2x"></i>
+        <p>No shops found in this campaign.</p>
+        <p class="hint">Create shop entities in Chronicle to see them here.</p>
+        {{else}}
+        <i class="fa-solid fa-store fa-2x"></i>
+        <p>No shop entity type found.</p>
+        <p class="hint">Add a "Shop" entity type to your campaign in Chronicle.</p>
+        {{/if}}
+      </div>
+      {{/if}}
+    </div>
+
+    {{!-- ================================================================= --}}
     {{!-- MAPS TAB                                                          --}}
     {{!-- ================================================================= --}}
     <div class="tab" data-tab="maps" data-group="primary">
@@ -216,6 +280,90 @@
         {{/each}}
         {{/if}}
       </div>
+    </div>
+
+    {{!-- ================================================================= --}}
+    {{!-- CHARACTERS TAB                                                    --}}
+    {{!-- ================================================================= --}}
+    <div class="tab" data-tab="characters" data-group="primary">
+      {{#if characterSyncAvailable}}
+        {{#if syncCharacters}}
+        <div class="dashboard-toolbar">
+          <div class="toolbar-actions">
+            <span class="system-badge">
+              <i class="fa-solid fa-gamepad"></i> {{matchedSystem}}
+            </span>
+            <button type="button" data-action="refresh" class="dashboard-btn btn-sm" title="Refresh">
+              <i class="fa-solid fa-arrows-rotate"></i>
+            </button>
+          </div>
+        </div>
+
+        {{#if characters.length}}
+        <div class="character-list">
+          {{#each characters}}
+          <div class="character-row {{#if synced}}synced{{/if}}">
+            <div class="character-info">
+              {{#if img}}
+              <img class="character-portrait" src="{{img}}" alt="{{name}}" />
+              {{else}}
+              <span class="character-portrait-placeholder">
+                <i class="fa-solid fa-user"></i>
+              </span>
+              {{/if}}
+              <div class="character-details">
+                <span class="character-name">{{name}}</span>
+                {{#if synced}}
+                <span class="character-sync-status synced">
+                  <i class="fa-solid fa-check"></i> Synced
+                </span>
+                {{else}}
+                <span class="character-sync-status unlinked">
+                  <i class="fa-solid fa-unlink"></i> Not linked
+                </span>
+                {{/if}}
+              </div>
+            </div>
+            <div class="character-actions">
+              {{#if synced}}
+              <span class="character-last-sync" title="Last synced">
+                {{lastSync}}
+              </span>
+              {{else}}
+              <button type="button" class="dashboard-btn btn-xs btn-push"
+                      data-action="push-actor" data-actor-id="{{id}}">
+                <i class="fa-solid fa-upload"></i> Push
+              </button>
+              {{/if}}
+            </div>
+          </div>
+          {{/each}}
+        </div>
+        {{else}}
+        <div class="dashboard-empty-tab">
+          <i class="fa-solid fa-users fa-2x"></i>
+          <p>No character actors found.</p>
+          <p class="hint">Create character actors in Foundry or character entities in Chronicle.</p>
+        </div>
+        {{/if}}
+
+        {{else}}
+        <div class="dashboard-empty-tab">
+          <i class="fa-solid fa-toggle-off fa-2x"></i>
+          <p>Character sync is disabled.</p>
+          <p class="hint">Enable "Sync Characters" in Module Settings to sync actors with Chronicle.</p>
+          <button type="button" data-action="open-settings" class="dashboard-btn">
+            <i class="fa-solid fa-gear"></i> Open Settings
+          </button>
+        </div>
+        {{/if}}
+      {{else}}
+      <div class="dashboard-empty-tab">
+        <i class="fa-solid fa-puzzle-piece fa-2x"></i>
+        <p>Character sync requires a matching game system.</p>
+        <p class="hint">Your Foundry system must match a Chronicle game system with character field templates. Check the Status tab for details.</p>
+      </div>
+      {{/if}}
     </div>
 
     {{!-- ================================================================= --}}
@@ -313,6 +461,41 @@
           <div class="stat-box">
             <div class="stat-value">{{linkedScenes}}</div>
             <div class="stat-label">Maps Linked</div>
+          </div>
+        </div>
+
+        {{!-- Game system detection --}}
+        <div class="system-detection">
+          <h3 class="section-heading">Game System</h3>
+          <div class="system-info-grid">
+            <div class="system-info-row">
+              <span class="system-label">Foundry System:</span>
+              <span class="system-value">{{#if foundrySystem}}{{foundrySystem}}{{else}}<em>None</em>{{/if}}</span>
+            </div>
+            <div class="system-info-row">
+              <span class="system-label">Chronicle System:</span>
+              {{#if systemMatched}}
+              <span class="system-value system-matched">
+                <i class="fa-solid fa-check-circle" style="color: #4ade80"></i> {{matchedSystem}} — Matched
+              </span>
+              {{else}}
+              <span class="system-value system-no-match">
+                <i class="fa-solid fa-circle-xmark" style="color: #f87171"></i> No Match
+              </span>
+              {{/if}}
+            </div>
+            <div class="system-info-row">
+              <span class="system-label">Character Sync:</span>
+              {{#if characterSyncAvailable}}
+                {{#if syncCharacters}}
+                <span class="system-value"><i class="fa-solid fa-toggle-on" style="color: #4ade80"></i> Enabled</span>
+                {{else}}
+                <span class="system-value"><i class="fa-solid fa-toggle-off"></i> Disabled</span>
+                {{/if}}
+              {{else}}
+              <span class="system-value hint">Requires matching game system</span>
+              {{/if}}
+            </div>
           </div>
         </div>
 

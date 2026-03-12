@@ -29,6 +29,10 @@
       "SyncCalendar": {
         "Name": "Sync Calendar",
         "Hint": "Sync Chronicle calendar with Calendaria or Simple Calendar module"
+      },
+      "SyncCharacters": {
+        "Name": "Sync Characters",
+        "Hint": "Sync Foundry actors with Chronicle character entities (requires matching game system)"
       }
     },
     "Status": {
@@ -52,7 +56,9 @@
       "NotConfiguredHint": "Go to Module Settings to enter your Chronicle URL, API key, and Campaign ID.",
       "Tabs": {
         "Entities": "Entities",
+        "Shops": "Shops",
         "Maps": "Maps",
+        "Characters": "Characters",
         "Calendar": "Calendar",
         "Status": "Status"
       },
@@ -85,6 +91,14 @@
         "Unlink": "Unlink",
         "NoMaps": "No maps found in this Chronicle campaign."
       },
+      "Shops": {
+        "Open": "Open",
+        "Synced": "Synced",
+        "NoShops": "No shops found in this campaign.",
+        "NoShopsHint": "Create shop entities in Chronicle to see them here.",
+        "NoShopType": "No shop entity type found.",
+        "NoShopTypeHint": "Add a \"Shop\" entity type to your campaign in Chronicle."
+      },
       "Calendar": {
         "CalendarModule": "Calendar Module",
         "Chronicle": "Chronicle",
@@ -99,11 +113,32 @@
         "NoModuleHint": "Install Calendaria or Simple Calendar to enable calendar sync.",
         "UnableToRead": "Unable to read"
       },
+      "Characters": {
+        "Synced": "Synced",
+        "NotLinked": "Not linked",
+        "Push": "Push",
+        "NoActors": "No character actors found.",
+        "NoActorsHint": "Create character actors in Foundry or character entities in Chronicle.",
+        "Disabled": "Character sync is disabled.",
+        "DisabledHint": "Enable \"Sync Characters\" in Module Settings to sync actors with Chronicle.",
+        "NoSystem": "Character sync requires a matching game system.",
+        "NoSystemHint": "Your Foundry system must match a Chronicle game system with character field templates."
+      },
       "StatusTab": {
         "Connection": "Connection",
         "EntitiesSynced": "Entities Synced",
         "MapsLinked": "Maps Linked",
         "LastSync": "Last sync",
+        "GameSystem": "Game System",
+        "FoundrySystem": "Foundry System",
+        "ChronicleSystem": "Chronicle System",
+        "SystemMatched": "Matched",
+        "SystemNoMatch": "No Match",
+        "SystemNone": "None detected",
+        "CharacterSync": "Character Sync",
+        "CharacterSyncEnabled": "Enabled",
+        "CharacterSyncDisabled": "Disabled",
+        "CharacterSyncNoSystem": "Requires matching game system",
         "RecentActivity": "Recent Activity",
         "NoActivity": "No recent activity.",
         "ClearLog": "Clear Log",

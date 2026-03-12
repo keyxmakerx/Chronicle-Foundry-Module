@@ -85,7 +85,7 @@ export class ShopWidget {
     });
 
     this._openWindows.set(entityId, window);
-    await window.render(true);
+    await window.render({ force: true });
   }
 
   /**
@@ -99,18 +99,36 @@ export class ShopWidget {
   }
 }
 
+const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+
 /**
  * ShopWindow is a Foundry ApplicationV2 that displays a shop inventory
  * with drag-and-drop support.
  */
-class ShopWindow extends Application {
-  constructor(api, entityId, shopName, onClose) {
-    super({
-      title: `Shop: ${shopName}`,
+class ShopWindow extends HandlebarsApplicationMixin(ApplicationV2) {
+  static DEFAULT_OPTIONS = {
+    id: 'chronicle-shop-{id}',
+    classes: ['chronicle-shop-window'],
+    window: {
+      title: 'Shop',
+      resizable: true,
+    },
+    position: {
       width: 400,
       height: 500,
-      resizable: true,
-      classes: ['chronicle-shop-window'],
+    },
+  };
+
+  static PARTS = {
+    shop: {
+      template: 'modules/chronicle-sync/templates/shop-window.hbs',
+    },
+  };
+
+  constructor(api, entityId, shopName, onClose) {
+    super({
+      id: `chronicle-shop-${entityId}`,
+      window: { title: `Shop: ${shopName}` },
     });
 
     this._api = api;
@@ -121,14 +139,7 @@ class ShopWindow extends Application {
     this._entity = null;
   }
 
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      template: 'modules/chronicle-sync/templates/shop-window.hbs',
-      classes: ['chronicle-shop-window'],
-    });
-  }
-
-  async getData() {
+  async _prepareContext(options = {}) {
     try {
       // Fetch entity data.
       this._entity = await this._api.get(`/entities/${this._entityId}`);
@@ -153,8 +164,15 @@ class ShopWindow extends Application {
           description: r.metadata.description || '',
         }));
 
+      // Normalize entity fields for template (API uses type_icon/type_color).
+      const entity = this._entity ? {
+        ...this._entity,
+        icon: this._entity.type_icon || 'fa-store',
+        color: this._entity.type_color || '#6b7280',
+      } : null;
+
       return {
-        entity: this._entity,
+        entity,
         inventory: this._inventory,
         shopName: this._shopName,
       };
@@ -169,18 +187,23 @@ class ShopWindow extends Application {
     }
   }
 
+  /** Re-fetch data and re-render. */
   async refresh() {
-    await this.render(false);
+    await this.render({ force: true });
   }
 
-  activateListeners(html) {
-    super.activateListeners(html);
+  /**
+   * Set up drag-and-drop on shop items after render.
+   * @param {object} context - Rendering context.
+   * @param {object} options - Render options.
+   */
+  _onRender(context, options) {
+    const el = this.element;
 
-    // Make shop items draggable.
-    html.find('.shop-item').each((i, el) => {
-      el.setAttribute('draggable', true);
-      el.addEventListener('dragstart', (event) => {
-        const itemId = el.dataset.itemId;
+    el.querySelectorAll('.shop-item').forEach((itemEl) => {
+      itemEl.setAttribute('draggable', 'true');
+      itemEl.addEventListener('dragstart', (event) => {
+        const itemId = itemEl.dataset.itemId;
         const itemData = this._inventory.find((item) => item.id === itemId) || {};
         event.dataTransfer.setData(
           'text/plain',

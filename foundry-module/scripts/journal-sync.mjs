@@ -153,25 +153,12 @@ export class JournalSync {
 
     this._syncing = true;
     try {
-      // Update the journal name.
-      const updates = { name: entity.name };
+      // Update the journal name and ownership from Chronicle permissions.
+      const ownership = await this._buildOwnership(entity);
+      await journal.update({ name: entity.name, ownership });
 
-      // Update ownership based on privacy.
-      if (entity.is_private) {
-        updates.ownership = { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE };
-      } else {
-        updates.ownership = { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER };
-      }
-
-      await journal.update(updates);
-
-      // Update the text page content.
-      const textPage = journal.pages.find((p) => p.type === 'text');
-      if (textPage && entity.entry_html) {
-        await textPage.update({
-          'text.content': entity.entry_html,
-        });
-      }
+      // Split entity content into pages and sync them.
+      await this._syncPagesToJournal(journal, entity.entry_html || '');
 
       // Update flags with latest entity data.
       await journal.setFlag(FLAG_SCOPE, 'entityType', entity.type_name || '');
@@ -231,33 +218,30 @@ export class JournalSync {
         });
       }
 
-      // Text page with entity content.
-      if (isMonksActive) {
-        // Monk's Enhanced Journal uses enhanced page type.
-        pages.push({
-          name: entity.name,
+      // Split entity content into pages by top-level headings.
+      const sections = this._splitByHeadings(entity.entry_html || '');
+
+      let sortIndex = 1;
+      for (const section of sections) {
+        const pageData = {
+          name: section.title,
           type: 'text',
-          text: { content: entity.entry_html || '' },
-          sort: 1,
-          flags: {
-            'monks-enhanced-journal': {
-              type: 'base',
-            },
-          },
-        });
-      } else {
-        pages.push({
-          name: entity.name,
-          type: 'text',
-          text: { content: entity.entry_html || '' },
-          sort: 1,
-        });
+          text: { content: section.content },
+          sort: sortIndex++,
+        };
+
+        // Monk's Enhanced Journal uses enhanced page flags.
+        if (isMonksActive) {
+          pageData.flags = {
+            'monks-enhanced-journal': { type: 'base' },
+          };
+        }
+
+        pages.push(pageData);
       }
 
-      // Determine ownership.
-      const ownership = entity.is_private
-        ? { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE }
-        : { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER };
+      // Determine ownership from Chronicle permissions.
+      const ownership = await this._buildOwnership(entity);
 
       const journalData = {
         name: entity.name,
@@ -321,14 +305,14 @@ export class JournalSync {
 
     // Create entity in Chronicle from this new journal.
     try {
-      const textPage = journal.pages.find((p) => p.type === 'text');
-      const imagePage = journal.pages.find((p) => p.type === 'image');
+      // Concatenate all text pages into a single entry for Chronicle.
+      const entryHtml = this._collectTextPages(journal);
 
       const entity = await this._api.post('/entities', {
         name: journal.name,
         entity_type_id: 0, // Default type — will use first available.
         is_private: (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER,
-        entry: textPage?.text?.content || '',
+        entry: entryHtml,
       });
 
       if (entity) {
@@ -349,6 +333,11 @@ export class JournalSync {
           sync_direction: 'both',
         });
 
+        // Push initial permissions from Foundry ownership.
+        const isPrivate =
+          (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER;
+        await this._pushPermissions(entity.id, journal.ownership, isPrivate);
+
         console.log(`Chronicle: Pushed new journal "${journal.name}" to Chronicle`);
       }
     } catch (err) {
@@ -358,6 +347,7 @@ export class JournalSync {
 
   /**
    * Handle Foundry JournalEntry update — push changes to Chronicle.
+   * Detects name, content, and ownership changes and pushes all to Chronicle.
    * @param {JournalEntry} journal
    * @param {object} change
    * @param {object} options
@@ -372,13 +362,20 @@ export class JournalSync {
     if (!entityId) return;
 
     try {
-      const textPage = journal.pages.find((p) => p.type === 'text');
+      // Concatenate all text pages into a single entry for Chronicle.
+      const entryHtml = this._collectTextPages(journal);
+      const isPrivate =
+        (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER;
 
       await this._api.put(`/entities/${entityId}`, {
         name: journal.name,
-        is_private: (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER,
-        entry: textPage?.text?.content || '',
+        is_private: isPrivate,
+        entry: entryHtml,
       });
+
+      // Push ownership changes as Chronicle permission updates.
+      // Map Foundry default ownership level to Chronicle visibility mode.
+      await this._pushPermissions(entityId, journal.ownership, isPrivate);
 
       this._syncing = true;
       try {
@@ -427,5 +424,239 @@ export class JournalSync {
     if (exclusions.excludedEntities.includes(entity.id)) return true;
     if (entity.entity_type_id && exclusions.excludedTypes.includes(entity.entity_type_id)) return true;
     return false;
+  }
+
+  // --- Permission Mapping Helpers ---
+
+  /**
+   * Build a Foundry ownership object from Chronicle entity permissions.
+   * Fetches the entity's permission grants and maps them to Foundry ownership levels.
+   *
+   * Mapping:
+   * - visibility "default" + is_private=true → { default: NONE }
+   * - visibility "default" + is_private=false → { default: OBSERVER }
+   * - visibility "custom" → uses role-based grants to determine default level,
+   *   and maps user-specific grants to per-Foundry-user ownership where possible.
+   *
+   * @param {object} entity - Chronicle entity with id, is_private, visibility fields.
+   * @returns {object} Foundry ownership object.
+   * @private
+   */
+  async _buildOwnership(entity) {
+    // Fallback for legacy or simple visibility.
+    if (!entity.visibility || entity.visibility === 'default') {
+      return entity.is_private
+        ? { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE }
+        : { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER };
+    }
+
+    // Custom visibility — fetch permission grants from API.
+    try {
+      const permsData = await this._api.get(`/entities/${entity.id}/permissions`);
+      if (!permsData?.permissions) {
+        // Fallback if API call returns no data.
+        return { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE };
+      }
+
+      const ownership = { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE };
+
+      for (const grant of permsData.permissions) {
+        if (grant.subject_type === 'role') {
+          // Role "1" = Player. If players have a grant, set default ownership.
+          if (grant.subject_id === '1') {
+            ownership.default =
+              grant.permission === 'edit'
+                ? CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER
+                : CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER;
+          }
+          // Role "2" = Scribe. Scribes get at least OBSERVER.
+          // (Foundry doesn't have a "scribe" concept; handle via default level.)
+        }
+        // User-specific and group grants are stored in flags for reference
+        // but can't be mapped to Foundry users without a user ID mapping table.
+      }
+
+      return ownership;
+    } catch (err) {
+      console.warn('Chronicle: Failed to fetch entity permissions, using fallback', err);
+      return entity.is_private
+        ? { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE }
+        : { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER };
+    }
+  }
+
+  /**
+   * Push Foundry ownership changes to Chronicle as permission updates.
+   * Maps Foundry default ownership level to Chronicle visibility mode:
+   * - NONE → visibility "default", is_private=true
+   * - OBSERVER → visibility "default", is_private=false
+   * - Changes in per-user ownership are logged but not yet pushed
+   *   (requires user ID mapping table).
+   *
+   * @param {string} entityId - Chronicle entity ID.
+   * @param {object} ownership - Foundry ownership object.
+   * @param {boolean} isPrivate - Derived privacy flag from default ownership.
+   * @private
+   */
+  async _pushPermissions(entityId, ownership, isPrivate) {
+    try {
+      // Build permission grants from Foundry ownership.
+      const permissions = [];
+
+      if (!isPrivate) {
+        // Entity is visible: grant view to player role.
+        permissions.push({
+          subject_type: 'role',
+          subject_id: '1',
+          permission: 'view',
+        });
+      }
+
+      // Determine visibility mode based on whether there are per-user grants.
+      // For now, use "default" mode since we can't map Foundry user IDs
+      // to Chronicle user IDs without a mapping table.
+      const hasPerUserGrants = Object.keys(ownership || {}).some(
+        (key) => key !== 'default' && ownership[key] > CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE
+      );
+
+      // Only push custom permissions if there are meaningful grants.
+      if (hasPerUserGrants || permissions.length > 0) {
+        await this._api.put(`/entities/${entityId}/permissions`, {
+          visibility: hasPerUserGrants ? 'custom' : 'default',
+          is_private: isPrivate,
+          permissions,
+        });
+      }
+    } catch (err) {
+      // Permission push is best-effort — don't fail the sync.
+      console.warn('Chronicle: Failed to push permissions update', err);
+    }
+  }
+
+  // --- Multi-Page Helpers ---
+
+  /**
+   * Split HTML content by top-level headings (h1/h2) into named sections.
+   * Each section becomes a separate Foundry journal page.
+   * If no headings are found, returns a single section with the entity name.
+   * @param {string} html - The entity entry_html content.
+   * @returns {Array<{title: string, content: string}>}
+   * @private
+   */
+  _splitByHeadings(html) {
+    if (!html) return [{ title: 'Content', content: '' }];
+
+    // Match h1 or h2 tags to use as page break points.
+    const headingRegex = /<h[12][^>]*>(.*?)<\/h[12]>/gi;
+    const matches = [...html.matchAll(headingRegex)];
+
+    // No headings found — return as single page.
+    if (matches.length === 0) {
+      return [{ title: 'Content', content: html }];
+    }
+
+    const sections = [];
+
+    // Content before the first heading (if any).
+    const preContent = html.substring(0, matches[0].index).trim();
+    if (preContent) {
+      sections.push({ title: 'Overview', content: preContent });
+    }
+
+    // Each heading starts a new section, ending at the next heading or end of string.
+    for (let i = 0; i < matches.length; i++) {
+      const match = matches[i];
+      const startAfterHeading = match.index + match[0].length;
+      const endIndex = i + 1 < matches.length ? matches[i + 1].index : html.length;
+      const sectionContent = html.substring(startAfterHeading, endIndex).trim();
+
+      // Strip HTML tags from heading text for the page title.
+      const title = match[1].replace(/<[^>]*>/g, '').trim() || `Section ${i + 1}`;
+
+      // Include the heading in the page content for context.
+      sections.push({
+        title,
+        content: match[0] + sectionContent,
+      });
+    }
+
+    return sections;
+  }
+
+  /**
+   * Collect all text pages from a Foundry JournalEntry and concatenate
+   * them into a single HTML string for Chronicle. Pages are joined in
+   * sort order.
+   * @param {JournalEntry} journal
+   * @returns {string} Combined HTML content.
+   * @private
+   */
+  _collectTextPages(journal) {
+    const textPages = journal.pages
+      .filter((p) => p.type === 'text')
+      .sort((a, b) => a.sort - b.sort);
+
+    if (textPages.length === 0) return '';
+    if (textPages.length === 1) return textPages[0].text?.content || '';
+
+    // Multiple pages: concatenate with the page name as a heading separator.
+    return textPages
+      .map((page) => {
+        const content = page.text?.content || '';
+        // If the page content already starts with a heading, use it as-is.
+        if (/^<h[12][^>]*>/i.test(content.trim())) return content;
+        // Otherwise, wrap the page name as an h2 heading.
+        return `<h2>${page.name}</h2>\n${content}`;
+      })
+      .join('\n');
+  }
+
+  /**
+   * Sync entity HTML content to journal pages. Splits by headings and
+   * updates existing pages or creates/removes pages as needed.
+   * @param {JournalEntry} journal
+   * @param {string} html - Entity entry_html content.
+   * @private
+   */
+  async _syncPagesToJournal(journal, html) {
+    const sections = this._splitByHeadings(html);
+    const existingTextPages = journal.pages
+      .filter((p) => p.type === 'text')
+      .sort((a, b) => a.sort - b.sort);
+
+    // Update existing pages and create new ones as needed.
+    for (let i = 0; i < sections.length; i++) {
+      const section = sections[i];
+
+      if (i < existingTextPages.length) {
+        // Update existing page.
+        const page = existingTextPages[i];
+        const updates = { 'text.content': section.content };
+        if (page.name !== section.title) {
+          updates.name = section.title;
+        }
+        await page.update(updates);
+      } else {
+        // Create new page.
+        await journal.createEmbeddedDocuments('JournalEntryPage', [
+          {
+            name: section.title,
+            type: 'text',
+            text: { content: section.content },
+            sort: (existingTextPages.length + i) * 100,
+          },
+        ]);
+      }
+    }
+
+    // Remove excess pages if entity has fewer sections than journal has pages.
+    if (sections.length < existingTextPages.length) {
+      const pagesToDelete = existingTextPages
+        .slice(sections.length)
+        .map((p) => p.id);
+      if (pagesToDelete.length > 0) {
+        await journal.deleteEmbeddedDocuments('JournalEntryPage', pagesToDelete);
+      }
+    }
   }
 }

@@ -12,6 +12,7 @@ import { JournalSync } from './journal-sync.mjs';
 import { MapSync } from './map-sync.mjs';
 import { ShopWidget } from './shop-widget.mjs';
 import { CalendarSync } from './calendar-sync.mjs';
+import { ActorSync } from './actor-sync.mjs';
 import { SyncDashboard } from './sync-dashboard.mjs';
 
 /** @type {SyncManager|null} */
@@ -44,6 +45,7 @@ Hooks.once('ready', async () => {
   syncManager.registerModule(new MapSync());
   syncManager.registerModule(new ShopWidget());
   syncManager.registerModule(new CalendarSync());
+  syncManager.registerModule(new ActorSync());
 
   // Start the sync manager (connects WebSocket, performs initial sync).
   await syncManager.start();
@@ -75,7 +77,7 @@ Hooks.on('getSceneControlButtons', (controls) => {
       icon: 'fa-solid fa-rotate',
       button: true,
       onClick: () => {
-        if (dashboard) dashboard.render(true);
+        if (dashboard) dashboard.render({ force: true });
       },
     }],
   });
@@ -133,12 +135,9 @@ function _addStatusIndicator() {
   syncManager.api.onStateChange(updateState);
   updateState();
 
-  // Click to reconnect when disconnected.
+  // Click to open the sync dashboard.
   indicator.addEventListener('click', () => {
-    const state = syncManager.api.state;
-    if (state === 'disconnected') {
-      syncManager.api.connect();
-    }
+    if (dashboard) dashboard.render({ force: true });
   });
 
   // Flash the dot briefly when a WS message arrives (activity indicator).
@@ -187,7 +186,7 @@ Hooks.once('ready', () => {
       syncManager,
       dashboard,
       getAPI: () => syncManager?.api,
-      openDashboard: () => dashboard?.render(true),
+      openDashboard: () => dashboard?.render({ force: true }),
     };
   }
 });
