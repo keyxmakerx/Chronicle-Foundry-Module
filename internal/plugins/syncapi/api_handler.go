@@ -337,6 +337,55 @@ func (h *APIHandler) UpdateEntityFields(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 
+// ToggleEntityReveal sets or toggles an entity's is_private flag via the REST API.
+// POST /api/v1/campaigns/:id/entities/:entityID/reveal
+// Used by Foundry VTT to sync NPC visibility changes bidirectionally.
+// Body: {"is_private": true|false} — if omitted, toggles current state.
+func (h *APIHandler) ToggleEntityReveal(c echo.Context) error {
+	entityID := c.Param("entityID")
+	ctx := c.Request().Context()
+
+	// Verify entity belongs to this campaign.
+	entity, err := h.entitySvc.GetByID(ctx, entityID)
+	if err != nil {
+		return apperror.NewNotFound("entity not found")
+	}
+	if entity.CampaignID != c.Param("id") {
+		return apperror.NewNotFound("entity not found")
+	}
+
+	var req struct {
+		IsPrivate *bool `json:"is_private"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return apperror.NewBadRequest("invalid request body")
+	}
+
+	// If explicit value matches current state, no-op.
+	if req.IsPrivate != nil && *req.IsPrivate == entity.IsPrivate {
+		return c.JSON(http.StatusOK, map[string]any{
+			"entity_id":  entityID,
+			"is_private": entity.IsPrivate,
+		})
+	}
+
+	// Toggle (or set to desired value — same effect since we checked above).
+	newPrivate, err := h.entitySvc.TogglePrivate(ctx, entityID)
+	if err != nil {
+		return err
+	}
+
+	slog.Info("entity visibility changed via API",
+		slog.String("entity_id", entityID),
+		slog.Bool("is_private", newPrivate),
+	)
+
+	return c.JSON(http.StatusOK, map[string]any{
+		"entity_id":  entityID,
+		"is_private": newPrivate,
+	})
+}
+
 // DeleteEntity deletes an entity from the campaign.
 // DELETE /api/v1/campaigns/:id/entities/:entityID
 func (h *APIHandler) DeleteEntity(c echo.Context) error {

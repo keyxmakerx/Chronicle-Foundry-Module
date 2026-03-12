@@ -8,7 +8,19 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-12 -- **Sprint F-QoL: Foundry Sync Diagnostics & Error Handling.**
+2026-03-12 -- **Sprint F-5: NPC Viewer / Hall.**
+
+39. **Sprint F-5: NPC Viewer / Hall (DONE).**
+    - **NPC plugin** — New `internal/plugins/npcs/` with model/repo/service/handler/templates/routes. View-layer plugin — no new database tables, queries existing `entities` table filtered by character type + visibility.
+    - **Gallery page** — `/campaigns/:id/npcs` shows a responsive grid of revealed character entities. Search by name (debounced HTMX), sort (name/updated/created), tag filter, pagination. Players see non-private characters; Scribes/Owners see all.
+    - **NPC card** — Portrait (aspect 3:4 or placeholder), name, type label/race/class, tags. Responsive grid (2→6 columns).
+    - **Reveal toggle** — Eye icon on each card (Scribe+). Toggles `is_private` via `POST /npcs/:eid/reveal` with HTMX swap. Green eye = visible, red eye-slash = hidden.
+    - **Entity service** — Added `TogglePrivate(entityID)` to `EntityService` interface. New `UpdatePrivate(entityID, isPrivate)` on `EntityRepository`. Publishes entity "updated" event via WebSocket.
+    - **npc_gallery layout block** — Registered in block registry (no addon required). Shows compact 3-4 column grid of up to 8 NPCs with "View all" link. Configurable via `{"limit": N}`.
+    - **Foundry sync** — Bidirectional NPC visibility sync. Chronicle→Foundry: entity `is_private` change updates actor's `prototypeToken.hidden`. Foundry→Chronicle: actor hidden toggle calls `POST /entities/:id/reveal` API.
+    - **Sync API** — New `POST /api/v1/campaigns/:id/entities/:entityID/reveal` endpoint. Accepts `{"is_private": bool}` or toggles if omitted. Verifies entity belongs to campaign.
+    - **Tests** — 7 tests: `ListNPCs_ReturnsCards`, `ListNPCs_EmptyWhenNoCharacterType`, `CountNPCs`, `NPCListOptions_Offset`, `NPCListOptions_OrderByClause`, `NPCCard_FieldString`, `TogglePrivate_EntityService`. All pass.
+    - **Wiring** — `npcEntityTypeFinderAdapter` and `npcVisibilityTogglerAdapter` in `app/routes.go`. Routes registered with `RequireRole(Player)` for view, `RequireRole(Scribe)` for reveal.
 
 38. **Sprint F-QoL: Foundry Sync Diagnostics (DONE).**
     - **Validation report** — New `ValidationReport` type and `BuildValidationReport()` on `SystemManifest`. Analyzes categories, fields, presets, Foundry compatibility, mapped/writable fields, and generates warnings. Shown in custom system section after upload.

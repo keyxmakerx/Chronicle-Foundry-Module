@@ -254,6 +254,17 @@ export class ActorSync {
         await actor.update(fieldUpdate);
       }
 
+      // Sync visibility: Chronicle is_private → Foundry actor hidden.
+      // A private entity means the NPC is hidden from players.
+      const shouldBeHidden = entity.is_private === true;
+      if (actor.hidden !== shouldBeHidden) {
+        // Update the actor's default token hidden state and active tokens.
+        await actor.update({ 'prototypeToken.hidden': shouldBeHidden });
+        console.log(
+          `Chronicle: ${shouldBeHidden ? 'Hid' : 'Revealed'} actor "${actor.name}" (visibility sync)`
+        );
+      }
+
       // Update sync timestamp.
       await actor.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
 
@@ -364,7 +375,27 @@ export class ActorSync {
     const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
 
-    // Only push if system data or name changed.
+    // Sync visibility: Foundry prototypeToken.hidden → Chronicle is_private.
+    const hiddenChanged =
+      change.prototypeToken?.hidden !== undefined ||
+      change.token?.hidden !== undefined;
+
+    if (hiddenChanged) {
+      try {
+        const isHidden =
+          change.prototypeToken?.hidden ?? change.token?.hidden ?? false;
+        await this._api.post(`/entities/${entityId}/reveal`, {
+          is_private: isHidden,
+        });
+        console.log(
+          `Chronicle: ${isHidden ? 'Hid' : 'Revealed'} entity for actor "${actor.name}" (Foundry → Chronicle)`
+        );
+      } catch (err) {
+        console.error('Chronicle: Failed to sync visibility to Chronicle', err);
+      }
+    }
+
+    // Only push field/name changes if system data or name changed.
     if (!change.system && !change.name) return;
 
     try {

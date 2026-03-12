@@ -92,6 +92,7 @@ func RegisterAPIRoutes(e *echo.Echo, api *APIHandler, calAPI *CalendarAPIHandler
 	cg.POST("/entities", api.CreateEntity, RequirePermission(PermWrite))
 	cg.PUT("/entities/:entityID", api.UpdateEntity, RequirePermission(PermWrite))
 	cg.PUT("/entities/:entityID/fields", api.UpdateEntityFields, RequirePermission(PermWrite))
+	cg.POST("/entities/:entityID/reveal", api.ToggleEntityReveal, RequirePermission(PermWrite))
 	cg.DELETE("/entities/:entityID", api.DeleteEntity, RequirePermission(PermWrite))
 
 	// Calendar write endpoints (require "write" permission + calendar addon).
