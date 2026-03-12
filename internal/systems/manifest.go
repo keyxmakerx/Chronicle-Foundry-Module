@@ -193,6 +193,90 @@ func (m *SystemManifest) CharacterFieldsForAPI() *CharacterFieldsResponse {
 	}
 }
 
+// ValidationReport summarizes a system manifest's capabilities and readiness.
+// Used to give campaign owners clear feedback after uploading a custom system.
+type ValidationReport struct {
+	// CategoryCount is the number of reference data categories.
+	CategoryCount int `json:"category_count"`
+
+	// TotalFields is the total number of fields across all categories.
+	TotalFields int `json:"total_fields"`
+
+	// PresetCount is the number of entity presets defined.
+	PresetCount int `json:"preset_count"`
+
+	// HasCharacterPreset indicates a character preset was found.
+	HasCharacterPreset bool `json:"has_character_preset"`
+
+	// CharacterFieldCount is the number of fields on the character preset.
+	CharacterFieldCount int `json:"character_field_count"`
+
+	// FoundryCompatible indicates foundry_system_id is set.
+	FoundryCompatible bool `json:"foundry_compatible"`
+
+	// FoundrySystemID is the declared Foundry system ID (if any).
+	FoundrySystemID string `json:"foundry_system_id,omitempty"`
+
+	// FoundryMappedFields is how many character fields have foundry_path set.
+	FoundryMappedFields int `json:"foundry_mapped_fields"`
+
+	// FoundryWritableFields is how many mapped fields are writable to Foundry.
+	FoundryWritableFields int `json:"foundry_writable_fields"`
+
+	// Warnings lists non-fatal issues the owner should be aware of.
+	Warnings []string `json:"warnings,omitempty"`
+}
+
+// BuildValidationReport analyzes the manifest and produces a summary of
+// capabilities, Foundry compatibility, and any warnings.
+func (m *SystemManifest) BuildValidationReport() *ValidationReport {
+	r := &ValidationReport{
+		CategoryCount:     len(m.Categories),
+		PresetCount:       len(m.EntityPresets),
+		FoundrySystemID:   m.FoundrySystemID,
+		FoundryCompatible: m.FoundrySystemID != "",
+	}
+
+	// Count category fields.
+	for _, cat := range m.Categories {
+		r.TotalFields += len(cat.Fields)
+	}
+
+	// Analyze character preset.
+	if preset := m.CharacterPreset(); preset != nil {
+		r.HasCharacterPreset = true
+		r.CharacterFieldCount = len(preset.Fields)
+
+		for _, f := range preset.Fields {
+			if f.FoundryPath != "" {
+				r.FoundryMappedFields++
+				if f.IsFoundryWritable() {
+					r.FoundryWritableFields++
+				}
+			}
+		}
+	}
+
+	// Generate warnings.
+	if r.CategoryCount == 0 {
+		r.Warnings = append(r.Warnings, "No reference data categories defined")
+	}
+	if r.PresetCount == 0 {
+		r.Warnings = append(r.Warnings, "No entity presets defined — campaigns won't get auto-created entity types")
+	}
+	if !r.HasCharacterPreset {
+		r.Warnings = append(r.Warnings, "No character preset found (slug ending in '-character') — Foundry character sync won't work")
+	}
+	if r.HasCharacterPreset && !r.FoundryCompatible {
+		r.Warnings = append(r.Warnings, "Character preset exists but no foundry_system_id set — Foundry auto-detection disabled")
+	}
+	if r.HasCharacterPreset && r.FoundryCompatible && r.FoundryMappedFields == 0 {
+		r.Warnings = append(r.Warnings, "foundry_system_id is set but no fields have foundry_path — character sync will be name-only")
+	}
+
+	return r
+}
+
 // CategoryNames returns a flat list of category display names.
 // Convenience method for backward-compatible display on admin pages.
 func (m *SystemManifest) CategoryNames() []string {

@@ -8,7 +8,17 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-12 -- **Sprint F-4.5: Generic System Adapter & Dynamic Matching.**
+2026-03-12 -- **Sprint F-QoL: Foundry Sync Diagnostics & Error Handling.**
+
+38. **Sprint F-QoL: Foundry Sync Diagnostics (DONE).**
+    - **Validation report** — New `ValidationReport` type and `BuildValidationReport()` on `SystemManifest`. Analyzes categories, fields, presets, Foundry compatibility, mapped/writable fields, and generates warnings. Shown in custom system section after upload.
+    - **Template update** — `SystemValidationReport` templ component renders capability badges (categories, fields, presets, character fields), Foundry compatibility status, field mapping summary, and warnings.
+    - **API client health metrics** — `api-client.mjs` now tracks REST success/error counts, reconnect attempts, connection uptime, last success/error timestamps. New `_errorLog` array with structured error entries (method, path, status, message). `getUptimePercent()` computes session uptime.
+    - **Retry queue** — New `queueForRetry()` method for failed write operations. `processRetryQueue()` runs on WebSocket reconnect, retrying up to 3 times with structured logging. Queue capped at 50 entries.
+    - **Dashboard diagnostics** — Status tab now shows: 4-column diagnostics grid (uptime%, API OK, API errors, reconnects), last success/error timestamps, pending retry count, field mapping debug info (adapter type, system ID, character type slug), and separate error log section.
+    - **Dashboard CSS** — Added `.diagnostics-grid`, `.diagnostics-detail`, `.error-value`, `.error-text`, `.error-log` styles.
+    - **Tests** — 3 new tests: `BuildValidationReport_FullSystem`, `BuildValidationReport_MinimalSystem`, `BuildValidationReport_NoFoundryPaths`. All pass.
+    - **Dagger Heart** added to deferred systems list alongside Draw Steel.
 
 37. **Sprint F-4.5: Generic System Adapter (DONE).**
     - **Manifest schema** — Added `foundry_system_id` to `SystemManifest`, `foundry_path` and `foundry_writable` to `FieldDef`. `IsFoundryWritable()` helper defaults to true when nil. New `CharacterFieldsForAPI()` builds API response with field annotations.

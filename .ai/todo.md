@@ -279,7 +279,7 @@ _WASM-sandboxed backend logic via Extism/wazero. See ADR-021._
 - [x] **Sprint R-3: Write Host Functions** — 6 write host functions (update_entity_fields, create_event, set_entity_tags, get_entity_tags, create_relation, send_message). 5 new capabilities. 4 write adapters. Plugin-to-plugin async messaging. 10 new tests (48 total).
 - [x] **Sprint R-4: Plugin SDK & Developer Tools** — Example WASM plugins (Rust auto-tagger, Go session-logger). Go SDK with MockHost test harness (9 tests). Plugin development guide. 7 new manifest tests. **Phase R complete.**
 
-### Phase F: Foundry Sync Enhancements & Character Integration ← CURRENT (F-QoL next)
+### Phase F: Foundry Sync Enhancements & Character Integration ← CURRENT (F-5 next)
 
 _Improve Foundry VTT sync fidelity. Add system-aware character sheet sync. Build toward inventory/NPC features._
 
@@ -288,7 +288,7 @@ _Improve Foundry VTT sync fidelity. Add system-aware character sheet sync. Build
 - [x] **Sprint F-3: System Detection & Character Field Templates** — Expanded dnd5e character preset (15 fields: class, level, race, alignment + 6 ability scores + HP/AC/speed/proficiency). Added pf2e character preset (15 fields: class, level, ancestry, heritage + 6 ability mods + HP/AC/perception/speed). `CharacterPreset()` helper on `SystemManifest`. New `GET /api/v1/campaigns/:id/systems` endpoint returns available systems with enabled flag. Foundry module: `syncCharacters` + `detectedSystem` settings, `SYSTEM_MAP` table, `_detectSystem()` on start, `getMatchedSystem()` accessor. Dashboard Status tab shows system match info and character sync availability.
 - [x] **Sprint F-4: Actor ↔ Entity Sync** — `actor-sync.mjs` with bidirectional Actor ↔ entity sync. System adapters: `dnd5e-adapter.mjs` (15 fields), `pf2e-adapter.mjs` (HP/name back only). Dashboard Characters tab with Push button. Registered in module.mjs. TESTING.md updated. **Note: adapters and SYSTEM_MAP are hardcoded — see F-4.5.**
 - [x] **Sprint F-4.5: Generic System Adapter & Dynamic Matching** — Added `foundry_system_id` to manifest, `foundry_path`/`foundry_writable` to FieldDef. New `GET /systems/:id/character-fields` API. `_detectSystem()` now API-driven (matches by `foundry_system_id`). New `generic-adapter.mjs` auto-generates field mappings from API. dnd5e (15 fields), pf2e (15 fields, most read-only), drawsteel annotated. actor-sync.mjs falls back to generic adapter. 7 new tests.
-- [ ] **Sprint F-QoL: Foundry Sync Diagnostics & Error Handling** — Validation report UI on system upload (field count, presets, Foundry compatibility). System preview before enabling. Foundry sync health dashboard (connection uptime, last sync timestamps, error log, retry buttons). Graceful error recovery (queue pending changes on disconnect, retry on reconnect). Field mapping debug view in Foundry dashboard.
+- [x] **Sprint F-QoL: Foundry Sync Diagnostics & Error Handling** — `ValidationReport` type with `BuildValidationReport()` analyzing categories, fields, presets, Foundry compatibility, warnings. Templ component shows capability badges + warnings after upload. API client health metrics (success/error counts, uptime, reconnect attempts). Structured error log. Retry queue for failed writes (processes on reconnect, max 3 retries). Dashboard Status tab: diagnostics grid, error log, field mapping debug info. 3 new tests.
 - [ ] **Sprint F-5: NPC Viewer / Hall (Plugin + Widget + Foundry Sync)** — Full NPC plugin at `internal/plugins/npcs/` with handler/service/repo/templates. Campaign route `/campaigns/:id/npcs` — gallery/grid of revealed NPCs (non-private character entities). Portrait, name, description, location, faction. Filters by location/organization/relation. "Reveal" = DM toggles visibility. `npc_gallery` layout block type for entity pages and dashboards. Foundry sync: NPC visibility changes sync bidirectionally — DM reveals/hides NPC in Foundry → Chronicle entity visibility updates and vice versa via actor-sync. Long-term: NPC relationship map (filtered relation graph).
 - [ ] **Sprint F-6: Armory / Inventory System** — Items as entities with game-mechanic fields (weight, cost, rarity, damage, properties). Character "Inventory" tab/block via entity relations. Relation metadata: equipped, quantity, attunement. System-specific item templates (dnd5e ≠ pf2e). Foundry sync: Actor inventory ↔ Chronicle inventory relations. "Armory" campaign page showing all catalogued items.
 - [ ] **Sprint F-7: Shop / Marketplace Enhancement** — Transaction logging (who bought what, when). Currency tracking per character. Stock management (auto-deplete on purchase). Foundry: purchase from shop window → update character inventory on both sides.
@@ -308,7 +308,8 @@ is truly modular and self-service._
 ### Deferred to Phase S+ (or community contributions)
 
 - [ ] **Module Builder UI** — Guided wizard that helps users create custom game system modules through the web UI. Step-by-step: name/metadata → define categories → define fields per category → paste/upload reference data → preview tooltips → export as module directory. Eliminates need to hand-write manifest.json + data files.
-- [ ] Draw Steel module
+- [ ] Draw Steel module (system data + Foundry adapter)
+- [ ] Dagger Heart module (system data + Foundry adapter)
 - [ ] Whiteboards / freeform canvas (Tldraw/Excalidraw)
 - [ ] Offline mode / service worker caching
 - [ ] Collaborative editing presence indicators

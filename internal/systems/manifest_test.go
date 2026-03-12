@@ -415,6 +415,117 @@ func TestLoadManifest_FoundryAnnotations(t *testing.T) {
 	}
 }
 
+func TestBuildValidationReport_FullSystem(t *testing.T) {
+	falseVal := false
+	m := &SystemManifest{
+		ID:              "dnd5e",
+		FoundrySystemID: "dnd5e",
+		Categories: []CategoryDef{
+			{Slug: "spells", Name: "Spells", Fields: []FieldDef{{Key: "level"}, {Key: "school"}}},
+			{Slug: "items", Name: "Items", Fields: []FieldDef{{Key: "rarity"}}},
+		},
+		EntityPresets: []EntityPresetDef{
+			{
+				Slug: "dnd5e-character",
+				Name: "D&D Character",
+				Fields: []FieldDef{
+					{Key: "str", FoundryPath: "system.abilities.str.value"},
+					{Key: "ac", FoundryPath: "system.attributes.ac.value", FoundryWritable: &falseVal},
+					{Key: "class"},
+				},
+			},
+		},
+	}
+
+	r := m.BuildValidationReport()
+
+	if r.CategoryCount != 2 {
+		t.Errorf("CategoryCount = %d, want 2", r.CategoryCount)
+	}
+	if r.TotalFields != 3 {
+		t.Errorf("TotalFields = %d, want 3", r.TotalFields)
+	}
+	if r.PresetCount != 1 {
+		t.Errorf("PresetCount = %d, want 1", r.PresetCount)
+	}
+	if !r.HasCharacterPreset {
+		t.Error("HasCharacterPreset = false, want true")
+	}
+	if r.CharacterFieldCount != 3 {
+		t.Errorf("CharacterFieldCount = %d, want 3", r.CharacterFieldCount)
+	}
+	if !r.FoundryCompatible {
+		t.Error("FoundryCompatible = false, want true")
+	}
+	if r.FoundryMappedFields != 2 {
+		t.Errorf("FoundryMappedFields = %d, want 2", r.FoundryMappedFields)
+	}
+	if r.FoundryWritableFields != 1 {
+		t.Errorf("FoundryWritableFields = %d, want 1", r.FoundryWritableFields)
+	}
+	if len(r.Warnings) != 0 {
+		t.Errorf("Warnings = %v, want none", r.Warnings)
+	}
+}
+
+func TestBuildValidationReport_MinimalSystem(t *testing.T) {
+	m := &SystemManifest{
+		ID: "bare",
+	}
+
+	r := m.BuildValidationReport()
+
+	if r.CategoryCount != 0 {
+		t.Errorf("CategoryCount = %d, want 0", r.CategoryCount)
+	}
+	if r.FoundryCompatible {
+		t.Error("FoundryCompatible = true, want false")
+	}
+	if r.HasCharacterPreset {
+		t.Error("HasCharacterPreset = true, want false")
+	}
+
+	// Should have warnings for missing categories, presets, and character preset.
+	if len(r.Warnings) < 3 {
+		t.Errorf("Expected at least 3 warnings, got %d: %v", len(r.Warnings), r.Warnings)
+	}
+}
+
+func TestBuildValidationReport_NoFoundryPaths(t *testing.T) {
+	m := &SystemManifest{
+		ID:              "custom",
+		FoundrySystemID: "custom-system",
+		Categories:      []CategoryDef{{Slug: "data", Name: "Data"}},
+		EntityPresets: []EntityPresetDef{
+			{
+				Slug: "custom-character",
+				Name: "Character",
+				Fields: []FieldDef{
+					{Key: "hp"},
+					{Key: "str"},
+				},
+			},
+		},
+	}
+
+	r := m.BuildValidationReport()
+
+	if r.FoundryMappedFields != 0 {
+		t.Errorf("FoundryMappedFields = %d, want 0", r.FoundryMappedFields)
+	}
+
+	// Should warn about foundry_system_id set but no foundry_path fields.
+	found := false
+	for _, w := range r.Warnings {
+		if len(w) > 0 && w[0:5] == "found" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Expected warning about missing foundry_path, got: %v", r.Warnings)
+	}
+}
+
 func TestValidateManifest_DefaultsEmptyStatus(t *testing.T) {
 	m := SystemManifest{
 		ID:         "test",
