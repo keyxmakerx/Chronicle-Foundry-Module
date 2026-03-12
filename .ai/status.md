@@ -8,7 +8,14 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-12 -- **Sprint F-5: NPC Viewer / Hall.**
+2026-03-12 -- **Post-F-5 QoL: NPC sidebar link + plan reorg.**
+
+40. **Post-F-5 QoL: NPC sidebar navigation link.**
+    - Added "NPCs" entry to campaign sidebar in `internal/templates/layouts/app.templ` below "All Pages" link.
+    - Uses `fa-users` icon, `isPathPrefix` for active highlighting, links to `/campaigns/:id/npcs`.
+    - Updated `.ai/phases.md` with 6-phase priority rewrite (already done in session 36).
+    - Phase X sprints (X-1 through X-5) already present in `todo.md`.
+    - **Next up:** Phase 1 continues — Sprint F-4.5/F-QoL/F-5 all complete. Next is Phase 2 (X-1: System Upload UX) or Phase 6 (F-6: Armory/Inventory), depending on owner priority.
 
 39. **Sprint F-5: NPC Viewer / Hall (DONE).**
     - **NPC plugin** — New `internal/plugins/npcs/` with model/repo/service/handler/templates/routes. View-layer plugin — no new database tables, queries existing `entities` table filtered by character type + visibility.
