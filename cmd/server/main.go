@@ -17,6 +17,7 @@ import (
 	"github.com/keyxmakerx/chronicle/internal/database"
 	"github.com/keyxmakerx/chronicle/internal/plugins/calendar"
 	"github.com/keyxmakerx/chronicle/internal/plugins/maps"
+	"github.com/keyxmakerx/chronicle/internal/plugins/packages"
 	"github.com/keyxmakerx/chronicle/internal/plugins/sessions"
 	"github.com/keyxmakerx/chronicle/internal/plugins/syncapi"
 	"github.com/keyxmakerx/chronicle/internal/plugins/timeline"
@@ -166,5 +167,6 @@ func registeredPlugins() []database.PluginSchema {
 		{Slug: "sessions", MigrationsFS: mustSub(sessions.MigrationsFS, database.PluginMigrationsSubdir)},
 		{Slug: "timeline", MigrationsFS: mustSub(timeline.MigrationsFS, database.PluginMigrationsSubdir)},
 		{Slug: "syncapi", MigrationsFS: mustSub(syncapi.MigrationsFS, database.PluginMigrationsSubdir)},
+		{Slug: "packages", MigrationsFS: mustSub(packages.MigrationsFS, database.PluginMigrationsSubdir)},
 	}
 }

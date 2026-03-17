@@ -23,6 +23,7 @@ import (
 	"github.com/keyxmakerx/chronicle/internal/plugins/campaigns"
 	"github.com/keyxmakerx/chronicle/internal/plugins/entities"
 	"github.com/keyxmakerx/chronicle/internal/plugins/media"
+	"github.com/keyxmakerx/chronicle/internal/plugins/packages"
 	"github.com/keyxmakerx/chronicle/internal/plugins/settings"
 	"github.com/keyxmakerx/chronicle/internal/plugins/smtp"
 	"github.com/keyxmakerx/chronicle/internal/plugins/calendar"
@@ -970,6 +971,19 @@ func (a *App) RegisterRoutes() {
 	extensions.RegisterAdminRoutes(adminGroup, extHandler)
 	extensions.RegisterCampaignRoutes(e, extHandler, campaignService, authService)
 	extensions.RegisterAssetRoutes(e, extHandler)
+
+	// Package manager: external repo management for systems and Foundry module.
+	pkgRepo := packages.NewPackageRepository(a.DB)
+	pkgGitHub := packages.NewGitHubClient()
+	pkgService := packages.NewPackageService(pkgRepo, pkgGitHub, a.Config.Upload.MediaPath)
+	pkgHandler := packages.NewHandler(pkgService)
+	if a.PluginHealth.IsHealthy("packages") {
+		packages.RegisterRoutes(adminGroup, pkgHandler)
+		// Start background auto-update worker.
+		go pkgService.StartAutoUpdateWorker(context.Background())
+	} else {
+		slog.Warn("packages plugin degraded — routes not registered")
+	}
 
 	// Security admin: event logging, session management, user account actions.
 	securityRepo := admin.NewSecurityEventRepository(a.DB)
