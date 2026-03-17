@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -370,6 +371,64 @@ func (h *Handler) ClearCampaignBypass(c echo.Context) error {
 		return c.NoContent(http.StatusNoContent)
 	}
 	return c.Redirect(http.StatusSeeOther, "/admin/storage")
+}
+
+// GetCORSOrigins returns the current CORS origin whitelist as JSON
+// (GET /admin/api/cors).
+func (h *Handler) GetCORSOrigins(c echo.Context) error {
+	origins, err := h.service.GetCORSOrigins(c.Request().Context())
+	if err != nil {
+		return err
+	}
+	if origins == nil {
+		origins = []string{}
+	}
+	return c.JSON(http.StatusOK, map[string]any{
+		"origins": origins,
+	})
+}
+
+// UpdateCORSOrigins replaces the CORS origin whitelist
+// (POST /admin/api/cors).
+func (h *Handler) UpdateCORSOrigins(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	// Accept both JSON and form data.
+	var origins []string
+	ct := c.Request().Header.Get("Content-Type")
+	if ct == "application/json" || ct == "application/json; charset=utf-8" {
+		var body struct {
+			Origins []string `json:"origins"`
+		}
+		if err := c.Bind(&body); err != nil {
+			return apperror.NewBadRequest("invalid request body")
+		}
+		origins = body.Origins
+	} else {
+		// Form submission: origins as comma-separated textarea value.
+		raw := c.FormValue("cors_origins")
+		for _, line := range strings.Split(raw, "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" {
+				origins = append(origins, line)
+			}
+		}
+	}
+
+	if err := h.service.UpdateCORSOrigins(ctx, origins); err != nil {
+		return err
+	}
+
+	slog.Info("CORS origins updated",
+		slog.String("by", auth.GetUserID(c)),
+		slog.Int("count", len(origins)),
+	)
+
+	if middleware.IsHTMX(c) {
+		c.Response().Header().Set("HX-Redirect", "/admin/api")
+		return c.NoContent(http.StatusNoContent)
+	}
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // parseDuration converts a duration string (e.g., "1h", "6h", "24h", "7d", "30d")

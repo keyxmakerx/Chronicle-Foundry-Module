@@ -2,8 +2,10 @@ package settings
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/keyxmakerx/chronicle/internal/apperror"
@@ -59,6 +61,14 @@ type SettingsService interface {
 
 	// ClearCampaignBypass removes the temporary bypass from a campaign's storage limits.
 	ClearCampaignBypass(ctx context.Context, campaignID string) error
+
+	// GetCORSOrigins returns the list of additional CORS origins from the database.
+	// Returns an empty slice if no origins are configured.
+	GetCORSOrigins(ctx context.Context) ([]string, error)
+
+	// UpdateCORSOrigins replaces the CORS origin whitelist with the given origins.
+	// Each origin must be a valid URL scheme+host (e.g., "http://localhost:30000").
+	UpdateCORSOrigins(ctx context.Context, origins []string) error
 }
 
 // settingsService implements SettingsService.
@@ -324,6 +334,52 @@ func (s *settingsService) ClearCampaignBypass(ctx context.Context, campaignID st
 		return apperror.NewBadRequest("campaign ID is required")
 	}
 	return s.repo.ClearCampaignBypass(ctx, campaignID)
+}
+
+// --- CORS Origin Management ---
+
+// GetCORSOrigins reads the comma-separated CORS origin list from site_settings.
+func (s *settingsService) GetCORSOrigins(ctx context.Context) ([]string, error) {
+	raw, err := s.repo.Get(ctx, KeyCORSAllowedOrigins)
+	if err != nil {
+		// Not found is fine — no origins configured yet.
+		var appErr *apperror.AppError
+		if errors.As(err, &appErr) && appErr.Code == 404 {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if raw == "" {
+		return nil, nil
+	}
+	var origins []string
+	for _, o := range strings.Split(raw, ",") {
+		o = strings.TrimSpace(o)
+		if o != "" {
+			origins = append(origins, o)
+		}
+	}
+	return origins, nil
+}
+
+// UpdateCORSOrigins validates and persists the CORS origin whitelist.
+func (s *settingsService) UpdateCORSOrigins(ctx context.Context, origins []string) error {
+	// Validate each origin is a reasonable URL (scheme + host).
+	var cleaned []string
+	for _, o := range origins {
+		o = strings.TrimSpace(o)
+		if o == "" {
+			continue
+		}
+		// Strip trailing slash for consistency.
+		o = strings.TrimRight(o, "/")
+		if !strings.HasPrefix(o, "http://") && !strings.HasPrefix(o, "https://") {
+			return apperror.NewBadRequest(fmt.Sprintf("invalid origin %q: must start with http:// or https://", o))
+		}
+		cleaned = append(cleaned, o)
+	}
+	value := strings.Join(cleaned, ",")
+	return s.repo.Set(ctx, KeyCORSAllowedOrigins, value)
 }
 
 // --- Parsing Helpers ---

@@ -138,6 +138,13 @@ type EntityPresetDef struct {
 	// specific features like the Armory (items) or NPC gallery (characters).
 	Category string `json:"category,omitempty"`
 
+	// FoundryActorType is the Foundry VTT Actor type string that corresponds
+	// to this preset (e.g., "character", "hero", "npc"). Different game
+	// systems use different actor types — D&D 5e uses "character", Draw Steel
+	// uses "hero". The Foundry module reads this from the API to create and
+	// filter actors of the correct type. Defaults to "character" if omitted.
+	FoundryActorType string `json:"foundry_actor_type,omitempty"`
+
 	// Fields are the default field definitions for entities of this type.
 	Fields []FieldDef `json:"fields,omitempty"`
 }
@@ -208,22 +215,24 @@ func (m *SystemManifest) ItemFieldsForAPI() *CharacterFieldsResponse {
 	}
 
 	return &CharacterFieldsResponse{
-		SystemID:        m.ID,
-		PresetSlug:      preset.Slug,
-		PresetName:      preset.Name,
-		FoundrySystemID: m.FoundrySystemID,
-		Fields:          fields,
+		SystemID:         m.ID,
+		PresetSlug:       preset.Slug,
+		PresetName:       preset.Name,
+		FoundrySystemID:  m.FoundrySystemID,
+		FoundryActorType: preset.FoundryActorType,
+		Fields:           fields,
 	}
 }
 
 // CharacterFieldsResponse is the API response shape for the character
 // fields endpoint, containing field definitions with Foundry annotations.
 type CharacterFieldsResponse struct {
-	SystemID        string                 `json:"system_id"`
-	PresetSlug      string                 `json:"preset_slug"`
-	PresetName      string                 `json:"preset_name"`
-	FoundrySystemID string                 `json:"foundry_system_id,omitempty"`
-	Fields          []CharacterFieldExport `json:"fields"`
+	SystemID         string                 `json:"system_id"`
+	PresetSlug       string                 `json:"preset_slug"`
+	PresetName       string                 `json:"preset_name"`
+	FoundrySystemID  string                 `json:"foundry_system_id,omitempty"`
+	FoundryActorType string                 `json:"foundry_actor_type,omitempty"`
+	Fields           []CharacterFieldExport `json:"fields"`
 }
 
 // CharacterFieldExport is a single field definition exported for the
@@ -256,11 +265,12 @@ func (m *SystemManifest) CharacterFieldsForAPI() *CharacterFieldsResponse {
 	}
 
 	return &CharacterFieldsResponse{
-		SystemID:        m.ID,
-		PresetSlug:      preset.Slug,
-		PresetName:      preset.Name,
-		FoundrySystemID: m.FoundrySystemID,
-		Fields:          fields,
+		SystemID:         m.ID,
+		PresetSlug:       preset.Slug,
+		PresetName:       preset.Name,
+		FoundrySystemID:  m.FoundrySystemID,
+		FoundryActorType: preset.FoundryActorType,
+		Fields:           fields,
 	}
 }
 

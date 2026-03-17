@@ -18,6 +18,12 @@ export const systemId = 'pathfinder2e';
 export const characterTypeSlug = 'pf2e-character';
 
 /**
+ * The Foundry VTT actor type that corresponds to characters.
+ * @type {string}
+ */
+export const actorType = 'character';
+
+/**
  * Extract Chronicle-compatible fields_data from a Foundry pf2e Actor.
  * PF2e stores ability modifiers rather than raw scores. It uses
  * `ancestry` instead of `race` and has `heritage` as a separate field.

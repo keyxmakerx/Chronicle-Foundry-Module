@@ -96,6 +96,7 @@
       "icon": "fa-hat-wizard",
       "color": "#7C3AED",
       "category": "character",
+      "foundry_actor_type": "character",
       "fields": [
         { "key": "class", "label": "Class", "type": "string", "foundry_path": "system.details.class" },
         { "key": "level", "label": "Level", "type": "number", "foundry_path": "system.details.level" },

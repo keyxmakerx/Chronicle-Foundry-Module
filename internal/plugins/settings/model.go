@@ -106,4 +106,9 @@ const (
 	KeyMaxStoragePerCampaign = "storage.max_storage_per_campaign"
 	KeyMaxFilesPerCampaign   = "storage.max_files_per_campaign"
 	KeyRateLimitUploadsPerMin = "storage.rate_limit_uploads_per_min"
+
+	// KeyCORSAllowedOrigins stores a comma-separated list of additional origins
+	// permitted to make cross-origin API requests (e.g., Foundry VTT servers).
+	// BaseURL is always allowed implicitly. Managed from admin panel.
+	KeyCORSAllowedOrigins = "cors.allowed_origins"
 )

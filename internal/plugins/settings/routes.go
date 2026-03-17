@@ -18,6 +18,10 @@ func RegisterRoutes(adminGroup *echo.Group, h *Handler) {
 	adminGroup.PUT("/campaigns/:id/storage", h.SetCampaignStorageLimit)
 	adminGroup.DELETE("/campaigns/:id/storage", h.DeleteCampaignStorageLimit)
 
+	// CORS origin whitelist management.
+	adminGroup.GET("/api/cors", h.GetCORSOrigins)
+	adminGroup.POST("/api/cors", h.UpdateCORSOrigins)
+
 	// Temporary storage bypass overrides.
 	adminGroup.PUT("/users/:id/storage/bypass", h.SetUserBypass)
 	adminGroup.DELETE("/users/:id/storage/bypass", h.ClearUserBypass)

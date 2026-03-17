@@ -313,7 +313,7 @@ is truly modular and self-service._
 ### Deferred to Phase S+ (or community contributions)
 
 - [ ] **Module Builder UI** — Guided wizard that helps users create custom game system modules through the web UI. Step-by-step: name/metadata → define categories → define fields per category → paste/upload reference data → preview tooltips → export as module directory. Eliminates need to hand-write manifest.json + data files.
-- [ ] Draw Steel module (system data + Foundry adapter)
+- [x] Draw Steel module (system data + Foundry adapter)
 - [ ] Dagger Heart module (system data + Foundry adapter)
 - [ ] Whiteboards / freeform canvas (Tldraw/Excalidraw)
 - [ ] Offline mode / service worker caching

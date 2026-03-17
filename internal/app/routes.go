@@ -1001,6 +1001,7 @@ func (a *App) RegisterRoutes() {
 	syncMappingRepoEarly := syncapi.NewSyncMappingRepository(a.DB)
 	syncMappingSvcEarly := syncapi.NewSyncMappingService(syncMappingRepoEarly)
 	syncHandler.SetSyncMappingService(syncMappingSvcEarly)
+	syncHandler.SetCORSOriginLister(settingsService)
 	if a.PluginHealth.IsHealthy("syncapi") {
 		syncapi.RegisterAdminRoutes(adminGroup, syncHandler)
 		syncapi.RegisterCampaignRoutes(e, syncHandler, campaignService, authService)
