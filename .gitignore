@@ -1,75 +1,24 @@
-# ============================================================================
-# Chronicle .gitignore
-# ============================================================================
-# This file controls what Git ignores. Organized by category.
-# Category: Static -- rarely needs changes.
-# ============================================================================
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
 
-# --- Go ---
-# Compiled binary
-/chronicle
-/server
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-
-# Test binary, built with `go test -c`
-*.test
-
-# Output of the go coverage tool
-*.out
-*.prof
-coverage.html
-
-# Go workspace file
-go.work.local
-
-# --- Templ (generated Go files from .templ sources) ---
-*_templ.go
-
-# --- sqlc (generated Go files from SQL queries) ---
-# NOTE: If we ever adopt sqlc, uncomment this:
-# db/sqlc/
-
-# --- Tailwind CSS (generated output) ---
-static/css/app.css
-
-# --- Environment & Secrets ---
-.env
-.env.*
-!.env.example
-
-# --- IDE / Editor ---
+# IDE / Editor
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
-Thumbs.db
 
-# --- Docker ---
-# Don't ignore docker-compose.yml or Dockerfile (those are tracked)
-
-# --- Node (Tailwind CLI & plugins) ---
+# Node (if tooling is added later)
 node_modules/
 
-# --- Temporary / Build ---
-tmp/
-dist/
-/bin/
+# Environment
+.env
 
-# --- OS / System files ---
-.DS_Store
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Desktop.ini
-
-# --- Log files ---
+# Logs
 *.log
 
-# --- Uploads (user-generated content in dev) ---
-uploads/
+# Temporary
+tmp/
+dist/
