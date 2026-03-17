@@ -631,6 +631,7 @@ export class MapSync {
 
     try {
       const chronicleDrawing = this._foundryDrawingToChronicle(drawing);
+      if (!chronicleDrawing) return;
       const result = await this._api.post(`/maps/${mapId}/drawings`, chronicleDrawing);
 
       if (result?.id) {
@@ -655,6 +656,7 @@ export class MapSync {
 
     try {
       const chronicleDrawing = this._foundryDrawingToChronicle(drawing);
+      if (!chronicleDrawing) return;
       await this._api.put(`/maps/${mapId}/drawings/${drawingId}`, chronicleDrawing);
     } catch (err) {
       console.error('Chronicle: Failed to update drawing', err);
@@ -890,6 +892,7 @@ export class MapSync {
         this._tokenDebounceTimers.delete(key);
         try {
           const scene = token.parent;
+          if (!scene?.dimensions) return;
           // Convert Foundry pixel coords to percentage.
           const x = (token.x / scene.dimensions.width) * 100;
           const y = (token.y / scene.dimensions.height) * 100;
@@ -1000,6 +1003,7 @@ export class MapSync {
    */
   _foundryDrawingToChronicle(drawing) {
     const scene = drawing.parent;
+    if (!scene?.dimensions) return null;
     const dims = scene.dimensions;
     const typeMap = { f: 'freehand', r: 'rectangle', e: 'ellipse', p: 'polygon', t: 'text' };
 

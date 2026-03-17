@@ -98,7 +98,9 @@ export async function createGenericAdapter(api, chronicleSystemId) {
 
         // Cast to appropriate type.
         if (field.type === 'number') {
-          update[field.foundry_path] = Number(value);
+          const num = Number(value);
+          if (Number.isNaN(num)) continue;
+          update[field.foundry_path] = num;
         } else {
           update[field.foundry_path] = value;
         }

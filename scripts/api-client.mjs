@@ -319,7 +319,7 @@ export class ChronicleAPI {
       method,
       path,
       status,
-      message: message.substring(0, 200), // Truncate long error bodies.
+      message: message.length > 200 ? message.substring(0, 200) + '…' : message,
     });
     if (this._errorLog.length > this._maxErrorLogEntries) {
       this._errorLog.length = this._maxErrorLogEntries;
@@ -404,6 +404,10 @@ export class ChronicleAPI {
       this._ws.send(JSON.stringify(message));
     } else {
       this._messageQueue.push(message);
+      // Cap queue to prevent unbounded growth during long disconnects.
+      if (this._messageQueue.length > 100) {
+        this._messageQueue.shift();
+      }
     }
   }
 

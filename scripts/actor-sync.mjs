@@ -346,10 +346,13 @@ export class ActorSync {
       });
 
       if (entity) {
-        this._syncing = true;
-        await actor.setFlag(FLAG_SCOPE, 'entityId', entity.id);
-        await actor.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
-        this._syncing = false;
+        try {
+          this._syncing = true;
+          await actor.setFlag(FLAG_SCOPE, 'entityId', entity.id);
+          await actor.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
+        } finally {
+          this._syncing = false;
+        }
 
         // Create sync mapping.
         await this._api.post('/sync/mappings', {
@@ -363,7 +366,6 @@ export class ActorSync {
         console.log(`Chronicle: Pushed new actor "${actor.name}" to Chronicle`);
       }
     } catch (err) {
-      this._syncing = false;
       console.error('Chronicle: Failed to push new actor to Chronicle', err);
     }
   }
@@ -421,13 +423,15 @@ export class ActorSync {
         await this._api.put(`/entities/${entityId}`, { name: change.name });
       }
 
-      this._syncing = true;
-      await actor.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
-      this._syncing = false;
+      try {
+        this._syncing = true;
+        await actor.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
+      } finally {
+        this._syncing = false;
+      }
 
       console.log(`Chronicle: Pushed actor "${actor.name}" changes to Chronicle`);
     } catch (err) {
-      this._syncing = false;
       console.error('Chronicle: Failed to push actor update to Chronicle', err);
     }
   }

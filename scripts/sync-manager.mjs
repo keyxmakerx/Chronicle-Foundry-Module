@@ -85,23 +85,27 @@ export class SyncManager {
     // Initialize all registered modules.
     for (const mod of this._modules) {
       if (typeof mod.init === 'function') {
-        await mod.init(this.api);
+        try {
+          await mod.init(this.api);
+        } catch (err) {
+          console.error(`Chronicle: Module ${mod.constructor.name} failed to initialize`, err);
+        }
       }
     }
 
     // Listen for all WebSocket messages and route to modules.
     this.api.on('*', (msg) => this._routeMessage(msg));
 
-    // Connect WebSocket.
-    this.api.connect();
-
-    // Listen for connection state changes.
+    // Listen for connection state changes (must be registered BEFORE connect).
     this.api.on('sync.status', async (msg) => {
       if (msg.payload?.status === 'connected' && !this._initialSyncDone) {
         await this._performInitialSync();
         this._initialSyncDone = true;
       }
     });
+
+    // Connect WebSocket.
+    this.api.connect();
 
     console.log('Chronicle: Sync manager started');
   }

@@ -1029,6 +1029,7 @@
 .config-save-bar {
   position: sticky;
   bottom: 0;
+  z-index: 10;
   padding: 8px 0;
   background: inherit;
   display: flex;

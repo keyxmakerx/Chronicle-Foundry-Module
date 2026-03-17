@@ -98,7 +98,7 @@ export class CalendarSync {
 
     // Store the mapping so we can correlate local ↔ Chronicle events.
     if (mapping.external_id && mapping.chronicle_id) {
-      this._storeEventMapping(mapping.external_id, mapping.chronicle_id);
+      await this._storeEventMapping(mapping.external_id, mapping.chronicle_id);
     }
   }
 
@@ -312,7 +312,7 @@ export class CalendarSync {
 
       // Store the Chronicle event ID in the local module's data for later sync.
       if (result?.id && eventData.id) {
-        this._storeEventMapping(eventData.id, result.id);
+        await this._storeEventMapping(eventData.id, result.id);
       }
     } catch (err) {
       console.error('Chronicle: Failed to push calendar event', err);
@@ -398,7 +398,7 @@ export class CalendarSync {
       });
 
       if (result?.id) {
-        this._storeEventMapping(journal.id, result.id);
+        await this._storeEventMapping(journal.id, result.id);
         await journal.setFlag(FLAG_SCOPE, 'calendarEventId', result.id);
       }
     } catch (err) {
@@ -555,7 +555,7 @@ export class CalendarSync {
           description: data.description || '',
         });
         if (localEvent?.id) {
-          this._storeEventMapping(localEvent.id, data.id);
+          await this._storeEventMapping(localEvent.id, data.id);
         }
       } else {
         // Fallback: store Chronicle event reference for display in our UI.
@@ -588,7 +588,7 @@ export class CalendarSync {
           0,    // repeats (none)
         );
         if (note?.id) {
-          this._storeEventMapping(note.id, data.id);
+          await this._storeEventMapping(note.id, data.id);
           // Store Chronicle event ID on the journal entry.
           const journal = game.journal.get(note.id);
           if (journal) {
@@ -664,11 +664,11 @@ export class CalendarSync {
    * @param {string} chronicleId
    * @private
    */
-  _storeEventMapping(localId, chronicleId) {
+  async _storeEventMapping(localId, chronicleId) {
     const mappings = this._getEventMappings();
     mappings[localId] = chronicleId;
     mappings[`_rev_${chronicleId}`] = localId;
-    game.user.setFlag(FLAG_SCOPE, 'calendarEventMappings', mappings);
+    await game.user.setFlag(FLAG_SCOPE, 'calendarEventMappings', mappings);
   }
 
   /**
