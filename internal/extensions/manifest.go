@@ -72,6 +72,7 @@ type EntityTypeTemplate struct {
 	NamePlural string          `json:"name_plural"`
 	Icon       string          `json:"icon"`
 	Color      string          `json:"color"`
+	Category   string          `json:"category,omitempty"` // Preset category (e.g., "character", "item", "creature").
 	Fields     []TemplateField `json:"fields,omitempty"`
 }
 

@@ -8,20 +8,20 @@ import "context"
 // entityTypeAdapter wraps any service with a CreateEntityType method
 // matching the entities.EntityService interface.
 type entityTypeAdapter struct {
-	create func(ctx context.Context, campaignID string, name, namePlural, icon, color string) (id int, slug string, err error)
+	create func(ctx context.Context, campaignID string, name, namePlural, icon, color, presetCategory string) (id int, slug string, err error)
 }
 
 // NewEntityTypeAdapter creates an adapter from a creation function.
 // The caller extracts the function from the concrete entity service.
 func NewEntityTypeAdapter(
-	create func(ctx context.Context, campaignID string, name, namePlural, icon, color string) (int, string, error),
+	create func(ctx context.Context, campaignID string, name, namePlural, icon, color, presetCategory string) (int, string, error),
 ) EntityTypeCreator {
 	return &entityTypeAdapter{create: create}
 }
 
 // CreateEntityType implements EntityTypeCreator.
 func (a *entityTypeAdapter) CreateEntityType(ctx context.Context, campaignID string, input EntityTypeCreateInput) (EntityTypeResult, error) {
-	id, slug, err := a.create(ctx, campaignID, input.Name, input.NamePlural, input.Icon, input.Color)
+	id, slug, err := a.create(ctx, campaignID, input.Name, input.NamePlural, input.Icon, input.Color, input.PresetCategory)
 	if err != nil {
 		return EntityTypeResult{}, err
 	}

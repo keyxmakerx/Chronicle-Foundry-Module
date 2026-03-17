@@ -33,6 +33,7 @@ import (
 	"github.com/keyxmakerx/chronicle/internal/templates/layouts"
 	"github.com/keyxmakerx/chronicle/internal/templates/pages"
 	ws "github.com/keyxmakerx/chronicle/internal/websocket"
+	"github.com/keyxmakerx/chronicle/internal/plugins/armory"
 	"github.com/keyxmakerx/chronicle/internal/plugins/npcs"
 	"github.com/keyxmakerx/chronicle/internal/widgets/notes"
 	"github.com/keyxmakerx/chronicle/internal/widgets/posts"
@@ -692,6 +693,44 @@ func (a *npcVisibilityTogglerAdapter) TogglePrivate(ctx context.Context, entityI
 	return a.svc.TogglePrivate(ctx, entityID)
 }
 
+// armoryItemTypeFinderAdapter wraps entities.EntityService to implement the
+// armory.ItemTypeFinder interface. Resolves item-category entity types using
+// the preset_category column.
+type armoryItemTypeFinderAdapter struct {
+	svc entities.EntityService
+}
+
+// FindItemTypeIDs returns the IDs of entity types with preset_category "item".
+func (a *armoryItemTypeFinderAdapter) FindItemTypeIDs(ctx context.Context, campaignID string) ([]int, error) {
+	types, err := a.svc.GetEntityTypesByPresetCategory(ctx, campaignID, "item")
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]int, len(types))
+	for i, t := range types {
+		ids[i] = t.ID
+	}
+	return ids, nil
+}
+
+// FindItemTypes returns item-category entity types for the Armory filter dropdown.
+func (a *armoryItemTypeFinderAdapter) FindItemTypes(ctx context.Context, campaignID string) ([]armory.ItemTypeInfo, error) {
+	types, err := a.svc.GetEntityTypesByPresetCategory(ctx, campaignID, "item")
+	if err != nil {
+		return nil, err
+	}
+	infos := make([]armory.ItemTypeInfo, len(types))
+	for i, t := range types {
+		infos[i] = armory.ItemTypeInfo{
+			ID:    t.ID,
+			Name:  t.Name,
+			Icon:  t.Icon,
+			Color: t.Color,
+		}
+	}
+	return infos, nil
+}
+
 // RegisterRoutes sets up all application routes. It registers public routes
 // directly and delegates to each plugin's route registration function.
 //
@@ -1038,6 +1077,12 @@ func (a *App) RegisterRoutes() {
 	npcHandler.SetVisibilityToggler(&npcVisibilityTogglerAdapter{svc: entityService})
 	npcs.RegisterRoutes(e, npcHandler, campaignService, authService, addonService)
 
+	// Armory plugin: gallery/hub view for item-category entities.
+	armoryRepo := armory.NewArmoryRepository(a.DB)
+	armorySvc := armory.NewArmoryService(armoryRepo, &armoryItemTypeFinderAdapter{svc: entityService})
+	armoryHandler := armory.NewHandler(armorySvc)
+	armory.RegisterRoutes(e, armoryHandler, campaignService, authService, addonService)
+
 	// Notes widget: personal floating note-taking panel (Google Keep-style).
 	noteRepo := notes.NewNoteRepository(a.DB)
 	attRepo := notes.NewAttachmentRepository(a.DB)
@@ -1117,6 +1162,19 @@ func (a *App) RegisterRoutes() {
 		return npcs.BlockNPCGallery(bctx.CC, cards, limit)
 	})
 
+	// Armory preview block — embeds a compact item grid on entity pages/dashboards.
+	blockRegistry.Register(entities.BlockMeta{
+		Type: "armory_preview", Label: "Armory Preview", Icon: "fa-shield-halved",
+		Description: "Grid of campaign items", Addon: "armory",
+	}, func(bctx entities.BlockRenderContext) templ.Component {
+		limit := entities.BlockConfigLimit(bctx.Block.Config, "limit", 8)
+		cards, err := armoryHandler.GalleryBlock(context.Background(), bctx.CC.Campaign.ID, int(bctx.CC.MemberRole), "", limit)
+		if err != nil {
+			return templ.NopComponent
+		}
+		return armory.BlockArmoryPreview(bctx.CC, cards, limit)
+	})
+
 	// Set the registry on the entity service (validation) and as the global (rendering).
 	// The addon checker lets Render() skip blocks whose addon is disabled.
 	blockRegistry.SetAddonChecker(addonService)
@@ -1159,12 +1217,13 @@ func (a *App) RegisterRoutes() {
 	extApplier := extensions.NewContentApplier(
 		a.Config.ExtensionsPath,
 		extRepo,
-		extensions.NewEntityTypeAdapter(func(ctx context.Context, campaignID string, name, namePlural, icon, color string) (int, string, error) {
+		extensions.NewEntityTypeAdapter(func(ctx context.Context, campaignID string, name, namePlural, icon, color, presetCategory string) (int, string, error) {
 			et, err := entityService.CreateEntityType(ctx, campaignID, entities.CreateEntityTypeInput{
-				Name:       name,
-				NamePlural: namePlural,
-				Icon:       icon,
-				Color:      color,
+				Name:           name,
+				NamePlural:     namePlural,
+				Icon:           icon,
+				Color:          color,
+				PresetCategory: presetCategory,
 			})
 			if err != nil {
 				return 0, "", err
