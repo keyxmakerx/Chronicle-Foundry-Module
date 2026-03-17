@@ -237,7 +237,7 @@ Branch: `claude/fix-journal-button-placement-UF4hD`.
 
 ## Phase & Sprint Plan
 See `.ai/phases.md` for the full roadmap. Phases organized by priority:
-1. **F**: Foundry Completion & QoL (F-4.5, F-QoL, F-5) ← CURRENT
+1. **F**: Foundry Completion & QoL (F-4.5, F-QoL, F-5) ← COMPLETE
 2. **X**: System Modularity & Owner Experience (X-1 through X-5)
 3. **W**: Maps & Spatial (W-2, W-2.5)
 4. **U**: Collaboration & Polish (U-1/2/3/4/5, W-1, W-4)
@@ -245,7 +245,7 @@ See `.ai/phases.md` for the full roadmap. Phases organized by priority:
 6. **F**: Foundry Advanced (F-6, F-7)
 
 ## Current Phase
-**Phase 1: Foundry Completion — Sprint F-4.5 IN PROGRESS.**
+**Sprint 42: U-1 + W-1 + T-3.** Phase 1 (Foundry Completion: F-4.5, F-QoL, F-5) done. Next: Phase 2 (X-1: System Upload UX) or Phase 6 (F-6: Armory/Inventory).
 
 ### Sprint V-2: Backlinks Panel & Entity Aliases (COMPLETE)
 - **Fixed migration 060**: Removed incorrect first ALTER that tried to drop 'module' from ENUM directly, causing Error 1265. Kept correct 3-step approach.
@@ -686,9 +686,9 @@ Created `.ai/audit.md` — comprehensive feature parity and completeness audit c
 - Updated architecture.md directory structure to reflect systems/ path
 
 ## Next Session Should
-- **Sprint F-4.5: Generic System Adapter** — Remove hardcoded SYSTEM_MAP, dynamic matching via API
-- **Sprint F-QoL: Foundry Sync Diagnostics** — Validation report, health dashboard, error recovery
-- **Sprint F-5: NPC Viewer / Hall** — Gallery of revealed NPCs
+- **W-1 Saved Filters** — Persist command palette search filters per campaign
+- **Phase 2: X-1 System Upload UX** — Guided wizard for system install
+- **Phase 6: F-6 Armory / Inventory System** — Items as entities, character inventory, Foundry sync
 - See `.ai/phases.md` for full execution order
 
 ## Known Issues Right Now

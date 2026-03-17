@@ -151,7 +151,7 @@ Requires a running Chronicle instance and Foundry VTT with the chronicle-sync mo
 ## Character Sync (Actor ↔ Entity)
 
 ### Prerequisites
-- [ ] Game system matches a Chronicle system (dnd5e or pf2e)
+- [ ] Game system matches a Chronicle system (built-in or custom with foundry_path annotations)
 - [ ] "Sync Characters" enabled in module settings
 - [ ] Character entity type exists in Chronicle campaign
 
@@ -187,6 +187,16 @@ Requires a running Chronicle instance and Foundry VTT with the chronicle-sync mo
 - [ ] PF2e: Only HP and name sync back from Chronicle (derived values protected)
 - [ ] PF2e: ancestry, heritage, class, level, perception, speed push to Chronicle
 
+### Generic Adapter (Custom Systems)
+- [ ] Custom system with foundry_path annotations → generic adapter loaded
+- [ ] Generic adapter maps annotated fields bidirectionally (Chronicle ↔ Foundry)
+- [ ] Fields with foundry_writable: false only push to Chronicle, not written back
+- [ ] System without foundry_path on any field → generic adapter returns null, character sync disabled
+- [ ] Type casting: number fields cast via Number(), string fields pass through
+- [ ] _detectSystem() matches by foundry_system_id from API (not SYSTEM_MAP)
+- [ ] _detectSystem() falls back to SYSTEM_MAP_FALLBACK when API fails
+- [ ] _loadAdapter() tries dnd5e/pf2e first, then generic adapter
+
 ### Edge Cases
 - [ ] Actor sync disabled when no system adapter available
 - [ ] Sync guard prevents infinite loops (change in A doesn't re-trigger back to A)
@@ -200,3 +210,26 @@ Requires a running Chronicle instance and Foundry VTT with the chronicle-sync mo
 - [ ] Network timeout during sync doesn't corrupt state
 - [ ] Partial sync failure (one entity fails) doesn't block others
 - [ ] Module gracefully handles Chronicle server restart
+
+## Sync Dashboard
+
+### Access
+- [ ] Click status indicator → dashboard opens (GM only)
+- [ ] Dashboard shows "Not configured" state when settings missing
+- [ ] Dashboard opens to last-active tab
+
+### Tabs
+- [ ] Entities tab: entity list with sync status dots, pull/push actions, visibility toggle, search filter
+- [ ] Shops tab: shop entities with "Open Shop" button linking to ShopWidget
+- [ ] Maps tab: scene-to-map linking via dropdown, drawing/token counts
+- [ ] Characters tab: synced/unlinked actors, push button, system badge
+- [ ] Calendar tab: date comparison (Chronicle vs Foundry), pull/push buttons, module detection
+- [ ] Status tab: connection health, activity log, error log, diagnostics grid, system match info
+
+### Diagnostics (F-QoL)
+- [ ] Health metrics: REST success/error counts, uptime percentage, reconnect attempts
+- [ ] Error log: last 50 errors with timestamp, method, path, status
+- [ ] Retry queue: failed writes queued and processed on reconnect (max 3 retries)
+- [ ] Activity log: last 100 sync actions with color-coded type icons
+- [ ] Clear log button resets activity log
+- [ ] Reconnect button triggers manual WebSocket reconnection
