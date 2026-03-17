@@ -134,11 +134,36 @@ function _addStatusIndicator() {
   };
 
   // Event-driven state updates (no polling).
-  syncManager.api.onStateChange(updateState);
+  let wasConnected = false;
+  syncManager.api.onStateChange((state) => {
+    updateState(state);
+    // Notify on disconnect (only if we were previously connected).
+    if (state === 'disconnected' && wasConnected) {
+      ui.notifications.warn('Chronicle: Connection lost. Reconnecting automatically...');
+    }
+    if (state === 'connected') {
+      if (wasConnected) {
+        // Reconnected after a disconnect.
+        ui.notifications.info('Chronicle: Reconnected.');
+      }
+      wasConnected = true;
+    }
+  });
   updateState();
 
-  // Click to open the sync dashboard.
+  // Click to open the sync dashboard, or reconnect if disconnected.
   indicator.addEventListener('click', () => {
+    if (syncManager.api.state === 'disconnected') {
+      syncManager.api.connect();
+      ui.notifications.info('Chronicle: Reconnecting...');
+    } else if (dashboard) {
+      dashboard.render({ force: true });
+    }
+  });
+
+  // Right-click always opens the dashboard (even when disconnected).
+  indicator.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
     if (dashboard) dashboard.render({ force: true });
   });
 
@@ -167,13 +192,13 @@ function _addStatusIndicator() {
 function _statusTooltip(state) {
   switch (state) {
     case 'connected':
-      return 'Connected to Chronicle. Real-time sync active.';
+      return 'Connected to Chronicle. Click to open dashboard.';
     case 'connecting':
       return 'Connecting to Chronicle...';
     case 'reconnecting':
       return 'Connection lost. Reconnecting automatically...';
     default:
-      return 'Disconnected from Chronicle. Click to reconnect.';
+      return 'Disconnected from Chronicle. Click to reconnect. Right-click for dashboard.';
   }
 }
 

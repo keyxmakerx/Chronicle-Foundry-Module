@@ -203,6 +203,7 @@ export class SyncManager {
 
     try {
       console.log(`Chronicle: Initial sync from ${lastSync}`);
+      ui.notifications.info('Chronicle: Syncing...', { permanent: false });
 
       // Pull sync mappings modified since last sync.
       const result = await this.api.get(`/sync/pull?since=${encodeURIComponent(lastSync)}`);

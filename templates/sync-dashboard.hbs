@@ -427,6 +427,11 @@
             <span class="system-badge">
               <i class="fa-solid fa-gamepad"></i> {{matchedSystem}}
             </span>
+            {{#if hasUnlinkedCharacters}}
+            <button type="button" data-action="push-all-actors" class="dashboard-btn btn-sm" title="Push all unlinked actors to Chronicle">
+              <i class="fa-solid fa-upload"></i> Push All
+            </button>
+            {{/if}}
             <button type="button" data-action="refresh" class="dashboard-btn btn-sm" title="Refresh">
               <i class="fa-solid fa-arrows-rotate"></i>
             </button>
