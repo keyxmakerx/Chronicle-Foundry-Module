@@ -855,7 +855,7 @@ var defaultBlockTypes = map[string]bool{
 	"title": true, "image": true, "entry": true,
 	"attributes": true, "details": true, "divider": true,
 	"posts": true, "tags": true, "relations": true,
-	"shop_inventory": true, "text_block": true,
+	"shop_inventory": true, "inventory": true, "text_block": true,
 }
 
 // UpdateEntityTypeLayout validates and persists a new layout for an entity type.
