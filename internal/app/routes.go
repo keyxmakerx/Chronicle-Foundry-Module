@@ -872,6 +872,11 @@ func (a *App) RegisterRoutes() {
 	// Addons plugin: extension framework with per-campaign enable/disable toggles.
 	addonRepo := addons.NewAddonRepository(a.DB)
 	addonService := addons.NewAddonService(addonRepo)
+	// Register all built-in addons on startup so new addons appear
+	// automatically without requiring SQL migrations.
+	if err := addonService.SeedInstalledAddons(context.Background()); err != nil {
+		slog.Error("failed to seed built-in addons", slog.String("error", err.Error()))
+	}
 	addonHandler := addons.NewHandler(addonService)
 	addons.RegisterAdminRoutes(adminGroup, addonHandler)
 	addons.RegisterCampaignRoutes(e, addonHandler, campaignService, authService)
