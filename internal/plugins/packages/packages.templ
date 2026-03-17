@@ -1,0 +1,289 @@
+// packages.templ renders the admin package management page.
+package packages
+
+import (
+	"fmt"
+	"github.com/keyxmakerx/chronicle/internal/templates/layouts"
+)
+
+// PackagesPage renders the main package management admin page.
+templ PackagesPage(packages []Package, csrfToken string) {
+	@layouts.App("Packages - Admin") {
+		<div class="max-w-5xl mx-auto space-y-6">
+			<div class="flex items-center justify-between">
+				<div>
+					<h1 class="text-2xl font-bold text-fg">Packages</h1>
+					<p class="text-sm text-fg-secondary mt-1">
+						Manage external package repositories: game systems and the Foundry VTT module.
+					</p>
+				</div>
+			</div>
+
+			<!-- Add Package Form -->
+			<div class="card p-5">
+				<h2 class="text-lg font-semibold text-fg mb-3">Add Package Repository</h2>
+				<form
+					method="POST"
+					action="/admin/packages"
+					hx-post="/admin/packages"
+					class="flex items-end gap-3"
+				>
+					<input type="hidden" name="csrf_token" value={ csrfToken }/>
+					<div class="flex-1">
+						<label for="repo_url" class="block text-sm font-medium text-fg-body mb-1">GitHub Repository URL</label>
+						<input
+							type="url"
+							id="repo_url"
+							name="repo_url"
+							required
+							class="input w-full"
+							placeholder="https://github.com/owner/repo"
+						/>
+					</div>
+					<div class="w-48">
+						<label for="type" class="block text-sm font-medium text-fg-body mb-1">Type</label>
+						<select id="type" name="type" class="input w-full">
+							<option value="system">Game System</option>
+							<option value="foundry-module">Foundry Module</option>
+						</select>
+					</div>
+					<button type="submit" class="btn-primary text-sm">
+						<i class="fa-solid fa-plus mr-1"></i>
+						Add Package
+					</button>
+				</form>
+			</div>
+
+			<!-- Package List -->
+			if len(packages) == 0 {
+				<div class="card p-8 text-center">
+					<i class="fa-solid fa-box-open text-4xl text-fg-muted mb-3"></i>
+					<p class="text-fg-secondary">No packages registered yet.</p>
+					<p class="text-sm text-fg-muted mt-1">Add a GitHub repository URL above to get started.</p>
+				</div>
+			} else {
+				<div class="space-y-4">
+					for _, pkg := range packages {
+						@packageCard(pkg, csrfToken)
+					}
+				</div>
+			}
+		</div>
+	}
+}
+
+// packageCard renders a single package with its controls.
+templ packageCard(pkg Package, csrfToken string) {
+	<div class="card p-5">
+		<div class="flex items-start justify-between gap-4">
+			<div class="flex-1 min-w-0">
+				<div class="flex items-center gap-2 mb-1">
+					<h3 class="text-lg font-semibold text-fg truncate">{ pkg.Name }</h3>
+					@packageTypeBadge(pkg.Type)
+					if pkg.PinnedVersion != "" {
+						<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-500/10 text-yellow-600">
+							<i class="fa-solid fa-thumbtack mr-1"></i>
+							Pinned: { pkg.PinnedVersion }
+						</span>
+					}
+				</div>
+				<p class="text-sm text-fg-muted mb-2">{ pkg.RepoURL }</p>
+				<div class="flex items-center gap-4 text-sm text-fg-secondary">
+					if pkg.InstalledVersion != "" {
+						<span>
+							<i class="fa-solid fa-check-circle text-green-500 mr-1"></i>
+							Installed: { pkg.InstalledVersion }
+						</span>
+					} else {
+						<span class="text-fg-muted">
+							<i class="fa-solid fa-circle-xmark text-red-400 mr-1"></i>
+							Not installed
+						</span>
+					}
+					<span>
+						<i class="fa-solid fa-arrows-rotate mr-1"></i>
+						Auto-update: { string(pkg.AutoUpdate) }
+					</span>
+					if pkg.LastCheckedAt != nil {
+						<span>
+							<i class="fa-regular fa-clock mr-1"></i>
+							Checked: { pkg.LastCheckedAt.Format("Jan 2 15:04") }
+						</span>
+					}
+				</div>
+			</div>
+			<div class="flex items-center gap-2 shrink-0">
+				<!-- Check for Updates -->
+				<button
+					hx-post={ fmt.Sprintf("/admin/packages/%s/check", pkg.ID) }
+					hx-headers={ fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, csrfToken) }
+					class="btn-secondary text-sm"
+					title="Check for updates"
+				>
+					<i class="fa-solid fa-rotate"></i>
+				</button>
+				<!-- Version Picker -->
+				<button
+					hx-get={ fmt.Sprintf("/admin/packages/%s/versions", pkg.ID) }
+					hx-target={ fmt.Sprintf("#versions-%s", pkg.ID) }
+					hx-swap="innerHTML"
+					class="btn-secondary text-sm"
+				>
+					<i class="fa-solid fa-code-branch mr-1"></i>
+					Versions
+				</button>
+				<!-- Usage -->
+				<button
+					hx-get={ fmt.Sprintf("/admin/packages/%s/usage", pkg.ID) }
+					hx-target={ fmt.Sprintf("#usage-%s", pkg.ID) }
+					hx-swap="innerHTML"
+					class="btn-secondary text-sm"
+				>
+					<i class="fa-solid fa-chart-bar mr-1"></i>
+					Usage
+				</button>
+				<!-- Delete -->
+				<button
+					hx-delete={ fmt.Sprintf("/admin/packages/%s", pkg.ID) }
+					hx-confirm={ fmt.Sprintf("Remove %s and all its data?", pkg.Name) }
+					hx-headers={ fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, csrfToken) }
+					class="text-sm text-red-600 hover:text-red-800 transition-colors p-2"
+					title="Remove package"
+				>
+					<i class="fa-solid fa-trash"></i>
+				</button>
+			</div>
+		</div>
+
+		<!-- Auto-update Policy -->
+		<div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex items-center gap-3">
+			<span class="text-sm text-fg-secondary">Auto-update:</span>
+			<form
+				hx-put={ fmt.Sprintf("/admin/packages/%s/auto-update", pkg.ID) }
+				hx-headers={ fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, csrfToken) }
+				class="flex items-center gap-2"
+			>
+				<select name="policy" class="input text-sm py-1" onchange="this.form.requestSubmit()">
+					<option value="off" selected?={ pkg.AutoUpdate == UpdateOff }>Off</option>
+					<option value="nightly" selected?={ pkg.AutoUpdate == UpdateNightly }>Nightly</option>
+					<option value="weekly" selected?={ pkg.AutoUpdate == UpdateWeekly }>Weekly</option>
+					<option value="on_release" selected?={ pkg.AutoUpdate == UpdateOnRelease }>On Release</option>
+				</select>
+			</form>
+			if pkg.PinnedVersion != "" {
+				<button
+					hx-delete={ fmt.Sprintf("/admin/packages/%s/pin", pkg.ID) }
+					hx-headers={ fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, csrfToken) }
+					hx-confirm="Unpin this package and allow auto-updates?"
+					class="text-sm text-yellow-600 hover:text-yellow-800 transition-colors"
+				>
+					<i class="fa-solid fa-thumbtack mr-1"></i>
+					Unpin
+				</button>
+			}
+		</div>
+
+		<!-- Expandable Sections -->
+		<div id={ fmt.Sprintf("versions-%s", pkg.ID) } class="mt-3"></div>
+		<div id={ fmt.Sprintf("usage-%s", pkg.ID) } class="mt-3"></div>
+	</div>
+}
+
+// packageTypeBadge renders a type indicator badge.
+templ packageTypeBadge(t PackageType) {
+	if t == PackageTypeFoundryModule {
+		<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-500/10 text-purple-600">
+			<i class="fa-solid fa-cube mr-1"></i>
+			Foundry Module
+		</span>
+	} else {
+		<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-500/10 text-blue-600">
+			<i class="fa-solid fa-dice-d20 mr-1"></i>
+			Game System
+		</span>
+	}
+}
+
+// VersionList renders the expandable version list for a package (HTMX fragment).
+templ VersionList(pkg *Package, versions []PackageVersion, csrfToken string) {
+	<div class="border-t border-gray-200 dark:border-gray-700 pt-3">
+		<h4 class="text-sm font-semibold text-fg mb-2">
+			Available Versions ({ fmt.Sprintf("%d", len(versions)) })
+		</h4>
+		if len(versions) == 0 {
+			<p class="text-sm text-fg-muted">No versions found. Try checking for updates.</p>
+		} else {
+			<div class="space-y-1 max-h-64 overflow-y-auto">
+				for _, v := range versions {
+					<div class={ "flex items-center justify-between py-2 px-3 rounded text-sm",
+						templ.KV("bg-green-50 dark:bg-green-900/20", v.Version == pkg.InstalledVersion) }>
+						<div class="flex items-center gap-3">
+							<span class="font-mono font-medium text-fg">{ v.Version }</span>
+							<span class="text-fg-muted">{ v.TagName }</span>
+							if v.Version == pkg.InstalledVersion {
+								<span class="text-xs text-green-600 font-medium">installed</span>
+							}
+							if v.Version == pkg.PinnedVersion {
+								<span class="text-xs text-yellow-600 font-medium">pinned</span>
+							}
+							<span class="text-xs text-fg-muted">{ v.PublishedAt.Format("Jan 2, 2006") }</span>
+						</div>
+						<div class="flex items-center gap-2">
+							if v.Version != pkg.InstalledVersion {
+								<button
+									hx-put={ fmt.Sprintf("/admin/packages/%s/version", pkg.ID) }
+									hx-vals={ fmt.Sprintf(`{"version":"%s"}`, v.Version) }
+									hx-headers={ fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, csrfToken) }
+									hx-confirm={ fmt.Sprintf("Install version %s?", v.Version) }
+									class="text-xs text-accent hover:text-accent/80 transition-colors"
+								>
+									Install
+								</button>
+							}
+							if v.Version != pkg.PinnedVersion {
+								<button
+									hx-put={ fmt.Sprintf("/admin/packages/%s/pin", pkg.ID) }
+									hx-vals={ fmt.Sprintf(`{"version":"%s"}`, v.Version) }
+									hx-headers={ fmt.Sprintf(`{"X-CSRF-Token":"%s"}`, csrfToken) }
+									class="text-xs text-yellow-600 hover:text-yellow-800 transition-colors"
+									title="Pin to this version"
+								>
+									Pin
+								</button>
+							}
+						</div>
+					</div>
+				}
+			</div>
+		}
+	</div>
+}
+
+// UsageTable renders the campaign usage for a package (HTMX fragment).
+templ UsageTable(pkg *Package, usage []PackageUsage) {
+	<div class="border-t border-gray-200 dark:border-gray-700 pt-3">
+		<h4 class="text-sm font-semibold text-fg mb-2">Campaign Usage</h4>
+		if len(usage) == 0 {
+			<p class="text-sm text-fg-muted">No campaigns are currently using this package.</p>
+		} else {
+			<table class="w-full text-sm">
+				<thead>
+					<tr class="text-left text-fg-muted border-b border-gray-200 dark:border-gray-700">
+						<th class="pb-2 font-medium">Campaign</th>
+						<th class="pb-2 font-medium">System</th>
+						<th class="pb-2 font-medium">Enabled</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, u := range usage {
+						<tr class="border-b border-gray-100 dark:border-gray-800">
+							<td class="py-2 text-fg">{ u.CampaignName }</td>
+							<td class="py-2 text-fg-secondary">{ u.SystemID }</td>
+							<td class="py-2 text-fg-muted">{ u.EnabledAt.Format("Jan 2, 2006") }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		}
+	</div>
+}

@@ -554,6 +554,17 @@ templ AdminSidebarNav() {
 				Security
 			</a>
 			<a
+				href="/admin/packages"
+				class={ sidebarNavLink,
+					templ.KV(sidebarNavActive, isPathPrefix(ctx, "/admin/packages")),
+					templ.KV(sidebarNavInactive, !isPathPrefix(ctx, "/admin/packages")) }
+			>
+				<span class="w-4 h-4 mr-3 shrink-0 flex items-center justify-center">
+					<i class="fa-solid fa-box text-xs"></i>
+				</span>
+				Packages
+			</a>
+			<a
 				href="/admin/database"
 				class={ sidebarNavLink,
 					templ.KV(sidebarNavActive, isPathPrefix(ctx, "/admin/database")),

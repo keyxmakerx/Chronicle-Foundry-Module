@@ -8,7 +8,12 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-17 -- **Sprint: Draw Steel System Module + Foundry Infrastructure Fixes.**
+2026-03-17 -- **Sprint: Package Manager Plugin + Repo Separation Docs.**
+
+45. **Sprint: Package Manager Plugin + Repo Separation.**
+    - **Repo Separation Documentation (COMPLETE)** — Created comprehensive documentation templates in `docs/repo-templates/` for `chronicle-foundry-module` and `chronicle-systems` repos. Includes README, CLAUDE.md, .ai/ architecture docs, API contracts, adapter docs, JSON schemas, and step-by-step system creation guides.
+    - **Package Manager Plugin (COMPLETE)** — New `internal/plugins/packages/` plugin with full admin UI. Features: GitHub release fetching, version management (install/pin/unpin), auto-update policies (off/nightly/weekly/on_release), background update worker, package CRUD, HTMX version picker and usage tracking UI. Database: `packages` and `package_versions` tables. Routes under `/admin/packages`. Sidebar link added.
+    - **Next Steps**: Wire usage tracking to campaign addon tables. Replace bundled Foundry module serving with package manager's installed path. Remove bundled system data and load from package manager instead.
 
 44. **Sprint: Draw Steel System Module + Infrastructure.**
     - **Draw Steel System (COMPLETE)** — Full manifest expansion: 24-field character preset with Foundry path annotations, creature preset with EV/role/role_type, kit preset. Reference data: 8 abilities, 6 creatures, 10 ancestries, 6 kits (CC-BY-4.0). Status changed from `coming_soon` to `available`.
