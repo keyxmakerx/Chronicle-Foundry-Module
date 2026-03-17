@@ -5,6 +5,7 @@ package app
 
 import (
 	"archive/zip"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -15,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
@@ -25,6 +27,7 @@ import (
 	"github.com/keyxmakerx/chronicle/internal/database"
 	"github.com/keyxmakerx/chronicle/internal/extensions"
 	"github.com/keyxmakerx/chronicle/internal/middleware"
+	"github.com/keyxmakerx/chronicle/internal/plugins/settings"
 	"github.com/keyxmakerx/chronicle/internal/templates/pages"
 )
 
@@ -133,9 +136,23 @@ func (a *App) setupMiddleware() {
 
 	// CORS -- allow cross-origin requests for the REST API.
 	// Only relevant for external clients (Foundry VTT module, etc.).
+	// BaseURL is always allowed. Additional origins are loaded dynamically
+	// from site_settings (managed by admin via /admin/api/cors).
+	settingsRepo := settings.NewSettingsRepository(a.DB)
+	settingsSvc := settings.NewSettingsService(settingsRepo)
 	a.Echo.Use(middleware.CORS(middleware.CORSConfig{
 		AllowedOrigins:   []string{a.Config.BaseURL},
 		AllowCredentials: true,
+		DynamicOrigins: func() []string {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			origins, err := settingsSvc.GetCORSOrigins(ctx)
+			if err != nil {
+				slog.Warn("failed to load dynamic CORS origins", slog.Any("error", err))
+				return nil
+			}
+			return origins
+		},
 	}))
 
 	// CSRF -- double-submit cookie pattern on all state-changing requests.

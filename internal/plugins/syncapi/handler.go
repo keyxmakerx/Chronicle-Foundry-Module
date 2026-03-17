@@ -1,6 +1,7 @@
 package syncapi
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,11 +15,17 @@ import (
 	"github.com/keyxmakerx/chronicle/internal/plugins/campaigns"
 )
 
+// CORSOriginLister provides CORS origins for the admin dashboard display.
+type CORSOriginLister interface {
+	GetCORSOrigins(ctx context.Context) ([]string, error)
+}
+
 // Handler handles sync API HTTP requests for both the management UI
 // (key management, dashboards) and the actual sync API endpoints.
 type Handler struct {
-	service    SyncAPIService
-	syncMapSvc SyncMappingService
+	service         SyncAPIService
+	syncMapSvc      SyncMappingService
+	corsOriginLister CORSOriginLister
 }
 
 // NewHandler creates a new sync API handler.
@@ -29,6 +36,11 @@ func NewHandler(service SyncAPIService) *Handler {
 // SetSyncMappingService injects the sync mapping service for owner dashboard sync status.
 func (h *Handler) SetSyncMappingService(svc SyncMappingService) {
 	h.syncMapSvc = svc
+}
+
+// SetCORSOriginLister injects the CORS origin provider for the admin dashboard.
+func (h *Handler) SetCORSOriginLister(lister CORSOriginLister) {
+	h.corsOriginLister = lister
 }
 
 // --- Campaign Owner: API Key Management ---
@@ -295,6 +307,12 @@ func (h *Handler) AdminDashboard(c echo.Context) error {
 		campaignSyncStats, _ = h.syncMapSvc.ListCampaignSyncStats(ctx)
 	}
 
+	// Fetch CORS origins for the whitelist display.
+	var corsOrigins []string
+	if h.corsOriginLister != nil {
+		corsOrigins, _ = h.corsOriginLister.GetCORSOrigins(ctx)
+	}
+
 	csrfToken := middleware.GetCSRFToken(c)
 
 	data := AdminDashboardData{
@@ -309,6 +327,7 @@ func (h *Handler) AdminDashboard(c echo.Context) error {
 		APIKeys:           keys,
 		TotalKeys:         totalKeys,
 		CampaignSyncStats: campaignSyncStats,
+		CORSOrigins:       corsOrigins,
 		CSRFToken:         csrfToken,
 	}
 
@@ -500,5 +519,6 @@ type AdminDashboardData struct {
 	APIKeys            []APIKey
 	TotalKeys          int
 	CampaignSyncStats  []CampaignSyncStats
+	CORSOrigins        []string
 	CSRFToken          string
 }

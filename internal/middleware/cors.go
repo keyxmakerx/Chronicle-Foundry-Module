@@ -19,6 +19,11 @@ type CORSConfig struct {
 	// and auth headers in cross-origin requests. Required for session-based
 	// auth from a different origin (e.g., Foundry VTT module).
 	AllowCredentials bool
+
+	// DynamicOrigins is an optional function that returns additional allowed
+	// origins at runtime. Called per-request to support admin-managed origin
+	// whitelists stored in the database. May return nil.
+	DynamicOrigins func() []string
 }
 
 // CORS returns middleware that handles Cross-Origin Resource Sharing headers.
@@ -31,14 +36,14 @@ type CORSConfig struct {
 // all requests are same-origin. But the API must support cross-origin access for
 // external integrations.
 func CORS(cfg CORSConfig) echo.MiddlewareFunc {
-	// Build a set for fast origin lookup.
+	// Build a set for fast origin lookup of static origins.
 	allowAll := false
-	originSet := make(map[string]bool)
+	staticOrigins := make(map[string]bool)
 	for _, o := range cfg.AllowedOrigins {
 		if o == "*" {
 			allowAll = true
 		}
-		originSet[o] = true
+		staticOrigins[o] = true
 	}
 
 	// SECURITY: Wildcard origin with credentials is a dangerous misconfiguration.
@@ -60,8 +65,16 @@ func CORS(cfg CORSConfig) echo.MiddlewareFunc {
 				return next(c)
 			}
 
-			// Check if the origin is allowed.
-			allowed := allowAll || originSet[origin]
+			// Check if the origin is allowed: static list first, then dynamic.
+			allowed := allowAll || staticOrigins[origin]
+			if !allowed && cfg.DynamicOrigins != nil {
+				for _, o := range cfg.DynamicOrigins() {
+					if o == origin {
+						allowed = true
+						break
+					}
+				}
+			}
 			if !allowed {
 				// Origin not in whitelist -- proceed without CORS headers.
 				// The browser will block the response on the client side.

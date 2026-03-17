@@ -57,6 +57,14 @@ export async function createGenericAdapter(api, chronicleSystemId) {
     characterTypeSlug: fieldDefs.preset_slug || `${chronicleSystemId}-character`,
 
     /**
+     * Foundry actor type string from the manifest (e.g., "character", "hero").
+     * Different game systems use different actor types — D&D 5e uses "character",
+     * Draw Steel uses "hero". Defaults to "character" if not specified.
+     * @type {string}
+     */
+    actorType: fieldDefs.foundry_actor_type || 'character',
+
+    /**
      * Extract Chronicle-compatible fields_data from a Foundry Actor.
      * Reads each mapped field from the actor using its foundry_path.
      *

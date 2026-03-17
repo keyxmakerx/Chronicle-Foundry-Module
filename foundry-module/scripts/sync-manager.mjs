@@ -18,7 +18,7 @@ import { getSetting, setSetting, isConfigured, getSyncDirections, getExcludedTag
 const SYSTEM_MAP_FALLBACK = {
   dnd5e: 'dnd5e',
   pf2e: 'pathfinder2e',
-  drawsteel: 'drawsteel',
+  'draw-steel': 'drawsteel',
 };
 
 /**

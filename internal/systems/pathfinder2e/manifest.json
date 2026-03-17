@@ -97,6 +97,7 @@
       "icon": "fa-shield-halved",
       "color": "#2563EB",
       "category": "character",
+      "foundry_actor_type": "character",
       "fields": [
         { "key": "class", "label": "Class", "type": "string", "foundry_path": "system.details.class.name", "foundry_writable": false },
         { "key": "level", "label": "Level", "type": "number", "foundry_path": "system.details.level.value", "foundry_writable": false },

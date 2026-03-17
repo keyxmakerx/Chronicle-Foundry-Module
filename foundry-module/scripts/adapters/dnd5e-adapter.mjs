@@ -18,6 +18,12 @@ export const systemId = 'dnd5e';
 export const characterTypeSlug = 'dnd5e-character';
 
 /**
+ * The Foundry VTT actor type that corresponds to characters.
+ * @type {string}
+ */
+export const actorType = 'character';
+
+/**
  * Extract Chronicle-compatible fields_data from a Foundry dnd5e Actor.
  * Reads from the Actor's system data paths and returns a flat object
  * matching the dnd5e-character entity preset field keys.

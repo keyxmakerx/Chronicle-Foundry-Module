@@ -7,8 +7,15 @@ package syncapi
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"github.com/keyxmakerx/chronicle/internal/templates/layouts"
 )
+
+// corsOriginsText joins CORS origins into a newline-separated string
+// for display in the textarea.
+func corsOriginsText(origins []string) string {
+	return strings.Join(origins, "\n")
+}
 
 // timeSeriesJSON serializes time series data for the mini bar charts.
 // Returns "[]" (not "null") when points is nil or empty, so the JS
@@ -85,6 +92,36 @@ templ AdminAPIDashboardTempl(data AdminDashboardData) {
 						<canvas></canvas>
 					</div>
 				</div>
+			</div>
+
+			// CORS Origin Whitelist.
+			<div class="card p-5">
+				<div class="flex items-center justify-between mb-4">
+					<div>
+						<h3 class="text-sm font-semibold text-fg">
+							<i class="fa-solid fa-shield-halved mr-2 text-emerald-500"></i>CORS Origin Whitelist
+						</h3>
+						<p class="text-xs text-fg-muted mt-1">
+							External origins allowed to make cross-origin API requests (e.g., Foundry VTT servers).
+							Your site URL is always allowed.
+						</p>
+					</div>
+				</div>
+				<form hx-post="/admin/api/cors" hx-swap="none" class="space-y-3">
+					<input type="hidden" name="_csrf" value={ data.CSRFToken }/>
+					<textarea
+						name="cors_origins"
+						rows="4"
+						class="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2 text-sm text-fg font-mono placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-accent"
+						placeholder="https://foundry.example.com&#10;http://localhost:30000"
+					>{ corsOriginsText(data.CORSOrigins) }</textarea>
+					<div class="flex items-center justify-between">
+						<p class="text-xs text-fg-muted">One origin per line (e.g., <code class="text-xs">http://localhost:30000</code>)</p>
+						<button type="submit" class="btn-primary text-sm">
+							<i class="fa-solid fa-save mr-1"></i> Save Origins
+						</button>
+					</div>
+				</form>
 			</div>
 
 			// Top tables row.

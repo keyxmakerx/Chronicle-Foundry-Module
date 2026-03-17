@@ -8,7 +8,13 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-17 -- **Sprint: F-6 Armory/Inventory, F-7 Shop Enhancement, Sync Dashboard, Foundry Config.**
+2026-03-17 -- **Sprint: Draw Steel System Module + Foundry Infrastructure Fixes.**
+
+44. **Sprint: Draw Steel System Module + Infrastructure.**
+    - **Draw Steel System (COMPLETE)** — Full manifest expansion: 24-field character preset with Foundry path annotations, creature preset with EV/role/role_type, kit preset. Reference data: 8 abilities, 6 creatures, 10 ancestries, 6 kits (CC-BY-4.0). Status changed from `coming_soon` to `available`.
+    - **Dynamic Foundry Actor Types (COMPLETE)** — Added `foundry_actor_type` to `EntityPresetDef` struct and `CharacterFieldsResponse` API. Draw Steel uses `"hero"` (not `"character"`). Generic adapter reads `actorType` from API. `actor-sync.mjs` uses `this._actorType` everywhere instead of hardcoded `'character'`.
+    - **CORS Admin Whitelist (COMPLETE)** — `cors.allowed_origins` in `site_settings`. `GetCORSOrigins()`/`UpdateCORSOrigins()` on SettingsService. CORS middleware accepts `DynamicOrigins` function that reads from DB. Admin UI on `/admin/api` page with textarea for managing origins. Fixes Foundry VTT CORS-blocked connections.
+    - **SYSTEM_MAP_FALLBACK Fix (COMPLETE)** — Changed `drawsteel` key to `'draw-steel'` to match the Foundry system ID.
 
 43. **Sprint: F-6 + F-7 (Armory, Inventory, Transactions, Shop Enhancement).**
     - **A-2: Chronicle Sync Dashboard Expansion (COMPLETE)** — Owner API Keys page expansion with sync status overview, mappings table, error display. Admin API Monitor expansion with per-campaign sync stats.

@@ -9,8 +9,9 @@
  * - Chronicle → Foundry: Entity changes arrive via WebSocket, create/update Actor.
  * - Foundry → Chronicle: Actor changes detected via Hooks, push to Chronicle API.
  *
- * System-specific field mapping is delegated to adapter modules
- * (dnd5e-adapter.mjs, pf2e-adapter.mjs).
+ * System-specific field mapping is delegated to adapter modules. The adapter's
+ * actorType property (e.g., "character" for D&D 5e, "hero" for Draw Steel)
+ * determines which Foundry actor type to sync.
  */
 
 import { getSetting } from './settings.mjs';
@@ -46,6 +47,15 @@ export class ActorSync {
   }
 
   /**
+   * Returns the Foundry actor type this sync handles (from the adapter).
+   * Defaults to "character" if no adapter is loaded.
+   * @returns {string}
+   */
+  get _actorType() {
+    return this._adapter?.actorType || 'character';
+  }
+
+  /**
    * Initialize the actor sync module.
    * Loads the appropriate system adapter and registers hooks.
    * @param {import('./api-client.mjs').ChronicleAPI} api
@@ -73,7 +83,7 @@ export class ActorSync {
     Hooks.on('updateActor', this._onUpdateActor);
     Hooks.on('deleteActor', this._onDeleteActor);
 
-    console.log(`Chronicle: Actor sync initialized (adapter: ${this._adapter.systemId})`);
+    console.log(`Chronicle: Actor sync initialized (adapter: ${this._adapter.systemId}, actorType: ${this._actorType})`);
   }
 
   /**
@@ -172,6 +182,7 @@ export class ActorSync {
   /**
    * Handle a new character entity from Chronicle.
    * Creates a new Foundry Actor if one isn't already linked.
+   * Uses the adapter's actorType to create the correct type (e.g., "hero").
    * @param {object} entity
    * @private
    */
@@ -187,7 +198,7 @@ export class ActorSync {
 
       const actorData = {
         name: entity.name,
-        type: 'character',
+        type: this._actorType,
         flags: {
           [FLAG_SCOPE]: {
             entityId: entity.id,
@@ -309,7 +320,7 @@ export class ActorSync {
 
   /**
    * Handle Foundry createActor hook.
-   * Only processes character-type actors created by the current user.
+   * Only processes actors matching the adapter's actorType.
    * @param {Actor} actor
    * @param {object} options
    * @param {string} userId
@@ -318,7 +329,7 @@ export class ActorSync {
   async _handleCreateActor(actor, options, userId) {
     if (this._syncing) return;
     if (userId !== game.user.id) return;
-    if (actor.type !== 'character') return;
+    if (actor.type !== this._actorType) return;
     if (!this._adapter || !this._characterTypeId) return;
 
     // Skip if already linked (came from Chronicle).
@@ -369,7 +380,7 @@ export class ActorSync {
   async _handleUpdateActor(actor, change, options, userId) {
     if (this._syncing) return;
     if (userId !== game.user.id) return;
-    if (actor.type !== 'character') return;
+    if (actor.type !== this._actorType) return;
     if (!this._adapter) return;
 
     const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
@@ -537,13 +548,16 @@ export class ActorSync {
 
   /**
    * Get all synced actors with their status for dashboard display.
+   * Filters by the adapter's actor type so Draw Steel shows heroes,
+   * D&D 5e shows characters, etc.
    * @returns {Array<{id: string, name: string, entityId: string|null, synced: boolean, lastSync: string|null}>}
    */
   getSyncedActors() {
     if (!this._adapter) return [];
 
+    const targetType = this._actorType;
     return game.actors.contents
-      .filter((a) => a.type === 'character')
+      .filter((a) => a.type === targetType)
       .map((a) => {
         const entityId = a.getFlag(FLAG_SCOPE, 'entityId') || null;
         const lastSync = a.getFlag(FLAG_SCOPE, 'lastSync') || null;
