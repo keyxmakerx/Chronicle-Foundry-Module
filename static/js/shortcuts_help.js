@@ -14,6 +14,7 @@
 
   var shortcuts = [
     { keys: mod + '+K', desc: 'Quick search (pages, notes, maps, events)' },
+    { keys: mod + '+Shift+P', desc: 'Command palette' },
     { keys: mod + '+N', desc: 'New page' },
     { keys: mod + '+Shift+N', desc: 'Quick capture note' },
     { keys: mod + '+E', desc: 'Edit current page' },

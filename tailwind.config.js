@@ -37,11 +37,12 @@ module.exports = {
           text: '#9ca3af',
           active: '#e5e7eb',
         },
-        // Accent color for links, buttons, active states
+        // Accent color for links, buttons, active states.
+        // References CSS custom property so per-campaign overrides work.
         accent: {
-          DEFAULT: '#6366f1',  // Indigo-500
-          hover: '#4f46e5',    // Indigo-600
-          light: '#a5b4fc',    // Indigo-300
+          DEFAULT: 'var(--color-accent, #6366f1)',
+          hover: 'var(--color-accent-hover, #4f46e5)',
+          light: 'var(--color-accent-light, #a5b4fc)',
         },
 
         // ── Semantic theme tokens ──────────────────────────────

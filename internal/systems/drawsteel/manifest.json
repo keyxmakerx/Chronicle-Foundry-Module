@@ -41,6 +41,18 @@
       ]
     }
   ],
+  "relation_presets": [
+    {
+      "slug": "has-item",
+      "name": "Has Item",
+      "reverse_name": "In Inventory Of",
+      "metadata_schema": {
+        "quantity": { "type": "number", "default": 1 },
+        "equipped": { "type": "boolean", "default": false },
+        "notes": { "type": "string", "default": "" }
+      }
+    }
+  ],
   "entity_presets": [
     {
       "slug": "drawsteel-character",
@@ -48,10 +60,30 @@
       "name_plural": "Draw Steel Characters",
       "icon": "fa-bolt",
       "color": "#F59E0B",
+      "category": "character",
       "fields": [
         { "key": "class", "label": "Class", "type": "string" },
         { "key": "level", "label": "Level", "type": "number" },
-        { "key": "ancestry", "label": "Ancestry", "type": "string" }
+        { "key": "ancestry", "label": "Ancestry", "type": "string" },
+        { "key": "currency_wealth", "label": "Wealth", "type": "number", "section": "Currency" }
+      ]
+    },
+    {
+      "slug": "drawsteel-kit",
+      "name": "Draw Steel Kit",
+      "name_plural": "Draw Steel Kits",
+      "icon": "fa-toolbox",
+      "color": "#EF4444",
+      "category": "item",
+      "fields": [
+        { "key": "kit_type", "label": "Kit Type", "type": "string" },
+        { "key": "tier", "label": "Tier", "type": "string" },
+        { "key": "armor_bonus", "label": "Armor Bonus", "type": "number" },
+        { "key": "speed_bonus", "label": "Speed Bonus", "type": "number" },
+        { "key": "stability_bonus", "label": "Stability Bonus", "type": "number" },
+        { "key": "melee_damage", "label": "Melee Damage", "type": "string" },
+        { "key": "ranged_damage", "label": "Ranged Damage", "type": "string" },
+        { "key": "signature_ability", "label": "Signature Ability", "type": "markdown" }
       ]
     }
   ]

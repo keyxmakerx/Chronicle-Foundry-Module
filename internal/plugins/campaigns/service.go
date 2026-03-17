@@ -63,6 +63,7 @@ type CampaignService interface {
 
 	// Dashboard layout
 	UpdateDashboardLayout(ctx context.Context, campaignID string, layout *DashboardLayout) error
+	UpdateDashboardLayoutRaw(ctx context.Context, campaignID string, layoutJSON *string) error
 	GetDashboardLayout(ctx context.Context, campaignID string) (*DashboardLayout, error)
 	ResetDashboardLayout(ctx context.Context, campaignID string) error
 
@@ -77,6 +78,7 @@ type CampaignService interface {
 
 	// Lifecycle hooks — set after construction to avoid circular initialization.
 	SetContentTemplateSeeder(seeder ContentTemplateSeeder)
+	SetWorldbuildingPromptSeeder(seeder WorldbuildingPromptSeeder)
 	SetMediaCleaner(cleaner MediaCleaner)
 	SetHookDispatcher(dispatcher CampaignHookDispatcher)
 }
@@ -112,6 +114,7 @@ type campaignService struct {
 	mail           MailService            // May be nil if SMTP is not configured.
 	seeder           EntityTypeSeeder       // Seeds default entity types on campaign creation. May be nil.
 	templateSeeder   ContentTemplateSeeder  // Seeds default content templates on campaign creation. May be nil.
+	promptSeeder     WorldbuildingPromptSeeder // Seeds default worldbuilding prompts on campaign creation. May be nil.
 	mediaCleaner     MediaCleaner           // Cleans up media files on campaign delete. May be nil.
 	hookDispatcher   CampaignHookDispatcher // Dispatches WASM lifecycle events. May be nil.
 	baseURL          string
@@ -133,6 +136,11 @@ func NewCampaignService(repo CampaignRepository, users UserFinder, mail MailServ
 // Called after all plugins are wired to avoid initialization order issues.
 func (s *campaignService) SetContentTemplateSeeder(seeder ContentTemplateSeeder) {
 	s.templateSeeder = seeder
+}
+
+// SetWorldbuildingPromptSeeder sets the seeder for default worldbuilding prompts.
+func (s *campaignService) SetWorldbuildingPromptSeeder(seeder WorldbuildingPromptSeeder) {
+	s.promptSeeder = seeder
 }
 
 // SetMediaCleaner sets the media cleaner for campaign deletion cleanup.
@@ -218,6 +226,16 @@ func (s *campaignService) Create(ctx context.Context, userID string, input Creat
 	if s.templateSeeder != nil {
 		if err := s.templateSeeder.SeedDefaults(ctx, campaign.ID); err != nil {
 			slog.Warn("failed to seed default content templates",
+				slog.String("campaign_id", campaign.ID),
+				slog.Any("error", err),
+			)
+		}
+	}
+
+	// Seed default worldbuilding prompts for the new campaign.
+	if s.promptSeeder != nil {
+		if err := s.promptSeeder.SeedDefaults(ctx, campaign.ID); err != nil {
+			slog.Warn("failed to seed default worldbuilding prompts",
 				slog.String("campaign_id", campaign.ID),
 				slog.Any("error", err),
 			)
@@ -855,6 +873,16 @@ func (s *campaignService) UpdateDashboardLayout(ctx context.Context, campaignID 
 		return err
 	}
 	slog.Info("dashboard layout updated", slog.String("campaign_id", campaignID))
+	return nil
+}
+
+// UpdateDashboardLayoutRaw saves a pre-marshaled dashboard layout JSON string.
+// Used by the handler when merging role-specific layouts.
+func (s *campaignService) UpdateDashboardLayoutRaw(ctx context.Context, campaignID string, layoutJSON *string) error {
+	if err := s.repo.UpdateDashboardLayout(ctx, campaignID, layoutJSON); err != nil {
+		return err
+	}
+	slog.Info("dashboard layout updated (raw)", slog.String("campaign_id", campaignID))
 	return nil
 }
 

@@ -77,6 +77,12 @@ templ EntityShowPage(cc *campaigns.CampaignContext, entity *Entity, entityType *
 			// Entity posts (sub-notes): additional content sections below the main entry.
 			@blockPosts(cc, entity, csrfToken)
 
+			// Writing prompts: collapsible panel to help content creators.
+			// Only shown to Scribe+ (content creators), lazy-loaded via HTMX.
+			if cc.MemberRole >= campaigns.RoleScribe && entityType != nil {
+				@WorldbuildingPromptsPanel(cc.Campaign.ID, entityType.ID)
+			}
+
 			// Backlinks: entities that reference this one via @mentions.
 			// Loaded asynchronously via HTMX to keep page load fast.
 			<div
@@ -388,6 +394,25 @@ templ blockRelations(cc *campaigns.CampaignContext, entity *Entity, csrfToken st
 	></div>
 }
 
+// blockInventory renders the character inventory widget mount point. Shows
+// "Has Item" relations with quantity, equipped, and attuned metadata.
+// Used on character-type entities to display their item inventory.
+templ blockInventory(cc *campaigns.CampaignContext, entity *Entity, csrfToken string) {
+	<div
+		data-widget="inventory"
+		data-relations-endpoint={ fmt.Sprintf("/campaigns/%s/entities/%s/relations", cc.Campaign.ID, entity.ID) }
+		data-entity-search-endpoint={ fmt.Sprintf("/campaigns/%s/entities/search", cc.Campaign.ID) }
+		data-quick-create-endpoint={ fmt.Sprintf("/campaigns/%s/entities/quick-create", cc.Campaign.ID) }
+		data-campaign-url={ fmt.Sprintf("/campaigns/%s", cc.Campaign.ID) }
+		data-relation-type="Has Item"
+		data-reverse-relation-type="In Inventory Of"
+		if cc.MemberRole >= campaigns.RoleScribe {
+			data-editable="true"
+		}
+		data-csrf-token={ csrfToken }
+	></div>
+}
+
 // blockShopInventory renders the shop inventory widget mount point. Appears on
 // entities of type "Shop" and displays items as "sells" relations with price,
 // quantity, and stock metadata.
@@ -402,6 +427,17 @@ templ blockShopInventory(cc *campaigns.CampaignContext, entity *Entity, csrfToke
 			data-editable="true"
 		}
 		data-csrf-token={ csrfToken }
+	></div>
+}
+
+// blockTransactionLog renders a transaction history widget mount point.
+// Shows purchase, sale, gift, and restock transactions for a shop entity.
+templ blockTransactionLog(cc *campaigns.CampaignContext, entity *Entity) {
+	<div
+		data-widget="transaction_log"
+		data-transactions-endpoint={ fmt.Sprintf("/campaigns/%s/armory/shops/%s/transactions", cc.Campaign.ID, entity.ID) }
+		data-campaign-url={ fmt.Sprintf("/campaigns/%s", cc.Campaign.ID) }
+		data-entity-id={ entity.ID }
 	></div>
 }
 

@@ -75,6 +75,19 @@
       ]
     }
   ],
+  "relation_presets": [
+    {
+      "slug": "has-item",
+      "name": "Has Item",
+      "reverse_name": "In Inventory Of",
+      "metadata_schema": {
+        "quantity": { "type": "number", "default": 1 },
+        "equipped": { "type": "boolean", "default": false },
+        "attuned": { "type": "boolean", "default": false },
+        "notes": { "type": "string", "default": "" }
+      }
+    }
+  ],
   "entity_presets": [
     {
       "slug": "dnd5e-character",
@@ -82,6 +95,7 @@
       "name_plural": "D&D Characters",
       "icon": "fa-hat-wizard",
       "color": "#7C3AED",
+      "category": "character",
       "fields": [
         { "key": "class", "label": "Class", "type": "string", "foundry_path": "system.details.class" },
         { "key": "level", "label": "Level", "type": "number", "foundry_path": "system.details.level" },
@@ -97,7 +111,12 @@
         { "key": "hp_max", "label": "Max HP", "type": "number", "foundry_path": "system.attributes.hp.max" },
         { "key": "ac", "label": "Armor Class", "type": "number", "foundry_path": "system.attributes.ac.value", "foundry_writable": false },
         { "key": "speed", "label": "Speed", "type": "number", "foundry_path": "system.attributes.movement.walk", "foundry_writable": false },
-        { "key": "proficiency_bonus", "label": "Proficiency Bonus", "type": "number", "foundry_path": "system.attributes.prof", "foundry_writable": false }
+        { "key": "proficiency_bonus", "label": "Proficiency Bonus", "type": "number", "foundry_path": "system.attributes.prof", "foundry_writable": false },
+        { "key": "currency_cp", "label": "Copper (cp)", "type": "number", "section": "Currency", "foundry_path": "system.currency.cp" },
+        { "key": "currency_sp", "label": "Silver (sp)", "type": "number", "section": "Currency", "foundry_path": "system.currency.sp" },
+        { "key": "currency_ep", "label": "Electrum (ep)", "type": "number", "section": "Currency", "foundry_path": "system.currency.ep" },
+        { "key": "currency_gp", "label": "Gold (gp)", "type": "number", "section": "Currency", "foundry_path": "system.currency.gp" },
+        { "key": "currency_pp", "label": "Platinum (pp)", "type": "number", "section": "Currency", "foundry_path": "system.currency.pp" }
       ]
     },
     {
@@ -106,10 +125,29 @@
       "name_plural": "D&D Creatures",
       "icon": "fa-dragon",
       "color": "#DC2626",
+      "category": "creature",
       "fields": [
         { "key": "cr", "label": "Challenge Rating", "type": "string" },
         { "key": "type", "label": "Type", "type": "string" },
         { "key": "hp", "label": "Hit Points", "type": "string" }
+      ]
+    },
+    {
+      "slug": "dnd5e-item",
+      "name": "D&D Item",
+      "name_plural": "D&D Items",
+      "icon": "fa-gem",
+      "color": "#A855F7",
+      "category": "item",
+      "fields": [
+        { "key": "item_type", "label": "Type", "type": "string", "foundry_path": "system.type.value" },
+        { "key": "rarity", "label": "Rarity", "type": "string", "foundry_path": "system.rarity" },
+        { "key": "weight", "label": "Weight (lb)", "type": "number", "foundry_path": "system.weight.value" },
+        { "key": "cost", "label": "Cost (gp)", "type": "string", "foundry_path": "system.price.value" },
+        { "key": "damage", "label": "Damage", "type": "string" },
+        { "key": "properties", "label": "Properties", "type": "string" },
+        { "key": "attunement", "label": "Requires Attunement", "type": "string", "foundry_path": "system.attunement" },
+        { "key": "description", "label": "Description", "type": "markdown" }
       ]
     }
   ]

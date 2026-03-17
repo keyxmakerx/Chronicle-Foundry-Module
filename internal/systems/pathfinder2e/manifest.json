@@ -76,6 +76,19 @@
       ]
     }
   ],
+  "relation_presets": [
+    {
+      "slug": "has-item",
+      "name": "Has Item",
+      "reverse_name": "In Inventory Of",
+      "metadata_schema": {
+        "quantity": { "type": "number", "default": 1 },
+        "equipped": { "type": "boolean", "default": false },
+        "invested": { "type": "boolean", "default": false },
+        "notes": { "type": "string", "default": "" }
+      }
+    }
+  ],
   "entity_presets": [
     {
       "slug": "pf2e-character",
@@ -83,6 +96,7 @@
       "name_plural": "PF2e Characters",
       "icon": "fa-shield-halved",
       "color": "#2563EB",
+      "category": "character",
       "fields": [
         { "key": "class", "label": "Class", "type": "string", "foundry_path": "system.details.class.name", "foundry_writable": false },
         { "key": "level", "label": "Level", "type": "number", "foundry_path": "system.details.level.value", "foundry_writable": false },
@@ -98,7 +112,11 @@
         { "key": "hp_max", "label": "Max HP", "type": "number", "foundry_path": "system.attributes.hp.max" },
         { "key": "ac", "label": "Armor Class", "type": "number", "foundry_path": "system.attributes.ac.value", "foundry_writable": false },
         { "key": "perception", "label": "Perception", "type": "number", "foundry_path": "system.attributes.perception.value", "foundry_writable": false },
-        { "key": "speed", "label": "Speed", "type": "number", "foundry_path": "system.attributes.speed.value", "foundry_writable": false }
+        { "key": "speed", "label": "Speed", "type": "number", "foundry_path": "system.attributes.speed.value", "foundry_writable": false },
+        { "key": "currency_cp", "label": "Copper (cp)", "type": "number", "section": "Currency", "foundry_path": "system.details.currency.cp" },
+        { "key": "currency_sp", "label": "Silver (sp)", "type": "number", "section": "Currency", "foundry_path": "system.details.currency.sp" },
+        { "key": "currency_gp", "label": "Gold (gp)", "type": "number", "section": "Currency", "foundry_path": "system.details.currency.gp" },
+        { "key": "currency_pp", "label": "Platinum (pp)", "type": "number", "section": "Currency", "foundry_path": "system.details.currency.pp" }
       ]
     },
     {
@@ -107,10 +125,27 @@
       "name_plural": "PF2e Creatures",
       "icon": "fa-skull",
       "color": "#DC2626",
+      "category": "creature",
       "fields": [
         { "key": "level", "label": "Level", "type": "number" },
         { "key": "type", "label": "Type", "type": "string" },
         { "key": "hp", "label": "Hit Points", "type": "number" }
+      ]
+    },
+    {
+      "slug": "pf2e-equipment",
+      "name": "PF2e Equipment",
+      "name_plural": "PF2e Equipment",
+      "icon": "fa-shield-halved",
+      "color": "#3B82F6",
+      "category": "item",
+      "fields": [
+        { "key": "level", "label": "Level", "type": "number", "foundry_path": "system.level.value" },
+        { "key": "price", "label": "Price", "type": "string", "foundry_path": "system.price.value" },
+        { "key": "bulk", "label": "Bulk", "type": "string", "foundry_path": "system.bulk.value" },
+        { "key": "traits", "label": "Traits", "type": "string" },
+        { "key": "category", "label": "Category", "type": "string" },
+        { "key": "description", "label": "Description", "type": "markdown" }
       ]
     }
   ]

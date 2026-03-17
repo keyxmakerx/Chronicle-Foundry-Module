@@ -48,6 +48,9 @@ type SyncMappingService interface {
 	DeleteMapping(ctx context.Context, id string) error
 	DeleteAllMappings(ctx context.Context, campaignID string) error
 	PullModified(ctx context.Context, campaignID string, since time.Time, limit int) (*SyncPullResponse, error)
+	GetSyncSummary(ctx context.Context, campaignID string) (*SyncSummary, error)
+	ListMappingsWithNames(ctx context.Context, campaignID string, opts SyncMappingListOptions) ([]SyncMappingRow, int, error)
+	ListCampaignSyncStats(ctx context.Context) ([]CampaignSyncStats, error)
 }
 
 // syncMappingService implements SyncMappingService.
@@ -170,6 +173,40 @@ func (s *syncMappingService) DeleteMapping(ctx context.Context, id string) error
 // DeleteAllMappings removes all sync mappings for a campaign.
 func (s *syncMappingService) DeleteAllMappings(ctx context.Context, campaignID string) error {
 	return s.repo.DeleteByCampaign(ctx, campaignID)
+}
+
+// GetSyncSummary returns an overview of sync state for a campaign.
+func (s *syncMappingService) GetSyncSummary(ctx context.Context, campaignID string) (*SyncSummary, error) {
+	byType, err := s.repo.CountByType(ctx, campaignID)
+	if err != nil {
+		return nil, err
+	}
+
+	total := 0
+	for _, c := range byType {
+		total += c
+	}
+
+	lastActivity, err := s.repo.LastSyncActivity(ctx, campaignID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &SyncSummary{
+		TotalMappings:    total,
+		ByType:           byType,
+		LastSyncActivity: lastActivity,
+	}, nil
+}
+
+// ListMappingsWithNames returns sync mappings joined with entity/map names for display.
+func (s *syncMappingService) ListMappingsWithNames(ctx context.Context, campaignID string, opts SyncMappingListOptions) ([]SyncMappingRow, int, error) {
+	return s.repo.ListMappingsWithNames(ctx, campaignID, opts)
+}
+
+// ListCampaignSyncStats returns per-campaign sync statistics for the admin dashboard.
+func (s *syncMappingService) ListCampaignSyncStats(ctx context.Context) ([]CampaignSyncStats, error) {
+	return s.repo.ListCampaignSyncStats(ctx)
 }
 
 // PullModified returns mappings updated since a given timestamp.

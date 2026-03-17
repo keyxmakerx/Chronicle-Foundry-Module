@@ -515,9 +515,49 @@
           svg.transition().call(zoom.transform, d3.zoomIdentity);
         });
 
+        // Export PNG button.
+        var exportBtn = document.createElement('button');
+        exportBtn.className = 'btn-secondary text-xs';
+        exportBtn.innerHTML = '<i class="fa-solid fa-download"></i>';
+        exportBtn.title = 'Export as PNG';
+        exportBtn.addEventListener('click', function () {
+          var svgEl = el.querySelector('svg.relation-graph-svg');
+          if (!svgEl) return;
+          // Serialize SVG to a data URL, draw on canvas, then download.
+          var serializer = new XMLSerializer();
+          var svgStr = serializer.serializeToString(svgEl);
+          var canvas = document.createElement('canvas');
+          var scale = 2; // 2x for retina clarity
+          canvas.width = svgEl.clientWidth * scale;
+          canvas.height = svgEl.clientHeight * scale;
+          var ctxCanvas = canvas.getContext('2d');
+          ctxCanvas.scale(scale, scale);
+          // Fill with background color.
+          var bgStyle = getComputedStyle(svgEl).backgroundColor;
+          ctxCanvas.fillStyle = bgStyle || '#ffffff';
+          ctxCanvas.fillRect(0, 0, canvas.width, canvas.height);
+          var img = new Image();
+          var blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+          var url = URL.createObjectURL(blob);
+          img.onload = function () {
+            ctxCanvas.drawImage(img, 0, 0, svgEl.clientWidth, svgEl.clientHeight);
+            URL.revokeObjectURL(url);
+            var link = document.createElement('a');
+            link.download = 'relations-graph.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+          };
+          img.onerror = function () {
+            URL.revokeObjectURL(url);
+            Chronicle.notify('Failed to export graph', 'error');
+          };
+          img.src = url;
+        });
+
         controls.appendChild(zoomIn);
         controls.appendChild(zoomOut);
         controls.appendChild(resetBtn);
+        controls.appendChild(exportBtn);
         el.appendChild(controls);
 
         // Legend.

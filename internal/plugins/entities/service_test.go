@@ -52,6 +52,10 @@ func (m *mockEntityTypeRepo) ListByCampaign(ctx context.Context, campaignID stri
 	return nil, nil
 }
 
+func (m *mockEntityTypeRepo) ListByPresetCategory(ctx context.Context, campaignID, category string) ([]EntityType, error) {
+	return nil, nil
+}
+
 func (m *mockEntityTypeRepo) UpdateLayout(ctx context.Context, id int, layoutJSON string) error {
 	if m.updateLayoutFn != nil {
 		return m.updateLayoutFn(ctx, id, layoutJSON)

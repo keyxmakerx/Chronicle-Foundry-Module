@@ -1,0 +1,147 @@
+// gallery.templ renders the Armory gallery page — a grid of item entities
+// with search, sort, type filter, and tag filtering. Supports full page and
+// HTMX fragment rendering.
+package armory
+
+import (
+	"fmt"
+	"github.com/keyxmakerx/chronicle/internal/plugins/campaigns"
+	"github.com/keyxmakerx/chronicle/internal/templates/layouts"
+)
+
+// ArmoryGalleryPage renders the full Armory gallery page with layout wrapper.
+templ ArmoryGalleryPage(cc *campaigns.CampaignContext, cards []ItemCard, total int, opts ItemListOptions, itemTypes []ItemTypeInfo) {
+	@layouts.App(cc.Campaign.Name + " - Armory") {
+		@ArmoryGalleryContent(cc, cards, total, opts, itemTypes)
+	}
+}
+
+// ArmoryGalleryContent renders the gallery content (HTMX partial target).
+templ ArmoryGalleryContent(cc *campaigns.CampaignContext, cards []ItemCard, total int, opts ItemListOptions, itemTypes []ItemTypeInfo) {
+	<div id="armory-gallery">
+		<!-- Page header -->
+		<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+			<div>
+				<h1 class="text-2xl font-bold text-fg">
+					<i class="fa-solid fa-shield-halved mr-2 text-fg-muted"></i>Armory
+				</h1>
+				<p class="text-sm text-fg-secondary mt-0.5">
+					{ fmt.Sprintf("%d", total) } items
+				</p>
+			</div>
+			<div class="flex items-center gap-3 flex-wrap">
+				<!-- Search -->
+				<div class="relative">
+					<input
+						type="text"
+						name="q"
+						placeholder="Search items..."
+						value={ opts.Search }
+						class="input pl-9 pr-3 py-2 w-56"
+						hx-get={ fmt.Sprintf("/campaigns/%s/armory", cc.Campaign.ID) }
+						hx-target="#armory-gallery"
+						hx-swap="innerHTML"
+						hx-trigger="input changed delay:300ms"
+						hx-include="[name='sort'],[name='tag'],[name='type']"
+					/>
+					<i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted text-xs"></i>
+				</div>
+
+				<!-- Type filter -->
+				if len(itemTypes) > 1 {
+					<select
+						name="type"
+						class="input py-2 text-sm"
+						hx-get={ fmt.Sprintf("/campaigns/%s/armory", cc.Campaign.ID) }
+						hx-target="#armory-gallery"
+						hx-swap="innerHTML"
+						hx-include="[name='q'],[name='sort'],[name='tag']"
+					>
+						<option value="">All types</option>
+						for _, it := range itemTypes {
+							<option value={ fmt.Sprintf("%d", it.ID) } selected?={ opts.TypeID == it.ID }>
+								{ it.Name }
+							</option>
+						}
+					</select>
+				}
+
+				<!-- Sort dropdown -->
+				<select
+					name="sort"
+					class="input py-2 text-sm"
+					hx-get={ fmt.Sprintf("/campaigns/%s/armory", cc.Campaign.ID) }
+					hx-target="#armory-gallery"
+					hx-swap="innerHTML"
+					hx-include="[name='q'],[name='tag'],[name='type']"
+				>
+					<option value="name" selected?={ opts.Sort == "name" }>Name</option>
+					<option value="updated" selected?={ opts.Sort == "updated" }>Recently Updated</option>
+					<option value="created" selected?={ opts.Sort == "created" }>Newest</option>
+				</select>
+			</div>
+		</div>
+
+		<!-- Item Grid -->
+		if len(cards) == 0 {
+			<div class="text-center py-16">
+				<i class="fa-solid fa-shield-halved text-4xl text-fg-muted mb-4"></i>
+				<h3 class="text-lg font-semibold text-fg-secondary mb-1">No items found</h3>
+				if opts.Search != "" || opts.Tag != "" || opts.TypeID > 0 {
+					<p class="text-sm text-fg-muted">Try adjusting your search or filters.</p>
+				} else if cc.MemberRole >= campaigns.RoleScribe {
+					<p class="text-sm text-fg-muted">
+						No item types configured. Enable a game system with item presets,
+						or create a custom entity type and set its category to "item."
+					</p>
+				} else {
+					<p class="text-sm text-fg-muted">
+						No items have been added to the armory yet.
+					</p>
+				}
+			</div>
+		} else {
+			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+				for _, card := range cards {
+					@ItemCardComponent(cc, &card)
+				}
+			</div>
+
+			// Pagination.
+			if total > opts.PerPage {
+				@armoryPagination(cc, total, opts)
+			}
+		}
+	</div>
+}
+
+// armoryPagination renders pagination controls for the Armory gallery.
+templ armoryPagination(cc *campaigns.CampaignContext, total int, opts ItemListOptions) {
+	<div class="flex items-center justify-center gap-2 mt-8">
+		if opts.Page > 1 {
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/armory?page=%d&sort=%s&q=%s&tag=%s&type=%d", cc.Campaign.ID, opts.Page-1, opts.Sort, opts.Search, opts.Tag, opts.TypeID)) }
+				class="px-3 py-1.5 text-sm rounded-md bg-surface-alt text-fg-secondary hover:text-fg transition-colors"
+				hx-get={ fmt.Sprintf("/campaigns/%s/armory?page=%d&sort=%s&q=%s&tag=%s&type=%d", cc.Campaign.ID, opts.Page-1, opts.Sort, opts.Search, opts.Tag, opts.TypeID) }
+				hx-target="#armory-gallery"
+				hx-swap="innerHTML"
+			>
+				<i class="fa-solid fa-chevron-left text-xs mr-1"></i>Previous
+			</a>
+		}
+		<span class="text-sm text-fg-muted px-3">
+			{ fmt.Sprintf("Page %d of %d", opts.Page, (total+opts.PerPage-1)/opts.PerPage) }
+		</span>
+		if opts.Page*opts.PerPage < total {
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/campaigns/%s/armory?page=%d&sort=%s&q=%s&tag=%s&type=%d", cc.Campaign.ID, opts.Page+1, opts.Sort, opts.Search, opts.Tag, opts.TypeID)) }
+				class="px-3 py-1.5 text-sm rounded-md bg-surface-alt text-fg-secondary hover:text-fg transition-colors"
+				hx-get={ fmt.Sprintf("/campaigns/%s/armory?page=%d&sort=%s&q=%s&tag=%s&type=%d", cc.Campaign.ID, opts.Page+1, opts.Sort, opts.Search, opts.Tag, opts.TypeID) }
+				hx-target="#armory-gallery"
+				hx-swap="innerHTML"
+			>
+				Next<i class="fa-solid fa-chevron-right text-xs ml-1"></i>
+			</a>
+		}
+	</div>
+}

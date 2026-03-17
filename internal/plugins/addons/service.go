@@ -26,6 +26,9 @@ type AddonService interface {
 	Delete(ctx context.Context, id int) error
 	UpdateStatus(ctx context.Context, id int, status AddonStatus) error
 
+	// SeedInstalledAddons upserts all built-in addons at startup.
+	SeedInstalledAddons(ctx context.Context) error
+
 	// Per-campaign controls (campaign owner).
 	ListForCampaign(ctx context.Context, campaignID string) ([]CampaignAddon, error)
 	EnableForCampaign(ctx context.Context, campaignID string, addonID int, userID string) error
@@ -117,27 +120,90 @@ var validStatuses = map[AddonStatus]bool{
 	StatusDeprecated: true,
 }
 
-// installedAddons lists addon slugs that have real backing code in the
-// codebase. Only installed addons can be activated by admins or enabled
-// by campaign owners. Update this set as new addons are built.
-var installedAddons = map[string]bool{
-	"sync-api":       true,
-	"notes":          true,
-	"attributes":     true,
-	"calendar":       true,
-	"maps":           true,
-	"sessions":       true,
-	"timeline":       true,
-	"media-gallery":  true,
-	"npcs":           true,
-	"dnd5e":          true,
-	"pathfinder2e":   true,
-	"drawsteel":      true,
+// addonDef describes a built-in addon that ships with the codebase.
+// Used for automatic registration at startup — no migration needed.
+type addonDef struct {
+	Slug        string
+	Name        string
+	Description string
+	Version     string
+	Category    AddonCategory
+	Status      AddonStatus
+	Icon        string
+	Author      string
+}
+
+// builtinAddons is the canonical registry of all addons that ship with
+// Chronicle. Adding a new addon here is all that's needed — the startup
+// seeder will upsert it into the database automatically. No migration required.
+var builtinAddons = []addonDef{
+	// Game systems (content packs).
+	{Slug: "dnd5e", Name: "D&D 5th Edition", Description: "Reference data, stat blocks, and tooltips for Dungeons & Dragons 5th Edition", Version: "0.1.0", Category: CategorySystem, Status: StatusActive, Icon: "fa-dragon", Author: "Chronicle"},
+	{Slug: "pathfinder2e", Name: "Pathfinder 2nd Edition", Description: "Reference data and tooltips for Pathfinder 2nd Edition", Version: "0.1.0", Category: CategorySystem, Status: StatusActive, Icon: "fa-shield-halved", Author: "Chronicle"},
+	{Slug: "drawsteel", Name: "Draw Steel", Description: "Reference data for the Draw Steel RPG system", Version: "0.1.0", Category: CategorySystem, Status: StatusActive, Icon: "fa-swords", Author: "Chronicle"},
+
+	// Plugins (feature apps).
+	{Slug: "calendar", Name: "Calendar", Description: "Custom fantasy calendar with configurable months, weekdays, moons, seasons, and events. Link events to entities for timeline tracking.", Version: "0.1.0", Category: CategoryPlugin, Status: StatusActive, Icon: "fa-calendar-days", Author: "Chronicle"},
+	{Slug: "maps", Name: "Interactive Maps", Description: "Leaflet.js map viewer with entity pins and layer support", Version: "0.1.0", Category: CategoryPlugin, Status: StatusActive, Icon: "fa-map", Author: "Chronicle"},
+	{Slug: "media-gallery", Name: "Media Gallery", Description: "Campaign media management — upload, browse, and organize images.", Version: "0.1.0", Category: CategoryPlugin, Status: StatusActive, Icon: "fa-images", Author: "Chronicle"},
+	{Slug: "timeline", Name: "Timeline", Description: "Interactive visual timelines with zoom levels, entity grouping, and calendar integration.", Version: "0.1.0", Category: CategoryPlugin, Status: StatusActive, Icon: "fa-timeline", Author: "Chronicle"},
+	{Slug: "sessions", Name: "Sessions", Description: "Track game sessions with scheduling, linked entities, and RSVP.", Version: "0.1.0", Category: CategoryPlugin, Status: StatusActive, Icon: "fa-calendar-check", Author: "Chronicle"},
+	{Slug: "npcs", Name: "NPC Gallery", Description: "Browse and reveal character entities as NPCs for your players.", Version: "1.0.0", Category: CategoryPlugin, Status: StatusActive, Icon: "fa-users", Author: "Chronicle"},
+	{Slug: "armory", Name: "Armory & Inventory", Description: "Item catalog, character inventories, and shop management. System-dependent item types with Foundry sync.", Version: "0.1.0", Category: CategoryPlugin, Status: StatusActive, Icon: "fa-shield-halved", Author: "Chronicle"},
+
+	// Integrations.
+	{Slug: "sync-api", Name: "Sync API", Description: "Secure REST API for external tool integration (Foundry VTT, Roll20, etc.)", Version: "0.1.0", Category: CategoryIntegration, Status: StatusActive, Icon: "fa-arrows-rotate", Author: "Chronicle"},
+
+	// Widgets.
+	{Slug: "notes", Name: "Notes", Description: "Floating notebook panel for personal and shared campaign notes. Includes checklists, color coding, version history, and edit locking.", Version: "0.1.0", Category: CategoryWidget, Status: StatusActive, Icon: "fa-book", Author: "Chronicle"},
+	{Slug: "attributes", Name: "Attributes", Description: "Custom attribute fields on entity pages (e.g. race, alignment, HP). When disabled, attribute panels are hidden.", Version: "0.1.0", Category: CategoryWidget, Status: StatusActive, Icon: "fa-sliders", Author: "Chronicle"},
+
+	// Planned (no backing code yet).
+	{Slug: "player-notes", Name: "Player Notes", Description: "Collaborative note-taking block for entity pages.", Version: "0.1.0", Category: CategoryWidget, Status: StatusPlanned, Icon: "fa-sticky-note", Author: "Chronicle"},
+	{Slug: "family-tree", Name: "Family Tree", Description: "Visual family/org tree diagram from entity relations", Version: "0.1.0", Category: CategoryWidget, Status: StatusPlanned, Icon: "fa-sitemap", Author: "Chronicle"},
+	{Slug: "dice-roller", Name: "Dice Roller", Description: "In-app dice rolling with formula support and history", Version: "0.1.0", Category: CategoryWidget, Status: StatusPlanned, Icon: "fa-dice-d20", Author: "Chronicle"},
+}
+
+// installedAddons is derived from builtinAddons for quick lookup.
+var installedAddons map[string]bool
+
+func init() {
+	installedAddons = make(map[string]bool, len(builtinAddons))
+	for _, a := range builtinAddons {
+		if a.Status == StatusActive {
+			installedAddons[a.Slug] = true
+		}
+	}
 }
 
 // IsInstalled reports whether an addon slug has backing code in the codebase.
 func IsInstalled(slug string) bool {
 	return installedAddons[slug]
+}
+
+// SeedInstalledAddons upserts all built-in addons into the database.
+// Called once at startup so new addons are registered automatically
+// without requiring SQL migrations.
+func (s *addonService) SeedInstalledAddons(ctx context.Context) error {
+	for _, def := range builtinAddons {
+		desc := def.Description
+		author := def.Author
+		addon := &Addon{
+			Slug:        def.Slug,
+			Name:        def.Name,
+			Description: &desc,
+			Version:     def.Version,
+			Category:    def.Category,
+			Status:      def.Status,
+			Icon:        def.Icon,
+			Author:      &author,
+		}
+		if err := s.repo.Upsert(ctx, addon); err != nil {
+			return fmt.Errorf("seeding addon %s: %w", def.Slug, err)
+		}
+	}
+	slog.Info("built-in addons registered", slog.Int("count", len(builtinAddons)))
+	return nil
 }
 
 // Create registers a new addon in the global registry.

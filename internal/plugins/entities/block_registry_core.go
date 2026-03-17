@@ -79,6 +79,20 @@ func RegisterCoreBlocks(r *BlockRegistry) {
 	})
 
 	r.Register(BlockMeta{
+		Type: "inventory", Label: "Inventory", Icon: "fa-shield-halved",
+		Description: "Character inventory — items with quantity, equipped, and attuned", Addon: "armory",
+	}, func(ctx BlockRenderContext) templ.Component {
+		return blockInventory(ctx.CC, ctx.Entity, ctx.CSRFToken)
+	})
+
+	r.Register(BlockMeta{
+		Type: "transaction_log", Label: "Transaction Log", Icon: "fa-receipt",
+		Description: "Purchase and sale history for shops", Addon: "armory",
+	}, func(ctx BlockRenderContext) templ.Component {
+		return blockTransactionLog(ctx.CC, ctx.Entity)
+	})
+
+	r.Register(BlockMeta{
 		Type: "text_block", Label: "Text Block", Icon: "fa-align-left",
 		Description: "Custom static HTML content",
 	}, func(ctx BlockRenderContext) templ.Component {

@@ -1558,7 +1558,12 @@ func (h *Handler) CreateEntityType(c echo.Context) error {
 		return apperror.NewBadRequest("invalid request")
 	}
 
-	input := CreateEntityTypeInput(req)
+	input := CreateEntityTypeInput{
+		Name:       req.Name,
+		NamePlural: req.NamePlural,
+		Icon:       req.Icon,
+		Color:      req.Color,
+	}
 
 	et, err := h.service.CreateEntityType(c.Request().Context(), cc.Campaign.ID, input)
 	if err != nil {

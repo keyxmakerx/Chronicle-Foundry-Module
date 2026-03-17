@@ -8,7 +8,47 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-12 -- **Post-F-5 QoL: NPC sidebar link + plan reorg.**
+2026-03-17 -- **Sprint: F-6 Armory/Inventory, F-7 Shop Enhancement, Sync Dashboard, Foundry Config.**
+
+43. **Sprint: F-6 + F-7 (Armory, Inventory, Transactions, Shop Enhancement).**
+    - **A-2: Chronicle Sync Dashboard Expansion (COMPLETE)** — Owner API Keys page expansion with sync status overview, mappings table, error display. Admin API Monitor expansion with per-campaign sync stats.
+    - **B-1: System-Dependent Item Presets (COMPLETE)** — `preset_category` column on `entity_types` (migration 000009). `RelationPresetDef` on SystemManifest. Item entity presets for dnd5e (gem), pf2e (equipment), drawsteel (kits). `ItemPreset()` + `ItemFieldsForAPI()` helpers. Item fields API endpoint.
+    - **B-2: Armory Page + Sidebar (COMPLETE)** — `internal/plugins/armory/` plugin: gallery page, handler, service, repo. HTMX search/filter/sort/pagination. Sidebar link gated on "armory" addon. `armory_preview` dashboard block. Adapter pattern for cross-plugin deps.
+    - **B-3: Inventory Block + Foundry Item Sync (COMPLETE)** — `blockInventory` templ mount point. `inventory.js` Chronicle widget with quantity/equipped/attuned controls. `item-sync.mjs` Foundry module: bidirectional "Has Item" relation ↔ Actor item sync. Hooks: createItem/deleteItem/updateItem. WS events: relation.created/deleted/metadata_updated.
+    - **C-1: Transaction Table + Service + Currency Fields (COMPLETE)** — Migration 000010: `shop_transactions` table. Transaction model/repo/service/handler. Purchase flow with stock validation. Currency fields on all character presets (dnd5e: cp/sp/ep/gp/pp, pf2e: cp/sp/gp/pp, drawsteel: wealth). REST endpoints: POST purchase, POST/GET transactions.
+    - **C-2: Shop Management UI + Foundry Purchase Flow (COMPLETE)** — Transaction history in `shop_inventory.js` widget. `transaction_log.js` standalone widget + `transaction_log` block type. Foundry `shop-widget.mjs` enhanced with `_executePurchase()` method, buy buttons, stock/buyer validation.
+
+42. **Sprint: U-1 + W-1 (partial) + T-3.**
+    - **U-1: Role-Aware Dashboard Editor (COMPLETE)** — Role selector in dashboard editor. `RoleDashboardLayouts` struct with backward-compatible JSON format: detects legacy bare `{"rows":[...]}` vs role-keyed `{"default":...,"player":...,"scribe":...}`. Alpine.js toggle (Default/Player/Scribe) in customize.templ. `dashboard_editor.js` appends `?role=` param, listens for `role-change` events. Handler merges role layouts via `SetRoleDashboardJSON`/`RemoveRoleDashboardJSON`. `ParseRoleDashboardLayout(role)` with fallback chain. `UpdateDashboardLayoutRaw` service method. 9 unit tests in `model_test.go`.
+    - **W-1: Command Palette (PARTIAL)** — `static/js/command_palette.js` (~280 lines). Ctrl+Shift+P trigger, modal with search input, scrollable command list. Context-aware: detects campaign ID from URL, admin from DOM. 13 campaign nav commands, 3 action commands, 3 universal commands. Fuzzy substring match, keyboard nav (arrows/enter/escape). Added to `base.templ` and `shortcuts_help.js`. Saved filters not yet implemented.
+    - **T-3: Worldbuilding Prompts (COMPLETE)** — Full stack:
+      - Migration 000008: `worldbuilding_prompts` table with campaign_id, entity_type_id, name, prompt_text, icon, sort_order, is_global, timestamps, foreign keys.
+      - Model: `WorldbuildingPrompt`, `CreatePromptInput`, `UpdatePromptInput` structs.
+      - Repository: `WorldbuildingPromptRepository` with Create, FindByID, ListForCampaign, ListForCampaignAndType, Update, Delete.
+      - Service: `WorldbuildingPromptService` with validation (name max 200, text max 5000), default icon. `EntityTypeLister` interface (subset of EntityTypeRepository). `SeedDefaults` inserts 16 prompts across 5 types.
+      - Handler: ListAPI (HTMX fragment support), CreateAPI, UpdateAPI, DeleteAPI with IDOR checks.
+      - Routes: GET (Player+), POST/PUT/DELETE (Owner) at `/campaigns/:id/worldbuilding-prompts`.
+      - Templates: `WorldbuildingPromptsPanel` (collapsible card, HTMX lazy-load) + `WorldbuildingPromptsFragment` (`<details>` accordion).
+      - Seeding: `WorldbuildingPromptSeeder` interface in campaigns package, called during campaign creation.
+      - Tests: 7 unit tests.
+    - **Next up:** W-1 saved filters, or Phase 2 (X-1: System Upload UX), or other backlog items.
+
+41. **Post-Phase-1 Sprint: W-0.5 + V-4b + U-2.**
+    - **W-0.5 completion** — Accent color CSS variable now propagates to all 258 Tailwind utility usages. Updated `tailwind.config.js` to reference `var(--color-accent)` instead of hardcoded hex. Added `--color-accent-hover` and `--color-accent-light` CSS variables with auto-computed darker/lighter variants from the base hex color. New `AccentColorCSS()` helper in `layouts/data.go` generates the CSS block with all three variants. Topbar styling, brand name, brand logo were already working.
+    - **V-4a (cover images)** — Already fully implemented: migration 000004 (`cover_image_path`), API (`PUT /entities/:eid/cover-image`), `cover_image` layout block type in block registry, upload/change UI with hover overlay. No new work needed.
+    - **V-4b (graph export)** — Added PNG export button to relations graph widget. Uses SVG→Canvas→PNG pipeline with 2x resolution for retina clarity. Download button in the graph controls bar alongside zoom buttons.
+    - **U-2: Campaign Invite System (NEW)** — Full invite flow:
+      - Migration 000007: `campaign_invites` table with token, role, expiry, accept tracking.
+      - Model: `Invite` struct with `IsExpired()`, `IsPending()` helpers.
+      - Repository: `InviteRepository` with Create, GetByToken, ListByCampaign, MarkAccepted, Delete, DeleteExpired, GetByEmailAndCampaign.
+      - Service: `InviteService` with CreateInvite (token generation, duplicate check, email send), AcceptInvite (token validation, membership creation), ListInvites, RevokeInvite, GetInviteByToken.
+      - Handler: `InviteHandler` with ListInvitesAPI, CreateInviteAPI, RevokeInviteAPI, AcceptInvitePage, InvitesPage.
+      - Templates: `InviteAcceptPage` (standalone page for accept flow with login/register redirect), `InviteListFragment` (HTMX fragment for settings page with send form + invite table).
+      - Routes: `RegisterInviteRoutes` — accept page at `/invites/accept?token=xxx`, CRUD at `/campaigns/:id/invites`.
+      - Email: HTML+plaintext invite email with accept link, campaign name, role.
+      - Auth redirect: Login and register handlers now support `?redirect=` parameter for post-auth redirect to invite accept page.
+      - Tests: 9 tests covering create, validation, duplicate, accept, expired, already-accepted, revoke, list, default role.
+    - **Next up:** Phase 2 (X-1: System Upload UX) or V-4 graph tag filtering, or Phase 4 collaboration features.
 
 40. **Post-F-5 QoL: NPC sidebar navigation link.**
     - Added "NPCs" entry to campaign sidebar in `internal/templates/layouts/app.templ` below "All Pages" link.
@@ -205,7 +245,7 @@ Branch: `claude/fix-journal-button-placement-UF4hD`.
 
 ## Phase & Sprint Plan
 See `.ai/phases.md` for the full roadmap. Phases organized by priority:
-1. **F**: Foundry Completion & QoL (F-4.5, F-QoL, F-5) ← CURRENT
+1. **F**: Foundry Completion & QoL (F-4.5, F-QoL, F-5) ← COMPLETE
 2. **X**: System Modularity & Owner Experience (X-1 through X-5)
 3. **W**: Maps & Spatial (W-2, W-2.5)
 4. **U**: Collaboration & Polish (U-1/2/3/4/5, W-1, W-4)
@@ -213,7 +253,7 @@ See `.ai/phases.md` for the full roadmap. Phases organized by priority:
 6. **F**: Foundry Advanced (F-6, F-7)
 
 ## Current Phase
-**Phase 1: Foundry Completion — Sprint F-4.5 IN PROGRESS.**
+**Sprint 42: U-1 + W-1 + T-3.** Phase 1 (Foundry Completion: F-4.5, F-QoL, F-5) done. Next: Phase 2 (X-1: System Upload UX) or Phase 6 (F-6: Armory/Inventory).
 
 ### Sprint V-2: Backlinks Panel & Entity Aliases (COMPLETE)
 - **Fixed migration 060**: Removed incorrect first ALTER that tried to drop 'module' from ENUM directly, causing Error 1265. Kept correct 3-step approach.
@@ -654,9 +694,9 @@ Created `.ai/audit.md` — comprehensive feature parity and completeness audit c
 - Updated architecture.md directory structure to reflect systems/ path
 
 ## Next Session Should
-- **Sprint F-4.5: Generic System Adapter** — Remove hardcoded SYSTEM_MAP, dynamic matching via API
-- **Sprint F-QoL: Foundry Sync Diagnostics** — Validation report, health dashboard, error recovery
-- **Sprint F-5: NPC Viewer / Hall** — Gallery of revealed NPCs
+- **W-1 Saved Filters** — Persist command palette search filters per campaign
+- **Phase 2: X-1 System Upload UX** — Guided wizard for system install
+- **Phase 6: F-6 Armory / Inventory System** — Items as entities, character inventory, Foundry sync
 - See `.ai/phases.md` for full execution order
 
 ## Known Issues Right Now

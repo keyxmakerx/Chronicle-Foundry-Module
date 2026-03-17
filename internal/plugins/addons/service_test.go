@@ -63,6 +63,10 @@ func (m *mockAddonRepo) Create(ctx context.Context, addon *Addon) error {
 	return nil
 }
 
+func (m *mockAddonRepo) Upsert(ctx context.Context, addon *Addon) error {
+	return nil
+}
+
 func (m *mockAddonRepo) Update(ctx context.Context, addon *Addon) error {
 	if m.updateFn != nil {
 		return m.updateFn(ctx, addon)

@@ -29,6 +29,7 @@ type EntityType struct {
 	NamePlural      string            `json:"name_plural"`
 	Icon            string            `json:"icon"`
 	Color           string            `json:"color"`
+	PresetCategory  *string           `json:"preset_category,omitempty"` // System preset category ("character", "item", "creature").
 	Description     *string           `json:"description,omitempty"`     // Rich text shown on category dashboard.
 	PinnedEntityIDs []string          `json:"pinned_entity_ids,omitempty"` // Entity IDs pinned to dashboard top.
 	DashboardLayout *string           `json:"dashboard_layout,omitempty"` // JSON layout; nil = use hardcoded default.
@@ -435,10 +436,11 @@ type UpdateEntityTypeRequest struct {
 
 // CreateEntityTypeInput is the validated input for creating an entity type.
 type CreateEntityTypeInput struct {
-	Name       string
-	NamePlural string
-	Icon       string
-	Color      string
+	Name           string
+	NamePlural     string
+	Icon           string
+	Color          string
+	PresetCategory string // Optional system preset category (e.g., "item", "character").
 }
 
 // UpdateEntityTypeInput is the validated input for updating an entity type.

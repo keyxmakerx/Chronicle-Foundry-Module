@@ -3,6 +3,7 @@ package campaigns
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -273,6 +274,8 @@ func (h *Handler) Create(c echo.Context) error {
 }
 
 // Show renders the campaign dashboard (GET /campaigns/:id).
+// Uses role-aware dashboard layout: each role can have its own Campaign Page
+// layout, falling back to the default layout.
 func (h *Handler) Show(c echo.Context) error {
 	cc := GetCampaignContext(c)
 	if cc == nil {
@@ -769,6 +772,7 @@ func (h *Handler) SidebarDrill(c echo.Context) error {
 // --- Dashboard Layout ---
 
 // GetDashboardLayout returns the current dashboard layout as JSON (GET /campaigns/:id/dashboard-layout).
+// Supports ?role= query param (default/player/scribe) for role-specific layouts.
 // Returns null if no custom layout is set (meaning the default is in use).
 func (h *Handler) GetDashboardLayout(c echo.Context) error {
 	cc := GetCampaignContext(c)
@@ -776,19 +780,32 @@ func (h *Handler) GetDashboardLayout(c echo.Context) error {
 		return apperror.NewMissingContext()
 	}
 
-	layout, err := h.service.GetDashboardLayout(c.Request().Context(), cc.Campaign.ID)
+	roleName := c.QueryParam("role")
+	if roleName == "" {
+		roleName = "default"
+	}
+
+	// Fetch campaign to access the raw dashboard_layout JSON.
+	campaign, err := h.service.GetByID(c.Request().Context(), cc.Campaign.ID)
 	if err != nil {
 		return err
 	}
 
+	layout := campaign.GetRoleDashboardJSON(roleName)
 	return c.JSON(http.StatusOK, layout)
 }
 
 // UpdateDashboardLayout saves a new dashboard layout (PUT /campaigns/:id/dashboard-layout).
+// Supports ?role= query param (default/player/scribe) to update a specific role's layout.
 func (h *Handler) UpdateDashboardLayout(c echo.Context) error {
 	cc := GetCampaignContext(c)
 	if cc == nil {
 		return apperror.NewMissingContext()
+	}
+
+	roleName := c.QueryParam("role")
+	if roleName == "" {
+		roleName = "default"
 	}
 
 	var layout DashboardLayout
@@ -796,26 +813,64 @@ func (h *Handler) UpdateDashboardLayout(c echo.Context) error {
 		return apperror.NewBadRequest("invalid JSON body")
 	}
 
-	if err := h.service.UpdateDashboardLayout(c.Request().Context(), cc.Campaign.ID, &layout); err != nil {
+	if err := validateDashboardLayout(&layout); err != nil {
 		return err
 	}
 
-	h.logAudit(c, cc.Campaign.ID, "dashboard_layout_updated", nil)
+	// Fetch campaign, merge this role's layout into the wrapper, and save.
+	campaign, err := h.service.GetByID(c.Request().Context(), cc.Campaign.ID)
+	if err != nil {
+		return err
+	}
+
+	fullJSON, err := campaign.SetRoleDashboardJSON(roleName, &layout)
+	if err != nil {
+		return apperror.NewInternal(fmt.Errorf("marshaling role layout: %w", err))
+	}
+
+	if err := h.service.UpdateDashboardLayoutRaw(c.Request().Context(), cc.Campaign.ID, fullJSON); err != nil {
+		return err
+	}
+
+	h.logAudit(c, cc.Campaign.ID, "dashboard_layout_updated", map[string]any{"role": roleName})
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // ResetDashboardLayout removes the custom dashboard layout (DELETE /campaigns/:id/dashboard-layout).
+// Supports ?role= query param. If "default", resets entire layout. If "player"/"scribe",
+// removes only that role's override.
 func (h *Handler) ResetDashboardLayout(c echo.Context) error {
 	cc := GetCampaignContext(c)
 	if cc == nil {
 		return apperror.NewMissingContext()
 	}
 
-	if err := h.service.ResetDashboardLayout(c.Request().Context(), cc.Campaign.ID); err != nil {
-		return err
+	roleName := c.QueryParam("role")
+	if roleName == "" {
+		roleName = "default"
 	}
 
-	h.logAudit(c, cc.Campaign.ID, "dashboard_layout_reset", nil)
+	// For "default" reset with no role param, clear the entire column.
+	if roleName == "default" {
+		if err := h.service.ResetDashboardLayout(c.Request().Context(), cc.Campaign.ID); err != nil {
+			return err
+		}
+	} else {
+		// Remove just this role's layout from the wrapper.
+		campaign, err := h.service.GetByID(c.Request().Context(), cc.Campaign.ID)
+		if err != nil {
+			return err
+		}
+		fullJSON, err := campaign.RemoveRoleDashboardJSON(roleName)
+		if err != nil {
+			return apperror.NewInternal(fmt.Errorf("removing role layout: %w", err))
+		}
+		if err := h.service.UpdateDashboardLayoutRaw(c.Request().Context(), cc.Campaign.ID, fullJSON); err != nil {
+			return err
+		}
+	}
+
+	h.logAudit(c, cc.Campaign.ID, "dashboard_layout_reset", map[string]any{"role": roleName})
 	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 

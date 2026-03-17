@@ -35,6 +35,8 @@
     --color-input-bg:      #ffffff;
     --color-input-border:  #d1d5db;  /* gray-300 */
     --color-accent:        #6366f1;  /* indigo-500 */
+    --color-accent-hover:  #4f46e5;  /* indigo-600 -- darker for hover states */
+    --color-accent-light:  #a5b4fc;  /* indigo-300 -- lighter for badges/tags */
     --color-sidebar-bg:    #1a1c23;  /* always dark */
   }
 
@@ -53,6 +55,8 @@
     --color-input-bg:      #111827;  /* gray-900 */
     --color-input-border:  #4b5563;  /* gray-600 */
     --color-accent:        #6366f1;  /* indigo-500 -- same both modes */
+    --color-accent-hover:  #4f46e5;  /* indigo-600 */
+    --color-accent-light:  #a5b4fc;  /* indigo-300 */
     --color-sidebar-bg:    #1a1c23;  /* always dark */
   }
 

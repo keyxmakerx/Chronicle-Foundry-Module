@@ -141,6 +141,30 @@ templ OwnerKeysPageTempl(campaignID string, keys []APIKey, stats *APIStats, csrf
 				</form>
 			</div>
 
+			// Sync Status Overview (HTMX lazy-loaded).
+			<div
+				hx-get={ fmt.Sprintf("/campaigns/%s/api-keys/sync-overview", campaignID) }
+				hx-trigger="load"
+				hx-swap="innerHTML"
+			>
+				<div class="card p-6 text-center">
+					<i class="fa-solid fa-spinner fa-spin text-fg-muted"></i>
+					<p class="text-sm text-fg-muted mt-2">Loading sync status...</p>
+				</div>
+			</div>
+
+			// Sync Mappings Table (HTMX lazy-loaded).
+			<div id="sync-mappings-container"
+				hx-get={ fmt.Sprintf("/campaigns/%s/api-keys/sync-mappings", campaignID) }
+				hx-trigger="load"
+				hx-swap="innerHTML"
+			>
+				<div class="card p-6 text-center">
+					<i class="fa-solid fa-spinner fa-spin text-fg-muted"></i>
+					<p class="text-sm text-fg-muted mt-2">Loading sync mappings...</p>
+				</div>
+			</div>
+
 			// Security info.
 			<div class="card p-6">
 				<div class="flex items-start gap-4">

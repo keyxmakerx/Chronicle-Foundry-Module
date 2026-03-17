@@ -31,10 +31,11 @@ type EntityTypeCreator interface {
 // EntityTypeCreateInput mirrors entities.CreateEntityTypeInput to avoid
 // importing the entities package directly.
 type EntityTypeCreateInput struct {
-	Name       string
-	NamePlural string
-	Icon       string
-	Color      string
+	Name           string
+	NamePlural     string
+	Icon           string
+	Color          string
+	PresetCategory string // Optional preset category (e.g., "character", "item").
 }
 
 // EntityTypeResult is the minimal result needed from entity type creation.
@@ -175,10 +176,11 @@ func (a *contentApplier) applyEntityTypeTemplates(
 ) error {
 	for _, t := range templates {
 		input := EntityTypeCreateInput{
-			Name:       t.Name,
-			NamePlural: t.NamePlural,
-			Icon:       t.Icon,
-			Color:      t.Color,
+			Name:           t.Name,
+			NamePlural:     t.NamePlural,
+			Icon:           t.Icon,
+			Color:          t.Color,
+			PresetCategory: t.Category,
 		}
 
 		result, err := a.entityTypes.CreateEntityType(ctx, campaignID, input)

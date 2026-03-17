@@ -55,12 +55,16 @@
   Chronicle.register('dashboard-editor', {
     init: function (el, config) {
       this.el = el;
-      this.endpoint = config.endpoint;
+      this.baseEndpoint = config.endpoint;
       this.campaignId = config.campaignId;
       this.csrfToken = config.csrfToken;
       this.layout = null; // null = default layout in use
       this.dirty = false;
       this.dragState = null; // { type, blockType } or { type, rowIdx, colIdx, blockIdx }
+      this.role = el.getAttribute('data-role') || ''; // Role for per-role layouts.
+
+      // Compute endpoint with role query param.
+      this.endpoint = this._buildEndpoint();
 
       // Allow per-widget block palette override (e.g., category dashboards).
       if (config.blockTypes) {
@@ -73,7 +77,36 @@
         this.blockTypes = DEFAULT_BLOCK_TYPES;
       }
 
+      // Listen for role-change events from the Alpine.js toggle.
+      var self = this;
+      this._onRoleChange = function (e) {
+        var newRole = e.detail && e.detail.role;
+        if (newRole && newRole !== self.role) {
+          if (self.dirty) {
+            if (!confirm('You have unsaved changes. Switch role and discard them?')) {
+              return;
+            }
+          }
+          self.role = newRole;
+          self.endpoint = self._buildEndpoint();
+          self.dirty = false;
+          self.load();
+        }
+      };
+      el.addEventListener('role-change', this._onRoleChange);
+
       this.load();
+    },
+
+    /**
+     * Build the API endpoint with role query param if set.
+     */
+    _buildEndpoint: function () {
+      if (this.role && this.role !== '') {
+        var sep = this.baseEndpoint.indexOf('?') >= 0 ? '&' : '?';
+        return this.baseEndpoint + sep + 'role=' + encodeURIComponent(this.role);
+      }
+      return this.baseEndpoint;
     },
 
     /**
@@ -663,6 +696,9 @@
     },
 
     destroy: function () {
+      if (this._onRoleChange) {
+        this.el.removeEventListener('role-change', this._onRoleChange);
+      }
       this.el.innerHTML = '';
     }
   });

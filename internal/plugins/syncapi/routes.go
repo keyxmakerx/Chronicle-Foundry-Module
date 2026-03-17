@@ -44,6 +44,10 @@ func RegisterCampaignRoutes(e *echo.Echo, h *Handler, campaignSvc campaigns.Camp
 
 	// Sync status embed (owner only — used by dashboard sync status block).
 	cg.GET("/sync-status", h.SyncStatusEmbed, campaigns.RequireRole(campaigns.RoleOwner))
+
+	// Sync dashboard fragments (owner only — HTMX-loaded on API keys page).
+	cg.GET("/api-keys/sync-overview", h.SyncOverviewFragment, campaigns.RequireRole(campaigns.RoleOwner))
+	cg.GET("/api-keys/sync-mappings", h.SyncMappingsFragment, campaigns.RequireRole(campaigns.RoleOwner))
 }
 
 // RegisterAPIRoutes adds the public REST API endpoints under /api/v1/.
@@ -72,6 +76,7 @@ func RegisterAPIRoutes(e *echo.Echo, api *APIHandler, calAPI *CalendarAPIHandler
 	cg.GET("", api.GetCampaign, RequirePermission(PermRead))
 	cg.GET("/systems", api.ListSystems, RequirePermission(PermRead))
 	cg.GET("/systems/:systemId/character-fields", api.GetCharacterFields, RequirePermission(PermRead))
+	cg.GET("/systems/:systemId/item-fields", api.GetItemFields, RequirePermission(PermRead))
 	cg.GET("/entity-types", api.ListEntityTypes, RequirePermission(PermRead))
 	cg.GET("/entity-types/:typeID", api.GetEntityType, RequirePermission(PermRead))
 	cg.GET("/entities", api.ListEntities, RequirePermission(PermRead))

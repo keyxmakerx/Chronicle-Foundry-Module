@@ -22,6 +22,9 @@ type AddonRepository interface {
 	Delete(ctx context.Context, id int) error
 	UpdateStatus(ctx context.Context, id int, status AddonStatus) error
 
+	// Upsert inserts or updates an addon by slug (used for startup registration).
+	Upsert(ctx context.Context, addon *Addon) error
+
 	// Per-campaign addon settings.
 	ListForCampaign(ctx context.Context, campaignID string) ([]CampaignAddon, error)
 	EnableForCampaign(ctx context.Context, campaignID string, addonID int, userID string) error
@@ -146,6 +149,29 @@ func (r *addonRepository) Create(ctx context.Context, addon *Addon) error {
 	}
 	id, _ := result.LastInsertId()
 	addon.ID = int(id)
+	return nil
+}
+
+// Upsert inserts a new addon or updates an existing one matched by slug.
+// Used during startup to register all built-in addons without requiring
+// separate SQL migrations for each addon.
+func (r *addonRepository) Upsert(ctx context.Context, addon *Addon) error {
+	query := `INSERT INTO addons (slug, name, description, version, category, status, icon, author)
+	          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	          ON DUPLICATE KEY UPDATE
+	            name = VALUES(name),
+	            description = VALUES(description),
+	            version = VALUES(version),
+	            icon = VALUES(icon),
+	            author = VALUES(author)`
+
+	_, err := r.db.ExecContext(ctx, query,
+		addon.Slug, addon.Name, addon.Description, addon.Version,
+		addon.Category, addon.Status, addon.Icon, addon.Author,
+	)
+	if err != nil {
+		return fmt.Errorf("upserting addon %s: %w", addon.Slug, err)
+	}
 	return nil
 }
 

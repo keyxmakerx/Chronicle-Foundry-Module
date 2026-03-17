@@ -94,6 +94,11 @@ templ AdminAPIDashboardTempl(data AdminDashboardData) {
 				@topTable("Top Keys", "fa-key", data.TopKeys)
 			</div>
 
+			// Campaign Sync Overview.
+			if len(data.CampaignSyncStats) > 0 {
+				@AdminCampaignSyncTableTempl(data.CampaignSyncStats)
+			}
+
 			// Security events.
 			<div class="card p-6">
 				<div class="flex items-center justify-between mb-4">

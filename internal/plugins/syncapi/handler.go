@@ -17,12 +17,18 @@ import (
 // Handler handles sync API HTTP requests for both the management UI
 // (key management, dashboards) and the actual sync API endpoints.
 type Handler struct {
-	service SyncAPIService
+	service    SyncAPIService
+	syncMapSvc SyncMappingService
 }
 
 // NewHandler creates a new sync API handler.
 func NewHandler(service SyncAPIService) *Handler {
 	return &Handler{service: service}
+}
+
+// SetSyncMappingService injects the sync mapping service for owner dashboard sync status.
+func (h *Handler) SetSyncMappingService(svc SyncMappingService) {
+	h.syncMapSvc = svc
 }
 
 // --- Campaign Owner: API Key Management ---
@@ -209,6 +215,59 @@ func (h *Handler) SyncStatusEmbed(c echo.Context) error {
 	return middleware.Render(c, http.StatusOK, SyncStatusFragment(cc.Campaign.ID, keys, stats))
 }
 
+// SyncOverviewFragment returns an HTMX fragment showing the sync summary card.
+// GET /campaigns/:id/api-keys/sync-overview
+func (h *Handler) SyncOverviewFragment(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	if cc == nil {
+		return apperror.NewForbidden("campaign context required")
+	}
+
+	if h.syncMapSvc == nil {
+		return middleware.Render(c, http.StatusOK, SyncOverviewEmptyTempl())
+	}
+
+	summary, err := h.syncMapSvc.GetSyncSummary(c.Request().Context(), cc.Campaign.ID)
+	if err != nil {
+		summary = &SyncSummary{}
+	}
+
+	return middleware.Render(c, http.StatusOK, SyncOverviewCardTempl(summary))
+}
+
+// SyncMappingsFragment returns an HTMX fragment with the paginated sync mappings table.
+// GET /campaigns/:id/api-keys/sync-mappings?search=&type=&sort=&offset=0
+func (h *Handler) SyncMappingsFragment(c echo.Context) error {
+	cc := campaigns.GetCampaignContext(c)
+	if cc == nil {
+		return apperror.NewForbidden("campaign context required")
+	}
+
+	if h.syncMapSvc == nil {
+		return middleware.Render(c, http.StatusOK, SyncMappingsEmptyTempl())
+	}
+
+	offset, _ := strconv.Atoi(c.QueryParam("offset"))
+	if offset < 0 {
+		offset = 0
+	}
+
+	opts := SyncMappingListOptions{
+		Search: strings.TrimSpace(c.QueryParam("search")),
+		Type:   strings.TrimSpace(c.QueryParam("type")),
+		Sort:   strings.TrimSpace(c.QueryParam("sort")),
+		Limit:  25,
+		Offset: offset,
+	}
+
+	rows, total, err := h.syncMapSvc.ListMappingsWithNames(c.Request().Context(), cc.Campaign.ID, opts)
+	if err != nil {
+		rows = []SyncMappingRow{}
+	}
+
+	return middleware.Render(c, http.StatusOK, SyncMappingsTableTempl(cc.Campaign.ID, rows, total, opts))
+}
+
 // --- Admin: API Monitoring Dashboard ---
 
 // AdminDashboard renders the admin API monitoring page (GET /admin/api).
@@ -230,20 +289,27 @@ func (h *Handler) AdminDashboard(c echo.Context) error {
 
 	keys, totalKeys, _ := h.service.ListAllKeys(ctx, 20, 0)
 
+	// Fetch per-campaign sync stats if sync mapping service is available.
+	var campaignSyncStats []CampaignSyncStats
+	if h.syncMapSvc != nil {
+		campaignSyncStats, _ = h.syncMapSvc.ListCampaignSyncStats(ctx)
+	}
+
 	csrfToken := middleware.GetCSRFToken(c)
 
 	data := AdminDashboardData{
-		Stats:           stats,
-		RequestSeries:   requestSeries,
-		SecuritySeries:  securitySeries,
-		TopIPs:          topIPs,
-		TopPaths:        topPaths,
-		TopKeys:         topKeys,
-		SecurityEvents:  secEvents,
-		IPBlocks:        ipBlocks,
-		APIKeys:         keys,
-		TotalKeys:       totalKeys,
-		CSRFToken:       csrfToken,
+		Stats:             stats,
+		RequestSeries:     requestSeries,
+		SecuritySeries:    securitySeries,
+		TopIPs:            topIPs,
+		TopPaths:          topPaths,
+		TopKeys:           topKeys,
+		SecurityEvents:    secEvents,
+		IPBlocks:          ipBlocks,
+		APIKeys:           keys,
+		TotalKeys:         totalKeys,
+		CampaignSyncStats: campaignSyncStats,
+		CSRFToken:         csrfToken,
 	}
 
 	return middleware.Render(c, http.StatusOK, AdminAPIDashboardTempl(data))
@@ -423,15 +489,16 @@ func (h *Handler) AdminRevokeKey(c echo.Context) error {
 
 // AdminDashboardData holds all data for the admin API monitoring dashboard.
 type AdminDashboardData struct {
-	Stats          *APIStats
-	RequestSeries  []TimeSeriesPoint
-	SecuritySeries []TimeSeriesPoint
-	TopIPs         []TopEntry
-	TopPaths       []TopEntry
-	TopKeys        []TopEntry
-	SecurityEvents []SecurityEvent
-	IPBlocks       []IPBlock
-	APIKeys        []APIKey
-	TotalKeys      int
-	CSRFToken      string
+	Stats              *APIStats
+	RequestSeries      []TimeSeriesPoint
+	SecuritySeries     []TimeSeriesPoint
+	TopIPs             []TopEntry
+	TopPaths           []TopEntry
+	TopKeys            []TopEntry
+	SecurityEvents     []SecurityEvent
+	IPBlocks           []IPBlock
+	APIKeys            []APIKey
+	TotalKeys          int
+	CampaignSyncStats  []CampaignSyncStats
+	CSRFToken          string
 }

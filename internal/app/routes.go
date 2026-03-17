@@ -33,6 +33,7 @@ import (
 	"github.com/keyxmakerx/chronicle/internal/templates/layouts"
 	"github.com/keyxmakerx/chronicle/internal/templates/pages"
 	ws "github.com/keyxmakerx/chronicle/internal/websocket"
+	"github.com/keyxmakerx/chronicle/internal/plugins/armory"
 	"github.com/keyxmakerx/chronicle/internal/plugins/npcs"
 	"github.com/keyxmakerx/chronicle/internal/widgets/notes"
 	"github.com/keyxmakerx/chronicle/internal/widgets/posts"
@@ -692,6 +693,76 @@ func (a *npcVisibilityTogglerAdapter) TogglePrivate(ctx context.Context, entityI
 	return a.svc.TogglePrivate(ctx, entityID)
 }
 
+// armoryItemTypeFinderAdapter wraps entities.EntityService to implement the
+// armory.ItemTypeFinder interface. Resolves item-category entity types using
+// the preset_category column.
+type armoryItemTypeFinderAdapter struct {
+	svc entities.EntityService
+}
+
+// FindItemTypeIDs returns the IDs of entity types with preset_category "item".
+func (a *armoryItemTypeFinderAdapter) FindItemTypeIDs(ctx context.Context, campaignID string) ([]int, error) {
+	types, err := a.svc.GetEntityTypesByPresetCategory(ctx, campaignID, "item")
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]int, len(types))
+	for i, t := range types {
+		ids[i] = t.ID
+	}
+	return ids, nil
+}
+
+// FindItemTypes returns item-category entity types for the Armory filter dropdown.
+func (a *armoryItemTypeFinderAdapter) FindItemTypes(ctx context.Context, campaignID string) ([]armory.ItemTypeInfo, error) {
+	types, err := a.svc.GetEntityTypesByPresetCategory(ctx, campaignID, "item")
+	if err != nil {
+		return nil, err
+	}
+	infos := make([]armory.ItemTypeInfo, len(types))
+	for i, t := range types {
+		infos[i] = armory.ItemTypeInfo{
+			ID:    t.ID,
+			Name:  t.Name,
+			Icon:  t.Icon,
+			Color: t.Color,
+		}
+	}
+	return infos, nil
+}
+
+// armoryRelationMetadataAdapter wraps the relations service to implement
+// armory.RelationMetadataUpdater. Used by the transaction service to decrement
+// shop stock when a purchase is made.
+type armoryRelationMetadataAdapter struct {
+	svc relations.RelationService
+}
+
+// UpdateMetadata updates the metadata JSON for a relation.
+func (a *armoryRelationMetadataAdapter) UpdateMetadata(ctx context.Context, id int, metadata json.RawMessage) error {
+	return a.svc.UpdateMetadata(ctx, id, metadata)
+}
+
+// armoryRelationFinderAdapter wraps the relations service to implement
+// armory.RelationFinder. Used by the transaction service to validate stock
+// before a purchase.
+type armoryRelationFinderAdapter struct {
+	svc relations.RelationService
+}
+
+// GetByID retrieves a relation by ID, mapping to the armory.RelationInfo type.
+func (a *armoryRelationFinderAdapter) GetByID(ctx context.Context, id int) (*armory.RelationInfo, error) {
+	rel, err := a.svc.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &armory.RelationInfo{
+		ID:         rel.ID,
+		Metadata:   rel.Metadata,
+		CampaignID: rel.CampaignID,
+	}, nil
+}
+
 // RegisterRoutes sets up all application routes. It registers public routes
 // directly and delegates to each plugin's route registration function.
 //
@@ -768,6 +839,12 @@ func (a *App) RegisterRoutes() {
 	campaignHandler.SetGroupService(groupService)
 	campaigns.RegisterRoutes(e, campaignHandler, campaignService, authService)
 
+	// Campaign invites.
+	inviteRepo := campaigns.NewInviteRepository(a.DB)
+	inviteService := campaigns.NewInviteService(inviteRepo, campaignRepo, smtpService, a.Config.BaseURL)
+	inviteHandler := campaigns.NewInviteHandler(inviteService, campaignService, a.Config.BaseURL)
+	campaigns.RegisterInviteRoutes(e, inviteHandler, campaignService, authService)
+
 	// Discover page (/) -- browse public campaigns. Uses OptionalAuth so
 	// authenticated users get the App layout with sidebar, while guests
 	// see a standalone page with signup CTA.
@@ -799,6 +876,13 @@ func (a *App) RegisterRoutes() {
 	entities.RegisterContentTemplateRoutes(e, contentTemplateHandler, campaignService, authService)
 	campaignService.SetContentTemplateSeeder(contentTemplateService)
 	entityHandler.SetContentTemplateService(contentTemplateService)
+
+	// Worldbuilding prompt routes (guided writing prompts for content creators).
+	wbPromptRepo := entities.NewWorldbuildingPromptRepository(a.DB)
+	wbPromptService := entities.NewWorldbuildingPromptService(wbPromptRepo, entityTypeRepo)
+	wbPromptHandler := entities.NewWorldbuildingPromptHandler(wbPromptService)
+	entities.RegisterWorldbuildingPromptRoutes(e, wbPromptHandler, campaignService, authService)
+	campaignService.SetWorldbuildingPromptSeeder(wbPromptService)
 
 	// Media plugin: file upload, storage, thumbnailing, serving.
 	// Graceful degradation: if the media directory can't be created, log a warning
@@ -859,6 +943,11 @@ func (a *App) RegisterRoutes() {
 	// Addons plugin: extension framework with per-campaign enable/disable toggles.
 	addonRepo := addons.NewAddonRepository(a.DB)
 	addonService := addons.NewAddonService(addonRepo)
+	// Register all built-in addons on startup so new addons appear
+	// automatically without requiring SQL migrations.
+	if err := addonService.SeedInstalledAddons(context.Background()); err != nil {
+		slog.Error("failed to seed built-in addons", slog.String("error", err.Error()))
+	}
 	addonHandler := addons.NewHandler(addonService)
 	addons.RegisterAdminRoutes(adminGroup, addonHandler)
 	addons.RegisterCampaignRoutes(e, addonHandler, campaignService, authService)
@@ -908,6 +997,10 @@ func (a *App) RegisterRoutes() {
 	syncRepo := syncapi.NewSyncAPIRepository(a.DB)
 	syncService := syncapi.NewSyncAPIService(syncRepo)
 	syncHandler := syncapi.NewHandler(syncService)
+	// Inject sync mapping service early so the owner dashboard can show sync status.
+	syncMappingRepoEarly := syncapi.NewSyncMappingRepository(a.DB)
+	syncMappingSvcEarly := syncapi.NewSyncMappingService(syncMappingRepoEarly)
+	syncHandler.SetSyncMappingService(syncMappingSvcEarly)
 	if a.PluginHealth.IsHealthy("syncapi") {
 		syncapi.RegisterAdminRoutes(adminGroup, syncHandler)
 		syncapi.RegisterCampaignRoutes(e, syncHandler, campaignService, authService)
@@ -994,11 +1087,9 @@ func (a *App) RegisterRoutes() {
 		mediaAPIHandler.SetURLSigner(urlSigner)
 	}
 
-	// Sync mapping service and handler for Foundry VTT bidirectional sync.
-	syncMappingRepo := syncapi.NewSyncMappingRepository(a.DB)
-	syncMappingSvc := syncapi.NewSyncMappingService(syncMappingRepo)
-	syncMappingHandler := syncapi.NewSyncHandler(syncMappingSvc)
-	_ = syncMappingSvc // Service will also be used by map/entity handlers.
+	// Sync mapping handler for Foundry VTT bidirectional sync.
+	// Reuses the sync mapping service created earlier for the owner dashboard.
+	syncMappingHandler := syncapi.NewSyncHandler(syncMappingSvcEarly)
 	mapAPIHandler := syncapi.NewMapAPIHandler(syncService, mapsService, drawingService, campaignService)
 
 	if a.PluginHealth.IsHealthy("syncapi") {
@@ -1017,6 +1108,19 @@ func (a *App) RegisterRoutes() {
 	npcHandler := npcs.NewHandler(npcSvc)
 	npcHandler.SetVisibilityToggler(&npcVisibilityTogglerAdapter{svc: entityService})
 	npcs.RegisterRoutes(e, npcHandler, campaignService, authService, addonService)
+
+	// Armory plugin: gallery/hub view for item-category entities.
+	armoryRepo := armory.NewArmoryRepository(a.DB)
+	armorySvc := armory.NewArmoryService(armoryRepo, &armoryItemTypeFinderAdapter{svc: entityService})
+	armoryHandler := armory.NewHandler(armorySvc)
+
+	// Transaction service: purchase flow, stock management, transaction logging.
+	txRepo := armory.NewTransactionRepository(a.DB)
+	txSvc := armory.NewTransactionService(txRepo)
+	txSvc.SetRelationMetadataUpdater(&armoryRelationMetadataAdapter{svc: relService})
+	txSvc.SetRelationFinder(&armoryRelationFinderAdapter{svc: relService})
+	txHandler := armory.NewTransactionHandler(txSvc)
+	armory.RegisterRoutes(e, armoryHandler, txHandler, campaignService, authService, addonService)
 
 	// Notes widget: personal floating note-taking panel (Google Keep-style).
 	noteRepo := notes.NewNoteRepository(a.DB)
@@ -1097,6 +1201,19 @@ func (a *App) RegisterRoutes() {
 		return npcs.BlockNPCGallery(bctx.CC, cards, limit)
 	})
 
+	// Armory preview block — embeds a compact item grid on entity pages/dashboards.
+	blockRegistry.Register(entities.BlockMeta{
+		Type: "armory_preview", Label: "Armory Preview", Icon: "fa-shield-halved",
+		Description: "Grid of campaign items", Addon: "armory",
+	}, func(bctx entities.BlockRenderContext) templ.Component {
+		limit := entities.BlockConfigLimit(bctx.Block.Config, "limit", 8)
+		cards, err := armoryHandler.GalleryBlock(context.Background(), bctx.CC.Campaign.ID, int(bctx.CC.MemberRole), "", limit)
+		if err != nil {
+			return templ.NopComponent
+		}
+		return armory.BlockArmoryPreview(bctx.CC, cards, limit)
+	})
+
 	// Set the registry on the entity service (validation) and as the global (rendering).
 	// The addon checker lets Render() skip blocks whose addon is disabled.
 	blockRegistry.SetAddonChecker(addonService)
@@ -1139,12 +1256,13 @@ func (a *App) RegisterRoutes() {
 	extApplier := extensions.NewContentApplier(
 		a.Config.ExtensionsPath,
 		extRepo,
-		extensions.NewEntityTypeAdapter(func(ctx context.Context, campaignID string, name, namePlural, icon, color string) (int, string, error) {
+		extensions.NewEntityTypeAdapter(func(ctx context.Context, campaignID string, name, namePlural, icon, color, presetCategory string) (int, string, error) {
 			et, err := entityService.CreateEntityType(ctx, campaignID, entities.CreateEntityTypeInput{
-				Name:       name,
-				NamePlural: namePlural,
-				Icon:       icon,
-				Color:      color,
+				Name:           name,
+				NamePlural:     namePlural,
+				Icon:           icon,
+				Color:          color,
+				PresetCategory: presetCategory,
 			})
 			if err != nil {
 				return 0, "", err

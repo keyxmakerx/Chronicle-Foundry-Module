@@ -21,6 +21,7 @@ type EntityTypeRepository interface {
 	FindByID(ctx context.Context, id int) (*EntityType, error)
 	FindBySlug(ctx context.Context, campaignID, slug string) (*EntityType, error)
 	ListByCampaign(ctx context.Context, campaignID string) ([]EntityType, error)
+	ListByPresetCategory(ctx context.Context, campaignID, category string) ([]EntityType, error)
 	Update(ctx context.Context, et *EntityType) error
 	Delete(ctx context.Context, id int) error
 	UpdateLayout(ctx context.Context, id int, layoutJSON string) error
@@ -53,12 +54,12 @@ func (r *entityTypeRepository) Create(ctx context.Context, et *EntityType) error
 		return fmt.Errorf("marshaling layout: %w", err)
 	}
 
-	query := `INSERT INTO entity_types (campaign_id, slug, name, name_plural, icon, color, fields, layout_json, sort_order, is_default, enabled)
-	          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	query := `INSERT INTO entity_types (campaign_id, slug, name, name_plural, icon, color, preset_category, fields, layout_json, sort_order, is_default, enabled)
+	          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	result, err := r.db.ExecContext(ctx, query,
 		et.CampaignID, et.Slug, et.Name, et.NamePlural,
-		et.Icon, et.Color, fieldsJSON, layoutJSON, et.SortOrder,
+		et.Icon, et.Color, et.PresetCategory, fieldsJSON, layoutJSON, et.SortOrder,
 		et.IsDefault, et.Enabled,
 	)
 	if err != nil {
@@ -76,7 +77,7 @@ func (r *entityTypeRepository) Create(ctx context.Context, et *EntityType) error
 // FindByID retrieves an entity type by its auto-increment ID.
 func (r *entityTypeRepository) FindByID(ctx context.Context, id int) (*EntityType, error) {
 	query := `SELECT id, campaign_id, slug, name, name_plural, icon, color,
-	                 description, pinned_entity_ids, dashboard_layout,
+	                 preset_category, description, pinned_entity_ids, dashboard_layout,
 	                 fields, layout_json, sort_order, is_default, enabled
 	          FROM entity_types WHERE id = ?`
 
@@ -84,7 +85,7 @@ func (r *entityTypeRepository) FindByID(ctx context.Context, id int) (*EntityTyp
 	var fieldsRaw, layoutRaw, pinnedRaw []byte
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&et.ID, &et.CampaignID, &et.Slug, &et.Name, &et.NamePlural,
-		&et.Icon, &et.Color, &et.Description, &pinnedRaw, &et.DashboardLayout,
+		&et.Icon, &et.Color, &et.PresetCategory, &et.Description, &pinnedRaw, &et.DashboardLayout,
 		&fieldsRaw, &layoutRaw, &et.SortOrder,
 		&et.IsDefault, &et.Enabled,
 	)
@@ -110,7 +111,7 @@ func (r *entityTypeRepository) FindByID(ctx context.Context, id int) (*EntityTyp
 // FindBySlug retrieves an entity type by campaign ID and slug.
 func (r *entityTypeRepository) FindBySlug(ctx context.Context, campaignID, slug string) (*EntityType, error) {
 	query := `SELECT id, campaign_id, slug, name, name_plural, icon, color,
-	                 description, pinned_entity_ids, dashboard_layout,
+	                 preset_category, description, pinned_entity_ids, dashboard_layout,
 	                 fields, layout_json, sort_order, is_default, enabled
 	          FROM entity_types WHERE campaign_id = ? AND slug = ?`
 
@@ -118,7 +119,7 @@ func (r *entityTypeRepository) FindBySlug(ctx context.Context, campaignID, slug 
 	var fieldsRaw, layoutRaw, pinnedRaw []byte
 	err := r.db.QueryRowContext(ctx, query, campaignID, slug).Scan(
 		&et.ID, &et.CampaignID, &et.Slug, &et.Name, &et.NamePlural,
-		&et.Icon, &et.Color, &et.Description, &pinnedRaw, &et.DashboardLayout,
+		&et.Icon, &et.Color, &et.PresetCategory, &et.Description, &pinnedRaw, &et.DashboardLayout,
 		&fieldsRaw, &layoutRaw, &et.SortOrder,
 		&et.IsDefault, &et.Enabled,
 	)
@@ -144,7 +145,7 @@ func (r *entityTypeRepository) FindBySlug(ctx context.Context, campaignID, slug 
 // ListByCampaign returns all entity types for a campaign, ordered by sort_order.
 func (r *entityTypeRepository) ListByCampaign(ctx context.Context, campaignID string) ([]EntityType, error) {
 	query := `SELECT id, campaign_id, slug, name, name_plural, icon, color,
-	                 description, pinned_entity_ids, dashboard_layout,
+	                 preset_category, description, pinned_entity_ids, dashboard_layout,
 	                 fields, layout_json, sort_order, is_default, enabled
 	          FROM entity_types WHERE campaign_id = ? ORDER BY sort_order, name`
 
@@ -160,7 +161,47 @@ func (r *entityTypeRepository) ListByCampaign(ctx context.Context, campaignID st
 		var fieldsRaw, layoutRaw, pinnedRaw []byte
 		if err := rows.Scan(
 			&et.ID, &et.CampaignID, &et.Slug, &et.Name, &et.NamePlural,
-			&et.Icon, &et.Color, &et.Description, &pinnedRaw, &et.DashboardLayout,
+			&et.Icon, &et.Color, &et.PresetCategory, &et.Description, &pinnedRaw, &et.DashboardLayout,
+			&fieldsRaw, &layoutRaw, &et.SortOrder,
+			&et.IsDefault, &et.Enabled,
+		); err != nil {
+			return nil, fmt.Errorf("scanning entity type row: %w", err)
+		}
+		if err := json.Unmarshal(fieldsRaw, &et.Fields); err != nil {
+			return nil, fmt.Errorf("unmarshaling entity type fields: %w", err)
+		}
+		et.Layout = ParseLayoutJSON(layoutRaw)
+		if len(pinnedRaw) > 0 {
+			if err := json.Unmarshal(pinnedRaw, &et.PinnedEntityIDs); err != nil {
+				return nil, fmt.Errorf("unmarshaling pinned entity IDs: %w", err)
+			}
+		}
+		types = append(types, et)
+	}
+	return types, rows.Err()
+}
+
+// ListByPresetCategory returns entity types in a campaign that were created
+// from a system preset with the given category (e.g., "item", "character").
+func (r *entityTypeRepository) ListByPresetCategory(ctx context.Context, campaignID, category string) ([]EntityType, error) {
+	query := `SELECT id, campaign_id, slug, name, name_plural, icon, color,
+	                 preset_category, description, pinned_entity_ids, dashboard_layout,
+	                 fields, layout_json, sort_order, is_default, enabled
+	          FROM entity_types WHERE campaign_id = ? AND preset_category = ? ORDER BY sort_order, name`
+
+	rows, err := r.db.QueryContext(ctx, query, campaignID, category)
+	if err != nil {
+		return nil, fmt.Errorf("listing entity types by preset category: %w", err)
+	}
+	defer rows.Close()
+
+	var types []EntityType
+	for rows.Next() {
+		var et EntityType
+		var fieldsRaw, layoutRaw, pinnedRaw []byte
+		if err := rows.Scan(
+			&et.ID, &et.CampaignID, &et.Slug, &et.Name, &et.NamePlural,
+			&et.Icon, &et.Color, &et.PresetCategory, &et.Description, &pinnedRaw, &et.DashboardLayout,
 			&fieldsRaw, &layoutRaw, &et.SortOrder,
 			&et.IsDefault, &et.Enabled,
 		); err != nil {

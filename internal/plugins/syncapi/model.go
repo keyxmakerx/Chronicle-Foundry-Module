@@ -229,3 +229,44 @@ type SyncPullResponse struct {
 	Mappings   []SyncMapping `json:"mappings"`
 	HasMore    bool          `json:"has_more"`
 }
+
+// SyncSummary provides an overview of sync state for a campaign.
+// Used by the owner's API Keys page to show what's syncing.
+type SyncSummary struct {
+	TotalMappings    int            `json:"total_mappings"`
+	ByType           map[string]int `json:"by_type"`
+	LastSyncActivity *time.Time     `json:"last_sync_activity,omitempty"`
+	RecentErrors     int            `json:"recent_errors"`
+}
+
+// SyncMappingRow is a display-friendly sync mapping with the linked
+// Chronicle entity name for the owner's mappings table.
+type SyncMappingRow struct {
+	ID            string    `json:"id"`
+	ChronicleType string   `json:"chronicle_type"`
+	ChronicleID   string   `json:"chronicle_id"`
+	ChronicleName string   `json:"chronicle_name"`
+	ExternalID    string   `json:"external_id"`
+	SyncDirection string   `json:"sync_direction"`
+	SyncVersion   int      `json:"sync_version"`
+	LastSyncedAt  time.Time `json:"last_synced_at"`
+}
+
+// SyncMappingListOptions configures the sync mappings list query.
+type SyncMappingListOptions struct {
+	Search string
+	Type   string
+	Sort   string
+	Limit  int
+	Offset int
+}
+
+// CampaignSyncStats provides per-campaign sync statistics for the admin dashboard.
+type CampaignSyncStats struct {
+	CampaignID    string     `json:"campaign_id"`
+	CampaignName  string     `json:"campaign_name"`
+	ActiveKeys    int        `json:"active_keys"`
+	TotalMappings int        `json:"total_mappings"`
+	LastActivity  *time.Time `json:"last_activity,omitempty"`
+	RecentErrors  int        `json:"recent_errors"`
+}

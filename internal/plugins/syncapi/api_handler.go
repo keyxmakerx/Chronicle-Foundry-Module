@@ -714,6 +714,7 @@ type systemInfoResponse struct {
 	Name               string `json:"name"`
 	Status             string `json:"status"`
 	HasCharacterFields bool   `json:"has_character_fields"`
+	HasItemFields      bool   `json:"has_item_fields"`
 	FoundrySystemID    string `json:"foundry_system_id,omitempty"`
 	Enabled            bool   `json:"enabled"`
 }
@@ -749,6 +750,7 @@ func (h *APIHandler) ListSystems(c echo.Context) error {
 			Name:               manifest.Name,
 			Status:             string(manifest.Status),
 			HasCharacterFields: manifest.CharacterPreset() != nil,
+			HasItemFields:      manifest.ItemPreset() != nil,
 			FoundrySystemID:    manifest.FoundrySystemID,
 			Enabled:            enabled,
 		})
@@ -804,6 +806,34 @@ func (h *APIHandler) GetCharacterFields(c echo.Context) error {
 	resp := manifest.CharacterFieldsForAPI()
 	if resp == nil {
 		return apperror.NewNotFound("character fields not found for system: " + systemID)
+	}
+
+	return c.JSON(http.StatusOK, resp)
+}
+
+// GetItemFields returns the item preset field definitions for a specific
+// system, including Foundry path annotations. Used by the Foundry module
+// for item sync field mappings.
+// GET /api/v1/campaigns/:id/systems/:systemId/item-fields
+func (h *APIHandler) GetItemFields(c echo.Context) error {
+	campaignID := c.Param("id")
+	systemID := c.Param("systemId")
+
+	// Look up the system manifest: first in global registry, then custom.
+	manifest := systems.Find(systemID)
+	if manifest == nil && h.campaignSystemLister != nil {
+		if custom := h.campaignSystemLister.GetManifest(campaignID); custom != nil && custom.ID == systemID {
+			manifest = custom
+		}
+	}
+
+	if manifest == nil {
+		return apperror.NewNotFound("system not found: " + systemID)
+	}
+
+	resp := manifest.ItemFieldsForAPI()
+	if resp == nil {
+		return apperror.NewNotFound("item fields not found for system: " + systemID)
 	}
 
 	return c.JSON(http.StatusOK, resp)

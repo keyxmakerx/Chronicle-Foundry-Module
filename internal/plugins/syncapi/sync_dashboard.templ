@@ -1,0 +1,340 @@
+// sync_dashboard.templ renders sync status fragments for the owner's API keys page
+// and the admin API monitoring dashboard.
+
+package syncapi
+
+import (
+	"fmt"
+	"strings"
+)
+
+// SyncOverviewCardTempl renders the sync summary card with type breakdown.
+templ SyncOverviewCardTempl(summary *SyncSummary) {
+	<div class="card p-6">
+		<div class="flex items-center justify-between mb-4">
+			<h2 class="text-lg font-semibold text-fg">
+				<i class="fa-solid fa-arrows-rotate text-accent mr-2"></i>
+				Sync Status
+			</h2>
+			if summary.LastSyncActivity != nil {
+				<span class="text-xs text-fg-muted">
+					Last activity: { syncRelativeTime(*summary.LastSyncActivity) }
+				</span>
+			}
+		</div>
+		if summary.TotalMappings == 0 {
+			<p class="text-sm text-fg-muted italic">No sync mappings yet. Connect Foundry VTT to start syncing.</p>
+		} else {
+			<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+				<div class="text-center p-3 rounded-lg bg-surface-alt">
+					<p class="text-2xl font-bold text-fg">{ fmt.Sprintf("%d", summary.TotalMappings) }</p>
+					<p class="text-xs text-fg-muted">Total Mappings</p>
+				</div>
+				for _, typeName := range syncTypeOrder() {
+					if count, ok := summary.ByType[typeName]; ok && count > 0 {
+						<div class="text-center p-3 rounded-lg bg-surface-alt">
+							<p class="text-2xl font-bold text-fg">{ fmt.Sprintf("%d", count) }</p>
+							<p class="text-xs text-fg-muted capitalize">{ syncTypePlural(typeName) }</p>
+						</div>
+					}
+				}
+			</div>
+		}
+	</div>
+}
+
+// SyncOverviewEmptyTempl renders when sync mapping service is not available.
+templ SyncOverviewEmptyTempl() {
+	<div class="card p-6">
+		<p class="text-sm text-fg-muted italic">Sync status unavailable.</p>
+	</div>
+}
+
+// SyncMappingsTableTempl renders the paginated, searchable sync mappings table.
+templ SyncMappingsTableTempl(campaignID string, rows []SyncMappingRow, total int, opts SyncMappingListOptions) {
+	<div class="card p-6">
+		<div class="flex items-center justify-between mb-4">
+			<h2 class="text-lg font-semibold text-fg">
+				<i class="fa-solid fa-link text-fg-muted mr-2"></i>
+				Sync Mappings
+				<span class="text-sm font-normal text-fg-muted ml-1">({ fmt.Sprintf("%d", total) })</span>
+			</h2>
+		</div>
+
+		// Search and filter controls.
+		<div class="flex flex-wrap items-center gap-3 mb-4">
+			<input
+				type="search"
+				name="search"
+				value={ opts.Search }
+				placeholder="Search by name..."
+				class="input text-sm flex-1 min-w-[200px]"
+				hx-get={ fmt.Sprintf("/campaigns/%s/api-keys/sync-mappings", campaignID) }
+				hx-trigger="input changed delay:300ms, search"
+				hx-target="#sync-mappings-container"
+				hx-swap="innerHTML"
+				hx-include="[name='type'],[name='sort']"
+			/>
+			<select
+				name="type"
+				class="input text-sm"
+				hx-get={ fmt.Sprintf("/campaigns/%s/api-keys/sync-mappings", campaignID) }
+				hx-trigger="change"
+				hx-target="#sync-mappings-container"
+				hx-swap="innerHTML"
+				hx-include="[name='search'],[name='sort']"
+			>
+				<option value="">All Types</option>
+				<option value="entity" selected?={ opts.Type == "entity" }>Entities</option>
+				<option value="map" selected?={ opts.Type == "map" }>Maps</option>
+				<option value="calendar_event" selected?={ opts.Type == "calendar_event" }>Calendar Events</option>
+				<option value="marker" selected?={ opts.Type == "marker" }>Markers</option>
+				<option value="drawing" selected?={ opts.Type == "drawing" }>Drawings</option>
+				<option value="token" selected?={ opts.Type == "token" }>Tokens</option>
+				<option value="fog" selected?={ opts.Type == "fog" }>Fog</option>
+				<option value="layer" selected?={ opts.Type == "layer" }>Layers</option>
+			</select>
+			<select
+				name="sort"
+				class="input text-sm"
+				hx-get={ fmt.Sprintf("/campaigns/%s/api-keys/sync-mappings", campaignID) }
+				hx-trigger="change"
+				hx-target="#sync-mappings-container"
+				hx-swap="innerHTML"
+				hx-include="[name='search'],[name='type']"
+			>
+				<option value="" selected?={ opts.Sort == "" }>Sort: Last Synced</option>
+				<option value="name" selected?={ opts.Sort == "name" }>Sort: Name</option>
+				<option value="type" selected?={ opts.Sort == "type" }>Sort: Type</option>
+			</select>
+		</div>
+
+		if len(rows) == 0 {
+			<p class="text-sm text-fg-muted italic py-4 text-center">
+				if opts.Search != "" || opts.Type != "" {
+					No mappings match your filters.
+				} else {
+					No sync mappings found.
+				}
+			</p>
+		} else {
+			<div class="overflow-x-auto">
+				<table class="w-full text-sm">
+					<thead>
+						<tr class="text-left text-xs text-fg-muted uppercase tracking-wider border-b border-edge">
+							<th class="pb-2 pr-4">Name</th>
+							<th class="pb-2 pr-4">Type</th>
+							<th class="pb-2 pr-4">External ID</th>
+							<th class="pb-2 pr-4">Direction</th>
+							<th class="pb-2 pr-4">Version</th>
+							<th class="pb-2">Last Synced</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-edge">
+						for _, row := range rows {
+							<tr>
+								<td class="py-2.5 pr-4">
+									if row.ChronicleName != "" {
+										<span class="text-fg font-medium">{ row.ChronicleName }</span>
+									} else {
+										<span class="text-fg-muted font-mono text-xs">{ truncateID(row.ChronicleID) }</span>
+									}
+								</td>
+								<td class="py-2.5 pr-4">
+									@syncTypeBadge(row.ChronicleType)
+								</td>
+								<td class="py-2.5 pr-4">
+									<span class="font-mono text-xs text-fg-muted">{ truncateID(row.ExternalID) }</span>
+								</td>
+								<td class="py-2.5 pr-4">
+									@syncDirectionBadge(row.SyncDirection)
+								</td>
+								<td class="py-2.5 pr-4 text-fg-muted">
+									v{ fmt.Sprintf("%d", row.SyncVersion) }
+								</td>
+								<td class="py-2.5 text-fg-muted text-xs">
+									{ syncRelativeTime(row.LastSyncedAt) }
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+
+			// Pagination.
+			if total > opts.Limit {
+				<div class="flex items-center justify-between mt-4 pt-4 border-t border-edge">
+					<span class="text-xs text-fg-muted">
+						Showing { fmt.Sprintf("%d", opts.Offset+1) }-{ fmt.Sprintf("%d", min(opts.Offset+opts.Limit, total)) } of { fmt.Sprintf("%d", total) }
+					</span>
+					<div class="flex gap-2">
+						if opts.Offset > 0 {
+							<button
+								class="btn-secondary text-xs"
+								hx-get={ fmt.Sprintf("/campaigns/%s/api-keys/sync-mappings?offset=%d&search=%s&type=%s&sort=%s", campaignID, max(0, opts.Offset-opts.Limit), opts.Search, opts.Type, opts.Sort) }
+								hx-target="#sync-mappings-container"
+								hx-swap="innerHTML"
+							>
+								Previous
+							</button>
+						}
+						if opts.Offset+opts.Limit < total {
+							<button
+								class="btn-secondary text-xs"
+								hx-get={ fmt.Sprintf("/campaigns/%s/api-keys/sync-mappings?offset=%d&search=%s&type=%s&sort=%s", campaignID, opts.Offset+opts.Limit, opts.Search, opts.Type, opts.Sort) }
+								hx-target="#sync-mappings-container"
+								hx-swap="innerHTML"
+							>
+								Next
+							</button>
+						}
+					</div>
+				</div>
+			}
+		}
+	</div>
+}
+
+// SyncMappingsEmptyTempl renders when sync mapping service is not available.
+templ SyncMappingsEmptyTempl() {
+	<div class="card p-6">
+		<p class="text-sm text-fg-muted italic">Sync mappings unavailable.</p>
+	</div>
+}
+
+// AdminCampaignSyncTableTempl renders the per-campaign sync overview for admins.
+templ AdminCampaignSyncTableTempl(stats []CampaignSyncStats) {
+	<div class="card p-6">
+		<div class="flex items-center justify-between mb-4">
+			<h2 class="text-lg font-semibold text-fg">
+				<i class="fa-solid fa-arrows-rotate text-accent mr-2"></i>
+				Campaign Sync Overview
+			</h2>
+		</div>
+		if len(stats) > 0 {
+			<div class="overflow-x-auto">
+				<table class="w-full text-sm">
+					<thead>
+						<tr class="text-left text-xs text-fg-muted uppercase tracking-wider border-b border-edge">
+							<th class="pb-2 pr-4">Campaign</th>
+							<th class="pb-2 pr-4">Active Keys</th>
+							<th class="pb-2 pr-4">Mappings</th>
+							<th class="pb-2 pr-4">Last Activity</th>
+							<th class="pb-2">Errors (24h)</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-edge">
+						for _, s := range stats {
+							<tr>
+								<td class="py-2.5 pr-4">
+									<span class="text-fg font-medium">{ s.CampaignName }</span>
+									<span class="text-xs text-fg-muted font-mono ml-1">{ truncateID(s.CampaignID) }</span>
+								</td>
+								<td class="py-2.5 pr-4">
+									<span class="text-fg">{ fmt.Sprintf("%d", s.ActiveKeys) }</span>
+								</td>
+								<td class="py-2.5 pr-4">
+									<span class="text-fg">{ fmt.Sprintf("%d", s.TotalMappings) }</span>
+								</td>
+								<td class="py-2.5 pr-4 text-xs text-fg-muted">
+									if s.LastActivity != nil {
+										{ syncRelativeTime(*s.LastActivity) }
+									} else {
+										<span class="italic">Never</span>
+									}
+								</td>
+								<td class="py-2.5">
+									if s.RecentErrors > 0 {
+										<span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+											{ fmt.Sprintf("%d", s.RecentErrors) }
+										</span>
+									} else {
+										<span class="text-fg-muted">0</span>
+									}
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		} else {
+			<p class="text-sm text-fg-muted italic">No campaigns with sync activity.</p>
+		}
+	</div>
+}
+
+// syncTypeBadge renders a colored badge for the sync mapping type.
+templ syncTypeBadge(typeName string) {
+	if typeName == "entity" {
+		<span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+			<i class="fa-solid fa-file-lines mr-1 text-[10px]"></i>Entity
+		</span>
+	} else if typeName == "map" {
+		<span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+			<i class="fa-solid fa-map mr-1 text-[10px]"></i>Map
+		</span>
+	} else if typeName == "calendar_event" {
+		<span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+			<i class="fa-solid fa-calendar mr-1 text-[10px]"></i>Event
+		</span>
+	} else if typeName == "marker" {
+		<span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+			<i class="fa-solid fa-location-dot mr-1 text-[10px]"></i>Marker
+		</span>
+	} else {
+		<span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400">
+			{ strings.ReplaceAll(typeName, "_", " ") }
+		</span>
+	}
+}
+
+// syncDirectionBadge renders a direction indicator.
+templ syncDirectionBadge(direction string) {
+	if direction == "both" {
+		<span class="text-xs text-fg-muted"><i class="fa-solid fa-arrows-left-right mr-1"></i>Both</span>
+	} else if direction == "push" {
+		<span class="text-xs text-fg-muted"><i class="fa-solid fa-arrow-right mr-1"></i>Push</span>
+	} else if direction == "pull" {
+		<span class="text-xs text-fg-muted"><i class="fa-solid fa-arrow-left mr-1"></i>Pull</span>
+	} else {
+		<span class="text-xs text-fg-muted">{ direction }</span>
+	}
+}
+
+// syncTypeOrder returns the display order for sync types.
+func syncTypeOrder() []string {
+	return []string{"entity", "map", "calendar_event", "marker", "drawing", "token", "fog", "layer"}
+}
+
+// syncTypePlural returns a plural display name for a sync type.
+func syncTypePlural(t string) string {
+	switch t {
+	case "entity":
+		return "Entities"
+	case "map":
+		return "Maps"
+	case "calendar_event":
+		return "Events"
+	case "marker":
+		return "Markers"
+	case "drawing":
+		return "Drawings"
+	case "token":
+		return "Tokens"
+	case "fog":
+		return "Fog"
+	case "layer":
+		return "Layers"
+	default:
+		return t
+	}
+}
+
+// truncateID shortens long IDs for display.
+func truncateID(id string) string {
+	if len(id) > 12 {
+		return id[:12] + "..."
+	}
+	return id
+}
+

@@ -47,6 +47,10 @@ type SystemManifest struct {
 	// enabling this module (e.g., "D&D Character" with predefined fields).
 	EntityPresets []EntityPresetDef `json:"entity_presets,omitempty"`
 
+	// RelationPresets are relation type templates that campaigns can adopt when
+	// enabling this module (e.g., "has-item" for inventory tracking).
+	RelationPresets []RelationPresetDef `json:"relation_presets,omitempty"`
+
 	// FoundrySystemID is the Foundry VTT game.system.id that this system
 	// corresponds to (e.g., "dnd5e", "pf2e"). When set, the Foundry module
 	// can automatically match this Chronicle system to the running Foundry
@@ -129,8 +133,36 @@ type EntityPresetDef struct {
 	// Color is the hex color for the entity type badge.
 	Color string `json:"color"`
 
+	// Category classifies the preset for feature gating (e.g., "character",
+	// "item", "creature"). Used to identify which entity types belong to
+	// specific features like the Armory (items) or NPC gallery (characters).
+	Category string `json:"category,omitempty"`
+
 	// Fields are the default field definitions for entities of this type.
 	Fields []FieldDef `json:"fields,omitempty"`
+}
+
+// RelationPresetDef describes a relation type template that a module provides.
+// Used to create system-specific relation types (e.g., "has-item" for inventory).
+type RelationPresetDef struct {
+	// Slug is the URL-safe identifier (e.g., "has-item").
+	Slug string `json:"slug"`
+
+	// Name is the display name (e.g., "Has Item").
+	Name string `json:"name"`
+
+	// ReverseName is the reverse direction label (e.g., "In Inventory Of").
+	ReverseName string `json:"reverse_name"`
+
+	// MetadataSchema defines the JSON metadata fields for this relation.
+	// Keys are field names, values describe type and default value.
+	MetadataSchema map[string]RelationFieldSchema `json:"metadata_schema,omitempty"`
+}
+
+// RelationFieldSchema defines a single metadata field on a relation preset.
+type RelationFieldSchema struct {
+	Type    string `json:"type"`    // "number", "boolean", "string"
+	Default any    `json:"default"` // Default value for new relations.
 }
 
 // CharacterPreset returns the first entity preset whose slug ends with
@@ -143,6 +175,45 @@ func (m *SystemManifest) CharacterPreset() *EntityPresetDef {
 		}
 	}
 	return nil
+}
+
+// ItemPreset returns the first entity preset with category "item", or nil
+// if no item preset is defined. Used by the Armory plugin and item sync.
+func (m *SystemManifest) ItemPreset() *EntityPresetDef {
+	for i := range m.EntityPresets {
+		if m.EntityPresets[i].Category == "item" {
+			return &m.EntityPresets[i]
+		}
+	}
+	return nil
+}
+
+// ItemFieldsForAPI builds the API response for item preset fields.
+// Returns nil if no item preset exists. Mirrors CharacterFieldsForAPI.
+func (m *SystemManifest) ItemFieldsForAPI() *CharacterFieldsResponse {
+	preset := m.ItemPreset()
+	if preset == nil {
+		return nil
+	}
+
+	fields := make([]CharacterFieldExport, len(preset.Fields))
+	for i, f := range preset.Fields {
+		fields[i] = CharacterFieldExport{
+			Key:             f.Key,
+			Label:           f.Label,
+			Type:            f.Type,
+			FoundryPath:     f.FoundryPath,
+			FoundryWritable: f.FoundryPath != "" && f.IsFoundryWritable(),
+		}
+	}
+
+	return &CharacterFieldsResponse{
+		SystemID:        m.ID,
+		PresetSlug:      preset.Slug,
+		PresetName:      preset.Name,
+		FoundrySystemID: m.FoundrySystemID,
+		Fields:          fields,
+	}
 }
 
 // CharacterFieldsResponse is the API response shape for the character
@@ -211,6 +282,12 @@ type ValidationReport struct {
 	// CharacterFieldCount is the number of fields on the character preset.
 	CharacterFieldCount int `json:"character_field_count"`
 
+	// HasItemPreset indicates an item-category preset was found.
+	HasItemPreset bool `json:"has_item_preset"`
+
+	// ItemFieldCount is the number of fields on the item preset.
+	ItemFieldCount int `json:"item_field_count"`
+
 	// FoundryCompatible indicates foundry_system_id is set.
 	FoundryCompatible bool `json:"foundry_compatible"`
 
@@ -255,6 +332,12 @@ func (m *SystemManifest) BuildValidationReport() *ValidationReport {
 				}
 			}
 		}
+	}
+
+	// Analyze item preset.
+	if itemPreset := m.ItemPreset(); itemPreset != nil {
+		r.HasItemPreset = true
+		r.ItemFieldCount = len(itemPreset.Fields)
 	}
 
 	// Generate warnings.

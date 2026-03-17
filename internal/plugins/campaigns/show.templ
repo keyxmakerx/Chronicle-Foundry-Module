@@ -36,8 +36,8 @@ templ CampaignShowPage(cc *CampaignContext, transfer *OwnershipTransfer, recentE
 				</div>
 			}
 
-			// Render from custom layout or fall back to hardcoded default.
-			if layout := cc.Campaign.ParseDashboardLayout(); layout != nil {
+			// Render from role-aware custom layout or fall back to hardcoded default.
+			if layout := cc.Campaign.ParseRoleDashboardLayout(cc.MemberRole); layout != nil {
 				@customDashboard(cc, layout, recentEntities)
 			} else {
 				@defaultDashboard(cc, recentEntities, csrfToken)

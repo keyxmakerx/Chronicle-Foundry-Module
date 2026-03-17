@@ -54,6 +54,7 @@ type EntityService interface {
 	GetEntityTypes(ctx context.Context, campaignID string) ([]EntityType, error)
 	GetEntityTypeBySlug(ctx context.Context, campaignID, slug string) (*EntityType, error)
 	GetEntityTypeByID(ctx context.Context, id int) (*EntityType, error)
+	GetEntityTypesByPresetCategory(ctx context.Context, campaignID, category string) ([]EntityType, error)
 	CountByType(ctx context.Context, campaignID string, role int, userID string) (map[int]int, error)
 
 	// Per-entity permissions
@@ -607,6 +608,12 @@ func (s *entityService) GetEntityTypeBySlug(ctx context.Context, campaignID, slu
 	return s.types.FindBySlug(ctx, campaignID, slug)
 }
 
+// GetEntityTypesByPresetCategory returns entity types created from a system
+// preset with the given category (e.g., "item" for armory items).
+func (s *entityService) GetEntityTypesByPresetCategory(ctx context.Context, campaignID, category string) ([]EntityType, error) {
+	return s.types.ListByPresetCategory(ctx, campaignID, category)
+}
+
 // GetEntityTypeByID returns an entity type by its auto-increment ID.
 func (s *entityService) GetEntityTypeByID(ctx context.Context, id int) (*EntityType, error) {
 	return s.types.FindByID(ctx, id)
@@ -666,18 +673,25 @@ func (s *entityService) CreateEntityType(ctx context.Context, campaignID string,
 		return nil, apperror.NewInternal(fmt.Errorf("querying max sort order: %w", err))
 	}
 
+	// Set preset category if provided (from system manifest presets).
+	var presetCategory *string
+	if input.PresetCategory != "" {
+		presetCategory = &input.PresetCategory
+	}
+
 	et := &EntityType{
-		CampaignID: campaignID,
-		Slug:       slug,
-		Name:       name,
-		NamePlural: namePlural,
-		Icon:       icon,
-		Color:      color,
-		Fields:     []FieldDefinition{},
-		Layout:     DefaultLayout(),
-		SortOrder:  maxOrder + 1,
-		IsDefault:  false,
-		Enabled:    true,
+		CampaignID:     campaignID,
+		Slug:           slug,
+		Name:           name,
+		NamePlural:     namePlural,
+		Icon:           icon,
+		Color:          color,
+		PresetCategory: presetCategory,
+		Fields:         []FieldDefinition{},
+		Layout:         DefaultLayout(),
+		SortOrder:      maxOrder + 1,
+		IsDefault:      false,
+		Enabled:        true,
 	}
 
 	if err := s.types.Create(ctx, et); err != nil {
@@ -841,7 +855,7 @@ var defaultBlockTypes = map[string]bool{
 	"title": true, "image": true, "entry": true,
 	"attributes": true, "details": true, "divider": true,
 	"posts": true, "tags": true, "relations": true,
-	"shop_inventory": true, "text_block": true,
+	"shop_inventory": true, "inventory": true, "text_block": true,
 }
 
 // UpdateEntityTypeLayout validates and persists a new layout for an entity type.
