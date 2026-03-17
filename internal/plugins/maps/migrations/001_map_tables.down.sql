@@ -1,6 +1,0 @@
-DROP TABLE IF EXISTS map_fog;
-DROP TABLE IF EXISTS map_tokens;
-DROP TABLE IF EXISTS map_drawings;
-DROP TABLE IF EXISTS map_layers;
-DROP TABLE IF EXISTS map_markers;
-DROP TABLE IF EXISTS maps;
