@@ -64,7 +64,8 @@
       "fields": [
         { "key": "class", "label": "Class", "type": "string" },
         { "key": "level", "label": "Level", "type": "number" },
-        { "key": "ancestry", "label": "Ancestry", "type": "string" }
+        { "key": "ancestry", "label": "Ancestry", "type": "string" },
+        { "key": "currency_wealth", "label": "Wealth", "type": "number", "section": "Currency" }
       ]
     },
     {

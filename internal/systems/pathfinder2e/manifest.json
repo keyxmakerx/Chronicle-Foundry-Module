@@ -112,7 +112,11 @@
         { "key": "hp_max", "label": "Max HP", "type": "number", "foundry_path": "system.attributes.hp.max" },
         { "key": "ac", "label": "Armor Class", "type": "number", "foundry_path": "system.attributes.ac.value", "foundry_writable": false },
         { "key": "perception", "label": "Perception", "type": "number", "foundry_path": "system.attributes.perception.value", "foundry_writable": false },
-        { "key": "speed", "label": "Speed", "type": "number", "foundry_path": "system.attributes.speed.value", "foundry_writable": false }
+        { "key": "speed", "label": "Speed", "type": "number", "foundry_path": "system.attributes.speed.value", "foundry_writable": false },
+        { "key": "currency_cp", "label": "Copper (cp)", "type": "number", "section": "Currency", "foundry_path": "system.details.currency.cp" },
+        { "key": "currency_sp", "label": "Silver (sp)", "type": "number", "section": "Currency", "foundry_path": "system.details.currency.sp" },
+        { "key": "currency_gp", "label": "Gold (gp)", "type": "number", "section": "Currency", "foundry_path": "system.details.currency.gp" },
+        { "key": "currency_pp", "label": "Platinum (pp)", "type": "number", "section": "Currency", "foundry_path": "system.details.currency.pp" }
       ]
     },
     {

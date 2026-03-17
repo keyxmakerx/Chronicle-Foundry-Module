@@ -731,6 +731,38 @@ func (a *armoryItemTypeFinderAdapter) FindItemTypes(ctx context.Context, campaig
 	return infos, nil
 }
 
+// armoryRelationMetadataAdapter wraps the relations service to implement
+// armory.RelationMetadataUpdater. Used by the transaction service to decrement
+// shop stock when a purchase is made.
+type armoryRelationMetadataAdapter struct {
+	svc relations.RelationService
+}
+
+// UpdateMetadata updates the metadata JSON for a relation.
+func (a *armoryRelationMetadataAdapter) UpdateMetadata(ctx context.Context, id int, metadata json.RawMessage) error {
+	return a.svc.UpdateMetadata(ctx, id, metadata)
+}
+
+// armoryRelationFinderAdapter wraps the relations service to implement
+// armory.RelationFinder. Used by the transaction service to validate stock
+// before a purchase.
+type armoryRelationFinderAdapter struct {
+	svc relations.RelationService
+}
+
+// GetByID retrieves a relation by ID, mapping to the armory.RelationInfo type.
+func (a *armoryRelationFinderAdapter) GetByID(ctx context.Context, id int) (*armory.RelationInfo, error) {
+	rel, err := a.svc.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &armory.RelationInfo{
+		ID:         rel.ID,
+		Metadata:   rel.Metadata,
+		CampaignID: rel.CampaignID,
+	}, nil
+}
+
 // RegisterRoutes sets up all application routes. It registers public routes
 // directly and delegates to each plugin's route registration function.
 //
@@ -1081,7 +1113,14 @@ func (a *App) RegisterRoutes() {
 	armoryRepo := armory.NewArmoryRepository(a.DB)
 	armorySvc := armory.NewArmoryService(armoryRepo, &armoryItemTypeFinderAdapter{svc: entityService})
 	armoryHandler := armory.NewHandler(armorySvc)
-	armory.RegisterRoutes(e, armoryHandler, campaignService, authService, addonService)
+
+	// Transaction service: purchase flow, stock management, transaction logging.
+	txRepo := armory.NewTransactionRepository(a.DB)
+	txSvc := armory.NewTransactionService(txRepo)
+	txSvc.SetRelationMetadataUpdater(&armoryRelationMetadataAdapter{svc: relService})
+	txSvc.SetRelationFinder(&armoryRelationFinderAdapter{svc: relService})
+	txHandler := armory.NewTransactionHandler(txSvc)
+	armory.RegisterRoutes(e, armoryHandler, txHandler, campaignService, authService, addonService)
 
 	// Notes widget: personal floating note-taking panel (Google Keep-style).
 	noteRepo := notes.NewNoteRepository(a.DB)
