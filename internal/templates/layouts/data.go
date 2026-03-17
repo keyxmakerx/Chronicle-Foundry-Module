@@ -7,6 +7,8 @@ package layouts
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -426,6 +428,54 @@ func SetAccentColor(ctx context.Context, color string) context.Context {
 func GetAccentColor(ctx context.Context) string {
 	color, _ := ctx.Value(keyAccentColor).(string)
 	return color
+}
+
+// AccentColorCSS returns a CSS block that overrides the accent color custom
+// properties. It computes hover (darker) and light (lighter) variants from the
+// base hex color. Returns empty string if no accent is set.
+func AccentColorCSS(ctx context.Context) string {
+	base := GetAccentColor(ctx)
+	if base == "" {
+		return ""
+	}
+	r, g, b, ok := parseHex(base)
+	if !ok {
+		return fmt.Sprintf(":root{--color-accent:%s;}", base)
+	}
+	// Hover: darken by ~12%
+	hr, hg, hb := clampByte(int(float64(r)*0.88)), clampByte(int(float64(g)*0.88)), clampByte(int(float64(b)*0.88))
+	// Light: blend toward white by ~60%
+	lr, lg, lb := clampByte(int(float64(r)+float64(255-r)*0.6)), clampByte(int(float64(g)+float64(255-g)*0.6)), clampByte(int(float64(b)+float64(255-b)*0.6))
+	return fmt.Sprintf(
+		":root{--color-accent:%s;--color-accent-hover:#%02x%02x%02x;--color-accent-light:#%02x%02x%02x;}",
+		base, hr, hg, hb, lr, lg, lb,
+	)
+}
+
+// parseHex parses a #RRGGBB hex color into RGB components.
+func parseHex(hex string) (r, g, b uint8, ok bool) {
+	hex = strings.TrimPrefix(hex, "#")
+	if len(hex) != 6 {
+		return 0, 0, 0, false
+	}
+	rv, err1 := strconv.ParseUint(hex[0:2], 16, 8)
+	gv, err2 := strconv.ParseUint(hex[2:4], 16, 8)
+	bv, err3 := strconv.ParseUint(hex[4:6], 16, 8)
+	if err1 != nil || err2 != nil || err3 != nil {
+		return 0, 0, 0, false
+	}
+	return uint8(rv), uint8(gv), uint8(bv), true
+}
+
+// clampByte clamps an int to the 0-255 range.
+func clampByte(v int) uint8 {
+	if v < 0 {
+		return 0
+	}
+	if v > 255 {
+		return 255
+	}
+	return uint8(v)
 }
 
 // SetBrandName stores the campaign's custom brand name in the context.

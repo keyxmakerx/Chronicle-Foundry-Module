@@ -245,6 +245,25 @@ templ CampaignSettingsPage(cc *CampaignContext, transfer *OwnershipTransfer, ent
 			</div>
 		</div>
 
+		// Invitations — invite users by email.
+			<div class="card p-6 mb-6">
+				<h2 class="text-lg font-semibold text-fg mb-4">
+					<i class="fa-solid fa-envelope mr-2 text-accent"></i>
+					Invitations
+				</h2>
+				<p class="text-sm text-fg-secondary mb-4">
+					Invite players and scribes by email. They'll receive a link to join
+					the campaign. Invitations expire after 7 days.
+				</p>
+				<div
+					hx-get={ fmt.Sprintf("/campaigns/%s/invites/page", cc.Campaign.ID) }
+					hx-trigger="load"
+					hx-swap="innerHTML"
+				>
+					<div class="text-center py-4 text-fg-muted text-sm">Loading invitations...</div>
+				</div>
+			</div>
+
 		// Transfer ownership section.
 			<div class="card p-6 mb-6">
 				<h2 class="text-lg font-semibold text-fg mb-4">Transfer Ownership</h2>

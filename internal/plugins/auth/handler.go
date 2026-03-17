@@ -108,12 +108,18 @@ func (h *Handler) Login(c echo.Context) error {
 	// Set the session cookie.
 	setSessionCookie(c, token, h.sessionTTL)
 
+	// Redirect to the requested page (e.g., invite accept), or dashboard.
+	redirectTo := "/dashboard"
+	if redir := c.QueryParam("redirect"); redir != "" && strings.HasPrefix(redir, "/") {
+		redirectTo = redir
+	}
+
 	// HTMX requests get a redirect header; browser forms get a 303 redirect.
 	if middleware.IsHTMX(c) {
-		c.Response().Header().Set("HX-Redirect", "/dashboard")
+		c.Response().Header().Set("HX-Redirect", redirectTo)
 		return c.NoContent(http.StatusNoContent)
 	}
-	return c.Redirect(http.StatusSeeOther, "/dashboard")
+	return c.Redirect(http.StatusSeeOther, redirectTo)
 }
 
 // RegisterForm renders the registration page (GET /register).
@@ -181,11 +187,17 @@ func (h *Handler) Register(c echo.Context) error {
 
 	setSessionCookie(c, token, h.sessionTTL)
 
+	// Redirect to the requested page (e.g., invite accept), or dashboard.
+	redirectTo := "/dashboard"
+	if redir := c.QueryParam("redirect"); redir != "" && strings.HasPrefix(redir, "/") {
+		redirectTo = redir
+	}
+
 	if middleware.IsHTMX(c) {
-		c.Response().Header().Set("HX-Redirect", "/dashboard")
+		c.Response().Header().Set("HX-Redirect", redirectTo)
 		return c.NoContent(http.StatusNoContent)
 	}
-	return c.Redirect(http.StatusSeeOther, "/dashboard")
+	return c.Redirect(http.StatusSeeOther, redirectTo)
 }
 
 // Logout destroys the session and clears the cookie (POST /logout).

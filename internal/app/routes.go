@@ -768,6 +768,12 @@ func (a *App) RegisterRoutes() {
 	campaignHandler.SetGroupService(groupService)
 	campaigns.RegisterRoutes(e, campaignHandler, campaignService, authService)
 
+	// Campaign invites.
+	inviteRepo := campaigns.NewInviteRepository(a.DB)
+	inviteService := campaigns.NewInviteService(inviteRepo, campaignRepo, smtpService, a.Config.BaseURL)
+	inviteHandler := campaigns.NewInviteHandler(inviteService, campaignService, a.Config.BaseURL)
+	campaigns.RegisterInviteRoutes(e, inviteHandler, campaignService, authService)
+
 	// Discover page (/) -- browse public campaigns. Uses OptionalAuth so
 	// authenticated users get the App layout with sidebar, while guests
 	// see a standalone page with signup CTA.

@@ -100,6 +100,25 @@ func RegisterRoutes(e *echo.Echo, h *Handler, svc CampaignService, authSvc auth.
 	cg.DELETE("/groups/:gid/members/:uid", h.RemoveGroupMemberAPI, RequireRole(RoleOwner))
 }
 
+// RegisterInviteRoutes sets up campaign invite routes.
+// The accept page is publicly accessible (with optional auth).
+// Invite CRUD is owner-only within the campaign scope.
+func RegisterInviteRoutes(e *echo.Echo, ih *InviteHandler, svc CampaignService, authSvc auth.AuthService) {
+	// Accept invite — accessible without campaign membership.
+	// Uses optional auth so logged-in users auto-accept.
+	e.GET("/invites/accept", ih.AcceptInvitePage, auth.OptionalAuth(authSvc))
+
+	// Campaign-scoped invite management (Owner only).
+	cg := e.Group("/campaigns/:id",
+		auth.RequireAuth(authSvc),
+		RequireCampaignAccess(svc),
+	)
+	cg.GET("/invites", ih.ListInvitesAPI, RequireRole(RoleOwner))
+	cg.GET("/invites/page", ih.InvitesPage, RequireRole(RoleOwner))
+	cg.POST("/invites", ih.CreateInviteAPI, RequireRole(RoleOwner))
+	cg.DELETE("/invites/:inviteId", ih.RevokeInviteAPI, RequireRole(RoleOwner))
+}
+
 // RegisterExportRoutes sets up campaign export/import routes.
 // Export is campaign-scoped (owner only). Import is auth-only (creates new campaign).
 func RegisterExportRoutes(e *echo.Echo, eh *ExportHandler, svc CampaignService, authSvc auth.AuthService) {

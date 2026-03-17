@@ -8,7 +8,24 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-12 -- **Post-F-5 QoL: NPC sidebar link + plan reorg.**
+2026-03-17 -- **Post-Phase-1 Sprint: Visual customization fix, graph export, invite system.**
+
+41. **Post-Phase-1 Sprint: W-0.5 + V-4b + U-2.**
+    - **W-0.5 completion** — Accent color CSS variable now propagates to all 258 Tailwind utility usages. Updated `tailwind.config.js` to reference `var(--color-accent)` instead of hardcoded hex. Added `--color-accent-hover` and `--color-accent-light` CSS variables with auto-computed darker/lighter variants from the base hex color. New `AccentColorCSS()` helper in `layouts/data.go` generates the CSS block with all three variants. Topbar styling, brand name, brand logo were already working.
+    - **V-4a (cover images)** — Already fully implemented: migration 000004 (`cover_image_path`), API (`PUT /entities/:eid/cover-image`), `cover_image` layout block type in block registry, upload/change UI with hover overlay. No new work needed.
+    - **V-4b (graph export)** — Added PNG export button to relations graph widget. Uses SVG→Canvas→PNG pipeline with 2x resolution for retina clarity. Download button in the graph controls bar alongside zoom buttons.
+    - **U-2: Campaign Invite System (NEW)** — Full invite flow:
+      - Migration 000007: `campaign_invites` table with token, role, expiry, accept tracking.
+      - Model: `Invite` struct with `IsExpired()`, `IsPending()` helpers.
+      - Repository: `InviteRepository` with Create, GetByToken, ListByCampaign, MarkAccepted, Delete, DeleteExpired, GetByEmailAndCampaign.
+      - Service: `InviteService` with CreateInvite (token generation, duplicate check, email send), AcceptInvite (token validation, membership creation), ListInvites, RevokeInvite, GetInviteByToken.
+      - Handler: `InviteHandler` with ListInvitesAPI, CreateInviteAPI, RevokeInviteAPI, AcceptInvitePage, InvitesPage.
+      - Templates: `InviteAcceptPage` (standalone page for accept flow with login/register redirect), `InviteListFragment` (HTMX fragment for settings page with send form + invite table).
+      - Routes: `RegisterInviteRoutes` — accept page at `/invites/accept?token=xxx`, CRUD at `/campaigns/:id/invites`.
+      - Email: HTML+plaintext invite email with accept link, campaign name, role.
+      - Auth redirect: Login and register handlers now support `?redirect=` parameter for post-auth redirect to invite accept page.
+      - Tests: 9 tests covering create, validation, duplicate, accept, expired, already-accepted, revoke, list, default role.
+    - **Next up:** Phase 2 (X-1: System Upload UX) or V-4 graph tag filtering, or Phase 4 collaboration features.
 
 40. **Post-F-5 QoL: NPC sidebar navigation link.**
     - Added "NPCs" entry to campaign sidebar in `internal/templates/layouts/app.templ` below "All Pages" link.
