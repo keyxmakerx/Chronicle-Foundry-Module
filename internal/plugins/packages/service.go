@@ -558,7 +558,7 @@ func extractZip(zipPath, destDir string) error {
 	if err != nil {
 		return fmt.Errorf("opening zip: %w", err)
 	}
-	defer zr.Close()
+	defer func() { _ = zr.Close() }()
 
 	for _, zf := range zr.File {
 		// Security: reject path traversal.
@@ -593,7 +593,7 @@ func extractSingleFile(zf *zip.File, destPath string) error {
 	if err != nil {
 		return fmt.Errorf("opening %s in zip: %w", zf.Name, err)
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	out, err := os.Create(destPath)
 	if err != nil {
