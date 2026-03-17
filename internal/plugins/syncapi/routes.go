@@ -44,6 +44,10 @@ func RegisterCampaignRoutes(e *echo.Echo, h *Handler, campaignSvc campaigns.Camp
 
 	// Sync status embed (owner only — used by dashboard sync status block).
 	cg.GET("/sync-status", h.SyncStatusEmbed, campaigns.RequireRole(campaigns.RoleOwner))
+
+	// Sync dashboard fragments (owner only — HTMX-loaded on API keys page).
+	cg.GET("/api-keys/sync-overview", h.SyncOverviewFragment, campaigns.RequireRole(campaigns.RoleOwner))
+	cg.GET("/api-keys/sync-mappings", h.SyncMappingsFragment, campaigns.RequireRole(campaigns.RoleOwner))
 }
 
 // RegisterAPIRoutes adds the public REST API endpoints under /api/v1/.

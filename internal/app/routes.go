@@ -926,6 +926,10 @@ func (a *App) RegisterRoutes() {
 	syncRepo := syncapi.NewSyncAPIRepository(a.DB)
 	syncService := syncapi.NewSyncAPIService(syncRepo)
 	syncHandler := syncapi.NewHandler(syncService)
+	// Inject sync mapping service early so the owner dashboard can show sync status.
+	syncMappingRepoEarly := syncapi.NewSyncMappingRepository(a.DB)
+	syncMappingSvcEarly := syncapi.NewSyncMappingService(syncMappingRepoEarly)
+	syncHandler.SetSyncMappingService(syncMappingSvcEarly)
 	if a.PluginHealth.IsHealthy("syncapi") {
 		syncapi.RegisterAdminRoutes(adminGroup, syncHandler)
 		syncapi.RegisterCampaignRoutes(e, syncHandler, campaignService, authService)
@@ -1012,11 +1016,9 @@ func (a *App) RegisterRoutes() {
 		mediaAPIHandler.SetURLSigner(urlSigner)
 	}
 
-	// Sync mapping service and handler for Foundry VTT bidirectional sync.
-	syncMappingRepo := syncapi.NewSyncMappingRepository(a.DB)
-	syncMappingSvc := syncapi.NewSyncMappingService(syncMappingRepo)
-	syncMappingHandler := syncapi.NewSyncHandler(syncMappingSvc)
-	_ = syncMappingSvc // Service will also be used by map/entity handlers.
+	// Sync mapping handler for Foundry VTT bidirectional sync.
+	// Reuses the sync mapping service created earlier for the owner dashboard.
+	syncMappingHandler := syncapi.NewSyncHandler(syncMappingSvcEarly)
 	mapAPIHandler := syncapi.NewMapAPIHandler(syncService, mapsService, drawingService, campaignService)
 
 	if a.PluginHealth.IsHealthy("syncapi") {

@@ -21,6 +21,10 @@ type SyncMappingRepository interface {
 	Delete(ctx context.Context, id string) error
 	DeleteByCampaign(ctx context.Context, campaignID string) error
 	ListModifiedSince(ctx context.Context, campaignID string, since time.Time, limit int) ([]SyncMapping, error)
+	CountByType(ctx context.Context, campaignID string) (map[string]int, error)
+	LastSyncActivity(ctx context.Context, campaignID string) (*time.Time, error)
+	ListMappingsWithNames(ctx context.Context, campaignID string, opts SyncMappingListOptions) ([]SyncMappingRow, int, error)
+	ListCampaignSyncStats(ctx context.Context) ([]CampaignSyncStats, error)
 }
 
 // syncMappingRepo implements SyncMappingRepository with MariaDB.
@@ -208,6 +212,174 @@ func (r *syncMappingRepo) scanMapping(row *sql.Row) (*SyncMapping, error) {
 		_ = json.Unmarshal(metaJSON, &m.SyncMetadata)
 	}
 	return &m, nil
+}
+
+// CountByType returns mapping counts grouped by chronicle_type for a campaign.
+func (r *syncMappingRepo) CountByType(ctx context.Context, campaignID string) (map[string]int, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT chronicle_type, COUNT(*) FROM sync_mappings
+		WHERE campaign_id = ? GROUP BY chronicle_type`,
+		campaignID)
+	if err != nil {
+		return nil, apperror.NewInternal(err)
+	}
+	defer rows.Close()
+
+	result := make(map[string]int)
+	for rows.Next() {
+		var t string
+		var c int
+		if err := rows.Scan(&t, &c); err != nil {
+			return nil, apperror.NewInternal(err)
+		}
+		result[t] = c
+	}
+	return result, nil
+}
+
+// LastSyncActivity returns the most recent last_synced_at for a campaign.
+func (r *syncMappingRepo) LastSyncActivity(ctx context.Context, campaignID string) (*time.Time, error) {
+	var t sql.NullTime
+	err := r.db.QueryRowContext(ctx, `
+		SELECT MAX(last_synced_at) FROM sync_mappings WHERE campaign_id = ?`,
+		campaignID).Scan(&t)
+	if err != nil {
+		return nil, apperror.NewInternal(err)
+	}
+	if t.Valid {
+		return &t.Time, nil
+	}
+	return nil, nil
+}
+
+// ListMappingsWithNames returns sync mappings joined with entity/map names
+// for display in the owner dashboard, with search, type filter, and sorting.
+func (r *syncMappingRepo) ListMappingsWithNames(ctx context.Context, campaignID string, opts SyncMappingListOptions) ([]SyncMappingRow, int, error) {
+	// Build WHERE clause.
+	where := "sm.campaign_id = ?"
+	args := []any{campaignID}
+
+	if opts.Type != "" {
+		where += " AND sm.chronicle_type = ?"
+		args = append(args, opts.Type)
+	}
+	if opts.Search != "" {
+		where += " AND (e.name LIKE ? OR m.name LIKE ?)"
+		search := "%" + opts.Search + "%"
+		args = append(args, search, search)
+	}
+
+	// Count.
+	var total int
+	countQuery := `
+		SELECT COUNT(*)
+		FROM sync_mappings sm
+		LEFT JOIN entities e ON sm.chronicle_type = 'entity' AND sm.chronicle_id = e.id
+		LEFT JOIN maps m ON sm.chronicle_type = 'map' AND sm.chronicle_id = m.id
+		WHERE ` + where
+	if err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, apperror.NewInternal(err)
+	}
+
+	// Sort.
+	orderBy := "sm.last_synced_at DESC"
+	if opts.Sort == "name" {
+		orderBy = "COALESCE(e.name, m.name, sm.chronicle_id) ASC"
+	} else if opts.Sort == "type" {
+		orderBy = "sm.chronicle_type ASC, sm.last_synced_at DESC"
+	}
+
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = 25
+	}
+
+	query := `
+		SELECT sm.id, sm.chronicle_type, sm.chronicle_id,
+			COALESCE(e.name, m.name, '') AS chronicle_name,
+			sm.external_id, sm.sync_direction, sm.sync_version, sm.last_synced_at
+		FROM sync_mappings sm
+		LEFT JOIN entities e ON sm.chronicle_type = 'entity' AND sm.chronicle_id = e.id
+		LEFT JOIN maps m ON sm.chronicle_type = 'map' AND sm.chronicle_id = m.id
+		WHERE ` + where + `
+		ORDER BY ` + orderBy + `
+		LIMIT ? OFFSET ?`
+	args = append(args, limit, opts.Offset)
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, 0, apperror.NewInternal(err)
+	}
+	defer rows.Close()
+
+	var result []SyncMappingRow
+	for rows.Next() {
+		var row SyncMappingRow
+		if err := rows.Scan(
+			&row.ID, &row.ChronicleType, &row.ChronicleID,
+			&row.ChronicleName, &row.ExternalID,
+			&row.SyncDirection, &row.SyncVersion, &row.LastSyncedAt,
+		); err != nil {
+			return nil, 0, apperror.NewInternal(err)
+		}
+		result = append(result, row)
+	}
+	return result, total, nil
+}
+
+// ListCampaignSyncStats returns per-campaign sync statistics for the admin dashboard.
+// Joins sync_mappings with campaigns and api_keys to show a full picture.
+func (r *syncMappingRepo) ListCampaignSyncStats(ctx context.Context) ([]CampaignSyncStats, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT
+			c.id AS campaign_id,
+			c.name AS campaign_name,
+			COALESCE(ak.active_keys, 0) AS active_keys,
+			COALESCE(sm.total_mappings, 0) AS total_mappings,
+			sm.last_activity,
+			COALESCE(rl.recent_errors, 0) AS recent_errors
+		FROM campaigns c
+		LEFT JOIN (
+			SELECT campaign_id, COUNT(*) AS active_keys
+			FROM sync_api_keys WHERE is_active = 1
+			GROUP BY campaign_id
+		) ak ON ak.campaign_id = c.id
+		LEFT JOIN (
+			SELECT campaign_id,
+				COUNT(*) AS total_mappings,
+				MAX(last_synced_at) AS last_activity
+			FROM sync_mappings
+			GROUP BY campaign_id
+		) sm ON sm.campaign_id = c.id
+		LEFT JOIN (
+			SELECT campaign_id, COUNT(*) AS recent_errors
+			FROM api_request_logs
+			WHERE status_code >= 400 AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
+			GROUP BY campaign_id
+		) rl ON rl.campaign_id = c.id
+		WHERE ak.active_keys > 0 OR sm.total_mappings > 0
+		ORDER BY sm.last_activity DESC`)
+	if err != nil {
+		return nil, apperror.NewInternal(err)
+	}
+	defer rows.Close()
+
+	var result []CampaignSyncStats
+	for rows.Next() {
+		var s CampaignSyncStats
+		var lastActivity sql.NullTime
+		if err := rows.Scan(
+			&s.CampaignID, &s.CampaignName, &s.ActiveKeys,
+			&s.TotalMappings, &lastActivity, &s.RecentErrors,
+		); err != nil {
+			return nil, apperror.NewInternal(err)
+		}
+		if lastActivity.Valid {
+			s.LastActivity = &lastActivity.Time
+		}
+		result = append(result, s)
+	}
+	return result, nil
 }
 
 // scanMappings reads multiple sync mapping rows.
