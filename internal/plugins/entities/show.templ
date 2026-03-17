@@ -77,6 +77,12 @@ templ EntityShowPage(cc *campaigns.CampaignContext, entity *Entity, entityType *
 			// Entity posts (sub-notes): additional content sections below the main entry.
 			@blockPosts(cc, entity, csrfToken)
 
+			// Writing prompts: collapsible panel to help content creators.
+			// Only shown to Scribe+ (content creators), lazy-loaded via HTMX.
+			if cc.MemberRole >= campaigns.RoleScribe && entityType != nil {
+				@WorldbuildingPromptsPanel(cc.Campaign.ID, entityType.ID)
+			}
+
 			// Backlinks: entities that reference this one via @mentions.
 			// Loaded asynchronously via HTMX to keep page load fast.
 			<div

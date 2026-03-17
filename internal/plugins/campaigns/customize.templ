@@ -142,22 +142,70 @@ templ CustomizePage(cc *CampaignContext, entityTypes []SettingsEntityType, csrfT
 // dashboardEditorTab renders the campaign dashboard layout editor with a
 // drag-and-drop block builder. Uses full-page flex layout so the editor
 // fills all available vertical space (matching Page Templates tab pattern).
+// Includes a role toggle (Default / Player / Scribe) so owners can create
+// per-role campaign page layouts.
 templ dashboardEditorTab(cc *CampaignContext, csrfToken string) {
 	<div class="h-full flex flex-col">
 		<div class="px-6 pt-4 pb-2 shrink-0">
 			<div class="max-w-3xl mx-auto">
 				<h2 class="text-base font-semibold text-fg mb-0.5">Campaign Page</h2>
-				<p class="text-xs text-fg-secondary">
-					Customize the layout of your campaign's main page visible to all members.
+				<p class="text-xs text-fg-secondary mb-3">
+					Customize the layout of your campaign's main page. Use the role toggle
+					to create different layouts for Players and Scribes.
 				</p>
+				<!-- Role toggle buttons -->
+				<div
+					x-data="{ dashRole: 'default' }"
+					x-init="$watch('dashRole', (val) => {
+						const editor = document.getElementById('campaign-page-editor');
+						if (editor) {
+							editor.setAttribute('data-role', val);
+							editor.dispatchEvent(new CustomEvent('role-change', { detail: { role: val } }));
+						}
+					})"
+				>
+					<div class="inline-flex rounded-lg bg-surface-alt p-0.5 mb-2">
+						<button
+							type="button"
+							class="text-xs px-3 py-1.5 rounded-md font-medium transition-colors"
+							:class="dashRole === 'default' ? 'bg-surface text-fg shadow-sm' : 'text-fg-secondary hover:text-fg'"
+							@click="dashRole = 'default'"
+						>
+							<i class="fa-solid fa-users mr-1"></i>Default
+						</button>
+						<button
+							type="button"
+							class="text-xs px-3 py-1.5 rounded-md font-medium transition-colors"
+							:class="dashRole === 'player' ? 'bg-surface text-fg shadow-sm' : 'text-fg-secondary hover:text-fg'"
+							@click="dashRole = 'player'"
+						>
+							<i class="fa-solid fa-user mr-1"></i>Player
+						</button>
+						<button
+							type="button"
+							class="text-xs px-3 py-1.5 rounded-md font-medium transition-colors"
+							:class="dashRole === 'scribe' ? 'bg-surface text-fg shadow-sm' : 'text-fg-secondary hover:text-fg'"
+							@click="dashRole = 'scribe'"
+						>
+							<i class="fa-solid fa-feather mr-1"></i>Scribe
+						</button>
+					</div>
+					<p class="text-xs text-fg-muted">
+						<span x-show="dashRole === 'default'">All members see this layout unless a role-specific override is set.</span>
+						<span x-show="dashRole === 'player'" x-cloak>Players see this layout. Falls back to Default if not customized.</span>
+						<span x-show="dashRole === 'scribe'" x-cloak>Scribes see this layout. Falls back to Default if not customized.</span>
+					</p>
+				</div>
 			</div>
 		</div>
 		<div class="flex-1 overflow-y-auto px-6 py-2">
 			<div
+				id="campaign-page-editor"
 				data-widget="dashboard-editor"
 				data-endpoint={ fmt.Sprintf("/campaigns/%s/dashboard-layout", cc.Campaign.ID) }
 				data-campaign-id={ cc.Campaign.ID }
 				data-csrf-token={ csrfToken }
+				data-role="default"
 			></div>
 		</div>
 		<div class="px-6 pt-6 pb-2 shrink-0 border-t border-edge mt-4">

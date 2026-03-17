@@ -8,7 +8,22 @@
 <!-- ====================================================================== -->
 
 ## Last Updated
-2026-03-17 -- **Post-Phase-1 Sprint: Visual customization fix, graph export, invite system.**
+2026-03-17 -- **Sprint: U-1 role dashboards, W-1 command palette, T-3 worldbuilding prompts.**
+
+42. **Sprint: U-1 + W-1 (partial) + T-3.**
+    - **U-1: Role-Aware Dashboard Editor (COMPLETE)** — Role selector in dashboard editor. `RoleDashboardLayouts` struct with backward-compatible JSON format: detects legacy bare `{"rows":[...]}` vs role-keyed `{"default":...,"player":...,"scribe":...}`. Alpine.js toggle (Default/Player/Scribe) in customize.templ. `dashboard_editor.js` appends `?role=` param, listens for `role-change` events. Handler merges role layouts via `SetRoleDashboardJSON`/`RemoveRoleDashboardJSON`. `ParseRoleDashboardLayout(role)` with fallback chain. `UpdateDashboardLayoutRaw` service method. 9 unit tests in `model_test.go`.
+    - **W-1: Command Palette (PARTIAL)** — `static/js/command_palette.js` (~280 lines). Ctrl+Shift+P trigger, modal with search input, scrollable command list. Context-aware: detects campaign ID from URL, admin from DOM. 13 campaign nav commands, 3 action commands, 3 universal commands. Fuzzy substring match, keyboard nav (arrows/enter/escape). Added to `base.templ` and `shortcuts_help.js`. Saved filters not yet implemented.
+    - **T-3: Worldbuilding Prompts (COMPLETE)** — Full stack:
+      - Migration 000008: `worldbuilding_prompts` table with campaign_id, entity_type_id, name, prompt_text, icon, sort_order, is_global, timestamps, foreign keys.
+      - Model: `WorldbuildingPrompt`, `CreatePromptInput`, `UpdatePromptInput` structs.
+      - Repository: `WorldbuildingPromptRepository` with Create, FindByID, ListForCampaign, ListForCampaignAndType, Update, Delete.
+      - Service: `WorldbuildingPromptService` with validation (name max 200, text max 5000), default icon. `EntityTypeLister` interface (subset of EntityTypeRepository). `SeedDefaults` inserts 16 prompts across 5 types.
+      - Handler: ListAPI (HTMX fragment support), CreateAPI, UpdateAPI, DeleteAPI with IDOR checks.
+      - Routes: GET (Player+), POST/PUT/DELETE (Owner) at `/campaigns/:id/worldbuilding-prompts`.
+      - Templates: `WorldbuildingPromptsPanel` (collapsible card, HTMX lazy-load) + `WorldbuildingPromptsFragment` (`<details>` accordion).
+      - Seeding: `WorldbuildingPromptSeeder` interface in campaigns package, called during campaign creation.
+      - Tests: 7 unit tests.
+    - **Next up:** W-1 saved filters, or Phase 2 (X-1: System Upload UX), or other backlog items.
 
 41. **Post-Phase-1 Sprint: W-0.5 + V-4b + U-2.**
     - **W-0.5 completion** — Accent color CSS variable now propagates to all 258 Tailwind utility usages. Updated `tailwind.config.js` to reference `var(--color-accent)` instead of hardcoded hex. Added `--color-accent-hover` and `--color-accent-light` CSS variables with auto-computed darker/lighter variants from the base hex color. New `AccentColorCSS()` helper in `layouts/data.go` generates the CSS block with all three variants. Topbar styling, brand name, brand logo were already working.

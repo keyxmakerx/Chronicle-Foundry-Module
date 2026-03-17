@@ -261,8 +261,20 @@ type DashboardBlock struct {
 	Config map[string]any `json:"config,omitempty"`
 }
 
+// RoleDashboardLayouts holds per-role campaign page layouts. When the
+// dashboard_layout column uses the new role-keyed format, each role can have
+// its own layout. Players and Scribes fall back to Default when their
+// role-specific layout is nil.
+type RoleDashboardLayouts struct {
+	Default *DashboardLayout `json:"default,omitempty"`
+	Player  *DashboardLayout `json:"player,omitempty"`
+	Scribe  *DashboardLayout `json:"scribe,omitempty"`
+}
+
 // ParseDashboardLayout parses the campaign's dashboard_layout JSON into a
 // DashboardLayout struct. Returns nil if the column is NULL (use default).
+// For backward compatibility, this returns the "default" layout from the
+// role-keyed format, or the bare layout from the legacy format.
 func (c *Campaign) ParseDashboardLayout() *DashboardLayout {
 	if c.DashboardLayout == nil || *c.DashboardLayout == "" {
 		return nil
@@ -275,7 +287,143 @@ func (c *Campaign) ParseDashboardLayout() *DashboardLayout {
 		)
 		return nil
 	}
-	return &layout
+	// If we got a valid layout with rows, it's legacy format.
+	if len(layout.Rows) > 0 {
+		return &layout
+	}
+	// Try role-keyed format.
+	roles := c.parseRoleDashboardLayouts()
+	if roles != nil && roles.Default != nil {
+		return roles.Default
+	}
+	return nil
+}
+
+// ParseRoleDashboardLayout returns the dashboard layout for the given role.
+// Falls back: role-specific → default → nil (use hardcoded default).
+// Handles both legacy format (bare layout) and new role-keyed format.
+func (c *Campaign) ParseRoleDashboardLayout(role Role) *DashboardLayout {
+	if c.DashboardLayout == nil || *c.DashboardLayout == "" {
+		return nil
+	}
+
+	// Try legacy format first (bare {"rows": [...]}).
+	var bare DashboardLayout
+	if err := json.Unmarshal([]byte(*c.DashboardLayout), &bare); err == nil && len(bare.Rows) > 0 {
+		return &bare // Legacy: all roles see the same layout.
+	}
+
+	// Try role-keyed format.
+	roles := c.parseRoleDashboardLayouts()
+	if roles == nil {
+		return nil
+	}
+
+	// Look up role-specific layout, fall back to default.
+	switch role {
+	case RolePlayer:
+		if roles.Player != nil {
+			return roles.Player
+		}
+	case RoleScribe:
+		if roles.Scribe != nil {
+			return roles.Scribe
+		}
+	}
+	return roles.Default
+}
+
+// parseRoleDashboardLayouts attempts to parse the dashboard_layout column as
+// the role-keyed wrapper format.
+func (c *Campaign) parseRoleDashboardLayouts() *RoleDashboardLayouts {
+	if c.DashboardLayout == nil || *c.DashboardLayout == "" {
+		return nil
+	}
+	var roles RoleDashboardLayouts
+	if err := json.Unmarshal([]byte(*c.DashboardLayout), &roles); err != nil {
+		return nil
+	}
+	if roles.Default == nil && roles.Player == nil && roles.Scribe == nil {
+		return nil
+	}
+	return &roles
+}
+
+// GetRoleDashboardJSON extracts a single role's layout from the dashboard_layout
+// column. Used by the API to return role-specific layouts to the editor.
+func (c *Campaign) GetRoleDashboardJSON(roleName string) *DashboardLayout {
+	if c.DashboardLayout == nil || *c.DashboardLayout == "" {
+		return nil
+	}
+
+	// Check legacy format (bare layout → treat as "default").
+	var bare DashboardLayout
+	if err := json.Unmarshal([]byte(*c.DashboardLayout), &bare); err == nil && len(bare.Rows) > 0 {
+		if roleName == "default" || roleName == "" {
+			return &bare
+		}
+		return nil // Legacy format has no role-specific layouts.
+	}
+
+	// Role-keyed format.
+	roles := c.parseRoleDashboardLayouts()
+	if roles == nil {
+		return nil
+	}
+	switch roleName {
+	case "player":
+		return roles.Player
+	case "scribe":
+		return roles.Scribe
+	default:
+		return roles.Default
+	}
+}
+
+// SetRoleDashboardJSON updates a single role's layout within the role-keyed
+// wrapper format and returns the new full JSON string. Migrates legacy format
+// to role-keyed format automatically.
+func (c *Campaign) SetRoleDashboardJSON(roleName string, layout *DashboardLayout) (*string, error) {
+	var roles RoleDashboardLayouts
+
+	if c.DashboardLayout != nil && *c.DashboardLayout != "" {
+		// Check if legacy format.
+		var bare DashboardLayout
+		if err := json.Unmarshal([]byte(*c.DashboardLayout), &bare); err == nil && len(bare.Rows) > 0 {
+			// Migrate legacy to role-keyed: existing layout becomes "default".
+			roles.Default = &bare
+		} else {
+			// Try parsing as role-keyed.
+			_ = json.Unmarshal([]byte(*c.DashboardLayout), &roles)
+		}
+	}
+
+	switch roleName {
+	case "player":
+		roles.Player = layout
+	case "scribe":
+		roles.Scribe = layout
+	default:
+		roles.Default = layout
+	}
+
+	// If all roles are nil, return nil (reset to default).
+	if roles.Default == nil && roles.Player == nil && roles.Scribe == nil {
+		return nil, nil
+	}
+
+	data, err := json.Marshal(&roles)
+	if err != nil {
+		return nil, err
+	}
+	s := string(data)
+	return &s, nil
+}
+
+// RemoveRoleDashboardJSON removes a single role's layout from the wrapper.
+// Returns the new full JSON string, or nil if all roles are now empty.
+func (c *Campaign) RemoveRoleDashboardJSON(roleName string) (*string, error) {
+	return c.SetRoleDashboardJSON(roleName, nil)
 }
 
 // ParseOwnerDashboardLayout parses the campaign's owner_dashboard_layout JSON
@@ -415,6 +563,12 @@ type EntityTypeSeeder interface {
 // ContentTemplateSeeder seeds default content templates when a campaign is
 // created. Implemented by the entities plugin's ContentTemplateService.
 type ContentTemplateSeeder interface {
+	SeedDefaults(ctx context.Context, campaignID string) error
+}
+
+// WorldbuildingPromptSeeder seeds default worldbuilding prompts when a campaign
+// is created. Implemented by the entities plugin's WorldbuildingPromptService.
+type WorldbuildingPromptSeeder interface {
 	SeedDefaults(ctx context.Context, campaignID string) error
 }
 

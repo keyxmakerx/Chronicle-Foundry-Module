@@ -806,6 +806,13 @@ func (a *App) RegisterRoutes() {
 	campaignService.SetContentTemplateSeeder(contentTemplateService)
 	entityHandler.SetContentTemplateService(contentTemplateService)
 
+	// Worldbuilding prompt routes (guided writing prompts for content creators).
+	wbPromptRepo := entities.NewWorldbuildingPromptRepository(a.DB)
+	wbPromptService := entities.NewWorldbuildingPromptService(wbPromptRepo, entityTypeRepo)
+	wbPromptHandler := entities.NewWorldbuildingPromptHandler(wbPromptService)
+	entities.RegisterWorldbuildingPromptRoutes(e, wbPromptHandler, campaignService, authService)
+	campaignService.SetWorldbuildingPromptSeeder(wbPromptService)
+
 	// Media plugin: file upload, storage, thumbnailing, serving.
 	// Graceful degradation: if the media directory can't be created, log a warning
 	// but don't crash -- the rest of the app keeps running.
