@@ -81,7 +81,7 @@ func (c *GitHubClient) ListReleases(ctx context.Context, repoURL string) ([]GitH
 	if err != nil {
 		return nil, fmt.Errorf("fetching releases: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
@@ -112,7 +112,7 @@ func (c *GitHubClient) DownloadAsset(ctx context.Context, downloadURL, destPath 
 	if err != nil {
 		return 0, fmt.Errorf("downloading asset: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return 0, fmt.Errorf("download returned HTTP %d", resp.StatusCode)
