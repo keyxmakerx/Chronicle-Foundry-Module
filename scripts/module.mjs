@@ -111,12 +111,14 @@ Hooks.on('getSceneControlButtons', (controls) => {
       }],
     });
   } else {
+    // v13 requires activeTool even for button-only controls, and does not
+    // use the v12 `layer` property. See foundryvtt/foundryvtt#12803.
     controls['chronicle-sync'] = {
       name: 'chronicle-sync',
       title: 'Chronicle Sync',
       icon: 'fa-solid fa-rotate',
-      layer: 'controls',
       visible: true,
+      activeTool: 'dashboard',
       tools: {
         dashboard: {
           name: 'dashboard',
