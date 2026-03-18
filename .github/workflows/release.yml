@@ -1,0 +1,52 @@
+name: Release Module
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Set version in module.json
+        run: |
+          jq --arg v "${{ steps.version.outputs.version }}" '.version = $v' module.json > module.tmp.json
+          mv module.tmp.json module.json
+
+      - name: Update download URL in module.json
+        run: |
+          jq --arg tag "${{ github.ref_name }}" \
+            '.download = "https://github.com/${{ github.repository }}/releases/download/" + $tag + "/chronicle-sync.zip"' \
+            module.json > module.tmp.json
+          mv module.tmp.json module.json
+
+      - name: Build release zip
+        run: |
+          zip -r chronicle-sync.zip \
+            module.json \
+            scripts/ \
+            styles/ \
+            templates/ \
+            lang/ \
+            LICENSE \
+            README.md \
+            -x "*.git*" "*.DS_Store" "*.ai.md" "CLAUDE.md" "TESTING.md" \
+                "API.md" "CONSTANTS.md"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            chronicle-sync.zip
+            module.json
+          generate_release_notes: true
