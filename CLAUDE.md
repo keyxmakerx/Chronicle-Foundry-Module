@@ -46,4 +46,4 @@ lang/                 # Localization (en.json)
 
 ## TODO
 
-- Add GitHub Actions release workflow (zip + publish on tag push)
+- (none currently)

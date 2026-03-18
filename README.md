@@ -24,7 +24,7 @@ Bidirectional real-time sync between [Chronicle](https://github.com/keyxmakerx/C
 1. In Foundry VTT, go to **Add-on Modules → Install Module**
 2. Paste the manifest URL:
    ```
-   https://raw.githubusercontent.com/keyxmakerx/Chronicle-Foundry-Module/main/module.json
+   https://github.com/keyxmakerx/Chronicle-Foundry-Module/releases/latest/download/module.json
    ```
 3. Click **Install**
 
