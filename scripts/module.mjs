@@ -168,11 +168,20 @@ function _addStatusIndicator() {
   });
 
   // Flash the dot briefly when a WS message arrives (activity indicator).
+  // Throttled to avoid excessive DOM manipulation under high message volume.
+  let activityThrottled = false;
   syncManager.api.on('*', () => {
+    if (activityThrottled) return;
+    activityThrottled = true;
     const dot = indicator.querySelector('.status-dot');
     if (dot && syncManager.api.state === 'connected') {
       dot.classList.add('activity');
-      setTimeout(() => dot.classList.remove('activity'), 300);
+      setTimeout(() => {
+        dot.classList.remove('activity');
+        activityThrottled = false;
+      }, 300);
+    } else {
+      activityThrottled = false;
     }
   });
 

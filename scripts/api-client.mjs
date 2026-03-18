@@ -53,6 +53,8 @@ export class ChronicleAPI {
       connectedSince: null,
       /** Total time connected (ms), excluding current connection. */
       totalConnectedMs: 0,
+      /** Timestamp (ms) of when this API client was created (session start). */
+      sessionStart: Date.now(),
       /** Timestamp (ms) of last successful REST call. */
       lastRestSuccess: null,
       /** Timestamp (ms) of last REST error. */
@@ -124,7 +126,15 @@ export class ChronicleAPI {
     // Handle 204 No Content.
     if (response.status === 204) return null;
 
-    return response.json();
+    // Parse JSON response safely.
+    const text = await response.text();
+    if (!text) return null;
+    try {
+      return JSON.parse(text);
+    } catch (err) {
+      this._logError('warn', method, path, response.status, 'Invalid JSON response body');
+      return null;
+    }
   }
 
   /**
@@ -346,20 +356,13 @@ export class ChronicleAPI {
    * @returns {number} 0-100 percentage.
    */
   getUptimePercent() {
-    const sessionStart = this.health.totalConnectedMs;
-    let connectedMs = sessionStart;
+    let connectedMs = this.health.totalConnectedMs;
 
     if (this.health.connectedSince) {
       connectedMs += Date.now() - this.health.connectedSince;
     }
 
-    // Approximate session duration from first success or first error.
-    const firstActivity = Math.min(
-      this.health.lastRestSuccess || Date.now(),
-      this.health.lastRestError || Date.now(),
-      this.health.connectedSince || Date.now()
-    );
-    const sessionDuration = Date.now() - firstActivity;
+    const sessionDuration = Date.now() - this.health.sessionStart;
 
     if (sessionDuration <= 0) return 100;
     return Math.min(100, Math.round((connectedMs / sessionDuration) * 100));

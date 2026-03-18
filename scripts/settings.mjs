@@ -235,7 +235,14 @@ export function isConfigured() {
   const url = getSetting('apiUrl');
   const key = getSetting('apiKey');
   const campaign = getSetting('campaignId');
-  return !!(url && key && campaign);
+  if (!url || !key || !campaign) return false;
+  // Validate URL is a proper HTTP(S) URL.
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 /**

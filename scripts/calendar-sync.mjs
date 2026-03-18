@@ -362,7 +362,7 @@ export class CalendarSync {
 
     try {
       await this._api.delete(`/calendar/events/${chronicleId}`);
-      this._removeEventMapping(eventData.id);
+      await this._removeEventMapping(eventData.id);
     } catch (err) {
       console.warn('Chronicle: Failed to delete calendar event', err);
     }
@@ -463,7 +463,7 @@ export class CalendarSync {
 
     try {
       await this._api.delete(`/calendar/events/${chronicleId}`);
-      this._removeEventMapping(journal.id);
+      await this._removeEventMapping(journal.id);
     } catch (err) {
       console.warn('Chronicle: Failed to delete SimpleCalendar note from Chronicle', err);
     }
@@ -651,7 +651,7 @@ export class CalendarSync {
       }
     }
 
-    this._removeEventMapping(localId);
+    await this._removeEventMapping(localId);
   }
 
   // --- Event Mapping Helpers ---
@@ -696,14 +696,14 @@ export class CalendarSync {
    * @param {string} localId
    * @private
    */
-  _removeEventMapping(localId) {
+  async _removeEventMapping(localId) {
     const mappings = this._getEventMappings();
     const chronicleId = mappings[localId];
     delete mappings[localId];
     if (chronicleId) {
       delete mappings[`_rev_${chronicleId}`];
     }
-    game.user.setFlag(FLAG_SCOPE, 'calendarEventMappings', mappings);
+    await game.user.setFlag(FLAG_SCOPE, 'calendarEventMappings', mappings);
   }
 
   /**

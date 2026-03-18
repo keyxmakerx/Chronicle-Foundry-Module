@@ -265,8 +265,8 @@ export class ItemSync {
           },
         },
         system: {
-          quantity: meta.quantity || 1,
-          equipped: meta.equipped || false,
+          quantity: meta.quantity ?? 1,
+          equipped: meta.equipped ?? false,
         },
       };
 
@@ -310,16 +310,19 @@ export class ItemSync {
         relationType: 'Has Item',
         reverseRelationType: 'In Inventory Of',
         metadata: JSON.stringify({
-          quantity: item.system?.quantity || 1,
-          equipped: item.system?.equipped || false,
+          quantity: item.system?.quantity ?? 1,
+          equipped: item.system?.equipped ?? false,
           foundry_item_name: item.name,
         }),
       });
 
       if (relation) {
         this._syncing = true;
-        await item.setFlag(FLAG_SCOPE, 'relationId', relation.id);
-        this._syncing = false;
+        try {
+          await item.setFlag(FLAG_SCOPE, 'relationId', relation.id);
+        } finally {
+          this._syncing = false;
+        }
         console.log(`Chronicle: Pushed new item "${item.name}" from "${actor.name}" to Chronicle`);
       }
     } catch (err) {
@@ -378,8 +381,8 @@ export class ItemSync {
 
     try {
       const meta = {
-        quantity: item.system?.quantity || 1,
-        equipped: item.system?.equipped || false,
+        quantity: item.system?.quantity ?? 1,
+        equipped: item.system?.equipped ?? false,
       };
 
       await this._api.put(`/entities/${entityId}/relations/${relationId}/metadata`, {
