@@ -85,28 +85,44 @@ Hooks.once('ready', async () => {
 Hooks.on('getSceneControlButtons', (controls) => {
   if (!game.user.isGM) return;
 
-  const controlData = {
-    name: 'chronicle-sync',
-    title: 'Chronicle Sync',
-    icon: 'fa-solid fa-rotate',
-    layer: 'controls',
-    visible: true,
-    tools: [{
-      name: 'dashboard',
-      title: 'Open Chronicle Sync Dashboard',
-      icon: 'fa-solid fa-rotate',
-      button: true,
-      onClick: () => {
-        if (dashboard) dashboard.render({ force: true });
-      },
-    }],
+  const openDashboard = () => {
+    if (dashboard) dashboard.render({ force: true });
   };
 
-  // v13: controls is a keyed object; v12: controls is an array.
+  // v13: controls and tools are keyed objects with onChange callback.
+  // v12: controls and tools are arrays with onClick callback.
   if (Array.isArray(controls)) {
-    controls.push(controlData);
+    controls.push({
+      name: 'chronicle-sync',
+      title: 'Chronicle Sync',
+      icon: 'fa-solid fa-rotate',
+      layer: 'controls',
+      visible: true,
+      tools: [{
+        name: 'dashboard',
+        title: 'Open Chronicle Sync Dashboard',
+        icon: 'fa-solid fa-rotate',
+        button: true,
+        onClick: openDashboard,
+      }],
+    });
   } else {
-    controls['chronicle-sync'] = controlData;
+    controls['chronicle-sync'] = {
+      name: 'chronicle-sync',
+      title: 'Chronicle Sync',
+      icon: 'fa-solid fa-rotate',
+      layer: 'controls',
+      visible: true,
+      tools: {
+        dashboard: {
+          name: 'dashboard',
+          title: 'Open Chronicle Sync Dashboard',
+          icon: 'fa-solid fa-rotate',
+          button: true,
+          onChange: openDashboard,
+        },
+      },
+    };
   }
 });
 
