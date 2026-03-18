@@ -44,7 +44,7 @@ export async function createGenericAdapter(api, chronicleSystemId) {
 
   const writableFields = mappedFields.filter((f) => f.foundry_writable !== false);
 
-  console.log(
+  console.debug(
     `Chronicle: Generic adapter loaded for "${chronicleSystemId}" — ` +
     `${mappedFields.length} fields mapped, ${writableFields.length} writable`
   );

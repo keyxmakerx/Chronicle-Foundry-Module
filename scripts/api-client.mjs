@@ -253,7 +253,7 @@ export class ChronicleAPI {
       retries: 0,
       maxRetries,
     });
-    console.log(`Chronicle: Queued ${method} ${path} for retry (${this._retryQueue.length} pending)`);
+    console.debug(`Chronicle: Queued ${method} ${path} for retry (${this._retryQueue.length} pending)`);
   }
 
   /**
@@ -296,7 +296,7 @@ export class ChronicleAPI {
     this._retryProcessing = false;
 
     if (success > 0 || failed > 0) {
-      console.log(`Chronicle: Retry queue processed — ${success} succeeded, ${failed} permanently failed, ${this._retryQueue.length} remaining`);
+      console.debug(`Chronicle: Retry queue processed — ${success} succeeded, ${failed} permanently failed, ${this._retryQueue.length} remaining`);
     }
 
     return { success, failed };
@@ -463,7 +463,7 @@ export class ChronicleAPI {
     }
 
     this._ws.onopen = async () => {
-      console.log('Chronicle: WebSocket connected');
+      console.debug('Chronicle: WebSocket connected');
       this._setState('connected');
       this._reconnectDelay = 1000; // Reset backoff.
       this.health.connectedSince = Date.now();
@@ -487,7 +487,7 @@ export class ChronicleAPI {
     };
 
     this._ws.onclose = (event) => {
-      console.log(`Chronicle: WebSocket closed (code=${event.code})`);
+      console.debug(`Chronicle: WebSocket closed (code=${event.code})`);
       this._ws = null;
 
       // Track connected time.
@@ -529,7 +529,7 @@ export class ChronicleAPI {
     this.health.reconnectAttempts++;
 
     const delay = Math.min(this._reconnectDelay, 30000); // Cap at 30s.
-    console.log(`Chronicle: Reconnecting in ${delay}ms (attempt ${this.health.reconnectAttempts})`);
+    console.debug(`Chronicle: Reconnecting in ${delay}ms (attempt ${this.health.reconnectAttempts})`);
 
     this._reconnectTimer = setTimeout(() => {
       this._reconnectTimer = null;

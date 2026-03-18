@@ -64,7 +64,7 @@ export class SyncManager {
    */
   async start() {
     if (!game.user.isGM) {
-      console.log('Chronicle: Non-GM user, skipping sync');
+      console.debug('Chronicle: Non-GM user, skipping sync');
       return;
     }
 
@@ -75,7 +75,7 @@ export class SyncManager {
     }
 
     if (!getSetting('syncEnabled')) {
-      console.log('Chronicle: Sync disabled in settings');
+      console.debug('Chronicle: Sync disabled in settings');
       return;
     }
 
@@ -107,7 +107,7 @@ export class SyncManager {
     // Connect WebSocket.
     this.api.connect();
 
-    console.log('Chronicle: Sync manager started');
+    console.debug('Chronicle: Sync manager started');
   }
 
   /**
@@ -122,7 +122,7 @@ export class SyncManager {
     }
     this._modules = [];
     this._initialSyncDone = false;
-    console.log('Chronicle: Sync manager stopped');
+    console.debug('Chronicle: Sync manager stopped');
   }
 
   /**
@@ -152,7 +152,7 @@ export class SyncManager {
     this._foundrySystemId = game.system?.id || null;
 
     if (!this._foundrySystemId) {
-      console.log('Chronicle: No Foundry game system detected');
+      console.debug('Chronicle: No Foundry game system detected');
       return;
     }
 
@@ -179,10 +179,10 @@ export class SyncManager {
         this._matchedSystem = match.id;
         await setSetting('detectedSystem', match.id);
         this.logActivity('connect', `Game system matched: ${match.name}`);
-        console.log(`Chronicle: System matched — Foundry "${this._foundrySystemId}" → Chronicle "${match.id}"`);
+        console.debug(`Chronicle: System matched — Foundry "${this._foundrySystemId}" → Chronicle "${match.id}"`);
       } else {
         await setSetting('detectedSystem', '');
-        console.log(`Chronicle: No Chronicle system matches Foundry system "${this._foundrySystemId}"`);
+        console.debug(`Chronicle: No Chronicle system matches Foundry system "${this._foundrySystemId}"`);
       }
     } catch (err) {
       console.warn('Chronicle: Failed to detect system match', err);
@@ -202,14 +202,14 @@ export class SyncManager {
     const lastSync = getSetting('lastSyncTime') || '1970-01-01T00:00:00Z';
 
     try {
-      console.log(`Chronicle: Initial sync from ${lastSync}`);
+      console.debug(`Chronicle: Initial sync from ${lastSync}`);
       ui.notifications.info('Chronicle: Syncing...', { permanent: false });
 
       // Pull sync mappings modified since last sync.
       const result = await this.api.get(`/sync/pull?since=${encodeURIComponent(lastSync)}`);
 
       if (result.mappings && result.mappings.length > 0) {
-        console.log(`Chronicle: Received ${result.mappings.length} mapping updates`);
+        console.debug(`Chronicle: Received ${result.mappings.length} mapping updates`);
 
         // Route each mapping to the appropriate module.
         for (const mapping of result.mappings) {

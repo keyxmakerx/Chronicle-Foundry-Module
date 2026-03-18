@@ -51,7 +51,7 @@ export class ShopWidget {
       });
     });
 
-    console.log('Chronicle: Shop widget initialized');
+    console.debug('Chronicle: Shop widget initialized');
   }
 
   /**

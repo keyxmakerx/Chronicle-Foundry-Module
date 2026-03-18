@@ -56,12 +56,12 @@ export class CalendarSync {
     }
 
     if (!this._calendarModule) {
-      console.log('Chronicle: No calendar module detected (Calendaria or SimpleCalendar). Calendar sync disabled.');
+      console.debug('Chronicle: No calendar module detected (Calendaria or SimpleCalendar). Calendar sync disabled.');
       return;
     }
 
     this._registerHooks();
-    console.log(`Chronicle: Calendar sync initialized (${this._calendarModule} detected)`);
+    console.debug(`Chronicle: Calendar sync initialized (${this._calendarModule} detected)`);
   }
 
   /**
@@ -112,7 +112,7 @@ export class CalendarSync {
     try {
       this._chronicleCalendar = await this._api.get('/calendar');
       if (!this._chronicleCalendar) {
-        console.log('Chronicle: No calendar configured for this campaign');
+        console.debug('Chronicle: No calendar configured for this campaign');
         return;
       }
 
@@ -125,7 +125,7 @@ export class CalendarSync {
         minute: this._chronicleCalendar.current_minute,
       });
 
-      console.log('Chronicle: Calendar initial sync complete');
+      console.debug('Chronicle: Calendar initial sync complete');
     } catch (err) {
       console.error('Chronicle: Calendar initial sync failed', err);
     }
@@ -559,7 +559,7 @@ export class CalendarSync {
         }
       } else {
         // Fallback: store Chronicle event reference for display in our UI.
-        console.log('Chronicle: Calendaria createEvent API not available, event stored as reference');
+        console.debug('Chronicle: Calendaria createEvent API not available, event stored as reference');
       }
     } else if (this._calendarModule === 'simple-calendar') {
       // SimpleCalendar events are journal entries with note flags.

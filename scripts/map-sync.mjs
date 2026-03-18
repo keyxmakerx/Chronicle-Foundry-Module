@@ -68,7 +68,7 @@ export class MapSync {
       });
     });
 
-    console.log('Chronicle: Map sync initialized');
+    console.debug('Chronicle: Map sync initialized');
   }
 
   /**
@@ -135,7 +135,7 @@ export class MapSync {
       const scene = game.scenes.get(mapping.external_id);
       if (scene && !scene.getFlag(FLAG_SCOPE, 'mapId')) {
         await scene.setFlag(FLAG_SCOPE, 'mapId', mapping.chronicle_id);
-        console.log(`Chronicle: Linked scene "${scene.name}" to map ${mapping.chronicle_id}`);
+        console.debug(`Chronicle: Linked scene "${scene.name}" to map ${mapping.chronicle_id}`);
       }
     } else if (mapping.chronicle_type === 'drawing') {
       // Set drawingId flag on the matching Foundry Drawing.
@@ -186,7 +186,7 @@ export class MapSync {
         if (maps && maps.length === 1) {
           mapId = maps[0].id;
           await scene.setFlag(FLAG_SCOPE, 'mapId', mapId);
-          console.log(`Chronicle: Auto-linked scene "${scene.name}" to map "${maps[0].name}"`);
+          console.debug(`Chronicle: Auto-linked scene "${scene.name}" to map "${maps[0].name}"`);
 
           // Create sync mapping on the server.
           await this._api.post('/sync/mappings', {
@@ -254,7 +254,7 @@ export class MapSync {
         await this._reconcileFogRegions(scene, fog);
       }
 
-      console.log('Chronicle: Map initial sync complete');
+      console.debug('Chronicle: Map initial sync complete');
     } catch (err) {
       console.error('Chronicle: Map initial sync failed', err);
     }
@@ -540,7 +540,7 @@ export class MapSync {
     try {
       const [created] = await scene.createEmbeddedDocuments('Drawing', [drawingData]);
       if (created) {
-        console.log(`Chronicle: Fog region ${region.id} added to scene`);
+        console.debug(`Chronicle: Fog region ${region.id} added to scene`);
       }
     } finally {
       this._syncing = false;
@@ -564,7 +564,7 @@ export class MapSync {
         'Drawing',
         fogDrawings.map((d) => d.id)
       );
-      console.log(`Chronicle: Cleared ${fogDrawings.length} fog drawings`);
+      console.debug(`Chronicle: Cleared ${fogDrawings.length} fog drawings`);
     } finally {
       this._syncing = false;
     }
@@ -833,7 +833,7 @@ export class MapSync {
   async _handleFogDrawingDelete(mapId, fogRegionId) {
     try {
       await this._api.delete(`/maps/${mapId}/fog/${fogRegionId}`);
-      console.log(`Chronicle: Fog region ${fogRegionId} deleted`);
+      console.debug(`Chronicle: Fog region ${fogRegionId} deleted`);
     } catch (err) {
       console.warn('Chronicle: Failed to delete fog region from Chronicle', err);
     }

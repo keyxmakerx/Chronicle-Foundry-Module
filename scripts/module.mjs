@@ -27,7 +27,7 @@ let dashboard = null;
  * This runs before the game is fully ready.
  */
 Hooks.once('init', () => {
-  console.log('Chronicle Sync | Initializing');
+  console.debug('Chronicle Sync | Initializing');
   registerSettings();
 
   // Register Handlebars helpers used by dashboard/shop templates.
@@ -55,7 +55,7 @@ Hooks.once('init', () => {
  * Foundry's native document sync.
  */
 Hooks.once('ready', async () => {
-  console.log('Chronicle Sync | Ready');
+  console.debug('Chronicle Sync | Ready');
 
   syncManager = new SyncManager();
 
