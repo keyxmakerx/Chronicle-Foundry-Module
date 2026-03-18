@@ -38,12 +38,12 @@ export class ShopWidget {
         name: 'Open Chronicle Shop',
         icon: '<i class="fas fa-store"></i>',
         condition: (li) => {
-          const id = li.data('documentId');
+          const id = li instanceof HTMLElement ? li.dataset.documentId : li.data('documentId');
           const journal = game.journal.get(id);
           return journal?.getFlag(FLAG_SCOPE, 'entityType') === 'Shop';
         },
         callback: async (li) => {
-          const id = li.data('documentId');
+          const id = li instanceof HTMLElement ? li.dataset.documentId : li.data('documentId');
           const journal = game.journal.get(id);
           const entityId = journal?.getFlag(FLAG_SCOPE, 'entityId');
           if (entityId) await this.openShop(entityId, journal.name);

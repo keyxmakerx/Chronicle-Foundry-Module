@@ -291,9 +291,9 @@ export async function setExcludedTags(tags) {
  * so we convert it after the settings form renders.
  */
 Hooks.on('renderSettingsConfig', (app, html) => {
-  const keyInput = html[0]?.querySelector
-    ? html[0].querySelector(`input[name="${MODULE_ID}.apiKey"]`)
-    : html.find(`input[name="${MODULE_ID}.apiKey"]`)[0];
+  // v13: html is an HTMLElement; v12: html is a jQuery object.
+  const root = html instanceof HTMLElement ? html : html[0] ?? html;
+  const keyInput = root?.querySelector?.(`input[name="${MODULE_ID}.apiKey"]`);
   if (keyInput) {
     keyInput.type = 'password';
     keyInput.autocomplete = 'off';

@@ -61,7 +61,7 @@ export class MapSync {
         icon: '<i class="fas fa-link"></i>',
         condition: () => game.user.isGM,
         callback: async (li) => {
-          const sceneId = li.data('sceneId');
+          const sceneId = li instanceof HTMLElement ? li.dataset.sceneId : li.data('sceneId');
           const scene = game.scenes.get(sceneId);
           if (scene) await this._showMapLinkDialog(scene);
         },
@@ -295,7 +295,8 @@ export class MapSync {
             icon: '<i class="fas fa-link"></i>',
             label: 'Link',
             callback: async (html) => {
-              const mapId = html.find('[name="mapId"]').val();
+              const root = html instanceof HTMLElement ? html : html[0] ?? html;
+              const mapId = root?.querySelector?.('[name="mapId"]')?.value;
               if (mapId) {
                 await scene.setFlag(FLAG_SCOPE, 'mapId', mapId);
 

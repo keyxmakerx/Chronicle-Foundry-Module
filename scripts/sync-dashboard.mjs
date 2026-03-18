@@ -946,7 +946,13 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** Open Foundry module settings. */
   static #onOpenSettingsAction() {
-    game.settings.sheet.render(true);
+    const sheet = game.settings.sheet;
+    // v13 ApplicationV2 uses render({force}) instead of render(true).
+    if (sheet.render?.length === 0 || sheet.constructor?.DEFAULT_OPTIONS) {
+      sheet.render({ force: true });
+    } else {
+      sheet.render(true);
+    }
   }
 
   /** Open a shop window via the ShopWidget module. */
@@ -1091,10 +1097,15 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    * @private
    */
   async _onPullAll() {
-    const confirmed = await Dialog.confirm({
-      title: 'Pull All from Chronicle',
-      content: '<p>Pull all Chronicle entities that don\'t have a Foundry journal yet?</p>',
-    });
+    let confirmed;
+    try {
+      confirmed = await Dialog.confirm({
+        title: 'Pull All from Chronicle',
+        content: '<p>Pull all Chronicle entities that don\'t have a Foundry journal yet?</p>',
+      });
+    } catch {
+      return; // User closed dialog.
+    }
     if (!confirmed) return;
 
     const data = await this._prepareContext();
@@ -1115,10 +1126,15 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    * @private
    */
   async _onPushAll() {
-    const confirmed = await Dialog.confirm({
-      title: 'Push All to Chronicle',
-      content: '<p>Push all Foundry journals that aren\'t linked to Chronicle yet?</p>',
-    });
+    let confirmed;
+    try {
+      confirmed = await Dialog.confirm({
+        title: 'Push All to Chronicle',
+        content: '<p>Push all Foundry journals that aren\'t linked to Chronicle yet?</p>',
+      });
+    } catch {
+      return; // User closed dialog.
+    }
     if (!confirmed) return;
 
     const journals = this._getFoundryOnlyJournals();
@@ -1296,10 +1312,15 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       return;
     }
 
-    const confirmed = await Dialog.confirm({
-      title: 'Push All Actors to Chronicle',
-      content: `<p>Push ${unlinked.length} unlinked actor(s) to Chronicle?</p>`,
-    });
+    let confirmed;
+    try {
+      confirmed = await Dialog.confirm({
+        title: 'Push All Actors to Chronicle',
+        content: `<p>Push ${unlinked.length} unlinked actor(s) to Chronicle?</p>`,
+      });
+    } catch {
+      return; // User closed dialog.
+    }
     if (!confirmed) return;
 
     let count = 0;
