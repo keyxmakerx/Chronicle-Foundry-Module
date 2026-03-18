@@ -15,8 +15,8 @@
     }
   ],
   "url": "https://github.com/keyxmakerx/Chronicle-Foundry-Module",
-  "manifest": "https://raw.githubusercontent.com/keyxmakerx/Chronicle-Foundry-Module/main/module.json",
-  "download": "https://github.com/keyxmakerx/Chronicle-Foundry-Module/releases/download/foundry-v0.2.0/chronicle-sync.zip",
+  "manifest": "https://github.com/keyxmakerx/Chronicle-Foundry-Module/releases/latest/download/module.json",
+  "download": "https://github.com/keyxmakerx/Chronicle-Foundry-Module/releases/download/v0.2.0/chronicle-sync.zip",
   "license": "MIT",
   "esmodules": [
     "scripts/module.mjs"
