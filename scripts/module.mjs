@@ -67,15 +67,19 @@ Hooks.once('ready', async () => {
   syncManager.registerModule(new ActorSync());
   syncManager.registerModule(new ItemSync());
 
-  // Start the sync manager (connects WebSocket, performs initial sync).
-  await syncManager.start();
-
-  // Create the sync dashboard (singleton, rendered on demand).
+  // Create UI first so it's always available, even if start() fails.
   dashboard = new SyncDashboard();
   dashboard.bind(syncManager);
-
-  // Add sync status indicator to the UI.
   _addStatusIndicator();
+
+  // Start the sync manager (connects WebSocket, performs initial sync).
+  // Failure is non-fatal; the dashboard remains accessible for diagnostics.
+  try {
+    await syncManager.start();
+  } catch (err) {
+    console.error('Chronicle Sync | Failed to start sync manager', err);
+    ui.notifications.error('Chronicle Sync: Connection failed. Open the dashboard to diagnose.');
+  }
 });
 
 /**

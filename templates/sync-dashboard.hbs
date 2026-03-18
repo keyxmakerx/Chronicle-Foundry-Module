@@ -511,7 +511,10 @@
       <div class="dashboard-empty-tab">
         <i class="fa-solid fa-puzzle-piece fa-2x"></i>
         <p>Character sync requires a matching game system.</p>
-        <p class="hint">Your Foundry system must match a Chronicle game system with character field templates. Check the Status tab for details.</p>
+        <p class="hint">
+          Chronicle doesn't have a system pack for <strong>{{#if foundrySystem}}{{foundrySystem}}{{else}}this system{{/if}}</strong> yet.
+          Use the <em>Copy System Debug</em> button on the Status tab to generate a snapshot you can paste into Claude AI to help build one.
+        </p>
       </div>
       {{/if}}
     </div>
@@ -754,6 +757,16 @@
             <i class="fa-solid fa-plug"></i> Reconnect
           </button>
           {{/if}}
+        </div>
+
+        {{!-- System Debug Export --}}
+        <h3 class="section-heading">System Debug Export</h3>
+        <p class="config-hint">Copy a snapshot of your Foundry system data to the clipboard. Paste this into Claude AI to help build a Chronicle system adapter for your game system.</p>
+        <div class="config-actions">
+          <button type="button" class="dashboard-btn btn-sm" data-action="copy-debug">
+            <i class="fa-solid fa-clipboard"></i> Copy System Debug to Clipboard
+          </button>
+          <span class="debug-copy-result" data-debug-result></span>
         </div>
       </div>
     </div>

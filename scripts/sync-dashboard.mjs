@@ -60,6 +60,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'push-all-actors': SyncDashboard.#onPushAllActorsAction,
       'test-connection': SyncDashboard.#onTestConnectionAction,
       'save-config': SyncDashboard.#onSaveConfigAction,
+      'copy-debug': SyncDashboard.#onCopyDebugAction,
     },
   };
 
@@ -988,6 +989,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this._onSaveConfig();
   }
 
+  /** Copy system debug snapshot to clipboard for pasting into AI tools. */
+  static #onCopyDebugAction() {
+    this._onCopyDebug();
+  }
+
   // ---------------------------------------------------------------------------
   // Actions (business logic)
   // ---------------------------------------------------------------------------
@@ -1405,7 +1411,15 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       }
     } catch (err) {
       if (resultEl) {
-        resultEl.textContent = `Connection error: ${err.message}`;
+        // Browsers throw a TypeError with generic message on CORS failure.
+        const isCors = err instanceof TypeError
+          && /failed to fetch|networkerror/i.test(err.message || '');
+        if (isCors) {
+          resultEl.textContent = 'CORS error: The Chronicle server is not allowing requests from this Foundry instance. '
+            + 'Add this origin to the server\'s CORS allowed origins.';
+        } else {
+          resultEl.textContent = `Connection error: ${err.message}`;
+        }
         resultEl.className = 'config-test-result test-error';
       }
     }
@@ -1485,6 +1499,180 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       console.error('Chronicle Dashboard: Save config failed', err);
       ui.notifications.error(`Failed to save config: ${err.message}`);
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Debug Export
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Build and copy a system debug snapshot to the clipboard.
+   * The output is designed to be pasted into an AI tool (e.g., Claude) to help
+   * build a Chronicle system adapter for the current Foundry game system.
+   * @private
+   */
+  async _onCopyDebug() {
+    const el = this.element;
+    const resultEl = el?.querySelector('[data-debug-result]');
+
+    try {
+      const snapshot = this._buildDebugExport();
+      const text = '```json\n' + JSON.stringify(snapshot, null, 2) + '\n```';
+      await navigator.clipboard.writeText(text);
+
+      if (resultEl) {
+        resultEl.textContent = 'Copied to clipboard!';
+        resultEl.className = 'debug-copy-result test-success';
+        setTimeout(() => { resultEl.textContent = ''; }, 3000);
+      }
+      ui.notifications.info('Chronicle: System debug snapshot copied to clipboard.');
+    } catch (err) {
+      console.error('Chronicle Dashboard: Debug export failed', err);
+      if (resultEl) {
+        resultEl.textContent = 'Copy failed — check console.';
+        resultEl.className = 'debug-copy-result test-error';
+      }
+    }
+  }
+
+  /**
+   * Gather all relevant data about the current Foundry game system that would
+   * be needed to build a Chronicle system adapter. Includes system metadata,
+   * actor types, sample actor schema, hooks used by the sync module, and the
+   * expected adapter interface.
+   * @returns {object}
+   * @private
+   */
+  _buildDebugExport() {
+    const sys = game.system;
+    const sampleActor = game.actors?.contents?.find(a => a.type === 'character')
+      || game.actors?.contents?.[0];
+
+    // Extract actor type distribution.
+    const actorTypes = {};
+    for (const a of (game.actors?.contents || [])) {
+      actorTypes[a.type] = (actorTypes[a.type] || 0) + 1;
+    }
+
+    // Extract system data schema from a sample actor.
+    let sampleSchema = null;
+    if (sampleActor?.system) {
+      sampleSchema = this._extractSchemaSnapshot(sampleActor.system, 'system', 3);
+    }
+
+    // Item type distribution.
+    const itemTypes = {};
+    const sampleItems = [];
+    if (sampleActor?.items?.size) {
+      for (const item of sampleActor.items) {
+        itemTypes[item.type] = (itemTypes[item.type] || 0) + 1;
+        if (sampleItems.length < 2) {
+          sampleItems.push({
+            name: item.name,
+            type: item.type,
+            schema: this._extractSchemaSnapshot(item.system || {}, 'system', 2),
+          });
+        }
+      }
+    }
+
+    // Chronicle sync state.
+    const matchedSystem = this._syncManager?.getMatchedSystem() || null;
+    const actorSync = this._syncManager?._modules?.find(
+      m => m.constructor?.name === 'ActorSync' || m._adapter
+    );
+
+    return {
+      _description: 'Chronicle Sync — Foundry System Debug Snapshot. '
+        + 'Use this to build a Chronicle system adapter or character-fields manifest. '
+        + 'See the "adapterInterface" section for the expected field mapping format.',
+      foundry: {
+        version: game.version,
+        system: {
+          id: sys?.id,
+          title: sys?.title,
+          version: sys?.version,
+        },
+      },
+      actorTypes,
+      sampleActor: sampleActor ? {
+        name: sampleActor.name,
+        type: sampleActor.type,
+        schema: sampleSchema,
+      } : null,
+      sampleItems: sampleItems.length ? sampleItems : null,
+      itemTypes: Object.keys(itemTypes).length ? itemTypes : null,
+      chronicleState: {
+        matchedSystem,
+        hasAdapter: !!actorSync?._adapter,
+        adapterType: actorSync?._adapter?._fieldDefs ? 'generic' : (actorSync?._adapter ? 'built-in' : 'none'),
+      },
+      hooks: {
+        _note: 'These are the Foundry hooks the Chronicle sync module listens to. '
+          + 'The adapter maps fields between these hook payloads and Chronicle entity fields_data.',
+        actorHooks: ['createActor', 'updateActor', 'deleteActor'],
+        itemHooks: ['createItem', 'updateItem', 'deleteItem'],
+        journalHooks: ['createJournalEntry', 'updateJournalEntry', 'deleteJournalEntry'],
+      },
+      adapterInterface: {
+        _note: 'To build a Chronicle system adapter, implement these exports. '
+          + 'toChronicleFields(actor) extracts from actor.system paths. '
+          + 'fromChronicleFields(entity) returns dot-notation keys for actor.update(). '
+          + 'Alternatively, create a generic adapter manifest with foundry_path annotations.',
+        exports: {
+          systemId: 'string — Chronicle system ID (e.g., "drawsteel")',
+          characterTypeSlug: 'string — Chronicle entity type slug (e.g., "drawsteel-character")',
+          actorType: 'string — Foundry actor type to sync (e.g., "character" or "hero")',
+          'toChronicleFields(actor)': 'Extract actor.system fields → flat {key: value} object',
+          'fromChronicleFields(entity)': 'Convert entity.fields_data → {"system.path.to.field": value} for actor.update()',
+        },
+        genericManifestFormat: {
+          _note: 'For the generic adapter, define fields via the /systems/:id/character-fields API.',
+          exampleField: {
+            key: 'hp_current',
+            foundry_path: 'system.attributes.hp.value',
+            foundry_writable: true,
+            type: 'number',
+          },
+          foundry_actor_type: 'character (or "hero" for Draw Steel, etc.)',
+          preset_slug: '<systemId>-character',
+        },
+      },
+    };
+  }
+
+  /**
+   * Recursively extract a schema snapshot from an object, showing types and
+   * sample values up to a given depth. Arrays are sampled at index 0.
+   * @param {object} obj - The object to snapshot.
+   * @param {string} prefix - Dot-notation prefix for keys.
+   * @param {number} maxDepth - Maximum recursion depth.
+   * @returns {object} Schema snapshot with {path: {type, value}} entries.
+   * @private
+   */
+  _extractSchemaSnapshot(obj, prefix, maxDepth) {
+    const result = {};
+    if (maxDepth <= 0 || obj == null || typeof obj !== 'object') return result;
+
+    const entries = Object.entries(obj);
+    for (const [key, value] of entries) {
+      const path = `${prefix}.${key}`;
+
+      if (value == null) {
+        result[path] = { type: 'null', value: null };
+      } else if (typeof value === 'number') {
+        result[path] = { type: 'number', value };
+      } else if (typeof value === 'string') {
+        result[path] = { type: 'string', value: value.length > 80 ? value.slice(0, 80) + '...' : value };
+      } else if (typeof value === 'boolean') {
+        result[path] = { type: 'boolean', value };
+      } else if (Array.isArray(value)) {
+        result[path] = { type: 'array', length: value.length };
+      } else if (typeof value === 'object') {
+        Object.assign(result, this._extractSchemaSnapshot(value, path, maxDepth - 1));
+      }
+    }
+    return result;
   }
 
   // ---------------------------------------------------------------------------
