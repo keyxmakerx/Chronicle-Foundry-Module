@@ -85,7 +85,7 @@ Hooks.once('ready', async () => {
 Hooks.on('getSceneControlButtons', (controls) => {
   if (!game.user.isGM) return;
 
-  controls.push({
+  const controlData = {
     name: 'chronicle-sync',
     title: 'Chronicle Sync',
     icon: 'fa-solid fa-rotate',
@@ -100,7 +100,14 @@ Hooks.on('getSceneControlButtons', (controls) => {
         if (dashboard) dashboard.render({ force: true });
       },
     }],
-  });
+  };
+
+  // v13: controls is a keyed object; v12: controls is an array.
+  if (Array.isArray(controls)) {
+    controls.push(controlData);
+  } else {
+    controls['chronicle-sync'] = controlData;
+  }
 });
 
 /**
