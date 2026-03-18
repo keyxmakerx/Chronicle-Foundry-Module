@@ -27,8 +27,26 @@ let dashboard = null;
  * This runs before the game is fully ready.
  */
 Hooks.once('init', () => {
-  console.log('Chronicle Sync | Initializing');
+  console.debug('Chronicle Sync | Initializing');
   registerSettings();
+
+  // Register Handlebars helpers used by dashboard/shop templates.
+  Handlebars.registerHelper('eq', (a, b) => a === b);
+  Handlebars.registerHelper('neq', (a, b) => a !== b);
+  Handlebars.registerHelper('lt', (a, b) => a < b);
+  Handlebars.registerHelper('timeAgo', (isoString) => {
+    if (!isoString) return 'Never';
+    const diff = Date.now() - new Date(isoString).getTime();
+    if (diff < 0) return 'Just now';
+    const seconds = Math.floor(diff / 1000);
+    if (seconds < 60) return 'Just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  });
 });
 
 /**
@@ -37,7 +55,7 @@ Hooks.once('init', () => {
  * Foundry's native document sync.
  */
 Hooks.once('ready', async () => {
-  console.log('Chronicle Sync | Ready');
+  console.debug('Chronicle Sync | Ready');
 
   syncManager = new SyncManager();
 
@@ -134,20 +152,54 @@ function _addStatusIndicator() {
   };
 
   // Event-driven state updates (no polling).
-  syncManager.api.onStateChange(updateState);
+  let wasConnected = false;
+  syncManager.api.onStateChange((state) => {
+    updateState(state);
+    // Notify on disconnect (only if we were previously connected).
+    if (state === 'disconnected' && wasConnected) {
+      ui.notifications.warn('Chronicle: Connection lost. Reconnecting automatically...');
+    }
+    if (state === 'connected') {
+      if (wasConnected) {
+        // Reconnected after a disconnect.
+        ui.notifications.info('Chronicle: Reconnected.');
+      }
+      wasConnected = true;
+    }
+  });
   updateState();
 
-  // Click to open the sync dashboard.
+  // Click to open the sync dashboard, or reconnect if disconnected.
   indicator.addEventListener('click', () => {
+    if (syncManager.api.state === 'disconnected') {
+      syncManager.api.connect();
+      ui.notifications.info('Chronicle: Reconnecting...');
+    } else if (dashboard) {
+      dashboard.render({ force: true });
+    }
+  });
+
+  // Right-click always opens the dashboard (even when disconnected).
+  indicator.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
     if (dashboard) dashboard.render({ force: true });
   });
 
   // Flash the dot briefly when a WS message arrives (activity indicator).
+  // Throttled to avoid excessive DOM manipulation under high message volume.
+  let activityThrottled = false;
   syncManager.api.on('*', () => {
+    if (activityThrottled) return;
+    activityThrottled = true;
     const dot = indicator.querySelector('.status-dot');
     if (dot && syncManager.api.state === 'connected') {
       dot.classList.add('activity');
-      setTimeout(() => dot.classList.remove('activity'), 300);
+      setTimeout(() => {
+        dot.classList.remove('activity');
+        activityThrottled = false;
+      }, 300);
+    } else {
+      activityThrottled = false;
     }
   });
 
@@ -167,13 +219,13 @@ function _addStatusIndicator() {
 function _statusTooltip(state) {
   switch (state) {
     case 'connected':
-      return 'Connected to Chronicle. Real-time sync active.';
+      return 'Connected to Chronicle. Click to open dashboard.';
     case 'connecting':
       return 'Connecting to Chronicle...';
     case 'reconnecting':
       return 'Connection lost. Reconnecting automatically...';
     default:
-      return 'Disconnected from Chronicle. Click to reconnect.';
+      return 'Disconnected from Chronicle. Click to reconnect. Right-click for dashboard.';
   }
 }
 

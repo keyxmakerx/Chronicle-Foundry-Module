@@ -64,14 +64,14 @@ export class ActorSync {
     this._api = api;
 
     if (!getSetting('syncCharacters')) {
-      console.log('Chronicle: Character sync disabled in settings');
+      console.debug('Chronicle: Character sync disabled in settings');
       return;
     }
 
     // Load the system adapter based on matched system.
     this._adapter = await this._loadAdapter();
     if (!this._adapter) {
-      console.log('Chronicle: No system adapter available, character sync inactive');
+      console.debug('Chronicle: No system adapter available, character sync inactive');
       return;
     }
 
@@ -83,7 +83,7 @@ export class ActorSync {
     Hooks.on('updateActor', this._onUpdateActor);
     Hooks.on('deleteActor', this._onDeleteActor);
 
-    console.log(`Chronicle: Actor sync initialized (adapter: ${this._adapter.systemId}, actorType: ${this._actorType})`);
+    console.debug(`Chronicle: Actor sync initialized (adapter: ${this._adapter.systemId}, actorType: ${this._actorType})`);
   }
 
   /**
@@ -228,7 +228,7 @@ export class ActorSync {
         sync_direction: 'both',
       });
 
-      console.log(`Chronicle: Created actor "${entity.name}" from character entity`);
+      console.debug(`Chronicle: Created actor "${entity.name}" from character entity`);
     } catch (err) {
       console.error('Chronicle: Failed to create actor from entity', err);
     } finally {
@@ -271,7 +271,7 @@ export class ActorSync {
       if (actor.hidden !== shouldBeHidden) {
         // Update the actor's default token hidden state and active tokens.
         await actor.update({ 'prototypeToken.hidden': shouldBeHidden });
-        console.log(
+        console.debug(
           `Chronicle: ${shouldBeHidden ? 'Hid' : 'Revealed'} actor "${actor.name}" (visibility sync)`
         );
       }
@@ -279,7 +279,7 @@ export class ActorSync {
       // Update sync timestamp.
       await actor.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
 
-      console.log(`Chronicle: Updated actor "${actor.name}" from entity`);
+      console.debug(`Chronicle: Updated actor "${actor.name}" from entity`);
     } catch (err) {
       console.error(`Chronicle: Failed to update actor "${actor.name}"`, err);
     } finally {
@@ -306,7 +306,7 @@ export class ActorSync {
       this._syncing = true;
       await actor.unsetFlag(FLAG_SCOPE, 'entityId');
       await actor.unsetFlag(FLAG_SCOPE, 'lastSync');
-      console.log(`Chronicle: Unlinked actor "${actor.name}" (entity deleted)`);
+      console.debug(`Chronicle: Unlinked actor "${actor.name}" (entity deleted)`);
     } catch (err) {
       console.error('Chronicle: Failed to unlink actor after entity deletion', err);
     } finally {
@@ -346,10 +346,13 @@ export class ActorSync {
       });
 
       if (entity) {
-        this._syncing = true;
-        await actor.setFlag(FLAG_SCOPE, 'entityId', entity.id);
-        await actor.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
-        this._syncing = false;
+        try {
+          this._syncing = true;
+          await actor.setFlag(FLAG_SCOPE, 'entityId', entity.id);
+          await actor.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
+        } finally {
+          this._syncing = false;
+        }
 
         // Create sync mapping.
         await this._api.post('/sync/mappings', {
@@ -360,10 +363,9 @@ export class ActorSync {
           sync_direction: 'both',
         });
 
-        console.log(`Chronicle: Pushed new actor "${actor.name}" to Chronicle`);
+        console.debug(`Chronicle: Pushed new actor "${actor.name}" to Chronicle`);
       }
     } catch (err) {
-      this._syncing = false;
       console.error('Chronicle: Failed to push new actor to Chronicle', err);
     }
   }
@@ -398,7 +400,7 @@ export class ActorSync {
         await this._api.post(`/entities/${entityId}/reveal`, {
           is_private: isHidden,
         });
-        console.log(
+        console.debug(
           `Chronicle: ${isHidden ? 'Hid' : 'Revealed'} entity for actor "${actor.name}" (Foundry → Chronicle)`
         );
       } catch (err) {
@@ -421,13 +423,15 @@ export class ActorSync {
         await this._api.put(`/entities/${entityId}`, { name: change.name });
       }
 
-      this._syncing = true;
-      await actor.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
-      this._syncing = false;
+      try {
+        this._syncing = true;
+        await actor.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
+      } finally {
+        this._syncing = false;
+      }
 
-      console.log(`Chronicle: Pushed actor "${actor.name}" changes to Chronicle`);
+      console.debug(`Chronicle: Pushed actor "${actor.name}" changes to Chronicle`);
     } catch (err) {
-      this._syncing = false;
       console.error('Chronicle: Failed to push actor update to Chronicle', err);
     }
   }
@@ -449,7 +453,7 @@ export class ActorSync {
 
     try {
       await this._api.delete(`/entities/${entityId}`);
-      console.log(`Chronicle: Deleted entity for actor "${actor.name}"`);
+      console.debug(`Chronicle: Deleted entity for actor "${actor.name}"`);
     } catch (err) {
       console.error('Chronicle: Failed to delete entity for deleted actor', err);
     }
@@ -486,7 +490,7 @@ export class ActorSync {
     try {
       const generic = await createGenericAdapter(this._api, matchedSystem);
       if (generic) {
-        console.log(`Chronicle: Using generic adapter for "${matchedSystem}"`);
+        console.debug(`Chronicle: Using generic adapter for "${matchedSystem}"`);
         return generic;
       }
     } catch (err) {
@@ -514,7 +518,7 @@ export class ActorSync {
       );
       if (match) {
         this._characterTypeId = match.id;
-        console.log(`Chronicle: Character type resolved — "${match.name}" (ID: ${match.id})`);
+        console.debug(`Chronicle: Character type resolved — "${match.name}" (ID: ${match.id})`);
       } else {
         console.warn('Chronicle: No character entity type found in campaign');
       }

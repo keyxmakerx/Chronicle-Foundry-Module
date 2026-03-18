@@ -57,6 +57,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'open-settings': SyncDashboard.#onOpenSettingsAction,
       'open-shop': SyncDashboard.#onOpenShopAction,
       'push-actor': SyncDashboard.#onPushActorAction,
+      'push-all-actors': SyncDashboard.#onPushAllActorsAction,
       'test-connection': SyncDashboard.#onTestConnectionAction,
       'save-config': SyncDashboard.#onSaveConfigAction,
     },
@@ -113,6 +114,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       return { configured: false };
     }
 
+    this._loading = true;
     const exclusions = this._getExclusions();
 
     // Build entity tab data.
@@ -158,9 +160,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     // Build config tab data.
     const configData = this._buildConfigData(entityGroups);
 
+    this._loading = false;
+
     return {
       configured: true,
-      loading: this._loading,
+      loading: false,
       searchFilter: this._searchFilter,
       activeTab: this._activeTab,
 
@@ -550,8 +554,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       (m) => m.constructor?.name === 'ActorSync'
     );
     const characters = actorSync?.getSyncedActors?.() ?? [];
+    const hasUnlinkedCharacters = characters.some((c) => !c.synced);
 
-    return { characters };
+    return { characters, hasUnlinkedCharacters };
   }
 
   // ---------------------------------------------------------------------------
@@ -962,6 +967,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this._onPushActor(actorId);
   }
 
+  /** Push all unlinked actors to Chronicle. */
+  static #onPushAllActorsAction() {
+    this._onPushAllActors();
+  }
+
   /** Test connection to Chronicle using current config field values. */
   static #onTestConnectionAction() {
     this._onTestConnection();
@@ -1262,6 +1272,52 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       console.error('Chronicle Dashboard: Push actor failed', err);
       ui.notifications.error(`Failed to push actor: ${err.message}`);
     }
+  }
+
+  /**
+   * Push all unlinked actors to Chronicle.
+   * Shows a confirmation dialog before proceeding.
+   * @private
+   */
+  async _onPushAllActors() {
+    const actorSync = this._syncManager?._modules?.find(
+      (m) => m.constructor?.name === 'ActorSync'
+    );
+    if (!actorSync) {
+      ui.notifications.warn('Character sync module not active.');
+      return;
+    }
+
+    const characters = actorSync.getSyncedActors?.() ?? [];
+    const unlinked = characters.filter((c) => !c.synced);
+
+    if (unlinked.length === 0) {
+      ui.notifications.info('Chronicle: All characters are already synced.');
+      return;
+    }
+
+    const confirmed = await Dialog.confirm({
+      title: 'Push All Actors to Chronicle',
+      content: `<p>Push ${unlinked.length} unlinked actor(s) to Chronicle?</p>`,
+    });
+    if (!confirmed) return;
+
+    let count = 0;
+    for (const c of unlinked) {
+      try {
+        const actor = game.actors.get(c.id);
+        if (actor) {
+          await actorSync._handleCreateActor(actor, {}, game.user.id);
+          count++;
+        }
+      } catch (err) {
+        console.error(`Chronicle Dashboard: Failed to push actor "${c.name}"`, err);
+      }
+    }
+
+    this._logActivity('push', `Pushed ${count} actors to Chronicle`);
+    ui.notifications.info(`Chronicle: Pushed ${count} actor(s) to Chronicle.`);
+    this.render({ force: true });
   }
 
   // ---------------------------------------------------------------------------

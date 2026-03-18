@@ -45,7 +45,7 @@ export class JournalSync {
     Hooks.on('updateJournalEntry', this._onUpdateJournal);
     Hooks.on('deleteJournalEntry', this._onDeleteJournal);
 
-    console.log('Chronicle: Journal sync initialized');
+    console.debug('Chronicle: Journal sync initialized');
   }
 
   /**
@@ -166,7 +166,7 @@ export class JournalSync {
       await journal.setFlag(FLAG_SCOPE, 'tags', entity.tags || []);
       await journal.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
 
-      console.log(`Chronicle: Updated journal "${journal.name}" from entity`);
+      console.debug(`Chronicle: Updated journal "${journal.name}" from entity`);
     } finally {
       this._syncing = false;
     }
@@ -188,7 +188,7 @@ export class JournalSync {
     this._syncing = true;
     try {
       await journal.delete();
-      console.log(`Chronicle: Deleted journal for entity ${data.id}`);
+      console.debug(`Chronicle: Deleted journal for entity ${data.id}`);
     } finally {
       this._syncing = false;
     }
@@ -280,7 +280,7 @@ export class JournalSync {
         }
       }
 
-      console.log(`Chronicle: Created journal "${entity.name}" from entity`);
+      console.debug(`Chronicle: Created journal "${entity.name}" from entity`);
       return journal;
     } finally {
       this._syncing = false;
@@ -338,7 +338,7 @@ export class JournalSync {
           (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER;
         await this._pushPermissions(entity.id, journal.ownership, isPrivate);
 
-        console.log(`Chronicle: Pushed new journal "${journal.name}" to Chronicle`);
+        console.debug(`Chronicle: Pushed new journal "${journal.name}" to Chronicle`);
       }
     } catch (err) {
       console.error('Chronicle: Failed to push journal to Chronicle', err);
@@ -384,7 +384,7 @@ export class JournalSync {
         this._syncing = false;
       }
 
-      console.log(`Chronicle: Pushed journal update "${journal.name}" to Chronicle`);
+      console.debug(`Chronicle: Pushed journal update "${journal.name}" to Chronicle`);
     } catch (err) {
       console.error('Chronicle: Failed to push journal update', err);
     }
@@ -406,7 +406,7 @@ export class JournalSync {
 
     try {
       await this._api.delete(`/entities/${entityId}`);
-      console.log(`Chronicle: Deleted entity ${entityId} from journal deletion`);
+      console.debug(`Chronicle: Deleted entity ${entityId} from journal deletion`);
     } catch (err) {
       // Entity may already be deleted on Chronicle side — that's fine.
       console.warn('Chronicle: Failed to delete entity on Chronicle', err);

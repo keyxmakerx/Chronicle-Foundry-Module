@@ -68,7 +68,7 @@ export class MapSync {
       });
     });
 
-    console.log('Chronicle: Map sync initialized');
+    console.debug('Chronicle: Map sync initialized');
   }
 
   /**
@@ -135,7 +135,7 @@ export class MapSync {
       const scene = game.scenes.get(mapping.external_id);
       if (scene && !scene.getFlag(FLAG_SCOPE, 'mapId')) {
         await scene.setFlag(FLAG_SCOPE, 'mapId', mapping.chronicle_id);
-        console.log(`Chronicle: Linked scene "${scene.name}" to map ${mapping.chronicle_id}`);
+        console.debug(`Chronicle: Linked scene "${scene.name}" to map ${mapping.chronicle_id}`);
       }
     } else if (mapping.chronicle_type === 'drawing') {
       // Set drawingId flag on the matching Foundry Drawing.
@@ -186,7 +186,7 @@ export class MapSync {
         if (maps && maps.length === 1) {
           mapId = maps[0].id;
           await scene.setFlag(FLAG_SCOPE, 'mapId', mapId);
-          console.log(`Chronicle: Auto-linked scene "${scene.name}" to map "${maps[0].name}"`);
+          console.debug(`Chronicle: Auto-linked scene "${scene.name}" to map "${maps[0].name}"`);
 
           // Create sync mapping on the server.
           await this._api.post('/sync/mappings', {
@@ -254,7 +254,7 @@ export class MapSync {
         await this._reconcileFogRegions(scene, fog);
       }
 
-      console.log('Chronicle: Map initial sync complete');
+      console.debug('Chronicle: Map initial sync complete');
     } catch (err) {
       console.error('Chronicle: Map initial sync failed', err);
     }
@@ -540,7 +540,7 @@ export class MapSync {
     try {
       const [created] = await scene.createEmbeddedDocuments('Drawing', [drawingData]);
       if (created) {
-        console.log(`Chronicle: Fog region ${region.id} added to scene`);
+        console.debug(`Chronicle: Fog region ${region.id} added to scene`);
       }
     } finally {
       this._syncing = false;
@@ -564,7 +564,7 @@ export class MapSync {
         'Drawing',
         fogDrawings.map((d) => d.id)
       );
-      console.log(`Chronicle: Cleared ${fogDrawings.length} fog drawings`);
+      console.debug(`Chronicle: Cleared ${fogDrawings.length} fog drawings`);
     } finally {
       this._syncing = false;
     }
@@ -631,6 +631,7 @@ export class MapSync {
 
     try {
       const chronicleDrawing = this._foundryDrawingToChronicle(drawing);
+      if (!chronicleDrawing) return;
       const result = await this._api.post(`/maps/${mapId}/drawings`, chronicleDrawing);
 
       if (result?.id) {
@@ -655,6 +656,7 @@ export class MapSync {
 
     try {
       const chronicleDrawing = this._foundryDrawingToChronicle(drawing);
+      if (!chronicleDrawing) return;
       await this._api.put(`/maps/${mapId}/drawings/${drawingId}`, chronicleDrawing);
     } catch (err) {
       console.error('Chronicle: Failed to update drawing', err);
@@ -831,7 +833,7 @@ export class MapSync {
   async _handleFogDrawingDelete(mapId, fogRegionId) {
     try {
       await this._api.delete(`/maps/${mapId}/fog/${fogRegionId}`);
-      console.log(`Chronicle: Fog region ${fogRegionId} deleted`);
+      console.debug(`Chronicle: Fog region ${fogRegionId} deleted`);
     } catch (err) {
       console.warn('Chronicle: Failed to delete fog region from Chronicle', err);
     }
@@ -890,6 +892,7 @@ export class MapSync {
         this._tokenDebounceTimers.delete(key);
         try {
           const scene = token.parent;
+          if (!scene?.dimensions) return;
           // Convert Foundry pixel coords to percentage.
           const x = (token.x / scene.dimensions.width) * 100;
           const y = (token.y / scene.dimensions.height) * 100;
@@ -978,8 +981,8 @@ export class MapSync {
       strokeAlpha: 1,
       strokeWidth: cd.stroke_width || 2,
       fillColor: cd.fill_color || '',
-      fillAlpha: cd.fill_alpha || 0.5,
-      rotation: cd.rotation || 0,
+      fillAlpha: cd.fill_alpha ?? 0.5,
+      rotation: cd.rotation ?? 0,
       text: cd.text_content || '',
       fontSize: cd.font_size || 48,
       hidden: cd.visibility === 'dm_only',
@@ -1000,6 +1003,7 @@ export class MapSync {
    */
   _foundryDrawingToChronicle(drawing) {
     const scene = drawing.parent;
+    if (!scene?.dimensions) return null;
     const dims = scene.dimensions;
     const typeMap = { f: 'freehand', r: 'rectangle', e: 'ellipse', p: 'polygon', t: 'text' };
 
@@ -1029,10 +1033,10 @@ export class MapSync {
       stroke_color: drawing.strokeColor || '#000000',
       stroke_width: drawing.strokeWidth || 2,
       fill_color: drawing.fillColor || null,
-      fill_alpha: drawing.fillAlpha || 0.5,
+      fill_alpha: drawing.fillAlpha ?? 0.5,
       text_content: drawing.text || '',
       font_size: drawing.fontSize || 48,
-      rotation: drawing.rotation || 0,
+      rotation: drawing.rotation ?? 0,
       visibility: drawing.hidden ? 'dm_only' : 'everyone',
     };
   }
@@ -1059,9 +1063,9 @@ export class MapSync {
       texture: { src: ct.image_path || '' },
       width: ct.width || 1,
       height: ct.height || 1,
-      rotation: ct.rotation || 0,
-      hidden: ct.is_hidden || false,
-      elevation: ct.elevation || 0,
+      rotation: ct.rotation ?? 0,
+      hidden: ct.is_hidden ?? false,
+      elevation: ct.elevation ?? 0,
       'bar1.value': ct.bar1_value,
       'bar1.max': ct.bar1_max,
       'bar2.value': ct.bar2_value,
@@ -1092,9 +1096,9 @@ export class MapSync {
       y: (token.y / dims.height) * 100,
       width: token.width || 1,
       height: token.height || 1,
-      rotation: token.rotation || 0,
-      is_hidden: token.hidden || false,
-      elevation: token.elevation || 0,
+      rotation: token.rotation ?? 0,
+      is_hidden: token.hidden ?? false,
+      elevation: token.elevation ?? 0,
       bar1_value: token.bar1?.value,
       bar1_max: token.bar1?.max,
       bar2_value: token.bar2?.value,

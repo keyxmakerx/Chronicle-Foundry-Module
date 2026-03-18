@@ -53,6 +53,8 @@ export class ChronicleAPI {
       connectedSince: null,
       /** Total time connected (ms), excluding current connection. */
       totalConnectedMs: 0,
+      /** Timestamp (ms) of when this API client was created (session start). */
+      sessionStart: Date.now(),
       /** Timestamp (ms) of last successful REST call. */
       lastRestSuccess: null,
       /** Timestamp (ms) of last REST error. */
@@ -124,7 +126,15 @@ export class ChronicleAPI {
     // Handle 204 No Content.
     if (response.status === 204) return null;
 
-    return response.json();
+    // Parse JSON response safely.
+    const text = await response.text();
+    if (!text) return null;
+    try {
+      return JSON.parse(text);
+    } catch (err) {
+      this._logError('warn', method, path, response.status, 'Invalid JSON response body');
+      return null;
+    }
   }
 
   /**
@@ -243,7 +253,7 @@ export class ChronicleAPI {
       retries: 0,
       maxRetries,
     });
-    console.log(`Chronicle: Queued ${method} ${path} for retry (${this._retryQueue.length} pending)`);
+    console.debug(`Chronicle: Queued ${method} ${path} for retry (${this._retryQueue.length} pending)`);
   }
 
   /**
@@ -286,7 +296,7 @@ export class ChronicleAPI {
     this._retryProcessing = false;
 
     if (success > 0 || failed > 0) {
-      console.log(`Chronicle: Retry queue processed — ${success} succeeded, ${failed} permanently failed, ${this._retryQueue.length} remaining`);
+      console.debug(`Chronicle: Retry queue processed — ${success} succeeded, ${failed} permanently failed, ${this._retryQueue.length} remaining`);
     }
 
     return { success, failed };
@@ -319,7 +329,7 @@ export class ChronicleAPI {
       method,
       path,
       status,
-      message: message.substring(0, 200), // Truncate long error bodies.
+      message: message.length > 200 ? message.substring(0, 200) + '…' : message,
     });
     if (this._errorLog.length > this._maxErrorLogEntries) {
       this._errorLog.length = this._maxErrorLogEntries;
@@ -346,20 +356,13 @@ export class ChronicleAPI {
    * @returns {number} 0-100 percentage.
    */
   getUptimePercent() {
-    const sessionStart = this.health.totalConnectedMs;
-    let connectedMs = sessionStart;
+    let connectedMs = this.health.totalConnectedMs;
 
     if (this.health.connectedSince) {
       connectedMs += Date.now() - this.health.connectedSince;
     }
 
-    // Approximate session duration from first success or first error.
-    const firstActivity = Math.min(
-      this.health.lastRestSuccess || Date.now(),
-      this.health.lastRestError || Date.now(),
-      this.health.connectedSince || Date.now()
-    );
-    const sessionDuration = Date.now() - firstActivity;
+    const sessionDuration = Date.now() - this.health.sessionStart;
 
     if (sessionDuration <= 0) return 100;
     return Math.min(100, Math.round((connectedMs / sessionDuration) * 100));
@@ -404,6 +407,10 @@ export class ChronicleAPI {
       this._ws.send(JSON.stringify(message));
     } else {
       this._messageQueue.push(message);
+      // Cap queue to prevent unbounded growth during long disconnects.
+      if (this._messageQueue.length > 100) {
+        this._messageQueue.shift();
+      }
     }
   }
 
@@ -456,7 +463,7 @@ export class ChronicleAPI {
     }
 
     this._ws.onopen = async () => {
-      console.log('Chronicle: WebSocket connected');
+      console.debug('Chronicle: WebSocket connected');
       this._setState('connected');
       this._reconnectDelay = 1000; // Reset backoff.
       this.health.connectedSince = Date.now();
@@ -480,7 +487,7 @@ export class ChronicleAPI {
     };
 
     this._ws.onclose = (event) => {
-      console.log(`Chronicle: WebSocket closed (code=${event.code})`);
+      console.debug(`Chronicle: WebSocket closed (code=${event.code})`);
       this._ws = null;
 
       // Track connected time.
@@ -522,7 +529,7 @@ export class ChronicleAPI {
     this.health.reconnectAttempts++;
 
     const delay = Math.min(this._reconnectDelay, 30000); // Cap at 30s.
-    console.log(`Chronicle: Reconnecting in ${delay}ms (attempt ${this.health.reconnectAttempts})`);
+    console.debug(`Chronicle: Reconnecting in ${delay}ms (attempt ${this.health.reconnectAttempts})`);
 
     this._reconnectTimer = setTimeout(() => {
       this._reconnectTimer = null;

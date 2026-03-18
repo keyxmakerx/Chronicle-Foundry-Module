@@ -57,7 +57,7 @@ export class ItemSync {
 
     if (!getSetting('syncCharacters')) {
       // Item sync requires character sync to be enabled (items belong to actors).
-      console.log('Chronicle: Item sync inactive (character sync disabled)');
+      console.debug('Chronicle: Item sync inactive (character sync disabled)');
       return;
     }
 
@@ -69,7 +69,7 @@ export class ItemSync {
     Hooks.on('deleteItem', this._onDeleteItem);
     Hooks.on('updateItem', this._onUpdateItem);
 
-    console.log('Chronicle: Item sync initialized');
+    console.debug('Chronicle: Item sync initialized');
   }
 
   /**
@@ -184,7 +184,7 @@ export class ItemSync {
     try {
       this._syncing = true;
       await item.delete();
-      console.log(`Chronicle: Removed item "${item.name}" from "${actor.name}" inventory`);
+      console.debug(`Chronicle: Removed item "${item.name}" from "${actor.name}" inventory`);
     } catch (err) {
       console.error('Chronicle: Failed to remove inventory item', err);
     } finally {
@@ -227,7 +227,7 @@ export class ItemSync {
       if (Object.keys(updateData).length > 0) {
         await item.update(updateData);
       }
-      console.log(`Chronicle: Updated item "${item.name}" metadata in "${actor.name}" inventory`);
+      console.debug(`Chronicle: Updated item "${item.name}" metadata in "${actor.name}" inventory`);
     } catch (err) {
       console.error('Chronicle: Failed to update inventory item metadata', err);
     } finally {
@@ -265,13 +265,13 @@ export class ItemSync {
           },
         },
         system: {
-          quantity: meta.quantity || 1,
-          equipped: meta.equipped || false,
+          quantity: meta.quantity ?? 1,
+          equipped: meta.equipped ?? false,
         },
       };
 
       await actor.createEmbeddedDocuments('Item', [itemData]);
-      console.log(`Chronicle: Added "${itemData.name}" to "${actor.name}" inventory`);
+      console.debug(`Chronicle: Added "${itemData.name}" to "${actor.name}" inventory`);
     } catch (err) {
       console.error('Chronicle: Failed to add item to actor inventory', err);
     } finally {
@@ -310,17 +310,20 @@ export class ItemSync {
         relationType: 'Has Item',
         reverseRelationType: 'In Inventory Of',
         metadata: JSON.stringify({
-          quantity: item.system?.quantity || 1,
-          equipped: item.system?.equipped || false,
+          quantity: item.system?.quantity ?? 1,
+          equipped: item.system?.equipped ?? false,
           foundry_item_name: item.name,
         }),
       });
 
       if (relation) {
         this._syncing = true;
-        await item.setFlag(FLAG_SCOPE, 'relationId', relation.id);
-        this._syncing = false;
-        console.log(`Chronicle: Pushed new item "${item.name}" from "${actor.name}" to Chronicle`);
+        try {
+          await item.setFlag(FLAG_SCOPE, 'relationId', relation.id);
+        } finally {
+          this._syncing = false;
+        }
+        console.debug(`Chronicle: Pushed new item "${item.name}" from "${actor.name}" to Chronicle`);
       }
     } catch (err) {
       this._syncing = false;
@@ -349,7 +352,7 @@ export class ItemSync {
 
     try {
       await this._api.delete(`/entities/${entityId}/relations/${relationId}`);
-      console.log(`Chronicle: Removed item relation for "${item.name}" from Chronicle`);
+      console.debug(`Chronicle: Removed item relation for "${item.name}" from Chronicle`);
     } catch (err) {
       console.warn(`Chronicle: Failed to remove item relation for "${item.name}"`, err);
     }
@@ -378,8 +381,8 @@ export class ItemSync {
 
     try {
       const meta = {
-        quantity: item.system?.quantity || 1,
-        equipped: item.system?.equipped || false,
+        quantity: item.system?.quantity ?? 1,
+        equipped: item.system?.equipped ?? false,
       };
 
       await this._api.put(`/entities/${entityId}/relations/${relationId}/metadata`, {
@@ -406,7 +409,7 @@ export class ItemSync {
       const result = await this._api.get(`/systems/${matchedSystem}/item-fields`);
       if (result?.fields) {
         this._itemFields = result.fields;
-        console.log(`Chronicle: Loaded ${result.fields.length} item field definitions`);
+        console.debug(`Chronicle: Loaded ${result.fields.length} item field definitions`);
       }
     } catch (err) {
       console.warn('Chronicle: Failed to load item field definitions', err);

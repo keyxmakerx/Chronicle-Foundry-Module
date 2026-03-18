@@ -44,7 +44,7 @@ export async function createGenericAdapter(api, chronicleSystemId) {
 
   const writableFields = mappedFields.filter((f) => f.foundry_writable !== false);
 
-  console.log(
+  console.debug(
     `Chronicle: Generic adapter loaded for "${chronicleSystemId}" — ` +
     `${mappedFields.length} fields mapped, ${writableFields.length} writable`
   );
@@ -98,7 +98,9 @@ export async function createGenericAdapter(api, chronicleSystemId) {
 
         // Cast to appropriate type.
         if (field.type === 'number') {
-          update[field.foundry_path] = Number(value);
+          const num = Number(value);
+          if (Number.isNaN(num)) continue;
+          update[field.foundry_path] = num;
         } else {
           update[field.foundry_path] = value;
         }

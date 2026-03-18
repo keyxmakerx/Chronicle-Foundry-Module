@@ -56,12 +56,12 @@ export class CalendarSync {
     }
 
     if (!this._calendarModule) {
-      console.log('Chronicle: No calendar module detected (Calendaria or SimpleCalendar). Calendar sync disabled.');
+      console.debug('Chronicle: No calendar module detected (Calendaria or SimpleCalendar). Calendar sync disabled.');
       return;
     }
 
     this._registerHooks();
-    console.log(`Chronicle: Calendar sync initialized (${this._calendarModule} detected)`);
+    console.debug(`Chronicle: Calendar sync initialized (${this._calendarModule} detected)`);
   }
 
   /**
@@ -98,7 +98,7 @@ export class CalendarSync {
 
     // Store the mapping so we can correlate local ↔ Chronicle events.
     if (mapping.external_id && mapping.chronicle_id) {
-      this._storeEventMapping(mapping.external_id, mapping.chronicle_id);
+      await this._storeEventMapping(mapping.external_id, mapping.chronicle_id);
     }
   }
 
@@ -112,7 +112,7 @@ export class CalendarSync {
     try {
       this._chronicleCalendar = await this._api.get('/calendar');
       if (!this._chronicleCalendar) {
-        console.log('Chronicle: No calendar configured for this campaign');
+        console.debug('Chronicle: No calendar configured for this campaign');
         return;
       }
 
@@ -125,7 +125,7 @@ export class CalendarSync {
         minute: this._chronicleCalendar.current_minute,
       });
 
-      console.log('Chronicle: Calendar initial sync complete');
+      console.debug('Chronicle: Calendar initial sync complete');
     } catch (err) {
       console.error('Chronicle: Calendar initial sync failed', err);
     }
@@ -312,7 +312,7 @@ export class CalendarSync {
 
       // Store the Chronicle event ID in the local module's data for later sync.
       if (result?.id && eventData.id) {
-        this._storeEventMapping(eventData.id, result.id);
+        await this._storeEventMapping(eventData.id, result.id);
       }
     } catch (err) {
       console.error('Chronicle: Failed to push calendar event', err);
@@ -362,7 +362,7 @@ export class CalendarSync {
 
     try {
       await this._api.delete(`/calendar/events/${chronicleId}`);
-      this._removeEventMapping(eventData.id);
+      await this._removeEventMapping(eventData.id);
     } catch (err) {
       console.warn('Chronicle: Failed to delete calendar event', err);
     }
@@ -398,7 +398,7 @@ export class CalendarSync {
       });
 
       if (result?.id) {
-        this._storeEventMapping(journal.id, result.id);
+        await this._storeEventMapping(journal.id, result.id);
         await journal.setFlag(FLAG_SCOPE, 'calendarEventId', result.id);
       }
     } catch (err) {
@@ -463,7 +463,7 @@ export class CalendarSync {
 
     try {
       await this._api.delete(`/calendar/events/${chronicleId}`);
-      this._removeEventMapping(journal.id);
+      await this._removeEventMapping(journal.id);
     } catch (err) {
       console.warn('Chronicle: Failed to delete SimpleCalendar note from Chronicle', err);
     }
@@ -555,11 +555,11 @@ export class CalendarSync {
           description: data.description || '',
         });
         if (localEvent?.id) {
-          this._storeEventMapping(localEvent.id, data.id);
+          await this._storeEventMapping(localEvent.id, data.id);
         }
       } else {
         // Fallback: store Chronicle event reference for display in our UI.
-        console.log('Chronicle: Calendaria createEvent API not available, event stored as reference');
+        console.debug('Chronicle: Calendaria createEvent API not available, event stored as reference');
       }
     } else if (this._calendarModule === 'simple-calendar') {
       // SimpleCalendar events are journal entries with note flags.
@@ -588,7 +588,7 @@ export class CalendarSync {
           0,    // repeats (none)
         );
         if (note?.id) {
-          this._storeEventMapping(note.id, data.id);
+          await this._storeEventMapping(note.id, data.id);
           // Store Chronicle event ID on the journal entry.
           const journal = game.journal.get(note.id);
           if (journal) {
@@ -651,7 +651,7 @@ export class CalendarSync {
       }
     }
 
-    this._removeEventMapping(localId);
+    await this._removeEventMapping(localId);
   }
 
   // --- Event Mapping Helpers ---
@@ -664,11 +664,11 @@ export class CalendarSync {
    * @param {string} chronicleId
    * @private
    */
-  _storeEventMapping(localId, chronicleId) {
+  async _storeEventMapping(localId, chronicleId) {
     const mappings = this._getEventMappings();
     mappings[localId] = chronicleId;
     mappings[`_rev_${chronicleId}`] = localId;
-    game.user.setFlag(FLAG_SCOPE, 'calendarEventMappings', mappings);
+    await game.user.setFlag(FLAG_SCOPE, 'calendarEventMappings', mappings);
   }
 
   /**
@@ -696,14 +696,14 @@ export class CalendarSync {
    * @param {string} localId
    * @private
    */
-  _removeEventMapping(localId) {
+  async _removeEventMapping(localId) {
     const mappings = this._getEventMappings();
     const chronicleId = mappings[localId];
     delete mappings[localId];
     if (chronicleId) {
       delete mappings[`_rev_${chronicleId}`];
     }
-    game.user.setFlag(FLAG_SCOPE, 'calendarEventMappings', mappings);
+    await game.user.setFlag(FLAG_SCOPE, 'calendarEventMappings', mappings);
   }
 
   /**
