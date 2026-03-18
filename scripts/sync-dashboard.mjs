@@ -1518,7 +1518,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     try {
       const snapshot = this._buildDebugExport();
       const text = '```json\n' + JSON.stringify(snapshot, null, 2) + '\n```';
-      await navigator.clipboard.writeText(text);
+      await game.clipboard.copyPlainText(text);
 
       if (resultEl) {
         resultEl.textContent = 'Copied to clipboard!';
