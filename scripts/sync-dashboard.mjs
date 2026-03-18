@@ -114,6 +114,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       return { configured: false };
     }
 
+    this._loading = true;
     const exclusions = this._getExclusions();
 
     // Build entity tab data.
@@ -159,9 +160,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     // Build config tab data.
     const configData = this._buildConfigData(entityGroups);
 
+    this._loading = false;
+
     return {
       configured: true,
-      loading: this._loading,
+      loading: false,
       searchFilter: this._searchFilter,
       activeTab: this._activeTab,
 

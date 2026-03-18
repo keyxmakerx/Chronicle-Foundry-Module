@@ -12,6 +12,12 @@
   </div>
   {{else}}
 
+  {{#if loading}}
+  <div class="dashboard-loading">
+    <i class="fa-solid fa-spinner fa-spin"></i> Loading...
+  </div>
+  {{/if}}
+
   {{!-- Tab navigation --}}
   <nav class="dashboard-tabs" data-group="primary">
     <a class="item" data-tab="config">
@@ -280,11 +286,16 @@
         </div>
         {{/if}}
 
-        {{!-- Empty state --}}
+        {{!-- Empty / no results states --}}
         {{#unless entityGroups.length}}
         {{#unless foundryOnlyJournals.length}}
         <div class="dashboard-empty-tab">
+          {{#if searchFilter}}
+          <i class="fa-solid fa-search fa-2x"></i>
+          <p>No entities match "{{searchFilter}}".</p>
+          {{else}}
           <p>No entities found. Create entities in Chronicle or journals in Foundry to get started.</p>
+          {{/if}}
         </div>
         {{/unless}}
         {{/unless}}
@@ -465,8 +476,8 @@
             </div>
             <div class="character-actions">
               {{#if synced}}
-              <span class="character-last-sync" title="Last synced">
-                {{lastSync}}
+              <span class="character-last-sync" title="{{lastSync}}">
+                {{timeAgo lastSync}}
               </span>
               {{else}}
               <button type="button" class="dashboard-btn btn-xs btn-push"
@@ -567,16 +578,18 @@
         {{#if calendar.noCampaignCalendar}}
         <i class="fa-solid fa-calendar-xmark fa-2x"></i>
         <p>No calendar configured for this campaign in Chronicle.</p>
-        {{else if calendar.module}}
-        <i class="fa-solid fa-toggle-off fa-2x"></i>
-        <p>Calendar sync is disabled. Enable it in Module Settings.</p>
         {{else if calendar.enabled}}
-        <i class="fa-solid fa-puzzle-piece fa-2x"></i>
-        <p>No calendar module detected.</p>
-        <p class="hint">Install <strong>Calendaria</strong> or <strong>Simple Calendar</strong> to enable calendar sync.</p>
+          {{#unless calendar.module}}
+          <i class="fa-solid fa-puzzle-piece fa-2x"></i>
+          <p>No calendar module detected.</p>
+          <p class="hint">Install <strong>Calendaria</strong> or <strong>Simple Calendar</strong> to enable calendar sync.</p>
+          {{/unless}}
         {{else}}
         <i class="fa-solid fa-toggle-off fa-2x"></i>
         <p>Calendar sync is disabled. Enable it in Module Settings.</p>
+        <button type="button" data-action="open-settings" class="dashboard-btn">
+          <i class="fa-solid fa-gear"></i> Open Settings
+        </button>
         {{/if}}
       </div>
       {{/if}}

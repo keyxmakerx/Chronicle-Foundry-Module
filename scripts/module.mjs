@@ -29,6 +29,24 @@ let dashboard = null;
 Hooks.once('init', () => {
   console.log('Chronicle Sync | Initializing');
   registerSettings();
+
+  // Register Handlebars helpers used by dashboard/shop templates.
+  Handlebars.registerHelper('eq', (a, b) => a === b);
+  Handlebars.registerHelper('neq', (a, b) => a !== b);
+  Handlebars.registerHelper('lt', (a, b) => a < b);
+  Handlebars.registerHelper('timeAgo', (isoString) => {
+    if (!isoString) return 'Never';
+    const diff = Date.now() - new Date(isoString).getTime();
+    if (diff < 0) return 'Just now';
+    const seconds = Math.floor(diff / 1000);
+    if (seconds < 60) return 'Just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  });
 });
 
 /**

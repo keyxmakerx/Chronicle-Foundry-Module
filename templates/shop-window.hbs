@@ -23,6 +23,7 @@
         {{#each inventory}}
           <div class="shop-item {{#unless in_stock}}out-of-stock{{/unless}}"
                data-item-id="{{id}}"
+               data-relation-id="{{relationId}}"
                draggable="true">
             {{#if image_path}}
               <img src="{{image_path}}" alt="{{name}}">
@@ -33,10 +34,15 @@
             {{/if}}
             <span class="item-name">{{name}}</span>
             {{#if price}}
-              <span class="item-price">{{price}} gp</span>
+              <span class="item-price">{{price}} {{currency}}</span>
             {{/if}}
             {{#if quantity}}
               <span class="item-qty">x{{quantity}}</span>
+            {{/if}}
+            {{#if in_stock}}
+            <button type="button" class="shop-buy-btn" data-item-id="{{id}}" data-relation-id="{{relationId}}" title="Purchase">
+              <i class="fa-solid fa-coins"></i>
+            </button>
             {{/if}}
           </div>
         {{/each}}
