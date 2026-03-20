@@ -15,6 +15,7 @@
  */
 
 import { getSetting } from './settings.mjs';
+import { ConflictError } from './api-client.mjs';
 import { createGenericAdapter } from './adapters/generic-adapter.mjs';
 
 // Flag namespace for Chronicle data stored on Foundry documents.
@@ -276,8 +277,11 @@ export class ActorSync {
         );
       }
 
-      // Update sync timestamp.
+      // Update sync timestamp and Chronicle updated_at for conflict detection.
       await actor.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
+      if (entity.updated_at) {
+        await actor.setFlag(FLAG_SCOPE, 'chronicleUpdatedAt', entity.updated_at);
+      }
 
       console.debug(`Chronicle: Updated actor "${actor.name}" from entity`);
     } catch (err) {
@@ -413,14 +417,45 @@ export class ActorSync {
 
     try {
       const fields = this._adapter.toChronicleFields(actor);
-      const updatePayload = { fields_data: fields };
-      if (change.name) updatePayload.name = change.name;
 
       await this._api.put(`/entities/${entityId}/fields`, { fields_data: fields });
 
-      // Update name separately if changed.
+      // Update name separately if changed, with conflict detection.
       if (change.name) {
-        await this._api.put(`/entities/${entityId}`, { name: change.name });
+        const nameBody = { name: change.name };
+        const chronicleUpdatedAt = actor.getFlag(FLAG_SCOPE, 'chronicleUpdatedAt');
+        if (chronicleUpdatedAt) {
+          nameBody.expected_updated_at = chronicleUpdatedAt;
+        }
+
+        try {
+          const result = await this._api.put(`/entities/${entityId}`, nameBody);
+          if (result?.updated_at) {
+            this._syncing = true;
+            try {
+              await actor.setFlag(FLAG_SCOPE, 'chronicleUpdatedAt', result.updated_at);
+            } finally {
+              this._syncing = false;
+            }
+          }
+        } catch (err) {
+          if (err instanceof ConflictError) {
+            const strategy = getSetting('conflictResolution');
+            if (strategy === 'chronicle') {
+              // Re-pull from Chronicle.
+              const entity = await this._api.get(`/entities/${entityId}`);
+              if (entity) await this._updateActorFromEntity(actor, entity);
+              ui.notifications.warn(`Chronicle: Conflict on "${actor.name}" — kept Chronicle version.`);
+            } else {
+              // Force push.
+              delete nameBody.expected_updated_at;
+              await this._api.put(`/entities/${entityId}`, nameBody);
+              ui.notifications.warn(`Chronicle: Conflict on "${actor.name}" — kept Foundry version.`);
+            }
+            return;
+          }
+          throw err;
+        }
       }
 
       try {

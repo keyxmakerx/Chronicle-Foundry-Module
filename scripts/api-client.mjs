@@ -10,6 +10,67 @@
 import { getSetting } from './settings.mjs';
 
 /**
+ * Error thrown when a PUT/POST request conflicts with a concurrent edit.
+ * The Chronicle API returns 409 when `expected_updated_at` is stale.
+ */
+export class ConflictError extends Error {
+  /**
+   * @param {object} data - Parsed response body from the 409 response.
+   */
+  constructor(data) {
+    super(data?.message || 'Entity was modified by another user');
+    this.name = 'ConflictError';
+    this.status = 409;
+    this.data = data;
+  }
+}
+
+// --- Case conversion helpers for Notes API ---
+// Notes responses use camelCase keys; requests use snake_case.
+
+/**
+ * Convert an object's keys from camelCase to snake_case (shallow).
+ * @param {object} obj
+ * @returns {object}
+ */
+function camelToSnake(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const snakeKey = key.replace(/[A-Z]/g, (ch) => `_${ch.toLowerCase()}`);
+    result[snakeKey] = value;
+  }
+  return result;
+}
+
+/**
+ * Convert an object's keys from snake_case to camelCase (shallow).
+ * @param {object} obj
+ * @returns {object}
+ */
+function snakeToCamel(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const camelKey = key.replace(/_([a-z])/g, (_, ch) => ch.toUpperCase());
+    result[camelKey] = value;
+  }
+  return result;
+}
+
+/**
+ * Normalize a Notes API response: convert camelCase keys to snake_case
+ * so internal code uses a consistent key format.
+ * Handles both single objects and arrays.
+ * @param {object|Array} data
+ * @returns {object|Array}
+ */
+function normalizeNoteResponse(data) {
+  if (Array.isArray(data)) return data.map(camelToSnake);
+  return camelToSnake(data);
+}
+
+/**
  * ChronicleAPI handles all communication with the Chronicle backend.
  * Combines REST fetch calls and a persistent WebSocket connection.
  */
@@ -116,6 +177,14 @@ export class ChronicleAPI {
       this.health.restErrorCount++;
       this.health.lastRestError = Date.now();
       this._logError('error', method, path, response.status, errorBody);
+
+      // Throw ConflictError for 409 so callers can handle optimistic concurrency.
+      if (response.status === 409) {
+        let data;
+        try { data = JSON.parse(errorBody); } catch { data = { message: errorBody }; }
+        throw new ConflictError(data);
+      }
+
       throw new Error(`Chronicle API error ${response.status}: ${errorBody}`);
     }
 
@@ -192,6 +261,55 @@ export class ChronicleAPI {
    */
   async delete(path) {
     return this.fetch(path, { method: 'DELETE' });
+  }
+
+  // --- Notes API (camelCase ↔ snake_case normalization) ---
+
+  /**
+   * GET notes from the Chronicle API, normalizing camelCase response keys to snake_case.
+   * @param {string} path - API path (e.g., '/notes').
+   * @returns {Promise<any>} Normalized response.
+   */
+  async getNotes(path) {
+    const data = await this.get(path);
+    if (!data) return data;
+    // Handle { data: [...] } wrapper or plain array/object.
+    if (data.data) {
+      return { ...data, data: normalizeNoteResponse(data.data) };
+    }
+    return normalizeNoteResponse(data);
+  }
+
+  /**
+   * POST a note, converting snake_case request body to snake_case (already native).
+   * Normalizes the camelCase response.
+   * @param {string} path
+   * @param {object} body - Request body in snake_case.
+   * @returns {Promise<any>}
+   */
+  async postNote(path, body) {
+    const data = await this.post(path, body);
+    return data ? normalizeNoteResponse(data) : data;
+  }
+
+  /**
+   * PUT a note, normalizing the camelCase response.
+   * @param {string} path
+   * @param {object} body - Request body in snake_case.
+   * @returns {Promise<any>}
+   */
+  async putNote(path, body) {
+    const data = await this.put(path, body);
+    return data ? normalizeNoteResponse(data) : data;
+  }
+
+  /**
+   * DELETE a note.
+   * @param {string} path
+   * @returns {Promise<any>}
+   */
+  async deleteNote(path) {
+    return this.delete(path);
   }
 
   /**

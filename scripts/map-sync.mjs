@@ -35,6 +35,9 @@ export class MapSync {
     this._onCreateToken = this._handleCreateToken.bind(this);
     this._onUpdateToken = this._handleUpdateToken.bind(this);
     this._onDeleteToken = this._handleDeleteToken.bind(this);
+    this._onCreateMapPin = this._handleCreateMapPin.bind(this);
+    this._onUpdateMapPin = this._handleUpdateMapPin.bind(this);
+    this._onDeleteMapPin = this._handleDeleteMapPin.bind(this);
   }
 
   /**
@@ -53,6 +56,9 @@ export class MapSync {
     Hooks.on('createToken', this._onCreateToken);
     Hooks.on('updateToken', this._onUpdateToken);
     Hooks.on('deleteToken', this._onDeleteToken);
+    Hooks.on('createNote', this._onCreateMapPin);
+    Hooks.on('updateNote', this._onUpdateMapPin);
+    Hooks.on('deleteNote', this._onDeleteMapPin);
 
     // Add context menu option to link scenes to Chronicle maps.
     Hooks.on('getSceneNavigationContext', (html, options) => {
@@ -101,6 +107,15 @@ export class MapSync {
       case 'fog.updated':
         await this._onFogUpdated(msg);
         break;
+      case 'marker.created':
+        await this._onMarkerCreated(msg);
+        break;
+      case 'marker.updated':
+        await this._onMarkerUpdated(msg);
+        break;
+      case 'marker.deleted':
+        await this._onMarkerDeleted(msg);
+        break;
     }
   }
 
@@ -114,6 +129,9 @@ export class MapSync {
     Hooks.off('createToken', this._onCreateToken);
     Hooks.off('updateToken', this._onUpdateToken);
     Hooks.off('deleteToken', this._onDeleteToken);
+    Hooks.off('createNote', this._onCreateMapPin);
+    Hooks.off('updateNote', this._onUpdateMapPin);
+    Hooks.off('deleteNote', this._onDeleteMapPin);
 
     // Clear debounce timers.
     for (const timer of this._tokenDebounceTimers.values()) {
@@ -212,10 +230,11 @@ export class MapSync {
 
     // Pull current drawings, tokens, and fog from Chronicle.
     try {
-      const [drawings, tokens, fog] = await Promise.all([
+      const [drawings, tokens, fog, markers] = await Promise.all([
         this._api.get(`/maps/${mapId}/drawings`).catch(() => []),
         this._api.get(`/maps/${mapId}/tokens`).catch(() => []),
         this._api.get(`/maps/${mapId}/fog`).catch(() => []),
+        this._api.get(`/maps/${mapId}/markers`).catch(() => []),
       ]);
 
       // Reconcile drawings: add any that are missing from the scene.
@@ -243,6 +262,22 @@ export class MapSync {
             if (tokenData) {
               await scene.createEmbeddedDocuments('Token', [tokenData]);
             }
+          }
+        }
+      } finally {
+        this._syncing = false;
+      }
+
+      // Reconcile markers: add any that are missing from the scene.
+      this._syncing = true;
+      try {
+        for (const marker of (markers || [])) {
+          const existing = scene.notes.find(
+            (n) => n.getFlag(FLAG_SCOPE, 'markerId') === marker.id
+          );
+          if (!existing) {
+            const noteData = this._chronicleMarkerToFoundry(marker, scene);
+            await scene.createEmbeddedDocuments('Note', [noteData]);
           }
         }
       } finally {
@@ -1106,4 +1141,304 @@ export class MapSync {
       bar2_max: token.bar2?.max,
     };
   }
+
+  // ---------------------------------------------------------------------------
+  // Map Markers / Pins
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Handle a new marker from Chronicle — create a Foundry Note (map pin).
+   * @param {object} msg
+   * @private
+   */
+  async _onMarkerCreated(msg) {
+    const marker = msg.payload;
+    if (!marker?.map_id) return;
+
+    const scene = this._findSceneByMapId(marker.map_id);
+    if (!scene) return;
+
+    // Check if pin already exists.
+    const existing = scene.notes.find(
+      (n) => n.getFlag(FLAG_SCOPE, 'markerId') === marker.id
+    );
+    if (existing) return;
+
+    this._syncing = true;
+    try {
+      const noteData = this._chronicleMarkerToFoundry(marker, scene);
+      await scene.createEmbeddedDocuments('Note', [noteData]);
+      console.debug(`Chronicle: Created map pin "${marker.name}" from marker`);
+    } finally {
+      this._syncing = false;
+    }
+  }
+
+  /**
+   * Handle an updated marker from Chronicle.
+   * @param {object} msg
+   * @private
+   */
+  async _onMarkerUpdated(msg) {
+    const marker = msg.payload;
+    if (!marker?.map_id) return;
+
+    const scene = this._findSceneByMapId(marker.map_id);
+    if (!scene) return;
+
+    const note = scene.notes.find(
+      (n) => n.getFlag(FLAG_SCOPE, 'markerId') === marker.id
+    );
+    if (!note) {
+      await this._onMarkerCreated(msg);
+      return;
+    }
+
+    this._syncing = true;
+    try {
+      const dims = scene.dimensions;
+      const pinStyle = PIN_ICONS[marker.pin_category] || PIN_ICONS.note;
+      const updates = {
+        x: (marker.x / 100) * dims.width,
+        y: (marker.y / 100) * dims.height,
+        text: marker.name || '',
+        'texture.src': pinStyle.icon,
+        'texture.tint': marker.color || pinStyle.color,
+      };
+      await note.update(updates);
+      console.debug(`Chronicle: Updated map pin "${marker.name}"`);
+    } finally {
+      this._syncing = false;
+    }
+  }
+
+  /**
+   * Handle a deleted marker from Chronicle.
+   * @param {object} msg
+   * @private
+   */
+  async _onMarkerDeleted(msg) {
+    const markerId = msg.payload?.id;
+    if (!markerId) return;
+
+    // Search all scenes for this marker.
+    for (const scene of game.scenes.contents) {
+      const note = scene.notes.find(
+        (n) => n.getFlag(FLAG_SCOPE, 'markerId') === markerId
+      );
+      if (note) {
+        this._syncing = true;
+        try {
+          await scene.deleteEmbeddedDocuments('Note', [note.id]);
+          console.debug(`Chronicle: Deleted map pin for marker ${markerId}`);
+        } finally {
+          this._syncing = false;
+        }
+        return;
+      }
+    }
+  }
+
+  /**
+   * Handle Foundry Note (map pin) creation — push to Chronicle as marker.
+   * @param {NoteDocument} note
+   * @param {object} options
+   * @param {string} userId
+   * @private
+   */
+  async _handleCreateMapPin(note, options, userId) {
+    if (this._syncing) return;
+    if (userId !== game.user.id) return;
+    if (note.getFlag(FLAG_SCOPE, 'markerId')) return;
+
+    const scene = note.parent;
+    const mapId = scene?.getFlag(FLAG_SCOPE, 'mapId');
+    if (!mapId) return;
+
+    try {
+      const markerData = this._foundryNoteToChronicle(note, scene);
+      markerData.foundry_id = note.id;
+
+      const result = await this._api.post(`/maps/${mapId}/markers`, markerData);
+      if (result?.id) {
+        this._syncing = true;
+        try {
+          await note.setFlag(FLAG_SCOPE, 'markerId', result.id);
+        } finally {
+          this._syncing = false;
+        }
+        console.debug(`Chronicle: Pushed new map pin "${note.text}" to Chronicle`);
+      }
+    } catch (err) {
+      console.error('Chronicle: Failed to push map pin to Chronicle', err);
+    }
+  }
+
+  /**
+   * Handle Foundry Note (map pin) update — push changes to Chronicle marker.
+   * @param {NoteDocument} note
+   * @param {object} change
+   * @param {object} options
+   * @param {string} userId
+   * @private
+   */
+  async _handleUpdateMapPin(note, change, options, userId) {
+    if (this._syncing) return;
+    if (userId !== game.user.id) return;
+
+    const markerId = note.getFlag(FLAG_SCOPE, 'markerId');
+    if (!markerId) return;
+
+    const scene = note.parent;
+    const mapId = scene?.getFlag(FLAG_SCOPE, 'mapId');
+    if (!mapId) return;
+
+    try {
+      const markerData = this._foundryNoteToChronicle(note, scene);
+      await this._api.put(`/maps/${mapId}/markers/${markerId}`, markerData);
+      console.debug(`Chronicle: Pushed map pin update "${note.text}" to Chronicle`);
+    } catch (err) {
+      console.error('Chronicle: Failed to push map pin update', err);
+    }
+  }
+
+  /**
+   * Handle Foundry Note (map pin) deletion — delete Chronicle marker.
+   * @param {NoteDocument} note
+   * @param {object} options
+   * @param {string} userId
+   * @private
+   */
+  async _handleDeleteMapPin(note, options, userId) {
+    if (this._syncing) return;
+    if (userId !== game.user.id) return;
+
+    const markerId = note.getFlag(FLAG_SCOPE, 'markerId');
+    if (!markerId) return;
+
+    const scene = note.parent;
+    const mapId = scene?.getFlag(FLAG_SCOPE, 'mapId');
+    if (!mapId) return;
+
+    try {
+      await this._api.delete(`/maps/${mapId}/markers/${markerId}`);
+      console.debug(`Chronicle: Deleted marker ${markerId} from map pin deletion`);
+    } catch (err) {
+      console.warn('Chronicle: Failed to delete marker on Chronicle', err);
+    }
+  }
+
+  /**
+   * Find a Foundry Scene linked to a Chronicle map ID.
+   * @param {string} mapId
+   * @returns {Scene|null}
+   * @private
+   */
+  _findSceneByMapId(mapId) {
+    return game.scenes.find(
+      (s) => s.getFlag(FLAG_SCOPE, 'mapId') === mapId
+    ) || null;
+  }
+
+  /**
+   * Convert a Chronicle marker to Foundry Note (map pin) data.
+   * @param {object} marker - Chronicle marker data.
+   * @param {Scene} scene - Target Foundry scene.
+   * @returns {object} Foundry NoteDocument creation data.
+   * @private
+   */
+  _chronicleMarkerToFoundry(marker, scene) {
+    const dims = scene.dimensions;
+    const pinStyle = PIN_ICONS[marker.pin_category] || PIN_ICONS.note;
+
+    // Find linked JournalEntry if marker has entity_id.
+    let entryId = null;
+    if (marker.entity_id) {
+      const linked = game.journal.find(
+        (j) => j.getFlag(FLAG_SCOPE, 'entityId') === marker.entity_id
+      );
+      if (linked) entryId = linked.id;
+    }
+
+    return {
+      x: (marker.x / 100) * dims.width,
+      y: (marker.y / 100) * dims.height,
+      text: marker.name || '',
+      texture: {
+        src: pinStyle.icon,
+        tint: marker.color || pinStyle.color,
+      },
+      entryId: entryId,
+      flags: {
+        [FLAG_SCOPE]: {
+          markerId: marker.id,
+          pinCategory: marker.pin_category || 'note',
+          markerDescription: marker.description || '',
+        },
+      },
+    };
+  }
+
+  /**
+   * Convert a Foundry Note (map pin) to Chronicle marker data.
+   * @param {NoteDocument} note
+   * @param {Scene} scene
+   * @returns {object}
+   * @private
+   */
+  _foundryNoteToChronicle(note, scene) {
+    const dims = scene.dimensions;
+    const pinCategory = note.getFlag(FLAG_SCOPE, 'pinCategory') || this._detectPinCategory(note);
+
+    // Resolve entity_id from linked journal entry.
+    let entityId = null;
+    if (note.entryId) {
+      const journal = game.journal.get(note.entryId);
+      if (journal) {
+        entityId = journal.getFlag(FLAG_SCOPE, 'entityId') || null;
+      }
+    }
+
+    const pinStyle = PIN_ICONS[pinCategory] || PIN_ICONS.note;
+
+    return {
+      name: note.text || 'Pin',
+      x: (note.x / dims.width) * 100,
+      y: (note.y / dims.height) * 100,
+      icon: pinStyle.faIcon || 'fa-map-pin',
+      color: note.texture?.tint || pinStyle.color,
+      pin_category: pinCategory,
+      entity_id: entityId,
+      visibility: 'everyone',
+      description: note.getFlag(FLAG_SCOPE, 'markerDescription') || '',
+    };
+  }
+
+  /**
+   * Detect pin category from a Foundry Note's icon/texture.
+   * Falls back to 'note' if no match.
+   * @param {NoteDocument} note
+   * @returns {string}
+   * @private
+   */
+  _detectPinCategory(note) {
+    const src = note.texture?.src || '';
+    if (src.includes('village') || src.includes('castle') || src.includes('house')) return 'location';
+    if (src.includes('skull') || src.includes('trap') || src.includes('hazard')) return 'danger';
+    if (src.includes('chest') || src.includes('gem') || src.includes('coin')) return 'treasure';
+    if (src.includes('book') || src.includes('scroll') || src.includes('quest')) return 'quest';
+    return 'note';
+  }
 }
+
+/**
+ * Pin category → Foundry icon and color mapping.
+ * Icons are from Foundry's bundled icon set.
+ */
+const PIN_ICONS = {
+  location: { icon: 'icons/svg/village.svg', color: '#3B82F6', faIcon: 'fa-map-pin' },
+  danger:   { icon: 'icons/svg/skull.svg',   color: '#EF4444', faIcon: 'fa-skull' },
+  treasure: { icon: 'icons/svg/chest.svg',   color: '#F59E0B', faIcon: 'fa-gem' },
+  quest:    { icon: 'icons/svg/book.svg',    color: '#8B5CF6', faIcon: 'fa-scroll' },
+  note:     { icon: 'icons/svg/bookmark.svg', color: '#6B7280', faIcon: 'fa-bookmark' },
+};
