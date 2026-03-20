@@ -7,7 +7,7 @@
  */
 
 import { ChronicleAPI } from './api-client.mjs';
-import { getSetting, setSetting, isConfigured, getSyncDirections, getExcludedTags } from './settings.mjs';
+import { getSetting, setSetting, isConfigured, getSyncDirections, getExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
 
 /**
  * Hardcoded fallback map for known Foundry→Chronicle system mappings.
@@ -47,6 +47,9 @@ export class SyncManager {
 
     /** @type {string|null} Foundry's game.system.id. */
     this._foundrySystemId = null;
+
+    /** @type {Array<object>|null} Cached Chronicle campaign members. */
+    this._members = null;
   }
 
   /**
@@ -108,6 +111,72 @@ export class SyncManager {
     this.api.connect();
 
     console.debug('Chronicle: Sync manager started');
+  }
+
+  /**
+   * Fetch campaign members from Chronicle and auto-match to Foundry users.
+   * Stores mappings in the `userMappings` setting.
+   */
+  async fetchAndCacheMembers() {
+    try {
+      const result = await this.api.get('/members');
+      const members = result?.data || result || [];
+      this._members = Array.isArray(members) ? members : [];
+
+      // Auto-match by display_name → Foundry user name.
+      const mappings = getUserMappings();
+      let newMappings = 0;
+      for (const member of this._members) {
+        if (mappings[member.user_id]) continue; // Already mapped.
+        const foundryUser = game.users.find(
+          (u) => u.name.toLowerCase() === (member.display_name || '').toLowerCase()
+        );
+        if (foundryUser) {
+          mappings[member.user_id] = foundryUser.id;
+          newMappings++;
+        }
+      }
+      if (newMappings > 0) {
+        await setUserMappings(mappings);
+        this.logActivity('connect', `Auto-matched ${newMappings} Chronicle members to Foundry users`);
+      }
+
+      console.debug(`Chronicle: Fetched ${this._members.length} campaign members`);
+    } catch (err) {
+      console.warn('Chronicle: Failed to fetch campaign members', err);
+      this._members = [];
+    }
+  }
+
+  /**
+   * Get cached campaign members.
+   * @returns {Array<object>}
+   */
+  getMembers() {
+    return this._members || [];
+  }
+
+  /**
+   * Get the Foundry user ID mapped to a Chronicle user ID.
+   * @param {string} chronicleUserId
+   * @returns {string|null}
+   */
+  getFoundryUserId(chronicleUserId) {
+    const mappings = getUserMappings();
+    return mappings[chronicleUserId] || null;
+  }
+
+  /**
+   * Get the Chronicle user ID mapped to a Foundry user ID.
+   * @param {string} foundryUserId
+   * @returns {string|null}
+   */
+  getChronicleUserId(foundryUserId) {
+    const mappings = getUserMappings();
+    for (const [cId, fId] of Object.entries(mappings)) {
+      if (fId === foundryUserId) return cId;
+    }
+    return null;
   }
 
   /**
@@ -204,6 +273,9 @@ export class SyncManager {
     try {
       console.debug(`Chronicle: Initial sync from ${lastSync}`);
       ui.notifications.info('Chronicle: Syncing...', { permanent: false });
+
+      // Fetch campaign members for user ID mapping.
+      await this.fetchAndCacheMembers();
 
       // Pull sync mappings modified since last sync.
       const result = await this.api.get(`/sync/pull?since=${encodeURIComponent(lastSync)}`);

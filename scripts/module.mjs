@@ -14,6 +14,7 @@ import { ShopWidget } from './shop-widget.mjs';
 import { CalendarSync } from './calendar-sync.mjs';
 import { ActorSync } from './actor-sync.mjs';
 import { ItemSync } from './item-sync.mjs';
+import { NoteSync } from './note-sync.mjs';
 import { SyncDashboard } from './sync-dashboard.mjs';
 
 /** @type {SyncManager|null} */
@@ -66,6 +67,7 @@ Hooks.once('ready', async () => {
   syncManager.registerModule(new CalendarSync());
   syncManager.registerModule(new ActorSync());
   syncManager.registerModule(new ItemSync());
+  syncManager.registerModule(new NoteSync());
 
   // Create UI first so it's always available, even if start() fails.
   dashboard = new SyncDashboard();

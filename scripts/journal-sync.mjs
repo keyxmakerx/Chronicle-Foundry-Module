@@ -10,6 +10,7 @@
  */
 
 import { getSetting, getSyncExclusions } from './settings.mjs';
+import { ConflictError } from './api-client.mjs';
 
 // Flag namespace for Chronicle data stored on Foundry documents.
 const FLAG_SCOPE = 'chronicle-sync';
@@ -64,6 +65,13 @@ export class JournalSync {
         break;
       case 'entity.deleted':
         await this._onEntityDeleted(msg.payload);
+        break;
+      case 'entity_type.created':
+      case 'entity_type.updated':
+        await this._onEntityTypeChanged(msg.payload);
+        break;
+      case 'entity_type.deleted':
+        // Entity type deleted — folders remain but lose their Chronicle link.
         break;
     }
   }
@@ -160,11 +168,15 @@ export class JournalSync {
       // Split entity content into pages and sync them.
       await this._syncPagesToJournal(journal, entity.entry_html || '');
 
+      // Sync player notes page.
+      await this._syncPlayerNotesPage(journal, entity.player_notes_html || '');
+
       // Update flags with latest entity data.
       await journal.setFlag(FLAG_SCOPE, 'entityType', entity.type_name || '');
       await journal.setFlag(FLAG_SCOPE, 'fields', entity.fields_data || {});
       await journal.setFlag(FLAG_SCOPE, 'tags', entity.tags || []);
       await journal.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
+      await journal.setFlag(FLAG_SCOPE, 'chronicleUpdatedAt', entity.updated_at || '');
 
       console.debug(`Chronicle: Updated journal "${journal.name}" from entity`);
     } finally {
@@ -192,6 +204,76 @@ export class JournalSync {
     } finally {
       this._syncing = false;
     }
+  }
+
+  /**
+   * Handle entity type create/update — update the matching Foundry folder.
+   * Uses entity type color and name for folder customization.
+   * @param {object} entityType - Entity type data with id, name, color, icon.
+   * @private
+   */
+  async _onEntityTypeChanged(entityType) {
+    if (!entityType?.name) return;
+
+    // Find the Foundry folder that corresponds to this entity type.
+    const folder = game.folders.find(
+      (f) => f.type === 'JournalEntry' && f.getFlag(FLAG_SCOPE, 'entityTypeId') === entityType.id
+    );
+    if (!folder) return;
+
+    this._syncing = true;
+    try {
+      const updates = {};
+      if (folder.name !== entityType.name) updates.name = entityType.name;
+      if (entityType.color && folder.color !== entityType.color) updates.color = entityType.color;
+      if (Object.keys(updates).length > 0) {
+        await folder.update(updates);
+        console.debug(`Chronicle: Updated folder "${entityType.name}" from entity type`);
+      }
+    } finally {
+      this._syncing = false;
+    }
+  }
+
+  /**
+   * Find or create a Foundry folder for an entity type.
+   * Uses enriched entity type data (color, sort_order) when available.
+   * @param {object} entity - Entity with type_name, entity_type_id, type_color.
+   * @returns {Promise<Folder|null>}
+   * @private
+   */
+  async _getOrCreateEntityFolder(entity) {
+    const typeName = entity.type_name;
+    if (!typeName) return null;
+
+    // Check for existing folder with this entity type ID.
+    let folder = game.folders.find(
+      (f) => f.type === 'JournalEntry' && f.getFlag(FLAG_SCOPE, 'entityTypeId') === entity.entity_type_id
+    );
+    if (folder) return folder;
+
+    // Check by name fallback.
+    folder = game.folders.find(
+      (f) => f.type === 'JournalEntry' && f.name === typeName
+    );
+    if (folder) {
+      // Tag the existing folder with the entity type ID.
+      await folder.setFlag(FLAG_SCOPE, 'entityTypeId', entity.entity_type_id);
+      if (entity.type_color && !folder.color) {
+        await folder.update({ color: entity.type_color });
+      }
+      return folder;
+    }
+
+    // Create a new folder with entity type enrichment.
+    const folderData = {
+      name: typeName,
+      type: 'JournalEntry',
+      flags: { [FLAG_SCOPE]: { entityTypeId: entity.entity_type_id } },
+    };
+    if (entity.type_color) folderData.color = entity.type_color;
+
+    return Folder.create(folderData);
   }
 
   /**
@@ -240,13 +322,29 @@ export class JournalSync {
         pages.push(pageData);
       }
 
+      // Add a player notes page if the entity has player-visible content.
+      if (entity.player_notes_html) {
+        pages.push({
+          name: 'Player Notes',
+          type: 'text',
+          text: { content: entity.player_notes_html },
+          sort: sortIndex++,
+          ownership: { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER },
+          flags: { [FLAG_SCOPE]: { isPlayerNotes: true } },
+        });
+      }
+
       // Determine ownership from Chronicle permissions.
       const ownership = await this._buildOwnership(entity);
+
+      // Find or create a folder for this entity type.
+      const folder = await this._getOrCreateEntityFolder(entity);
 
       const journalData = {
         name: entity.name,
         pages,
         ownership,
+        folder: folder?.id || null,
         flags: {
           [FLAG_SCOPE]: {
             entityId: entity.id,
@@ -254,6 +352,7 @@ export class JournalSync {
             fields: entity.fields_data || {},
             tags: entity.tags || [],
             lastSync: new Date().toISOString(),
+            chronicleUpdatedAt: entity.updated_at || '',
           },
         },
       };
@@ -364,22 +463,48 @@ export class JournalSync {
     try {
       // Concatenate all text pages into a single entry for Chronicle.
       const entryHtml = this._collectTextPages(journal);
+      const playerNotesHtml = this._collectPlayerNotes(journal);
       const isPrivate =
         (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER;
 
-      await this._api.put(`/entities/${entityId}`, {
+      // Build the update body with optimistic concurrency.
+      const body = {
         name: journal.name,
         is_private: isPrivate,
         entry: entryHtml,
-      });
+      };
+
+      // Include player notes if present.
+      if (playerNotesHtml !== null) {
+        body.player_notes = playerNotesHtml;
+      }
+
+      // Include expected_updated_at for conflict detection.
+      const chronicleUpdatedAt = journal.getFlag(FLAG_SCOPE, 'chronicleUpdatedAt');
+      if (chronicleUpdatedAt) {
+        body.expected_updated_at = chronicleUpdatedAt;
+      }
+
+      let result;
+      try {
+        result = await this._api.put(`/entities/${entityId}`, body);
+      } catch (err) {
+        if (err instanceof ConflictError) {
+          await this._handleConflict(journal, entityId, body);
+          return;
+        }
+        throw err;
+      }
 
       // Push ownership changes as Chronicle permission updates.
-      // Map Foundry default ownership level to Chronicle visibility mode.
       await this._pushPermissions(entityId, journal.ownership, isPrivate);
 
       this._syncing = true;
       try {
         await journal.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
+        if (result?.updated_at) {
+          await journal.setFlag(FLAG_SCOPE, 'chronicleUpdatedAt', result.updated_at);
+        }
       } finally {
         this._syncing = false;
       }
@@ -593,7 +718,7 @@ export class JournalSync {
    */
   _collectTextPages(journal) {
     const textPages = journal.pages
-      .filter((p) => p.type === 'text')
+      .filter((p) => p.type === 'text' && !p.getFlag(FLAG_SCOPE, 'isPlayerNotes'))
       .sort((a, b) => a.sort - b.sort);
 
     if (textPages.length === 0) return '';
@@ -612,6 +737,123 @@ export class JournalSync {
   }
 
   /**
+   * Extract player notes content from a journal's Player Notes page.
+   * @param {JournalEntry} journal
+   * @returns {string|null} HTML content, or null if no player notes page exists.
+   * @private
+   */
+  _collectPlayerNotes(journal) {
+    const playerNotesPage = journal.pages.find(
+      (p) => p.getFlag(FLAG_SCOPE, 'isPlayerNotes')
+    );
+    if (!playerNotesPage) return null;
+    return playerNotesPage.text?.content || '';
+  }
+
+  /**
+   * Sync the player notes page on a journal. Creates, updates, or deletes
+   * the page based on whether the entity has player_notes_html.
+   * @param {JournalEntry} journal
+   * @param {string} playerNotesHtml
+   * @private
+   */
+  async _syncPlayerNotesPage(journal, playerNotesHtml) {
+    const existingPage = journal.pages.find(
+      (p) => p.getFlag(FLAG_SCOPE, 'isPlayerNotes')
+    );
+
+    if (playerNotesHtml) {
+      if (existingPage) {
+        // Update existing player notes page.
+        await existingPage.update({ 'text.content': playerNotesHtml });
+      } else {
+        // Create new player notes page.
+        const maxSort = Math.max(0, ...journal.pages.map((p) => p.sort || 0));
+        await journal.createEmbeddedDocuments('JournalEntryPage', [
+          {
+            name: 'Player Notes',
+            type: 'text',
+            text: { content: playerNotesHtml },
+            sort: maxSort + 100,
+            ownership: { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER },
+            flags: { [FLAG_SCOPE]: { isPlayerNotes: true } },
+          },
+        ]);
+      }
+    } else if (existingPage) {
+      // Remove player notes page if entity no longer has player notes.
+      await journal.deleteEmbeddedDocuments('JournalEntryPage', [existingPage.id]);
+    }
+  }
+
+  /**
+   * Handle a 409 Conflict error during entity push.
+   * Applies the configured conflict resolution strategy.
+   * @param {JournalEntry} journal
+   * @param {string} entityId
+   * @param {object} body - The PUT body that was rejected.
+   * @private
+   */
+  async _handleConflict(journal, entityId, body) {
+    const strategy = getSetting('conflictResolution');
+    console.warn(`Chronicle: Conflict on entity ${entityId}, strategy="${strategy}"`);
+
+    switch (strategy) {
+      case 'chronicle': {
+        // Discard local changes, re-pull Chronicle version.
+        const entity = await this._api.get(`/entities/${entityId}`);
+        if (entity) {
+          await this._onEntityUpdated(entity);
+        }
+        ui.notifications.warn(`Chronicle: Conflict on "${journal.name}" — kept Chronicle version.`);
+        break;
+      }
+      case 'foundry': {
+        // Force push without expected_updated_at.
+        delete body.expected_updated_at;
+        const result = await this._api.put(`/entities/${entityId}`, body);
+        this._syncing = true;
+        try {
+          if (result?.updated_at) {
+            await journal.setFlag(FLAG_SCOPE, 'chronicleUpdatedAt', result.updated_at);
+          }
+          await journal.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
+        } finally {
+          this._syncing = false;
+        }
+        ui.notifications.warn(`Chronicle: Conflict on "${journal.name}" — kept Foundry version.`);
+        break;
+      }
+      case 'newest':
+      default: {
+        // Compare timestamps, keep newest.
+        const remote = await this._api.get(`/entities/${entityId}`);
+        const localUpdatedAt = journal.getFlag(FLAG_SCOPE, 'lastSync') || '1970-01-01';
+        if (remote && new Date(localUpdatedAt) > new Date(remote.updated_at)) {
+          // Local is newer — force push.
+          delete body.expected_updated_at;
+          const result = await this._api.put(`/entities/${entityId}`, body);
+          this._syncing = true;
+          try {
+            if (result?.updated_at) {
+              await journal.setFlag(FLAG_SCOPE, 'chronicleUpdatedAt', result.updated_at);
+            }
+            await journal.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
+          } finally {
+            this._syncing = false;
+          }
+          ui.notifications.info(`Chronicle: Conflict on "${journal.name}" — Foundry version was newer.`);
+        } else if (remote) {
+          // Remote is newer — re-pull.
+          await this._onEntityUpdated(remote);
+          ui.notifications.info(`Chronicle: Conflict on "${journal.name}" — Chronicle version was newer.`);
+        }
+        break;
+      }
+    }
+  }
+
+  /**
    * Sync entity HTML content to journal pages. Splits by headings and
    * updates existing pages or creates/removes pages as needed.
    * @param {JournalEntry} journal
@@ -621,7 +863,7 @@ export class JournalSync {
   async _syncPagesToJournal(journal, html) {
     const sections = this._splitByHeadings(html);
     const existingTextPages = journal.pages
-      .filter((p) => p.type === 'text')
+      .filter((p) => p.type === 'text' && !p.getFlag(FLAG_SCOPE, 'isPlayerNotes'))
       .sort((a, b) => a.sort - b.sort);
 
     // Update existing pages and create new ones as needed.

@@ -35,6 +35,9 @@
     <a class="item" data-tab="characters">
       <i class="fa-solid fa-users"></i> Characters
     </a>
+    <a class="item" data-tab="notes">
+      <i class="fa-solid fa-sticky-note"></i> Notes
+    </a>
     <a class="item" data-tab="calendar">
       <i class="fa-solid fa-calendar"></i> Calendar
     </a>
@@ -529,6 +532,36 @@
           Chronicle doesn't have a system pack for <strong>{{#if foundrySystem}}{{foundrySystem}}{{else}}this system{{/if}}</strong> yet.
           Use the <em>Copy System Debug</em> button on the Status tab to generate a snapshot you can paste into Claude AI to help build one.
         </p>
+      </div>
+      {{/if}}
+    </div>
+
+    {{!-- ================================================================= --}}
+    {{!-- NOTES TAB                                                         --}}
+    {{!-- ================================================================= --}}
+    <div class="tab" data-tab="notes" data-group="primary">
+      {{#if notes.length}}
+      <div class="notes-list">
+        {{#each notes}}
+        <div class="note-row {{status}}" data-note-id="{{id}}">
+          <span class="note-icon"><i class="fa-solid fa-sticky-note" {{#if color}}style="color: {{color}}"{{/if}}></i></span>
+          <span class="note-title">{{title}}</span>
+          <span class="note-status badge badge-{{status}}">{{status}}</span>
+          <span class="note-shared">{{#if is_shared}}<i class="fa-solid fa-users" title="Shared"></i>{{else}}<i class="fa-solid fa-lock" title="Private"></i>{{/if}}</span>
+          <span class="note-sync-time">{{#if lastSync}}{{timeAgo lastSync}}{{else}}Never{{/if}}</span>
+          {{#if (eq status "chronicle-only")}}
+          <button type="button" data-action="pull-note" data-note-id="{{id}}" class="dashboard-btn btn-xs" title="Pull to Foundry">
+            <i class="fa-solid fa-download"></i>
+          </button>
+          {{/if}}
+        </div>
+        {{/each}}
+      </div>
+      {{else}}
+      <div class="dashboard-empty-tab">
+        <i class="fa-solid fa-sticky-note fa-2x"></i>
+        <p>No Chronicle notes found.</p>
+        <p class="hint">Notes created in Chronicle will appear here when note sync is enabled.</p>
       </div>
       {{/if}}
     </div>

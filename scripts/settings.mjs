@@ -83,6 +83,16 @@ export function registerSettings() {
     default: false,
   });
 
+  // Notes sync toggle.
+  game.settings.register(MODULE_ID, 'syncNotes', {
+    name: game.i18n.localize('CHRONICLE.Settings.SyncNotes.Name'),
+    hint: game.i18n.localize('CHRONICLE.Settings.SyncNotes.Hint'),
+    scope: 'world',
+    config: true,
+    type: Boolean,
+    default: false,
+  });
+
   // Character sync toggle (requires matching game system).
   game.settings.register(MODULE_ID, 'syncCharacters', {
     name: game.i18n.localize('CHRONICLE.Settings.SyncCharacters.Name'),
@@ -109,6 +119,15 @@ export function registerSettings() {
     default: '',
   });
 
+  // Internal: Chronicle user → Foundry user ID mapping (not shown in settings UI).
+  // Stored as JSON: { "chronicle-user-uuid": "foundry-user-id", ... }
+  game.settings.register(MODULE_ID, 'userMappings', {
+    scope: 'world',
+    config: false,
+    type: String,
+    default: '{}',
+  });
+
   // Internal: per-type and per-entity sync exclusions (not shown in settings UI).
   // Stored as JSON: { excludedTypes: [typeId, ...], excludedEntities: ["entityId", ...] }
   game.settings.register(MODULE_ID, 'syncExclusions', {
@@ -128,7 +147,7 @@ export function registerSettings() {
     scope: 'world',
     config: false,
     type: String,
-    default: '{"journals":"both","maps":"both","calendar":"both","characters":"both","shops":"both"}',
+    default: '{"journals":"both","maps":"both","calendar":"both","characters":"both","shops":"both","notes":"both"}',
   });
 
   // Permission mapping: sync Chronicle visibility to Foundry ownership levels.
@@ -283,6 +302,26 @@ export function getExcludedTags() {
  */
 export async function setExcludedTags(tags) {
   await setSetting('excludedTags', JSON.stringify(tags));
+}
+
+/**
+ * Get user mappings (Chronicle user ID → Foundry user ID).
+ * @returns {Object<string, string>}
+ */
+export function getUserMappings() {
+  try {
+    return JSON.parse(getSetting('userMappings'));
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Save user mappings.
+ * @param {Object<string, string>} mappings
+ */
+export async function setUserMappings(mappings) {
+  await setSetting('userMappings', JSON.stringify(mappings));
 }
 
 /**

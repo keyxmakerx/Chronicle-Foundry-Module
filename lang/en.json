@@ -33,6 +33,10 @@
       "SyncCharacters": {
         "Name": "Sync Characters",
         "Hint": "Sync Foundry actors with Chronicle character entities (requires matching game system)"
+      },
+      "SyncNotes": {
+        "Name": "Sync Notes",
+        "Hint": "Sync Chronicle campaign notes with Foundry journal entries"
       }
     },
     "Status": {
@@ -46,6 +50,11 @@
       "JournalSynced": "Journal synced from Chronicle: {name}",
       "MapSynced": "Map synced from Chronicle: {name}",
       "SyncConflict": "Sync conflict detected for: {name}",
+      "ConflictKeptChronicle": "Conflict on \"{name}\" — kept Chronicle version.",
+      "ConflictKeptFoundry": "Conflict on \"{name}\" — kept Foundry version.",
+      "ConflictNewerChronicle": "Conflict on \"{name}\" — Chronicle version was newer.",
+      "ConflictNewerFoundry": "Conflict on \"{name}\" — Foundry version was newer.",
+      "MembersMatched": "Auto-matched {count} Chronicle members to Foundry users.",
       "ConnectionLost": "Lost connection to Chronicle. Retrying...",
       "ConnectionRestored": "Connection to Chronicle restored"
     },
@@ -58,6 +67,7 @@
         "Entities": "Entities",
         "Shops": "Shops",
         "Maps": "Maps",
+        "Notes": "Notes",
         "Characters": "Characters",
         "Calendar": "Calendar",
         "Status": "Status"
@@ -112,6 +122,17 @@
         "NoModule": "No calendar module detected.",
         "NoModuleHint": "Install Calendaria or Simple Calendar to enable calendar sync.",
         "UnableToRead": "Unable to read"
+      },
+      "Notes": {
+        "Synced": "Synced",
+        "ChronicleOnly": "Chronicle Only",
+        "Pull": "Pull",
+        "Shared": "Shared",
+        "Private": "Private",
+        "NoNotes": "No Chronicle notes found.",
+        "NoNotesHint": "Notes created in Chronicle will appear here when note sync is enabled.",
+        "Disabled": "Note sync is disabled.",
+        "DisabledHint": "Enable \"Sync Notes\" in Module Settings."
       },
       "Characters": {
         "Synced": "Synced",
