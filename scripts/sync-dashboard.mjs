@@ -109,6 +109,28 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   // Data
   // ---------------------------------------------------------------------------
 
+  /**
+   * Normalize an API response to an array.
+   * Chronicle endpoints may return a plain array or an object wrapping
+   * the array under common keys like `data`, `entity_types`, `entities`,
+   * `maps`, etc.  This helper unwraps whichever shape we get.
+   * @param {*} raw - The raw parsed JSON from the API.
+   * @param {...string} keys - Object keys to try (in order) if raw is not an array.
+   * @returns {Array}
+   * @private
+   */
+  _normalizeArray(raw, ...keys) {
+    if (Array.isArray(raw)) return raw;
+    if (raw && typeof raw === 'object') {
+      for (const key of keys) {
+        if (Array.isArray(raw[key])) return raw[key];
+      }
+      // Last resort: try the generic `data` wrapper.
+      if (Array.isArray(raw.data)) return raw.data;
+    }
+    return [];
+  }
+
   /** @override */
   async _prepareContext(options = {}) {
     if (!this._syncManager || !this.api) {
@@ -117,6 +139,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     this._loading = true;
     const exclusions = this._getExclusions();
+    const loadErrors = [];
 
     // Build entity tab data.
     let entityGroups = [];
@@ -126,6 +149,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       foundryOnlyJournals = this._getFoundryOnlyJournals();
     } catch (err) {
       console.error('Chronicle Dashboard: Failed to load entities', err);
+      loadErrors.push({ tab: 'entities', message: err.message || 'Failed to load entities' });
     }
 
     // Build map tab data.
@@ -134,6 +158,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       mapData = await this._buildMapData();
     } catch (err) {
       console.error('Chronicle Dashboard: Failed to load maps', err);
+      loadErrors.push({ tab: 'maps', message: err.message || 'Failed to load maps' });
     }
 
     // Build shops tab data.
@@ -142,6 +167,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       shopData = await this._buildShopData();
     } catch (err) {
       console.error('Chronicle Dashboard: Failed to load shops', err);
+      loadErrors.push({ tab: 'shops', message: err.message || 'Failed to load shops' });
     }
 
     // Build calendar tab data.
@@ -150,6 +176,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       calendarData = await this._buildCalendarData();
     } catch (err) {
       console.error('Chronicle Dashboard: Failed to load calendar', err);
+      loadErrors.push({ tab: 'calendar', message: err.message || 'Failed to load calendar' });
     }
 
     // Build status tab data.
@@ -168,6 +195,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       loading: false,
       searchFilter: this._searchFilter,
       activeTab: this._activeTab,
+      loadErrors,
+      hasLoadErrors: loadErrors.length > 0,
 
       // Config tab.
       config: configData,
@@ -208,9 +237,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   async _buildEntityGroups(exclusions) {
     // Fetch entity types from Chronicle.
     if (!this._cache.entityTypes) {
-      this._cache.entityTypes = await this.api.get('/entity-types');
+      const raw = await this.api.get('/entity-types');
+      this._cache.entityTypes = this._normalizeArray(raw, 'entity_types');
     }
-    const types = this._cache.entityTypes || [];
+    const types = this._cache.entityTypes;
 
     // Fetch all entities (paginated, up to 500 for now).
     if (!this._cache.entities) {
@@ -219,8 +249,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       let hasMore = true;
       while (hasMore && page <= 5) {
         const result = await this.api.get(`/entities?per_page=100&page=${page}`);
-        const entities = result?.entities || result || [];
-        if (Array.isArray(entities) && entities.length > 0) {
+        const entities = this._normalizeArray(result, 'entities');
+        if (entities.length > 0) {
           allEntities.push(...entities);
           hasMore = entities.length === 100;
           page++;
@@ -345,9 +375,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   async _buildMapData() {
     // Fetch Chronicle maps.
     if (!this._cache.maps) {
-      this._cache.maps = await this.api.get('/maps').catch(() => []);
+      const raw = await this.api.get('/maps').catch(() => []);
+      this._cache.maps = this._normalizeArray(raw, 'maps');
     }
-    const chronicles = this._cache.maps || [];
+    const chronicles = this._cache.maps;
 
     // Index Foundry scenes by linked mapId.
     const scenesByMapId = new Map();
@@ -395,9 +426,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   async _buildShopData() {
     // Ensure entity types are cached.
     if (!this._cache.entityTypes) {
-      this._cache.entityTypes = await this.api.get('/entity-types');
+      const raw = await this.api.get('/entity-types');
+      this._cache.entityTypes = this._normalizeArray(raw, 'entity_types');
     }
-    const types = this._cache.entityTypes || [];
+    const types = this._cache.entityTypes;
 
     // Find the shop entity type by slug or name.
     const shopType = types.find(t =>

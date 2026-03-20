@@ -43,6 +43,20 @@
     </a>
   </nav>
 
+  {{!-- Load error banner --}}
+  {{#if hasLoadErrors}}
+  <div class="dashboard-load-errors">
+    <i class="fa-solid fa-triangle-exclamation"></i>
+    Some data failed to load from Chronicle:
+    {{#each loadErrors}}
+    <span class="load-error-item">{{tab}}{{#unless @last}},{{/unless}}</span>
+    {{/each}}
+    <button type="button" data-action="refresh" class="dashboard-btn btn-xs" title="Retry">
+      <i class="fa-solid fa-arrows-rotate"></i> Retry
+    </button>
+  </div>
+  {{/if}}
+
   {{!-- Tab content --}}
   <section class="dashboard-content">
 
