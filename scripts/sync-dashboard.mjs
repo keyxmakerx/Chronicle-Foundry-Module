@@ -208,9 +208,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   async _buildEntityGroups(exclusions) {
     // Fetch entity types from Chronicle.
     if (!this._cache.entityTypes) {
-      this._cache.entityTypes = await this.api.get('/entity-types');
+      const raw = await this.api.get('/entity-types');
+      this._cache.entityTypes = Array.isArray(raw) ? raw : (raw?.data || raw?.entity_types || []);
     }
-    const types = this._cache.entityTypes || [];
+    const types = this._cache.entityTypes;
 
     // Fetch all entities (paginated, up to 500 for now).
     if (!this._cache.entities) {
@@ -395,9 +396,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   async _buildShopData() {
     // Ensure entity types are cached.
     if (!this._cache.entityTypes) {
-      this._cache.entityTypes = await this.api.get('/entity-types');
+      const raw = await this.api.get('/entity-types');
+      this._cache.entityTypes = Array.isArray(raw) ? raw : (raw?.data || raw?.entity_types || []);
     }
-    const types = this._cache.entityTypes || [];
+    const types = this._cache.entityTypes;
 
     // Find the shop entity type by slug or name.
     const shopType = types.find(t =>
