@@ -38,6 +38,11 @@ styles/               # CSS
 lang/                 # Localization (en.json)
 ```
 
+## API Contract
+
+See **API-CONTRACT.md** for the full Chronicle REST API and WebSocket contract
+with request/response schemas, authentication, and CORS requirements.
+
 ## Code Conventions
 
 - **ES modules** (`.mjs`) with `export default class` pattern.
