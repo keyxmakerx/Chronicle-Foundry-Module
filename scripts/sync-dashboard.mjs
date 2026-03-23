@@ -9,8 +9,7 @@
  */
 
 import { getSetting, setSetting, getSyncDirections, setSyncDirections, getExcludedTags, setExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
-
-const FLAG_SCOPE = 'chronicle-sync';
+import { FLAG_SCOPE } from './constants.mjs';
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**

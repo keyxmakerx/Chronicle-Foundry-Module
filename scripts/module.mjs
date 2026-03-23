@@ -155,10 +155,13 @@ function _addStatusIndicator() {
 
   const indicator = document.createElement('div');
   indicator.className = 'chronicle-sync-status disconnected';
-  indicator.innerHTML = `
-    <span class="status-dot"></span>
-    <span class="status-text">Chronicle</span>
-  `;
+
+  const dot = document.createElement('span');
+  dot.className = 'status-dot';
+  const text = document.createElement('span');
+  text.className = 'status-text';
+  text.textContent = 'Chronicle';
+  indicator.append(dot, text);
 
   // Update indicator based on WebSocket state.
   const updateState = (state) => {

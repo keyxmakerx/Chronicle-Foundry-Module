@@ -5,7 +5,7 @@
  * Settings are stored per-world and only editable by GMs.
  */
 
-const MODULE_ID = 'chronicle-sync';
+import { MODULE_ID } from './constants.mjs';
 
 /**
  * Register all Chronicle Sync module settings.

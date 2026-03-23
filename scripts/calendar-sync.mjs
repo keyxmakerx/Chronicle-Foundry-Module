@@ -20,8 +20,7 @@
  */
 
 import { getSetting } from './settings.mjs';
-
-const FLAG_SCOPE = 'chronicle-sync';
+import { FLAG_SCOPE } from './constants.mjs';
 
 /**
  * CalendarSync handles calendar ↔ Foundry calendar module synchronization.
@@ -149,22 +148,30 @@ export class CalendarSync {
    * Clean up hooks on destroy.
    */
   destroy() {
+    this._unregisterHooks();
+  }
+
+  /**
+   * Remove all registered hooks. Safe to call even if no hooks are registered.
+   * @private
+   */
+  _unregisterHooks() {
     if (this._calendarModule === 'calendaria') {
       // Modern Calendaria hooks.
-      Hooks.off('calendaria.dateTimeChange', this._boundHandlers.dateTimeChange);
-      Hooks.off('calendaria.noteCreated', this._boundHandlers.noteCreated);
-      Hooks.off('calendaria.noteUpdated', this._boundHandlers.noteUpdated);
-      Hooks.off('calendaria.noteDeleted', this._boundHandlers.noteDeleted);
+      if (this._boundHandlers.dateTimeChange) Hooks.off('calendaria.dateTimeChange', this._boundHandlers.dateTimeChange);
+      if (this._boundHandlers.noteCreated) Hooks.off('calendaria.noteCreated', this._boundHandlers.noteCreated);
+      if (this._boundHandlers.noteUpdated) Hooks.off('calendaria.noteUpdated', this._boundHandlers.noteUpdated);
+      if (this._boundHandlers.noteDeleted) Hooks.off('calendaria.noteDeleted', this._boundHandlers.noteDeleted);
       // Legacy Calendaria hooks (for older versions).
-      Hooks.off('calendariaDateChange', this._boundHandlers.dateChange);
-      Hooks.off('calendariaEventCreate', this._boundHandlers.eventCreate);
-      Hooks.off('calendariaEventUpdate', this._boundHandlers.eventUpdate);
-      Hooks.off('calendariaEventDelete', this._boundHandlers.eventDelete);
+      if (this._boundHandlers.dateChange) Hooks.off('calendariaDateChange', this._boundHandlers.dateChange);
+      if (this._boundHandlers.eventCreate) Hooks.off('calendariaEventCreate', this._boundHandlers.eventCreate);
+      if (this._boundHandlers.eventUpdate) Hooks.off('calendariaEventUpdate', this._boundHandlers.eventUpdate);
+      if (this._boundHandlers.eventDelete) Hooks.off('calendariaEventDelete', this._boundHandlers.eventDelete);
     } else if (this._calendarModule === 'simple-calendar') {
-      Hooks.off('simple-calendar-date-time-change', this._boundHandlers.dateChange);
-      Hooks.off('createJournalEntry', this._boundHandlers.noteCreate);
-      Hooks.off('updateJournalEntry', this._boundHandlers.noteUpdate);
-      Hooks.off('deleteJournalEntry', this._boundHandlers.noteDelete);
+      if (this._boundHandlers.dateChange) Hooks.off('simple-calendar-date-time-change', this._boundHandlers.dateChange);
+      if (this._boundHandlers.noteCreate) Hooks.off('createJournalEntry', this._boundHandlers.noteCreate);
+      if (this._boundHandlers.noteUpdate) Hooks.off('updateJournalEntry', this._boundHandlers.noteUpdate);
+      if (this._boundHandlers.noteDelete) Hooks.off('deleteJournalEntry', this._boundHandlers.noteDelete);
     }
     this._boundHandlers = {};
   }
@@ -176,6 +183,10 @@ export class CalendarSync {
    * @private
    */
   _registerHooks() {
+    // Guard against duplicate listeners if init() is called multiple times
+    // (e.g., during reconnection). Remove any existing hooks first.
+    this._unregisterHooks();
+
     if (this._calendarModule === 'calendaria') {
       // Modern Calendaria hooks (v2+): dateTimeChange includes hour/minute,
       // noteCreated/Updated/Deleted handle calendar notes.

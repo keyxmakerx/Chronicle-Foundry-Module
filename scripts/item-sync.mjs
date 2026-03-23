@@ -16,9 +16,7 @@
  */
 
 import { getSetting } from './settings.mjs';
-
-// Flag namespace for Chronicle data stored on Foundry documents.
-const FLAG_SCOPE = 'chronicle-sync';
+import { FLAG_SCOPE } from './constants.mjs';
 
 /**
  * ItemSync handles item inventory synchronization between Chronicle
@@ -326,7 +324,6 @@ export class ItemSync {
         console.debug(`Chronicle: Pushed new item "${item.name}" from "${actor.name}" to Chronicle`);
       }
     } catch (err) {
-      this._syncing = false;
       console.warn(`Chronicle: Failed to push new item "${item.name}" to Chronicle`, err);
     }
   }

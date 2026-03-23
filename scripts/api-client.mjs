@@ -527,7 +527,8 @@ export class ChronicleAPI {
       this._messageQueue.push(message);
       // Cap queue to prevent unbounded growth during long disconnects.
       if (this._messageQueue.length > 100) {
-        this._messageQueue.shift();
+        const dropped = this._messageQueue.shift();
+        console.warn('Chronicle: Offline message queue full — oldest message dropped:', dropped?.type || 'unknown');
       }
     }
   }

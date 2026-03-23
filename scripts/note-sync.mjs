@@ -14,8 +14,7 @@
  */
 
 import { getSetting } from './settings.mjs';
-
-const FLAG_SCOPE = 'chronicle-sync';
+import { FLAG_SCOPE } from './constants.mjs';
 
 /** Name of the root Foundry folder for Chronicle notes. */
 const NOTES_FOLDER_NAME = 'Chronicle Notes';
