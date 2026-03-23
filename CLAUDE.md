@@ -25,6 +25,8 @@ scripts/              # ES modules (.mjs)
   calendar-sync.mjs   # Calendar adapter (Calendaria/SimpleCalendar)
   actor-sync.mjs      # Character entity ↔ Actor sync
   item-sync.mjs       # Item sync
+  note-sync.mjs       # Chronicle Notes ↔ JournalEntry sync
+  constants.mjs       # Shared constants (FLAG_SCOPE, MODULE_ID)
   shop-widget.mjs     # Shop inventory UI
   sync-dashboard.mjs  # 6-tab dashboard UI
   adapters/           # Game system field mappers
@@ -40,7 +42,7 @@ lang/                 # Localization (en.json)
 
 - **ES modules** (`.mjs`) with `export default class` pattern.
 - Sync modules use a `_syncing` boolean guard to prevent infinite loops.
-- System adapters implement `toFoundryData()` / `toChronicleFields()` / `fromChronicleFields()`.
+- System adapters implement `toChronicleFields()` / `fromChronicleFields()`.
 - All REST calls use Bearer token auth via `api-client.mjs`.
 - WebSocket messages are routed by type through `SyncManager`.
 

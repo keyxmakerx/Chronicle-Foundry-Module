@@ -13,8 +13,7 @@
  */
 
 import { getSetting } from './settings.mjs';
-
-const FLAG_SCOPE = 'chronicle-sync';
+import { FLAG_SCOPE } from './constants.mjs';
 
 /**
  * MapSync handles map ↔ scene synchronization.

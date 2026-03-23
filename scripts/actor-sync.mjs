@@ -17,9 +17,7 @@
 import { getSetting } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
 import { createGenericAdapter } from './adapters/generic-adapter.mjs';
-
-// Flag namespace for Chronicle data stored on Foundry documents.
-const FLAG_SCOPE = 'chronicle-sync';
+import { FLAG_SCOPE } from './constants.mjs';
 
 /**
  * ActorSync handles character entity ↔ Actor synchronization.
@@ -393,6 +391,7 @@ export class ActorSync {
     if (!entityId) return;
 
     // Sync visibility: Foundry prototypeToken.hidden → Chronicle is_private.
+    // Await this before field sync to avoid inconsistent state.
     const hiddenChanged =
       change.prototypeToken?.hidden !== undefined ||
       change.token?.hidden !== undefined;
@@ -409,6 +408,7 @@ export class ActorSync {
         );
       } catch (err) {
         console.error('Chronicle: Failed to sync visibility to Chronicle', err);
+        // Continue to field sync even if visibility sync fails.
       }
     }
 

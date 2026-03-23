@@ -10,8 +10,7 @@
  */
 
 import { getSetting } from './settings.mjs';
-
-const FLAG_SCOPE = 'chronicle-sync';
+import { FLAG_SCOPE } from './constants.mjs';
 
 /**
  * ShopWidget manages the shop window UI and drag-and-drop.

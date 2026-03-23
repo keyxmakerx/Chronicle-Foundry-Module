@@ -11,9 +11,7 @@
 
 import { getSetting, getSyncExclusions } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
-
-// Flag namespace for Chronicle data stored on Foundry documents.
-const FLAG_SCOPE = 'chronicle-sync';
+import { FLAG_SCOPE } from './constants.mjs';
 
 /**
  * JournalSync handles entity ↔ JournalEntry synchronization.
