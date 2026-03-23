@@ -7,9 +7,13 @@
  *
  * Sync flow:
  * - Chronicle → Foundry: Calendar changes arrive via WebSocket, update
- *   the active Foundry calendar module (date, events).
+ *   the active Foundry calendar module (date, events/notes).
  * - Foundry → Chronicle: Calendar changes detected via Hooks, push to
  *   Chronicle API (PUT /calendar/date, POST/PUT/DELETE /calendar/events).
+ *
+ * Calendaria notes are synced as Chronicle calendar events. The module uses
+ * Calendaria's modern hook names (calendaria.dateTimeChange, calendaria.note*)
+ * with fallbacks for older versions.
  *
  * Initial sync: On first connect, fetches Chronicle calendar structure and
  * optionally pushes to the active Foundry calendar module.
@@ -34,6 +38,9 @@ export class CalendarSync {
     /** @type {object|null} Cached Chronicle calendar structure. */
     this._chronicleCalendar = null;
 
+    /** @type {boolean} Whether modern Calendaria API (CALENDARIA.api) is available. */
+    this._hasModernCalendariaApi = false;
+
     // Bound hook handlers for cleanup.
     this._boundHandlers = {};
   }
@@ -51,6 +58,8 @@ export class CalendarSync {
     // Detect active calendar module.
     if (game.modules.get('calendaria')?.active) {
       this._calendarModule = 'calendaria';
+      // Check for modern Calendaria API (v2+).
+      this._hasModernCalendariaApi = typeof globalThis.CALENDARIA?.api?.setDateTime === 'function';
     } else if (game.modules.get('foundryvtt-simple-calendar')?.active) {
       this._calendarModule = 'simple-calendar';
     }
@@ -61,7 +70,7 @@ export class CalendarSync {
     }
 
     this._registerHooks();
-    console.debug(`Chronicle: Calendar sync initialized (${this._calendarModule} detected)`);
+    console.debug(`Chronicle: Calendar sync initialized (${this._calendarModule} detected, modern API: ${this._hasModernCalendariaApi})`);
   }
 
   /**
@@ -125,6 +134,11 @@ export class CalendarSync {
         minute: this._chronicleCalendar.current_minute,
       });
 
+      // Sync Chronicle calendar events to Calendaria notes (if using Calendaria).
+      if (this._calendarModule === 'calendaria') {
+        await this._syncChronicleEventsToCalendariaNotes();
+      }
+
       console.debug('Chronicle: Calendar initial sync complete');
     } catch (err) {
       console.error('Chronicle: Calendar initial sync failed', err);
@@ -136,6 +150,12 @@ export class CalendarSync {
    */
   destroy() {
     if (this._calendarModule === 'calendaria') {
+      // Modern Calendaria hooks.
+      Hooks.off('calendaria.dateTimeChange', this._boundHandlers.dateTimeChange);
+      Hooks.off('calendaria.noteCreated', this._boundHandlers.noteCreated);
+      Hooks.off('calendaria.noteUpdated', this._boundHandlers.noteUpdated);
+      Hooks.off('calendaria.noteDeleted', this._boundHandlers.noteDeleted);
+      // Legacy Calendaria hooks (for older versions).
       Hooks.off('calendariaDateChange', this._boundHandlers.dateChange);
       Hooks.off('calendariaEventCreate', this._boundHandlers.eventCreate);
       Hooks.off('calendariaEventUpdate', this._boundHandlers.eventUpdate);
@@ -157,6 +177,19 @@ export class CalendarSync {
    */
   _registerHooks() {
     if (this._calendarModule === 'calendaria') {
+      // Modern Calendaria hooks (v2+): dateTimeChange includes hour/minute,
+      // noteCreated/Updated/Deleted handle calendar notes.
+      this._boundHandlers.dateTimeChange = this._onCalendariaDateTimeChange.bind(this);
+      this._boundHandlers.noteCreated = this._onCalendariaNoteCreated.bind(this);
+      this._boundHandlers.noteUpdated = this._onCalendariaNoteUpdated.bind(this);
+      this._boundHandlers.noteDeleted = this._onCalendariaNoteDeleted.bind(this);
+
+      Hooks.on('calendaria.dateTimeChange', this._boundHandlers.dateTimeChange);
+      Hooks.on('calendaria.noteCreated', this._boundHandlers.noteCreated);
+      Hooks.on('calendaria.noteUpdated', this._boundHandlers.noteUpdated);
+      Hooks.on('calendaria.noteDeleted', this._boundHandlers.noteDeleted);
+
+      // Legacy Calendaria hooks (fallback for older versions).
       this._boundHandlers.dateChange = this._onLocalDateChange.bind(this);
       this._boundHandlers.eventCreate = this._onLocalEventCreate.bind(this);
       this._boundHandlers.eventUpdate = this._onLocalEventUpdate.bind(this);
@@ -238,10 +271,148 @@ export class CalendarSync {
     }
   }
 
-  // --- Foundry → Chronicle ---
+  // --- Foundry → Chronicle (Calendaria Modern Hooks) ---
 
   /**
-   * Push date change from Calendaria to Chronicle.
+   * Push date/time change from modern Calendaria (dateTimeChange hook) to Chronicle.
+   * This hook fires on every world time change and includes full date+time.
+   * @param {object} data - { year, month, dayOfMonth, hour, minute, second, ... }
+   * @private
+   */
+  async _onCalendariaDateTimeChange(data) {
+    if (this._syncing) return;
+    if (!game.user.isGM) return;
+
+    try {
+      await this._api.put('/calendar/date', {
+        year: data.year,
+        month: data.month,
+        day: data.dayOfMonth ?? data.day,
+        hour: data.hour ?? 0,
+        minute: data.minute ?? 0,
+      });
+    } catch (err) {
+      console.error('Chronicle: Failed to push Calendaria date/time to Chronicle', err);
+    }
+  }
+
+  /**
+   * Push new Calendaria note to Chronicle as a calendar event.
+   * @param {object} noteData - Calendaria note data from the hook.
+   * @private
+   */
+  async _onCalendariaNoteCreated(noteData) {
+    if (this._syncing) return;
+    if (!game.user.isGM) return;
+
+    const eventPayload = this._calendariaNoteToChronicleEvent(noteData);
+    if (!eventPayload) return;
+
+    try {
+      const result = await this._api.post('/calendar/events', eventPayload);
+      if (result?.id && noteData.id) {
+        await this._storeEventMapping(noteData.id, result.id);
+      }
+    } catch (err) {
+      console.error('Chronicle: Failed to push Calendaria note to Chronicle', err);
+    }
+  }
+
+  /**
+   * Push Calendaria note update to Chronicle.
+   * @param {object} noteData - Calendaria note data from the hook.
+   * @private
+   */
+  async _onCalendariaNoteUpdated(noteData) {
+    if (this._syncing) return;
+    if (!game.user.isGM) return;
+
+    const chronicleId = this._getChronicleEventId(noteData.id);
+    if (!chronicleId) {
+      // Note exists in Calendaria but not in Chronicle — create it.
+      await this._onCalendariaNoteCreated(noteData);
+      return;
+    }
+
+    const eventPayload = this._calendariaNoteToChronicleEvent(noteData);
+    if (!eventPayload) return;
+
+    try {
+      await this._api.put(`/calendar/events/${chronicleId}`, eventPayload);
+    } catch (err) {
+      console.error('Chronicle: Failed to update Calendaria note in Chronicle', err);
+    }
+  }
+
+  /**
+   * Push Calendaria note deletion to Chronicle.
+   * @param {object} noteData - Calendaria note data (at minimum { id }).
+   * @private
+   */
+  async _onCalendariaNoteDeleted(noteData) {
+    if (this._syncing) return;
+    if (!game.user.isGM) return;
+
+    const noteId = noteData?.id || noteData?.pageId;
+    if (!noteId) return;
+
+    const chronicleId = this._getChronicleEventId(noteId);
+    if (!chronicleId) return;
+
+    try {
+      await this._api.delete(`/calendar/events/${chronicleId}`);
+      await this._removeEventMapping(noteId);
+    } catch (err) {
+      console.warn('Chronicle: Failed to delete Calendaria note from Chronicle', err);
+    }
+  }
+
+  /**
+   * Convert a Calendaria note object to a Chronicle calendar event payload.
+   * @param {object} noteData - Calendaria note data.
+   * @returns {object|null} Chronicle event body, or null if invalid.
+   * @private
+   */
+  _calendariaNoteToChronicleEvent(noteData) {
+    if (!noteData) return null;
+
+    // Calendaria notes store date in flagData or startDate.
+    const flagData = noteData.flagData || noteData;
+    const startDate = flagData.startDate || flagData;
+
+    // Validate we have date info.
+    if (startDate.year === undefined && startDate.month === undefined) {
+      // Try getting the date from the note's page document via API.
+      if (this._hasModernCalendariaApi && noteData.id) {
+        try {
+          const note = CALENDARIA.api.getNote(noteData.id);
+          if (note?.flagData?.startDate) {
+            return this._calendariaNoteToChronicleEvent({
+              ...noteData,
+              flagData: note.flagData,
+              name: note.name || noteData.name,
+            });
+          }
+        } catch { /* fall through */ }
+      }
+      return null;
+    }
+
+    // Calendaria uses 1-indexed months (same as Chronicle).
+    return {
+      name: noteData.name || noteData.title || 'Untitled Note',
+      year: startDate.year,
+      month: startDate.month,
+      day: startDate.day ?? startDate.dayOfMonth ?? 1,
+      description: noteData.content || noteData.description || flagData.content || '',
+      visibility: noteData.gmOnly ? 'gm_only' : 'everyone',
+    };
+  }
+
+  // --- Foundry → Chronicle (Legacy Calendaria Hooks) ---
+
+  /**
+   * Push date change from legacy Calendaria to Chronicle.
    * @param {object} dateData - { year, month, day }
    * @private
    */
@@ -292,7 +463,7 @@ export class CalendarSync {
   }
 
   /**
-   * Push new event from Calendaria to Chronicle.
+   * Push new event from legacy Calendaria to Chronicle.
    * @param {object} eventData
    * @private
    */
@@ -320,7 +491,7 @@ export class CalendarSync {
   }
 
   /**
-   * Push event update from Calendaria to Chronicle.
+   * Push event update from legacy Calendaria to Chronicle.
    * @param {object} eventData
    * @private
    */
@@ -349,7 +520,7 @@ export class CalendarSync {
   }
 
   /**
-   * Push event delete from Calendaria to Chronicle.
+   * Push event delete from legacy Calendaria to Chronicle.
    * @param {object} eventData
    * @private
    */
@@ -503,6 +674,7 @@ export class CalendarSync {
 
   /**
    * Set the date on the active Foundry calendar module.
+   * Uses CALENDARIA.api.setDateTime() when available for full hour/minute support.
    * @param {object} data - { year, month, day, hour, minute }
    * @private
    */
@@ -510,7 +682,17 @@ export class CalendarSync {
     this._syncing = true;
     try {
       if (this._calendarModule === 'calendaria') {
-        if (game.Calendaria?.setDate) {
+        if (this._hasModernCalendariaApi) {
+          // Modern Calendaria: setDateTime supports full date + time.
+          await CALENDARIA.api.setDateTime({
+            year: data.year,
+            month: data.month,
+            day: data.day,
+            hour: data.hour ?? 0,
+            minute: data.minute ?? 0,
+          });
+        } else if (game.Calendaria?.setDate) {
+          // Legacy Calendaria: setDate only supports date (no time).
           await game.Calendaria.setDate({
             year: data.year,
             month: data.month,
@@ -540,13 +722,36 @@ export class CalendarSync {
 
   /**
    * Create a calendar event in the active Foundry calendar module.
+   * For Calendaria, creates a note via CALENDARIA.api.createNote() (modern)
+   * or game.Calendaria.createEvent() (legacy).
    * @param {object} data - Chronicle event data.
    * @private
    */
   async _createLocalEvent(data) {
     if (this._calendarModule === 'calendaria') {
-      // Calendaria events: use its API if available, otherwise store as flag.
-      if (game.Calendaria?.createEvent) {
+      if (this._hasModernCalendariaApi) {
+        // Modern Calendaria: create a note (notes are the primary event type).
+        try {
+          const note = await CALENDARIA.api.createNote({
+            name: data.name || 'Event',
+            content: data.description || '',
+            startDate: {
+              year: data.year,
+              month: data.month,
+              day: data.day,
+            },
+            allDay: true,
+            gmOnly: data.visibility === 'gm_only',
+            openSheet: false,
+          });
+          if (note?.id) {
+            await this._storeEventMapping(note.id, data.id);
+          }
+        } catch (err) {
+          console.error('Chronicle: Failed to create Calendaria note from Chronicle event', err);
+        }
+      } else if (game.Calendaria?.createEvent) {
+        // Legacy Calendaria.
         const localEvent = await game.Calendaria.createEvent({
           name: data.name,
           year: data.year,
@@ -558,8 +763,7 @@ export class CalendarSync {
           await this._storeEventMapping(localEvent.id, data.id);
         }
       } else {
-        // Fallback: store Chronicle event reference for display in our UI.
-        console.debug('Chronicle: Calendaria createEvent API not available, event stored as reference');
+        console.debug('Chronicle: Calendaria createEvent/createNote API not available');
       }
     } else if (this._calendarModule === 'simple-calendar') {
       // SimpleCalendar events are journal entries with note flags.
@@ -606,17 +810,31 @@ export class CalendarSync {
    */
   async _updateLocalEvent(data) {
     if (this._calendarModule === 'calendaria') {
-      if (game.Calendaria?.updateEvent) {
-        const localId = this._getLocalEventId(data.id);
-        if (localId) {
-          await game.Calendaria.updateEvent(localId, {
+      const localId = this._getLocalEventId(data.id);
+      if (!localId) return;
+
+      if (this._hasModernCalendariaApi) {
+        try {
+          await CALENDARIA.api.updateNote(localId, {
             name: data.name,
-            year: data.year,
-            month: data.month,
-            day: data.day,
-            description: data.description || '',
+            content: data.description || '',
+            startDate: {
+              year: data.year,
+              month: data.month,
+              day: data.day,
+            },
           });
+        } catch (err) {
+          console.error('Chronicle: Failed to update Calendaria note', err);
         }
+      } else if (game.Calendaria?.updateEvent) {
+        await game.Calendaria.updateEvent(localId, {
+          name: data.name,
+          year: data.year,
+          month: data.month,
+          day: data.day,
+          description: data.description || '',
+        });
       }
     } else if (this._calendarModule === 'simple-calendar') {
       // SimpleCalendar notes are journal entries — update name/content.
@@ -640,7 +858,13 @@ export class CalendarSync {
     if (!localId) return;
 
     if (this._calendarModule === 'calendaria') {
-      if (game.Calendaria?.deleteEvent) {
+      if (this._hasModernCalendariaApi) {
+        try {
+          await CALENDARIA.api.deleteNote(localId);
+        } catch (err) {
+          console.error('Chronicle: Failed to delete Calendaria note', err);
+        }
+      } else if (game.Calendaria?.deleteEvent) {
         await game.Calendaria.deleteEvent(localId);
       }
     } else if (this._calendarModule === 'simple-calendar') {
@@ -652,6 +876,32 @@ export class CalendarSync {
     }
 
     await this._removeEventMapping(localId);
+  }
+
+  // --- Initial Sync: Chronicle Events → Calendaria Notes ---
+
+  /**
+   * Fetch all Chronicle calendar events and create corresponding Calendaria
+   * notes for any that don't already have local mappings.
+   * @private
+   */
+  async _syncChronicleEventsToCalendariaNotes() {
+    if (!this._hasModernCalendariaApi && !game.Calendaria?.createEvent) return;
+
+    try {
+      const events = await this._api.get('/calendar/events');
+      if (!Array.isArray(events)) return;
+
+      for (const event of events) {
+        const localId = this._getLocalEventId(event.id);
+        if (localId) continue; // Already synced.
+
+        await this._createLocalEvent(event);
+      }
+    } catch (err) {
+      // Calendar events endpoint may not exist yet; not critical.
+      console.debug('Chronicle: Could not fetch calendar events for initial sync', err.message);
+    }
   }
 
   // --- Event Mapping Helpers ---
