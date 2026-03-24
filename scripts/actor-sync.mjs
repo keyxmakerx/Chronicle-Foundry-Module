@@ -499,9 +499,9 @@ export class ActorSync {
   // ---------------------------------------------------------------------------
 
   /**
-   * Load the appropriate system adapter based on the matched Chronicle system.
-   * Tries hand-written adapters first (best quality), then falls back to the
-   * generic API-driven adapter for custom or unknown systems.
+   * Load the system adapter based on the matched Chronicle system.
+   * Uses the generic API-driven adapter which reads field definitions
+   * (including foundry_path annotations) from the system manifest.
    * @returns {Promise<object|null>} Adapter module or null.
    * @private
    */
@@ -509,19 +509,6 @@ export class ActorSync {
     const matchedSystem = getSetting('detectedSystem');
     if (!matchedSystem) return null;
 
-    // Try hand-written adapters first for known systems.
-    try {
-      switch (matchedSystem) {
-        case 'dnd5e':
-          return await import('./adapters/dnd5e-adapter.mjs');
-        case 'pathfinder2e':
-          return await import('./adapters/pf2e-adapter.mjs');
-      }
-    } catch (err) {
-      console.warn(`Chronicle: Failed to load built-in adapter for "${matchedSystem}", trying generic`, err);
-    }
-
-    // Fall back to generic adapter (reads field defs from API).
     try {
       const generic = await createGenericAdapter(this._api, matchedSystem);
       if (generic) {

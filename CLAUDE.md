@@ -30,9 +30,7 @@ scripts/              # ES modules (.mjs)
   shop-widget.mjs     # Shop inventory UI
   sync-dashboard.mjs  # 6-tab dashboard UI
   adapters/           # Game system field mappers
-    dnd5e-adapter.mjs
-    pf2e-adapter.mjs
-    generic-adapter.mjs
+    generic-adapter.mjs # API-driven adapter for all systems
 templates/            # Handlebars templates
 styles/               # CSS
 lang/                 # Localization (en.json)
