@@ -10,6 +10,30 @@
 import { getSetting } from './settings.mjs';
 
 /**
+ * Allowed WebSocket message type prefixes.
+ * Messages with types not matching any prefix are silently ignored to prevent
+ * unexpected handler invocations from malformed or spoofed messages.
+ * @type {ReadonlyArray<string>}
+ */
+const ALLOWED_WS_TYPE_PREFIXES = Object.freeze([
+  'entity.', 'entity_type.',
+  'drawing.', 'token.', 'marker.', 'fog.', 'layer.',
+  'note.',
+  'calendar.',
+  'relation.',
+  'sync.',
+]);
+
+/**
+ * Check whether a WebSocket message type is in the allowlist.
+ * @param {string} type
+ * @returns {boolean}
+ */
+function _isAllowedMessageType(type) {
+  return ALLOWED_WS_TYPE_PREFIXES.some((prefix) => type.startsWith(prefix));
+}
+
+/**
  * Error thrown when a PUT/POST request conflicts with a concurrent edit.
  * The Chronicle API returns 409 when `expected_updated_at` is stale.
  */
@@ -567,8 +591,10 @@ export class ChronicleAPI {
     const baseUrl = getSetting('apiUrl').replace(/\/+$/, '');
     const apiKey = getSetting('apiKey');
 
-    // Convert http(s) to ws(s).
-    const wsUrl = baseUrl.replace(/^http/, 'ws') + `/ws?token=${encodeURIComponent(apiKey)}`;
+    // Convert http(s) to ws(s). Token is sent in the first message after
+    // connection rather than in the URL to avoid leaking via server logs,
+    // proxy logs, browser history, and referrer headers.
+    const wsUrl = baseUrl.replace(/^http/, 'ws') + '/ws';
 
     this._setState('connecting');
 
@@ -582,7 +608,11 @@ export class ChronicleAPI {
     }
 
     this._ws.onopen = async () => {
-      console.debug('Chronicle: WebSocket connected');
+      console.debug('Chronicle: WebSocket connected, authenticating...');
+
+      // Authenticate by sending the token as the first message.
+      this._ws.send(JSON.stringify({ type: 'authenticate', token: apiKey }));
+
       this._setState('connected');
       this._reconnectDelay = 1000; // Reset backoff.
       this.health.connectedSince = Date.now();
@@ -631,6 +661,10 @@ export class ChronicleAPI {
     this._ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
+        if (!msg.type || !_isAllowedMessageType(msg.type)) {
+          console.warn(`Chronicle: Ignoring unknown WebSocket message type: ${msg.type}`);
+          return;
+        }
         this._emit(msg.type, msg);
       } catch (err) {
         console.warn('Chronicle: Invalid WebSocket message', err);
