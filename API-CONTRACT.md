@@ -11,9 +11,12 @@ All REST requests include a Bearer token:
 Authorization: Bearer <api-key>
 ```
 
-WebSocket connections authenticate via query parameter:
+WebSocket connections authenticate via the first message after connection
+(not in the URL, to avoid token leakage via server logs, proxy logs, browser
+history, and referrer headers):
 ```
-wss://chronicle.example.com/ws?token=<api-key>
+wss://chronicle.example.com/ws
+→ { "type": "authenticate", "token": "<api-key>" }
 ```
 
 API keys are scoped to a single campaign. The key determines:
@@ -671,9 +674,18 @@ Lists relations for an entity (used for shop inventory).
 
 ### Connection
 ```
-GET /ws?token=<api-key>
+GET /ws
 Upgrade: websocket
 ```
+
+After the WebSocket upgrade completes, the client sends an authentication
+message as the first frame:
+```json
+{ "type": "authenticate", "token": "<api-key>" }
+```
+
+The server must validate the token before processing any further messages.
+If the token is invalid, the server should close the connection with code 4001.
 
 ### Message Format (Server → Client)
 ```json
