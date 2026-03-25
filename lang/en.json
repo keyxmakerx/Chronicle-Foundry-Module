@@ -145,6 +145,7 @@
         "NoSystem": "Character sync requires a matching game system.",
         "NoSystemHint": "Your Foundry system must match a Chronicle game system with character field templates."
       },
+      "OfflineWarning": "Sync messages are queued while disconnected, but the queue is limited. Extended offline periods may cause missed updates — use Pull All after reconnecting to ensure consistency.",
       "StatusTab": {
         "Connection": "Connection",
         "EntitiesSynced": "Entities Synced",

@@ -118,6 +118,43 @@ Returns character preset field definitions with Foundry annotations.
 - `foundry_path` — Dot-notation path on `actor.system` (e.g., "system.abilities.str.value")
 - `foundry_writable` — Whether this field can be written back to Foundry (false = read-only from Foundry)
 
+##### Multi-Preset Systems (e.g., Draw Steel Creatures)
+
+A single game system may expose multiple entity presets, each with its own
+`foundry_actor_type` and field mappings. For example, Draw Steel has both a
+**hero** preset (`drawsteel-character`, actor type `"hero"`) and a **creature**
+preset (`drawsteel-creature`, actor type `"npc"`).
+
+**Expected creature preset response:**
+```json
+{
+  "system_id": "drawsteel",
+  "preset_slug": "drawsteel-creature",
+  "preset_name": "Draw Steel Creature",
+  "foundry_system_id": "draw-steel",
+  "foundry_actor_type": "npc",
+  "fields": [
+    { "key": "stamina_max",   "label": "Stamina (Max)",     "type": "number", "foundry_path": "system.stamina.max",                     "foundry_writable": false },
+    { "key": "stamina_value", "label": "Stamina (Current)", "type": "number", "foundry_path": "system.stamina.value",                   "foundry_writable": true },
+    { "key": "might",         "label": "Might",             "type": "number", "foundry_path": "system.characteristics.might.value",      "foundry_writable": true },
+    { "key": "agility",       "label": "Agility",           "type": "number", "foundry_path": "system.characteristics.agility.value",    "foundry_writable": true },
+    { "key": "reason",        "label": "Reason",            "type": "number", "foundry_path": "system.characteristics.reason.value",     "foundry_writable": true },
+    { "key": "intuition",     "label": "Intuition",         "type": "number", "foundry_path": "system.characteristics.intuition.value",  "foundry_writable": true },
+    { "key": "presence",      "label": "Presence",          "type": "number", "foundry_path": "system.characteristics.presence.value",   "foundry_writable": true },
+    { "key": "speed",         "label": "Speed",             "type": "number", "foundry_path": "system.speed.value",                     "foundry_writable": true },
+    { "key": "stability",     "label": "Stability",         "type": "number", "foundry_path": "system.stability.value",                 "foundry_writable": true },
+    { "key": "level",         "label": "Level",             "type": "number", "foundry_path": "system.level",                           "foundry_writable": false },
+    { "key": "ev",            "label": "EV",                "type": "number", "foundry_path": "system.ev",                              "foundry_writable": false }
+  ]
+}
+```
+
+> **Current limitation:** The Foundry module's generic adapter (`generic-adapter.mjs`)
+> and actor sync (`actor-sync.mjs`) currently support only **one preset per system**.
+> If the primary preset is `drawsteel-character`, creature entities with slug
+> `drawsteel-creature` will not sync. Multi-preset support requires extending the
+> adapter architecture to load multiple presets and route entities by `type_slug`.
+
 #### GET /systems/:systemId/item-fields
 Returns item preset field definitions. Same shape as character-fields.
 
