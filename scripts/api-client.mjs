@@ -371,6 +371,80 @@ export class ChronicleAPI {
     return response.json();
   }
 
+  // --- Wizard / Import API convenience methods ---
+  // These wrap new Chronicle API endpoints needed by the import wizard.
+  // Endpoints may not be deployed yet; callers handle errors gracefully.
+
+  /**
+   * Fetch enabled addons for the current campaign.
+   * @returns {Promise<Array<{slug: string, name: string, category: string, enabled: boolean}>>}
+   */
+  async getAddons() {
+    return this.get('/addons');
+  }
+
+  /**
+   * Fetch all tags for the current campaign.
+   * @returns {Promise<Array>}
+   */
+  async getTags() {
+    return this.get('/tags');
+  }
+
+  /**
+   * Create a new tag in the current campaign.
+   * @param {{ name: string, color?: string, dm_only?: boolean }} body
+   * @returns {Promise<object>}
+   */
+  async createTag(body) {
+    return this.post('/tags', body);
+  }
+
+  /**
+   * Bulk assign/remove tags on multiple entities.
+   * @param {{ entity_ids: string[], tag_ids: number[], action: 'add'|'remove'|'set' }} body
+   * @returns {Promise<object>}
+   */
+  async bulkAssignTags(body) {
+    return this.post('/entities/bulk-tags', body);
+  }
+
+  /**
+   * Bulk update entity type for multiple entities.
+   * @param {{ entity_ids: string[], entity_type_id: number }} body
+   * @returns {Promise<object>}
+   */
+  async bulkUpdateEntityType(body) {
+    return this.post('/entities/bulk-update', body);
+  }
+
+  /**
+   * Create a new entity type in the current campaign.
+   * @param {{ name: string, name_plural?: string, icon?: string, color?: string }} body
+   * @returns {Promise<object>}
+   */
+  async createEntityType(body) {
+    return this.post('/entity-types', body);
+  }
+
+  /**
+   * Fetch relation types for the current campaign.
+   * @returns {Promise<Array>}
+   */
+  async getRelationTypes() {
+    return this.get('/relations/types');
+  }
+
+  /**
+   * Create a relation on an entity.
+   * @param {string} entityId
+   * @param {{ target_entity_id: string, relation_type_id: number, metadata?: object }} body
+   * @returns {Promise<object>}
+   */
+  async createRelation(entityId, body) {
+    return this.post(`/entities/${entityId}/relations`, body);
+  }
+
   // --- Retry queue (F-QoL) ---
 
   /**

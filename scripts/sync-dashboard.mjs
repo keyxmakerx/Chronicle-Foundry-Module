@@ -60,6 +60,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'test-connection': SyncDashboard.#onTestConnectionAction,
       'save-config': SyncDashboard.#onSaveConfigAction,
       'copy-debug': SyncDashboard.#onCopyDebugAction,
+      'open-wizard': SyncDashboard.#onOpenWizardAction,
     },
   };
 
@@ -1075,6 +1076,13 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Copy system debug snapshot to clipboard for pasting into AI tools. */
   static #onCopyDebugAction() {
     this._onCopyDebug();
+  }
+
+  static async #onOpenWizardAction() {
+    const { ImportWizard } = await import('./import-wizard.mjs');
+    const wizard = ImportWizard.instance;
+    wizard.bind(this._syncManager);
+    wizard.render({ force: true });
   }
 
   // ---------------------------------------------------------------------------

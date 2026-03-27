@@ -22,7 +22,8 @@
     "scripts/module.mjs"
   ],
   "styles": [
-    "styles/chronicle-sync.css"
+    "styles/chronicle-sync.css",
+    "styles/import-wizard.css"
   ],
   "languages": [
     {

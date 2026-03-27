@@ -1012,6 +1012,19 @@
   font-weight: normal;
 }
 
+.config-wizard-prompt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  margin-bottom: 4px;
+}
+
+.config-wizard-prompt .config-hint {
+  margin: 0;
+  flex: 1;
+}
+
 /* Scope grid: sync type rows with direction dropdown */
 .config-scope-grid {
   display: flex;
