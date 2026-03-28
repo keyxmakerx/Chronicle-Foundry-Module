@@ -429,6 +429,39 @@ the relation type (not a numeric ID).
 }
 ```
 
+#### GET /entities/:entityId/relations
+List all relations on an entity.
+
+**Used by:** `item-sync.mjs` → pull inventory relations for actors
+
+#### DELETE /entities/:entityId/relations/:relationId
+Delete a relation.
+
+**Used by:** `item-sync.mjs` → remove item from actor inventory
+
+#### PUT /entities/:entityId/relations/:relationId/metadata
+Update relation metadata (e.g., item quantity, equipped state).
+
+**Used by:** `item-sync.mjs` → update inventory item metadata
+
+---
+
+### Members
+
+#### GET /members
+Lists campaign members with their display names and roles.
+
+**Used by:** `sync-manager.mjs` → auto-match Chronicle users to Foundry users by display name
+
+**Response:**
+```json
+{
+  "data": [
+    { "id": "uuid", "display_name": "Alice", "role": "player" }
+  ]
+}
+```
+
 ---
 
 ### Sync Mappings
@@ -549,6 +582,18 @@ Updates fog of war data.
 
 #### GET /maps/:mapId/layers
 Lists map layers.
+
+#### GET /maps/:mapId/markers
+Lists map markers (pins/notes on the map).
+
+#### POST /maps/:mapId/markers
+Creates a map marker.
+
+#### PUT /maps/:mapId/markers/:markerId
+Updates a map marker.
+
+#### DELETE /maps/:mapId/markers/:markerId
+Deletes a map marker.
 
 ---
 
