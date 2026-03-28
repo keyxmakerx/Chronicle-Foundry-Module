@@ -61,6 +61,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'save-config': SyncDashboard.#onSaveConfigAction,
       'copy-debug': SyncDashboard.#onCopyDebugAction,
       'open-wizard': SyncDashboard.#onOpenWizardAction,
+      'bulk-set-public': SyncDashboard.#onBulkSetPublicAction,
+      'bulk-set-private': SyncDashboard.#onBulkSetPrivateAction,
+      'bulk-delete': SyncDashboard.#onBulkDeleteAction,
     },
   };
 
@@ -90,6 +93,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     /** @type {string} Currently active tab. */
     this._activeTab = 'entities';
+
+    /** @type {Set<string>} Currently selected entity IDs for bulk operations. */
+    this._selectedEntities = new Set();
   }
 
   /**
@@ -211,10 +217,18 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       config: configData,
 
       // Entities tab.
-      entityGroups,
+      entityGroups: entityGroups.map(g => ({
+        ...g,
+        entities: g.entities.map(e => ({
+          ...e,
+          isSelected: this._selectedEntities.has(e.id),
+        })),
+      })),
+      entityTypes: entityGroups.map(g => ({ id: g.typeId, name: g.typeNamePlural })),
       foundryOnlyJournals,
       hasChronicleOnly: entityGroups.some(g => g.entities.some(e => e.status === 'chronicle-only')),
       hasFoundryOnly: foundryOnlyJournals.length > 0,
+      bulkSelectionCount: this._selectedEntities.size,
 
       // Shops tab.
       ...shopData,
@@ -891,6 +905,44 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       });
     });
 
+    // --- Bulk selection checkboxes ---
+    el.querySelectorAll('.bulk-entity-checkbox').forEach((checkbox) => {
+      checkbox.addEventListener('change', (e) => {
+        const entityId = e.currentTarget.dataset.entityId;
+        if (e.currentTarget.checked) {
+          this._selectedEntities.add(entityId);
+        } else {
+          this._selectedEntities.delete(entityId);
+        }
+        this.render({ force: true });
+      });
+    });
+
+    // --- Bulk select all checkbox ---
+    const selectAllCb = el.querySelector('.bulk-select-all-checkbox');
+    if (selectAllCb) {
+      selectAllCb.addEventListener('change', (e) => {
+        if (e.currentTarget.checked) {
+          el.querySelectorAll('.bulk-entity-checkbox').forEach((cb) => {
+            this._selectedEntities.add(cb.dataset.entityId);
+          });
+        } else {
+          this._selectedEntities.clear();
+        }
+        this.render({ force: true });
+      });
+    }
+
+    // --- Bulk change type select ---
+    const bulkTypeSelect = el.querySelector('.bulk-type-select');
+    if (bulkTypeSelect) {
+      bulkTypeSelect.addEventListener('change', (e) => {
+        const typeId = Number(e.currentTarget.value);
+        if (typeId) this._onBulkChangeType(typeId);
+        e.currentTarget.value = '';
+      });
+    }
+
     // --- Config tab: direction selects auto-save visual feedback ---
     el.querySelectorAll('.config-direction-select').forEach((select) => {
       select.addEventListener('change', () => {
@@ -1083,6 +1135,21 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const wizard = ImportWizard.instance;
     wizard.bind(this._syncManager);
     wizard.render({ force: true });
+  }
+
+  /** Set all selected entities to public. */
+  static #onBulkSetPublicAction() {
+    this._onBulkSetVisibility(false);
+  }
+
+  /** Set all selected entities to private. */
+  static #onBulkSetPrivateAction() {
+    this._onBulkSetVisibility(true);
+  }
+
+  /** Delete all selected entities after confirmation. */
+  static #onBulkDeleteAction() {
+    this._onBulkDelete();
   }
 
   // ---------------------------------------------------------------------------
@@ -1764,6 +1831,114 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       }
     }
     return result;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bulk operations
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Change entity type for all selected entities.
+   * @param {number} newTypeId
+   * @private
+   */
+  async _onBulkChangeType(newTypeId) {
+    if (this._selectedEntities.size === 0) return;
+
+    const count = this._selectedEntities.size;
+    let confirmed;
+    try {
+      confirmed = await Dialog.confirm({
+        title: game.i18n.localize('CHRONICLE.Dashboard.Bulk.ChangeType'),
+        content: `<p>${game.i18n.format('CHRONICLE.Dashboard.Bulk.ConfirmChangeType', { count })}</p>`,
+      });
+    } catch { return; }
+    if (!confirmed) return;
+
+    try {
+      await this.api.bulkUpdateEntityType({
+        entity_ids: [...this._selectedEntities],
+        entity_type_id: newTypeId,
+      });
+      this._selectedEntities.clear();
+      this._cache.entities = null;
+      this._logActivity('update', `Bulk changed type for ${count} entities`);
+      this.render({ force: true });
+    } catch (err) {
+      console.error('Chronicle Dashboard: Bulk change type failed', err);
+      ui.notifications.error(`Bulk type change failed: ${err.message}`);
+    }
+  }
+
+  /**
+   * Set visibility (public/private) for all selected entities.
+   * @param {boolean} makePrivate
+   * @private
+   */
+  async _onBulkSetVisibility(makePrivate) {
+    if (this._selectedEntities.size === 0) return;
+
+    const count = this._selectedEntities.size;
+    const ids = [...this._selectedEntities];
+    let succeeded = 0;
+
+    for (const entityId of ids) {
+      try {
+        await this.api.put(`/entities/${entityId}`, { is_private: makePrivate });
+
+        const journal = game.journal.find(j => j.getFlag(FLAG_SCOPE, 'entityId') === entityId);
+        if (journal) {
+          const newOwnership = makePrivate
+            ? { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE }
+            : { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER };
+          await journal.update({ ownership: newOwnership });
+        }
+        succeeded++;
+      } catch (err) {
+        console.warn(`Chronicle: Failed to set visibility for entity ${entityId}`, err);
+      }
+    }
+
+    this._selectedEntities.clear();
+    this._cache.entities = null;
+    const label = makePrivate ? 'private' : 'public';
+    this._logActivity('update', `Set ${succeeded} entities to ${label}`);
+    this.render({ force: true });
+  }
+
+  /**
+   * Delete all selected entities from Chronicle (with confirmation).
+   * @private
+   */
+  async _onBulkDelete() {
+    if (this._selectedEntities.size === 0) return;
+
+    const count = this._selectedEntities.size;
+    let confirmed;
+    try {
+      confirmed = await Dialog.confirm({
+        title: game.i18n.localize('CHRONICLE.Dashboard.Bulk.Delete'),
+        content: `<p>${game.i18n.format('CHRONICLE.Dashboard.Bulk.ConfirmDelete', { count })}</p>`,
+      });
+    } catch { return; }
+    if (!confirmed) return;
+
+    const ids = [...this._selectedEntities];
+    let succeeded = 0;
+
+    for (const entityId of ids) {
+      try {
+        await this.api.delete(`/entities/${entityId}`);
+        succeeded++;
+      } catch (err) {
+        console.warn(`Chronicle: Failed to delete entity ${entityId}`, err);
+      }
+    }
+
+    this._selectedEntities.clear();
+    this._cache.entities = null;
+    this._logActivity('update', `Deleted ${succeeded} entities from Chronicle`);
+    this.render({ force: true });
   }
 
   // ---------------------------------------------------------------------------

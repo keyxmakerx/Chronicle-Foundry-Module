@@ -93,6 +93,15 @@
         "PublicClickPrivate": "Public — click to make private",
         "EmptyState": "No entities found. Create entities in Chronicle or journals in Foundry to get started."
       },
+      "Bulk": {
+        "Selected": "selected",
+        "ChangeType": "Change Type",
+        "MakePublic": "Make Public",
+        "MakePrivate": "Make Private",
+        "Delete": "Delete",
+        "ConfirmChangeType": "Change entity type for {count} selected entities?",
+        "ConfirmDelete": "Permanently delete {count} selected entities from Chronicle? This cannot be undone."
+      },
       "Maps": {
         "ChronicleMaps": "Chronicle Maps",
         "UnlinkedScenes": "Unlinked Foundry Scenes",

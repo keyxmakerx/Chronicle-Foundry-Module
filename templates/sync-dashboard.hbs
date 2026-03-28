@@ -230,6 +230,36 @@
         <input type="text" class="dashboard-search" placeholder="Search entities..." value="{{searchFilter}}"/>
       </div>
 
+      {{!-- Bulk actions toolbar (visible when entities are selected) --}}
+      <div class="bulk-toolbar {{#if bulkSelectionCount}}visible{{/if}}">
+        <div class="bulk-toolbar-left">
+          <label class="bulk-select-all-label">
+            <input type="checkbox" class="bulk-select-all-checkbox" />
+          </label>
+          <span class="bulk-count-badge">{{bulkSelectionCount}} {{localize "CHRONICLE.Dashboard.Bulk.Selected"}}</span>
+        </div>
+        <div class="bulk-toolbar-actions">
+          <select class="bulk-type-select" title="{{localize "CHRONICLE.Dashboard.Bulk.ChangeType"}}">
+            <option value="">{{localize "CHRONICLE.Dashboard.Bulk.ChangeType"}}</option>
+            {{#each entityTypes}}
+            <option value="{{id}}">{{name}}</option>
+            {{/each}}
+          </select>
+          <button type="button" class="dashboard-btn btn-xs" data-action="bulk-set-public"
+                  title="{{localize "CHRONICLE.Dashboard.Bulk.MakePublic"}}">
+            <i class="fa-solid fa-lock-open"></i>
+          </button>
+          <button type="button" class="dashboard-btn btn-xs" data-action="bulk-set-private"
+                  title="{{localize "CHRONICLE.Dashboard.Bulk.MakePrivate"}}">
+            <i class="fa-solid fa-lock"></i>
+          </button>
+          <button type="button" class="dashboard-btn btn-xs btn-danger" data-action="bulk-delete"
+                  title="{{localize "CHRONICLE.Dashboard.Bulk.Delete"}}">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
+      </div>
+
       <div class="entity-list">
         {{#each entityGroups}}
         <div class="entity-type-group">
@@ -255,7 +285,8 @@
           {{#unless isCollapsed}}
           <div class="entity-rows">
             {{#each entities}}
-            <div class="entity-row status-{{status}}">
+            <div class="entity-row status-{{status}} {{#if isSelected}}bulk-selected{{/if}}">
+              <input type="checkbox" class="bulk-entity-checkbox" data-entity-id="{{id}}" {{#if isSelected}}checked{{/if}} />
               <span class="entity-status-dot" title="{{status}}"></span>
               <span class="entity-name">{{name}}</span>
 
