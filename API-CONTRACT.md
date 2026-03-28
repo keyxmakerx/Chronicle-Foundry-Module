@@ -11,17 +11,15 @@ All REST requests include a Bearer token:
 Authorization: Bearer <api-key>
 ```
 
-WebSocket connections authenticate via the first message after connection
-(not in the URL, to avoid token leakage via server logs, proxy logs, browser
-history, and referrer headers):
+WebSocket connections authenticate via query parameter at connection time:
 ```
-wss://chronicle.example.com/ws
-→ { "type": "authenticate", "token": "<api-key>" }
+wss://chronicle.example.com/ws?token=<api-key>
 ```
 
 API keys are scoped to a single campaign. The key determines:
 - Which campaign's data is accessible
-- Permission level: `read`, `write`, `sync`
+- Permission level: `read` (GET), `write` (POST/PUT/DELETE), `sync` (sync endpoints)
+- A `sync`-level key covers read + write + sync
 - Rate limit: 60 requests/minute (default)
 
 ## Base URL Pattern
@@ -287,7 +285,7 @@ Create a new entity type in the campaign.
 
 **Used by:** `import-wizard.mjs` → "Create new type" in Step 3
 
-**Request:**
+**Request** (all 4 fields required):
 ```json
 {
   "name": "Quest",
@@ -350,7 +348,8 @@ Create a new tag.
 **Response:** The created tag object.
 
 #### POST /entities/bulk-tags
-Bulk assign or remove tags on multiple entities.
+Bulk assign or remove tags on multiple entities. Maximum 200 entities per
+request — the Foundry module auto-batches larger sets.
 
 **Used by:** `import-wizard.mjs` → bulk tag assignment after import
 
@@ -365,6 +364,18 @@ Bulk assign or remove tags on multiple entities.
 
 `action` must be `"add"`, `"remove"`, or `"set"` (replace all tags).
 
+**Response:**
+```json
+{
+  "status": "ok",
+  "processed": 2,
+  "results": [
+    { "entity_id": "uuid1", "status": "ok" },
+    { "entity_id": "uuid2", "status": "ok" }
+  ]
+}
+```
+
 ---
 
 ### Bulk Operations
@@ -373,6 +384,8 @@ Bulk assign or remove tags on multiple entities.
 Bulk update entity type for multiple entities.
 
 **Used by:** `sync-dashboard.mjs` → bulk Change Type action
+
+**Response:** `{ "status": "ok", "updated": 5 }`
 
 **Request:**
 ```json
@@ -387,7 +400,8 @@ Bulk update entity type for multiple entities.
 ### Relations
 
 #### GET /relations/types
-Lists relation types for the campaign.
+Lists predefined relation types for the campaign. Types are immutable
+forward/reverse string pairs (17 built-in pairs like "parent of" / "child of").
 
 **Used by:** `import-wizard.mjs` → future relation creation support
 
@@ -395,19 +409,22 @@ Lists relation types for the campaign.
 ```json
 {
   "data": [
-    { "id": 1, "name": "Has Item", "reverse_name": "Owned By" }
+    { "forward": "parent of", "reverse": "child of" },
+    { "forward": "has item", "reverse": "owned by" },
+    { "forward": "member of", "reverse": "has member" }
   ]
 }
 ```
 
 #### POST /entities/:entityId/relations
-Create a relation on an entity.
+Create a relation on an entity. Uses the forward label string to identify
+the relation type (not a numeric ID).
 
 **Request:**
 ```json
 {
   "target_entity_id": "uuid",
-  "relation_type_id": 1,
+  "relation_type": "parent of",
   "metadata": {}
 }
 ```
@@ -804,18 +821,12 @@ Lists relations for an entity (used for shop inventory).
 
 ### Connection
 ```
-GET /ws
+GET /ws?token=<api-key>
 Upgrade: websocket
 ```
 
-After the WebSocket upgrade completes, the client sends an authentication
-message as the first frame:
-```json
-{ "type": "authenticate", "token": "<api-key>" }
-```
-
-The server must validate the token before processing any further messages.
-If the token is invalid, the server should close the connection with code 4001.
+Authentication happens at connection time via the `token` query parameter.
+If the token is invalid, the server rejects the upgrade.
 
 ### Message Format (Server → Client)
 ```json

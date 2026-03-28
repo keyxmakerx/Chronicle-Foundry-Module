@@ -628,13 +628,23 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this._typeMappings[idx]) {
           const val = e.target.value;
           if (val === '__new__') {
-            this._newTypeForm = { mappingIndex: idx, name: '', icon: 'fa-solid fa-circle' };
+            this._newTypeForm = { mappingIndex: idx, name: '', icon: 'fa-solid fa-circle', color: '#60a5fa' };
             this.render({ force: true });
           } else {
             this._typeMappings[idx].chronicleTypeId = val ? Number(val) : null;
           }
         }
       });
+    }
+
+    // Step 3: inline "create new type" form inputs.
+    const newTypeName = el.querySelector('[data-field="new-type-name"]');
+    if (newTypeName && this._newTypeForm) {
+      newTypeName.addEventListener('input', (e) => { this._newTypeForm.name = e.target.value; });
+    }
+    const newTypeColor = el.querySelector('[data-field="new-type-color"]');
+    if (newTypeColor && this._newTypeForm) {
+      newTypeColor.addEventListener('input', (e) => { this._newTypeForm.color = e.target.value; });
     }
 
     // Step 4: tag toggle checkboxes.
@@ -827,19 +837,21 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
 
   static #onCreateNewType(event, target) {
     const idx = Number(target.dataset.mappingIndex);
-    this._newTypeForm = { mappingIndex: idx, name: '', icon: 'fa-solid fa-circle' };
+    this._newTypeForm = { mappingIndex: idx, name: '', icon: 'fa-solid fa-circle', color: '#60a5fa' };
     this.render({ force: true });
   }
 
   static async #onSaveNewType() {
     if (!this._newTypeForm || !this.api) return;
-    const { mappingIndex, name } = this._newTypeForm;
+    const { mappingIndex, name, icon, color } = this._newTypeForm;
     if (!name.trim()) return;
 
     try {
       const created = await this.api.createEntityType({
         name: name.trim(),
         name_plural: name.trim() + 's',
+        icon: icon || 'fa-solid fa-circle',
+        color: color || '#60a5fa',
       });
       // Add to known entity types and select it.
       this._connectionStatus.entityTypes.push(created);

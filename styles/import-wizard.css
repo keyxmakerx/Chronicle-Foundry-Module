@@ -354,6 +354,16 @@
   outline: none;
 }
 
+.wizard-color-input {
+  width: 32px;
+  height: 28px;
+  padding: 1px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
 /* --- Tag chips (Step 4) --- */
 
 .wizard-tag-list {
