@@ -309,6 +309,67 @@
   gap: 4px;
 }
 
+/* --- Bulk actions toolbar --- */
+
+.bulk-toolbar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  background: rgba(96, 165, 250, 0.08);
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  border-radius: 4px;
+}
+
+.bulk-toolbar.visible {
+  display: flex;
+}
+
+.bulk-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bulk-count-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #60a5fa;
+}
+
+.bulk-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bulk-type-select {
+  padding: 3px 6px;
+  font-size: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  max-width: 160px;
+}
+
+.bulk-type-select:focus {
+  border-color: #60a5fa;
+  outline: none;
+}
+
+.bulk-entity-checkbox {
+  flex-shrink: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.entity-row.bulk-selected {
+  background: rgba(96, 165, 250, 0.06);
+}
+
 .dashboard-search {
   flex: 1;
   padding: 4px 8px;
@@ -1010,6 +1071,19 @@
   font-size: 11px;
   color: rgba(255, 255, 255, 0.3);
   font-weight: normal;
+}
+
+.config-wizard-prompt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  margin-bottom: 4px;
+}
+
+.config-wizard-prompt .config-hint {
+  margin: 0;
+  flex: 1;
 }
 
 /* Scope grid: sync type rows with direction dropdown */

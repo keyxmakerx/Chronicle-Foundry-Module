@@ -206,6 +206,14 @@ export function registerSettings() {
     type: String,
     default: '',
   });
+
+  // Whether the import wizard has been completed at least once.
+  game.settings.register(MODULE_ID, 'wizardCompleted', {
+    scope: 'world',
+    config: false,
+    type: Boolean,
+    default: false,
+  });
 }
 
 /**

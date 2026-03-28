@@ -11,17 +11,15 @@ All REST requests include a Bearer token:
 Authorization: Bearer <api-key>
 ```
 
-WebSocket connections authenticate via the first message after connection
-(not in the URL, to avoid token leakage via server logs, proxy logs, browser
-history, and referrer headers):
+WebSocket connections authenticate via query parameter at connection time:
 ```
-wss://chronicle.example.com/ws
-→ { "type": "authenticate", "token": "<api-key>" }
+wss://chronicle.example.com/ws?token=<api-key>
 ```
 
 API keys are scoped to a single campaign. The key determines:
 - Which campaign's data is accessible
-- Permission level: `read`, `write`, `sync`
+- Permission level: `read` (GET), `write` (POST/PUT/DELETE), `sync` (sync endpoints)
+- A `sync`-level key covers read + write + sync
 - Rate limit: 60 requests/minute (default)
 
 ## Base URL Pattern
@@ -282,6 +280,188 @@ Lists all entity types in the campaign.
 #### GET /entity-types/:typeId
 Returns a single entity type with field definitions.
 
+#### POST /entity-types
+Create a new entity type in the campaign.
+
+**Used by:** `import-wizard.mjs` → "Create new type" in Step 3
+
+**Request** (all 4 fields required):
+```json
+{
+  "name": "Quest",
+  "name_plural": "Quests",
+  "icon": "fa-solid fa-scroll",
+  "color": "#fbbf24"
+}
+```
+
+**Response:** The created entity type object (same shape as GET /entity-types items).
+
+---
+
+### Addons
+
+#### GET /addons
+Lists addons with their enabled/disabled state for the campaign.
+
+**Used by:** `import-wizard.mjs` → Step 1 addon discovery
+
+**Response:**
+```json
+{
+  "data": [
+    { "slug": "calendar", "name": "Calendar", "category": "worldbuilding", "enabled": true },
+    { "slug": "maps", "name": "Maps", "category": "worldbuilding", "enabled": true },
+    { "slug": "bestiary", "name": "Bestiary", "category": "worldbuilding", "enabled": false }
+  ]
+}
+```
+
+---
+
+### Tags
+
+#### GET /tags
+Lists all tags in the campaign.
+
+**Used by:** `import-wizard.mjs` → Step 4 tag detection
+
+**Response:**
+```json
+{
+  "data": [
+    { "id": 1, "name": "Important", "color": "#ef4444", "dm_only": false }
+  ]
+}
+```
+
+#### POST /tags
+Create a new tag.
+
+**Used by:** `import-wizard.mjs` → Step 8 tag creation during import
+
+**Request:**
+```json
+{ "name": "NPCs", "color": "#60a5fa", "dm_only": false }
+```
+
+**Response:** The created tag object.
+
+#### POST /entities/bulk-tags
+Bulk assign or remove tags on multiple entities. Maximum 200 entities per
+request — the Foundry module auto-batches larger sets.
+
+**Used by:** `import-wizard.mjs` → bulk tag assignment after import
+
+**Request:**
+```json
+{
+  "entity_ids": ["uuid1", "uuid2"],
+  "tag_ids": [1, 2],
+  "action": "add"
+}
+```
+
+`action` must be `"add"`, `"remove"`, or `"set"` (replace all tags).
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "processed": 2,
+  "results": [
+    { "entity_id": "uuid1", "status": "ok" },
+    { "entity_id": "uuid2", "status": "ok" }
+  ]
+}
+```
+
+---
+
+### Bulk Operations
+
+#### POST /entities/bulk-update
+Bulk update entity type for multiple entities.
+
+**Used by:** `sync-dashboard.mjs` → bulk Change Type action
+
+**Response:** `{ "status": "ok", "updated": 5 }`
+
+**Request:**
+```json
+{
+  "entity_ids": ["uuid1", "uuid2"],
+  "entity_type_id": 5
+}
+```
+
+---
+
+### Relations
+
+#### GET /relations/types
+Lists predefined relation types for the campaign. Types are immutable
+forward/reverse string pairs (17 built-in pairs like "parent of" / "child of").
+
+**Used by:** `import-wizard.mjs` → future relation creation support
+
+**Response:**
+```json
+{
+  "data": [
+    { "forward": "parent of", "reverse": "child of" },
+    { "forward": "has item", "reverse": "owned by" },
+    { "forward": "member of", "reverse": "has member" }
+  ]
+}
+```
+
+#### POST /entities/:entityId/relations
+Create a relation on an entity. Uses the forward label string to identify
+the relation type (not a numeric ID).
+
+**Request:**
+```json
+{
+  "target_entity_id": "uuid",
+  "relation_type": "parent of",
+  "metadata": {}
+}
+```
+
+#### GET /entities/:entityId/relations
+List all relations on an entity.
+
+**Used by:** `item-sync.mjs` → pull inventory relations for actors
+
+#### DELETE /entities/:entityId/relations/:relationId
+Delete a relation.
+
+**Used by:** `item-sync.mjs` → remove item from actor inventory
+
+#### PUT /entities/:entityId/relations/:relationId/metadata
+Update relation metadata (e.g., item quantity, equipped state).
+
+**Used by:** `item-sync.mjs` → update inventory item metadata
+
+---
+
+### Members
+
+#### GET /members
+Lists campaign members with their display names and roles.
+
+**Used by:** `sync-manager.mjs` → auto-match Chronicle users to Foundry users by display name
+
+**Response:**
+```json
+{
+  "data": [
+    { "id": "uuid", "display_name": "Alice", "role": "player" }
+  ]
+}
+```
+
 ---
 
 ### Sync Mappings
@@ -402,6 +582,18 @@ Updates fog of war data.
 
 #### GET /maps/:mapId/layers
 Lists map layers.
+
+#### GET /maps/:mapId/markers
+Lists map markers (pins/notes on the map).
+
+#### POST /maps/:mapId/markers
+Creates a map marker.
+
+#### PUT /maps/:mapId/markers/:markerId
+Updates a map marker.
+
+#### DELETE /maps/:mapId/markers/:markerId
+Deletes a map marker.
 
 ---
 
@@ -674,18 +866,12 @@ Lists relations for an entity (used for shop inventory).
 
 ### Connection
 ```
-GET /ws
+GET /ws?token=<api-key>
 Upgrade: websocket
 ```
 
-After the WebSocket upgrade completes, the client sends an authentication
-message as the first frame:
-```json
-{ "type": "authenticate", "token": "<api-key>" }
-```
-
-The server must validate the token before processing any further messages.
-If the token is invalid, the server should close the connection with code 4001.
+Authentication happens at connection time via the `token` query parameter.
+If the token is invalid, the server rejects the upgrade.
 
 ### Message Format (Server → Client)
 ```json

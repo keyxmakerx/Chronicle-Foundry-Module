@@ -371,6 +371,91 @@ export class ChronicleAPI {
     return response.json();
   }
 
+  // --- Wizard / Import API convenience methods ---
+  // These wrap new Chronicle API endpoints needed by the import wizard.
+  // Endpoints may not be deployed yet; callers handle errors gracefully.
+
+  /**
+   * Fetch enabled addons for the current campaign.
+   * @returns {Promise<Array<{slug: string, name: string, category: string, enabled: boolean}>>}
+   */
+  async getAddons() {
+    return this.get('/addons');
+  }
+
+  /**
+   * Fetch all tags for the current campaign.
+   * @returns {Promise<Array>}
+   */
+  async getTags() {
+    return this.get('/tags');
+  }
+
+  /**
+   * Create a new tag in the current campaign.
+   * @param {{ name: string, color?: string, dm_only?: boolean }} body
+   * @returns {Promise<object>}
+   */
+  async createTag(body) {
+    return this.post('/tags', body);
+  }
+
+  /**
+   * Bulk assign/remove tags on multiple entities.
+   * Automatically batches requests to stay within the 200-entity limit.
+   * @param {{ entity_ids: string[], tag_ids: number[], action: 'add'|'remove'|'set' }} body
+   * @returns {Promise<object[]>} Array of batch results.
+   */
+  async bulkAssignTags(body) {
+    const BATCH_SIZE = 200;
+    const { entity_ids, ...rest } = body;
+    const results = [];
+    for (let i = 0; i < entity_ids.length; i += BATCH_SIZE) {
+      const batch = entity_ids.slice(i, i + BATCH_SIZE);
+      const result = await this.post('/entities/bulk-tags', { entity_ids: batch, ...rest });
+      results.push(result);
+    }
+    return results;
+  }
+
+  /**
+   * Bulk update entity type for multiple entities.
+   * @param {{ entity_ids: string[], entity_type_id: number }} body
+   * @returns {Promise<object>}
+   */
+  async bulkUpdateEntityType(body) {
+    return this.post('/entities/bulk-update', body);
+  }
+
+  /**
+   * Create a new entity type in the current campaign.
+   * @param {{ name: string, name_plural?: string, icon?: string, color?: string }} body
+   * @returns {Promise<object>}
+   */
+  async createEntityType(body) {
+    return this.post('/entity-types', body);
+  }
+
+  /**
+   * Fetch relation types for the current campaign.
+   * @returns {Promise<Array>}
+   */
+  async getRelationTypes() {
+    return this.get('/relations/types');
+  }
+
+  /**
+   * Create a relation on an entity.
+   * Relation types use forward/reverse string labels (e.g., "parent of" / "child of"),
+   * not numeric IDs.
+   * @param {string} entityId
+   * @param {{ target_entity_id: string, relation_type: string, metadata?: object }} body
+   * @returns {Promise<object>}
+   */
+  async createRelation(entityId, body) {
+    return this.post(`/entities/${entityId}/relations`, body);
+  }
+
   // --- Retry queue (F-QoL) ---
 
   /**
@@ -591,10 +676,9 @@ export class ChronicleAPI {
     const baseUrl = getSetting('apiUrl').replace(/\/+$/, '');
     const apiKey = getSetting('apiKey');
 
-    // Convert http(s) to ws(s). Token is sent in the first message after
-    // connection rather than in the URL to avoid leaking via server logs,
-    // proxy logs, browser history, and referrer headers.
-    const wsUrl = baseUrl.replace(/^http/, 'ws') + '/ws';
+    // Authenticate via query parameter — the server expects the token in the
+    // URL at connection time (not as a post-connect message).
+    const wsUrl = baseUrl.replace(/^http/, 'ws') + `/ws?token=${encodeURIComponent(apiKey)}`;
 
     this._setState('connecting');
 
@@ -608,10 +692,7 @@ export class ChronicleAPI {
     }
 
     this._ws.onopen = async () => {
-      console.debug('Chronicle: WebSocket connected, authenticating...');
-
-      // Authenticate by sending the token as the first message.
-      this._ws.send(JSON.stringify({ type: 'authenticate', token: apiKey }));
+      console.debug('Chronicle: WebSocket connected');
 
       this._setState('connected');
       this._reconnectDelay = 1000; // Reset backoff.

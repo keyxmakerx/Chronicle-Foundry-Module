@@ -415,6 +415,56 @@ export class SyncManager {
   }
 
   /**
+   * Execute a single import plan item from the import wizard.
+   * Delegates to the appropriate sync module method based on item type.
+   * @param {{ type: string, data: object }} item - Import plan item.
+   */
+  async runWizardImport(item) {
+    switch (item.type) {
+      case 'create-tag': {
+        await this.api.createTag(item.data);
+        break;
+      }
+      case 'push-journal': {
+        const journal = game.journal.get(item.data.journalId);
+        if (!journal) throw new Error(`Journal ${item.data.journalId} not found`);
+        const journalSync = this._modules.find((m) => m.constructor.name === 'JournalSync');
+        if (!journalSync) throw new Error('JournalSync module not loaded');
+        await journalSync._handleCreateJournal(journal, {}, game.user.id);
+        break;
+      }
+      case 'push-actor': {
+        const actor = game.actors.get(item.data.actorId);
+        if (!actor) throw new Error(`Actor ${item.data.actorId} not found`);
+        const actorSync = this._modules.find((m) => m.constructor.name === 'ActorSync');
+        if (!actorSync) throw new Error('ActorSync module not loaded');
+        await actorSync._handleCreateActor(actor, {}, game.user.id);
+        break;
+      }
+      case 'link-map': {
+        const scene = game.scenes.get(item.data.sceneId);
+        if (!scene) throw new Error(`Scene ${item.data.sceneId} not found`);
+        await scene.setFlag('chronicle-sync', 'mapId', item.data.mapId);
+        await this.createMapping({
+          chronicle_type: 'map',
+          chronicle_id: item.data.mapId,
+          external_system: 'foundry',
+          external_id: item.data.sceneId,
+          sync_direction: 'both',
+          sync_metadata: { foundry_type: 'Scene' },
+        });
+        break;
+      }
+      case 'assign-tags': {
+        await this.api.bulkAssignTags(item.data);
+        break;
+      }
+      default:
+        throw new Error(`Unknown import item type: ${item.type}`);
+    }
+  }
+
+  /**
    * Look up a sync mapping by Chronicle identity.
    * @param {string} chronicleType
    * @param {string} chronicleId

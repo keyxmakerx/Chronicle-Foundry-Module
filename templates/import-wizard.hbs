@@ -1,0 +1,384 @@
+{{!-- Chronicle Sync - Import Wizard --}}
+<div class="chronicle-wizard-inner">
+
+  {{!-- Step indicator nav --}}
+  <nav class="wizard-steps-nav">
+    {{#each steps}}
+    <div class="wizard-step-indicator {{#if isCurrent}}current{{/if}} {{#if isCompleted}}completed{{/if}} {{#if isSkipped}}skipped{{/if}}"
+         data-step="{{index}}">
+      <span class="step-circle">
+        {{#if isCompleted}}<i class="fa-solid fa-check"></i>{{else}}{{stepNumber}}{{/if}}
+      </span>
+      <span class="step-label">{{localize labelKey}}</span>
+    </div>
+    {{/each}}
+  </nav>
+
+  {{!-- Step content panels --}}
+  <div class="wizard-content">
+
+    {{!-- ================================================================= --}}
+    {{!-- STEP 1: Connect & Detect                                         --}}
+    {{!-- ================================================================= --}}
+    <div class="wizard-step" data-step="0">
+      <h2 class="wizard-step-title"><i class="fa-solid fa-plug"></i> {{localize "CHRONICLE.Wizard.Steps.Connect"}}</h2>
+      <p class="wizard-step-desc">{{localize "CHRONICLE.Wizard.ConnectDesc"}}</p>
+
+      {{#if connection}}
+      <div class="wizard-detect-results">
+        <div class="wizard-detect-row">
+          <span class="detect-label">{{localize "CHRONICLE.Wizard.Connection"}}</span>
+          {{#if connection.connected}}
+          <span class="detect-value detect-ok"><i class="fa-solid fa-check-circle"></i> {{localize "CHRONICLE.Wizard.Connected"}}</span>
+          {{else}}
+          <span class="detect-value detect-error"><i class="fa-solid fa-times-circle"></i> {{connection.error}}</span>
+          {{/if}}
+        </div>
+        {{#if connection.connected}}
+        <div class="wizard-detect-row">
+          <span class="detect-label">{{localize "CHRONICLE.Wizard.EntityTypes"}}</span>
+          <span class="detect-value">{{connection.entityTypes.length}} {{localize "CHRONICLE.Wizard.TypesFound"}}</span>
+        </div>
+        <div class="wizard-detect-row">
+          <span class="detect-label">{{localize "CHRONICLE.Wizard.GameSystem"}}</span>
+          {{#if connection.systemMatch}}
+          <span class="detect-value detect-ok"><i class="fa-solid fa-check-circle"></i> {{connection.systemMatch.name}}</span>
+          {{else}}
+          <span class="detect-value detect-warn"><i class="fa-solid fa-triangle-exclamation"></i> {{localize "CHRONICLE.Wizard.NoSystemMatch"}}</span>
+          {{/if}}
+        </div>
+        <div class="wizard-detect-row">
+          <span class="detect-label">{{localize "CHRONICLE.Wizard.Addons"}}</span>
+          {{#if connection.addons.length}}
+          <span class="detect-value">
+            {{#each connection.addons}}
+            <span class="wizard-addon-badge {{#if enabled}}addon-on{{else}}addon-off{{/if}}">{{name}}</span>
+            {{/each}}
+          </span>
+          {{else}}
+          <span class="detect-value detect-muted">{{localize "CHRONICLE.Wizard.NoAddonsInfo"}}</span>
+          {{/if}}
+        </div>
+        <div class="wizard-detect-row">
+          <span class="detect-label">{{localize "CHRONICLE.Wizard.Tags"}}</span>
+          {{#if connection.tagsAvailable}}
+          <span class="detect-value detect-ok"><i class="fa-solid fa-check-circle"></i> {{localize "CHRONICLE.Wizard.Available"}}</span>
+          {{else}}
+          <span class="detect-value detect-muted">{{localize "CHRONICLE.Wizard.NotAvailable"}}</span>
+          {{/if}}
+        </div>
+        {{/if}}
+      </div>
+      {{else}}
+      <div class="wizard-loading">
+        <i class="fa-solid fa-spinner fa-spin"></i> {{localize "CHRONICLE.Wizard.Detecting"}}
+      </div>
+      {{/if}}
+    </div>
+
+    {{!-- ================================================================= --}}
+    {{!-- STEP 2: Scan Foundry World                                       --}}
+    {{!-- ================================================================= --}}
+    <div class="wizard-step" data-step="1">
+      <h2 class="wizard-step-title"><i class="fa-solid fa-magnifying-glass"></i> {{localize "CHRONICLE.Wizard.Steps.Scan"}}</h2>
+      <p class="wizard-step-desc">{{localize "CHRONICLE.Wizard.ScanDesc"}}</p>
+
+      {{#if worldScan}}
+      <div class="wizard-scan-summary">
+        <div class="wizard-stat-grid">
+          <div class="wizard-stat-box">
+            <span class="wizard-stat-value">{{worldScan.journals.length}}</span>
+            <span class="wizard-stat-label">{{localize "CHRONICLE.Wizard.Journals"}}</span>
+          </div>
+          <div class="wizard-stat-box">
+            <span class="wizard-stat-value">{{worldScan.actors.length}}</span>
+            <span class="wizard-stat-label">{{localize "CHRONICLE.Wizard.Actors"}}</span>
+          </div>
+          <div class="wizard-stat-box">
+            <span class="wizard-stat-value">{{worldScan.scenes.length}}</span>
+            <span class="wizard-stat-label">{{localize "CHRONICLE.Wizard.Scenes"}}</span>
+          </div>
+          <div class="wizard-stat-box">
+            <span class="wizard-stat-value">{{worldScan.items.length}}</span>
+            <span class="wizard-stat-label">{{localize "CHRONICLE.Wizard.Items"}}</span>
+          </div>
+        </div>
+
+        {{#if worldScan.folders.length}}
+        <h3 class="wizard-subheading">{{localize "CHRONICLE.Wizard.ByFolder"}}</h3>
+        <div class="wizard-folder-list">
+          {{#each worldScan.folders}}
+          <div class="wizard-folder-row">
+            <i class="fa-solid fa-folder"></i>
+            <span class="folder-name">{{name}}</span>
+            <span class="folder-count">{{count}} {{localize "CHRONICLE.Wizard.Documents"}}</span>
+          </div>
+          {{/each}}
+        </div>
+        {{/if}}
+      </div>
+      {{else}}
+      <div class="wizard-loading">
+        <i class="fa-solid fa-spinner fa-spin"></i> {{localize "CHRONICLE.Wizard.Scanning"}}
+      </div>
+      {{/if}}
+    </div>
+
+    {{!-- ================================================================= --}}
+    {{!-- STEP 3: Entity Type Mapping                                      --}}
+    {{!-- ================================================================= --}}
+    <div class="wizard-step" data-step="2">
+      <h2 class="wizard-step-title"><i class="fa-solid fa-layer-group"></i> {{localize "CHRONICLE.Wizard.Steps.Types"}}</h2>
+      <p class="wizard-step-desc">{{localize "CHRONICLE.Wizard.TypesDesc"}}</p>
+
+      {{#if typeMappings.length}}
+      <table class="wizard-mapping-table">
+        <thead>
+          <tr>
+            <th>{{localize "CHRONICLE.Wizard.Folder"}}</th>
+            <th>{{localize "CHRONICLE.Wizard.Count"}}</th>
+            <th>{{localize "CHRONICLE.Wizard.ChronicleType"}}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each typeMappings}}
+          <tr>
+            <td><i class="fa-solid fa-folder"></i> {{folderName}}</td>
+            <td class="text-center">{{count}}</td>
+            <td>
+              <select class="wizard-type-select" data-mapping-index="{{@index}}">
+                <option value="">— {{localize "CHRONICLE.Wizard.Skip"}} —</option>
+                {{#each @root.entityTypes}}
+                <option value="{{id}}" {{#if (eq id ../chronicleTypeId)}}selected{{/if}}>{{name}}</option>
+                {{/each}}
+                <option value="__new__">+ {{localize "CHRONICLE.Wizard.CreateNewType"}}</option>
+              </select>
+            </td>
+          </tr>
+          {{!-- Inline "create new type" form --}}
+          {{#if (eq @root.newTypeForm.mappingIndex @index)}}
+          <tr class="wizard-new-type-row">
+            <td colspan="3">
+              <div class="wizard-inline-form">
+                <input type="text" class="wizard-input" placeholder="{{localize "CHRONICLE.Wizard.NewTypeName"}}"
+                       value="{{@root.newTypeForm.name}}" data-field="new-type-name" />
+                <input type="color" class="wizard-color-input" value="{{@root.newTypeForm.color}}"
+                       data-field="new-type-color" title="Type color" />
+                <button type="button" class="dashboard-btn btn-sm" data-action="save-new-type">
+                  <i class="fa-solid fa-check"></i>
+                </button>
+                <button type="button" class="dashboard-btn btn-sm" data-action="cancel-new-type">
+                  <i class="fa-solid fa-times"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {{/if}}
+          {{/each}}
+        </tbody>
+      </table>
+      {{else}}
+      <div class="wizard-empty">{{localize "CHRONICLE.Wizard.NoFolders"}}</div>
+      {{/if}}
+    </div>
+
+    {{!-- ================================================================= --}}
+    {{!-- STEP 4: Tag Assignment                                           --}}
+    {{!-- ================================================================= --}}
+    <div class="wizard-step" data-step="3">
+      <h2 class="wizard-step-title"><i class="fa-solid fa-tags"></i> {{localize "CHRONICLE.Wizard.Steps.Tags"}}</h2>
+      <p class="wizard-step-desc">{{localize "CHRONICLE.Wizard.TagsDesc"}}</p>
+
+      {{#if tagPlan.length}}
+      <div class="wizard-tag-list">
+        {{#each tagPlan}}
+        <div class="wizard-tag-row">
+          <input type="checkbox" class="wizard-tag-toggle" data-tag-index="{{@index}}" {{#if enabled}}checked{{/if}} />
+          <span class="wizard-tag-chip" style="background: {{color}}20; color: {{color}}; border-color: {{color}}40">
+            {{name}}
+          </span>
+          <span class="tag-source">{{source}}</span>
+          <button type="button" class="dashboard-btn btn-xs" data-action="remove-tag" data-tag-index="{{@index}}" title="Remove">
+            <i class="fa-solid fa-times"></i>
+          </button>
+        </div>
+        {{/each}}
+      </div>
+      {{else}}
+      <div class="wizard-empty">{{localize "CHRONICLE.Wizard.NoTags"}}</div>
+      {{/if}}
+    </div>
+
+    {{!-- ================================================================= --}}
+    {{!-- STEP 5: Character Mapping                                        --}}
+    {{!-- ================================================================= --}}
+    <div class="wizard-step" data-step="4">
+      <h2 class="wizard-step-title"><i class="fa-solid fa-users"></i> {{localize "CHRONICLE.Wizard.Steps.Characters"}}</h2>
+      <p class="wizard-step-desc">{{localize "CHRONICLE.Wizard.CharactersDesc"}}</p>
+
+      {{#if characterPlan.length}}
+      <table class="wizard-mapping-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>{{localize "CHRONICLE.Wizard.Actor"}}</th>
+            <th>{{localize "CHRONICLE.Wizard.Type"}}</th>
+            <th>{{localize "CHRONICLE.Wizard.PC"}}</th>
+            <th>{{localize "CHRONICLE.Wizard.Include"}}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each characterPlan}}
+          <tr>
+            <td>
+              {{#if img}}<img class="wizard-char-portrait" src="{{img}}" alt="" />{{/if}}
+            </td>
+            <td>{{name}}</td>
+            <td>{{type}}</td>
+            <td><input type="checkbox" class="wizard-char-pc" data-char-index="{{@index}}" {{#if isPC}}checked{{/if}} /></td>
+            <td><input type="checkbox" class="wizard-char-include" data-char-index="{{@index}}" {{#if include}}checked{{/if}} /></td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+      {{else}}
+      <div class="wizard-empty">{{localize "CHRONICLE.Wizard.NoActors"}}</div>
+      {{/if}}
+    </div>
+
+    {{!-- ================================================================= --}}
+    {{!-- STEP 6: Calendar Sync                                            --}}
+    {{!-- ================================================================= --}}
+    <div class="wizard-step" data-step="5">
+      <h2 class="wizard-step-title"><i class="fa-solid fa-calendar"></i> {{localize "CHRONICLE.Wizard.Steps.Calendar"}}</h2>
+      <p class="wizard-step-desc">{{localize "CHRONICLE.Wizard.CalendarDesc"}}</p>
+
+      <div class="wizard-radio-group">
+        <label class="wizard-radio-label">
+          <input type="radio" name="calendar-direction" value="pull" {{#if (eq calendarDirection "pull")}}checked{{/if}} />
+          <i class="fa-solid fa-download"></i> {{localize "CHRONICLE.Wizard.CalendarPull"}}
+        </label>
+        <label class="wizard-radio-label">
+          <input type="radio" name="calendar-direction" value="push" {{#if (eq calendarDirection "push")}}checked{{/if}} />
+          <i class="fa-solid fa-upload"></i> {{localize "CHRONICLE.Wizard.CalendarPush"}}
+        </label>
+        <label class="wizard-radio-label">
+          <input type="radio" name="calendar-direction" value="skip" {{#if (eq calendarDirection "skip")}}checked{{/if}} />
+          <i class="fa-solid fa-forward"></i> {{localize "CHRONICLE.Wizard.CalendarSkip"}}
+        </label>
+      </div>
+    </div>
+
+    {{!-- ================================================================= --}}
+    {{!-- STEP 7: Map Linking                                              --}}
+    {{!-- ================================================================= --}}
+    <div class="wizard-step" data-step="6">
+      <h2 class="wizard-step-title"><i class="fa-solid fa-map"></i> {{localize "CHRONICLE.Wizard.Steps.Maps"}}</h2>
+      <p class="wizard-step-desc">{{localize "CHRONICLE.Wizard.MapsDesc"}}</p>
+
+      {{#if mapLinkPlan.length}}
+      <table class="wizard-mapping-table">
+        <thead>
+          <tr>
+            <th>{{localize "CHRONICLE.Wizard.FoundryScene"}}</th>
+            <th>{{localize "CHRONICLE.Wizard.ChronicleMap"}}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each mapLinkPlan}}
+          <tr>
+            <td><i class="fa-solid fa-image"></i> {{sceneName}}</td>
+            <td>
+              <select class="wizard-map-select" data-map-index="{{@index}}">
+                <option value="">— {{localize "CHRONICLE.Wizard.NoLink"}} —</option>
+                {{#each chronicleMaps}}
+                <option value="{{id}}" {{#if (eq id ../chronicleMapId)}}selected{{/if}}>{{name}}</option>
+                {{/each}}
+              </select>
+            </td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+      {{else}}
+      <div class="wizard-empty">{{localize "CHRONICLE.Wizard.NoScenes"}}</div>
+      {{/if}}
+    </div>
+
+    {{!-- ================================================================= --}}
+    {{!-- STEP 8: Review & Import                                          --}}
+    {{!-- ================================================================= --}}
+    <div class="wizard-step" data-step="7">
+      <h2 class="wizard-step-title"><i class="fa-solid fa-clipboard-check"></i> {{localize "CHRONICLE.Wizard.Steps.Review"}}</h2>
+
+      {{#if importRunning}}
+      <div class="wizard-progress-section">
+        <div class="wizard-progress-bar">
+          <div class="wizard-progress-fill" style="width: {{importProgress.percentComplete}}%"></div>
+        </div>
+        <p class="wizard-progress-text">
+          {{importProgress.done}} / {{importProgress.total}} — {{importProgress.errors}} {{localize "CHRONICLE.Wizard.Errors"}}
+        </p>
+        <button type="button" class="dashboard-btn btn-sm btn-danger" data-action="wizard-cancel-import">
+          <i class="fa-solid fa-stop"></i> {{localize "CHRONICLE.Wizard.CancelImport"}}
+        </button>
+      </div>
+      {{else if importPlan}}
+      <div class="wizard-review-summary">
+        <p>{{localize "CHRONICLE.Wizard.ReviewSummary"}}</p>
+        <ul class="wizard-plan-list">
+          {{#each importPlan}}
+          <li class="wizard-plan-item status-{{status}}">
+            <span class="plan-status-icon">
+              {{#if (eq status "done")}}<i class="fa-solid fa-check"></i>{{/if}}
+              {{#if (eq status "error")}}<i class="fa-solid fa-times"></i>{{/if}}
+              {{#if (eq status "pending")}}<i class="fa-solid fa-clock"></i>{{/if}}
+              {{#if (eq status "skipped")}}<i class="fa-solid fa-forward"></i>{{/if}}
+            </span>
+            <span class="plan-label">{{label}}</span>
+          </li>
+          {{/each}}
+        </ul>
+      </div>
+      {{else}}
+      <div class="wizard-empty">{{localize "CHRONICLE.Wizard.NoPlan"}}</div>
+      {{/if}}
+
+      {{!-- Import activity log --}}
+      {{#if importProgress.log.length}}
+      <div class="wizard-log">
+        <h3 class="wizard-subheading">{{localize "CHRONICLE.Wizard.ActivityLog"}}</h3>
+        {{#each importProgress.log}}
+        <div class="wizard-log-entry log-{{type}}">
+          {{#if (eq type "success")}}<i class="fa-solid fa-check"></i>{{else}}<i class="fa-solid fa-times"></i>{{/if}}
+          {{message}}
+        </div>
+        {{/each}}
+      </div>
+      {{/if}}
+    </div>
+
+  </div>
+
+  {{!-- Footer navigation --}}
+  <div class="wizard-footer">
+    <button type="button" class="dashboard-btn" data-action="wizard-back" {{#if isFirstStep}}disabled{{/if}}>
+      <i class="fa-solid fa-arrow-left"></i> {{localize "CHRONICLE.Wizard.Back"}}
+    </button>
+    <span class="wizard-step-counter">
+      {{localize "CHRONICLE.Wizard.StepOf" step=currentStepDisplay total=totalSteps}}
+    </span>
+    {{#if isLastStep}}
+    {{#unless importRunning}}
+    <button type="button" class="dashboard-btn btn-import" data-action="wizard-start-import">
+      <i class="fa-solid fa-file-import"></i> {{localize "CHRONICLE.Wizard.StartImport"}}
+    </button>
+    {{/unless}}
+    {{else}}
+    <button type="button" class="dashboard-btn" data-action="wizard-next">
+      {{localize "CHRONICLE.Wizard.Next"}} <i class="fa-solid fa-arrow-right"></i>
+    </button>
+    {{/if}}
+  </div>
+
+</div>
