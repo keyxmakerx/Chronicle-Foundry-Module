@@ -282,6 +282,136 @@ Lists all entity types in the campaign.
 #### GET /entity-types/:typeId
 Returns a single entity type with field definitions.
 
+#### POST /entity-types
+Create a new entity type in the campaign.
+
+**Used by:** `import-wizard.mjs` → "Create new type" in Step 3
+
+**Request:**
+```json
+{
+  "name": "Quest",
+  "name_plural": "Quests",
+  "icon": "fa-solid fa-scroll",
+  "color": "#fbbf24"
+}
+```
+
+**Response:** The created entity type object (same shape as GET /entity-types items).
+
+---
+
+### Addons
+
+#### GET /addons
+Lists addons with their enabled/disabled state for the campaign.
+
+**Used by:** `import-wizard.mjs` → Step 1 addon discovery
+
+**Response:**
+```json
+{
+  "data": [
+    { "slug": "calendar", "name": "Calendar", "category": "worldbuilding", "enabled": true },
+    { "slug": "maps", "name": "Maps", "category": "worldbuilding", "enabled": true },
+    { "slug": "bestiary", "name": "Bestiary", "category": "worldbuilding", "enabled": false }
+  ]
+}
+```
+
+---
+
+### Tags
+
+#### GET /tags
+Lists all tags in the campaign.
+
+**Used by:** `import-wizard.mjs` → Step 4 tag detection
+
+**Response:**
+```json
+{
+  "data": [
+    { "id": 1, "name": "Important", "color": "#ef4444", "dm_only": false }
+  ]
+}
+```
+
+#### POST /tags
+Create a new tag.
+
+**Used by:** `import-wizard.mjs` → Step 8 tag creation during import
+
+**Request:**
+```json
+{ "name": "NPCs", "color": "#60a5fa", "dm_only": false }
+```
+
+**Response:** The created tag object.
+
+#### POST /entities/bulk-tags
+Bulk assign or remove tags on multiple entities.
+
+**Used by:** `import-wizard.mjs` → bulk tag assignment after import
+
+**Request:**
+```json
+{
+  "entity_ids": ["uuid1", "uuid2"],
+  "tag_ids": [1, 2],
+  "action": "add"
+}
+```
+
+`action` must be `"add"`, `"remove"`, or `"set"` (replace all tags).
+
+---
+
+### Bulk Operations
+
+#### POST /entities/bulk-update
+Bulk update entity type for multiple entities.
+
+**Used by:** `sync-dashboard.mjs` → bulk Change Type action
+
+**Request:**
+```json
+{
+  "entity_ids": ["uuid1", "uuid2"],
+  "entity_type_id": 5
+}
+```
+
+---
+
+### Relations
+
+#### GET /relations/types
+Lists relation types for the campaign.
+
+**Used by:** `import-wizard.mjs` → future relation creation support
+
+**Response:**
+```json
+{
+  "data": [
+    { "id": 1, "name": "Has Item", "reverse_name": "Owned By" }
+  ]
+}
+```
+
+#### POST /entities/:entityId/relations
+Create a relation on an entity.
+
+**Request:**
+```json
+{
+  "target_entity_id": "uuid",
+  "relation_type_id": 1,
+  "metadata": {}
+}
+```
+
 ---
 
 ### Sync Mappings
