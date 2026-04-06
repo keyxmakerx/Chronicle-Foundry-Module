@@ -64,6 +64,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'bulk-set-public': SyncDashboard.#onBulkSetPublicAction,
       'bulk-set-private': SyncDashboard.#onBulkSetPrivateAction,
       'bulk-delete': SyncDashboard.#onBulkDeleteAction,
+      'create-entity-type': SyncDashboard.#onCreateEntityTypeAction,
     },
   };
 
@@ -85,14 +86,17 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     /** @type {object} Cached data for each tab. */
     this._cache = { entityTypes: null, entities: null, maps: null, calendar: null };
 
-    /** @type {Set<number>} Collapsed entity type groups. */
-    this._collapsedTypes = new Set();
+    /** @type {Set<number>} Collapsed entity type groups (persisted per-client). */
+    try {
+      const collapsed = JSON.parse(getSetting('dashboardCollapsedTypes'));
+      this._collapsedTypes = new Set(collapsed);
+    } catch { this._collapsedTypes = new Set(); }
 
     /** @type {string} Current search filter text. */
     this._searchFilter = '';
 
-    /** @type {string} Currently active tab. */
-    this._activeTab = 'entities';
+    /** @type {string} Currently active tab (persisted per-client). */
+    this._activeTab = getSetting('dashboardActiveTab') || 'entities';
 
     /** @type {Set<string>} Currently selected entity IDs for bulk operations. */
     this._selectedEntities = new Set();
@@ -884,6 +888,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         } else {
           this._collapsedTypes.add(typeId);
         }
+        setSetting('dashboardCollapsedTypes', JSON.stringify([...this._collapsedTypes]));
         this.render({ force: true });
       });
     });
@@ -1006,6 +1011,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         e.preventDefault();
         const tabName = tab.dataset.tab;
         this._activeTab = tabName;
+        setSetting('dashboardActiveTab', tabName);
 
         tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tabName));
         panels.forEach(p => p.classList.toggle('active', p.dataset.tab === tabName));
@@ -1150,6 +1156,59 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Delete all selected entities after confirmation. */
   static #onBulkDeleteAction() {
     this._onBulkDelete();
+  }
+
+  /** Open a dialog to create a new Chronicle entity type. */
+  static async #onCreateEntityTypeAction() {
+    const html = `
+      <form class="chronicle-create-type-form">
+        <div class="form-group">
+          <label>Name</label>
+          <input type="text" name="name" placeholder="e.g. Faction" required />
+        </div>
+        <div class="form-group">
+          <label>Plural Name</label>
+          <input type="text" name="name_plural" placeholder="e.g. Factions" />
+        </div>
+        <div class="form-group">
+          <label>Icon Class</label>
+          <input type="text" name="icon" value="fa-solid fa-circle" placeholder="fa-solid fa-circle" />
+        </div>
+        <div class="form-group">
+          <label>Color</label>
+          <input type="color" name="color" value="#60a5fa" />
+        </div>
+      </form>
+    `;
+
+    const result = await Dialog.prompt({
+      title: game.i18n.localize('CHRONICLE.Dashboard.Entities.CreateTypeTitle'),
+      content: html,
+      callback: (html) => {
+        const form = html.querySelector ? html.querySelector('form') : html[0].querySelector('form');
+        const name = form.querySelector('[name="name"]').value.trim();
+        if (!name) return null;
+        return {
+          name,
+          name_plural: form.querySelector('[name="name_plural"]').value.trim() || name + 's',
+          icon: form.querySelector('[name="icon"]').value.trim() || 'fa-solid fa-circle',
+          color: form.querySelector('[name="color"]').value || '#60a5fa',
+        };
+      },
+      rejectClose: false,
+    });
+
+    if (!result) return;
+
+    try {
+      await this.api.createEntityType(result);
+      ui.notifications.info(`Entity type "${result.name}" created.`);
+      this._cache.entityTypes = null;
+      this._cache.entities = null;
+      this.render({ force: true });
+    } catch (err) {
+      ui.notifications.error(`Failed to create entity type: ${err.message}`);
+    }
   }
 
   // ---------------------------------------------------------------------------

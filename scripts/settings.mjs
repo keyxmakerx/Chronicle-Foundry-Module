@@ -214,6 +214,21 @@ export function registerSettings() {
     type: Boolean,
     default: false,
   });
+
+  // Dashboard layout preferences (per-user, per-browser).
+  game.settings.register(MODULE_ID, 'dashboardActiveTab', {
+    scope: 'client',
+    config: false,
+    type: String,
+    default: 'entities',
+  });
+
+  game.settings.register(MODULE_ID, 'dashboardCollapsedTypes', {
+    scope: 'client',
+    config: false,
+    type: String,
+    default: '[]',
+  });
 }
 
 /**
