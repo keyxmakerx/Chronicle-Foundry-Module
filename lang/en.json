@@ -91,7 +91,9 @@
         "Unlinked": "unlinked",
         "PrivateClickPublic": "Private — click to make public",
         "PublicClickPrivate": "Public — click to make private",
-        "EmptyState": "No entities found. Create entities in Chronicle or journals in Foundry to get started."
+        "EmptyState": "No entities found. Create entities in Chronicle or journals in Foundry to get started.",
+        "CreateType": "Create Type",
+        "CreateTypeTitle": "Create Entity Type"
       },
       "Bulk": {
         "Selected": "selected",
