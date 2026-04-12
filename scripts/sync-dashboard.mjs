@@ -1872,6 +1872,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       m => m.constructor?.name === 'ActorSync' || m._adapter
     );
 
+    // Include API errors so they appear in the debug copy/paste.
+    const errorLog = this.api?.getErrorLog() ?? [];
+    const connectionState = this.api?.connected
+      ? 'connected' : (this.api ? 'disconnected' : 'no-client');
+
     return {
       _description: 'Chronicle Sync — Foundry System Debug Snapshot. '
         + 'Use this to build a Chronicle system adapter or character-fields manifest. '
@@ -1896,7 +1901,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         matchedSystem,
         hasAdapter: !!actorSync?._adapter,
         adapterType: actorSync?._adapter?._fieldDefs ? 'generic' : (actorSync?._adapter ? 'built-in' : 'none'),
+        connection: connectionState,
       },
+      errors: errorLog.length ? errorLog : null,
       hooks: {
         _note: 'These are the Foundry hooks the Chronicle sync module listens to. '
           + 'The adapter maps fields between these hook payloads and Chronicle entity fields_data.',
