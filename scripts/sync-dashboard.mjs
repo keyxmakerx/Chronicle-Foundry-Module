@@ -1579,9 +1579,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   // ---------------------------------------------------------------------------
 
   /**
-   * Test connection to Chronicle API using current config tab values.
-   * Reads URL, key, and campaign ID from the Config tab inputs, attempts
-   * a lightweight API call, and shows the result inline.
+   * Test connection to Chronicle with multi-step diagnostics.
+   * Tests API reachability, authentication, campaign access, and system match.
+   * Shows per-step results inline.
    * @private
    */
   async _onTestConnection() {
@@ -1598,58 +1598,121 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const campaignId = campInput?.value?.trim();
 
     if (!url || !key || !campaignId) {
-      if (resultEl) {
-        resultEl.textContent = 'Fill in URL, key, and campaign ID first.';
-        resultEl.className = 'config-test-result test-error';
-      }
+      this._renderTestResults(resultEl, [
+        { icon: 'xmark', text: 'Fill in URL, key, and campaign ID first.' },
+      ]);
       return;
     }
 
     if (resultEl) {
-      resultEl.textContent = 'Testing...';
+      resultEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Testing...';
       resultEl.className = 'config-test-result test-pending';
     }
 
-    try {
-      const testUrl = `${url.replace(/\/+$/, '')}/api/v1/campaigns/${campaignId}/entity-types`;
-      const resp = await fetch(testUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${key}`,
-          'Accept': 'application/json',
-        },
-      });
+    const baseUrl = url.replace(/\/+$/, '');
+    const steps = [];
 
-      if (resp.ok) {
-        if (resultEl) {
-          resultEl.textContent = 'Connected successfully!';
-          resultEl.className = 'config-test-result test-success';
-        }
-      } else {
-        const status = resp.status;
-        let hint = '';
-        if (status === 401 || status === 403) hint = 'Check API key and permissions.';
-        else if (status === 404) hint = 'Check campaign ID.';
-        else hint = `HTTP ${status}`;
-        if (resultEl) {
-          resultEl.textContent = `Connection failed: ${hint}`;
-          resultEl.className = 'config-test-result test-error';
-        }
-      }
+    // Step 1: API reachable + auth + campaign
+    let resp;
+    try {
+      resp = await fetch(`${baseUrl}/api/v1/campaigns/${campaignId}/entity-types`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${key}`, 'Accept': 'application/json' },
+      });
     } catch (err) {
-      if (resultEl) {
-        // Browsers throw a TypeError with generic message on CORS failure.
-        const isCors = err instanceof TypeError
-          && /failed to fetch|networkerror/i.test(err.message || '');
-        if (isCors) {
-          resultEl.textContent = 'CORS error: The Chronicle server is not allowing requests from this Foundry instance. '
-            + 'Add this origin to the server\'s CORS allowed origins.';
-        } else {
-          resultEl.textContent = `Connection error: ${err.message}`;
-        }
-        resultEl.className = 'config-test-result test-error';
+      const isCors = err instanceof TypeError && /failed to fetch|networkerror/i.test(err.message || '');
+      if (isCors) {
+        steps.push({ icon: 'xmark', text: `CORS: Chronicle is blocking requests from this domain. Ask admin to add ${window.location.origin} to CORS whitelist.` });
+      } else {
+        steps.push({ icon: 'xmark', text: `Unreachable: Chronicle server not responding at ${baseUrl}. Check URL and server status.` });
       }
+      this._renderTestResults(resultEl, steps);
+      return;
     }
+
+    if (resp.status === 401) {
+      steps.push({ icon: 'check', text: 'API reachable' });
+      steps.push({ icon: 'xmark', text: 'Auth failed: API key invalid or revoked. Create a new key in Chronicle Settings \u2192 Integrations.' });
+      this._renderTestResults(resultEl, steps);
+      return;
+    }
+    if (resp.status === 403) {
+      steps.push({ icon: 'check', text: 'API reachable' });
+      steps.push({ icon: 'xmark', text: 'Forbidden: API key lacks required permissions. Check Read/Write/Sync are enabled.' });
+      this._renderTestResults(resultEl, steps);
+      return;
+    }
+    if (resp.status === 404) {
+      steps.push({ icon: 'check', text: 'API reachable' });
+      steps.push({ icon: 'check', text: 'Auth OK' });
+      steps.push({ icon: 'xmark', text: `Campaign not found. Check campaign ID: ${campaignId}` });
+      this._renderTestResults(resultEl, steps);
+      return;
+    }
+    if (resp.status === 429) {
+      steps.push({ icon: 'check', text: 'API reachable' });
+      steps.push({ icon: 'xmark', text: 'Rate limit exceeded. Wait a moment or ask admin to increase the limit.' });
+      this._renderTestResults(resultEl, steps);
+      return;
+    }
+    if (!resp.ok) {
+      steps.push({ icon: 'check', text: 'API reachable' });
+      steps.push({ icon: 'xmark', text: `HTTP ${resp.status}: ${resp.statusText}` });
+      this._renderTestResults(resultEl, steps);
+      return;
+    }
+
+    steps.push({ icon: 'check', text: 'API reachable' });
+    steps.push({ icon: 'check', text: 'Auth OK' });
+    steps.push({ icon: 'check', text: 'Campaign accessible' });
+
+    // Step 2: System match check
+    try {
+      const sysResp = await fetch(`${baseUrl}/api/v1/campaigns/${campaignId}/systems`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${key}`, 'Accept': 'application/json' },
+      });
+      if (sysResp.ok) {
+        const sysResult = await sysResp.json();
+        const systems = sysResult.data || [];
+        const foundryId = game.system?.id;
+        if (foundryId) {
+          const match = systems.find(s => s.foundry_system_id === foundryId && s.enabled);
+          if (match) {
+            steps.push({ icon: 'check', text: `System matched: ${match.name}` });
+          } else {
+            const byId = systems.find(s => s.foundry_system_id === foundryId);
+            if (byId && !byId.enabled) {
+              steps.push({ icon: 'warn', text: `System "${byId.name}" found but not enabled for this campaign` });
+            } else if (systems.length > 0) {
+              steps.push({ icon: 'warn', text: `No system matches Foundry "${foundryId}". Available: ${systems.map(s => s.foundry_system_id || '(none)').join(', ')}` });
+            } else {
+              steps.push({ icon: 'warn', text: 'No game systems installed in Chronicle' });
+            }
+          }
+        }
+      }
+    } catch { /* system check is optional */ }
+
+    this._renderTestResults(resultEl, steps);
+  }
+
+  /**
+   * Render multi-step test connection results.
+   * @param {HTMLElement} resultEl
+   * @param {Array<{icon: string, text: string}>} steps
+   * @private
+   */
+  _renderTestResults(resultEl, steps) {
+    if (!resultEl) return;
+    const hasError = steps.some(s => s.icon === 'xmark');
+    const icons = {
+      check: '<i class="fa-solid fa-check-circle" style="color:#4ade80"></i>',
+      xmark: '<i class="fa-solid fa-circle-xmark" style="color:#f87171"></i>',
+      warn: '<i class="fa-solid fa-triangle-exclamation" style="color:#fbbf24"></i>',
+    };
+    resultEl.innerHTML = steps.map(s => `<div>${icons[s.icon] || ''} ${s.text}</div>`).join('');
+    resultEl.className = `config-test-result ${hasError ? 'test-error' : 'test-success'}`;
   }
 
   /**

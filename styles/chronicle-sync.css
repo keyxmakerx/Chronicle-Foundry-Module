@@ -1178,14 +1178,19 @@
 .config-test-result {
   font-size: 12px;
   transition: color 0.2s;
+  margin-top: 4px;
+}
+
+.config-test-result > div {
+  padding: 1px 0;
 }
 
 .config-test-result.test-success {
-  color: #4ade80;
+  color: #d1d5db;
 }
 
 .config-test-result.test-error {
-  color: #f87171;
+  color: #d1d5db;
 }
 
 .config-test-result.test-pending {
