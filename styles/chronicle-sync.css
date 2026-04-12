@@ -641,6 +641,17 @@
   color: inherit;
 }
 
+.map-pin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(107, 114, 128, 0.2);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+}
+
 /* ================================================================= */
 /* SHOPS TAB                                                          */
 /* ================================================================= */

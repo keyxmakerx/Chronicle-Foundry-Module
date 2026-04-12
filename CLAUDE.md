@@ -21,7 +21,7 @@ scripts/              # ES modules (.mjs)
   sync-manager.mjs    # Orchestrator, API routing, WS management
   api-client.mjs      # REST + WebSocket client
   journal-sync.mjs    # Entity ↔ JournalEntry sync
-  map-sync.mjs        # Map drawings/tokens/fog sync
+  map-sync.mjs        # Map marker/pin sync (markers ↔ Scene Notes)
   calendar-sync.mjs   # Calendar adapter (Calendaria/SimpleCalendar)
   actor-sync.mjs      # Character entity ↔ Actor sync
   item-sync.mjs       # Item sync

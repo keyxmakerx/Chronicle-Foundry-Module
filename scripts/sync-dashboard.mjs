@@ -426,12 +426,22 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     // Build chronicle map entries.
     const chronicleMaps = chronicles.map(m => {
       const scene = scenesByMapId.get(m.id);
+      const pinCount = scene
+        ? scene.notes.filter(n => n.getFlag(FLAG_SCOPE, 'markerId')).length
+        : 0;
+      const baseUrl = getSetting('apiUrl')?.replace(/\/+$/, '');
+      const campId = getSetting('campaignId');
+      const chronicleUrl = (baseUrl && campId)
+        ? `${baseUrl}/campaigns/${campId}/maps/${m.id}`
+        : null;
       return {
         id: m.id,
         name: m.name,
         linked: !!scene,
         sceneId: scene?.id ?? null,
         sceneName: scene?.name ?? null,
+        pinCount,
+        chronicleUrl,
       };
     });
 

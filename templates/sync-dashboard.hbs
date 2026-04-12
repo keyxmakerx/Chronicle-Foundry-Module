@@ -448,6 +448,16 @@
           <div class="map-link-info">
             <i class="fa-solid fa-arrow-right"></i>
             <span>{{sceneName}}</span>
+            {{#if pinCount}}
+            <span class="map-pin-badge" title="{{pinCount}} synced pins">
+              <i class="fa-solid fa-map-pin"></i> {{pinCount}}
+            </span>
+            {{/if}}
+            {{#if chronicleUrl}}
+            <a href="{{chronicleUrl}}" target="_blank" class="dashboard-btn btn-xs" title="View in Chronicle">
+              <i class="fa-solid fa-external-link-alt"></i>
+            </a>
+            {{/if}}
             <button type="button" class="dashboard-btn btn-xs btn-danger" data-action="unlink-scene" data-scene-id="{{sceneId}}">
               <i class="fa-solid fa-unlink"></i> Unlink
             </button>

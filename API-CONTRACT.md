@@ -547,41 +547,9 @@ Generic sync endpoint for batch operations.
 #### GET /maps
 Lists all maps in the campaign.
 
-#### GET /maps/:mapId/drawings
-Lists drawings for a map.
-
-#### POST /maps/:mapId/drawings
-Creates a new drawing.
-
-#### PUT /maps/:mapId/drawings/:drawingId
-Updates a drawing.
-
-#### DELETE /maps/:mapId/drawings/:drawingId
-Deletes a drawing.
-
-#### GET /maps/:mapId/tokens
-Lists tokens for a map.
-
-#### POST /maps/:mapId/tokens
-Creates a token.
-
-#### PATCH /maps/:mapId/tokens/:tokenId/position
-Moves a token (x, y only).
-
-#### PUT /maps/:mapId/tokens/:tokenId
-Full token update.
-
-#### DELETE /maps/:mapId/tokens/:tokenId
-Deletes a token.
-
-#### GET /maps/:mapId/fog
-Gets fog of war data.
-
-#### PUT /maps/:mapId/fog
-Updates fog of war data.
-
-#### GET /maps/:mapId/layers
-Lists map layers.
+> **Note:** Drawing, token, fog, and layer endpoints exist on the Chronicle API
+> but are consumed by Chronicle's web map editor only — they are not synced to
+> Foundry. Only markers are synced as Foundry Scene Map Notes.
 
 #### GET /maps/:mapId/markers
 Lists map markers (pins/notes on the map).
@@ -891,18 +859,9 @@ If the token is invalid, the server rejects the upgrade.
 | `entity_type.created` | Full entity type object | Entity type created |
 | `entity_type.updated` | Full entity type object | Entity type modified |
 | `entity_type.deleted` | `{ id: "uuid" }` | Entity type deleted |
-| `drawing.created` | Full drawing object | Map drawing created |
-| `drawing.updated` | Full drawing object | Map drawing modified |
-| `drawing.deleted` | `{ id, map_id }` | Map drawing deleted |
-| `token.created` | Full token object | Map token created |
-| `token.moved` | `{ id, map_id, x, y }` | Map token moved |
-| `token.updated` | Full token object | Map token modified |
-| `token.deleted` | `{ id, map_id }` | Map token deleted |
 | `marker.created` | Full marker object | Map marker created |
 | `marker.updated` | Full marker object | Map marker modified |
 | `marker.deleted` | `{ id }` | Map marker deleted |
-| `fog.updated` | `{ map_id, fog_data }` | Fog of war changed |
-| `layer.updated` | Full layer object | Map layer changed |
 | `note.created` | Full note object | Note created |
 | `note.updated` | Full note object | Note modified |
 | `note.deleted` | `{ id }` | Note deleted |

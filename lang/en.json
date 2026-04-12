@@ -24,7 +24,7 @@
       },
       "SyncMaps": {
         "Name": "Sync Maps",
-        "Hint": "Sync Chronicle maps with Foundry scenes (drawings, tokens)"
+        "Hint": "Sync Chronicle map markers with Foundry scene pins"
       },
       "SyncCalendar": {
         "Name": "Sync Calendar",
