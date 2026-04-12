@@ -28,7 +28,7 @@ scripts/              # ES modules (.mjs)
   note-sync.mjs       # Chronicle Notes ↔ JournalEntry sync
   constants.mjs       # Shared constants (FLAG_SCOPE, MODULE_ID)
   shop-widget.mjs     # Shop inventory UI
-  sync-dashboard.mjs  # 6-tab dashboard UI
+  sync-dashboard.mjs  # 8-tab dashboard UI
   adapters/           # Game system field mappers
     generic-adapter.mjs # API-driven adapter for all systems
 templates/            # Handlebars templates

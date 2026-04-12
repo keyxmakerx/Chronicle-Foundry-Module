@@ -5,11 +5,11 @@ Bidirectional real-time sync between [Chronicle](https://github.com/keyxmakerx/C
 ## Features
 
 - **Journal Sync** — Chronicle entities ↔ Foundry journal entries (with multi-page splitting)
-- **Map Sync** — Drawings, tokens, and fog of war
+- **Map Sync** — Chronicle map markers ↔ Foundry scene pins (with "View in Chronicle" for full map editor)
 - **Calendar Sync** — Calendaria and Simple Calendar integration
 - **Character Sync** — Actor ↔ character entity with system-aware field mapping (D&D 5e, Pathfinder 2e, or any system with annotated fields)
 - **Shop Widget** — Browse and purchase from Chronicle shop entities in Foundry
-- **Sync Dashboard** — 6-tab management UI with diagnostics, error logs, and health metrics
+- **Sync Dashboard** — 8-tab management UI with diagnostics, error logs, and health metrics
 - **Permission Mapping** — Chronicle visibility ↔ Foundry ownership levels
 
 ## Compatibility
@@ -18,6 +18,7 @@ Bidirectional real-time sync between [Chronicle](https://github.com/keyxmakerx/C
 |-------------|--------|
 | v12         | Minimum supported |
 | v13         | Verified |
+| v14         | Verified |
 
 ## Installation
 

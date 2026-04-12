@@ -56,40 +56,28 @@ Requires a running Chronicle instance and Foundry VTT with the chronicle-sync mo
 - [ ] Sync guard prevents infinite loops (edit in A, syncs to B, doesn't re-sync to A)
 - [ ] Monk's Enhanced Journal: content syncs correctly if module active
 
-## Map Sync
+## Map Sync (Markers Only)
+
+Note: Drawings, tokens, fog of war, and layers are managed by Chronicle's web
+map editor. Only markers/pins sync to Foundry as Scene Map Notes.
 
 ### Chronicle -> Foundry
-- [ ] Create drawing in Chronicle -> Drawing appears on Foundry scene
-- [ ] Move/resize drawing -> Foundry drawing updates
-- [ ] Delete drawing -> Foundry drawing removed
-- [ ] Create token -> Token appears on Foundry scene
-- [ ] Move token (PATCH position) -> Token position updates in Foundry
-- [ ] Delete token -> Token removed from Foundry
+- [ ] Create marker in Chronicle -> Scene Note (pin) appears on linked Foundry scene
+- [ ] Update marker position/name -> Scene Note updates
+- [ ] Delete marker -> Scene Note removed
 
 ### Foundry -> Chronicle
-- [ ] Create drawing on scene -> Drawing syncs to Chronicle map
-- [ ] Move drawing -> Chronicle drawing position updates
-- [ ] Create token on scene -> Token syncs to Chronicle
-- [ ] Move token -> Token position updates (debounced)
-- [ ] Delete drawing/token -> Removed in Chronicle
+- [ ] Create Scene Note on linked scene -> Marker syncs to Chronicle map
+- [ ] Move/update Scene Note -> Marker updates in Chronicle
+- [ ] Delete Scene Note -> Marker removed from Chronicle
 
 ### Coordinate Conversion
-- [ ] Verify pixel-to-percentage conversion is accurate
-- [ ] Drawing at (0,0) maps correctly
-- [ ] Drawing at scene edge maps correctly
+- [ ] Verify percentage-to-pixel conversion is accurate for markers
+- [ ] Markers at scene edge map correctly
 
-## Fog of War
-
-### Chronicle -> Foundry
-- [ ] Create fog region in Chronicle -> Semi-transparent polygon drawing appears on scene
-- [ ] Create multiple fog regions -> All render correctly as overlay drawings
-- [ ] Reset fog in Chronicle -> All fog drawings cleared from scene
-- [ ] Fog region reconciliation: add/remove regions correctly on re-fetch
-
-### Foundry -> Chronicle
-- [ ] Draw a dark polygon (black fill, alpha > 0.5) -> Pushes as fog region to Chronicle
-- [ ] Delete a fog drawing in Foundry -> Fog region deleted in Chronicle
-- [ ] Non-fog polygon (light color or low alpha) -> Syncs as regular drawing, not fog
+### View in Chronicle
+- [ ] Right-click linked scene -> "View in Chronicle" opens map URL in browser
+- [ ] Dashboard Maps tab -> "View in Chronicle" link opens map URL
 
 ## Calendar Sync
 
@@ -136,7 +124,7 @@ Requires a running Chronicle instance and Foundry VTT with the chronicle-sync mo
 
 - [ ] Fresh connection triggers initial sync (GET /sync/pull)
 - [ ] Existing entities create proper sync mappings
-- [ ] Existing maps/drawings/tokens have mappings created
+- [ ] Existing map-to-scene links and marker mappings created
 - [ ] lastSyncTime updates after successful initial sync
 
 ## Permission & Security
@@ -218,13 +206,35 @@ Requires a running Chronicle instance and Foundry VTT with the chronicle-sync mo
 - [ ] Dashboard shows "Not configured" state when settings missing
 - [ ] Dashboard opens to last-active tab
 
-### Tabs
-- [ ] Entities tab: entity list with sync status dots, pull/push actions, visibility toggle, search filter
+### Tabs (8 total)
+- [ ] Config tab: API URL, key, campaign ID, sync scope, exclusion rules, save config
+- [ ] Entities tab: entity list with sync status dots, pull/push actions, visibility toggle, search filter, bulk tools, "Create Type" button
 - [ ] Shops tab: shop entities with "Open Shop" button linking to ShopWidget
-- [ ] Maps tab: scene-to-map linking via dropdown, drawing/token counts
+- [ ] Maps tab: scene-to-map linking via dropdown, pin count, "View in Chronicle" link
 - [ ] Characters tab: synced/unlinked actors, push button, system badge
+- [ ] Notes tab: Chronicle notes synced as JournalEntries
 - [ ] Calendar tab: date comparison (Chronicle vs Foundry), pull/push buttons, module detection
 - [ ] Status tab: connection health, activity log, error log, diagnostics grid, system match info
+
+### Layout Persistence
+- [ ] Switch to Maps tab, close dashboard, reopen -> Maps tab still active
+- [ ] Collapse an entity type group, reload Foundry -> group still collapsed
+- [ ] Different browser/user has independent layout preferences
+
+### Entity Type Creation
+- [ ] "Create Type" button visible in Entities tab toolbar
+- [ ] Click -> Dialog with name, plural name, icon class, color fields
+- [ ] Submit with name "Quest" -> type created, dashboard refreshes
+- [ ] New type appears in bulk "Change Type" dropdown
+- [ ] Cancel/close without name -> no API call, no errors
+
+### Test Connection (Multi-step)
+- [ ] Test with valid config -> Shows: API reachable ✓, Auth OK ✓, Campaign ✓, System match ✓
+- [ ] Test with wrong URL -> "Unreachable: Chronicle not responding at {url}"
+- [ ] Test with wrong API key -> "Auth failed: API key invalid or revoked"
+- [ ] Test with wrong campaign ID -> "Campaign not found"
+- [ ] Test with CORS issue -> Shows origin URL and whitelist instructions
+- [ ] Test with system not matched -> Shows available foundry_system_ids
 
 ### Diagnostics (F-QoL)
 - [ ] Health metrics: REST success/error counts, uptime percentage, reconnect attempts
