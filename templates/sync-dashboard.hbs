@@ -92,7 +92,7 @@
             <button type="button" class="dashboard-btn btn-sm" data-action="test-connection">
               <i class="fa-solid fa-plug"></i> Test Connection
             </button>
-            <span class="config-test-result" data-test-result></span>
+            <div class="config-test-result" data-test-result></div>
           </div>
         </div>
 
@@ -448,6 +448,16 @@
           <div class="map-link-info">
             <i class="fa-solid fa-arrow-right"></i>
             <span>{{sceneName}}</span>
+            {{#if pinCount}}
+            <span class="map-pin-badge" title="{{pinCount}} synced pins">
+              <i class="fa-solid fa-map-pin"></i> {{pinCount}}
+            </span>
+            {{/if}}
+            {{#if chronicleUrl}}
+            <a href="{{chronicleUrl}}" target="_blank" class="dashboard-btn btn-xs" title="View in Chronicle">
+              <i class="fa-solid fa-external-link-alt"></i>
+            </a>
+            {{/if}}
             <button type="button" class="dashboard-btn btn-xs btn-danger" data-action="unlink-scene" data-scene-id="{{sceneId}}">
               <i class="fa-solid fa-unlink"></i> Unlink
             </button>
@@ -575,11 +585,12 @@
       {{else}}
       <div class="dashboard-empty-tab">
         <i class="fa-solid fa-puzzle-piece fa-2x"></i>
-        <p>Character sync requires a matching game system.</p>
-        <p class="hint">
-          Chronicle doesn't have a system pack for <strong>{{#if foundrySystem}}{{foundrySystem}}{{else}}this system{{/if}}</strong> yet.
-          Use the <em>Copy System Debug</em> button on the Status tab to generate a snapshot you can paste into Claude AI to help build one.
-        </p>
+        <p>No Chronicle system matches your Foundry game system{{#if foundrySystem}} (<code>{{foundrySystem}}</code>){{/if}}.</p>
+        <ul class="hint" style="text-align: left; margin-top: 0.5rem;">
+          <li>Is the game system package installed in Chronicle? (Admin &rarr; Packages)</li>
+          <li>Is it enabled for this campaign? (Campaign Settings &rarr; Game System)</li>
+          <li>Check the browser console for detailed diagnostics.</li>
+        </ul>
       </div>
       {{/if}}
     </div>
@@ -730,7 +741,7 @@
               </span>
               {{else}}
               <span class="system-value system-no-match">
-                <i class="fa-solid fa-circle-xmark" style="color: #f87171"></i> No Match
+                <i class="fa-solid fa-circle-xmark" style="color: #f87171"></i> No match &mdash; check Packages &amp; Campaign Settings
               </span>
               {{/if}}
             </div>

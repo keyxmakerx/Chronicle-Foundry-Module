@@ -219,6 +219,13 @@ export class SyncManager {
       const result = await this.api.get('/systems');
       const systems = result.data || [];
 
+      // Log API response for debugging system matching issues.
+      console.debug(`Chronicle: /systems API returned ${systems.length} system(s)`);
+      for (const s of systems) {
+        console.debug(`  - ${s.id} (foundry_id: ${s.foundry_system_id ?? 'MISSING'}, enabled: ${s.enabled})`);
+      }
+      console.debug(`Chronicle: Looking for foundry_system_id: "${this._foundrySystemId}"`);
+
       // Match by foundry_system_id returned from the API.
       const match = systems.find(
         (s) => s.foundry_system_id === this._foundrySystemId && s.enabled
@@ -231,7 +238,19 @@ export class SyncManager {
         console.debug(`Chronicle: System matched — Foundry "${this._foundrySystemId}" → Chronicle "${match.id}"`);
       } else {
         await setSetting('detectedSystem', '');
-        console.debug(`Chronicle: No Chronicle system matches Foundry system "${this._foundrySystemId}"`);
+        // Provide diagnostic info about why matching failed.
+        const byFoundryId = systems.find(s => s.foundry_system_id === this._foundrySystemId);
+        if (byFoundryId && !byFoundryId.enabled) {
+          console.warn(`Chronicle: System "${byFoundryId.id}" matches Foundry system "${this._foundrySystemId}" but is not enabled for this campaign`);
+          this.logActivity('warning', `System "${byFoundryId.name}" found but not enabled for this campaign`);
+        } else if (systems.length > 0) {
+          const ids = systems.map(s => s.foundry_system_id || '(none)').join(', ');
+          console.warn(`Chronicle: No system has foundry_system_id="${this._foundrySystemId}". Available: ${ids}`);
+          this.logActivity('warning', `No Chronicle system matches Foundry system "${this._foundrySystemId}"`);
+        } else {
+          console.warn('Chronicle: No game systems installed in Chronicle');
+          this.logActivity('warning', 'No game systems installed in Chronicle');
+        }
       }
     } catch (err) {
       console.warn('Chronicle: Failed to detect system match', err);
