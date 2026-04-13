@@ -16,6 +16,7 @@ import { ActorSync } from './actor-sync.mjs';
 import { ItemSync } from './item-sync.mjs';
 import { NoteSync } from './note-sync.mjs';
 import { SyncDashboard } from './sync-dashboard.mjs';
+import { MapViewerSheet } from './map-viewer.mjs';
 
 /** @type {SyncManager|null} */
 let syncManager = null;
@@ -30,6 +31,13 @@ let dashboard = null;
 Hooks.once('init', () => {
   console.debug('Chronicle Sync | Initializing');
   registerSettings();
+
+  // Register Chronicle Map Viewer as an alternate sheet for image journal pages.
+  DocumentSheetConfig.registerSheet(JournalEntryPage, 'chronicle-sync', MapViewerSheet, {
+    types: ['image'],
+    makeDefault: false,
+    label: 'Chronicle Map Viewer',
+  });
 
   // Register Handlebars helpers used by dashboard/shop templates.
   Handlebars.registerHelper('eq', (a, b) => a === b);

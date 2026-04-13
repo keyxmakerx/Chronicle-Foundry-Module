@@ -1,0 +1,60 @@
+<div class="chronicle-map-viewer" data-page-id="{{pageId}}">
+  {{!-- Toolbar --}}
+  <div class="map-toolbar">
+    <div class="pin-tools">
+      {{#each pinTypes}}
+        <button type="button" class="pin-tool-btn" data-pin-type="{{@key}}"
+                title="{{label}}" style="color: {{color}};">
+          <i class="fa-solid {{faIcon}}"></i>
+        </button>
+      {{/each}}
+    </div>
+    <div class="toolbar-separator"></div>
+    <div class="view-tools">
+      <button type="button" class="view-tool-btn" data-action="zoom-in"
+              title="{{localize 'CHRONICLE.MapViewer.ZoomIn'}}">
+        <i class="fa-solid fa-magnifying-glass-plus"></i>
+      </button>
+      <button type="button" class="view-tool-btn" data-action="zoom-out"
+              title="{{localize 'CHRONICLE.MapViewer.ZoomOut'}}">
+        <i class="fa-solid fa-magnifying-glass-minus"></i>
+      </button>
+      <button type="button" class="view-tool-btn" data-action="zoom-reset"
+              title="{{localize 'CHRONICLE.MapViewer.ZoomReset'}}">
+        <i class="fa-solid fa-expand"></i>
+      </button>
+      <button type="button" class="view-tool-btn" data-action="fit-view"
+              title="{{localize 'CHRONICLE.MapViewer.FitView'}}">
+        <i class="fa-solid fa-arrows-to-dot"></i>
+      </button>
+      <button type="button" class="view-tool-btn toggle-labels {{#if showLabels}}active{{/if}}"
+              data-action="toggle-labels"
+              title="{{localize 'CHRONICLE.MapViewer.ToggleLabels'}}">
+        <i class="fa-solid fa-tag"></i>
+      </button>
+    </div>
+  </div>
+
+  {{!-- Viewport --}}
+  <div class="map-viewport">
+    <div class="map-container">
+      {{#if src}}
+        <img class="map-image" src="{{src}}" alt="Map" draggable="false" />
+      {{/if}}
+      <div class="pin-layer">
+        {{#each pins}}
+          <div class="map-pin {{type}} {{#unless shared}}gm-only{{/unless}}"
+               data-pin-id="{{id}}"
+               style="left: {{x}}%; top: {{y}}%;"
+               title="{{label}}">
+            <i class="pin-icon fa-solid {{faIcon}}"></i>
+            {{#if ../showLabels}}
+              <span class="pin-label">{{label}}</span>
+            {{/if}}
+          </div>
+        {{/each}}
+      </div>
+    </div>
+    <div class="zoom-indicator">{{zoomPercent}}%</div>
+  </div>
+</div>

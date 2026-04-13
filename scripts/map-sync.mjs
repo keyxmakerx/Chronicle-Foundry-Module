@@ -611,7 +611,7 @@ export class MapSync {
  * Pin category → Foundry icon and color mapping.
  * Icons are from Foundry's bundled icon set.
  */
-const PIN_ICONS = {
+export const PIN_ICONS = {
   location: { icon: 'icons/svg/village.svg', color: '#3B82F6', faIcon: 'fa-map-pin' },
   danger:   { icon: 'icons/svg/skull.svg',   color: '#EF4444', faIcon: 'fa-skull' },
   treasure: { icon: 'icons/svg/chest.svg',   color: '#F59E0B', faIcon: 'fa-gem' },
