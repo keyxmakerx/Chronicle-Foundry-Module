@@ -179,6 +179,32 @@
         "Reconnect": "Reconnect"
       }
     },
+    "MapViewer": {
+      "SheetLabel": "Chronicle Map Viewer",
+      "PlacePin": "Click map to place pin",
+      "PinConfig": "Configure Pin",
+      "PinLabel": "Label",
+      "PinType": "Type",
+      "PinDescription": "Description",
+      "PinShared": "Visible to players",
+      "PinLinkedJournal": "Linked Journal",
+      "PinSave": "Save",
+      "PinDelete": "Delete Pin",
+      "PinDeleteConfirm": "Delete this pin?",
+      "ZoomIn": "Zoom In",
+      "ZoomOut": "Zoom Out",
+      "ZoomReset": "Reset Zoom",
+      "FitView": "Fit to View",
+      "ToggleLabels": "Toggle Labels",
+      "PinTypes": {
+        "location": "Location",
+        "danger": "Danger",
+        "treasure": "Treasure",
+        "quest": "Quest",
+        "note": "Note",
+        "text": "Text Label"
+      }
+    },
     "Wizard": {
       "Title": "Chronicle Import Wizard",
       "OpenWizard": "Setup Wizard",

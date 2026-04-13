@@ -1,0 +1,47 @@
+<form class="chronicle-pin-config-form" autocomplete="off">
+  <div class="form-group">
+    <label>{{localize "CHRONICLE.MapViewer.PinLabel"}}</label>
+    <input type="text" name="label" value="{{pin.label}}" placeholder="Pin name..." />
+  </div>
+
+  <div class="form-group">
+    <label>{{localize "CHRONICLE.MapViewer.PinType"}}</label>
+    <select name="type">
+      {{#each pinTypes}}
+        <option value="{{@key}}" {{#if (eq @key ../pin.type)}}selected{{/if}}>
+          {{label}}
+        </option>
+      {{/each}}
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>{{localize "CHRONICLE.MapViewer.PinDescription"}}</label>
+    <textarea name="description" rows="3">{{pin.description}}</textarea>
+  </div>
+
+  {{#if isGM}}
+  <div class="form-group form-group-inline">
+    <input type="checkbox" name="shared" id="pin-shared-{{pin.id}}"
+           {{#if pin.shared}}checked{{/if}} />
+    <label for="pin-shared-{{pin.id}}">{{localize "CHRONICLE.MapViewer.PinShared"}}</label>
+  </div>
+  {{/if}}
+
+  <div class="form-group">
+    <label>{{localize "CHRONICLE.MapViewer.PinLinkedJournal"}}</label>
+    <input type="text" name="linkedJournalId" value="{{pin.linkedJournalId}}"
+           placeholder="JournalEntry UUID..." />
+  </div>
+
+  <div class="form-actions">
+    <button type="button" data-action="save-pin" class="dashboard-btn">
+      {{localize "CHRONICLE.MapViewer.PinSave"}}
+    </button>
+    {{#if isGM}}
+      <button type="button" data-action="delete-pin" class="dashboard-btn btn-danger">
+        {{localize "CHRONICLE.MapViewer.PinDelete"}}
+      </button>
+    {{/if}}
+  </div>
+</form>

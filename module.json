@@ -23,7 +23,8 @@
   ],
   "styles": [
     "styles/chronicle-sync.css",
-    "styles/import-wizard.css"
+    "styles/import-wizard.css",
+    "styles/map-viewer.css"
   ],
   "languages": [
     {
