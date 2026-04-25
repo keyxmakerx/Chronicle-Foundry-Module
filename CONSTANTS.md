@@ -86,15 +86,9 @@ The module adds/subtracts 1 when converting between SimpleCalendar and Chronicle
 
 ## System Matching
 
-### Fallback Map (used when API fails)
-
-```javascript
-SYSTEM_MAP_FALLBACK = {
-  'dnd5e': 'dnd5e',
-  'pf2e': 'pathfinder2e',
-  'draw-steel': 'drawsteel',
-}
-```
+System matching is API-driven: the `/systems` endpoint returns each system's
+`foundry_system_id`, which `sync-manager.mjs:231` matches against
+`game.system.id`. There is no in-module fallback table.
 
 ### Actor Type by System
 
