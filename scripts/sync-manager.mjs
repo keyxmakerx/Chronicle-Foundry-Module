@@ -43,9 +43,14 @@ export class SyncManager {
   /**
    * Register a sync module (e.g., JournalSync, MapSync).
    * Modules must implement: init(api), onMessage(msg), destroy().
+   * If the module declares a `_syncManager` field, a back-reference is bound
+   * so the module can reach SyncManager-level helpers (e.g., user mappings).
    * @param {object} module
    */
   registerModule(module) {
+    if (Object.prototype.hasOwnProperty.call(module, '_syncManager')) {
+      module._syncManager = this;
+    }
     this._modules.push(module);
   }
 

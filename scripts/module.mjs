@@ -17,6 +17,7 @@ import { ItemSync } from './item-sync.mjs';
 import { NoteSync } from './note-sync.mjs';
 import { SyncDashboard } from './sync-dashboard.mjs';
 import { MapViewerSheet } from './map-viewer.mjs';
+import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs';
 
 /** @type {SyncManager|null} */
 let syncManager = null;
@@ -81,6 +82,7 @@ Hooks.once('ready', async () => {
   dashboard = new SyncDashboard();
   dashboard.bind(syncManager);
   _addStatusIndicator();
+  registerCharacterClaimIndicator();
 
   // Start the sync manager (connects WebSocket, performs initial sync).
   // Failure is non-fatal; the dashboard remains accessible for diagnostics.
