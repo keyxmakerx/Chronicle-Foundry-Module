@@ -33,6 +33,15 @@ export class ActorSync {
     /** @type {boolean} Suppress hook processing during sync-initiated changes. */
     this._syncing = false;
 
+    /**
+     * Tracks Foundry-originated creates whose POST is in flight.
+     * Maps actor.id → actor.name. Used to suppress the WS-driven
+     * `_onCharacterCreated` from spawning a duplicate Foundry actor when
+     * `entity.created` arrives before our POST returns.
+     * @type {Map<string, string>}
+     */
+    this._inFlightCreates = new Map();
+
     /** @type {object|null} Loaded system adapter module. */
     this._adapter = null;
 
@@ -192,6 +201,21 @@ export class ActorSync {
     );
     if (existing) return;
 
+    // Race guard: a Foundry-originated POST for this name is in flight.
+    // The originating handler will set the entityId flag once its POST
+    // returns; creating another actor here would produce a duplicate
+    // Foundry actor sharing the same chronicle entity. Match on name
+    // because we don't yet know the new entity's ID on the Foundry side.
+    for (const inFlightName of this._inFlightCreates.values()) {
+      if (inFlightName === entity.name) {
+        console.debug(
+          `Chronicle: Skipping WS-driven actor create for "${entity.name}" — ` +
+          `Foundry-originated POST is in flight; the originating handler will link it.`
+        );
+        return;
+      }
+    }
+
     try {
       this._syncing = true;
 
@@ -344,6 +368,13 @@ export class ActorSync {
     // Skip if already linked (came from Chronicle).
     if (actor.getFlag(FLAG_SCOPE, 'entityId')) return;
 
+    // Mark this Foundry-originated create as in-flight so the WS-driven
+    // _onCharacterCreated can skip the matching `entity.created` broadcast
+    // that arrives before our POST returns. The flag is set after the POST
+    // succeeds; without this guard, the WS handler doesn't see the flag yet
+    // and creates a duplicate Foundry actor.
+    this._inFlightCreates.set(actor.id, actor.name);
+
     try {
       const fields = this._adapter.toChronicleFields(actor);
 
@@ -388,6 +419,8 @@ export class ActorSync {
       }
     } catch (err) {
       console.error('Chronicle: Failed to push new actor to Chronicle', err);
+    } finally {
+      this._inFlightCreates.delete(actor.id);
     }
   }
 
