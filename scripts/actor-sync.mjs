@@ -202,6 +202,7 @@ export class ActorSync {
           [FLAG_SCOPE]: {
             entityId: entity.id,
             lastSync: new Date().toISOString(),
+            chronicleOwnerUserId: entity.owner_user_id ?? null,
           },
         },
       };
@@ -280,6 +281,12 @@ export class ActorSync {
       if (entity.updated_at) {
         await actor.setFlag(FLAG_SCOPE, 'chronicleUpdatedAt', entity.updated_at);
       }
+      // Cache claim status for the actor-sheet indicator (FM-CH2). Falls
+      // through `null` when the entity is unclaimed so the indicator can
+      // show "Unclaimed" rather than stale data.
+      if (Object.prototype.hasOwnProperty.call(entity, 'owner_user_id')) {
+        await actor.setFlag(FLAG_SCOPE, 'chronicleOwnerUserId', entity.owner_user_id ?? null);
+      }
 
       console.debug(`Chronicle: Updated actor "${actor.name}" from entity`);
     } catch (err) {
@@ -340,18 +347,30 @@ export class ActorSync {
     try {
       const fields = this._adapter.toChronicleFields(actor);
 
-      const entity = await this._api.post('/entities', {
+      const payload = {
         name: actor.name,
         entity_type_id: this._characterTypeId,
         is_private: false,
         fields_data: fields,
-      });
+      };
+
+      // Resolve actor owner → Chronicle user → owner_user_id (FM-CH1).
+      // Omit if no Foundry owner is set or no Chronicle mapping exists; the
+      // host leaves owner_user_id null and the player can claim from chronicle.
+      const ownerUserId = this._resolveOwnerUserId(actor);
+      if (ownerUserId) payload.owner_user_id = ownerUserId;
+
+      const entity = await this._api.post('/entities', payload);
 
       if (entity) {
         try {
           this._syncing = true;
           await actor.setFlag(FLAG_SCOPE, 'entityId', entity.id);
           await actor.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
+          // Cache owner for the claim-status indicator (FM-CH2). Prefer the
+          // server's value if returned; fall back to what we sent.
+          const cachedOwner = entity.owner_user_id ?? ownerUserId ?? null;
+          await actor.setFlag(FLAG_SCOPE, 'chronicleOwnerUserId', cachedOwner);
         } finally {
           this._syncing = false;
         }
@@ -570,6 +589,41 @@ export class ActorSync {
       return entity.entity_type_id === this._characterTypeId;
     }
     return false;
+  }
+
+  /**
+   * Resolve a Foundry actor's player owner to a Chronicle user ID.
+   * Returns null when no non-GM owner is set or no Chronicle mapping exists.
+   * If multiple non-GM owners exist (rare), picks the lowest user id
+   * deterministically and logs a debug; the GM can reassign in chronicle.
+   * @param {Actor} actor
+   * @returns {string|null}
+   * @private
+   */
+  _resolveOwnerUserId(actor) {
+    if (!this._syncManager) return null;
+
+    const ownership = actor.ownership ?? {};
+    const ownerLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
+    const playerOwners = [];
+    for (const [userId, level] of Object.entries(ownership)) {
+      if (userId === 'default') continue;
+      if (level !== ownerLevel) continue;
+      const user = game.users?.get(userId);
+      if (!user || user.isGM) continue;
+      playerOwners.push(userId);
+    }
+
+    if (playerOwners.length === 0) return null;
+    playerOwners.sort();
+    if (playerOwners.length > 1) {
+      console.debug(
+        `Chronicle: Actor "${actor.name}" has ${playerOwners.length} non-GM owners; ` +
+        `using "${playerOwners[0]}" for owner_user_id mapping. Reassign in chronicle if wrong.`
+      );
+    }
+
+    return this._syncManager.getChronicleUserId(playerOwners[0]);
   }
 
   /**
