@@ -129,7 +129,7 @@ export class ActorSync {
    * @param {object} mapping
    */
   async onSyncMapping(mapping) {
-    if (mapping.chronicle_type !== 'actor') return;
+    if (mapping.chronicle_type !== 'entity') return;
     if (!this._adapter || !getSetting('syncCharacters')) return;
 
     // Check if the Foundry actor exists; if not, fetch and create it.
@@ -245,7 +245,7 @@ export class ActorSync {
 
       // Create sync mapping.
       await this._api.post('/sync/mappings', {
-        chronicle_type: 'actor',
+        chronicle_type: 'entity',
         chronicle_id: entity.id,
         external_system: 'foundry',
         external_id: actor.id,
@@ -408,7 +408,7 @@ export class ActorSync {
 
         // Create sync mapping.
         await this._api.post('/sync/mappings', {
-          chronicle_type: 'actor',
+          chronicle_type: 'entity',
           chronicle_id: entity.id,
           external_system: 'foundry',
           external_id: actor.id,
