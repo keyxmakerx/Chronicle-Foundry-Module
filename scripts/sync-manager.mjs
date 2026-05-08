@@ -304,6 +304,19 @@ export class SyncManager {
         }
       }
 
+      // Post-pass: modules that need to coordinate with each other after
+      // the first sync (e.g., journal-sync deletes character duplicates
+      // once actor-sync has materialized its actors).
+      for (const mod of this._modules) {
+        if (typeof mod.onPostInitialSync === 'function') {
+          try {
+            await mod.onPostInitialSync();
+          } catch (err) {
+            console.warn(`Chronicle: ${mod.constructor.name}.onPostInitialSync failed`, err);
+          }
+        }
+      }
+
       // Update last sync timestamp.
       await setSetting('lastSyncTime', result.server_time || new Date().toISOString());
 

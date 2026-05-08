@@ -258,10 +258,11 @@ export class MapViewerSheet extends JournalPageSheet {
       };
     }
 
-    // ----- Image src: prefer Chronicle meta over the page's own src
-    //                  when the page is a Chronicle-linked map. -----
-    const src = (mapId && meta?.image_id)
-      ? this._mapImageSrc(meta)
+    // ----- Image src: prefer the resolved Chronicle URL on the meta flag
+    //                  (written by GM via map-sync), else any direct URL on
+    //                  meta, else fall back to the page's own src. -----
+    const src = mapId
+      ? this._mapImageSrc(meta) || this.document.src
       : this.document.src;
 
     return {
@@ -285,17 +286,24 @@ export class MapViewerSheet extends JournalPageSheet {
   }
 
   /**
-   * Build a Chronicle map image src URL from cached meta. Prefers a direct
-   * URL on the row and falls back to /api/v1/media/:id.
+   * Resolve a map image src from the cached meta. The GM client writes the
+   * fully-resolved URL into `meta.image_url` during materialization, so
+   * players can read it without an extra API call. Relative URLs are
+   * prefixed with the configured Chronicle base URL.
    * @param {object} meta
    * @returns {string}
    * @private
    */
   _mapImageSrc(meta) {
+    if (!meta) return '';
     const baseUrl = (game.settings.get(MODULE_ID, 'apiUrl') || '').replace(/\/+$/, '');
-    if (meta?.image_url) return meta.image_url;
-    if (meta?.image_id && baseUrl) return `${baseUrl}/api/v1/media/${meta.image_id}`;
-    return this.document.src || '';
+    for (const field of ['image_url', 'image_path', 'image']) {
+      const v = meta[field];
+      if (typeof v !== 'string' || !v) continue;
+      if (/^https?:/i.test(v)) return v;
+      if (v.startsWith('/')) return baseUrl ? `${baseUrl}${v}` : v;
+    }
+    return '';
   }
 
   /**
