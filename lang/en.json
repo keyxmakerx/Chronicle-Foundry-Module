@@ -24,7 +24,7 @@
       },
       "SyncMaps": {
         "Name": "Sync Maps",
-        "Hint": "Sync Chronicle map markers with Foundry scene pins"
+        "Hint": "Materialize Chronicle maps as Foundry journal entries with an interactive map viewer"
       },
       "SyncCalendar": {
         "Name": "Sync Calendar",
@@ -106,10 +106,15 @@
       },
       "Maps": {
         "ChronicleMaps": "Chronicle Maps",
-        "UnlinkedScenes": "Unlinked Foundry Scenes",
-        "LinkToScene": "Link to scene...",
-        "LinkToMap": "Link to map...",
-        "Unlink": "Unlink",
+        "OpenInFoundry": "Open in Foundry",
+        "OpenInFoundryHint": "Open the materialized journal entry for this map",
+        "OpenInChronicle": "Open in Chronicle",
+        "Status": "Status",
+        "MaterializedAs": "Materialized as journal entry",
+        "NotMaterialized": "Not yet materialized",
+        "MarkerCount": "{count} markers",
+        "DrawingCount": "{count} drawings",
+        "TokenCount": "{count} tokens",
         "NoMaps": "No maps found in this Chronicle campaign."
       },
       "Shops": {
@@ -191,6 +196,30 @@
       "PinSave": "Save",
       "PinDelete": "Delete Pin",
       "PinDeleteConfirm": "Delete this pin?",
+      "LocalPinShared": "Personal annotation, visible to all players in this world",
+      "LocalPinGmOnly": "Personal annotation, GM only",
+      "MarkerAudienceEveryone": "Chronicle marker, visible to everyone",
+      "MarkerAudienceDm": "Chronicle marker, DM only",
+      "PlaceChronicleMarker": "Place Chronicle marker",
+      "OpenInChronicle": "Open in Chronicle web editor",
+      "NotChronicleMap": "This page isn't linked to a Chronicle map. Place local pins instead.",
+      "MapArchivedNotice": "Chronicle map \"{name}\" was deleted, but your local annotations have been preserved on the archived journal entry.",
+      "MarkerConfig": "Configure Chronicle Marker",
+      "MarkerName": "Name",
+      "MarkerCategory": "Category",
+      "MarkerDescription": "Description",
+      "MarkerVisibilityLabel": "Visibility",
+      "MarkerSave": "Save",
+      "MarkerCreate": "Create",
+      "MarkerDelete": "Delete Marker",
+      "MarkerDeleteConfirm": "Delete this Chronicle marker? This change syncs to Chronicle and other clients.",
+      "MarkerCreateFailed": "Failed to create marker on Chronicle.",
+      "MarkerUpdateFailed": "Failed to update marker on Chronicle.",
+      "MarkerDeleteFailed": "Failed to delete marker on Chronicle.",
+      "MarkerVisibility": {
+        "everyone": "Everyone",
+        "dm_only": "DM only"
+      },
       "ZoomIn": "Zoom In",
       "ZoomOut": "Zoom Out",
       "ZoomReset": "Reset Zoom",

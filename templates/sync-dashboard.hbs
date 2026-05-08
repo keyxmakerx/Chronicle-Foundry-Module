@@ -437,67 +437,44 @@
 
       <div class="map-list">
         {{#if chronicleMaps.length}}
-        <h3 class="section-heading">Chronicle Maps</h3>
+        <h3 class="section-heading">{{localize "CHRONICLE.Dashboard.Maps.ChronicleMaps"}}</h3>
         {{#each chronicleMaps}}
-        <div class="map-row {{#if linked}}linked{{/if}}">
+        <div class="map-row {{#if materialized}}linked{{/if}}">
           <div class="map-info">
             <i class="fa-solid fa-map" style="color: #60a5fa"></i>
             <span class="map-name">{{name}}</span>
           </div>
-          {{#if linked}}
           <div class="map-link-info">
-            <i class="fa-solid fa-arrow-right"></i>
-            <span>{{sceneName}}</span>
-            {{#if pinCount}}
-            <span class="map-pin-badge" title="{{pinCount}} synced pins">
-              <i class="fa-solid fa-map-pin"></i> {{pinCount}}
-            </span>
+            {{#if materialized}}
+              <span class="map-pin-badge" title="{{markerCount}} markers / {{drawingCount}} drawings / {{tokenCount}} tokens">
+                <i class="fa-solid fa-map-pin"></i> {{markerCount}}
+                <i class="fa-solid fa-pen-nib"></i> {{drawingCount}}
+                <i class="fa-solid fa-chess-pawn"></i> {{tokenCount}}
+              </span>
+              {{#if journalEntryId}}
+              <button type="button" class="dashboard-btn btn-xs"
+                      data-action="open-map-journal"
+                      data-journal-entry-id="{{journalEntryId}}"
+                      title="{{localize 'CHRONICLE.Dashboard.Maps.OpenInFoundryHint'}}">
+                <i class="fa-solid fa-folder-open"></i> {{localize "CHRONICLE.Dashboard.Maps.OpenInFoundry"}}
+              </button>
+              {{/if}}
+            {{else}}
+              <span class="map-status-pending">{{localize "CHRONICLE.Dashboard.Maps.NotMaterialized"}}</span>
             {{/if}}
             {{#if chronicleUrl}}
-            <a href="{{chronicleUrl}}" target="_blank" class="dashboard-btn btn-xs" title="View in Chronicle">
+            <a href="{{chronicleUrl}}" target="_blank" class="dashboard-btn btn-xs"
+               title="{{localize 'CHRONICLE.Dashboard.Maps.OpenInChronicle'}}">
               <i class="fa-solid fa-external-link-alt"></i>
             </a>
             {{/if}}
-            <button type="button" class="dashboard-btn btn-xs btn-danger" data-action="unlink-scene" data-scene-id="{{sceneId}}">
-              <i class="fa-solid fa-unlink"></i> Unlink
-            </button>
           </div>
-          {{else}}
-          <div class="map-link-controls">
-            <select data-action="link-scene" data-map-id="{{id}}">
-              <option value="">Link to scene...</option>
-              {{#each ../availableScenes}}
-              <option value="{{id}}">{{name}}</option>
-              {{/each}}
-            </select>
-          </div>
-          {{/if}}
         </div>
         {{/each}}
         {{else}}
         <div class="dashboard-empty-tab">
-          <p>No maps found in this Chronicle campaign.</p>
+          <p>{{localize "CHRONICLE.Dashboard.Maps.NoMaps"}}</p>
         </div>
-        {{/if}}
-
-        {{#if unlinkedScenes.length}}
-        <h3 class="section-heading">Unlinked Foundry Scenes</h3>
-        {{#each unlinkedScenes}}
-        <div class="map-row">
-          <div class="map-info">
-            <i class="fa-solid fa-clapperboard" style="color: #fb923c"></i>
-            <span class="map-name">{{name}}</span>
-          </div>
-          <div class="map-link-controls">
-            <select data-action="link-map" data-scene-id="{{id}}">
-              <option value="">Link to map...</option>
-              {{#each ../availableMaps}}
-              <option value="{{id}}">{{name}}</option>
-              {{/each}}
-            </select>
-          </div>
-        </div>
-        {{/each}}
         {{/if}}
       </div>
     </div>

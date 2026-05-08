@@ -1,4 +1,4 @@
-<div class="chronicle-map-viewer" data-page-id="{{pageId}}">
+<div class="chronicle-map-viewer {{#if hasChronicleMap}}has-chronicle-map{{/if}}" data-page-id="{{pageId}}">
   {{!-- Toolbar --}}
   <div class="map-toolbar">
     <div class="pin-tools">
@@ -9,6 +9,25 @@
         </button>
       {{/each}}
     </div>
+
+    {{#if hasChronicleMap}}
+    {{#if isGM}}
+    <div class="toolbar-separator"></div>
+    <div class="chronicle-tools">
+      <button type="button" class="chronicle-tool-btn" data-action="place-chronicle-marker"
+              title="{{localize 'CHRONICLE.MapViewer.PlaceChronicleMarker'}}">
+        <i class="fa-solid fa-location-dot"></i>
+      </button>
+      {{#if chronicleEditUrl}}
+      <a href="{{chronicleEditUrl}}" target="_blank" class="chronicle-tool-btn"
+         title="{{localize 'CHRONICLE.MapViewer.OpenInChronicle'}}">
+        <i class="fa-solid fa-up-right-from-square"></i>
+      </a>
+      {{/if}}
+    </div>
+    {{/if}}
+    {{/if}}
+
     <div class="toolbar-separator"></div>
     <div class="view-tools">
       <button type="button" class="view-tool-btn" data-action="zoom-in"
@@ -41,12 +60,97 @@
       {{#if src}}
         <img class="map-image" src="{{src}}" alt="Map" draggable="false" />
       {{/if}}
+
+      {{!-- Drawings overlay (SVG, percentage viewBox 0-100) --}}
+      {{#if drawings.length}}
+      <svg class="chronicle-drawing-layer" viewBox="0 0 100 100"
+           preserveAspectRatio="none" aria-hidden="true">
+        {{#each drawings}}
+          {{#if (eq type "rectangle")}}
+          <rect class="chronicle-drawing"
+                x="{{x}}" y="{{y}}" width="{{w}}" height="{{h}}"
+                fill="{{fill}}" fill-opacity="{{fillAlpha}}"
+                stroke="{{stroke}}" stroke-width="{{strokeWidth}}"
+                vector-effect="non-scaling-stroke"
+                data-drawing-id="{{id}}" />
+          {{else if (eq type "ellipse")}}
+          <ellipse class="chronicle-drawing"
+                   cx="{{cx}}" cy="{{cy}}" rx="{{rx}}" ry="{{ry}}"
+                   fill="{{fill}}" fill-opacity="{{fillAlpha}}"
+                   stroke="{{stroke}}" stroke-width="{{strokeWidth}}"
+                   vector-effect="non-scaling-stroke"
+                   data-drawing-id="{{id}}" />
+          {{else if (eq type "line")}}
+          <line class="chronicle-drawing"
+                x1="{{x1}}" y1="{{y1}}" x2="{{x2}}" y2="{{y2}}"
+                stroke="{{stroke}}" stroke-width="{{strokeWidth}}"
+                vector-effect="non-scaling-stroke"
+                data-drawing-id="{{id}}" />
+          {{else if (eq type "polygon")}}
+          <polygon class="chronicle-drawing"
+                   points="{{pointsAttr}}"
+                   fill="{{fill}}" fill-opacity="{{fillAlpha}}"
+                   stroke="{{stroke}}" stroke-width="{{strokeWidth}}"
+                   vector-effect="non-scaling-stroke"
+                   data-drawing-id="{{id}}" />
+          {{else if (eq type "freehand")}}
+          <polyline class="chronicle-drawing"
+                    points="{{pointsAttr}}"
+                    fill="none"
+                    stroke="{{stroke}}" stroke-width="{{strokeWidth}}"
+                    vector-effect="non-scaling-stroke"
+                    data-drawing-id="{{id}}" />
+          {{/if}}
+        {{/each}}
+      </svg>
+      {{/if}}
+
+      {{!-- Tokens overlay --}}
+      {{#if tokens.length}}
+      <div class="chronicle-token-layer">
+        {{#each tokens}}
+        <div class="chronicle-token"
+             data-token-id="{{id}}"
+             style="left: {{x}}%; top: {{y}}%; width: {{size}}%;"
+             title="{{name}}">
+          {{#if image}}
+          <img class="token-image" src="{{image}}" alt="{{name}}" draggable="false" />
+          {{/if}}
+          {{#if hasHp}}
+          <div class="token-hp-bar" title="{{current_hp}} / {{max_hp}}">
+            <div class="token-hp-fill" style="width: {{hpPercent}}%;"></div>
+          </div>
+          {{/if}}
+          {{#if ../showLabels}}
+          {{#if name}}
+          <span class="token-label">{{name}}</span>
+          {{/if}}
+          {{/if}}
+        </div>
+        {{/each}}
+      </div>
+      {{/if}}
+
+      {{!-- Fog overlay (GM only — server filtering plus client-side defense) --}}
+      {{#if isGM}}
+      {{#if hasFog}}
+      <svg class="chronicle-fog-layer" viewBox="0 0 100 100"
+           preserveAspectRatio="none" aria-hidden="true">
+        {{!-- Phase A: render the entire map area as semi-transparent overlay
+              when fog data exists. Detailed mask painting is Phase B. --}}
+        <rect x="0" y="0" width="100" height="100"
+              fill="#000000" fill-opacity="0.4" />
+      </svg>
+      {{/if}}
+      {{/if}}
+
+      {{!-- Local pins --}}
       <div class="pin-layer">
-        {{#each pins}}
+        {{#each localPins}}
           <div class="map-pin {{type}} {{#unless shared}}gm-only{{/unless}}"
                data-pin-id="{{id}}"
                style="left: {{x}}%; top: {{y}}%;"
-               title="{{label}}">
+               title="{{label}} — {{sharedLabel}}">
             <i class="pin-icon fa-solid {{faIcon}}"></i>
             {{#if ../showLabels}}
               <span class="pin-label">{{label}}</span>
@@ -54,6 +158,23 @@
           </div>
         {{/each}}
       </div>
+
+      {{!-- Chronicle markers (rendered above local pins by DOM order) --}}
+      {{#if chronicleMarkers.length}}
+      <div class="chronicle-marker-layer">
+        {{#each chronicleMarkers}}
+          <div class="chronicle-marker {{category}} {{#if isDmOnly}}dm-only{{/if}}"
+               data-marker-id="{{id}}"
+               style="left: {{x}}%; top: {{y}}%; --marker-color: {{color}};"
+               title="{{label}} — {{audienceLabel}}">
+            <i class="pin-icon fa-solid {{faIcon}}"></i>
+            {{#if ../showLabels}}
+              <span class="pin-label">{{label}}</span>
+            {{/if}}
+          </div>
+        {{/each}}
+      </div>
+      {{/if}}
     </div>
     <div class="zoom-indicator">{{zoomPercent}}%</div>
   </div>

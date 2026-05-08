@@ -1,16 +1,33 @@
 /**
- * Chronicle Sync - Interactive Map Viewer Journal Page
+ * Chronicle Sync - Interactive Map Viewer Journal Page (FM-MAP1, Path B)
  *
- * Registers a custom JournalPageSheet for image-type pages that provides
- * an interactive map viewer with pin placement, zoom/pan, and real-time
- * socket sync between Foundry clients. Pins are stored as page flags.
+ * Custom JournalPageSheet for image-type pages that renders both local
+ * journal-flag pins and Chronicle map data (markers, drawings, tokens,
+ * fog, layers). Two pin systems coexist on the same SVG/DOM surface:
  *
- * Phase 1: Standalone viewer with local storage + Foundry socket sync.
- * Phase 2 (future): Chronicle marker API integration.
+ *   - Local pins: stored in `flags.chronicle-sync.pins` on the page; not
+ *     synced to Chronicle. Visual: dotted outline. Tooltip: "Personal
+ *     annotation".
+ *   - Chronicle markers: pulled from Chronicle via MapSync; rendered from
+ *     `flags.chronicle-sync.chronicleMarkers` (player-safe subset written
+ *     by the GM client) plus GM-only memory data. Visual: solid fill.
+ *     Tooltip: "Chronicle marker".
+ *
+ * Visibility filtering happens at render time:
+ *   - `visibility=dm_only` markers and the entire fog overlay never render
+ *     for non-GMs (they are absent from the flag data; GM-only memory
+ *     supplies them only on the GM client).
+ *   - `visibility_rules.allowed_users` / `denied_users` are honored
+ *     against the current user's mapped Chronicle user id.
+ *
+ * Phase A is read-only for drawings, tokens, fog, and layers; markers stay
+ * editable (with a visibility=dm_only checkbox) for GM users via the
+ * existing right-click and toolbar affordances.
  */
 
 import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
 import { PIN_ICONS } from './map-sync.mjs';
+import { getUserMappings } from './settings.mjs';
 
 /* ============================================================
    Constants
@@ -22,21 +39,95 @@ const ZOOM_MAX = 4;
 const ZOOM_STEP = 0.15;
 
 /**
- * Extended pin types for the map viewer. Inherits the 5 types from
- * map-sync.mjs and adds a text-only label type.
+ * Extended pin types for the local-pin viewer. Inherits the 5 canonical
+ * categories from PIN_ICONS and adds a text-only label type. Local pins
+ * use these icons; Chronicle markers reuse the same five canonical
+ * categories (text is local-only).
  */
 const VIEWER_PIN_TYPES = {
   ...PIN_ICONS,
   text: { icon: 'icons/svg/scroll.svg', color: '#e2e8f0', faIcon: 'fa-font' },
 };
 
+/** Chronicle marker pin categories (the five shared with PIN_ICONS). */
+const CHRONICLE_MARKER_CATEGORIES = ['location', 'danger', 'treasure', 'quest', 'note'];
+
+/** Chronicle marker visibility values. */
+const VISIBILITY_VALUES = ['everyone', 'dm_only'];
+
+/* ============================================================
+   Helpers
+   ============================================================ */
+
+/**
+ * Locate the running MapSync module instance, if any. Returns null on
+ * non-GM clients (where SyncManager.start exits early), or before the
+ * module is ready.
+ * @returns {object|null}
+ */
+function _getMapSync() {
+  const mod = game.modules.get(MODULE_ID);
+  const syncManager = mod?.api?.syncManager;
+  if (!syncManager?._modules) return null;
+  return syncManager._modules.find((m) => m.constructor?.name === 'MapSync') || null;
+}
+
+/**
+ * Find the Chronicle user id mapped to the current Foundry user.
+ * Reads from world settings, so it works on both GM and player clients.
+ * @returns {string|null}
+ */
+function _currentChronicleUserId() {
+  const mappings = getUserMappings();
+  for (const [chronicleId, foundryId] of Object.entries(mappings || {})) {
+    if (foundryId === game.user.id) return chronicleId;
+  }
+  return null;
+}
+
+/**
+ * Visibility filter for a Chronicle marker. Honors `visibility=dm_only`
+ * AND the per-user `visibility_rules.allowed_users` / `denied_users`.
+ * @param {object} marker
+ * @param {boolean} isGM
+ * @param {string|null} chronicleUserId
+ * @returns {boolean}
+ */
+function _userCanSeeMarker(marker, isGM, chronicleUserId) {
+  if (!marker) return false;
+  if (marker.visibility === 'dm_only') return isGM;
+
+  const rules = marker.visibility_rules;
+  if (!rules || typeof rules !== 'object') return true;
+  // GM always sees regardless of rules (defense-in-depth on top of dm_only check).
+  if (isGM) return true;
+
+  const denied = Array.isArray(rules.denied_users) ? rules.denied_users : null;
+  if (denied && chronicleUserId && denied.includes(chronicleUserId)) return false;
+
+  const allowed = Array.isArray(rules.allowed_users) ? rules.allowed_users : null;
+  if (allowed && allowed.length > 0) {
+    return chronicleUserId ? allowed.includes(chronicleUserId) : false;
+  }
+  return true;
+}
+
+/** Cap a hex color to the standard `#RRGGBB[AA]` shape; strips dangerous chars. */
+function _safeColor(value, fallback = '#888888') {
+  if (typeof value !== 'string') return fallback;
+  const m = value.match(/^#([0-9a-fA-F]{3,8})$/);
+  return m ? `#${m[1]}` : fallback;
+}
+
 /* ============================================================
    MapViewerSheet — Custom JournalPageSheet for image pages
    ============================================================ */
 
 /**
- * An interactive map viewer that renders inside a journal entry page.
- * Provides pin placement, drag-to-move, zoom/pan, and label toggling.
+ * Interactive map viewer rendered inside a JournalEntryPage. Supports
+ * pan/zoom, local-pin placement, Chronicle marker rendering with
+ * visibility filtering, and read-only overlays for Chronicle drawings,
+ * tokens, fog, and layers.
  */
 export class MapViewerSheet extends JournalPageSheet {
 
@@ -59,16 +150,18 @@ export class MapViewerSheet extends JournalPageSheet {
     this._panX = 0;
     this._panY = 0;
     this._showLabels = true;
-    this._activeTool = null; // null or pin type key
+    /** @type {string|null} Active placement tool: a pin-type key or 'chronicle-marker'. */
+    this._activeTool = null;
     this._isPanning = false;
     this._panStart = null;
 
-    // Pin drag state.
+    // Pin drag state (local pins; Chronicle markers are not draggable in Phase A).
     this._draggingPin = null;
     this._dragOffset = null;
 
-    // Bound socket handler for cleanup.
+    // Bound handlers for cleanup.
     this._boundSocketHandler = this._onSocketMessage.bind(this);
+    this._boundDataChangedHandler = this._onChronicleDataChanged.bind(this);
   }
 
   /* ----------------------------------------------------------
@@ -78,19 +171,85 @@ export class MapViewerSheet extends JournalPageSheet {
   /** @override */
   async getData(options = {}) {
     const data = await super.getData(options);
-    const allPins = this.document.getFlag(FLAG_SCOPE, 'pins') || [];
 
-    // Filter GM-only pins for non-GM users.
+    const mapId = this.document.getFlag(FLAG_SCOPE, 'mapId') || null;
     const isGM = game.user.isGM;
-    const visiblePins = isGM ? allPins : allPins.filter((p) => p.shared !== false);
+    const userChronicleId = _currentChronicleUserId();
 
-    // Enrich pins with icon/color from type definitions.
-    const pins = visiblePins.map((pin) => {
+    // ----- Local pins (existing system, unchanged) -----
+    const allLocalPins = this.document.getFlag(FLAG_SCOPE, 'pins') || [];
+    const visibleLocalPins = isGM ? allLocalPins : allLocalPins.filter((p) => p.shared !== false);
+    const localPins = visibleLocalPins.map((pin) => {
       const style = VIEWER_PIN_TYPES[pin.type] || VIEWER_PIN_TYPES.note;
-      return { ...pin, faIcon: style.faIcon, color: style.color };
+      return {
+        ...pin,
+        faIcon: style.faIcon,
+        color: style.color,
+        kind: 'local',
+        sharedLabel: pin.shared === false
+          ? game.i18n.localize('CHRONICLE.MapViewer.LocalPinGmOnly')
+          : game.i18n.localize('CHRONICLE.MapViewer.LocalPinShared'),
+      };
     });
 
-    // Build pin type list with labels for toolbar/dropdown.
+    // ----- Chronicle map data -----
+    const mapSync = _getMapSync();
+    const mapData = mapSync && mapId
+      ? mapSync.getMapData(this.document)
+      : this._readChronicleFromFlags();
+
+    const meta = mapData?.meta || null;
+    const layersById = new Map(
+      (mapData?.layers || []).map((l) => [l.id, l])
+    );
+
+    // Visibility-filter markers; render-time enforcement of dm_only and rules.
+    const filteredMarkers = (mapData?.markers || []).filter(
+      (m) => _userCanSeeMarker(m, isGM, userChronicleId)
+    );
+
+    // Annotate markers for the template.
+    const chronicleMarkers = filteredMarkers.map((m) => {
+      const category = CHRONICLE_MARKER_CATEGORIES.includes(m.pin_category)
+        ? m.pin_category : 'note';
+      const style = PIN_ICONS[category];
+      const audience = m.visibility === 'dm_only'
+        ? game.i18n.localize('CHRONICLE.MapViewer.MarkerAudienceDm')
+        : game.i18n.localize('CHRONICLE.MapViewer.MarkerAudienceEveryone');
+      return {
+        id: m.id,
+        x: Number(m.x) || 0,
+        y: Number(m.y) || 0,
+        label: m.name || '',
+        description: m.description || '',
+        category,
+        faIcon: style.faIcon,
+        color: _safeColor(m.color, style.color),
+        visibility: m.visibility || 'everyone',
+        isDmOnly: m.visibility === 'dm_only',
+        audienceLabel: audience,
+        entityId: m.entity_id || null,
+      };
+    });
+
+    // Drawings: filter is_visible / is_hidden (defense-in-depth — flag data
+    // already has hidden ones removed for non-GM).
+    const drawings = (mapData?.drawings || [])
+      .filter((d) => d?.is_visible !== false && (isGM || d?.is_hidden !== true))
+      .map((d) => this._prepareDrawing(d, layersById));
+
+    // Sort drawings by layer sort_order, then by their own sort if any.
+    drawings.sort((a, b) => (a._layerOrder ?? 0) - (b._layerOrder ?? 0));
+
+    // Tokens: render all (no per-user vis in schema).
+    const tokens = (mapData?.tokens || []).map((t) => this._prepareToken(t, layersById));
+    tokens.sort((a, b) => (a._layerOrder ?? 0) - (b._layerOrder ?? 0));
+
+    // Fog of war: GM only. Players never receive the data (it lives in GM
+    // memory only, never written to flags), but defense-in-depth here too.
+    const fog = isGM ? mapData?.fog || null : null;
+
+    // ----- Pin types for the toolbar -----
     const pinTypes = {};
     for (const [key, val] of Object.entries(VIEWER_PIN_TYPES)) {
       pinTypes[key] = {
@@ -99,15 +258,148 @@ export class MapViewerSheet extends JournalPageSheet {
       };
     }
 
+    // ----- Image src: prefer Chronicle meta over the page's own src
+    //                  when the page is a Chronicle-linked map. -----
+    const src = (mapId && meta?.image_id)
+      ? this._mapImageSrc(meta)
+      : this.document.src;
+
     return {
       ...data,
       pageId: this.document.id,
-      src: this.document.src,
-      pins,
-      pinTypes,
+      src,
+      mapId,
+      hasChronicleMap: !!mapId,
+      chronicleEditUrl: mapId ? mapSync?.getChronicleMapUrl?.(mapId) || null : null,
       isGM,
+      pinTypes,
+      localPins,
+      chronicleMarkers,
+      drawings,
+      tokens,
+      fog,
+      hasFog: !!fog,
       showLabels: this._showLabels,
       zoomPercent: Math.round(this._zoom * 100),
+    };
+  }
+
+  /**
+   * Build a Chronicle map image src URL from cached meta. Prefers a direct
+   * URL on the row and falls back to /api/v1/media/:id.
+   * @param {object} meta
+   * @returns {string}
+   * @private
+   */
+  _mapImageSrc(meta) {
+    const baseUrl = (game.settings.get(MODULE_ID, 'apiUrl') || '').replace(/\/+$/, '');
+    if (meta?.image_url) return meta.image_url;
+    if (meta?.image_id && baseUrl) return `${baseUrl}/api/v1/media/${meta.image_id}`;
+    return this.document.src || '';
+  }
+
+  /**
+   * Read Chronicle map data straight from the page flags. Used on player
+   * clients where MapSync is inert.
+   * @returns {object}
+   * @private
+   */
+  _readChronicleFromFlags() {
+    const doc = this.document;
+    return {
+      meta: doc.getFlag(FLAG_SCOPE, 'chronicleMapMeta') || null,
+      markers: doc.getFlag(FLAG_SCOPE, 'chronicleMarkers') || [],
+      drawings: doc.getFlag(FLAG_SCOPE, 'chronicleDrawings') || [],
+      tokens: doc.getFlag(FLAG_SCOPE, 'chronicleTokens') || [],
+      layers: doc.getFlag(FLAG_SCOPE, 'chronicleLayers') || [],
+      fog: null,
+    };
+  }
+
+  /**
+   * Convert a Chronicle drawing row into a render-ready descriptor for the
+   * SVG overlay. Coordinates are 0–100 percentages; the SVG viewBox matches.
+   * @param {object} d
+   * @param {Map<string, object>} layersById
+   * @returns {object}
+   * @private
+   */
+  _prepareDrawing(d, layersById) {
+    const layer = d.layer_id ? layersById.get(d.layer_id) : null;
+    const points = Array.isArray(d.points) ? d.points : [];
+    const stroke = _safeColor(d.stroke_color, '#ffffff');
+    const fill = _safeColor(d.fill_color, '#ffffff');
+    const fillAlpha = typeof d.fill_alpha === 'number' ? Math.max(0, Math.min(1, d.fill_alpha)) : 0.3;
+    const strokeWidth = typeof d.stroke_width === 'number' ? Math.max(0.1, d.stroke_width) : 1;
+
+    const out = {
+      id: d.id,
+      type: d.drawing_type || 'rectangle',
+      stroke,
+      fill,
+      fillAlpha,
+      strokeWidth,
+      isHidden: d.is_hidden === true,
+      _layerOrder: layer?.sort_order ?? 0,
+    };
+
+    switch (out.type) {
+      case 'rectangle':
+      case 'ellipse': {
+        if (points.length < 2) return null;
+        const [a, b] = points;
+        const x = Math.min(a.x, b.x);
+        const y = Math.min(a.y, b.y);
+        const w = Math.abs(a.x - b.x);
+        const h = Math.abs(a.y - b.y);
+        out.x = x; out.y = y; out.w = w; out.h = h;
+        out.cx = x + w / 2; out.cy = y + h / 2;
+        out.rx = w / 2; out.ry = h / 2;
+        return out;
+      }
+      case 'line': {
+        if (points.length < 2) return null;
+        out.x1 = points[0].x; out.y1 = points[0].y;
+        out.x2 = points[1].x; out.y2 = points[1].y;
+        return out;
+      }
+      case 'polygon':
+      case 'freehand': {
+        if (points.length < 2) return null;
+        out.pointsAttr = points.map((p) => `${p.x},${p.y}`).join(' ');
+        out.closed = out.type === 'polygon';
+        return out;
+      }
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Render-ready token descriptor.
+   * @param {object} t
+   * @param {Map<string, object>} layersById
+   * @returns {object}
+   * @private
+   */
+  _prepareToken(t, layersById) {
+    const layer = t.layer_id ? layersById.get(t.layer_id) : null;
+    const size = typeof t.size === 'number' ? Math.max(1, Math.min(40, t.size)) : 4;
+    const max = Number(t.max_hp) || 0;
+    const cur = Number(t.current_hp) || 0;
+    const hpPct = max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : null;
+    return {
+      id: t.id,
+      x: Number(t.x) || 0,
+      y: Number(t.y) || 0,
+      size,
+      image: t.image || t.image_url || '',
+      name: t.name || '',
+      max_hp: max,
+      current_hp: cur,
+      hpPercent: hpPct,
+      hasHp: hpPct !== null,
+      _layerOrder: layer?.sort_order ?? 0,
     };
   }
 
@@ -127,22 +419,33 @@ export class MapViewerSheet extends JournalPageSheet {
     this._viewport = viewer.querySelector('.map-viewport');
     this._container = viewer.querySelector('.map-container');
     this._pinLayer = viewer.querySelector('.pin-layer');
-
-    // Apply current transform (e.g. after re-render).
+    this._markerLayer = viewer.querySelector('.chronicle-marker-layer');
     this._applyTransform();
 
-    // ---- Toolbar: pin tools ----
+    // Notify MapSync so it can fetch/refresh sub-resources and start polling.
+    const mapId = this.document.getFlag(FLAG_SCOPE, 'mapId');
+    if (mapId) {
+      const mapSync = _getMapSync();
+      mapSync?.onViewerOpen?.(mapId).catch(() => {});
+    }
+
+    // ---- Toolbar: local pin tools ----
     viewer.querySelectorAll('.pin-tool-btn').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         const type = btn.dataset.pinType;
-        if (this._activeTool === type) {
-          this._setActiveTool(null);
-        } else {
-          this._setActiveTool(type);
-        }
+        this._setActiveTool(this._activeTool === type ? null : type);
       });
     });
+
+    // ---- Toolbar: Chronicle marker placement (GM only) ----
+    const markerBtn = viewer.querySelector('[data-action="place-chronicle-marker"]');
+    if (markerBtn) {
+      markerBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this._setActiveTool(this._activeTool === 'chronicle-marker' ? null : 'chronicle-marker');
+      });
+    }
 
     // ---- Toolbar: view tools ----
     viewer.querySelectorAll('.view-tool-btn').forEach((btn) => {
@@ -164,20 +467,19 @@ export class MapViewerSheet extends JournalPageSheet {
       this._zoomAt(delta, e.clientX, e.clientY);
     }, { passive: false });
 
-    // ---- Viewport: pan + pin placement ----
+    // ---- Viewport: pan + placement ----
     this._viewport.addEventListener('mousedown', (e) => {
-      // Left-click only.
       if (e.button !== 0) return;
+      // Defer to pin-layer / marker-layer handlers when clicking on a pin/marker.
+      if (e.target.closest('.map-pin') || e.target.closest('.chronicle-marker')) return;
 
-      // Check if clicking on a pin (handled separately).
-      if (e.target.closest('.map-pin')) return;
-
-      if (this._activeTool) {
-        // Place a new pin at the click position.
+      if (this._activeTool === 'chronicle-marker') {
         e.preventDefault();
-        this._placePin(e);
+        this._beginChronicleMarkerPlacement(e);
+      } else if (this._activeTool) {
+        e.preventDefault();
+        this._placeLocalPin(e);
       } else {
-        // Start panning.
         e.preventDefault();
         this._isPanning = true;
         this._panStart = { x: e.clientX - this._panX, y: e.clientY - this._panY };
@@ -206,40 +508,82 @@ export class MapViewerSheet extends JournalPageSheet {
       }
     });
 
-    // ---- Pin interactions ----
-    this._pinLayer.addEventListener('mousedown', (e) => {
-      const pinEl = e.target.closest('.map-pin');
-      if (!pinEl || e.button !== 0) return;
-      e.preventDefault();
-      e.stopPropagation();
-      this._onPinDragStart(pinEl, e);
-    });
+    // ---- Local pin interactions ----
+    if (this._pinLayer) {
+      this._pinLayer.addEventListener('mousedown', (e) => {
+        const pinEl = e.target.closest('.map-pin');
+        if (!pinEl || e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        this._onPinDragStart(pinEl, e);
+      });
 
-    this._pinLayer.addEventListener('contextmenu', (e) => {
-      const pinEl = e.target.closest('.map-pin');
-      if (!pinEl) return;
-      e.preventDefault();
-      this._openPinConfig(pinEl.dataset.pinId);
-    });
+      this._pinLayer.addEventListener('contextmenu', (e) => {
+        const pinEl = e.target.closest('.map-pin');
+        if (!pinEl) return;
+        e.preventDefault();
+        this._openPinConfig(pinEl.dataset.pinId);
+      });
 
-    this._pinLayer.addEventListener('dblclick', (e) => {
-      const pinEl = e.target.closest('.map-pin');
-      if (!pinEl) return;
-      e.preventDefault();
-      this._onPinDoubleClick(pinEl.dataset.pinId);
-    });
+      this._pinLayer.addEventListener('dblclick', (e) => {
+        const pinEl = e.target.closest('.map-pin');
+        if (!pinEl) return;
+        e.preventDefault();
+        this._onPinDoubleClick(pinEl.dataset.pinId);
+      });
+    }
 
-    // ---- Foundry socket sync ----
+    // ---- Chronicle marker interactions ----
+    if (this._markerLayer) {
+      this._markerLayer.addEventListener('contextmenu', (e) => {
+        const markerEl = e.target.closest('.chronicle-marker');
+        if (!markerEl) return;
+        e.preventDefault();
+        if (!game.user.isGM) return; // Players cannot edit Chronicle markers in Phase A.
+        this._openChronicleMarkerConfig(markerEl.dataset.markerId);
+      });
+
+      this._markerLayer.addEventListener('dblclick', (e) => {
+        const markerEl = e.target.closest('.chronicle-marker');
+        if (!markerEl) return;
+        e.preventDefault();
+        this._onChronicleMarkerDoubleClick(markerEl.dataset.markerId);
+      });
+    }
+
+    // ---- Foundry socket sync (local pins only) ----
     game.socket.on(SOCKET_CHANNEL, this._boundSocketHandler);
+
+    // ---- Hook for Chronicle data changes (re-render when WS events arrive) ----
+    Hooks.on('chronicleMapDataChanged', this._boundDataChangedHandler);
   }
 
   /** @override */
   close(options) {
-    // Clean up global listeners.
     if (this._onMouseMove) document.removeEventListener('mousemove', this._onMouseMove);
     if (this._onMouseUp) document.removeEventListener('mouseup', this._onMouseUp);
     game.socket.off(SOCKET_CHANNEL, this._boundSocketHandler);
+    Hooks.off('chronicleMapDataChanged', this._boundDataChangedHandler);
+
+    const mapId = this.document.getFlag(FLAG_SCOPE, 'mapId');
+    if (mapId) {
+      const mapSync = _getMapSync();
+      mapSync?.onViewerClose?.(mapId);
+    }
+
     return super.close(options);
+  }
+
+  /**
+   * Re-render when Chronicle data for the open map changes.
+   * @param {string} mapId
+   * @private
+   */
+  _onChronicleDataChanged(mapId) {
+    const ourMapId = this.document.getFlag(FLAG_SCOPE, 'mapId');
+    if (ourMapId && ourMapId === mapId) {
+      this.render(false);
+    }
   }
 
   /* ----------------------------------------------------------
@@ -250,7 +594,6 @@ export class MapViewerSheet extends JournalPageSheet {
     if (!this._container) return;
     this._container.style.transform = `translate(${this._panX}px, ${this._panY}px) scale(${this._zoom})`;
 
-    // Update zoom indicator.
     const indicator = this._viewer?.querySelector('.zoom-indicator');
     if (indicator) indicator.textContent = `${Math.round(this._zoom * 100)}%`;
   }
@@ -260,9 +603,6 @@ export class MapViewerSheet extends JournalPageSheet {
     this._applyTransform();
   }
 
-  /**
-   * Zoom towards the mouse cursor position.
-   */
   _zoomAt(delta, clientX, clientY) {
     const oldZoom = this._zoom;
     const newZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, oldZoom + delta));
@@ -272,7 +612,6 @@ export class MapViewerSheet extends JournalPageSheet {
     const mouseX = clientX - rect.left;
     const mouseY = clientY - rect.top;
 
-    // Adjust pan so the point under the cursor stays fixed.
     const ratio = newZoom / oldZoom;
     this._panX = mouseX - ratio * (mouseX - this._panX);
     this._panY = mouseY - ratio * (mouseY - this._panY);
@@ -306,12 +645,9 @@ export class MapViewerSheet extends JournalPageSheet {
 
   _toggleLabels() {
     this._showLabels = !this._showLabels;
-
-    // Toggle label visibility in DOM without full re-render.
     const btn = this._viewer?.querySelector('.toggle-labels');
     if (btn) btn.classList.toggle('active', this._showLabels);
-
-    this._pinLayer?.querySelectorAll('.pin-label').forEach((el) => {
+    this._viewer?.querySelectorAll('.pin-label').forEach((el) => {
       el.style.display = this._showLabels ? '' : 'none';
     });
   }
@@ -323,17 +659,19 @@ export class MapViewerSheet extends JournalPageSheet {
   _setActiveTool(type) {
     this._activeTool = type;
 
-    // Update toolbar button states.
     this._viewer?.querySelectorAll('.pin-tool-btn').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.pinType === type);
     });
+    const markerBtn = this._viewer?.querySelector('[data-action="place-chronicle-marker"]');
+    if (markerBtn) {
+      markerBtn.classList.toggle('active', type === 'chronicle-marker');
+    }
 
-    // Update viewport cursor.
     this._viewport?.classList.toggle('placing', !!type);
   }
 
   /* ----------------------------------------------------------
-     Pin CRUD
+     Local Pin CRUD
      ---------------------------------------------------------- */
 
   _getPins() {
@@ -344,12 +682,8 @@ export class MapViewerSheet extends JournalPageSheet {
     await this.document.setFlag(FLAG_SCOPE, 'pins', pins);
   }
 
-  /**
-   * Place a new pin at the click position.
-   */
-  async _placePin(event) {
+  async _placeLocalPin(event) {
     if (!this._activeTool) return;
-
     const coords = this._eventToPercent(event);
     if (!coords) return;
 
@@ -371,8 +705,6 @@ export class MapViewerSheet extends JournalPageSheet {
 
     this._emitPinChange('pin-create', pin);
     this._setActiveTool(null);
-
-    // Re-render to show the new pin.
     this.render(false);
   }
 
@@ -384,7 +716,6 @@ export class MapViewerSheet extends JournalPageSheet {
     pin.x = newX;
     pin.y = newY;
     await this._savePins(pins);
-
     this._emitPinChange('pin-update', pin);
   }
 
@@ -407,13 +738,12 @@ export class MapViewerSheet extends JournalPageSheet {
 
     const remaining = pins.filter((p) => p.id !== pinId);
     await this._savePins(remaining);
-
     this._emitPinChange('pin-delete', pin);
     this.render(false);
   }
 
   /* ----------------------------------------------------------
-     Pin Drag (move)
+     Local Pin Drag (move)
      ---------------------------------------------------------- */
 
   _onPinDragStart(pinEl, event) {
@@ -426,14 +756,11 @@ export class MapViewerSheet extends JournalPageSheet {
   _onPinDragMove(event) {
     if (!this._draggingPin) return;
 
-    // Only count as a drag if moved more than 3px (to distinguish from click).
     const dx = event.clientX - this._dragStartPos.x;
     const dy = event.clientY - this._dragStartPos.y;
     if (!this._dragMoved && Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
-
     this._dragMoved = true;
 
-    // Move the pin element visually (will be saved on mouseup).
     const coords = this._clientToPercent(event.clientX, event.clientY);
     if (coords) {
       this._draggingPin.style.left = `${coords.x}%`;
@@ -450,15 +777,13 @@ export class MapViewerSheet extends JournalPageSheet {
 
     if (this._dragMoved) {
       const coords = this._clientToPercent(event.clientX, event.clientY);
-      if (coords) {
-        await this._movePin(pinEl.dataset.pinId, coords.x, coords.y);
-      }
+      if (coords) await this._movePin(pinEl.dataset.pinId, coords.x, coords.y);
     }
     this._dragMoved = false;
   }
 
   /* ----------------------------------------------------------
-     Pin Double-Click (open linked journal)
+     Local Pin Double-Click
      ---------------------------------------------------------- */
 
   _onPinDoubleClick(pinId) {
@@ -474,10 +799,6 @@ export class MapViewerSheet extends JournalPageSheet {
     }
   }
 
-  /* ----------------------------------------------------------
-     Pin Config Dialog
-     ---------------------------------------------------------- */
-
   _openPinConfig(pinId) {
     const pins = this._getPins();
     const pin = pins.find((p) => p.id === pinId);
@@ -492,31 +813,112 @@ export class MapViewerSheet extends JournalPageSheet {
   }
 
   /* ----------------------------------------------------------
-     Coordinate Conversion
+     Chronicle Marker placement / edit (GM only)
      ---------------------------------------------------------- */
 
   /**
-   * Convert a mouse event position to percentage coordinates relative to the map image.
+   * Place mode: click on the map opens a config dialog and creates the
+   * marker on Chronicle when saved.
+   * @param {MouseEvent} event
+   * @private
    */
+  _beginChronicleMarkerPlacement(event) {
+    if (!game.user.isGM) {
+      this._setActiveTool(null);
+      return;
+    }
+    const coords = this._eventToPercent(event);
+    if (!coords) return;
+
+    const mapId = this.document.getFlag(FLAG_SCOPE, 'mapId');
+    if (!mapId) {
+      ui.notifications.warn(game.i18n.localize('CHRONICLE.MapViewer.NotChronicleMap'));
+      this._setActiveTool(null);
+      return;
+    }
+
+    new ChronicleMarkerConfigDialog({
+      marker: {
+        id: null,
+        name: '',
+        description: '',
+        x: coords.x,
+        y: coords.y,
+        pin_category: 'note',
+        color: PIN_ICONS.note.color,
+        visibility: 'everyone',
+      },
+      mode: 'create',
+      onSave: async (data) => {
+        const mapSync = _getMapSync();
+        if (!mapSync) return;
+        await mapSync.createMarker(mapId, data);
+        this.render(false);
+      },
+    }).render(true);
+
+    this._setActiveTool(null);
+  }
+
+  _openChronicleMarkerConfig(markerId) {
+    if (!game.user.isGM || !markerId) return;
+    const mapId = this.document.getFlag(FLAG_SCOPE, 'mapId');
+    if (!mapId) return;
+
+    const mapSync = _getMapSync();
+    const data = mapSync?.getMapData(this.document);
+    const marker = (data?.markers || []).find((m) => m.id === markerId);
+    if (!marker) return;
+
+    new ChronicleMarkerConfigDialog({
+      marker: { ...marker },
+      mode: 'edit',
+      onSave: async (updated) => {
+        await mapSync?.updateMarker(mapId, markerId, updated);
+        this.render(false);
+      },
+      onDelete: async () => {
+        await mapSync?.deleteMarker(mapId, markerId);
+        this.render(false);
+      },
+    }).render(true);
+  }
+
+  /**
+   * Double-click a Chronicle marker → open its linked entity (if any).
+   * @param {string} markerId
+   * @private
+   */
+  _onChronicleMarkerDoubleClick(markerId) {
+    const mapSync = _getMapSync();
+    const data = mapSync?.getMapData(this.document) || this._readChronicleFromFlags();
+    const marker = (data.markers || []).find((m) => m.id === markerId);
+    if (!marker?.entity_id) return;
+
+    // Resolve via journal-sync materialization: find a JournalEntry with
+    // the matching `entityId` flag and open it.
+    const journal = game.journal.find((j) => j.getFlag(FLAG_SCOPE, 'entityId') === marker.entity_id);
+    if (journal?.sheet) journal.sheet.render(true);
+  }
+
+  /* ----------------------------------------------------------
+     Coordinate Conversion
+     ---------------------------------------------------------- */
+
   _eventToPercent(event) {
     return this._clientToPercent(event.clientX, event.clientY);
   }
 
-  /**
-   * Convert client (screen) coordinates to percentage of the map image.
-   */
   _clientToPercent(clientX, clientY) {
     const img = this._viewer?.querySelector('.map-image');
     if (!img) return null;
 
-    // The image's bounding rect accounts for the CSS transform (zoom + pan).
     const imgRect = img.getBoundingClientRect();
     if (!imgRect.width || !imgRect.height) return null;
 
     const x = ((clientX - imgRect.left) / imgRect.width) * 100;
     const y = ((clientY - imgRect.top) / imgRect.height) * 100;
 
-    // Clamp to image bounds.
     return {
       x: Math.max(0, Math.min(100, Math.round(x * 10) / 10)),
       y: Math.max(0, Math.min(100, Math.round(y * 10) / 10)),
@@ -524,7 +926,7 @@ export class MapViewerSheet extends JournalPageSheet {
   }
 
   /* ----------------------------------------------------------
-     Socket Sync
+     Local Pin Foundry-Socket Sync
      ---------------------------------------------------------- */
 
   _emitPinChange(action, pin) {
@@ -540,18 +942,14 @@ export class MapViewerSheet extends JournalPageSheet {
   _onSocketMessage(data) {
     if (data.type !== 'map-viewer') return;
     if (data.pageId !== this.document.id) return;
-    if (data.userId === game.user.id) return; // Ignore own events.
-
-    // Re-render to reflect the remote change. The flag data is already
-    // updated by the time we receive the socket event (since the sending
-    // client called setFlag which propagates via Foundry's native sync).
+    if (data.userId === game.user.id) return;
     this.render(false);
   }
 }
 
 
 /* ============================================================
-   PinConfigDialog — ApplicationV2 popup for editing a pin
+   PinConfigDialog — local pin editor
    ============================================================ */
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -591,7 +989,7 @@ export class PinConfigDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     this._onDeleteCallback = onDelete;
   }
 
-  async _prepareContext(options = {}) {
+  async _prepareContext(_options = {}) {
     const pinTypes = {};
     for (const [key, val] of Object.entries(this._pinTypes)) {
       pinTypes[key] = {
@@ -599,7 +997,6 @@ export class PinConfigDialog extends HandlebarsApplicationMixin(ApplicationV2) {
         label: game.i18n.localize(`CHRONICLE.MapViewer.PinTypes.${key}`),
       };
     }
-
     return {
       pin: this._pin,
       pinTypes,
@@ -607,7 +1004,7 @@ export class PinConfigDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     };
   }
 
-  static #onSave(event, target) {
+  static #onSave(_event, _target) {
     const form = this.element.querySelector('.chronicle-pin-config-form');
     if (!form) return;
 
@@ -626,14 +1023,110 @@ export class PinConfigDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     this.close();
   }
 
-  static async #onDelete(event, target) {
+  static async #onDelete(_event, _target) {
     const confirmed = await Dialog.confirm({
       title: game.i18n.localize('CHRONICLE.MapViewer.PinDelete'),
       content: `<p>${game.i18n.localize('CHRONICLE.MapViewer.PinDeleteConfirm')}</p>`,
     });
-
     if (confirmed) {
       if (this._onDeleteCallback) this._onDeleteCallback(this._pin.id);
+      this.close();
+    }
+  }
+}
+
+
+/* ============================================================
+   ChronicleMarkerConfigDialog — Chronicle marker editor (GM only)
+   ============================================================ */
+
+export class ChronicleMarkerConfigDialog extends HandlebarsApplicationMixin(ApplicationV2) {
+
+  static DEFAULT_OPTIONS = {
+    id: 'chronicle-marker-config',
+    classes: ['chronicle-marker-config'],
+    window: {
+      title: 'CHRONICLE.MapViewer.MarkerConfig',
+      resizable: false,
+    },
+    position: { width: 360 },
+    actions: {
+      'save-marker': ChronicleMarkerConfigDialog.#onSave,
+      'delete-marker': ChronicleMarkerConfigDialog.#onDelete,
+    },
+  };
+
+  static PARTS = {
+    config: {
+      template: 'modules/chronicle-sync/templates/chronicle-marker-config.hbs',
+    },
+  };
+
+  constructor({ marker, mode, onSave, onDelete }) {
+    const id = marker?.id ? `chronicle-marker-config-${marker.id}` : 'chronicle-marker-config-new';
+    super({
+      id,
+      window: { title: game.i18n.localize('CHRONICLE.MapViewer.MarkerConfig') },
+    });
+    this._marker = marker;
+    this._mode = mode || 'edit';
+    this._onSaveCallback = onSave;
+    this._onDeleteCallback = onDelete;
+  }
+
+  async _prepareContext(_options = {}) {
+    const categories = CHRONICLE_MARKER_CATEGORIES.map((key) => ({
+      key,
+      label: game.i18n.localize(`CHRONICLE.MapViewer.PinTypes.${key}`),
+      faIcon: PIN_ICONS[key].faIcon,
+      color: PIN_ICONS[key].color,
+    }));
+    const visibilityOptions = VISIBILITY_VALUES.map((v) => ({
+      value: v,
+      label: game.i18n.localize(`CHRONICLE.MapViewer.MarkerVisibility.${v}`),
+    }));
+    return {
+      marker: this._marker,
+      mode: this._mode,
+      isCreate: this._mode === 'create',
+      categories,
+      visibilityOptions,
+    };
+  }
+
+  static #onSave(_event, _target) {
+    const form = this.element.querySelector('.chronicle-marker-config-form');
+    if (!form) return;
+
+    const name = form.querySelector('[name="name"]').value.trim() || 'Marker';
+    const description = form.querySelector('[name="description"]').value.trim();
+    const category = form.querySelector('[name="pin_category"]').value;
+    const visibility = form.querySelector('[name="visibility"]').value;
+    const safeCategory = CHRONICLE_MARKER_CATEGORIES.includes(category) ? category : 'note';
+    const safeVisibility = VISIBILITY_VALUES.includes(visibility) ? visibility : 'everyone';
+
+    const data = {
+      name,
+      description,
+      x: this._marker.x,
+      y: this._marker.y,
+      pin_category: safeCategory,
+      color: PIN_ICONS[safeCategory].color,
+      icon: PIN_ICONS[safeCategory].faIcon,
+      visibility: safeVisibility,
+    };
+
+    if (this._onSaveCallback) this._onSaveCallback(data);
+    this.close();
+  }
+
+  static async #onDelete(_event, _target) {
+    const confirmed = await Dialog.confirm({
+      title: game.i18n.localize('CHRONICLE.MapViewer.MarkerDelete'),
+      content: `<p>${game.i18n.localize('CHRONICLE.MapViewer.MarkerDeleteConfirm')}</p>`,
+    });
+    if (confirmed) {
+      if (this._onDeleteCallback) this._onDeleteCallback();
       this.close();
     }
   }

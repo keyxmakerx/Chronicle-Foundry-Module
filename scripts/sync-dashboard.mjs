@@ -48,7 +48,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'pull-all': SyncDashboard.#onPullAllAction,
       'push-all': SyncDashboard.#onPushAllAction,
       'toggle-visibility': SyncDashboard.#onToggleVisibilityAction,
-      'unlink-scene': SyncDashboard.#onUnlinkSceneAction,
+      'open-map-journal': SyncDashboard.#onOpenMapJournalAction,
       'pull-date': SyncDashboard.#onPullDateAction,
       'push-date': SyncDashboard.#onPushDateAction,
       reconnect: SyncDashboard.#onReconnectAction,
@@ -398,59 +398,54 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   // ---------------------------------------------------------------------------
 
   /**
-   * Build map tab data: Chronicle maps matched with Foundry scenes.
+   * Build map tab data. Path B: Chronicle maps materialize as JournalEntries
+   * with image-type pages; the dashboard surfaces them as journal links and
+   * a Chronicle deep-link, not as scene bindings.
    * @returns {Promise<object>}
    * @private
    */
   async _buildMapData() {
-    // Fetch Chronicle maps.
     if (!this._cache.maps) {
       const raw = await this.api.get('/maps').catch(() => []);
       this._cache.maps = this._normalizeArray(raw, 'maps');
     }
     const chronicles = this._cache.maps;
 
-    // Index Foundry scenes by linked mapId.
-    const scenesByMapId = new Map();
-    const unlinkedScenes = [];
+    const baseUrl = getSetting('apiUrl')?.replace(/\/+$/, '');
+    const campId = getSetting('campaignId');
 
-    for (const scene of game.scenes.contents) {
-      const mapId = scene.getFlag(FLAG_SCOPE, 'mapId');
-      if (mapId) {
-        scenesByMapId.set(mapId, scene);
-      } else {
-        unlinkedScenes.push({ id: scene.id, name: scene.name });
+    // Index materialized JournalEntry pages by Chronicle map id.
+    const pagesByMapId = new Map();
+    for (const entry of game.journal.contents) {
+      for (const page of entry.pages.contents) {
+        const mapId = page.getFlag(FLAG_SCOPE, 'mapId');
+        if (mapId) pagesByMapId.set(mapId, page);
       }
     }
 
-    // Build chronicle map entries.
-    const chronicleMaps = chronicles.map(m => {
-      const scene = scenesByMapId.get(m.id);
-      const pinCount = scene
-        ? scene.notes.filter(n => n.getFlag(FLAG_SCOPE, 'markerId')).length
-        : 0;
-      const baseUrl = getSetting('apiUrl')?.replace(/\/+$/, '');
-      const campId = getSetting('campaignId');
+    const chronicleMaps = chronicles.map((m) => {
+      const page = pagesByMapId.get(m.id);
+      const entry = page?.parent || null;
+      const markerCount = (page?.getFlag(FLAG_SCOPE, 'chronicleMarkers') || []).length;
+      const drawingCount = (page?.getFlag(FLAG_SCOPE, 'chronicleDrawings') || []).length;
+      const tokenCount = (page?.getFlag(FLAG_SCOPE, 'chronicleTokens') || []).length;
       const chronicleUrl = (baseUrl && campId)
         ? `${baseUrl}/campaigns/${campId}/maps/${m.id}`
         : null;
       return {
         id: m.id,
         name: m.name,
-        linked: !!scene,
-        sceneId: scene?.id ?? null,
-        sceneName: scene?.name ?? null,
-        pinCount,
+        materialized: !!page,
+        journalEntryId: entry?.id ?? null,
+        journalEntryName: entry?.name ?? null,
+        markerCount,
+        drawingCount,
+        tokenCount,
         chronicleUrl,
       };
     });
 
-    return {
-      chronicleMaps,
-      unlinkedScenes,
-      availableScenes: unlinkedScenes,
-      availableMaps: chronicles.filter(m => !scenesByMapId.has(m.id)),
-    };
+    return { chronicleMaps };
   }
 
   // ---------------------------------------------------------------------------
@@ -734,9 +729,13 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       j => j.getFlag(FLAG_SCOPE, 'entityId')
     ).length;
 
-    const linkedScenes = game.scenes.contents.filter(
-      s => s.getFlag(FLAG_SCOPE, 'mapId')
-    ).length;
+    // Count Chronicle maps materialized as JournalEntry pages (Path B).
+    let linkedScenes = 0;
+    for (const entry of game.journal.contents) {
+      for (const page of entry.pages.contents) {
+        if (page.getFlag(FLAG_SCOPE, 'mapId')) linkedScenes++;
+      }
+    }
 
     // System detection info.
     const foundrySystem = this._syncManager?.getFoundrySystemId() || null;
@@ -976,22 +975,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       });
     });
 
-    // --- Map link/unlink selects ---
-    el.querySelectorAll('[data-action="link-scene"]').forEach((select) => {
-      select.addEventListener('change', (e) => {
-        const mapId = e.currentTarget.dataset.mapId;
-        const sceneId = e.currentTarget.value;
-        if (sceneId) this._onLinkScene(mapId, sceneId);
-      });
-    });
-
-    el.querySelectorAll('[data-action="link-map"]').forEach((select) => {
-      select.addEventListener('change', (e) => {
-        const sceneId = e.currentTarget.dataset.sceneId;
-        const mapId = e.currentTarget.value;
-        if (mapId) this._onLinkScene(mapId, sceneId);
-      });
-    });
+    // Map tab handlers are wired via the `open-map-journal` action above;
+    // no additional select listeners are needed in Path B.
   }
 
   /**
@@ -1069,10 +1054,12 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this._onToggleVisibility(entityId, isPrivate);
   }
 
-  /** Unlink a scene from its Chronicle map. */
-  static #onUnlinkSceneAction(event, target) {
-    const sceneId = target.dataset.sceneId;
-    this._onUnlinkScene(sceneId);
+  /** Open the materialized JournalEntry for a Chronicle map. */
+  static #onOpenMapJournalAction(_event, target) {
+    const entryId = target.dataset.journalEntryId;
+    if (!entryId) return;
+    const entry = game.journal.get(entryId);
+    if (entry?.sheet) entry.sheet.render(true);
   }
 
   /** Pull calendar date from Chronicle. */
@@ -1407,54 +1394,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     }
   }
 
-  /**
-   * Link a Foundry scene to a Chronicle map.
-   * @param {string} mapId
-   * @param {string} sceneId
-   * @private
-   */
-  async _onLinkScene(mapId, sceneId) {
-    const scene = game.scenes.get(sceneId);
-    if (!scene) return;
-
-    try {
-      await scene.setFlag(FLAG_SCOPE, 'mapId', mapId);
-
-      await this.api.post('/sync/mappings', {
-        chronicle_type: 'map',
-        chronicle_id: mapId,
-        external_system: 'foundry',
-        external_id: sceneId,
-        sync_direction: 'both',
-      });
-
-      this._logActivity('link', `Linked scene "${scene.name}" to map`);
-      this._cache.maps = null;
-      this.render({ force: true });
-
-      ui.notifications.info(`Chronicle: Scene "${scene.name}" linked to map.`);
-    } catch (err) {
-      console.error('Chronicle Dashboard: Link failed', err);
-      ui.notifications.error(`Failed to link scene: ${err.message}`);
-    }
-  }
-
-  /**
-   * Unlink a Foundry scene from its Chronicle map.
-   * @param {string} sceneId
-   * @private
-   */
-  async _onUnlinkScene(sceneId) {
-    const scene = game.scenes.get(sceneId);
-    if (!scene) return;
-
-    await scene.unsetFlag(FLAG_SCOPE, 'mapId');
-    this._logActivity('unlink', `Unlinked scene "${scene.name}"`);
-    this._cache.maps = null;
-    this.render({ force: true });
-
-    ui.notifications.info(`Chronicle: Scene "${scene.name}" unlinked.`);
-  }
 
   /**
    * Pull calendar date from Chronicle to Foundry.
