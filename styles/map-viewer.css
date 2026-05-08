@@ -114,8 +114,14 @@
   pointer-events: none;
 }
 
-/* ---- Individual Pins ---- */
+/* ---- Individual Pins (local) ---- */
 
+/*
+ * Local pins use a dotted outline ring around the icon to visually distinguish
+ * them from Chronicle markers (which use a solid filled badge). This is a
+ * visual contract — see CHRONICLE.MapViewer.LocalPinShared / Chronicle marker
+ * tooltips for the explanation users see on hover.
+ */
 .chronicle-map-viewer .map-pin {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -126,6 +132,10 @@
   align-items: center;
   z-index: 5;
   transition: filter 0.15s;
+  padding: 3px;
+  border: 2px dotted rgba(255, 255, 255, 0.55);
+  border-radius: 50%;
+  background: rgba(15, 15, 30, 0.35);
 }
 
 .chronicle-map-viewer .map-pin:hover {
@@ -217,6 +227,270 @@
   opacity: 0.5;
   font-size: 20px;
   z-index: 15;
+}
+
+/* ============================================================
+   Chronicle Toolbar Group (GM-only Chronicle marker placement)
+   ============================================================ */
+
+.chronicle-map-viewer .chronicle-tools {
+  display: flex;
+  gap: 2px;
+}
+
+.chronicle-map-viewer .chronicle-tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 14px;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.chronicle-map-viewer .chronicle-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #555;
+  color: #fff;
+}
+
+.chronicle-map-viewer .chronicle-tool-btn.active {
+  background: rgba(96, 165, 250, 0.15);
+  border-color: #60a5fa;
+  box-shadow: 0 0 4px rgba(96, 165, 250, 0.3);
+}
+
+/* ============================================================
+   Chronicle Drawings Layer (SVG)
+   ============================================================ */
+
+.chronicle-map-viewer .chronicle-drawing-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.chronicle-map-viewer .chronicle-drawing {
+  pointer-events: none;
+}
+
+/* ============================================================
+   Chronicle Tokens Layer
+   ============================================================ */
+
+.chronicle-map-viewer .chronicle-token-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.chronicle-map-viewer .chronicle-token {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+  aspect-ratio: 1 / 1;
+  min-width: 16px;
+  cursor: default;
+}
+
+.chronicle-map-viewer .chronicle-token .token-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  border-radius: 4px;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.chronicle-map-viewer .chronicle-token .token-hp-bar {
+  position: absolute;
+  left: 0; right: 0; bottom: -6px;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.7);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.chronicle-map-viewer .chronicle-token .token-hp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #dc2626 0%, #f59e0b 50%, #16a34a 100%);
+}
+
+.chronicle-map-viewer .chronicle-token .token-label {
+  position: absolute;
+  top: calc(100% + 6px);
+  font-size: 11px;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ============================================================
+   Chronicle Fog Layer (GM only — server filtering plus client-side defense)
+   ============================================================ */
+
+.chronicle-map-viewer .chronicle-fog-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* ============================================================
+   Chronicle Markers (solid fill — visually distinct from local pins)
+   ============================================================ */
+
+.chronicle-map-viewer .chronicle-marker-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.chronicle-map-viewer .chronicle-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: filter 0.15s;
+  padding: 3px;
+  border: 2px solid var(--marker-color, #60a5fa);
+  border-radius: 50%;
+  background: var(--marker-color, #60a5fa);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+.chronicle-map-viewer .chronicle-marker .pin-icon {
+  font-size: 16px;
+  color: #ffffff;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+  transition: transform 0.1s;
+}
+
+.chronicle-map-viewer .chronicle-marker:hover {
+  filter: brightness(1.25);
+  z-index: 11;
+}
+
+.chronicle-map-viewer .chronicle-marker:hover .pin-icon {
+  transform: scale(1.1);
+}
+
+.chronicle-map-viewer .chronicle-marker .pin-label {
+  font-size: 11px;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8), 0 0 6px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  margin-top: 2px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  line-height: 1.2;
+}
+
+/* DM-only Chronicle markers get a red eye-slash badge (GM-side only). */
+.chronicle-map-viewer .chronicle-marker.dm-only {
+  outline: 1px dashed rgba(248, 113, 113, 0.7);
+  outline-offset: 2px;
+}
+
+.chronicle-map-viewer .chronicle-marker.dm-only::after {
+  content: '\f070'; /* fa-eye-slash */
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  font-size: 8px;
+  color: #f87171;
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.8);
+}
+
+/* ============================================================
+   Chronicle Marker Config Dialog
+   ============================================================ */
+
+.chronicle-marker-config .window-content {
+  padding: 0;
+}
+
+.chronicle-marker-config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+.chronicle-marker-config-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chronicle-marker-config-form .form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ccc;
+}
+
+.chronicle-marker-config-form .form-group input[type="text"],
+.chronicle-marker-config-form .form-group select,
+.chronicle-marker-config-form .form-group textarea {
+  padding: 6px 8px;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #2a2a3e;
+  color: #e2e8f0;
+  font-size: 13px;
+}
+
+.chronicle-marker-config-form .form-group input[type="text"]:focus,
+.chronicle-marker-config-form .form-group select:focus,
+.chronicle-marker-config-form .form-group textarea:focus {
+  outline: none;
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.3);
+}
+
+.chronicle-marker-config-form .form-group textarea {
+  min-height: 60px;
+  resize: vertical;
+}
+
+.chronicle-marker-config-form .form-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid #333;
+}
+
+.chronicle-marker-config-form .form-actions .dashboard-btn {
+  flex: 1;
 }
 
 /* ============================================================

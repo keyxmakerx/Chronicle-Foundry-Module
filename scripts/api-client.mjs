@@ -17,7 +17,12 @@ import { getSetting } from './settings.mjs';
  */
 const ALLOWED_WS_TYPE_PREFIXES = Object.freeze([
   'entity.', 'entity_type.',
+  'map.',
   'marker.',
+  'drawing.',
+  'token.',
+  'layer.',
+  'fog.',
   'note.',
   'calendar.',
   'relation.',

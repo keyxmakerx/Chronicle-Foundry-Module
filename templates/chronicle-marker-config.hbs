@@ -1,0 +1,44 @@
+<form class="chronicle-marker-config-form" autocomplete="off">
+  <div class="form-group">
+    <label>{{localize "CHRONICLE.MapViewer.MarkerName"}}</label>
+    <input type="text" name="name" value="{{marker.name}}" placeholder="Marker name..." />
+  </div>
+
+  <div class="form-group">
+    <label>{{localize "CHRONICLE.MapViewer.MarkerCategory"}}</label>
+    <select name="pin_category">
+      {{#each categories}}
+        <option value="{{key}}" {{#if (eq key ../marker.pin_category)}}selected{{/if}}>
+          {{label}}
+        </option>
+      {{/each}}
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>{{localize "CHRONICLE.MapViewer.MarkerVisibilityLabel"}}</label>
+    <select name="visibility">
+      {{#each visibilityOptions}}
+        <option value="{{value}}" {{#if (eq value ../marker.visibility)}}selected{{/if}}>
+          {{label}}
+        </option>
+      {{/each}}
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>{{localize "CHRONICLE.MapViewer.MarkerDescription"}}</label>
+    <textarea name="description" rows="3">{{marker.description}}</textarea>
+  </div>
+
+  <div class="form-actions">
+    <button type="button" data-action="save-marker" class="dashboard-btn">
+      {{#if isCreate}}{{localize "CHRONICLE.MapViewer.MarkerCreate"}}{{else}}{{localize "CHRONICLE.MapViewer.MarkerSave"}}{{/if}}
+    </button>
+    {{#unless isCreate}}
+    <button type="button" data-action="delete-marker" class="dashboard-btn btn-danger">
+      {{localize "CHRONICLE.MapViewer.MarkerDelete"}}
+    </button>
+    {{/unless}}
+  </div>
+</form>
