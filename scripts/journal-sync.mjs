@@ -21,6 +21,9 @@ export class JournalSync {
     /** @type {import('./api-client.mjs').ChronicleAPI|null} */
     this._api = null;
 
+    /** @type {import('./sync-manager.mjs').SyncManager|null} */
+    this._syncManager = null;
+
     /** @type {boolean} Suppress hook processing during sync-initiated changes. */
     this._syncing = false;
 
@@ -87,13 +90,23 @@ export class JournalSync {
     if (!journal) {
       try {
         const entity = await this._api.get(`/entities/${mapping.chronicle_id}`);
-        if (entity) {
-          await this._createJournalFromEntity(entity, mapping.external_id);
-        }
+        if (!entity) return;
+        // Defer character entities to ActorSync.
+        if (this._isHandledByActorSync(entity)) return;
+        await this._createJournalFromEntity(entity, mapping.external_id);
       } catch (err) {
         console.warn(`Chronicle: Failed to sync entity ${mapping.chronicle_id}`, err);
       }
     }
+  }
+
+  /**
+   * Run after all modules complete `onInitialSync`. Cleans up character
+   * JournalEntries left behind by earlier sync runs (before ActorSync was
+   * the canonical handler).
+   */
+  async onPostInitialSync() {
+    await this.cleanupActorJournalDuplicates();
   }
 
   /**
@@ -127,14 +140,21 @@ export class JournalSync {
     if (existing) return;
 
     // Fetch full entity data (WS payload may be partial).
+    let fullEntity = entity;
     try {
-      const fullEntity = await this._api.get(`/entities/${entity.id}`);
-      await this._createJournalFromEntity(fullEntity || entity);
+      fullEntity = (await this._api.get(`/entities/${entity.id}`)) || entity;
     } catch (err) {
-      // Fallback to WS payload data if fetch fails.
       console.warn('Chronicle: Failed to fetch full entity, using WS payload', err);
-      await this._createJournalFromEntity(entity);
     }
+
+    // Defer character entities to ActorSync so we don't create a duplicate
+    // JournalEntry alongside the Foundry Actor sheet.
+    if (this._isHandledByActorSync(fullEntity)) {
+      console.debug(`Chronicle: Skipping journal for character entity ${fullEntity.id} (handled by ActorSync)`);
+      return;
+    }
+
+    await this._createJournalFromEntity(fullEntity);
   }
 
   /**
@@ -152,7 +172,9 @@ export class JournalSync {
       (j) => j.getFlag(FLAG_SCOPE, 'entityId') === entity.id
     );
     if (!journal) {
-      // Entity was updated but we don't have a journal for it yet — create one.
+      // Entity was updated but we don't have a journal for it yet — create
+      // one, unless it's a character handled by ActorSync.
+      if (this._isHandledByActorSync(entity)) return;
       await this._createJournalFromEntity(entity);
       return;
     }
@@ -547,6 +569,70 @@ export class JournalSync {
     if (exclusions.excludedEntities.includes(entity.id)) return true;
     if (entity.entity_type_id && exclusions.excludedTypes.includes(entity.entity_type_id)) return true;
     return false;
+  }
+
+  /**
+   * Whether this entity is a character that ActorSync is actively
+   * handling. Character entities should not get a JournalEntry — they
+   * surface as Foundry Actors with their dedicated sheets. The check is
+   * conservative: only true if ActorSync has loaded a system adapter
+   * (i.e. character sync is enabled and the system matches).
+   * @param {object} entity
+   * @returns {boolean}
+   * @private
+   */
+  _isHandledByActorSync(entity) {
+    if (!entity) return false;
+    const actorSync = this._syncManager?._modules?.find(
+      (m) => m.constructor?.name === 'ActorSync'
+    );
+    if (!actorSync?._adapter) return false;
+    return typeof actorSync._isCharacterEntity === 'function'
+      ? actorSync._isCharacterEntity(entity)
+      : false;
+  }
+
+  /**
+   * Remove any JournalEntries that duplicate a synced Foundry Actor
+   * (same `entityId` flag on both). Called after the initial sync pass
+   * completes — by that point ActorSync has materialized its actors,
+   * so this overlaps cleanly. Conservative: only deletes entries whose
+   * single page is the auto-generated content (no user pages added).
+   */
+  async cleanupActorJournalDuplicates() {
+    if (!getSetting('syncJournals')) return;
+
+    // Index actor entityIds.
+    const actorEntityIds = new Set();
+    for (const actor of game.actors.contents) {
+      const eid = actor.getFlag(FLAG_SCOPE, 'entityId');
+      if (eid) actorEntityIds.add(eid);
+    }
+    if (actorEntityIds.size === 0) return;
+
+    let deleted = 0;
+    this._syncing = true;
+    try {
+      for (const journal of [...game.journal.contents]) {
+        const eid = journal.getFlag(FLAG_SCOPE, 'entityId');
+        if (!eid || !actorEntityIds.has(eid)) continue;
+        try {
+          await journal.delete();
+          deleted++;
+        } catch (err) {
+          console.warn(`Chronicle: Failed to delete duplicate journal ${journal.id}`, err);
+        }
+      }
+    } finally {
+      this._syncing = false;
+    }
+
+    if (deleted > 0) {
+      console.debug(`Chronicle: Cleaned up ${deleted} duplicate character journal(s)`);
+      ui.notifications.info(
+        `Chronicle: Removed ${deleted} duplicate character journal entr${deleted === 1 ? 'y' : 'ies'} (handled by Actor sheets).`
+      );
+    }
   }
 
   // --- Permission Mapping Helpers ---

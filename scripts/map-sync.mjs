@@ -66,19 +66,27 @@ export const PIN_ICONS = {
 };
 
 /**
- * Convert a Chronicle map's `image_id` (or full URL) to a usable image src
- * for Foundry. Chronicle returns either a media UUID or a full URL; we
- * prefix media UUIDs with the configured base URL.
+ * Convert a Chronicle map's image fields to a usable image src for Foundry.
+ * Tries full-URL fields first, then relative paths, and finally returns
+ * empty if only an `image_id` is available (the caller resolves it via
+ * the media metadata endpoint and rewrites this).
  * @param {object} map
  * @returns {string}
  */
 function _mapImageSrc(map) {
   if (!map) return '';
-  if (map.image_url) return map.image_url;
-  if (map.image && /^https?:/i.test(map.image)) return map.image;
-  if (map.image_id) {
-    const baseUrl = getSetting('apiUrl')?.replace(/\/+$/, '');
-    return baseUrl ? `${baseUrl}/api/v1/media/${map.image_id}` : '';
+  // Prefer any full URL Chronicle includes directly.
+  for (const field of ['image_url', 'image_path', 'image']) {
+    const v = map[field];
+    if (typeof v === 'string' && /^https?:/i.test(v)) return v;
+  }
+  // Relative path (e.g., "/media/foo.png") — prefix with base URL.
+  for (const field of ['image_url', 'image_path', 'image']) {
+    const v = map[field];
+    if (typeof v === 'string' && v.startsWith('/')) {
+      const baseUrl = getSetting('apiUrl')?.replace(/\/+$/, '');
+      return baseUrl ? `${baseUrl}${v}` : v;
+    }
   }
   return '';
 }
@@ -115,6 +123,46 @@ export class MapSync {
 
     /** Open-viewer registry: mapId → count of open MapViewerSheets needing data. */
     this._openCounts = new Map();
+
+    /**
+     * Cache of resolved media URLs by media id. Populated by
+     * `_resolveMediaUrl` and reused for subsequent map renders so we never
+     * call `/media/:id` twice for the same image.
+     * @type {Map<string, string>}
+     */
+    this._mediaUrlCache = new Map();
+  }
+
+  /**
+   * Resolve a Chronicle media id to a fully-qualified image URL.
+   * The Chronicle API serves media at `${baseUrl}/media/{filename}` and
+   * exposes the relative path through the `url` field of the
+   * `/media/:id` metadata endpoint. We cache results in-memory for the
+   * lifetime of the GM session.
+   * @param {string} mediaId
+   * @returns {Promise<string>}
+   * @private
+   */
+  async _resolveMediaUrl(mediaId) {
+    if (!mediaId || !this._api) return '';
+    if (this._mediaUrlCache.has(mediaId)) return this._mediaUrlCache.get(mediaId);
+
+    try {
+      const meta = await this._api.get(`/media/${mediaId}`);
+      const url = meta?.url || meta?.path || '';
+      if (!url) return '';
+
+      const baseUrl = getSetting('apiUrl')?.replace(/\/+$/, '');
+      const full = /^https?:/i.test(url)
+        ? url
+        : (baseUrl ? `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}` : url);
+
+      this._mediaUrlCache.set(mediaId, full);
+      return full;
+    } catch (err) {
+      console.warn(`Chronicle: Failed to resolve media ${mediaId}`, err);
+      return '';
+    }
   }
 
   /**
@@ -196,8 +244,12 @@ export class MapSync {
       return;
     }
 
-    if (!maps.length) {
-      console.debug('Chronicle: No maps to materialize');
+    console.debug(`Chronicle: /maps returned ${maps.length} map(s).`);
+    if (maps.length) {
+      // Diagnostic: dump the first map so users can confirm which fields
+      // Chronicle is actually populating (image_id, image_url, etc.).
+      console.debug('Chronicle: sample map row:', maps[0]);
+    } else {
       return;
     }
 
@@ -422,8 +474,21 @@ export class MapSync {
     if (!mapData?.id) return null;
 
     const folder = await this._ensureMapsFolder();
-    const meta = this._buildMapMeta(mapData);
-    const imageSrc = _mapImageSrc(mapData);
+
+    // Resolve image URL: prefer direct fields on the map row; fall back to
+    // the media metadata endpoint when only `image_id` is present.
+    let imageSrc = _mapImageSrc(mapData);
+    if (!imageSrc && mapData.image_id) {
+      imageSrc = await this._resolveMediaUrl(mapData.image_id);
+    }
+
+    const meta = this._buildMapMeta(mapData, imageSrc);
+
+    if (!imageSrc) {
+      console.warn(
+        `Chronicle: Map "${mapData.name}" has no resolvable image (image_id=${mapData.image_id || 'none'}, image_url=${mapData.image_url || 'none'})`
+      );
+    }
 
     let page = this.findPageByMapId(mapData.id);
 
@@ -465,16 +530,20 @@ export class MapSync {
 
   /**
    * Build the `chronicleMapMeta` page flag from a Chronicle map row.
+   * `imageSrc` is the resolved URL (already through `_resolveMediaUrl` on
+   * GM); persisting it on the flag means players never need to re-resolve.
    * @param {object} mapData
+   * @param {string} [imageSrc]
    * @returns {object}
    * @private
    */
-  _buildMapMeta(mapData) {
+  _buildMapMeta(mapData, imageSrc = '') {
     return {
       id: mapData.id,
       name: mapData.name || '',
       description: mapData.description || '',
       image_id: mapData.image_id || null,
+      image_url: imageSrc || mapData.image_url || mapData.image_path || '',
       image_width: mapData.image_width || 0,
       image_height: mapData.image_height || 0,
       background_color: mapData.background_color || '',
@@ -670,9 +739,13 @@ export class MapSync {
     if (!mapData?.id) return;
     await this._materializeMap(mapData);
 
+    // Pull the freshly-written meta (with resolved image URL) from the page
+    // and mirror it into the cache so GM render reuses it.
+    const page = this.findPageByMapId(mapData.id);
+    const meta = page?.getFlag(FLAG_SCOPE, 'chronicleMapMeta') || null;
     const cached = this._cache.get(mapData.id);
     if (cached) {
-      cached.meta = this._buildMapMeta(mapData);
+      cached.meta = meta;
       this._cache.set(mapData.id, cached);
     }
     this._notifyViewers(mapData.id);
