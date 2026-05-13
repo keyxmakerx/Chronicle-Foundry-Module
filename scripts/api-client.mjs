@@ -683,7 +683,10 @@ export class ChronicleAPI {
 
     // Authenticate via query parameter — the server expects the token in the
     // URL at connection time (not as a post-connect message).
-    const wsUrl = baseUrl.replace(/^http/, 'ws') + `/ws?token=${encodeURIComponent(apiKey)}`;
+    // `client=foundry-module` is consumed by the Chronicle server for the
+    // "Connected to Foundry" presence pill on map detail pages.
+    const wsUrl = baseUrl.replace(/^http/, 'ws')
+      + `/ws?token=${encodeURIComponent(apiKey)}&client=foundry-module`;
 
     this._setState('connecting');
 

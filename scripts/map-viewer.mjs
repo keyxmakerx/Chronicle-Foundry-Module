@@ -455,6 +455,25 @@ export class MapViewerSheet extends JournalPageSheet {
       });
     }
 
+    // ---- Toolbar: per-map resync (GM only) ----
+    const resyncBtn = viewer.querySelector('[data-action="resync-this-map"]');
+    if (resyncBtn) {
+      resyncBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        if (resyncBtn.classList.contains('busy')) return;
+        const targetMapId = this.document.getFlag(FLAG_SCOPE, 'mapId');
+        if (!targetMapId) return;
+        resyncBtn.classList.add('busy');
+        try {
+          const mapSync = _getMapSync();
+          await mapSync?.resyncOne?.(targetMapId);
+          this.render(false);
+        } finally {
+          resyncBtn.classList.remove('busy');
+        }
+      });
+    }
+
     // ---- Toolbar: view tools ----
     viewer.querySelectorAll('.view-tool-btn').forEach((btn) => {
       btn.addEventListener('click', (e) => {

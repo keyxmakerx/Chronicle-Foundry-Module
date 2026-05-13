@@ -49,6 +49,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'push-all': SyncDashboard.#onPushAllAction,
       'toggle-visibility': SyncDashboard.#onToggleVisibilityAction,
       'open-map-journal': SyncDashboard.#onOpenMapJournalAction,
+      'resync-all-maps': SyncDashboard.#onResyncAllMapsAction,
+      'open-maps-folder': SyncDashboard.#onOpenMapsFolderAction,
+      'dismiss-map-errors': SyncDashboard.#onDismissMapErrorsAction,
       'pull-date': SyncDashboard.#onPullDateAction,
       'push-date': SyncDashboard.#onPushDateAction,
       reconnect: SyncDashboard.#onReconnectAction,
@@ -445,7 +448,35 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       };
     });
 
-    return { chronicleMaps };
+    // Pull MapSync diagnostics (errors, counts, lastSyncAt) for the panel.
+    const mapSync = this._syncManager?._modules?.find(
+      (mod) => mod.constructor?.name === 'MapSync'
+    );
+    const status = mapSync?.getSyncStatus?.() || null;
+    const folder = game.folders.find(
+      (f) => f.type === 'JournalEntry' && f.getFlag(FLAG_SCOPE, 'isMapsFolder') === true
+    );
+
+    return {
+      chronicleMaps,
+      mapsFolderId: folder?.id ?? null,
+      mapSyncStatus: status ? {
+        materializedCount: status.materializedCount,
+        errorCount: status.errorCount,
+        openViewers: status.openViewers,
+        lastSyncAt: status.lastSyncAt
+          ? new Date(status.lastSyncAt).toISOString()
+          : null,
+        recentErrors: status.recentErrors.map((e) => ({
+          kind: e.kind,
+          mapId: e.mapId,
+          message: e.message,
+          status: e.status,
+          timeFormatted: new Date(e.time).toLocaleTimeString(),
+        })),
+        hasErrors: status.errorCount > 0,
+      } : null,
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -1060,6 +1091,53 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!entryId) return;
     const entry = game.journal.get(entryId);
     if (entry?.sheet) entry.sheet.render(true);
+  }
+
+  /** Trigger a verbose full map resync. */
+  static async #onResyncAllMapsAction() {
+    const mapSync = this._syncManager?._modules?.find(
+      (m) => m.constructor?.name === 'MapSync'
+    );
+    if (!mapSync) {
+      ui.notifications.warn('Chronicle: MapSync is not running.');
+      return;
+    }
+    await mapSync.resyncAll({ verbose: true });
+    this._cache.maps = null;
+    this.render({ force: true });
+  }
+
+  /**
+   * Reveal the "Chronicle Maps" folder in Foundry's journal sidebar.
+   * Activates the journal tab and expands the folder.
+   */
+  static #onOpenMapsFolderAction(_event, target) {
+    const folderId = target.dataset.folderId;
+    if (!folderId) {
+      ui.notifications.warn('Chronicle: "Chronicle Maps" folder not found. Run an initial sync first.');
+      return;
+    }
+    try {
+      ui.sidebar?.activateTab?.('journal');
+      const folder = game.folders.get(folderId);
+      if (folder) {
+        // Folder.collection.render reveals the folder in the sidebar tree;
+        // toggling expanded ensures the items inside are visible.
+        if (folder.expanded === false) folder.expanded = true;
+        ui.journal?.render?.(true);
+      }
+    } catch (err) {
+      console.warn('Chronicle: Could not focus the Chronicle Maps folder', err);
+    }
+  }
+
+  /** Clear the surfaced map-sync error log. */
+  static #onDismissMapErrorsAction() {
+    const mapSync = this._syncManager?._modules?.find(
+      (m) => m.constructor?.name === 'MapSync'
+    );
+    mapSync?.clearRecentErrors?.();
+    this.render({ force: true });
   }
 
   /** Pull calendar date from Chronicle. */

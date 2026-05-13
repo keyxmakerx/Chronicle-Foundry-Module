@@ -433,7 +433,57 @@
         <button type="button" data-action="refresh" class="dashboard-btn btn-sm" title="Refresh">
           <i class="fa-solid fa-arrows-rotate"></i>
         </button>
+        <button type="button" data-action="resync-all-maps" class="dashboard-btn btn-sm"
+                title="{{localize 'CHRONICLE.Dashboard.Maps.ResyncAllHint'}}">
+          <i class="fa-solid fa-rotate"></i> {{localize "CHRONICLE.Dashboard.Maps.ResyncAll"}}
+        </button>
+        {{#if mapsFolderId}}
+        <button type="button" data-action="open-maps-folder" class="dashboard-btn btn-sm"
+                data-folder-id="{{mapsFolderId}}"
+                title="{{localize 'CHRONICLE.Dashboard.Maps.OpenFolderHint'}}">
+          <i class="fa-solid fa-folder-tree"></i> {{localize "CHRONICLE.Dashboard.Maps.OpenFolder"}}
+        </button>
+        {{/if}}
       </div>
+
+      {{#if mapSyncStatus}}
+      <div class="map-status-summary">
+        <div class="map-status-row">
+          <span class="map-status-label">{{localize "CHRONICLE.Dashboard.Maps.Materialized"}}:</span>
+          <span class="map-status-value">{{mapSyncStatus.materializedCount}}</span>
+          <span class="map-status-divider">·</span>
+          <span class="map-status-label">{{localize "CHRONICLE.Dashboard.Maps.OpenViewers"}}:</span>
+          <span class="map-status-value">{{mapSyncStatus.openViewers}}</span>
+          <span class="map-status-divider">·</span>
+          <span class="map-status-label">{{localize "CHRONICLE.Dashboard.Maps.LastSync"}}:</span>
+          <span class="map-status-value">
+            {{#if mapSyncStatus.lastSyncAt}}{{timeAgo mapSyncStatus.lastSyncAt}}{{else}}{{localize "CHRONICLE.Dashboard.Maps.NeverSynced"}}{{/if}}
+          </span>
+        </div>
+        {{#if mapSyncStatus.hasErrors}}
+        <div class="map-status-errors">
+          <div class="map-status-errors-header">
+            <span><i class="fa-solid fa-triangle-exclamation"></i>
+              {{mapSyncStatus.errorCount}} {{localize "CHRONICLE.Dashboard.Maps.RecentErrors"}}</span>
+            <button type="button" data-action="dismiss-map-errors" class="dashboard-btn btn-xs"
+                    title="{{localize 'CHRONICLE.Dashboard.Maps.DismissErrorsHint'}}">
+              {{localize "CHRONICLE.Dashboard.Maps.DismissErrors"}}
+            </button>
+          </div>
+          <ul class="map-error-list">
+            {{#each mapSyncStatus.recentErrors}}
+            <li class="map-error-item">
+              <span class="map-error-time">{{timeFormatted}}</span>
+              <span class="map-error-kind">[{{kind}}{{#if status}} {{status}}{{/if}}]</span>
+              {{#if mapId}}<span class="map-error-mapid">{{mapId}}</span>{{/if}}
+              <span class="map-error-msg">{{message}}</span>
+            </li>
+            {{/each}}
+          </ul>
+        </div>
+        {{/if}}
+      </div>
+      {{/if}}
 
       <div class="map-list">
         {{#if chronicleMaps.length}}

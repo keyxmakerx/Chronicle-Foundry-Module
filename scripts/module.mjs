@@ -88,6 +88,17 @@ Hooks.once('ready', async () => {
   // Failure is non-fatal; the dashboard remains accessible for diagnostics.
   try {
     await syncManager.start();
+
+    // Surface a positive confirmation when maps materialized so the
+    // operator isn't left wondering whether anything happened. Silent
+    // when zero — the dashboard / error log carries that case.
+    if (game.user.isGM) {
+      const mapSync = syncManager._modules?.find((m) => m.constructor?.name === 'MapSync');
+      const count = mapSync?._materializedThisStartup || 0;
+      if (count > 0) {
+        ui.notifications.info(`Chronicle: synced ${count} map(s) from Chronicle.`);
+      }
+    }
   } catch (err) {
     console.error('Chronicle Sync | Failed to start sync manager', err);
     ui.notifications.error('Chronicle Sync: Connection failed. Open the dashboard to diagnose.');

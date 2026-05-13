@@ -681,6 +681,100 @@
   font-size: 11px;
 }
 
+.map-status-summary {
+  margin: 8px 0 12px;
+  padding: 8px 10px;
+  background: rgba(20, 22, 36, 0.55);
+  border: 1px solid #2d3142;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.map-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  color: #cbd5e1;
+}
+
+.map-status-label {
+  color: #94a3b8;
+}
+
+.map-status-value {
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.map-status-divider {
+  color: #475569;
+  margin: 0 2px;
+}
+
+.map-status-errors {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(248, 113, 113, 0.2);
+}
+
+.map-status-errors-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #fda4af;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.map-error-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.map-error-item {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 6px;
+  padding: 3px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+  color: #cbd5e1;
+}
+
+.map-error-item:nth-child(odd) {
+  background: rgba(248, 113, 113, 0.05);
+}
+
+.map-error-time {
+  color: #64748b;
+  font-family: monospace;
+}
+
+.map-error-kind {
+  color: #f87171;
+  font-family: monospace;
+}
+
+.map-error-mapid {
+  color: #94a3b8;
+  font-family: monospace;
+  grid-column: 2;
+}
+
+.map-error-msg {
+  grid-column: 3;
+}
+
+.map-status-pending {
+  color: #94a3b8;
+  font-size: 11px;
+  font-style: italic;
+}
+
 /* ================================================================= */
 /* SHOPS TAB                                                          */
 /* ================================================================= */

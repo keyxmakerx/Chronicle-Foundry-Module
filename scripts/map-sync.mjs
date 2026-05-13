@@ -46,6 +46,12 @@ const MAPS_FOLDER_NAME = 'Chronicle Maps';
 /** Polling interval for sub-resource types Chronicle doesn't yet emit events for. */
 const POLL_INTERVAL_MS = 5000;
 
+/** Maximum entries retained in `_recentErrors` (FIFO). */
+const MAX_RECENT_ERRORS = 50;
+
+/** Debounce window for coalescing WS-driven viewer re-renders. */
+const NOTIFY_DEBOUNCE_MS = 200;
+
 /** Sub-resource types we currently poll. `marker.*` is omitted because
  *  Chronicle's `MapEventPublisher` already emits marker events. */
 // TODO(FM-MAP1-WS): remove drawing/token/layer/fog from this list once
@@ -131,6 +137,107 @@ export class MapSync {
      * @type {Map<string, string>}
      */
     this._mediaUrlCache = new Map();
+
+    /**
+     * FIFO ring buffer of recent failures, surfaced in the sync dashboard.
+     * Each entry: `{kind, mapId, message, status, time}`.
+     * @type {Array<{kind: string, mapId: string|null, message: string, status: number|null, time: number}>}
+     */
+    this._recentErrors = [];
+
+    /** Keys for which we've already shown a once-per-session toast. */
+    this._toastsShown = new Set();
+
+    /** Count of maps materialized in the current GM startup. Read by module.mjs. */
+    this._materializedThisStartup = 0;
+
+    /** Timestamp (ms) of the last successful initial sync / resync. */
+    this._lastSyncAt = null;
+
+    /** Pending debounced viewer-notify timers, keyed by mapId. */
+    this._notifyTimers = new Map();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Error reporting + status surface
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Record a failure for surface in the dashboard. Also writes to console
+   * so the operator can copy/paste full context.
+   * @param {{kind: string, mapId?: string|null, message: string, status?: number|null, error?: Error}} entry
+   * @private
+   */
+  _logError({ kind, mapId = null, message, status = null, error = null }) {
+    this._recentErrors.unshift({
+      kind,
+      mapId,
+      message,
+      status,
+      time: Date.now(),
+    });
+    if (this._recentErrors.length > MAX_RECENT_ERRORS) {
+      this._recentErrors.length = MAX_RECENT_ERRORS;
+    }
+    const ctx = mapId ? `[map=${mapId}] ` : '';
+    if (error) {
+      console.warn(`Chronicle MapSync [${kind}] ${ctx}${message}`, error);
+    } else {
+      console.warn(`Chronicle MapSync [${kind}] ${ctx}${message}`);
+    }
+  }
+
+  /**
+   * Show a `ui.notifications` toast once per session for the given key.
+   * Subsequent calls with the same key are no-ops until the GM reloads.
+   * @param {string} key - Stable identifier for the toast category.
+   * @param {'info'|'warn'|'error'} level
+   * @param {string} message
+   * @private
+   */
+  _toastOnce(key, level, message) {
+    if (this._toastsShown.has(key)) return;
+    this._toastsShown.add(key);
+    try {
+      (ui?.notifications?.[level] || ui?.notifications?.info)?.call(ui.notifications, message);
+    } catch {
+      /* notifications layer not ready — error already logged via _logError */
+    }
+  }
+
+  /**
+   * Snapshot the current sync status for the dashboard.
+   * @returns {{
+   *   lastSyncAt: number|null,
+   *   materializedCount: number,
+   *   errorCount: number,
+   *   recentErrors: Array<{kind: string, mapId: string|null, message: string, status: number|null, time: number}>,
+   *   openViewers: number,
+   * }}
+   */
+  getSyncStatus() {
+    let openViewers = 0;
+    for (const n of this._openCounts.values()) openViewers += n;
+
+    let materializedCount = 0;
+    for (const entry of game.journal.contents) {
+      for (const page of entry.pages.contents) {
+        if (page.getFlag(FLAG_SCOPE, 'mapId')) materializedCount++;
+      }
+    }
+
+    return {
+      lastSyncAt: this._lastSyncAt,
+      materializedCount,
+      errorCount: this._recentErrors.length,
+      recentErrors: this._recentErrors.slice(),
+      openViewers,
+    };
+  }
+
+  /** Clear the surfaced error log. Used by the dashboard's "dismiss" action. */
+  clearRecentErrors() {
+    this._recentErrors = [];
   }
 
   /**
@@ -209,12 +316,23 @@ export class MapSync {
         case 'layer.deleted':
           await this._onLayerEvent(msg.type, msg.payload); break;
 
+        case 'fog.created':
         case 'fog.updated':
         case 'fog.deleted':
           await this._onFogEvent(msg.type, msg.payload); break;
       }
     } catch (err) {
-      console.error(`Chronicle: MapSync.onMessage error for ${msg.type}`, err);
+      this._logError({
+        kind: 'ws_event',
+        mapId: msg?.payload?.map_id || msg?.payload?.id || null,
+        message: `Handler failed for ${msg.type}: ${err.message || err}`,
+        error: err,
+      });
+      this._toastOnce(
+        'ws_event_error',
+        'warn',
+        `Chronicle: a real-time map update failed to apply (${msg.type}). See the sync dashboard for details.`
+      );
     }
   }
 
@@ -222,6 +340,8 @@ export class MapSync {
   destroy() {
     for (const timer of this._pollTimers.values()) clearInterval(timer);
     this._pollTimers.clear();
+    for (const timer of this._notifyTimers.values()) clearTimeout(timer);
+    this._notifyTimers.clear();
     this._cache.clear();
     this._openCounts.clear();
   }
@@ -235,13 +355,37 @@ export class MapSync {
     if (!getSetting('syncMaps')) return;
     if (!this._api) return;
 
+    this._materializedThisStartup = 0;
+    return this._runMapSync({ verbose: false });
+  }
+
+  /**
+   * Fetch + materialize all maps from `/maps`. Shared by `onInitialSync`
+   * (silent except for failures) and the dashboard's "Resync All Maps"
+   * button (verbose toasts).
+   * @param {{verbose: boolean}} [opts]
+   * @returns {Promise<{materialized: number, errors: number}>}
+   * @private
+   */
+  async _runMapSync({ verbose = false } = {}) {
+    if (verbose) ui.notifications.info('Chronicle: fetching maps…');
+
     let maps;
     try {
       const result = await this._api.get('/maps');
       maps = Array.isArray(result) ? result : (result?.data || []);
     } catch (err) {
-      console.warn('Chronicle: Initial map sync failed to fetch /maps', err);
-      return;
+      const status = err?.status || null;
+      this._logError({
+        kind: 'maps_fetch',
+        message: `GET /maps failed (${status || 'network'}): ${err.message || err}`,
+        status,
+        error: err,
+      });
+      ui.notifications.error(
+        `Chronicle: could not fetch maps from Chronicle${status ? ` (HTTP ${status})` : ''}. Verify apiUrl, apiKey, and campaignId in Module Settings.`
+      );
+      return { materialized: 0, errors: 1 };
     }
 
     console.debug(`Chronicle: /maps returned ${maps.length} map(s).`);
@@ -250,19 +394,54 @@ export class MapSync {
       // Chronicle is actually populating (image_id, image_url, etc.).
       console.debug('Chronicle: sample map row:', maps[0]);
     } else {
-      return;
+      if (verbose) ui.notifications.info('Chronicle: no maps in this campaign.');
+      this._lastSyncAt = Date.now();
+      return { materialized: 0, errors: 0 };
     }
 
     await this._ensureMapsFolder();
 
+    let materialized = 0;
+    let failures = 0;
+    const failureMapNames = [];
+
     for (const map of maps) {
       try {
         await this._materializeMap(map);
+        materialized++;
       } catch (err) {
-        console.warn(`Chronicle: Failed to materialize map ${map.id}`, err);
+        failures++;
+        failureMapNames.push(map?.name || map?.id || '?');
+        this._logError({
+          kind: 'materialize',
+          mapId: map?.id || null,
+          message: `Failed to materialize "${map?.name || map?.id}": ${err.message || err}`,
+          error: err,
+        });
       }
     }
-    console.debug(`Chronicle: Materialized ${maps.length} Chronicle map(s)`);
+
+    this._materializedThisStartup = materialized;
+    this._lastSyncAt = Date.now();
+    console.debug(`Chronicle: Materialized ${materialized} of ${maps.length} Chronicle map(s)`);
+
+    if (verbose) {
+      if (failures > 0) {
+        ui.notifications.warn(
+          `Chronicle: materialized ${materialized} of ${maps.length} map(s); ${failures} failed. See sync dashboard for details.`
+        );
+      } else {
+        ui.notifications.info(`Chronicle: synced ${materialized} map(s).`);
+      }
+    } else if (failures > 0) {
+      // Silent (initial-sync) path: still surface a single aggregated toast
+      // so the operator notices partial materialization.
+      ui.notifications.warn(
+        `Chronicle: ${failures} of ${maps.length} maps failed to materialize. See sync dashboard.`
+      );
+    }
+
+    return { materialized, errors: failures };
   }
 
   /**
@@ -349,6 +528,56 @@ export class MapSync {
       this._stopPolling(mapId);
     } else {
       this._openCounts.set(mapId, count);
+    }
+  }
+
+  /**
+   * Re-run a full map sync from `/maps`. GM-only. Verbose by default — fires
+   * progress toasts. Powers the dashboard's "Resync All Maps" button.
+   * @param {{verbose?: boolean}} [opts]
+   * @returns {Promise<{materialized: number, errors: number}>}
+   */
+  async resyncAll({ verbose = true } = {}) {
+    if (!game.user.isGM || !this._api) {
+      return { materialized: 0, errors: 0 };
+    }
+    return this._runMapSync({ verbose });
+  }
+
+  /**
+   * Re-fetch one map (metadata + sub-resources) and re-materialize. Used
+   * by the per-viewer "Resync this map" button. GM-only.
+   * @param {string} mapId
+   * @returns {Promise<boolean>} `true` if the map was refreshed.
+   */
+  async resyncOne(mapId) {
+    if (!game.user.isGM || !this._api || !mapId) return false;
+    try {
+      const mapData = await this._api.get(`/maps/${mapId}`);
+      const map = mapData?.data || mapData;
+      if (!map?.id) {
+        ui.notifications.warn(`Chronicle: map ${mapId} not found.`);
+        return false;
+      }
+      await this._materializeMap(map);
+      await this._refreshSubResources(mapId);
+      this._lastSyncAt = Date.now();
+      this._notifyViewers(mapId);
+      ui.notifications.info(`Chronicle: resynced "${map.name || mapId}".`);
+      return true;
+    } catch (err) {
+      const status = err?.status || null;
+      this._logError({
+        kind: 'resync_one',
+        mapId,
+        message: `Resync failed for ${mapId}: ${err.message || err}`,
+        status,
+        error: err,
+      });
+      ui.notifications.error(
+        `Chronicle: resync failed for this map${status ? ` (HTTP ${status})` : ''}. See sync dashboard.`
+      );
+      return false;
     }
   }
 
@@ -485,8 +714,20 @@ export class MapSync {
     const meta = this._buildMapMeta(mapData, imageSrc);
 
     if (!imageSrc) {
-      console.warn(
-        `Chronicle: Map "${mapData.name}" has no resolvable image (image_id=${mapData.image_id || 'none'}, image_url=${mapData.image_url || 'none'})`
+      const reason = mapData.image_id
+        ? `media id ${mapData.image_id} did not resolve via /media/:id`
+        : (mapData.image_url || mapData.image_path || mapData.image)
+          ? 'image fields present but none parsed as a valid URL'
+          : 'no image_id, image_url, image_path, or image fields on the map row';
+      this._logError({
+        kind: 'image_url',
+        mapId: mapData.id,
+        message: `Map "${mapData.name || mapData.id}" has no resolvable image: ${reason}.`,
+      });
+      this._toastOnce(
+        `image_url:${mapData.id}`,
+        'warn',
+        `Chronicle: map "${mapData.name || mapData.id}" has no image — check apiUrl setting and that the map has an uploaded image in Chronicle.`
       );
     }
 
@@ -564,13 +805,32 @@ export class MapSync {
   async _refreshSubResources(mapId) {
     if (!this._api || !mapId) return;
 
-    // Fetch in parallel; missing endpoints (404) degrade to empty arrays.
+    // Fetch in parallel. Each `.catch` records to `_recentErrors` so a
+    // failing endpoint surfaces in the dashboard instead of silently
+    // degrading to `[]`. 404 is logged but not surfaced as a toast (the
+    // endpoint legitimately may not yet exist on the Chronicle side).
+    const sub = (kind) => this._api
+      .get(`/maps/${mapId}/${kind}`)
+      .catch((err) => {
+        const status = err?.status || null;
+        if (status !== 404) {
+          this._logError({
+            kind: `subresource:${kind}`,
+            mapId,
+            message: `GET /maps/${mapId}/${kind} failed${status ? ` (${status})` : ''}: ${err.message || err}`,
+            status,
+            error: err,
+          });
+        }
+        return null;
+      });
+
     const [markersR, drawingsR, tokensR, layersR, fogR] = await Promise.all([
-      this._api.get(`/maps/${mapId}/markers`).catch(() => null),
-      this._api.get(`/maps/${mapId}/drawings`).catch(() => null),
-      this._api.get(`/maps/${mapId}/tokens`).catch(() => null),
-      this._api.get(`/maps/${mapId}/layers`).catch(() => null),
-      this._api.get(`/maps/${mapId}/fog`).catch(() => null),
+      sub('markers'),
+      sub('drawings'),
+      sub('tokens'),
+      sub('layers'),
+      sub('fog'),
     ]);
 
     const markers = this._coerceArray(markersR);
@@ -836,12 +1096,20 @@ export class MapSync {
 
   /**
    * Fire a Foundry hook so any open MapViewerSheet for the affected map
-   * re-renders with fresh data.
+   * re-renders with fresh data. Debounced per-mapId so a burst of WS
+   * events (e.g. drag of a token producing rapid `*.updated`) collapses
+   * to one render.
    * @param {string} mapId
    * @private
    */
   _notifyViewers(mapId) {
     if (!mapId) return;
-    Hooks.callAll('chronicleMapDataChanged', mapId);
+    const existing = this._notifyTimers.get(mapId);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(() => {
+      this._notifyTimers.delete(mapId);
+      Hooks.callAll('chronicleMapDataChanged', mapId);
+    }, NOTIFY_DEBOUNCE_MS);
+    this._notifyTimers.set(mapId, timer);
   }
 }

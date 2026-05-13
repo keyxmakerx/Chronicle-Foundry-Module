@@ -115,7 +115,18 @@
         "MarkerCount": "{count} markers",
         "DrawingCount": "{count} drawings",
         "TokenCount": "{count} tokens",
-        "NoMaps": "No maps found in this Chronicle campaign."
+        "NoMaps": "No maps found in this Chronicle campaign.",
+        "ResyncAll": "Resync All Maps",
+        "ResyncAllHint": "Re-fetch every map from Chronicle and re-materialize the journal entries",
+        "OpenFolder": "Open Chronicle Maps Folder",
+        "OpenFolderHint": "Reveal the Chronicle Maps folder in Foundry's journal sidebar",
+        "Materialized": "Materialized",
+        "OpenViewers": "Open viewers",
+        "LastSync": "Last sync",
+        "NeverSynced": "never",
+        "RecentErrors": "recent error(s)",
+        "DismissErrors": "Dismiss",
+        "DismissErrorsHint": "Clear the recent map-sync error log"
       },
       "Shops": {
         "Open": "Open",
@@ -201,6 +212,7 @@
       "MarkerAudienceEveryone": "Chronicle marker, visible to everyone",
       "MarkerAudienceDm": "Chronicle marker, DM only",
       "PlaceChronicleMarker": "Place Chronicle marker",
+      "ResyncThisMap": "Resync this map from Chronicle",
       "OpenInChronicle": "Open in Chronicle web editor",
       "NotChronicleMap": "This page isn't linked to a Chronicle map. Place local pins instead.",
       "MapArchivedNotice": "Chronicle map \"{name}\" was deleted, but your local annotations have been preserved on the archived journal entry.",
