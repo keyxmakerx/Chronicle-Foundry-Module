@@ -1,9 +1,10 @@
 /**
  * Chronicle Sync - Interactive Map Viewer Journal Page (FM-MAP1, Path B)
  *
- * Custom JournalPageSheet for image-type pages that renders both local
- * journal-flag pins and Chronicle map data (markers, drawings, tokens,
- * fog, layers). Two pin systems coexist on the same SVG/DOM surface:
+ * Custom JournalEntryPage sheet for image-type pages that renders both
+ * local journal-flag pins and Chronicle map data (markers, drawings,
+ * tokens, fog, layers). Two pin systems coexist on the same SVG/DOM
+ * surface:
  *
  *   - Local pins: stored in `flags.chronicle-sync.pins` on the page; not
  *     synced to Chronicle. Visual: dotted outline. Tooltip: "Personal
@@ -23,6 +24,15 @@
  * Phase A is read-only for drawings, tokens, fog, and layers; markers stay
  * editable (with a visibility=dm_only checkbox) for GM users via the
  * existing right-click and toolbar affordances.
+ *
+ * ## ApplicationV2 (FM-MAP-V2 port)
+ *
+ * This sheet extends the v13/v14 `JournalEntryPageSheet` (under
+ * `foundry.applications.sheets.journal`) with `HandlebarsApplicationMixin`.
+ * The previous AppV1 `JournalPageSheet` base is dead in v14 — its outer
+ * wrapper template (`templates/journal/page-image-view.html`) no longer
+ * exists on disk, so any AppV1 subclass throws `ENOENT` at render time.
+ * See FM-MAP-V2 PR for the conversion details.
  */
 
 import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
@@ -120,7 +130,15 @@ function _safeColor(value, fallback = '#888888') {
 }
 
 /* ============================================================
-   MapViewerSheet — Custom JournalPageSheet for image pages
+   Base classes (v13/v14 ApplicationV2 namespace)
+   ============================================================ */
+
+const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+const _JournalEntryPageSheet =
+  foundry.applications?.sheets?.journal?.JournalEntryPageSheet;
+
+/* ============================================================
+   MapViewerSheet — Custom JournalEntryPageSheet for image pages
    ============================================================ */
 
 /**
@@ -128,22 +146,39 @@ function _safeColor(value, fallback = '#888888') {
  * pan/zoom, local-pin placement, Chronicle marker rendering with
  * visibility filtering, and read-only overlays for Chronicle drawings,
  * tokens, fog, and layers.
+ *
+ * Extends the v13/v14 ApplicationV2-based `JournalEntryPageSheet` so it
+ * integrates cleanly with `JournalEntrySheet`'s page rendering pipeline.
  */
-export class MapViewerSheet extends JournalPageSheet {
+export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPageSheet) {
 
   /** @override */
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      classes: ['chronicle-map-viewer-sheet'],
-      template: 'modules/chronicle-sync/templates/map-viewer.hbs',
-      width: 740,
-      height: 600,
-      submitOnChange: false,
-    });
-  }
+  static DEFAULT_OPTIONS = {
+    classes: ['chronicle-map-viewer-sheet'],
+    // Toolbar buttons with `data-action="..."` route here. Method names
+    // (strings) are resolved against the instance at click time — this
+    // avoids the subtle static-method binding timing seen with class-name
+    // references inside a static initializer.
+    actions: {
+      'place-chronicle-marker': '_onActionPlaceMarker',
+      'resync-this-map':        '_onActionResyncMap',
+      'zoom-in':                '_onActionZoomIn',
+      'zoom-out':               '_onActionZoomOut',
+      'zoom-reset':             '_onActionZoomReset',
+      'fit-view':               '_onActionFitView',
+      'toggle-labels':          '_onActionToggleLabels',
+    },
+  };
 
-  constructor(...args) {
-    super(...args);
+  /** @override */
+  static PARTS = {
+    content: {
+      template: 'modules/chronicle-sync/templates/map-viewer.hbs',
+    },
+  };
+
+  constructor(options = {}) {
+    super(options);
 
     // View state (not persisted — resets on re-open).
     this._zoom = 1;
@@ -157,20 +192,35 @@ export class MapViewerSheet extends JournalPageSheet {
 
     // Pin drag state (local pins; Chronicle markers are not draggable in Phase A).
     this._draggingPin = null;
-    this._dragOffset = null;
+    this._dragMoved = false;
+    this._dragStartPos = null;
 
-    // Bound handlers for cleanup.
+    // DOM references resolved on each render (cleared in `_preRender`).
+    this._viewer = null;
+    this._viewport = null;
+    this._container = null;
+    this._pinLayer = null;
+    this._markerLayer = null;
+
+    // Bound handlers — created once so add/remove pairs reference the
+    // same function. `_onRender` attaches `mousemove`/`mouseup` on
+    // `document`; `_onClose` detaches them.
     this._boundSocketHandler = this._onSocketMessage.bind(this);
     this._boundDataChangedHandler = this._onChronicleDataChanged.bind(this);
+    this._boundDocMouseMove = this._handleDocMouseMove.bind(this);
+    this._boundDocMouseUp = this._handleDocMouseUp.bind(this);
+
+    /** Tracks whether document-level + hook-level listeners are attached. */
+    this._globalListenersAttached = false;
   }
 
   /* ----------------------------------------------------------
-     Data
+     Data (replaces v1 getData)
      ---------------------------------------------------------- */
 
   /** @override */
-  async getData(options = {}) {
-    const data = await super.getData(options);
+  async _prepareContext(options) {
+    const context = await super._prepareContext?.(options) ?? {};
 
     const mapId = this.document.getFlag(FLAG_SCOPE, 'mapId') || null;
     const isGM = game.user.isGM;
@@ -208,7 +258,6 @@ export class MapViewerSheet extends JournalPageSheet {
       (m) => _userCanSeeMarker(m, isGM, userChronicleId)
     );
 
-    // Annotate markers for the template.
     const chronicleMarkers = filteredMarkers.map((m) => {
       const category = CHRONICLE_MARKER_CATEGORIES.includes(m.pin_category)
         ? m.pin_category : 'note';
@@ -232,24 +281,17 @@ export class MapViewerSheet extends JournalPageSheet {
       };
     });
 
-    // Drawings: filter is_visible / is_hidden (defense-in-depth — flag data
-    // already has hidden ones removed for non-GM).
     const drawings = (mapData?.drawings || [])
       .filter((d) => d?.is_visible !== false && (isGM || d?.is_hidden !== true))
-      .map((d) => this._prepareDrawing(d, layersById));
-
-    // Sort drawings by layer sort_order, then by their own sort if any.
+      .map((d) => this._prepareDrawing(d, layersById))
+      .filter(Boolean);
     drawings.sort((a, b) => (a._layerOrder ?? 0) - (b._layerOrder ?? 0));
 
-    // Tokens: render all (no per-user vis in schema).
     const tokens = (mapData?.tokens || []).map((t) => this._prepareToken(t, layersById));
     tokens.sort((a, b) => (a._layerOrder ?? 0) - (b._layerOrder ?? 0));
 
-    // Fog of war: GM only. Players never receive the data (it lives in GM
-    // memory only, never written to flags), but defense-in-depth here too.
     const fog = isGM ? mapData?.fog || null : null;
 
-    // ----- Pin types for the toolbar -----
     const pinTypes = {};
     for (const [key, val] of Object.entries(VIEWER_PIN_TYPES)) {
       pinTypes[key] = {
@@ -258,15 +300,12 @@ export class MapViewerSheet extends JournalPageSheet {
       };
     }
 
-    // ----- Image src: prefer the resolved Chronicle URL on the meta flag
-    //                  (written by GM via map-sync), else any direct URL on
-    //                  meta, else fall back to the page's own src. -----
     const src = mapId
       ? this._mapImageSrc(meta) || this.document.src
       : this.document.src;
 
     return {
-      ...data,
+      ...context,
       pageId: this.document.id,
       src,
       mapId,
@@ -324,14 +363,6 @@ export class MapViewerSheet extends JournalPageSheet {
     };
   }
 
-  /**
-   * Convert a Chronicle drawing row into a render-ready descriptor for the
-   * SVG overlay. Coordinates are 0–100 percentages; the SVG viewBox matches.
-   * @param {object} d
-   * @param {Map<string, object>} layersById
-   * @returns {object}
-   * @private
-   */
   _prepareDrawing(d, layersById) {
     const layer = d.layer_id ? layersById.get(d.layer_id) : null;
     const points = Array.isArray(d.points) ? d.points : [];
@@ -343,10 +374,7 @@ export class MapViewerSheet extends JournalPageSheet {
     const out = {
       id: d.id,
       type: d.drawing_type || 'rectangle',
-      stroke,
-      fill,
-      fillAlpha,
-      strokeWidth,
+      stroke, fill, fillAlpha, strokeWidth,
       isHidden: d.is_hidden === true,
       _layerOrder: layer?.sort_order ?? 0,
     };
@@ -383,13 +411,6 @@ export class MapViewerSheet extends JournalPageSheet {
     }
   }
 
-  /**
-   * Render-ready token descriptor.
-   * @param {object} t
-   * @param {Map<string, object>} layersById
-   * @returns {object}
-   * @private
-   */
   _prepareToken(t, layersById) {
     const layer = t.layer_id ? layersById.get(t.layer_id) : null;
     const size = typeof t.size === 'number' ? Math.max(1, Math.min(40, t.size)) : 4;
@@ -412,15 +433,19 @@ export class MapViewerSheet extends JournalPageSheet {
   }
 
   /* ----------------------------------------------------------
-     Listeners
+     Render lifecycle (replaces v1 activateListeners / close)
      ---------------------------------------------------------- */
 
   /** @override */
-  activateListeners(html) {
-    super.activateListeners(html);
+  async _onRender(context, options) {
+    await super._onRender?.(context, options);
 
-    const el = html[0] ?? html;
-    const viewer = el.closest('.chronicle-map-viewer') ?? el.querySelector('.chronicle-map-viewer');
+    const root = this.element;
+    if (!root) return;
+
+    const viewer = root.matches?.('.chronicle-map-viewer')
+      ? root
+      : root.querySelector('.chronicle-map-viewer');
     if (!viewer) return;
 
     this._viewer = viewer;
@@ -437,7 +462,7 @@ export class MapViewerSheet extends JournalPageSheet {
       mapSync?.onViewerOpen?.(mapId).catch(() => {});
     }
 
-    // ---- Toolbar: local pin tools ----
+    // ---- Toolbar: local pin tools (data-pin-type, not data-action) ----
     viewer.querySelectorAll('.pin-tool-btn').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -446,58 +471,16 @@ export class MapViewerSheet extends JournalPageSheet {
       });
     });
 
-    // ---- Toolbar: Chronicle marker placement (GM only) ----
-    const markerBtn = viewer.querySelector('[data-action="place-chronicle-marker"]');
-    if (markerBtn) {
-      markerBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        this._setActiveTool(this._activeTool === 'chronicle-marker' ? null : 'chronicle-marker');
-      });
-    }
-
-    // ---- Toolbar: per-map resync (GM only) ----
-    const resyncBtn = viewer.querySelector('[data-action="resync-this-map"]');
-    if (resyncBtn) {
-      resyncBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        if (resyncBtn.classList.contains('busy')) return;
-        const targetMapId = this.document.getFlag(FLAG_SCOPE, 'mapId');
-        if (!targetMapId) return;
-        resyncBtn.classList.add('busy');
-        try {
-          const mapSync = _getMapSync();
-          await mapSync?.resyncOne?.(targetMapId);
-          this.render(false);
-        } finally {
-          resyncBtn.classList.remove('busy');
-        }
-      });
-    }
-
-    // ---- Toolbar: view tools ----
-    viewer.querySelectorAll('.view-tool-btn').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const action = btn.dataset.action;
-        if (action === 'zoom-in') this._zoomBy(ZOOM_STEP);
-        else if (action === 'zoom-out') this._zoomBy(-ZOOM_STEP);
-        else if (action === 'zoom-reset') this._resetView();
-        else if (action === 'fit-view') this._fitToView();
-        else if (action === 'toggle-labels') this._toggleLabels();
-      });
-    });
-
     // ---- Viewport: zoom (mouse wheel) ----
-    this._viewport.addEventListener('wheel', (e) => {
+    this._viewport?.addEventListener('wheel', (e) => {
       e.preventDefault();
       const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
       this._zoomAt(delta, e.clientX, e.clientY);
     }, { passive: false });
 
     // ---- Viewport: pan + placement ----
-    this._viewport.addEventListener('mousedown', (e) => {
+    this._viewport?.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return;
-      // Defer to pin-layer / marker-layer handlers when clicking on a pin/marker.
       if (e.target.closest('.map-pin') || e.target.closest('.chronicle-marker')) return;
 
       if (this._activeTool === 'chronicle-marker') {
@@ -511,27 +494,6 @@ export class MapViewerSheet extends JournalPageSheet {
         this._isPanning = true;
         this._panStart = { x: e.clientX - this._panX, y: e.clientY - this._panY };
         this._viewport.classList.add('panning');
-      }
-    });
-
-    document.addEventListener('mousemove', this._onMouseMove = (e) => {
-      if (this._isPanning) {
-        this._panX = e.clientX - this._panStart.x;
-        this._panY = e.clientY - this._panStart.y;
-        this._applyTransform();
-      } else if (this._draggingPin) {
-        this._onPinDragMove(e);
-      }
-    });
-
-    document.addEventListener('mouseup', this._onMouseUp = (e) => {
-      if (this._isPanning) {
-        this._isPanning = false;
-        this._panStart = null;
-        this._viewport.classList.remove('panning');
-      }
-      if (this._draggingPin) {
-        this._onPinDragEnd(e);
       }
     });
 
@@ -566,7 +528,7 @@ export class MapViewerSheet extends JournalPageSheet {
         const markerEl = e.target.closest('.chronicle-marker');
         if (!markerEl) return;
         e.preventDefault();
-        if (!game.user.isGM) return; // Players cannot edit Chronicle markers in Phase A.
+        if (!game.user.isGM) return;
         this._openChronicleMarkerConfig(markerEl.dataset.markerId);
       });
 
@@ -578,27 +540,66 @@ export class MapViewerSheet extends JournalPageSheet {
       });
     }
 
-    // ---- Foundry socket sync (local pins only) ----
-    game.socket.on(SOCKET_CHANNEL, this._boundSocketHandler);
-
-    // ---- Hook for Chronicle data changes (re-render when WS events arrive) ----
-    Hooks.on('chronicleMapDataChanged', this._boundDataChangedHandler);
+    // ---- Document-level + hook-level listeners (attach once) ----
+    if (!this._globalListenersAttached) {
+      document.addEventListener('mousemove', this._boundDocMouseMove);
+      document.addEventListener('mouseup', this._boundDocMouseUp);
+      game.socket.on(SOCKET_CHANNEL, this._boundSocketHandler);
+      Hooks.on('chronicleMapDataChanged', this._boundDataChangedHandler);
+      this._globalListenersAttached = true;
+    }
   }
 
   /** @override */
-  close(options) {
-    if (this._onMouseMove) document.removeEventListener('mousemove', this._onMouseMove);
-    if (this._onMouseUp) document.removeEventListener('mouseup', this._onMouseUp);
-    game.socket.off(SOCKET_CHANNEL, this._boundSocketHandler);
-    Hooks.off('chronicleMapDataChanged', this._boundDataChangedHandler);
+  async _preClose(options) {
+    await super._preClose?.(options);
+    this._teardownGlobalListeners();
 
     const mapId = this.document.getFlag(FLAG_SCOPE, 'mapId');
     if (mapId) {
       const mapSync = _getMapSync();
       mapSync?.onViewerClose?.(mapId);
     }
+  }
 
-    return super.close(options);
+  _teardownGlobalListeners() {
+    if (!this._globalListenersAttached) return;
+    document.removeEventListener('mousemove', this._boundDocMouseMove);
+    document.removeEventListener('mouseup', this._boundDocMouseUp);
+    game.socket.off(SOCKET_CHANNEL, this._boundSocketHandler);
+    Hooks.off('chronicleMapDataChanged', this._boundDataChangedHandler);
+    this._globalListenersAttached = false;
+  }
+
+  /**
+   * Document-level mousemove — handles pan and pin-drag continuation.
+   * @param {MouseEvent} e
+   * @private
+   */
+  _handleDocMouseMove(e) {
+    if (this._isPanning) {
+      this._panX = e.clientX - this._panStart.x;
+      this._panY = e.clientY - this._panStart.y;
+      this._applyTransform();
+    } else if (this._draggingPin) {
+      this._onPinDragMove(e);
+    }
+  }
+
+  /**
+   * Document-level mouseup — terminates pan and pin-drag operations.
+   * @param {MouseEvent} e
+   * @private
+   */
+  _handleDocMouseUp(e) {
+    if (this._isPanning) {
+      this._isPanning = false;
+      this._panStart = null;
+      this._viewport?.classList.remove('panning');
+    }
+    if (this._draggingPin) {
+      this._onPinDragEnd(e);
+    }
   }
 
   /**
@@ -612,6 +613,35 @@ export class MapViewerSheet extends JournalPageSheet {
       this.render(false);
     }
   }
+
+  /* ----------------------------------------------------------
+     Toolbar actions (wired via DEFAULT_OPTIONS.actions by name)
+     ---------------------------------------------------------- */
+
+  /** @param {PointerEvent} _event @param {HTMLElement} _target */
+  _onActionPlaceMarker(_event, _target) {
+    this._setActiveTool(this._activeTool === 'chronicle-marker' ? null : 'chronicle-marker');
+  }
+
+  async _onActionResyncMap(_event, target) {
+    if (target.classList.contains('busy')) return;
+    const mapId = this.document.getFlag(FLAG_SCOPE, 'mapId');
+    if (!mapId) return;
+    target.classList.add('busy');
+    try {
+      const mapSync = _getMapSync();
+      await mapSync?.resyncOne?.(mapId);
+      this.render(false);
+    } finally {
+      target.classList.remove('busy');
+    }
+  }
+
+  _onActionZoomIn()        { this._zoomBy(ZOOM_STEP); }
+  _onActionZoomOut()       { this._zoomBy(-ZOOM_STEP); }
+  _onActionZoomReset()     { this._resetView(); }
+  _onActionFitView()       { this._fitToView(); }
+  _onActionToggleLabels()  { this._toggleLabels(); }
 
   /* ----------------------------------------------------------
      Zoom / Pan
@@ -843,12 +873,6 @@ export class MapViewerSheet extends JournalPageSheet {
      Chronicle Marker placement / edit (GM only)
      ---------------------------------------------------------- */
 
-  /**
-   * Place mode: click on the map opens a config dialog and creates the
-   * marker on Chronicle when saved.
-   * @param {MouseEvent} event
-   * @private
-   */
   _beginChronicleMarkerPlacement(event) {
     if (!game.user.isGM) {
       this._setActiveTool(null);
@@ -911,19 +935,12 @@ export class MapViewerSheet extends JournalPageSheet {
     }).render(true);
   }
 
-  /**
-   * Double-click a Chronicle marker → open its linked entity (if any).
-   * @param {string} markerId
-   * @private
-   */
   _onChronicleMarkerDoubleClick(markerId) {
     const mapSync = _getMapSync();
     const data = mapSync?.getMapData(this.document) || this._readChronicleFromFlags();
     const marker = (data.markers || []).find((m) => m.id === markerId);
     if (!marker?.entity_id) return;
 
-    // Resolve via journal-sync materialization: find a JournalEntry with
-    // the matching `entityId` flag and open it.
     const journal = game.journal.find((j) => j.getFlag(FLAG_SCOPE, 'entityId') === marker.entity_id);
     if (journal?.sheet) journal.sheet.render(true);
   }
@@ -976,10 +993,8 @@ export class MapViewerSheet extends JournalPageSheet {
 
 
 /* ============================================================
-   PinConfigDialog — local pin editor
+   PinConfigDialog — local pin editor (already ApplicationV2)
    ============================================================ */
-
-const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 export class PinConfigDialog extends HandlebarsApplicationMixin(ApplicationV2) {
 
