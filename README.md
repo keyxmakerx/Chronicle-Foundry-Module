@@ -22,12 +22,33 @@ Bidirectional real-time sync between [Chronicle](https://github.com/keyxmakerx/C
 
 ## Installation
 
-1. In Foundry VTT, go to **Add-on Modules → Install Module**
-2. Paste the manifest URL:
-   ```
-   https://github.com/keyxmakerx/Chronicle-Foundry-Module/releases/latest/download/module.json
-   ```
-3. Click **Install**
+Module releases are served from your Chronicle instance, not from GitHub.
+The install URL is **per-campaign**, signed, and pinned to the version
+your campaign owner selected.
+
+**To install:**
+
+1. In Chronicle, open your campaign → **Settings → Foundry Module** tab.
+2. Copy the **install URL** shown on that page.
+3. In Foundry VTT, go to **Add-on Modules → Install Module**, paste the
+   URL, and click **Install**.
+
+After install, Foundry remembers that URL and re-uses it on every update
+check — so you'll receive whichever module version your campaign owner
+pins, without further configuration.
+
+> **For Chronicle admins:** upload new module `.zip` builds via
+> `/admin/modules/foundry` on your Chronicle instance. Campaign owners
+> can then pin any uploaded version per-campaign from their settings
+> tab.
+
+> **GitHub release distribution is deprecated.** The
+> `https://github.com/.../releases/latest/download/module.json` URL is
+> no longer published. Existing installs that point at GitHub continue
+> to run, but no further updates will arrive via that channel — open
+> the **Update Source** panel inside the module settings (Game Settings
+> → Module Settings → Chronicle Sync → Update Source) to check whether
+> your install needs to be re-pointed at Chronicle.
 
 ## Configuration
 

@@ -1,0 +1,73 @@
+<div class="chronicle-update-info-form">
+
+  {{!-- Source indicator --}}
+  <section class="update-info-section">
+    <h3>{{localize "CHRONICLE.UpdateInfo.SourceHeader"}}</h3>
+
+    {{#if isChronicle}}
+      <div class="update-source-badge source-chronicle">
+        <i class="fa-solid fa-circle-check"></i>
+        <span>{{localize "CHRONICLE.UpdateInfo.SourceChronicle"}}</span>
+      </div>
+    {{else if isGithub}}
+      <div class="update-source-badge source-github">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span>{{localize "CHRONICLE.UpdateInfo.SourceGithub"}}</span>
+      </div>
+    {{else}}
+      <div class="update-source-badge source-unknown">
+        <i class="fa-solid fa-circle-question"></i>
+        <span>{{localize "CHRONICLE.UpdateInfo.SourceUnknown"}}</span>
+      </div>
+    {{/if}}
+
+    <div class="update-info-row">
+      <label>{{localize "CHRONICLE.UpdateInfo.InstallUrl"}}</label>
+      {{#if hasUrl}}
+        <code class="update-info-url" title="{{url}}">{{url}}</code>
+        <button type="button" class="update-info-copy" data-action="copy-url"
+                title="{{localize 'CHRONICLE.UpdateInfo.CopyUrl'}}">
+          <i class="fa-solid fa-copy"></i>
+        </button>
+      {{else}}
+        <em class="update-info-empty">{{localize "CHRONICLE.UpdateInfo.NoUrl"}}</em>
+      {{/if}}
+    </div>
+
+    <div class="update-info-row">
+      <label>{{localize "CHRONICLE.UpdateInfo.InstalledVersion"}}</label>
+      <code>{{installedVersion}}</code>
+    </div>
+  </section>
+
+  {{!-- Manual check --}}
+  <section class="update-info-section">
+    <h3>{{localize "CHRONICLE.UpdateInfo.CheckHeader"}}</h3>
+    <p class="update-info-help">{{localize "CHRONICLE.UpdateInfo.CheckHelp"}}</p>
+
+    <button type="button" class="update-info-check-btn" data-action="check-for-updates"
+            {{#if checking}}disabled{{/if}}>
+      {{#if checking}}
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        {{localize "CHRONICLE.UpdateInfo.Checking"}}
+      {{else}}
+        <i class="fa-solid fa-arrows-rotate"></i>
+        {{localize "CHRONICLE.UpdateInfo.CheckButton"}}
+      {{/if}}
+    </button>
+
+    {{#if result}}
+      <div class="update-info-result result-{{result.state}}">
+        {{#if (eq result.state "update-available")}}
+          <i class="fa-solid fa-arrow-up"></i>
+        {{else if (eq result.state "up-to-date")}}
+          <i class="fa-solid fa-check"></i>
+        {{else}}
+          <i class="fa-solid fa-circle-exclamation"></i>
+        {{/if}}
+        <span>{{result.message}}</span>
+      </div>
+    {{/if}}
+  </section>
+
+</div>

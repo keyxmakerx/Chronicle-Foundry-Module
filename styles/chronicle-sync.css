@@ -1487,3 +1487,160 @@
   height: 30px;
   padding: 2px;
 }
+
+/* ============================================================
+   Update Source Info dialog (FM-CSU)
+   ============================================================ */
+
+.chronicle-update-info-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px;
+}
+
+.chronicle-update-info-form .update-info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chronicle-update-info-form .update-info-section h3 {
+  margin: 0 0 4px 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.55);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 4px;
+}
+
+.chronicle-update-info-form .update-source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.chronicle-update-info-form .update-source-badge.source-chronicle {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.chronicle-update-info-form .update-source-badge.source-github {
+  background: rgba(234, 179, 8, 0.15);
+  color: #facc15;
+  border: 1px solid rgba(234, 179, 8, 0.4);
+}
+
+.chronicle-update-info-form .update-source-badge.source-unknown {
+  background: rgba(148, 163, 184, 0.15);
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+.chronicle-update-info-form .update-info-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chronicle-update-info-form .update-info-row label {
+  flex: 0 0 auto;
+  min-width: 120px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.chronicle-update-info-form .update-info-url {
+  flex: 1;
+  font-size: 11px;
+  word-break: break-all;
+  padding: 4px 6px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 3px;
+  max-height: 4.5em;
+  overflow-y: auto;
+}
+
+.chronicle-update-info-form .update-info-copy {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+}
+
+.chronicle-update-info-form .update-info-copy:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.chronicle-update-info-form .update-info-empty {
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+}
+
+.chronicle-update-info-form .update-info-help {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.chronicle-update-info-form .update-info-check-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid #3b82f6;
+  border-radius: 4px;
+  background: rgba(59, 130, 246, 0.18);
+  color: #bfdbfe;
+  cursor: pointer;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.chronicle-update-info-form .update-info-check-btn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.3);
+}
+
+.chronicle-update-info-form .update-info-check-btn:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.chronicle-update-info-form .update-info-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.chronicle-update-info-form .update-info-result.result-update-available {
+  background: rgba(59, 130, 246, 0.15);
+  color: #bfdbfe;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+}
+
+.chronicle-update-info-form .update-info-result.result-up-to-date {
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.chronicle-update-info-form .update-info-result.result-error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fecaca;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}

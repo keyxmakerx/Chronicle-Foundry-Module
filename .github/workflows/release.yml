@@ -1,9 +1,19 @@
+# Module releases moved to Chronicle (FM-CSU).
+# Admins upload module .zip builds via /admin/modules/foundry on the
+# Chronicle instance; campaign owners pin a version per-campaign and
+# Foundry pulls updates from the per-campaign signed manifest URL.
+#
+# This workflow remains for emergency manual dispatches only — the
+# tag-push trigger is intentionally commented out to stop automatic
+# GitHub releases. To produce an ad-hoc artifact, use the
+# `workflow_dispatch` button in the Actions tab.
 name: Release Module
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+  # push:
+  #   tags:
+  #     - 'v*'
 
 permissions:
   contents: write
