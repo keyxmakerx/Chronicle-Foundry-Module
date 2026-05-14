@@ -43,6 +43,15 @@ import { FLAG_SCOPE } from './constants.mjs';
 /** Folder name for materialized Chronicle maps. */
 const MAPS_FOLDER_NAME = 'Chronicle Maps';
 
+/**
+ * Sheet identifier set on Chronicle-linked image pages via
+ * `flags.core.sheetClass`. Format is `<scope>.<className>` matching the
+ * `DocumentSheetConfig.registerSheet` call in `module.mjs`. Forcing the
+ * sheet class per-page bypasses system-level overrides (e.g., Draw Steel
+ * registers its own default image-page sheet, which otherwise wins).
+ */
+const MAP_VIEWER_SHEET_CLASS = 'chronicle-sync.MapViewerSheet';
+
 /** Polling interval for sub-resource types Chronicle doesn't yet emit events for. */
 const POLL_INTERVAL_MS = 5000;
 
@@ -742,6 +751,11 @@ export class MapSync {
           type: 'image',
           src: imageSrc,
           flags: {
+            // Force the MapViewerSheet for this page so it isn't rendered
+            // by the system's default image-page sheet (e.g., Draw Steel
+            // overrides JournalEntryPage image rendering at the system
+            // level, which made Chronicle-linked pages appear blank).
+            core: { sheetClass: MAP_VIEWER_SHEET_CLASS },
             [FLAG_SCOPE]: {
               mapId: mapData.id,
               chronicleMapMeta: meta,
@@ -757,6 +771,12 @@ export class MapSync {
       };
       if (imageSrc && page.src !== imageSrc) updates.src = imageSrc;
       if (page.name !== mapData.name && mapData.name) updates.name = mapData.name;
+      // Backfill the sheet-class flag for pages materialized before this
+      // fix. Only set it when missing so a user who explicitly switched
+      // to a different sheet via Sheet Configuration keeps their choice.
+      if (!page.getFlag('core', 'sheetClass')) {
+        updates['flags.core.sheetClass'] = MAP_VIEWER_SHEET_CLASS;
+      }
       await page.update(updates);
 
       const entry = page.parent;
