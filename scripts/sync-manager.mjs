@@ -379,12 +379,74 @@ export class SyncManager {
   }
 
   /**
-   * Create or update a sync mapping on the server.
+   * Create or update a sync mapping on the server. Delegates to
+   * `ensureMapping` so legacy callers (wizard `link-map`, dashboard
+   * manual-sync) inherit conflict-tolerant idempotency.
    * @param {object} mapping
    * @returns {Promise<object>}
    */
   async createMapping(mapping) {
-    return this.api.post('/sync/mappings', mapping);
+    return this.ensureMapping(mapping);
+  }
+
+  /**
+   * Idempotent sync-mapping POST.
+   *
+   * 1. Look up an existing mapping for `(chronicle_type, chronicle_id)`.
+   *    If one exists, return it — the happy path for already-synced
+   *    docs (no Chronicle round-trip beyond the GET; no 400 noise).
+   * 2. Otherwise POST `/sync/mappings`.
+   * 3. If the POST returns a 400 with body containing "already exists",
+   *    refetch via `findMapping` and return that — covers the race
+   *    window between our GET and POST where a concurrent client
+   *    created the mapping. The absorbed 400 is also stripped from the
+   *    api-client error log so it does not pollute the FM-MAP-DIAG
+   *    dashboard.
+   * 4. Any other failure propagates.
+   *
+   * @param {object} payload - `{chronicle_type, chronicle_id, external_system, external_id, sync_direction, sync_metadata?}`
+   * @returns {Promise<object|null>}
+   */
+  async ensureMapping(payload) {
+    const ctype = payload?.chronicle_type;
+    const cid = payload?.chronicle_id;
+
+    if (ctype && cid) {
+      const existing = await this.findMapping(ctype, cid);
+      if (existing) return existing;
+    }
+
+    try {
+      return await this.api.post('/sync/mappings', payload);
+    } catch (err) {
+      if (this._isMappingConflict(err)) {
+        // Absorbed conflict — strip the 400 from the dashboard error log
+        // and return the freshly-fetched mapping.
+        this.api.dropLastErrorLogEntry?.({
+          status: 400,
+          path: '/sync/mappings',
+          messageIncludes: 'already exists',
+        });
+        if (ctype && cid) return await this.findMapping(ctype, cid);
+        return null;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Detect Chronicle's specific 400 conflict for sync mappings. Chronicle
+   * returns `{error: "Bad Request", message: "conflict: sync mapping already
+   * exists for this object"}` with HTTP 400 (not 409, so api-client wraps
+   * it in a generic Error). Match on substring rather than relying on the
+   * status code alone so we don't suppress unrelated 400s.
+   * @param {Error} err
+   * @returns {boolean}
+   * @private
+   */
+  _isMappingConflict(err) {
+    const msg = err?.message || '';
+    return /Chronicle API error 400/.test(msg) && /already exists/i.test(msg);
   }
 
   /**

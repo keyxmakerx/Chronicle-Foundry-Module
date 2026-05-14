@@ -569,6 +569,38 @@ export class ChronicleAPI {
   }
 
   /**
+   * Drop the most-recent error-log entry if it matches the given criteria.
+   * Used by SyncManager.ensureMapping to clean up after absorbing a 400
+   * "sync mapping already exists" conflict — that 400 is not a real error
+   * once handled, and should not pollute the FM-MAP-DIAG dashboard log.
+   *
+   * Also rolls back the `restErrorCount` health metric so the dashboard's
+   * error count stays accurate.
+   *
+   * @param {{path?: string|RegExp, status?: number, messageIncludes?: string}} match
+   * @returns {boolean} True if an entry was removed.
+   */
+  dropLastErrorLogEntry(match = {}) {
+    const top = this._errorLog[0];
+    if (!top) return false;
+
+    if (match.status != null && top.status !== match.status) return false;
+    if (match.path != null) {
+      const ok = typeof match.path === 'string'
+        ? top.path === match.path
+        : match.path.test(top.path);
+      if (!ok) return false;
+    }
+    if (match.messageIncludes && !top.message.includes(match.messageIncludes)) {
+      return false;
+    }
+
+    this._errorLog.shift();
+    if (this.health.restErrorCount > 0) this.health.restErrorCount--;
+    return true;
+  }
+
+  /**
    * Get the error log entries for dashboard display.
    * @returns {Array<{time: number, level: string, method: string, path: string, status: number|null, message: string}>}
    */

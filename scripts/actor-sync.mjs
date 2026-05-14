@@ -132,9 +132,23 @@ export class ActorSync {
     if (mapping.chronicle_type !== 'entity') return;
     if (!this._adapter || !getSetting('syncCharacters')) return;
 
-    // Check if the Foundry actor exists; if not, fetch and create it.
-    const actor = game.actors.get(mapping.external_id);
-    if (actor) return; // Already exists.
+    // 1. Happy path: the mapping's stored external_id matches a current
+    //    Foundry actor.
+    let actor = game.actors.get(mapping.external_id);
+
+    // 2. Fallback: find by `entityId` flag. Catches the
+    //    "already synced but re-imported / migrated" case where the
+    //    mapping's external_id is stale (points at a dead Foundry id)
+    //    but the local actor still carries the correct entityId.
+    //    Without this, the handler would fall through to a duplicate
+    //    Actor.create and a 400 mapping conflict.
+    if (!actor) {
+      actor = game.actors.find(
+        (a) => a.getFlag(FLAG_SCOPE, 'entityId') === mapping.chronicle_id
+      );
+    }
+
+    if (actor) return; // Either path found it → nothing to do.
 
     try {
       const entity = await this._api.get(`/entities/${mapping.chronicle_id}`);
@@ -243,8 +257,10 @@ export class ActorSync {
 
       const actor = await Actor.create(actorData);
 
-      // Create sync mapping.
-      await this._api.post('/sync/mappings', {
+      // Create sync mapping (idempotent — tolerates a pre-existing
+      // Chronicle mapping pointing at a stale Foundry id, which is
+      // common when the user has re-imported a world).
+      await this._syncManager?.ensureMapping({
         chronicle_type: 'entity',
         chronicle_id: entity.id,
         external_system: 'foundry',
@@ -406,8 +422,10 @@ export class ActorSync {
           this._syncing = false;
         }
 
-        // Create sync mapping.
-        await this._api.post('/sync/mappings', {
+        // Create sync mapping (idempotent — handles the case where the
+        // Foundry-originated POST raced a Chronicle-side mapping created
+        // by another client or a server-side trigger).
+        await this._syncManager?.ensureMapping({
           chronicle_type: 'entity',
           chronicle_id: entity.id,
           external_system: 'foundry',

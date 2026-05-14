@@ -85,18 +85,31 @@ export class JournalSync {
     if (mapping.chronicle_type !== 'entity') return;
     if (!getSetting('syncJournals')) return;
 
-    // Check if the Foundry journal exists; if not, fetch and create it.
-    const journal = game.journal.get(mapping.external_id);
+    // 1. Happy path: the mapping's stored external_id matches a current
+    //    Foundry journal.
+    let journal = game.journal.get(mapping.external_id);
+
+    // 2. Fallback: find by `entityId` flag. Catches the case where the
+    //    journal was previously synced but the mapping's external_id is
+    //    stale (e.g., world re-import / migration). Without this the
+    //    handler would create a duplicate journal and trigger a 400
+    //    mapping conflict.
     if (!journal) {
-      try {
-        const entity = await this._api.get(`/entities/${mapping.chronicle_id}`);
-        if (!entity) return;
-        // Defer character entities to ActorSync.
-        if (this._isHandledByActorSync(entity)) return;
-        await this._createJournalFromEntity(entity, mapping.external_id);
-      } catch (err) {
-        console.warn(`Chronicle: Failed to sync entity ${mapping.chronicle_id}`, err);
-      }
+      journal = game.journal.find(
+        (j) => j.getFlag(FLAG_SCOPE, 'entityId') === mapping.chronicle_id
+      );
+    }
+
+    if (journal) return;
+
+    try {
+      const entity = await this._api.get(`/entities/${mapping.chronicle_id}`);
+      if (!entity) return;
+      // Defer character entities to ActorSync.
+      if (this._isHandledByActorSync(entity)) return;
+      await this._createJournalFromEntity(entity, mapping.external_id);
+    } catch (err) {
+      console.warn(`Chronicle: Failed to sync entity ${mapping.chronicle_id}`, err);
     }
   }
 
@@ -383,10 +396,12 @@ export class JournalSync {
 
       const journal = await JournalEntry.create(journalData);
 
-      // Create sync mapping on Chronicle server.
+      // Create sync mapping on Chronicle server (idempotent — tolerates
+      // a pre-existing Chronicle mapping pointing at a stale Foundry id,
+      // which is common when the user has re-imported a world).
       if (journal) {
         try {
-          await this._api.post('/sync/mappings', {
+          await this._syncManager?.ensureMapping({
             chronicle_type: 'entity',
             chronicle_id: entity.id,
             external_system: 'foundry',
@@ -395,6 +410,9 @@ export class JournalSync {
             sync_metadata: { foundry_type: 'JournalEntry' },
           });
         } catch (err) {
+          // Real (non-conflict) errors still surface as a warn — the
+          // helper only absorbs the "already exists" conflict and
+          // propagates everything else.
           console.warn('Chronicle: Failed to create sync mapping', err);
         }
       }
@@ -443,8 +461,9 @@ export class JournalSync {
           this._syncing = false;
         }
 
-        // Create sync mapping.
-        await this._api.post('/sync/mappings', {
+        // Create sync mapping (idempotent — tolerates server-side
+        // mapping created concurrently or pre-existing for this entity).
+        await this._syncManager?.ensureMapping({
           chronicle_type: 'entity',
           chronicle_id: entity.id,
           external_system: 'foundry',

@@ -1371,7 +1371,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         await journal.setFlag(FLAG_SCOPE, 'entityId', entity.id);
         await journal.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
 
-        await this.api.post('/sync/mappings', {
+        // Idempotent — tolerates pre-existing mapping (e.g., dashboard
+        // re-push or race with a concurrent server-side create).
+        await this._syncManager?.ensureMapping({
           chronicle_type: 'entity',
           chronicle_id: entity.id,
           external_system: 'foundry',
