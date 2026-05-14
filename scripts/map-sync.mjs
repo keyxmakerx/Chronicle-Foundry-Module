@@ -140,12 +140,17 @@ export class MapSync {
     this._openCounts = new Map();
 
     /**
-     * Cache of resolved media URLs by media id. Populated by
-     * `_resolveMediaUrl` and reused for subsequent map renders so we never
-     * call `/media/:id` twice for the same image.
-     * @type {Map<string, string>}
+     * Cache of resolved media URLs by media id. Chronicle returns signed
+     * URLs (`?expires=…&sig=…`) with a ~24h validity window — caching them
+     * indefinitely would surface as a broken `page.src` after the expiry
+     * on long-running sessions. Entries TTL out at `_mediaUrlCacheTtlMs`
+     * so the next `_resolveMediaUrl` call re-fetches `/media/:id`.
+     * @type {Map<string, {url: string, cachedAt: number}>}
      */
     this._mediaUrlCache = new Map();
+
+    /** Cache TTL for signed media URLs. 1h — well inside Chronicle's ~24h window. */
+    this._mediaUrlCacheTtlMs = 60 * 60 * 1000;
 
     /**
      * FIFO ring buffer of recent failures, surfaced in the sync dashboard.
@@ -253,15 +258,23 @@ export class MapSync {
    * Resolve a Chronicle media id to a fully-qualified image URL.
    * The Chronicle API serves media at `${baseUrl}/media/{filename}` and
    * exposes the relative path through the `url` field of the
-   * `/media/:id` metadata endpoint. We cache results in-memory for the
-   * lifetime of the GM session.
+   * `/media/:id` metadata endpoint. Results are cached with a TTL so
+   * signed URLs don't outlive their `?expires=…` window.
    * @param {string} mediaId
+   * @param {{forceFresh?: boolean}} [opts] When `forceFresh` is true the
+   *   cache is bypassed and `/media/:id` is re-fetched.
    * @returns {Promise<string>}
    * @private
    */
-  async _resolveMediaUrl(mediaId) {
+  async _resolveMediaUrl(mediaId, { forceFresh = false } = {}) {
     if (!mediaId || !this._api) return '';
-    if (this._mediaUrlCache.has(mediaId)) return this._mediaUrlCache.get(mediaId);
+
+    if (!forceFresh) {
+      const entry = this._mediaUrlCache.get(mediaId);
+      if (entry && (Date.now() - entry.cachedAt) < this._mediaUrlCacheTtlMs) {
+        return entry.url;
+      }
+    }
 
     try {
       const meta = await this._api.get(`/media/${mediaId}`);
@@ -273,7 +286,7 @@ export class MapSync {
         ? url
         : (baseUrl ? `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}` : url);
 
-      this._mediaUrlCache.set(mediaId, full);
+      this._mediaUrlCache.set(mediaId, { url: full, cachedAt: Date.now() });
       return full;
     } catch (err) {
       console.warn(`Chronicle: Failed to resolve media ${mediaId}`, err);
@@ -521,10 +534,48 @@ export class MapSync {
     this._openCounts.set(mapId, count);
 
     if (count === 1) {
+      // Re-resolve the image URL up front. Chronicle's media URLs are
+      // signed and expire (~24h); the value persisted in `page.src` will
+      // 404 on long-running sessions. Refreshing here means each viewer
+      // open gets a working URL, and players inherit it via the page
+      // update broadcast.
+      await this._refreshMapImage(mapId).catch((err) =>
+        console.warn(`Chronicle: Image refresh failed for map ${mapId}`, err)
+      );
       await this._refreshSubResources(mapId).catch((err) =>
         console.warn(`Chronicle: Sub-resource fetch failed for map ${mapId}`, err)
       );
       this._startPolling(mapId);
+    }
+  }
+
+  /**
+   * Force-refresh the persisted image URL for a map. Resolves a new signed
+   * URL via `/media/:id` (bypassing the in-memory cache) and updates the
+   * page's `src` + `chronicleMapMeta.image_url` if it changed. GM-only.
+   * @param {string} mapId
+   * @private
+   */
+  async _refreshMapImage(mapId) {
+    if (!game.user.isGM || !this._api || !mapId) return;
+
+    const page = this.findPageByMapId(mapId);
+    if (!page) return;
+
+    const meta = page.getFlag(FLAG_SCOPE, 'chronicleMapMeta') || null;
+    const mediaId = meta?.image_id;
+    if (!mediaId) return;
+
+    const fresh = await this._resolveMediaUrl(mediaId, { forceFresh: true });
+    if (!fresh) return;
+
+    const updates = {};
+    if (page.src !== fresh) updates.src = fresh;
+    if (meta.image_url !== fresh) {
+      updates[`flags.${FLAG_SCOPE}.chronicleMapMeta`] = { ...meta, image_url: fresh };
+    }
+    if (Object.keys(updates).length > 0) {
+      await page.update(updates);
     }
   }
 
