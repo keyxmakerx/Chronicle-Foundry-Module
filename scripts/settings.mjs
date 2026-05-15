@@ -6,6 +6,7 @@
  */
 
 import { MODULE_ID } from './constants.mjs';
+import { UpdateInfoApplication } from './update-info.mjs';
 
 /**
  * Register all Chronicle Sync module settings.
@@ -228,6 +229,19 @@ export function registerSettings() {
     config: false,
     type: String,
     default: '[]',
+  });
+
+  // "Update Source" panel — surfaces the install-time manifest URL Foundry
+  // uses for module updates, lets the operator confirm whether the install
+  // is wired to Chronicle (per-campaign signed URL) or still pointing at
+  // GitHub, and provides a manual "Check Chronicle for updates" button.
+  game.settings.registerMenu(MODULE_ID, 'updateInfo', {
+    name: game.i18n.localize('CHRONICLE.Settings.UpdateInfo.Name'),
+    hint: game.i18n.localize('CHRONICLE.Settings.UpdateInfo.Hint'),
+    label: game.i18n.localize('CHRONICLE.Settings.UpdateInfo.Label'),
+    icon: 'fa-solid fa-circle-info',
+    type: UpdateInfoApplication,
+    restricted: true,
   });
 }
 

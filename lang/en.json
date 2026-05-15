@@ -37,6 +37,11 @@
       "SyncNotes": {
         "Name": "Sync Notes",
         "Hint": "Sync Chronicle campaign notes with Foundry journal entries"
+      },
+      "UpdateInfo": {
+        "Name": "Update Source",
+        "Hint": "Show the install-time manifest URL Foundry uses for updates and run a manual check against Chronicle.",
+        "Label": "Open"
       }
     },
     "Status": {
@@ -315,6 +320,32 @@
       "Errors": "errors",
       "NoPlan": "No import plan generated — go back and configure at least one step.",
       "ActivityLog": "Activity Log"
+    },
+    "UpdateInfo": {
+      "Title": "Update Source",
+      "MenuLabel": "Update Source & Manual Check",
+      "MenuHint": "Show the install-time manifest URL Foundry uses for updates and check Chronicle for the latest version.",
+      "MenuButton": "Open",
+      "SourceHeader": "Update Source",
+      "SourceChronicle": "Connected to Chronicle",
+      "SourceGithub": "Updates from GitHub — reinstall via Chronicle for version-pinned updates",
+      "SourceUnknown": "Unknown update source",
+      "InstallUrl": "Install URL",
+      "InstalledVersion": "Installed version",
+      "CopyUrl": "Copy URL",
+      "UrlCopied": "Install URL copied to clipboard.",
+      "CopyFailed": "Could not copy URL to clipboard.",
+      "NoUrl": "Foundry did not record an install-time manifest URL for this module.",
+      "CheckHeader": "Manual Check",
+      "CheckHelp": "Fetches the install-time manifest URL directly and compares the version field. Use this to confirm Foundry can reach Chronicle without going through Setup → Modules → Update All.",
+      "CheckButton": "Check Chronicle for updates",
+      "Checking": "Checking…",
+      "UpdateAvailable": "Update available — installed {installed}, latest {latest}.",
+      "UpToDate": "Up to date — installed {installed}.",
+      "NetworkError": "Network error: {error}",
+      "HttpError": "HTTP {status} {statusText}",
+      "ParseError": "Could not parse manifest response: {error}",
+      "MissingVersion": "Manifest response did not include a version field."
     }
   }
 }
