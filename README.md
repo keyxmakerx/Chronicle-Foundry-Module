@@ -22,33 +22,39 @@ Bidirectional real-time sync between [Chronicle](https://github.com/keyxmakerx/C
 
 ## Installation
 
-Module releases are served from your Chronicle instance, not from GitHub.
-The install URL is **per-campaign**, signed, and pinned to the version
-your campaign owner selected.
+Module releases are served from your Chronicle instance, not from GitHub
+directly. Chronicle automatically pulls new versions from this
+repository's GitHub releases on a regular schedule, and your campaign
+owner pins which version Foundry sees. The install URL is **per-campaign**
+and signed.
 
-**To install:**
+**To install (players + GMs):**
 
-1. In Chronicle, open your campaign → **Settings → Foundry Module** tab.
-2. Copy the **install URL** shown on that page.
-3. In Foundry VTT, go to **Add-on Modules → Install Module**, paste the
+1. In Chronicle, open your campaign → **Settings → VTT Setup Guides**
+   and copy the **Module Install URL** shown there.
+2. In Foundry VTT, go to **Add-on Modules → Install Module**, paste the
    URL, and click **Install**.
 
 After install, Foundry remembers that URL and re-uses it on every update
 check — so you'll receive whichever module version your campaign owner
 pins, without further configuration.
 
-> **For Chronicle admins:** upload new module `.zip` builds via
-> `/admin/modules/foundry` on your Chronicle instance. Campaign owners
-> can then pin any uploaded version per-campaign from their settings
-> tab.
+> **For Chronicle admins:** Chronicle auto-fetches new releases from the
+> GitHub repo by default (no manual action needed); use the **Foundry
+> Modules** section of `/admin/packages` to trigger an immediate fetch
+> ("Fetch from GitHub now"), to manually upload a `.zip` (useful for
+> testing forks or pre-release builds), and to manage which versions
+> are published / deprecated / withdrawn. Campaign owners pin any
+> available version per-campaign from their **VTT Setup Guides**
+> settings section.
 
-> **GitHub release distribution is deprecated.** The
-> `https://github.com/.../releases/latest/download/module.json` URL is
-> no longer published. Existing installs that point at GitHub continue
-> to run, but no further updates will arrive via that channel — open
-> the **Update Source** panel inside the module settings (Game Settings
-> → Module Settings → Chronicle Sync → Update Source) to check whether
-> your install needs to be re-pointed at Chronicle.
+> **GitHub direct-install is deprecated.** The legacy
+> `https://github.com/.../releases/latest/download/module.json` URL
+> still resolves but bypasses Chronicle's per-campaign pinning entirely.
+> Open the **Update Source** panel inside the module settings (Game
+> Settings → Module Settings → Chronicle Sync → Update Source) to check
+> whether your install is wired to Chronicle or still pointing at
+> GitHub.
 
 ## Configuration
 
