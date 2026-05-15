@@ -50,6 +50,20 @@ pins, without further configuration.
 > → Module Settings → Chronicle Sync → Update Source) to check whether
 > your install needs to be re-pointed at Chronicle.
 
+## Updating in Foundry
+
+Once installed via your Chronicle install URL, Foundry stores that URL
+and uses it for every future update check — updates always come from
+Chronicle, reflecting whichever version your campaign owner has pinned.
+
+Foundry's central Package Repository also lists this module with its
+GitHub manifest URL. On an update check, Foundry may detect the
+mismatch and prompt you to switch the locally-stored manifest URL to
+one from the Package Repository. **If you see this prompt, decline it
+to keep your install on Chronicle.** Switching to the Package
+Repository's URL bypasses your campaign owner's pinned version and
+sends update traffic to GitHub instead of Chronicle.
+
 ## Configuration
 
 1. Enable the module in your world's **Module Management**
