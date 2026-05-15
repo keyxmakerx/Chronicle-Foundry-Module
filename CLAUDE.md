@@ -48,6 +48,7 @@ with request/response schemas, authentication, and CORS requirements.
 - System adapters implement `toChronicleFields()` / `fromChronicleFields()`.
 - All REST calls use Bearer token auth via `api-client.mjs`.
 - WebSocket messages are routed by type through `SyncManager`.
+- Chronicle-side serving rules live in `chronicle-package.json` at repo root; CI validates it against `module.json` via `tools/check-package-descriptor.mjs`.
 
 ## TODO
 
