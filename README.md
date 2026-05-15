@@ -65,6 +65,34 @@ The module runs sync for the GM only. Players receive updates passively through 
 - [Calendaria](https://foundryvtt.com/packages/calendaria) — Calendar sync
 - [Simple Calendar](https://foundryvtt.com/packages/foundryvtt-simple-calendar) — Calendar sync (alternative)
 
+## For Chronicle integrators
+
+This module ships a [`chronicle-package.json`](chronicle-package.json)
+descriptor at the repo root. Chronicle reads it during admin install to
+decide how to serve the module: where the manifest lives inside the zip,
+what URL shape to emit when generating per-campaign install URLs, and
+whether per-campaign signed tokens are required.
+
+The descriptor is the "Foundry instructs Chronicle" mechanism — every
+Foundry-specific assumption that would otherwise be hardcoded in
+Chronicle lives in this file instead, so the same Chronicle code can
+serve any future Foundry module (or other package type) without
+modification.
+
+CI validates the descriptor on every push and pull request via
+[`tools/check-package-descriptor.mjs`](tools/check-package-descriptor.mjs).
+The check enforces:
+
+- `chronicle-package.json` is valid JSON with `schemaVersion: 1`
+- `package.id` matches `module.json#/id`
+- `package.kind` is `"foundry-module"`
+- `package.moduleJsonPath` resolves to an actual file in the zip
+- Endpoint templates include the required `{campaign_id}` and `{token}` placeholders
+- Field types are correct
+
+Bumping `module.json#/id` (rare) requires updating
+`chronicle-package.json#/package/id` in the same commit.
+
 ## License
 
 MIT

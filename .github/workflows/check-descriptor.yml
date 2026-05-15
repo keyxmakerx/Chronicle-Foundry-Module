@@ -1,0 +1,30 @@
+name: Check Package Descriptor
+
+# Validates chronicle-package.json against module.json on every push to
+# main and every PR. Guards against the two files drifting (e.g., a
+# version bump in module.json without a corresponding update in the
+# descriptor, an id rename, an endpoint placeholder typo).
+#
+# Intentionally a separate workflow from release.yml — descriptor
+# validation should run on PRs (where the release workflow's tag-push
+# trigger doesn't fire) so misconfigurations are caught before merge.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  check-descriptor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate chronicle-package.json
+        run: node tools/check-package-descriptor.mjs
