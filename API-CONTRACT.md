@@ -830,6 +830,124 @@ Lists relations for an entity (used for shop inventory).
 
 ---
 
+## Chronicle-served Module Distribution
+
+This section documents the install/update contract — the URLs Foundry hits to
+fetch the module's manifest and zip from Chronicle (rather than GitHub).
+Settled by FM-CONSOLIDATE-R1 D1 and codified in `chronicle-package.json` at
+this repo's root (`serving.manifestEndpoint`, `serving.downloadEndpoint`).
+
+Unlike the REST endpoints above, these endpoints are hit by **Foundry itself**
+(both at install and on every update check), not by this module's runtime
+code. The Update Source diagnostic dialog (`scripts/update-info.mjs`) also
+hits the manifest endpoint manually so the operator can confirm reachability.
+
+### Authentication
+
+Per-campaign signed token in the query string — not the Bearer-token API key.
+Each token is tied to a specific campaign; Chronicle rotates them on request
+from the campaign owner. The token is generated when the owner first opens
+the Foundry VTT disclosure in their campaign settings.
+
+```
+?token=<signed>
+```
+
+### GET /api/v1/campaigns/:campaignId/foundry-vtt/module.json
+
+Returns the resolved `module.json` for whichever version the campaign is
+pinned to (or the auto-latest version if no pin is set), with `manifest` and
+`download` fields rewritten to per-campaign Chronicle URLs.
+
+**Used by:**
+- Foundry's Install Module dialog (operator pastes this URL).
+- Foundry's native Setup → Modules → Update All on every check.
+- `scripts/update-info.mjs` for the manual "Check Chronicle for updates".
+
+**Success response (200):** A standard Foundry `module.json` body. The fields
+named in the descriptor's `serving.rewriteFields` array (currently `manifest`
+and `download`) carry Chronicle URLs:
+
+```json
+{
+  "id": "chronicle-sync",
+  "version": "0.1.11",
+  "manifest": "https://chronicle.example.com/api/v1/campaigns/<cid>/foundry-vtt/module.json?token=<signed>",
+  "download": "https://chronicle.example.com/api/v1/campaigns/<cid>/foundry-vtt/module.zip?token=<signed>",
+  "...": "all other fields unchanged from the on-disk module.json"
+}
+```
+
+**Error response:** Structured JSON body so clients (including
+`update-info.mjs`) can surface actionable messages. Shape:
+
+```json
+{
+  "error": "no_version_available",
+  "message": "Campaign is pinned to Foundry module v0.X.Y but that version is not installed on this Chronicle instance...",
+  "category": "config"
+}
+```
+
+`category` is one of `config`, `auth`, `not_found`, `validation`, `internal`
+(loosely mapped to HTTP status: `503` for config, `403` for auth, `404` for
+not_found, `422` for validation, `500` for internal). Specific `error` codes
+evolve with Chronicle releases; `message` is always human-readable.
+
+### GET /api/v1/campaigns/:campaignId/foundry-vtt/module.zip
+
+Streams the release zip for the resolved pinned version. Same token auth as
+the manifest endpoint.
+
+**Used by:** Foundry's install/update flow, after reading the `download` URL
+from the manifest response.
+
+**Response:** `application/zip` body. The embedded `module.json` inside the
+zip carries Chronicle URLs (not the GitHub URLs in the source zip), so
+Foundry's subsequent update checks go to Chronicle.
+
+> **Note.** This zip-rewriting-at-download is in flight on the Chronicle side
+> (C-FMC-7). Until it deploys, the zip may carry the source `module.json`
+> with GitHub URLs, in which case Foundry's update checks after install will
+> route back to GitHub. The Update Source dialog detects this and reports
+> `github` as the install source even when installed via Chronicle.
+
+### Serving descriptor
+
+`chronicle-package.json` at this repo's root tells Chronicle how to serve
+this module. Schema v1:
+
+```jsonc
+{
+  "schemaVersion": 1,
+  "package": {
+    "id": "chronicle-sync",       // must match module.json#/id
+    "kind": "foundry-module",
+    "moduleJsonPath": "module.json"
+  },
+  "serving": {
+    "rewriteFields": ["manifest", "download"],
+    "manifestEndpoint": "/api/v1/campaigns/{campaign_id}/foundry-vtt/module.json?token={token}",
+    "downloadEndpoint": "/api/v1/campaigns/{campaign_id}/foundry-vtt/module.zip?token={token}",
+    "perCampaignSignedToken": true,
+    "zipContentRoot": ""
+  }
+}
+```
+
+Chronicle reads this from the extracted zip via `PostInstallHook` (C-FMC-5b);
+absent or invalid descriptor falls back to hardcoded defaults matching the
+schema above. CI validates the descriptor on every push via
+`tools/check-package-descriptor.mjs`.
+
+If Chronicle's URL shape ever changes, three places update together:
+
+1. `chronicle-package.json` (`serving.manifestEndpoint` / `downloadEndpoint`)
+2. `scripts/update-info.mjs` (`CHRONICLE_MANIFEST_RE` classifier)
+3. This section of `API-CONTRACT.md`
+
+---
+
 ## WebSocket Protocol
 
 ### Connection

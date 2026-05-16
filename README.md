@@ -42,13 +42,15 @@ pins, without further configuration.
 > can then pin any uploaded version per-campaign from their settings
 > tab.
 
-> **GitHub release distribution is deprecated.** The
-> `https://github.com/.../releases/latest/download/module.json` URL is
-> no longer published. Existing installs that point at GitHub continue
-> to run, but no further updates will arrive via that channel — open
-> the **Update Source** panel inside the module settings (Game Settings
-> → Module Settings → Chronicle Sync → Update Source) to check whether
-> your install needs to be re-pointed at Chronicle.
+> **GitHub release distribution is no longer the primary channel.**
+> The repo still produces GitHub releases (Chronicle's package catalog
+> uses them as its upstream source), but the install URL Foundry users
+> should consume is the per-campaign Chronicle URL above — that's how
+> per-campaign version pinning works. Existing installs pointing at
+> GitHub continue to run but won't receive the campaign's pinned
+> version. Open the **Update Source** panel (Game Settings → Module
+> Settings → Chronicle Sync → Update Source) to check whether your
+> install needs to be re-pointed at Chronicle.
 
 ## Updating in Foundry
 
