@@ -60,12 +60,36 @@
       <div class="update-info-result result-{{result.state}}">
         {{#if (eq result.state "update-available")}}
           <i class="fa-solid fa-arrow-up"></i>
+          <span>{{result.message}}</span>
         {{else if (eq result.state "up-to-date")}}
           <i class="fa-solid fa-check"></i>
+          <span>{{result.message}}</span>
         {{else}}
-          <i class="fa-solid fa-circle-exclamation"></i>
+          {{!--
+            Error / diagnostic result: 4-clause layout. Icon class is
+            chosen by the JS based on category (see CATEGORY_ICONS in
+            update-info.mjs); CSS picks the hue from result-{{state}}.
+          --}}
+          <i class="update-info-result-icon fa-solid {{result.iconClass}}"></i>
+          <div class="update-info-result-body">
+            <div class="update-info-result-line update-info-result-line-tried">
+              <strong>{{localize "CHRONICLE.UpdateInfo.Errors.TriedLabel"}}</strong>
+              <span>{{result.tried}}</span>
+            </div>
+            <div class="update-info-result-line update-info-result-line-happened">
+              <strong>{{localize "CHRONICLE.UpdateInfo.Errors.HappenedLabel"}}</strong>
+              <span>{{result.happened}}</span>
+            </div>
+            <div class="update-info-result-line update-info-result-line-cause">
+              <strong>{{localize "CHRONICLE.UpdateInfo.Errors.CauseLabel"}}</strong>
+              <span>{{result.cause}}</span>
+            </div>
+            <div class="update-info-result-line update-info-result-line-action">
+              <strong>{{localize "CHRONICLE.UpdateInfo.Errors.ActionLabel"}}</strong>
+              <span>{{result.action}}</span>
+            </div>
+          </div>
         {{/if}}
-        <span>{{result.message}}</span>
       </div>
     {{/if}}
   </section>
