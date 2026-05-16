@@ -18,10 +18,14 @@ const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**
  * Patterns used to classify the install-time manifest URL.
+ *
  * Chronicle pattern matches the per-campaign signed manifest endpoint
- * (`/api/v1/campaigns/<uuid>/foundry/module.json` + token query).
+ * served by Chronicle's `foundry_vtt` sub-plugin:
+ *   `/api/v1/campaigns/<uuid>/foundry-vtt/module.json?token=<signed>`
+ * The URL shape is defined in `chronicle-package.json` at repo root
+ * (`serving.manifestEndpoint`) and locked by FM-CONSOLIDATE-R1 D1.
  */
-const CHRONICLE_MANIFEST_RE = /\/api\/v1\/campaigns\/[^/]+\/foundry\/module\.json/i;
+const CHRONICLE_MANIFEST_RE = /\/api\/v1\/campaigns\/[^/]+\/foundry-vtt\/module\.json/i;
 const GITHUB_MANIFEST_RE = /github\.com/i;
 
 /**

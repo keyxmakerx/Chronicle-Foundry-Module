@@ -14,32 +14,46 @@ Entry point: `scripts/module.mjs` → registers settings on `init`, starts
 ## File Structure
 
 ```
-module.json           # Foundry module manifest (v12–v13)
-scripts/              # ES modules (.mjs)
-  module.mjs          # Entry point
-  settings.mjs        # World settings registration
-  sync-manager.mjs    # Orchestrator, API routing, WS management
-  api-client.mjs      # REST + WebSocket client
-  journal-sync.mjs    # Entity ↔ JournalEntry sync
-  map-sync.mjs        # Map marker/pin sync (markers ↔ Scene Notes)
-  calendar-sync.mjs   # Calendar adapter (Calendaria/SimpleCalendar)
-  actor-sync.mjs      # Character entity ↔ Actor sync
-  item-sync.mjs       # Item sync
-  note-sync.mjs       # Chronicle Notes ↔ JournalEntry sync
-  constants.mjs       # Shared constants (FLAG_SCOPE, MODULE_ID)
-  shop-widget.mjs     # Shop inventory UI
-  sync-dashboard.mjs  # 8-tab dashboard UI
-  adapters/           # Game system field mappers
-    generic-adapter.mjs # API-driven adapter for all systems
-templates/            # Handlebars templates
-styles/               # CSS
-lang/                 # Localization (en.json)
+module.json                       # Foundry module manifest (v12–v14)
+chronicle-package.json            # Chronicle serving descriptor (schema v1)
+scripts/                          # ES modules (.mjs)
+  module.mjs                      # Entry point
+  settings.mjs                    # World settings registration
+  constants.mjs                   # Shared constants (FLAG_SCOPE, MODULE_ID)
+  sync-manager.mjs                # Orchestrator, API routing, WS management
+  api-client.mjs                  # REST + WebSocket client
+  journal-sync.mjs                # Entity ↔ JournalEntry sync
+  map-sync.mjs                    # Chronicle map + sub-resources ↔ JournalEntry (image page); markers/drawings/tokens/fog/layers rendered as overlays via MapViewerSheet
+  map-viewer.mjs                  # MapViewerSheet (ApplicationV2): image + SVG overlay
+  calendar-sync.mjs               # Calendar adapter (Calendaria/SimpleCalendar)
+  actor-sync.mjs                  # Character entity ↔ Actor sync
+  item-sync.mjs                   # Item sync
+  note-sync.mjs                   # Chronicle Notes ↔ JournalEntry sync
+  shop-widget.mjs                 # Shop inventory UI
+  sync-dashboard.mjs              # 8-tab dashboard UI
+  update-info.mjs                 # "Update Source" diagnostic dialog (install/update flow)
+  character-claim-indicator.mjs   # Per-player character-claim status indicator
+  import-wizard.mjs               # Initial-import wizard UI
+  adapters/                       # Game system field mappers
+    generic-adapter.mjs           # API-driven adapter for all systems
+templates/                        # Handlebars templates
+styles/                           # CSS
+lang/                             # Localization (en.json)
+tools/
+  check-package-descriptor.mjs    # CI: validates chronicle-package.json vs module.json
+.github/workflows/
+  check-descriptor.yml            # Runs the descriptor check on push + PR
+  release.yml                     # Builds release zip (manual workflow_dispatch)
 ```
 
 ## API Contract
 
-See **API-CONTRACT.md** for the full Chronicle REST API and WebSocket contract
-with request/response schemas, authentication, and CORS requirements.
+See **API-CONTRACT.md** for the full Chronicle REST API and WebSocket contract,
+plus the Chronicle-served module distribution contract (per-campaign manifest +
+download endpoints, serving descriptor, error JSON shape).
+
+For the install/update flow specifically, also see `.ai.md` → "Chronicle
+Integration — Install & Updates".
 
 ## Code Conventions
 
