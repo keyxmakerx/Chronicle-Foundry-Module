@@ -1639,8 +1639,61 @@
   border: 1px solid rgba(34, 197, 94, 0.4);
 }
 
-.chronicle-update-info-form .update-info-result.result-error {
+/*
+ * Category-driven hues for the 4-clause diagnostic readout:
+ *   red    — auth-error, server   (something is broken / refused)
+ *   amber  — not-found, conflict  (configuration / transient state)
+ *   slate  — network, parse       (environment / unexpected payload)
+ */
+.chronicle-update-info-form .update-info-result.result-auth-error,
+.chronicle-update-info-form .update-info-result.result-server {
   background: rgba(239, 68, 68, 0.15);
   color: #fecaca;
   border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.chronicle-update-info-form .update-info-result.result-not-found,
+.chronicle-update-info-form .update-info-result.result-conflict {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fde68a;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.chronicle-update-info-form .update-info-result.result-network,
+.chronicle-update-info-form .update-info-result.result-parse {
+  background: rgba(148, 163, 184, 0.15);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+/* 4-clause body layout (tried / happened / cause / action). */
+.chronicle-update-info-form .update-info-result-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.chronicle-update-info-form .update-info-result-line {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.chronicle-update-info-form .update-info-result-line strong {
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.8;
+}
+
+.chronicle-update-info-form .update-info-result-line span {
+  word-break: break-word;
+}
+
+.chronicle-update-info-form .update-info-result-icon {
+  margin-top: 4px;
+  flex-shrink: 0;
 }
