@@ -936,8 +936,11 @@ at the Chronicle repo, pinned by the wire-contract decision:
 https://raw.githubusercontent.com/keyxmakerx/Chronicle/main/internal/plugins/foundry_vtt/error-catalog.json
 ```
 
-The file has `schema_version: 1`. FM-DRIFT-GUARD CI (queued) will fetch
-this URL on every Foundry PR and assert the table below matches.
+The artifact is treated as **implicit schema v1** — it does not currently
+carry an explicit `schema_version` field, and the decision to add one is
+deferred to the FM-DRIFT-GUARD dispatch (which will pin both the field
+shape and the CI mismatch behavior). FM-DRIFT-GUARD CI (queued) will
+fetch this URL on every Foundry PR and assert the table below matches.
 
 | `error` code                   | `category`   | Description                                                                                                                       |
 |--------------------------------|--------------|-----------------------------------------------------------------------------------------------------------------------------------|
@@ -951,10 +954,21 @@ this URL on every Foundry PR and assert the table below matches.
 | `token_not_initialized`        | `config`     | Owner has never opened the Foundry VTT disclosure for this campaign, so no token has been generated yet. HTTP 503.                |
 
 `error-catalog.json` also lists Chronicle's catch-all `ErrInternal`
-constructor with `wildcard: true`, category `internal`, HTTP 500 — this
-covers dynamic / unexpected error codes Chronicle did not enumerate.
-Treat any unknown `error` value in an `internal`-category response as
-covered by this wildcard.
+constructor with `wildcard: true`, category `internal`, HTTP 500. In the
+catalog file this entry's `code` is the literal placeholder `<dynamic>`;
+on the wire, the runtime `error` value is the underlying Go error
+message, **not** the literal text `<dynamic>`. Consumer rules per
+cordinator `decisions/2026-05-17-error-catalog-wire-contract.md`:
+
+- Treat wildcard codes as valid but **opaque**. Do not enumerate them in
+  any code→category map; do not branch on the runtime `error` value.
+- The `category` field remains authoritative for routing (here,
+  `internal`). Render `message` verbatim as with any other error.
+- Documentation lists the wildcard as a placeholder row, not an
+  enumerable code. FM-DRIFT-GUARD CI will treat any `wildcard: true`
+  entry as "any code value matches the placeholder" so the doc keeps
+  passing even though the wire payload differs from the literal
+  `<dynamic>` string.
 
 **Fallback when `category` is missing or unrecognized.**
 `scripts/update-info.mjs`'s `categorize()` (file:line
