@@ -1640,20 +1640,27 @@
 }
 
 /*
- * Category-driven hues for the 4-clause diagnostic readout:
- *   red    — auth-error, server   (something is broken / refused)
- *   amber  — not-found, conflict  (configuration / transient state)
- *   slate  — network, parse       (environment / unexpected payload)
+ * Category-driven hues. Class names mirror Chronicle's server-side
+ * category enum exactly (auth, config, not_found, validation, internal)
+ * with underscores rather than kebab-case — so a future contract change
+ * on Chronicle's side only requires touching the JS, not the CSS class
+ * names.
+ *
+ *   red    — auth, internal           (broken / refused / server fault)
+ *   amber  — config, validation,      (you / someone can fix this)
+ *            not_found
+ *   slate  — network, parse           (environment / unexpected payload)
  */
-.chronicle-update-info-form .update-info-result.result-auth-error,
-.chronicle-update-info-form .update-info-result.result-server {
+.chronicle-update-info-form .update-info-result.result-auth,
+.chronicle-update-info-form .update-info-result.result-internal {
   background: rgba(239, 68, 68, 0.15);
   color: #fecaca;
   border: 1px solid rgba(239, 68, 68, 0.4);
 }
 
-.chronicle-update-info-form .update-info-result.result-not-found,
-.chronicle-update-info-form .update-info-result.result-conflict {
+.chronicle-update-info-form .update-info-result.result-config,
+.chronicle-update-info-form .update-info-result.result-validation,
+.chronicle-update-info-form .update-info-result.result-not_found {
   background: rgba(245, 158, 11, 0.15);
   color: #fde68a;
   border: 1px solid rgba(245, 158, 11, 0.4);
@@ -1666,7 +1673,10 @@
   border: 1px solid rgba(148, 163, 184, 0.4);
 }
 
-/* 4-clause body layout (tried / happened / cause / action). */
+/*
+ * Body layout — shared by the Chronicle-message rendering and the
+ * client-built 4-clause rendering.
+ */
 .chronicle-update-info-form .update-info-result-body {
   display: flex;
   flex-direction: column;
@@ -1689,8 +1699,26 @@
   opacity: 0.8;
 }
 
-.chronicle-update-info-form .update-info-result-line span {
+.chronicle-update-info-form .update-info-result-line span,
+.chronicle-update-info-form .update-info-result-message {
   word-break: break-word;
+}
+
+.chronicle-update-info-form .update-info-result-message {
+  white-space: pre-line;
+}
+
+.chronicle-update-info-form .update-info-result-code {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+.chronicle-update-info-form .update-info-result-code code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 0 4px;
+  border-radius: 3px;
 }
 
 .chronicle-update-info-form .update-info-result-icon {
