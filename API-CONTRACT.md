@@ -865,15 +865,16 @@ disclosure in campaign settings (the rotate button hits the `token/rotate`
 endpoint documented below). After rotation:
 
 - The old token is **immediately invalidated**. Any Foundry instance that
-  installed before the rotation will start getting `401` with
-  `{ "error": "token_invalid", ... }` on its next update check.
+  installed before the rotation will start getting `403` with
+  `{ "error": "invalid_token", "category": "auth", ... }` on its next
+  update check.
 - The new token is the one embedded in the per-campaign URLs Chronicle
   emits going forward. Players who reinstall via the freshly-displayed
   URL get a working install again.
 - Recovery for existing installs is **reinstall**, not in-place repair —
   Foundry stores the install-time URL on its own and we don't have a
   supported way to swap it out from within the module. The Update Source
-  diagnostic dialog detects this case (`auth-error` category in
+  diagnostic dialog detects this case (`auth` category in
   `update-info.mjs`) and surfaces a "reinstall using the fresh install
   URL" action message.
 
@@ -903,37 +904,83 @@ and `download`) carry Chronicle URLs:
 ```
 
 **Error response shape:** Structured JSON body so clients (including
-`update-info.mjs`) can surface actionable messages. Shape:
+`update-info.mjs`) can surface actionable messages. Three fields, all
+strings:
 
 ```json
 {
-  "error": "token_invalid",
-  "message": "The install-time token was rotated by the campaign owner...",
-  "category": "auth"
+  "error": "invalid_token",
+  "category": "auth",
+  "message": "The install-time token was rotated by the campaign owner..."
 }
 ```
 
-`error` is a machine-readable code (see table below); `message` is always
-human-readable; `category` is a coarse bucket (`auth`, `not_found`, `config`,
-`validation`, `internal`).
+- `error` — machine-readable code from the catalog below. **Opaque
+  identifier**, used for logs / debugging. Foundry consumers MUST NOT
+  branch on this field; treating it as a public enum couples Foundry to
+  Chronicle's internal naming. Branch on `category` instead.
+- `category` — snake_case bucket from the five-value enum below
+  (`auth`, `config`, `not_found`, `validation`, `internal`). Pinned by
+  cordinator `decisions/2026-05-17-error-catalog-wire-contract.md`. This
+  is the canonical wire field name (Chronicle marshals it as
+  `json:"category"`); the `chronicleCategory` identifier seen inside
+  `scripts/update-info.mjs` is a local function-parameter rename, not a
+  wire field.
+- `message` — human-readable, operator-actionable string. Render verbatim;
+  do not re-construct on the client side.
 
-**Error code catalog.** This is the contract `update-info.mjs`'s
-`CODE_TO_CATEGORY` table consumes — adding a new code on Chronicle's side
-must be paired with a Foundry-side mapping update (or it falls through to
-the HTTP-status fallback, which is less precise).
+**Authoritative catalog.** The live source of truth is `error-catalog.json`
+at the Chronicle repo, pinned by the wire-contract decision:
 
-| `error` code             | HTTP | Category    | Fires when                                                                                                                                | Foundry diagnostic bucket |
-|--------------------------|------|-------------|-------------------------------------------------------------------------------------------------------------------------------------------|---------------------------|
-| `token_invalid`          | 401  | `auth`      | Token signature does not match (rotated, forged, or truncated).                                                                           | `auth-error`              |
-| `token_expired`          | 401  | `auth`      | Token's embedded expiry has passed.                                                                                                       | `auth-error`              |
-| `campaign_not_found`     | 404  | `not_found` | Campaign id in the URL no longer exists (deleted by the owner, or never existed).                                                         | `not-found`               |
-| `version_unpinned`       | 404  | `not_found` | Campaign exists but has no pinned module version and no auto-latest is available.                                                         | `not-found`               |
-| `version_unknown`        | 404  | `not_found` | Campaign is pinned to a version that doesn't exist in Chronicle's catalog (race after admin-side unpublish).                              | `not-found`               |
-| `no_version_available`   | 404  | `not_found` | Aliased successor of `version_unpinned` / `version_unknown` for clients that don't distinguish; treat as `not-found`.                     | `not-found`               |
+```
+https://raw.githubusercontent.com/keyxmakerx/Chronicle/main/internal/plugins/foundry_vtt/error-catalog.json
+```
 
-Any non-2xx response without a recognized `error` code falls through to
-HTTP-status-based categorization in `update-info.mjs`: 401/403 → `auth-error`,
-404 → `not-found`, 409 → `conflict`, 5xx → `server`.
+The artifact is treated as **implicit schema v1** — it does not currently
+carry an explicit `schema_version` field, and the decision to add one is
+deferred to the FM-DRIFT-GUARD dispatch (which will pin both the field
+shape and the CI mismatch behavior). FM-DRIFT-GUARD CI (queued) will
+fetch this URL on every Foundry PR and assert the table below matches.
+
+| `error` code                   | `category`   | Description                                                                                                                       |
+|--------------------------------|--------------|-----------------------------------------------------------------------------------------------------------------------------------|
+| `campaign_not_found`           | `not_found`  | Campaign id in the URL does not exist (deleted by the owner, or never existed). HTTP 404.                                         |
+| `descriptor_invalid`           | `validation` | The release zip's `chronicle-package.json` failed schema validation on Chronicle's `PostInstallHook`. HTTP 422.                   |
+| `invalid_token`                | `auth`       | Token signature does not match (rotated, forged, or truncated). HTTP 403.                                                         |
+| `module_json_missing`          | `internal`   | The resolved release zip is missing its `module.json` at the descriptor's `moduleJsonPath`. Chronicle-side packaging bug. HTTP 500. |
+| `no_package_registered`        | `config`     | Chronicle has no package registered for this campaign's Foundry serving slot. Owner needs to install / re-pin a release. HTTP 503. |
+| `no_version_available`         | `config`     | Campaign has no pinned version and no auto-latest is available (e.g., catalog is empty). HTTP 503.                                |
+| `pinned_version_not_installed` | `config`     | Campaign is pinned to a version that isn't in Chronicle's installed catalog (race after admin-side unpublish, or stale pin). HTTP 503. |
+| `token_not_initialized`        | `config`     | Owner has never opened the Foundry VTT disclosure for this campaign, so no token has been generated yet. HTTP 503.                |
+
+`error-catalog.json` also lists Chronicle's catch-all `ErrInternal`
+constructor with `wildcard: true`, category `internal`, HTTP 500. In the
+catalog file this entry's `code` is the literal placeholder `<dynamic>`;
+on the wire, the runtime `error` value is the underlying Go error
+message, **not** the literal text `<dynamic>`. Consumer rules per
+cordinator `decisions/2026-05-17-error-catalog-wire-contract.md`:
+
+- Treat wildcard codes as valid but **opaque**. Do not enumerate them in
+  any code→category map; do not branch on the runtime `error` value.
+- The `category` field remains authoritative for routing (here,
+  `internal`). Render `message` verbatim as with any other error.
+- Documentation lists the wildcard as a placeholder row, not an
+  enumerable code. FM-DRIFT-GUARD CI will treat any `wildcard: true`
+  entry as "any code value matches the placeholder" so the doc keeps
+  passing even though the wire payload differs from the literal
+  `<dynamic>` string.
+
+**Fallback when `category` is missing or unrecognized.**
+`scripts/update-info.mjs`'s `categorize()` (file:line
+`scripts/update-info.mjs:104-110`) trusts `body.category` if it appears
+in the local `CHRONICLE_CATEGORIES` set; otherwise it derives a category
+from HTTP status: 401 / 403 → `auth`, 404 → `not_found`, 5xx → `internal`,
+anything else → `internal`. There is intentionally **no** code-to-category
+lookup table on the Foundry side — branching on `error` would re-create
+the cross-repo drift the wire contract was written to prevent. New
+Chronicle categories therefore need a paired Foundry-side update; until
+that update lands, an unrecognized `category` falls through to HTTP-status
+classification (less precise, but never wrong).
 
 ### GET /api/v1/campaigns/:campaignId/foundry-vtt/module.zip
 
@@ -965,7 +1012,7 @@ reading this file should know they exist.
 
 Owner-only. Rotates the per-campaign signed token. After rotation, all
 existing Foundry installs of this campaign's module will get
-`token_invalid` errors on their next update check (see "Token rotation
+`invalid_token` errors on their next update check (see "Token rotation
 behavior" above).
 
 **Used by:** Chronicle's owner-side Foundry VTT disclosure (rotate button).
