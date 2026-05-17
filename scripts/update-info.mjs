@@ -16,6 +16,13 @@
  *
  * Wired into the module settings panel via `game.settings.registerMenu`
  * in `settings.mjs`.
+ *
+ * Architecture context: see `.ai.md` → "Chronicle Integration — Install
+ * & Updates" for the Foundry-side narrative (how Foundry stores the
+ * install-time URL, how rotation breaks installs, what counts as
+ * recovery). For the wire-level contract (response shapes, error
+ * codes), see `API-CONTRACT.md` → "Chronicle-served Module
+ * Distribution".
  */
 
 import { MODULE_ID } from './constants.mjs';

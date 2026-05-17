@@ -842,6 +842,11 @@ Unlike the REST endpoints above, these endpoints are hit by **Foundry itself**
 code. The Update Source diagnostic dialog (`scripts/update-info.mjs`) also
 hits the manifest endpoint manually so the operator can confirm reachability.
 
+> **For the Foundry-side narrative** (how Foundry stores the install-time
+> URL, how rotation affects already-installed instances, how update-info.mjs
+> classifies errors), see `.ai.md` → "Chronicle Integration — Install &
+> Updates".
+
 ### Authentication
 
 Per-campaign signed token in the query string — not the Bearer-token API key.
@@ -852,6 +857,25 @@ the Foundry VTT disclosure in their campaign settings.
 ```
 ?token=<signed>
 ```
+
+### Token rotation behavior
+
+The campaign owner can rotate their token at any time from the Foundry VTT
+disclosure in campaign settings (the rotate button hits the `token/rotate`
+endpoint documented below). After rotation:
+
+- The old token is **immediately invalidated**. Any Foundry instance that
+  installed before the rotation will start getting `401` with
+  `{ "error": "token_invalid", ... }` on its next update check.
+- The new token is the one embedded in the per-campaign URLs Chronicle
+  emits going forward. Players who reinstall via the freshly-displayed
+  URL get a working install again.
+- Recovery for existing installs is **reinstall**, not in-place repair —
+  Foundry stores the install-time URL on its own and we don't have a
+  supported way to swap it out from within the module. The Update Source
+  diagnostic dialog detects this case (`auth-error` category in
+  `update-info.mjs`) and surfaces a "reinstall using the fresh install
+  URL" action message.
 
 ### GET /api/v1/campaigns/:campaignId/foundry-vtt/module.json
 
@@ -878,21 +902,38 @@ and `download`) carry Chronicle URLs:
 }
 ```
 
-**Error response:** Structured JSON body so clients (including
+**Error response shape:** Structured JSON body so clients (including
 `update-info.mjs`) can surface actionable messages. Shape:
 
 ```json
 {
-  "error": "no_version_available",
-  "message": "Campaign is pinned to Foundry module v0.X.Y but that version is not installed on this Chronicle instance...",
-  "category": "config"
+  "error": "token_invalid",
+  "message": "The install-time token was rotated by the campaign owner...",
+  "category": "auth"
 }
 ```
 
-`category` is one of `config`, `auth`, `not_found`, `validation`, `internal`
-(loosely mapped to HTTP status: `503` for config, `403` for auth, `404` for
-not_found, `422` for validation, `500` for internal). Specific `error` codes
-evolve with Chronicle releases; `message` is always human-readable.
+`error` is a machine-readable code (see table below); `message` is always
+human-readable; `category` is a coarse bucket (`auth`, `not_found`, `config`,
+`validation`, `internal`).
+
+**Error code catalog.** This is the contract `update-info.mjs`'s
+`CODE_TO_CATEGORY` table consumes — adding a new code on Chronicle's side
+must be paired with a Foundry-side mapping update (or it falls through to
+the HTTP-status fallback, which is less precise).
+
+| `error` code             | HTTP | Category    | Fires when                                                                                                                                | Foundry diagnostic bucket |
+|--------------------------|------|-------------|-------------------------------------------------------------------------------------------------------------------------------------------|---------------------------|
+| `token_invalid`          | 401  | `auth`      | Token signature does not match (rotated, forged, or truncated).                                                                           | `auth-error`              |
+| `token_expired`          | 401  | `auth`      | Token's embedded expiry has passed.                                                                                                       | `auth-error`              |
+| `campaign_not_found`     | 404  | `not_found` | Campaign id in the URL no longer exists (deleted by the owner, or never existed).                                                         | `not-found`               |
+| `version_unpinned`       | 404  | `not_found` | Campaign exists but has no pinned module version and no auto-latest is available.                                                         | `not-found`               |
+| `version_unknown`        | 404  | `not_found` | Campaign is pinned to a version that doesn't exist in Chronicle's catalog (race after admin-side unpublish).                              | `not-found`               |
+| `no_version_available`   | 404  | `not_found` | Aliased successor of `version_unpinned` / `version_unknown` for clients that don't distinguish; treat as `not-found`.                     | `not-found`               |
+
+Any non-2xx response without a recognized `error` code falls through to
+HTTP-status-based categorization in `update-info.mjs`: 401/403 → `auth-error`,
+404 → `not-found`, 409 → `conflict`, 5xx → `server`.
 
 ### GET /api/v1/campaigns/:campaignId/foundry-vtt/module.zip
 
@@ -904,13 +945,47 @@ from the manifest response.
 
 **Response:** `application/zip` body. The embedded `module.json` inside the
 zip carries Chronicle URLs (not the GitHub URLs in the source zip), so
-Foundry's subsequent update checks go to Chronicle.
+Foundry's subsequent update checks go to Chronicle. This rewrite happens at
+download time per-campaign, so two campaigns hitting the same on-disk source
+zip get two zips whose embedded `module.json` carries different
+campaign-specific URLs. Settled by C-FMC-7.
 
-> **Note.** This zip-rewriting-at-download is in flight on the Chronicle side
-> (C-FMC-7). Until it deploys, the zip may carry the source `module.json`
-> with GitHub URLs, in which case Foundry's update checks after install will
-> route back to GitHub. The Update Source dialog detects this and reports
-> `github` as the install source even when installed via Chronicle.
+**Error response:** Same JSON error shape as the manifest endpoint (same
+`error` / `message` / `category` triple, same code catalog).
+
+### Owner-side endpoints (Chronicle web app)
+
+These endpoints are part of Chronicle's web UI, **not** called by Foundry or
+by anything in this module. They are documented here because they affect the
+contract Foundry depends on — token rotation invalidates installs, pin
+changes change the version served to Foundry — and a future contributor
+reading this file should know they exist.
+
+#### POST /api/v1/campaigns/:campaignId/foundry-vtt/token/rotate
+
+Owner-only. Rotates the per-campaign signed token. After rotation, all
+existing Foundry installs of this campaign's module will get
+`token_invalid` errors on their next update check (see "Token rotation
+behavior" above).
+
+**Used by:** Chronicle's owner-side Foundry VTT disclosure (rotate button).
+
+**Response (200):** The new signed token. Owner-side UI re-renders the
+per-campaign install URL with the new token embedded.
+
+#### PUT /api/v1/campaigns/:campaignId/settings/foundry-vtt-pin
+
+Owner-only. Sets or clears the campaign's pinned module version. An empty /
+absent pin means "track latest". A specific version (e.g., `0.1.11`) means
+"serve exactly this version regardless of newer releases".
+
+**Used by:** Chronicle's owner-side Foundry VTT disclosure (pin selector).
+
+**Effect on Foundry:** Already-installed instances will see the new version
+on their next `module.json` update check. Foundry will offer an update if
+the new pin's version is greater than the installed version, a downgrade
+prompt if it's lower (Foundry's native behavior — not module-specific), or
+do nothing if it's equal.
 
 ### Serving descriptor
 
@@ -935,7 +1010,8 @@ this module. Schema v1:
 }
 ```
 
-Chronicle reads this from the extracted zip via `PostInstallHook` (C-FMC-5b);
+This is the **contract between this repo and Chronicle's `packages` plugin**.
+Chronicle reads it from the extracted zip via `PostInstallHook` (C-FMC-5b);
 absent or invalid descriptor falls back to hardcoded defaults matching the
 schema above. CI validates the descriptor on every push via
 `tools/check-package-descriptor.mjs`.
