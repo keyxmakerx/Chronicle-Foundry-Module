@@ -64,11 +64,28 @@
         {{else if (eq result.state "up-to-date")}}
           <i class="fa-solid fa-check"></i>
           <span>{{result.message}}</span>
+        {{else if result.message}}
+          {{!--
+            Chronicle-classified error: render Chronicle's message
+            directly (server is source of truth for cause + action
+            wording). Optional `code` shown as a small footer for
+            debug context.
+          --}}
+          <i class="update-info-result-icon fa-solid {{result.iconClass}}"></i>
+          <div class="update-info-result-body">
+            <span class="update-info-result-message">{{result.message}}</span>
+            {{#if result.code}}
+              <span class="update-info-result-code">
+                {{localize "CHRONICLE.UpdateInfo.Errors.CodeLabel"}}
+                <code>{{result.code}}</code>
+              </span>
+            {{/if}}
+          </div>
         {{else}}
           {{!--
-            Error / diagnostic result: 4-clause layout. Icon class is
-            chosen by the JS based on category (see CATEGORY_ICONS in
-            update-info.mjs); CSS picks the hue from result-{{state}}.
+            Client-built 4-clause: network / parse / NoUrl / HttpFallback
+            (the cases Chronicle never classifies for us). Icon class
+            comes from JS; hue comes from result-{{state}} CSS.
           --}}
           <i class="update-info-result-icon fa-solid {{result.iconClass}}"></i>
           <div class="update-info-result-body">

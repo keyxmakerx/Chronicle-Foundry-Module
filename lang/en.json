@@ -347,37 +347,26 @@
         "HappenedLabel": "What happened:",
         "CauseLabel": "Likely cause:",
         "ActionLabel": "What to do:",
-        "NoMessage": "(no message in response body)",
-        "Tried": "Fetched the campaign manifest from {url}.",
-        "Happened": {
-          "Http": "Chronicle responded with HTTP {status}: {chronicleMessage}.",
-          "Network": "The fetch failed before reaching Chronicle: {error}.",
-          "Parse": "Chronicle's response could not be parsed as JSON: {error}.",
-          "MissingField": "Chronicle returned 200 OK but the response had no '{field}' field."
-        },
-        "AuthError": {
-          "Cause": "The install-time token is rejected — it may have been rotated, or the campaign's module pin was revoked.",
-          "Action": "Ask the campaign owner to reinstall this module using a fresh install URL from their campaign's VTT Setup Guides in Chronicle."
-        },
-        "NotFound": {
-          "Cause": "Either the campaign id is wrong, or there is no pinned module version for this campaign yet.",
-          "Action": "Ask the campaign owner to pin a module version in Campaign Settings → VTT Setup Guides → Foundry Module."
-        },
-        "Conflict": {
-          "Cause": "Chronicle reports a conflicting state on the manifest endpoint — usually a transient deploy, rotation, or migration in progress.",
-          "Action": "Wait a minute and try again. If the problem persists, contact the Chronicle admin."
-        },
+        "CodeLabel": "Chronicle error code:",
+        "NoStatusText": "(no status text)",
         "Network": {
+          "Tried": "Fetched the campaign manifest from {url}.",
+          "Happened": "The fetch failed before reaching Chronicle: {error}.",
           "Cause": "Foundry could not reach Chronicle at all — typically a DNS, TLS, CORS, or firewall problem.",
           "Action": "Verify your Chronicle URL in the module settings, then open the install URL in a browser to confirm it is reachable from this host."
         },
         "Parse": {
-          "Cause": "Chronicle returned a response but the body is not a valid module manifest.",
-          "Action": "Open the install URL in a browser. If you see HTML or an unexpected body, contact the Chronicle admin."
+          "Tried": "Fetched the campaign manifest from {url}.",
+          "Happened": "Chronicle's response could not be parsed as a module manifest: {error}.",
+          "Cause": "Chronicle returned a response but the body is not a valid module manifest. This is unusual when Chronicle is healthy.",
+          "Action": "Open the install URL in a browser. If you see HTML or an unexpected body, contact the Chronicle admin.",
+          "MissingFieldError": "200 OK but the response had no '{field}' field"
         },
-        "Server": {
-          "Cause": "Chronicle returned an error status without a recognized error code — most likely an unexpected server-side condition.",
-          "Action": "Try again in a moment. If it persists, contact the Chronicle admin and share the HTTP status shown above."
+        "HttpFallback": {
+          "Tried": "Fetched the campaign manifest from {url}.",
+          "Happened": "Chronicle responded with HTTP {status} {statusText} but did not return a structured error body.",
+          "Cause": "Something between Foundry and Chronicle (proxy, CDN, load balancer) returned the error, or Chronicle returned a non-JSON body.",
+          "Action": "Open the install URL in a browser to see the raw response. If it looks like a proxy error page, check your network. Otherwise contact the Chronicle admin."
         },
         "NoUrl": {
           "Tried": "No fetch — Foundry has no install-time manifest URL recorded for this module.",

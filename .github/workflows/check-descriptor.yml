@@ -28,3 +28,6 @@ jobs:
 
       - name: Validate chronicle-package.json
         run: node tools/check-package-descriptor.mjs
+
+      - name: Test update-info classifier helpers
+        run: node --test tools/test-update-info.mjs
