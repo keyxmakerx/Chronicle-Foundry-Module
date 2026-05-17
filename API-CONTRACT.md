@@ -865,8 +865,8 @@ disclosure in campaign settings (the rotate button hits the `token/rotate`
 endpoint documented below). After rotation:
 
 - The old token is **immediately invalidated**. Any Foundry instance that
-  installed before the rotation will start getting `401` with
-  `{ "error": "token_invalid", ... }` on its next update check.
+  installed before the rotation will start getting `403` with
+  `{ "error": "invalid_token", "category": "auth", ... }` on its next update check.
 - The new token is the one embedded in the per-campaign URLs Chronicle
   emits going forward. Players who reinstall via the freshly-displayed
   URL get a working install again.
@@ -907,33 +907,46 @@ and `download`) carry Chronicle URLs:
 
 ```json
 {
-  "error": "token_invalid",
+  "error": "invalid_token",
   "message": "The install-time token was rotated by the campaign owner...",
   "category": "auth"
 }
 ```
 
-`error` is a machine-readable code (see table below); `message` is always
-human-readable; `category` is a coarse bucket (`auth`, `not_found`, `config`,
-`validation`, `internal`).
+`error` is a machine-readable code (see catalog below); `message` is always
+human-readable and pre-formatted to be operator-actionable (4-clause
+narrative built server-side); `category` is one of five buckets — `auth`,
+`config`, `not_found`, `validation`, `internal` — that Foundry's
+`update-info.mjs` consumes directly as the diagnostic state.
 
-**Error code catalog.** This is the contract `update-info.mjs`'s
-`CODE_TO_CATEGORY` table consumes — adding a new code on Chronicle's side
-must be paired with a Foundry-side mapping update (or it falls through to
-the HTTP-status fallback, which is less precise).
+**Architectural property.** Foundry trusts the server-side `category`
+field rather than reclassifying client-side. Chronicle adding a new
+`error` code (or even a new category, provided it's one of the five enum
+values above) therefore requires zero Foundry deploys — the Update
+Source dialog renders Chronicle's `category` for hue + icon and
+`message` verbatim for the body. The consumer-side behavior is in
+`update-info.mjs`'s `categorize()` (see also PR #40 / FM-CSU-DIAG-FIX
+for the rationale).
 
-| `error` code             | HTTP | Category    | Fires when                                                                                                                                | Foundry diagnostic bucket |
-|--------------------------|------|-------------|-------------------------------------------------------------------------------------------------------------------------------------------|---------------------------|
-| `token_invalid`          | 401  | `auth`      | Token signature does not match (rotated, forged, or truncated).                                                                           | `auth-error`              |
-| `token_expired`          | 401  | `auth`      | Token's embedded expiry has passed.                                                                                                       | `auth-error`              |
-| `campaign_not_found`     | 404  | `not_found` | Campaign id in the URL no longer exists (deleted by the owner, or never existed).                                                         | `not-found`               |
-| `version_unpinned`       | 404  | `not_found` | Campaign exists but has no pinned module version and no auto-latest is available.                                                         | `not-found`               |
-| `version_unknown`        | 404  | `not_found` | Campaign is pinned to a version that doesn't exist in Chronicle's catalog (race after admin-side unpublish).                              | `not-found`               |
-| `no_version_available`   | 404  | `not_found` | Aliased successor of `version_unpinned` / `version_unknown` for clients that don't distinguish; treat as `not-found`.                     | `not-found`               |
+**Error code catalog.** Canonical list as defined in Chronicle's
+`internal/plugins/foundry_vtt/errors.go`. Codes are stable across
+Chronicle releases; new entries here are additive.
 
-Any non-2xx response without a recognized `error` code falls through to
-HTTP-status-based categorization in `update-info.mjs`: 401/403 → `auth-error`,
-404 → `not-found`, 409 → `conflict`, 5xx → `server`.
+| `error` code                    | HTTP | Category     | Fires when                                                                                                              | Foundry diagnostic bucket |
+|---------------------------------|------|--------------|-------------------------------------------------------------------------------------------------------------------------|---------------------------|
+| `invalid_token`                 | 403  | `auth`       | HMAC mismatch, or the token was rotated since this URL was issued.                                                       | `auth`                    |
+| `token_not_initialized`         | 503  | `config`     | Campaign owner has not yet visited VTT Setup Guides; the install URL has never been minted for this campaign.            | `config`                  |
+| `no_package_registered`         | 503  | `config`     | Admin has not added the Chronicle Foundry module package to `/admin/packages` on this Chronicle instance.                | `config`                  |
+| `no_version_available`          | 503  | `config`     | The package is registered but no version is installed yet.                                                              | `config`                  |
+| `pinned_version_not_installed`  | 503  | `config`     | The campaign's pin points to a version that is no longer present on disk (admin pruned it, or it never finished install). | `config`                  |
+| `campaign_not_found`            | 404  | `not_found`  | Owner-side endpoints only. The manifest endpoint surfaces unknown-campaign as `token_not_initialized` because token verification fires first. | `not_found`               |
+| `descriptor_invalid`            | 422  | `validation` | The `chronicle-package.json` shipped inside the installed zip failed schema validation.                                  | `validation`              |
+| `module_json_missing`           | 500  | `internal`   | The descriptor-declared `package.moduleJsonPath` does not exist in the extracted zip after install.                      | `internal`                |
+| (dynamic via `ErrInternal(...)`) | 500 | `internal`   | DB / filesystem / unexpected faults. Codes are operator-facing debug strings, not stable identifiers.                    | `internal`                |
+
+Any non-2xx response without a recognized `error` code (proxy, CDN,
+non-JSON body) falls through to HTTP-status-based categorization in
+`update-info.mjs`: 401/403 → `auth`, 404 → `not_found`, 5xx → `internal`.
 
 ### GET /api/v1/campaigns/:campaignId/foundry-vtt/module.zip
 
@@ -965,7 +978,7 @@ reading this file should know they exist.
 
 Owner-only. Rotates the per-campaign signed token. After rotation, all
 existing Foundry installs of this campaign's module will get
-`token_invalid` errors on their next update check (see "Token rotation
+`invalid_token` errors on their next update check (see "Token rotation
 behavior" above).
 
 **Used by:** Chronicle's owner-side Foundry VTT disclosure (rotate button).
