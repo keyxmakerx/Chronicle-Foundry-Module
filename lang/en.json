@@ -375,6 +375,12 @@
           "Action": "Reinstall the module using your campaign's install URL from Chronicle's VTT Setup Guides so Foundry can record it for future update checks."
         }
       }
+    },
+    "Recovery": {
+      "AuthFailure": {
+        "Prefix": "Chronicle Sync:",
+        "Message": "Your install URL is no longer valid. Copy the current Module Install URL from Chronicle's Campaign Settings → Integrations and reinstall this module to recover."
+      }
     }
   }
 }
