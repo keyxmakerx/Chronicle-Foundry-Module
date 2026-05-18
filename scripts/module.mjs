@@ -18,6 +18,7 @@ import { NoteSync } from './note-sync.mjs';
 import { SyncDashboard } from './sync-dashboard.mjs';
 import { MapViewerSheet } from './map-viewer.mjs';
 import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs';
+import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 
 /** @type {SyncManager|null} */
 let syncManager = null;
@@ -102,6 +103,18 @@ Hooks.once('ready', async () => {
   } catch (err) {
     console.error('Chronicle Sync | Failed to start sync manager', err);
     ui.notifications.error('Chronicle Sync: Connection failed. Open the dashboard to diagnose.');
+  }
+
+  // Fire-and-forget manifest health probe (GM only). Surfaces a sticky
+  // `ui.notifications.error` if Foundry's install-time URL no longer
+  // authenticates — typically because Chronicle rotated its signing
+  // secret or the campaign owner reset the token. Recovery path is
+  // reinstall from a fresh URL; the banner says so. Companion to
+  // cordinator Issue #17.
+  if (game.user.isGM) {
+    surfaceManifestRecoveryIfNeeded().catch((err) => {
+      console.warn('Chronicle Sync | Manifest recovery probe failed', err);
+    });
   }
 });
 
