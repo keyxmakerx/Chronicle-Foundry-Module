@@ -65,9 +65,13 @@ const CHRONICLE_CATEGORIES = new Set([
 /**
  * Read the install-time manifest URL Foundry stored for this module.
  * v13+ exposes it as `module.manifest`; v12 nested it under `module.data`.
+ *
+ * Exported for reuse by the startup recovery probe in `module.mjs` and by
+ * the unit tests in `tools/test-update-info.mjs`.
+ *
  * @returns {string} The manifest URL, or empty string if not available.
  */
-function _readInstallManifestUrl() {
+export function readInstallManifestUrl() {
   const mod = game.modules.get(MODULE_ID);
   if (!mod) return '';
   return mod.manifest || mod?.data?.manifest || '';
@@ -148,6 +152,123 @@ export function parseChronicleErrorBody(body) {
     message:  typeof body.message  === 'string' ? body.message  : '',
     category: typeof body.category === 'string' ? body.category : '',
   };
+}
+
+/**
+ * Passive manifest health probe. Fetches the install-time URL Foundry
+ * stored for this module and classifies the result using the same
+ * `parseChronicleErrorBody` + `categorize` path the "Check for updates"
+ * button uses. Pure data return — does not touch `ui.notifications`,
+ * does not render. Caller decides what to do with the result.
+ *
+ * Used by `surfaceManifestRecoveryIfNeeded()` on `ready` to detect a
+ * stuck install (post-restart secret rotation, token-version bump, or
+ * any other auth-category failure) and surface a recovery notification
+ * to the GM. Designed so future callers (e.g. a periodic re-probe) can
+ * reuse the same shape.
+ *
+ * Outcome shape:
+ *   { ok: false, state: 'no_url' }                               — Foundry has no install URL
+ *   { ok: true,  state: 'ok', httpStatus, url }                  — 200 reachable
+ *   { ok: false, state: <category>, httpStatus, url, code,
+ *     message, body? }                                           — Chronicle (or HTTP-fallback) error
+ *   { ok: false, state: 'network', url, error }                  — fetch threw
+ *   { ok: false, state: 'parse',   url, httpStatus, error }      — body not JSON / unreadable
+ *
+ * `state` values mirror `categorize()`'s output (`auth | config |
+ * not_found | validation | internal`) plus the Foundry-only buckets
+ * (`network`, `parse`) and the precondition state `no_url`. Callers
+ * branch on `state` for routing, render `message` verbatim.
+ *
+ * @returns {Promise<object>} Outcome object — see shape above.
+ */
+export async function probeManifest() {
+  const url = readInstallManifestUrl();
+  if (!url) return { ok: false, state: 'no_url' };
+
+  let response;
+  try {
+    response = await fetch(url, { cache: 'no-store' });
+  } catch (err) {
+    return { ok: false, state: 'network', url, error: err?.message || String(err) };
+  }
+
+  if (response.ok) {
+    return { ok: true, state: 'ok', httpStatus: response.status, url };
+  }
+
+  let body = null;
+  try {
+    body = await response.json();
+  } catch {
+    // Non-JSON or empty body — body stays null; classification falls
+    // through to HTTP-status only.
+  }
+  const parsed = parseChronicleErrorBody(body);
+  const category = categorize({
+    httpStatus: response.status,
+    chronicleCategory: parsed.category,
+  });
+
+  return {
+    ok:         false,
+    state:      category,
+    httpStatus: response.status,
+    url,
+    code:       parsed.code,
+    message:    parsed.message,
+    body,
+  };
+}
+
+/**
+ * Startup recovery hook. Probes the install-time manifest URL and, on an
+ * `auth`-category failure, surfaces a sticky `ui.notifications.error`
+ * with Chronicle's `body.message` (or a localized fallback) so the GM
+ * sees a clear recovery prompt in the Foundry UI instead of having to
+ * open DevTools.
+ *
+ * GM-only — players can't reinstall a module, so the banner would be
+ * unactionable noise. Callers should gate on `game.user.isGM`.
+ *
+ * One-shot per session. Fire-and-forget from the `ready` hook; failures
+ * inside this function never propagate. Non-`auth` failures (network,
+ * parse, server, etc.) intentionally do NOT surface here — the "Check
+ * for updates" dialog covers diagnostic cases that aren't actionable as
+ * "reinstall from a fresh URL".
+ *
+ * Resolves the Foundry-side companion to cordinator Issue #17
+ * (`FM-UPDATER-RECOVERY-UX`).
+ *
+ * @returns {Promise<void>}
+ */
+export async function surfaceManifestRecoveryIfNeeded() {
+  let result;
+  try {
+    result = await probeManifest();
+  } catch (err) {
+    // probeManifest itself catches network errors; an exception here is
+    // an unexpected bug in the probe path. Log, don't crash startup.
+    console.warn('Chronicle Sync | Manifest probe failed unexpectedly', err);
+    return;
+  }
+  if (result.state !== 'auth') return;
+
+  const fallback = game.i18n.localize('CHRONICLE.Recovery.AuthFailure.Message');
+  const prefix   = game.i18n.localize('CHRONICLE.Recovery.AuthFailure.Prefix');
+  const detail   = result.message && result.message.trim() ? result.message : fallback;
+  const text     = `${prefix} ${detail}`;
+
+  // Sticky banner so the GM can't miss it between sessions.
+  ui.notifications.error(text, { permanent: true, console: false });
+  // Mirror to the console for support / log-scraping operators. Reusing
+  // the existing structured log path from PR #40's error log would be
+  // overkill for a one-shot startup notice.
+  console.warn('Chronicle Sync | Manifest auth failure on startup:', {
+    httpStatus: result.httpStatus,
+    code:       result.code,
+    url:        result.url,
+  });
 }
 
 /**
@@ -239,7 +360,7 @@ export class UpdateInfoApplication extends HandlebarsApplicationMixin(Applicatio
   /** @override */
   async _prepareContext(_options = {}) {
     const mod = game.modules.get(MODULE_ID);
-    const url = _readInstallManifestUrl();
+    const url = readInstallManifestUrl();
     const source = classifyManifestSource(url);
     return {
       url,
@@ -262,7 +383,7 @@ export class UpdateInfoApplication extends HandlebarsApplicationMixin(Applicatio
   static async #onCheck(_event, _target) {
     if (this._checking) return;
 
-    const url = _readInstallManifestUrl();
+    const url = readInstallManifestUrl();
     if (!url) {
       // Precondition failure — Foundry has no install-time URL recorded.
       // Categorized as `not_found` so the styling lines up (something
@@ -388,7 +509,7 @@ export class UpdateInfoApplication extends HandlebarsApplicationMixin(Applicatio
   }
 
   static async #onCopyUrl(_event, _target) {
-    const url = _readInstallManifestUrl();
+    const url = readInstallManifestUrl();
     if (!url) return;
     try {
       await navigator.clipboard.writeText(url);
