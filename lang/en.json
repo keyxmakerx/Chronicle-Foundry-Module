@@ -497,7 +497,62 @@
         }
       },
       "Footer": {
-        "PR2": "Event CRUD · PR 2"
+        "PR2": "Event CRUD · PR 2",
+        "PR3": "Event CRUD · Moon strip · Recurrence · PR 3"
+      },
+      "MoonStrip": {
+        "Heading": "Moon phases",
+        "RandomizedTooltip": "Randomized phase mode — positions vary each tick.",
+        "ConvergenceLabel": "Multi-moon full convergence on day(s):",
+        "ClickHint": "Click a strip position to jump the day inspector there."
+      },
+      "Recurrence": {
+        "Legend": "Recurrence",
+        "Hint": "Apply a preset for events that repeat. Leave blank for a one-off date.",
+        "NoneSelected": "No recurrence (event fires once on its start date).",
+        "CurrentSummaryLabel": "Current pattern",
+        "Clear": "Clear recurrence",
+        "AdvancedHint": "Need more? Open Calendaria's note editor for the full condition tree.",
+        "PresetBadParams": "Recurrence preset needs valid parameters.",
+        "Preset": {
+          "EveryNthOfMonth":  "Every Nth of every month",
+          "EveryFullMoon":    "Every full",
+          "EveryNewMoon":     "Every new",
+          "EverySeason":      "Every day in",
+          "EveryWeekday":     "Every weekday Nth",
+          "EveryNthWeekdayOfSeason": "Every Nth weekday in",
+          "EveryMonth":       "Every day of month",
+          "EveryCycleStage":  "Every cycle stage"
+        },
+        "Errors": {
+          "NotAnObject":           "Recurrence is not an object.",
+          "RootMustBeGroup":       "Recurrence root must be a group (Calendaria silently ignores non-group roots).",
+          "InvalidGroupMode":      "Recurrence group mode must be 'and' or 'or'.",
+          "EmptyGroup":            "Recurrence group must contain at least one condition.",
+          "TooDeep":               "Recurrence nesting deeper than 2 levels (use Calendaria's advanced editor for this).",
+          "InvalidChild":          "Recurrence has an invalid child entry.",
+          "InvalidChildType":      "Recurrence has a child of unsupported type.",
+          "FieldNotInV1Scope":     "Recurrence uses a field outside the v1 builder scope (still saved verbatim).",
+          "OperatorNotInV1Scope":  "Recurrence uses an operator outside the v1 builder scope (still saved verbatim).",
+          "MissingValue":          "Recurrence condition is missing its value."
+        }
+      },
+      "Import": {
+        "HeaderAbsent": "No calendar in Chronicle yet — import from Calendaria",
+        "HintAbsent": "Pick a Calendaria calendar to push into Chronicle. After import, Chronicle becomes the source of truth and the existing two-way sync handles events and the current date.",
+        "Button": "Import into Chronicle",
+        "InProgress": "Importing…",
+        "Probing": "Checking Chronicle for an existing calendar…",
+        "Success": "Chronicle Sync: calendar imported.",
+        "ChronicleTooOld": "Chronicle doesn't expose the calendar-create endpoint yet — update Chronicle, then click Recheck.",
+        "Unreachable": "Could not reach Chronicle to check for a calendar. Check your sync settings.",
+        "Recheck": "Recheck Chronicle",
+        "CalendariaUnavailable": "Calendaria's API is not available — cannot read the source calendar.",
+        "CalendarNotFound": "Calendaria has no calendar with that id.",
+        "TransformFailed": "Could not transform the Calendaria calendar into a Chronicle payload.",
+        "ChronicleUnreachable": "Could not reach Chronicle — sync manager not initialized.",
+        "PostFailed": "Chronicle rejected the calendar payload.",
+        "NoCalendariaCalendars": "Calendaria has no calendars loaded. Open Calendaria's Calendar Editor to create one first."
       },
       "Degraded": {
         "NoCalendaria": "Calendaria is not installed or not enabled. Sync Calendar requires Calendaria to be active.",
