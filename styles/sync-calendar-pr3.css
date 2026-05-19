@@ -1,0 +1,330 @@
+/* ====================================================================
+ * Sync Calendar — FM-CAL-EDITOR-PR3 additions
+ * Moon strip + recurrence builder + empty-state Calendaria import
+ * ==================================================================== */
+
+/* --- Moon-phase strip in month view --------------------------------- */
+
+.sync-calendar .moon-strip-block {
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.16);
+  border: 1px solid var(--rail-border);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sync-calendar .moon-strip-heading {
+  margin: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sync-calendar .moon-strip-row {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  align-items: center;
+  gap: 6px;
+}
+
+.sync-calendar .moon-strip-label {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sync-calendar .moon-strip-label i {
+  font-size: 10px;
+  margin-left: 3px;
+  opacity: 0.75;
+}
+
+.sync-calendar .moon-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 1px;
+  height: 14px;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.sync-calendar .moon-day {
+  display: block;
+  height: 100%;
+  transition: outline 0.1s;
+}
+
+.sync-calendar .moon-day.is-full {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+}
+
+.sync-calendar .moon-day.is-new {
+  background: rgba(0, 0, 0, 0.85) !important;
+  opacity: 1 !important;
+}
+
+.sync-calendar .moon-strip-convergence {
+  margin: 0;
+  font-size: 11px;
+  color: var(--festival-color);
+}
+
+.sync-calendar .moon-strip-convergence i {
+  margin-right: 3px;
+}
+
+.sync-calendar .moon-strip-hint {
+  margin: 0;
+  font-size: 10px;
+  opacity: 0.55;
+  font-style: italic;
+}
+
+/* --- Recurrence builder in note form --------------------------------- */
+
+.sync-calendar .recurrence-fieldset {
+  border-color: rgba(167, 139, 250, 0.45);
+}
+
+.sync-calendar .recurrence-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0;
+  padding: 4px 6px;
+  background: rgba(167, 139, 250, 0.08);
+  border-radius: 3px;
+}
+
+.sync-calendar .recurrence-summary-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+.sync-calendar .recurrence-summary code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: #ddd6fe;
+  word-break: break-all;
+}
+
+.sync-calendar .recurrence-empty {
+  margin: 0 0 4px;
+  font-size: 11px;
+  opacity: 0.65;
+  font-style: italic;
+}
+
+.sync-calendar .recurrence-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.sync-calendar .recurrence-preset-btn {
+  font-size: 10px;
+  padding: 3px 8px;
+  background: rgba(167, 139, 250, 0.15);
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  color: #ddd6fe;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.sync-calendar .recurrence-preset-btn:hover:not(:disabled) {
+  background: rgba(167, 139, 250, 0.28);
+}
+
+.sync-calendar .recurrence-preset-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sync-calendar .recurrence-clear {
+  font-size: 10px;
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fecaca;
+  border-radius: 3px;
+  cursor: pointer;
+  align-self: flex-start;
+  margin-bottom: 4px;
+}
+
+.sync-calendar .recurrence-clear:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.sync-calendar .recurrence-advanced-hint {
+  margin: 4px 0 0;
+  font-size: 10px;
+  opacity: 0.55;
+  font-style: italic;
+}
+
+/* --- Empty-state import banner --------------------------------------- */
+
+.sync-calendar .import-banner {
+  margin: 8px 0;
+  padding: 10px 12px;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.32);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sync-calendar .import-banner.import-banner-inline {
+  margin: 0;
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.sync-calendar-degraded .import-banner {
+  max-width: 640px;
+  margin: 16px auto 0;
+  text-align: left;
+}
+
+.sync-calendar .import-banner h3 {
+  margin: 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #bfdbfe;
+}
+
+.sync-calendar .import-banner .import-hint,
+.sync-calendar .import-banner .import-probing,
+.sync-calendar .import-banner .import-too-old,
+.sync-calendar .import-banner .import-unreachable,
+.sync-calendar .import-banner .import-empty {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.sync-calendar .import-banner .import-too-old {
+  color: #fde68a;
+}
+
+.sync-calendar .import-banner .import-unreachable {
+  color: #fecaca;
+}
+
+.sync-calendar .import-calendar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sync-calendar .import-calendar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 3px;
+}
+
+.sync-calendar .import-cal-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sync-calendar .import-cal-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e0e7ff;
+}
+
+.sync-calendar .import-cal-stats {
+  font-size: 10px;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.sync-calendar .import-cal-skips {
+  font-size: 10px;
+  color: #fde68a;
+  opacity: 0.85;
+}
+
+.sync-calendar .import-btn {
+  font-size: 11px;
+  padding: 4px 10px;
+  background: rgba(59, 130, 246, 0.22);
+  border: 1px solid var(--finding-info);
+  color: #bfdbfe;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sync-calendar .import-btn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.36);
+}
+
+.sync-calendar .import-btn:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.sync-calendar .import-recheck {
+  font-size: 10px;
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px solid var(--rail-border);
+  color: inherit;
+  border-radius: 3px;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.sync-calendar .import-recheck:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sync-calendar .import-last-result {
+  margin: 0;
+  font-size: 11px;
+  padding: 4px 6px;
+  border-radius: 3px;
+}
+
+.sync-calendar .import-last-result.ok {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.sync-calendar .import-last-result.err {
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
