@@ -1725,3 +1725,505 @@
   margin-top: 4px;
   flex-shrink: 0;
 }
+
+/* ====================================================================
+ * Sync Calendar — FM-CAL-EDITOR-PR1
+ * 3-pane editor: left rail | year overview | day inspector
+ * ==================================================================== */
+
+.sync-calendar {
+  --rail-bg: rgba(0, 0, 0, 0.12);
+  --rail-border: rgba(255, 255, 255, 0.08);
+  --finding-warn: #f59e0b;
+  --finding-error: #ef4444;
+  --finding-info: #60a5fa;
+  --festival-color: #fbbf24;
+}
+
+.sync-calendar .sync-calendar-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 8px;
+  padding: 4px;
+}
+
+.sync-calendar-degraded {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+  height: 100%;
+}
+
+.sync-calendar-degraded i {
+  font-size: 32px;
+  opacity: 0.6;
+}
+
+.sync-calendar-degraded .meta {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.sync-calendar-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--rail-border);
+}
+
+.sync-calendar-header .title-block { flex: 1 1 auto; min-width: 0; }
+.sync-calendar-header .cal-name { margin: 0 0 2px 0; font-size: 16px; }
+.sync-calendar-header .cal-description {
+  margin: 0;
+  font-size: 11px;
+  opacity: 0.7;
+  max-height: 2.6em;
+  overflow: hidden;
+}
+
+.sync-calendar-header .header-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.sync-calendar-header .meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--rail-border);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.sync-calendar-header .meta-pill.warn {
+  border-color: var(--finding-warn);
+  color: var(--finding-warn);
+}
+
+.sync-calendar-header .header-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  font-size: 11px;
+}
+
+.sync-calendar-grid {
+  display: grid;
+  grid-template-columns: 220px 1fr 280px;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.sync-calendar .rail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: var(--rail-bg);
+  border: 1px solid var(--rail-border);
+  border-radius: 4px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.sync-calendar .rail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sync-calendar .rail-section h3 {
+  margin: 0;
+  padding: 0 0 4px 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.85;
+  border-bottom: 1px solid var(--rail-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sync-calendar .rail-section h3 .badge.warn {
+  background: var(--finding-warn);
+  color: #000;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.sync-calendar .rail-meta {
+  font-size: 10px;
+  opacity: 0.6;
+  margin: 0;
+}
+
+.sync-calendar .rail-meta.empty-state {
+  font-style: italic;
+}
+
+.sync-calendar .year-nav {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.sync-calendar .month-nav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sync-calendar .month-nav li.selected button {
+  background: rgba(96, 165, 250, 0.18);
+  border-color: var(--finding-info);
+}
+
+.sync-calendar .month-nav button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 28px 1fr auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.sync-calendar .month-nav button:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sync-calendar .month-nav .month-ord {
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+
+.sync-calendar .month-nav .badge,
+.sync-calendar .structure-list .count {
+  font-size: 10px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sync-calendar .month-nav .badge.festival,
+.sync-calendar .year-grid .badge.festival {
+  background: var(--festival-color);
+  color: #000;
+}
+
+.sync-calendar .structure-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sync-calendar .structure-list button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 8px;
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.sync-calendar .structure-list button:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sync-calendar .structure-list .count.empty {
+  opacity: 0.4;
+}
+
+.sync-calendar .findings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sync-calendar .finding-button {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 11px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--rail-border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.sync-calendar .finding-button:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.sync-calendar .finding.severity-error .finding-icon   { color: var(--finding-error); }
+.sync-calendar .finding.severity-warning .finding-icon { color: var(--finding-warn); }
+.sync-calendar .finding.severity-info .finding-icon    { color: var(--finding-info); }
+
+.sync-calendar .finding-icon {
+  font-size: 14px;
+  margin-top: 1px;
+}
+
+.sync-calendar .finding-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sync-calendar .finding-message {
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.sync-calendar .finding-hint {
+  opacity: 0.75;
+  font-weight: normal;
+}
+
+.sync-calendar .finding-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  opacity: 0.5;
+  align-self: flex-start;
+}
+
+.sync-calendar .pane {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: var(--rail-bg);
+  border: 1px solid var(--rail-border);
+  border-radius: 4px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.sync-calendar .pane-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.sync-calendar .pane-title-row h3 {
+  margin: 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sync-calendar .pane-meta {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.sync-calendar .year-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.sync-calendar .year-month {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--rail-border);
+  border-radius: 3px;
+}
+
+.sync-calendar .year-month.selected {
+  border-color: var(--finding-info);
+  background: rgba(96, 165, 250, 0.08);
+}
+
+.sync-calendar .year-month .month-header {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.sync-calendar .year-month .month-ord {
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+
+.sync-calendar .year-month .month-name {
+  font-weight: 600;
+}
+
+.sync-calendar .year-month .month-abbr {
+  font-size: 10px;
+  opacity: 0.65;
+}
+
+.sync-calendar .year-month .month-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.sync-calendar .year-month .month-meta .badge {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0 5px;
+  border-radius: 8px;
+  font-size: 10px;
+}
+
+.sync-calendar .year-month .month-select {
+  font-size: 11px;
+  padding: 2px 8px;
+  align-self: flex-start;
+}
+
+.sync-calendar .pane-footnote {
+  margin: 0;
+  font-size: 10px;
+  opacity: 0.55;
+  font-style: italic;
+}
+
+.sync-calendar .day-headline {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.sync-calendar .day-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0;
+  border-top: 1px solid var(--rail-border);
+}
+
+.sync-calendar .day-block:first-of-type {
+  border-top: none;
+}
+
+.sync-calendar .day-block h4 {
+  margin: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.8;
+}
+
+.sync-calendar .event-list,
+.sync-calendar .moon-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sync-calendar .event-row,
+.sync-calendar .moon-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 3px 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 3px;
+}
+
+.sync-calendar .event-row .event-name {
+  flex: 1 1 auto;
+  padding-left: 6px;
+  border-left: 3px solid transparent;
+}
+
+.sync-calendar .event-row .event-visibility {
+  font-size: 10px;
+  opacity: 0.5;
+  text-transform: uppercase;
+}
+
+.sync-calendar .moon-row {
+  border-left: 3px solid transparent;
+  justify-content: space-between;
+}
+
+.sync-calendar .moon-row .moon-name { font-weight: 600; }
+.sync-calendar .moon-row .moon-phase { opacity: 0.85; font-size: 11px; }
+
+.sync-calendar .add-event-stub {
+  font-size: 11px;
+  padding: 4px 8px;
+  align-self: flex-start;
+  opacity: 0.7;
+  cursor: pointer;
+}
+
+.sync-calendar .weather-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.sync-calendar .weather-temp {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.sync-calendar .weather-description {
+  margin: 0;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.sync-calendar-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 4px 12px;
+  border-top: 1px solid var(--rail-border);
+  font-size: 10px;
+  opacity: 0.6;
+}

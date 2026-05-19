@@ -1,0 +1,226 @@
+{{!--
+  Sync Calendar — main template.
+
+  Receives the view-model from SyncCalendarApplication._prepareContext().
+  Handles two top-level modes:
+    - degraded: Calendaria missing / incompatible / no active calendar
+    - normal:   3-pane layout (left rail / center year view / right day inspector)
+
+  Actions are wired via data-action="..." attributes that ApplicationV2
+  binds to the actions map in DEFAULT_OPTIONS. No inline onclick.
+--}}
+
+{{#if degraded}}
+  <section class="sync-calendar-degraded">
+    <i class="fa-solid fa-triangle-exclamation"></i>
+    <p>{{localize degradedReason}}</p>
+    {{#if calendariaVersion}}
+      <p class="meta">{{localize "CHRONICLE.SyncCalendar.CalendariaVersion"}}: {{calendariaVersion}}</p>
+    {{/if}}
+  </section>
+{{else}}
+  <header class="sync-calendar-header">
+    <div class="title-block">
+      <h2 class="cal-name">{{cal.name}}</h2>
+      {{#if cal.description}}
+        <p class="cal-description">{{cal.description}}</p>
+      {{/if}}
+    </div>
+    <div class="header-meta">
+      <span class="meta-pill">
+        <i class="fa-solid fa-calendar-day"></i>
+        {{localize "CHRONICLE.SyncCalendar.SelectedDate"}}:
+        {{selectedDate.day}} {{dayDetail.monthName}}, {{selectedDate.year}}
+      </span>
+      {{#if dayDetail.season}}
+        <span class="meta-pill" style="border-color: {{dayDetail.season.color}};">
+          <i class="fa-solid fa-leaf"></i> {{dayDetail.season.name}}
+        </span>
+      {{/if}}
+      {{#if findingTotal}}
+        <span class="meta-pill warn">
+          <i class="fa-solid fa-circle-exclamation"></i>
+          {{findingTotal}} {{localize "CHRONICLE.SyncCalendar.Findings.Pill"}}
+        </span>
+      {{/if}}
+      <button type="button" class="header-action" data-action="jump-today">
+        <i class="fa-solid fa-bullseye"></i>
+        {{localize "CHRONICLE.SyncCalendar.JumpToday"}}
+      </button>
+    </div>
+  </header>
+
+  <main class="sync-calendar-grid">
+
+    {{!-- LEFT RAIL: year navigator + structure summary + validation panel --}}
+    <aside class="rail rail-left">
+      <section class="rail-section">
+        <h3>{{localize "CHRONICLE.SyncCalendar.Rail.Year"}}</h3>
+        <div class="year-nav">
+          <span class="year-current">{{localize "CHRONICLE.SyncCalendar.YearLabel"}} {{selectedDate.year}}</span>
+        </div>
+        <ol class="month-nav">
+          {{#each yearOverview as |m|}}
+            <li class="{{#if m.isSelected}}selected{{/if}}">
+              <button type="button"
+                      data-action="select-month"
+                      data-month="{{m.ordinal}}"
+                      title="{{m.name}}">
+                <span class="month-ord">{{m.ordinal}}</span>
+                <span class="month-name">{{m.name}}</span>
+                {{#if m.noteCount}}<span class="badge">{{m.noteCount}}</span>{{/if}}
+                {{#if m.festivalCount}}<span class="badge festival">★ {{m.festivalCount}}</span>{{/if}}
+              </button>
+            </li>
+          {{/each}}
+        </ol>
+      </section>
+
+      <section class="rail-section">
+        <h3>{{localize "CHRONICLE.SyncCalendar.Rail.Structure"}}</h3>
+        <ul class="structure-list">
+          <li><button type="button" data-action="focus-target" data-focus="months">    {{localize "CHRONICLE.SyncCalendar.Structure.Months"}}    <span class="count">{{structureCounts.months}}</span></button></li>
+          <li><button type="button" data-action="focus-target" data-focus="weekdays">  {{localize "CHRONICLE.SyncCalendar.Structure.Weekdays"}}  <span class="count">{{structureCounts.weekdays}}</span></button></li>
+          <li><button type="button" data-action="focus-target" data-focus="seasons">   {{localize "CHRONICLE.SyncCalendar.Structure.Seasons"}}   <span class="count">{{structureCounts.seasons}}</span></button></li>
+          <li><button type="button" data-action="focus-target" data-focus="moons">     {{localize "CHRONICLE.SyncCalendar.Structure.Moons"}}     <span class="count">{{structureCounts.moons}}</span></button></li>
+          <li><button type="button" data-action="focus-target" data-focus="eras">      {{localize "CHRONICLE.SyncCalendar.Structure.Eras"}}      <span class="count">{{structureCounts.eras}}</span></button></li>
+          <li><button type="button" data-action="focus-target" data-focus="festivals"> {{localize "CHRONICLE.SyncCalendar.Structure.Festivals"}} <span class="count {{#unless structureCounts.festivals}}empty{{/unless}}">{{structureCounts.festivals}}</span></button></li>
+          <li><button type="button" data-action="focus-target" data-focus="cycles">    {{localize "CHRONICLE.SyncCalendar.Structure.Cycles"}}    <span class="count {{#unless structureCounts.cycles}}empty{{/unless}}">{{structureCounts.cycles}}</span></button></li>
+          <li><button type="button" data-action="focus-target" data-focus="weather">   {{localize "CHRONICLE.SyncCalendar.Structure.WeatherZones"}} <span class="count {{#unless structureCounts.weatherZones}}empty{{/unless}}">{{structureCounts.weatherZones}}</span></button></li>
+        </ul>
+        <p class="rail-meta">{{localize "CHRONICLE.SyncCalendar.Structure.ReadOnlyHint"}}</p>
+      </section>
+
+      <section class="rail-section">
+        <h3>
+          {{localize "CHRONICLE.SyncCalendar.Rail.Validation"}}
+          {{#if findingTotal}}<span class="badge warn">{{findingTotal}}</span>{{/if}}
+        </h3>
+        {{#if findingTotal}}
+          <ul class="findings">
+            {{#each findings as |f|}}
+              <li class="finding {{f.severityClass}}">
+                <button type="button" data-action="focus-target" data-focus="{{f.focusTarget}}" class="finding-button">
+                  <span class="finding-icon" aria-hidden="true">
+                    {{#if (eq f.severity "error")}}<i class="fa-solid fa-circle-xmark"></i>{{/if}}
+                    {{#if (eq f.severity "warning")}}<i class="fa-solid fa-triangle-exclamation"></i>{{/if}}
+                    {{#if (eq f.severity "info")}}<i class="fa-solid fa-circle-info"></i>{{/if}}
+                  </span>
+                  <span class="finding-body">
+                    <span class="finding-message">{{f.message}}</span>
+                    {{#if f.fixHint}}<span class="finding-hint">{{f.fixHint}}</span>{{/if}}
+                    <span class="finding-code">{{f.code}}</span>
+                  </span>
+                </button>
+              </li>
+            {{/each}}
+          </ul>
+        {{else}}
+          <p class="rail-meta empty-state">{{localize "CHRONICLE.SyncCalendar.Findings.None"}}</p>
+        {{/if}}
+      </section>
+    </aside>
+
+    {{!-- CENTER: year overview (months grid) --}}
+    <section class="pane pane-center">
+      <div class="pane-title-row">
+        <h3>{{localize "CHRONICLE.SyncCalendar.YearOverview"}}</h3>
+        <span class="pane-meta">{{localize "CHRONICLE.SyncCalendar.YearOverviewHint"}}</span>
+      </div>
+      <div class="year-grid">
+        {{#each yearOverview as |m|}}
+          <article class="year-month {{#if m.isSelected}}selected{{/if}}">
+            <header class="month-header">
+              <span class="month-ord">{{m.ordinal}}.</span>
+              <span class="month-name">{{m.name}}</span>
+              {{#if m.abbreviation}}<span class="month-abbr">{{m.abbreviation}}</span>{{/if}}
+            </header>
+            <div class="month-meta">
+              <span>{{m.days}} {{localize "CHRONICLE.SyncCalendar.DaysSuffix"}}</span>
+              {{#if m.noteCount}}<span class="badge">{{m.noteCount}} {{localize "CHRONICLE.SyncCalendar.NotesSuffix"}}</span>{{/if}}
+              {{#if m.festivalCount}}<span class="badge festival">★ {{m.festivalCount}}</span>{{/if}}
+            </div>
+            <button type="button" class="month-select"
+                    data-action="select-month"
+                    data-month="{{m.ordinal}}">
+              {{localize "CHRONICLE.SyncCalendar.ViewMonth"}}
+            </button>
+          </article>
+        {{/each}}
+      </div>
+      <p class="pane-footnote">{{localize "CHRONICLE.SyncCalendar.YearOverviewFootnote"}}</p>
+    </section>
+
+    {{!-- RIGHT: day inspector --}}
+    <aside class="rail rail-right">
+      <section class="rail-section">
+        <h3>{{localize "CHRONICLE.SyncCalendar.Rail.SelectedDay"}}</h3>
+        <p class="day-headline">
+          {{dayDetail.day}} {{dayDetail.monthName}}, {{dayDetail.year}}
+        </p>
+
+        <div class="day-block">
+          <h4>{{localize "CHRONICLE.SyncCalendar.Day.Events"}} ({{dayDetail.notes.length}})</h4>
+          {{#if dayDetail.notes.length}}
+            <ul class="event-list">
+              {{#each dayDetail.notes as |n|}}
+                <li class="event-row">
+                  {{#if n.icon}}<i class="event-icon {{n.icon}}" aria-hidden="true"></i>{{/if}}
+                  <span class="event-name" {{#if n.color}}style="border-left-color: {{n.color}};"{{/if}}>{{n.name}}</span>
+                  {{#if n.visibility}}<span class="event-visibility">{{n.visibility}}</span>{{/if}}
+                </li>
+              {{/each}}
+            </ul>
+          {{else}}
+            <p class="rail-meta empty-state">{{localize "CHRONICLE.SyncCalendar.Day.NoEvents"}}</p>
+          {{/if}}
+          <button type="button" class="add-event-stub" data-action="add-event">
+            <i class="fa-solid fa-plus"></i>
+            {{localize "CHRONICLE.SyncCalendar.AddEvent.Label"}}
+          </button>
+        </div>
+
+        <div class="day-block">
+          <h4>{{localize "CHRONICLE.SyncCalendar.Day.Moons"}}</h4>
+          {{#if dayDetail.moonPhases.length}}
+            <ul class="moon-list">
+              {{#each dayDetail.moonPhases as |p|}}
+                <li class="moon-row" {{#if p.color}}style="border-left-color: {{p.color}};"{{/if}}>
+                  <span class="moon-name">{{p.moonName}}</span>
+                  <span class="moon-phase">{{p.phaseName}}</span>
+                </li>
+              {{/each}}
+            </ul>
+          {{else}}
+            <p class="rail-meta empty-state">{{localize "CHRONICLE.SyncCalendar.Day.NoMoons"}}</p>
+          {{/if}}
+        </div>
+
+        <div class="day-block">
+          <h4>{{localize "CHRONICLE.SyncCalendar.Day.Weather"}}</h4>
+          {{#if dayDetail.weather}}
+            <div class="weather-row">
+              {{#if dayDetail.weather.icon}}<i class="weather-icon {{dayDetail.weather.icon}}" aria-hidden="true"></i>{{/if}}
+              <span class="weather-label">{{dayDetail.weather.label}}</span>
+              {{#if dayDetail.weather.temperature}}<span class="weather-temp">{{dayDetail.weather.temperature}}°C</span>{{/if}}
+            </div>
+            {{#if dayDetail.weather.description}}
+              <p class="weather-description">{{dayDetail.weather.description}}</p>
+            {{/if}}
+          {{else}}
+            <p class="rail-meta empty-state">{{localize "CHRONICLE.SyncCalendar.Day.NoWeather"}}</p>
+          {{/if}}
+        </div>
+      </section>
+    </aside>
+
+  </main>
+
+  <footer class="sync-calendar-footer">
+    <span class="footer-meta">{{localize "CHRONICLE.SyncCalendar.Footer.ReadOnly"}}</span>
+    {{#if calendariaVersion}}
+      <span class="footer-meta">Calendaria v{{calendariaVersion}}</span>
+    {{/if}}
+    <span class="footer-meta">schema v{{schemaVersion}}</span>
+  </footer>
+{{/if}}
