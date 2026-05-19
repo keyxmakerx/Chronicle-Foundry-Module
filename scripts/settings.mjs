@@ -249,10 +249,14 @@ export function registerSettings() {
   // with an always-on validation panel. Read-only in PR 1; event authoring,
   // recurrence builder, weather + structure editing land in PR 2-5 per
   // cordinator reports/foundry/2026-05-19-fm-cal-editor-scoping.md.
-  game.settings.registerMenu(MODULE_ID, 'syncCalendar', {
-    name: game.i18n.localize('CHRONICLE.Settings.SyncCalendar.Name'),
-    hint: game.i18n.localize('CHRONICLE.Settings.SyncCalendar.Hint'),
-    label: game.i18n.localize('CHRONICLE.Settings.SyncCalendar.Label'),
+  // i18n keys live under `CHRONICLE.Settings.SyncCalendarMenu.*` (not
+  // `CHRONICLE.Settings.SyncCalendar.*`) — that latter namespace is the
+  // existing `syncCalendar` boolean toggle's hint/name. PR 1 collided
+  // the two; PR 2's carry-in fix B renamed the menu entry's keys.
+  game.settings.registerMenu(MODULE_ID, 'syncCalendarMenu', {
+    name: game.i18n.localize('CHRONICLE.Settings.SyncCalendarMenu.Name'),
+    hint: game.i18n.localize('CHRONICLE.Settings.SyncCalendarMenu.Hint'),
+    label: game.i18n.localize('CHRONICLE.Settings.SyncCalendarMenu.Label'),
     icon: 'fa-solid fa-calendar-days',
     type: SyncCalendarApplication,
     restricted: true,
