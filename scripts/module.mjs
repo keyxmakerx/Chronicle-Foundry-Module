@@ -45,6 +45,10 @@ Hooks.once('init', () => {
   Handlebars.registerHelper('eq', (a, b) => a === b);
   Handlebars.registerHelper('neq', (a, b) => a !== b);
   Handlebars.registerHelper('lt', (a, b) => a < b);
+  // PR 3 (Sync Calendar): serialize a value as JSON for embedding in a
+  // data-* attribute. The recurrence preset buttons stash their
+  // `paramsTemplate` object here so the click handler can decode it.
+  Handlebars.registerHelper('json', (v) => new Handlebars.SafeString(JSON.stringify(v ?? {})));
   Handlebars.registerHelper('timeAgo', (isoString) => {
     if (!isoString) return 'Never';
     const diff = Date.now() - new Date(isoString).getTime();
