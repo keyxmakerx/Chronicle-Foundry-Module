@@ -1214,17 +1214,22 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
 /**
  * Pre-built option lists for the form's `<select>` elements. Templates
  * iterate these to render `<option>` elements with localized labels.
+ *
+ * Note: the labelKey paths use the `VisibilityOption` / `DisplayStyleOption`
+ * sub-objects in `lang/en.json` (not `Visibility.Visible` flat keys) to
+ * avoid colliding with the sibling `Visibility` / `DisplayStyle` field
+ * label strings — see F-LANG-1 footgun in `.ai.md`.
  */
 const VISIBILITY_OPTIONS = [
-  { value: VISIBILITY.VISIBLE, labelKey: 'CHRONICLE.SyncCalendar.NoteForm.Visibility.Visible' },
-  { value: VISIBILITY.HIDDEN,  labelKey: 'CHRONICLE.SyncCalendar.NoteForm.Visibility.Hidden' },
-  { value: VISIBILITY.SECRET,  labelKey: 'CHRONICLE.SyncCalendar.NoteForm.Visibility.Secret' },
+  { value: VISIBILITY.VISIBLE, labelKey: 'CHRONICLE.SyncCalendar.NoteForm.VisibilityOption.Visible' },
+  { value: VISIBILITY.HIDDEN,  labelKey: 'CHRONICLE.SyncCalendar.NoteForm.VisibilityOption.Hidden' },
+  { value: VISIBILITY.SECRET,  labelKey: 'CHRONICLE.SyncCalendar.NoteForm.VisibilityOption.Secret' },
 ];
 
 const DISPLAY_STYLE_OPTIONS = [
-  { value: DISPLAY_STYLE.ICON,   labelKey: 'CHRONICLE.SyncCalendar.NoteForm.DisplayStyle.Icon' },
-  { value: DISPLAY_STYLE.PIP,    labelKey: 'CHRONICLE.SyncCalendar.NoteForm.DisplayStyle.Pip' },
-  { value: DISPLAY_STYLE.BANNER, labelKey: 'CHRONICLE.SyncCalendar.NoteForm.DisplayStyle.Banner' },
+  { value: DISPLAY_STYLE.ICON,   labelKey: 'CHRONICLE.SyncCalendar.NoteForm.DisplayStyleOption.Icon' },
+  { value: DISPLAY_STYLE.PIP,    labelKey: 'CHRONICLE.SyncCalendar.NoteForm.DisplayStyleOption.Pip' },
+  { value: DISPLAY_STYLE.BANNER, labelKey: 'CHRONICLE.SyncCalendar.NoteForm.DisplayStyleOption.Banner' },
 ];
 
 /**
