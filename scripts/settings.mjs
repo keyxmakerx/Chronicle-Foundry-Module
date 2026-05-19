@@ -7,6 +7,7 @@
 
 import { MODULE_ID } from './constants.mjs';
 import { UpdateInfoApplication } from './update-info.mjs';
+import { SyncCalendarApplication } from './sync-calendar.mjs';
 
 /**
  * Register all Chronicle Sync module settings.
@@ -241,6 +242,19 @@ export function registerSettings() {
     label: game.i18n.localize('CHRONICLE.Settings.UpdateInfo.Label'),
     icon: 'fa-solid fa-circle-info',
     type: UpdateInfoApplication,
+    restricted: true,
+  });
+
+  // "Sync Calendar" — GM-only 3-pane view of the active Calendaria calendar
+  // with an always-on validation panel. Read-only in PR 1; event authoring,
+  // recurrence builder, weather + structure editing land in PR 2-5 per
+  // cordinator reports/foundry/2026-05-19-fm-cal-editor-scoping.md.
+  game.settings.registerMenu(MODULE_ID, 'syncCalendar', {
+    name: game.i18n.localize('CHRONICLE.Settings.SyncCalendar.Name'),
+    hint: game.i18n.localize('CHRONICLE.Settings.SyncCalendar.Hint'),
+    label: game.i18n.localize('CHRONICLE.Settings.SyncCalendar.Label'),
+    icon: 'fa-solid fa-calendar-days',
+    type: SyncCalendarApplication,
     restricted: true,
   });
 }
