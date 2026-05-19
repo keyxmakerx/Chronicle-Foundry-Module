@@ -22,6 +22,55 @@
     {{#if calendariaVersion}}
       <p class="meta">{{localize "CHRONICLE.SyncCalendar.CalendariaVersion"}}: {{calendariaVersion}}</p>
     {{/if}}
+    {{#if importBanner}}
+      {{!-- Import banner shown even in degraded state if Chronicle has no calendar --}}
+      <div class="import-banner">
+        {{#if (eq importBanner.state "probing")}}
+          <p class="import-probing">{{localize "CHRONICLE.SyncCalendar.Import.Probing"}}</p>
+        {{else if (eq importBanner.state "absent")}}
+          <h3>{{localize "CHRONICLE.SyncCalendar.Import.HeaderAbsent"}}</h3>
+          <p class="import-hint">{{localize "CHRONICLE.SyncCalendar.Import.HintAbsent"}}</p>
+          {{#if importBanner.calendars.length}}
+            <ul class="import-calendar-list">
+              {{#each importBanner.calendars as |cal|}}
+                <li class="import-calendar-row">
+                  <div class="import-cal-summary">
+                    <span class="import-cal-name">{{cal.name}}</span>
+                    <span class="import-cal-stats">{{cal.daysPerYear}} {{localize "CHRONICLE.SyncCalendar.DaysSuffix"}} · {{cal.monthCount}} mo · {{cal.weekdayCount}} wk · {{cal.moonCount}} moons</span>
+                    {{#if cal.skipNotice}}<span class="import-cal-skips">{{cal.skipNotice}}</span>{{/if}}
+                  </div>
+                  <button type="button" class="import-btn"
+                          data-action="import-calendar"
+                          data-calendar-id="{{cal.id}}"
+                          {{#if cal.busy}}disabled{{/if}}>
+                    {{#if cal.busy}}
+                      <i class="fa-solid fa-circle-notch fa-spin"></i> {{localize "CHRONICLE.SyncCalendar.Import.InProgress"}}
+                    {{else}}
+                      <i class="fa-solid fa-download"></i> {{localize "CHRONICLE.SyncCalendar.Import.Button"}}
+                    {{/if}}
+                  </button>
+                </li>
+              {{/each}}
+            </ul>
+          {{else}}
+            <p class="import-empty">{{localize "CHRONICLE.SyncCalendar.Import.NoCalendariaCalendars"}}</p>
+          {{/if}}
+        {{else if (eq importBanner.state "no-create-api")}}
+          <p class="import-too-old"><i class="fa-solid fa-circle-info"></i> {{localize "CHRONICLE.SyncCalendar.Import.ChronicleTooOld"}}</p>
+        {{else if (eq importBanner.state "unreachable")}}
+          <p class="import-unreachable"><i class="fa-solid fa-plug-circle-xmark"></i> {{localize "CHRONICLE.SyncCalendar.Import.Unreachable"}}</p>
+        {{/if}}
+        {{#if importBanner.lastResult}}
+          <p class="import-last-result {{#if importBanner.lastResult.ok}}ok{{else}}err{{/if}}">
+            {{localize importBanner.lastResult.key}}
+            {{#if importBanner.lastResult.detail}} — {{importBanner.lastResult.detail}}{{/if}}
+          </p>
+        {{/if}}
+        <button type="button" class="import-recheck" data-action="recheck-chronicle">
+          <i class="fa-solid fa-rotate"></i> {{localize "CHRONICLE.SyncCalendar.Import.Recheck"}}
+        </button>
+      </div>
+    {{/if}}
   </section>
 {{else}}
   <header class="sync-calendar-header">
@@ -60,6 +109,53 @@
       </button>
     </div>
   </header>
+
+  {{#if importBanner}}
+    {{!-- Non-degraded but Chronicle still has no calendar — surface the
+         import banner above the main grid so the editor stays usable
+         for browsing while the operator decides which calendar to import. --}}
+    <section class="import-banner import-banner-inline">
+      {{#if (eq importBanner.state "probing")}}
+        <p class="import-probing">{{localize "CHRONICLE.SyncCalendar.Import.Probing"}}</p>
+      {{else if (eq importBanner.state "absent")}}
+        <h3>{{localize "CHRONICLE.SyncCalendar.Import.HeaderAbsent"}}</h3>
+        <p class="import-hint">{{localize "CHRONICLE.SyncCalendar.Import.HintAbsent"}}</p>
+        {{#if importBanner.calendars.length}}
+          <ul class="import-calendar-list">
+            {{#each importBanner.calendars as |cal|}}
+              <li class="import-calendar-row">
+                <div class="import-cal-summary">
+                  <span class="import-cal-name">{{cal.name}}</span>
+                  <span class="import-cal-stats">{{cal.daysPerYear}} {{localize "CHRONICLE.SyncCalendar.DaysSuffix"}} · {{cal.monthCount}} mo · {{cal.weekdayCount}} wk · {{cal.moonCount}} moons</span>
+                  {{#if cal.skipNotice}}<span class="import-cal-skips">{{cal.skipNotice}}</span>{{/if}}
+                </div>
+                <button type="button" class="import-btn"
+                        data-action="import-calendar"
+                        data-calendar-id="{{cal.id}}"
+                        {{#if cal.busy}}disabled{{/if}}>
+                  {{#if cal.busy}}
+                    <i class="fa-solid fa-circle-notch fa-spin"></i> {{localize "CHRONICLE.SyncCalendar.Import.InProgress"}}
+                  {{else}}
+                    <i class="fa-solid fa-download"></i> {{localize "CHRONICLE.SyncCalendar.Import.Button"}}
+                  {{/if}}
+                </button>
+              </li>
+            {{/each}}
+          </ul>
+        {{/if}}
+      {{else if (eq importBanner.state "no-create-api")}}
+        <p class="import-too-old"><i class="fa-solid fa-circle-info"></i> {{localize "CHRONICLE.SyncCalendar.Import.ChronicleTooOld"}}</p>
+      {{else if (eq importBanner.state "unreachable")}}
+        <p class="import-unreachable"><i class="fa-solid fa-plug-circle-xmark"></i> {{localize "CHRONICLE.SyncCalendar.Import.Unreachable"}}</p>
+      {{/if}}
+      {{#if importBanner.lastResult}}
+        <p class="import-last-result {{#if importBanner.lastResult.ok}}ok{{else}}err{{/if}}">
+          {{localize importBanner.lastResult.key}}
+          {{#if importBanner.lastResult.detail}} — {{importBanner.lastResult.detail}}{{/if}}
+        </p>
+      {{/if}}
+    </section>
+  {{/if}}
 
   <main class="sync-calendar-grid">
 
@@ -153,6 +249,33 @@
             </button>
           {{/each}}
         </div>
+        {{#if moonStrip}}
+          <div class="moon-strip-block">
+            <h4 class="moon-strip-heading">
+              <i class="fa-solid fa-moon"></i> {{localize "CHRONICLE.SyncCalendar.MoonStrip.Heading"}}
+            </h4>
+            {{#each moonStrip.moons as |m|}}
+              <div class="moon-strip-row" title="{{m.name}}">
+                <span class="moon-strip-label" style="color: {{m.color}};">{{m.name}}{{#if m.isRandomized}} <i class="fa-solid fa-dice" title="{{localize "CHRONICLE.SyncCalendar.MoonStrip.RandomizedTooltip"}}"></i>{{/if}}</span>
+                <div class="moon-strip" data-strip-days="{{monthDetail.daysInMonth}}" data-moon-index="{{m.index}}">
+                  {{#each m.days as |d|}}
+                    <span class="moon-day {{#if d.isFull}}is-full{{/if}} {{#if d.isNew}}is-new{{/if}}"
+                          title="{{../m.name}} — day {{d.day}}: {{d.phaseName}}"
+                          style="background:{{../m.color}}; opacity:{{d.position}};"></span>
+                  {{/each}}
+                </div>
+              </div>
+            {{/each}}
+            {{#if moonStrip.convergenceDays.length}}
+              <p class="moon-strip-convergence">
+                <i class="fa-solid fa-star"></i>
+                {{localize "CHRONICLE.SyncCalendar.MoonStrip.ConvergenceLabel"}}
+                {{#each moonStrip.convergenceDays as |d|}}{{d}}{{#unless @last}}, {{/unless}}{{/each}}
+              </p>
+            {{/if}}
+            <p class="moon-strip-hint">{{localize "CHRONICLE.SyncCalendar.MoonStrip.ClickHint"}}</p>
+          </div>
+        {{/if}}
         <p class="pane-footnote">{{localize "CHRONICLE.SyncCalendar.MonthViewFootnote"}}</p>
       {{else}}
         {{!-- YEAR VIEW: month cards --}}
@@ -330,6 +453,39 @@
             <p class="form-hint">{{localize "CHRONICLE.SyncCalendar.NoteForm.CategoriesHint"}}</p>
           </label>
 
+          <fieldset class="form-fieldset recurrence-fieldset">
+            <legend>{{localize "CHRONICLE.SyncCalendar.Recurrence.Legend"}}</legend>
+            <p class="form-hint">{{localize "CHRONICLE.SyncCalendar.Recurrence.Hint"}}</p>
+            {{#if formView.recurrence.hasTree}}
+              <div class="recurrence-summary">
+                <span class="recurrence-summary-label">{{localize "CHRONICLE.SyncCalendar.Recurrence.CurrentSummaryLabel"}}</span>
+                <code>{{formView.recurrence.summary}}</code>
+              </div>
+              {{#if formView.recurrence.errors.length}}
+                <ul class="form-errors">
+                  {{#each formView.recurrence.errors as |e|}}<li><i class="fa-solid fa-circle-exclamation"></i> {{localize e}}</li>{{/each}}
+                </ul>
+              {{/if}}
+              <button type="button" class="recurrence-clear" data-action="clear-recurrence" {{#if formView.busy}}disabled{{/if}}>
+                <i class="fa-solid fa-eraser"></i> {{localize "CHRONICLE.SyncCalendar.Recurrence.Clear"}}
+              </button>
+            {{else}}
+              <p class="recurrence-empty">{{localize "CHRONICLE.SyncCalendar.Recurrence.NoneSelected"}}</p>
+            {{/if}}
+            <div class="recurrence-presets">
+              {{#each formView.recurrence.presets as |p|}}
+                <button type="button" class="recurrence-preset-btn"
+                        data-action="apply-recurrence-preset"
+                        data-preset="{{p.id}}"
+                        data-params="{{json p.paramsTemplate}}"
+                        {{#if ../formView.busy}}disabled{{/if}}>
+                  {{localize p.labelKey}}{{#if p.extraLabel}} — {{p.extraLabel}}{{/if}}
+                </button>
+              {{/each}}
+            </div>
+            <p class="recurrence-advanced-hint">{{localize "CHRONICLE.SyncCalendar.Recurrence.AdvancedHint"}}</p>
+          </fieldset>
+
           <div class="form-actions">
             <button type="button" class="form-save" data-action="save-event" {{#if formView.busy}}disabled{{/if}}>
               <i class="fa-solid fa-floppy-disk"></i>
@@ -417,7 +573,7 @@
   </main>
 
   <footer class="sync-calendar-footer">
-    <span class="footer-meta">{{localize "CHRONICLE.SyncCalendar.Footer.PR2"}}</span>
+    <span class="footer-meta">{{localize "CHRONICLE.SyncCalendar.Footer.PR3"}}</span>
     {{#if calendariaVersion}}
       <span class="footer-meta">Calendaria v{{calendariaVersion}}</span>
     {{/if}}
