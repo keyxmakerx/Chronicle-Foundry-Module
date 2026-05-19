@@ -42,6 +42,21 @@ import {
   VISIBILITY,
   DISPLAY_STYLE,
 } from './sync-calendar-note-form.mjs';
+import {
+  buildMoonStripData,
+  dayFromStripClick,
+  findConvergenceDays,
+} from './sync-calendar-moon-strip.mjs';
+import {
+  PRESETS,
+  treeFromPreset,
+  validateTree,
+  treeToSummary,
+} from './sync-calendar-condition-builder.mjs';
+import {
+  transformCalendariaCalendar,
+  buildCalendarPreflightSummary,
+} from './sync-calendar-import-from-calendaria.mjs';
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -78,6 +93,12 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
       'save-event':        SyncCalendarApplication.#onSaveEvent,
       'delete-event':      SyncCalendarApplication.#onDeleteEvent,
       'cancel-form':       SyncCalendarApplication.#onCancelForm,
+      // PR 3: recurrence builder
+      'apply-recurrence-preset': SyncCalendarApplication.#onApplyRecurrencePreset,
+      'clear-recurrence':        SyncCalendarApplication.#onClearRecurrence,
+      // PR 3: empty-state import-from-Calendaria
+      'import-calendar':         SyncCalendarApplication.#onImportCalendar,
+      'recheck-chronicle':       SyncCalendarApplication.#onRecheckChronicle,
       // Misc
       'focus-target':      SyncCalendarApplication.#onFocusTarget,
     },
@@ -116,6 +137,22 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
     this._hooksRegistered = false;
     this._hookHandlers = {};
     this._renderPending = false;
+
+    /**
+     * PR 3: Chronicle-side calendar presence state. One of:
+     *   - 'unknown'        — not yet probed
+     *   - 'present'        — Chronicle has a calendar for this campaign
+     *   - 'absent'         — Chronicle responded but said no calendar
+     *   - 'unreachable'    — fetch failed (config, network, auth)
+     *   - 'no-create-api'  — POST /calendar returned 404/405 (endpoint not deployed)
+     * The empty-state import banner renders when state is 'absent' AND
+     * Calendaria has calendars to import.
+     */
+    this._chronicleCalendarState = 'unknown';
+    /** Last import attempt's outcome for inline feedback. */
+    this._lastImportResult = null;
+    /** Per-calendar import busy flags so the right button shows progress. */
+    this._importBusyByCalendarId = new Set();
   }
 
   /**
@@ -130,6 +167,13 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
     const calendariaModule = game.modules.get?.('calendaria');
     this._calendariaVersion = calendariaModule?.version || '';
 
+    // Fire-and-forget probe of Chronicle's calendar surface. We only
+    // probe on first render or after an explicit recheck — re-probing
+    // on every Calendaria hook tick would spam the API.
+    if (this._chronicleCalendarState === 'unknown') {
+      this.#probeChronicleCalendar();
+    }
+
     if (!api || typeof api.getActiveCalendar !== 'function') {
       return {
         degraded: true,
@@ -138,6 +182,7 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
           : 'CHRONICLE.SyncCalendar.Degraded.NoCalendaria',
         calendariaVersion: this._calendariaVersion,
         schemaVersion: SCHEMA_VERSION,
+        importBanner: this.#buildImportBanner(api),
       };
     }
 
@@ -154,6 +199,7 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
         degradedReason: 'CHRONICLE.SyncCalendar.Degraded.NoActiveCalendar',
         calendariaVersion: this._calendariaVersion,
         schemaVersion: SCHEMA_VERSION,
+        importBanner: this.#buildImportBanner(api),
       };
     }
 
@@ -212,6 +258,11 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
       ? this.#buildMonthDetail(api, yearOverview, festivals)
       : null;
 
+    // PR 3: moon-phase strip for month view.
+    const moonStrip = (this._viewMode === 'month' && monthDetail)
+      ? this.#buildMoonStripView(api, moons, monthDetail.year, monthDetail.monthOrdinal, monthDetail.daysInMonth)
+      : null;
+
     const dayDetail = this.#buildDayDetail(api, cal, moons, seasons);
 
     const findingsView = findings.map((f) => ({
@@ -226,6 +277,8 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
     // Form view-model — only populated when form is open.
     let formView = null;
     if (this._formMode !== 'none' && this._formData) {
+      const tree = this._formData.conditionTree || null;
+      const recurrenceErrors = tree ? validateTree(tree) : [];
       formView = {
         mode:                this._formMode,
         noteId:              this._formNoteId || '',
@@ -236,6 +289,12 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
         visibilityOptions:   VISIBILITY_OPTIONS,
         displayStyleOptions: DISPLAY_STYLE_OPTIONS,
         categoriesText:      Array.isArray(this._formData.categories) ? this._formData.categories.join(', ') : '',
+        recurrence: {
+          hasTree:           !!tree,
+          summary:           tree ? treeToSummary(tree) : '',
+          errors:            recurrenceErrors,
+          presets:           this.#buildRecurrencePresetOptions(moons, seasons),
+        },
       };
     }
 
@@ -257,8 +316,10 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
       viewMode: this._viewMode,
       yearOverview,
       monthDetail,
+      moonStrip,
       dayDetail,
       formView,
+      importBanner: this.#buildImportBanner(api),
 
       structureCounts: {
         months:       months.length,
@@ -351,6 +412,184 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
       daysInMonth,
       days,
     };
+  }
+
+  /**
+   * Build the moon-strip view-model for the month view. Pure logic
+   * lives in `sync-calendar-moon-strip.mjs`; this method just plumbs
+   * Calendaria's `getMoonPhasePosition` through to the pure builder
+   * and surfaces convergence days.
+   *
+   * @private
+   */
+  #buildMoonStripView(api, moons, year, monthOrdinal, daysInMonth) {
+    if (!Array.isArray(moons) || moons.length === 0) return null;
+    const getPosition = (idx, date) => {
+      try { return api.getMoonPhasePosition?.(idx, date) ?? 0; }
+      catch (err) {
+        console.warn('Sync Calendar | getMoonPhasePosition failed', err);
+        return 0;
+      }
+    };
+    const data = buildMoonStripData({ moons, year, monthOrdinal, daysInMonth, getPosition });
+    if (!data.moons.length) return null;
+    return {
+      moons:           data.moons,
+      convergenceDays: findConvergenceDays(data),
+    };
+  }
+
+  /**
+   * Build the empty-state import banner view-model. Renders the list
+   * of Calendaria calendars + import buttons when Chronicle has no
+   * calendar for this campaign. Returns `null` if the banner
+   * shouldn't render (Chronicle has a calendar, Calendaria absent,
+   * etc.).
+   *
+   * @private
+   */
+  #buildImportBanner(api) {
+    if (this._chronicleCalendarState === 'present') return null;
+    if (this._chronicleCalendarState === 'unknown') {
+      return { state: 'probing' };
+    }
+    if (!api || typeof api.getAllCalendars !== 'function') {
+      // Calendaria absent — nothing to import from.
+      return {
+        state:        this._chronicleCalendarState,
+        calendars:    [],
+        lastResult:   this._lastImportResult,
+      };
+    }
+    let allCalendars = null;
+    try { allCalendars = api.getAllCalendars(); }
+    catch (err) {
+      console.warn('Sync Calendar | getAllCalendars failed', err);
+      return {
+        state:        this._chronicleCalendarState,
+        calendars:    [],
+        lastResult:   this._lastImportResult,
+      };
+    }
+    // Calendaria returns a Map<id, calendarObject>.
+    const list = [];
+    if (allCalendars instanceof Map) {
+      for (const [, calObj] of allCalendars) {
+        const s = buildCalendarPreflightSummary(calObj);
+        if (s.id) list.push({ ...s, busy: this._importBusyByCalendarId.has(s.id) });
+      }
+    } else if (allCalendars && typeof allCalendars === 'object') {
+      for (const calObj of Object.values(allCalendars)) {
+        const s = buildCalendarPreflightSummary(calObj);
+        if (s.id) list.push({ ...s, busy: this._importBusyByCalendarId.has(s.id) });
+      }
+    }
+    return {
+      state:      this._chronicleCalendarState,
+      calendars:  list,
+      lastResult: this._lastImportResult,
+    };
+  }
+
+  /**
+   * Build the list of recurrence preset options the form surfaces in
+   * its recurrence section. Each entry is `{id, labelKey, params}` —
+   * the template renders a button per entry and the click handler
+   * passes the params object to `treeFromPreset`.
+   *
+   * Some presets need structural ids (a season id, a moon index); we
+   * compose one button per available structural element rather than
+   * forcing the operator to pick from a dropdown after clicking.
+   *
+   * @private
+   */
+  #buildRecurrencePresetOptions(moons, seasons) {
+    const presets = [];
+
+    presets.push({
+      id:       PRESETS.EVERY_NTH_OF_MONTH,
+      labelKey: 'CHRONICLE.SyncCalendar.Recurrence.Preset.EveryNthOfMonth',
+      paramsTemplate: { monthDay: 1 },
+    });
+
+    // One "every full <moon>" + "every new <moon>" per defined moon.
+    if (Array.isArray(moons)) {
+      moons.forEach((moon, index) => {
+        const name = moon?.name || `Moon ${index + 1}`;
+        presets.push({
+          id:       PRESETS.EVERY_FULL_MOON,
+          labelKey: 'CHRONICLE.SyncCalendar.Recurrence.Preset.EveryFullMoon',
+          extraLabel: name,
+          paramsTemplate: { moonIndex: index },
+        });
+        presets.push({
+          id:       PRESETS.EVERY_NEW_MOON,
+          labelKey: 'CHRONICLE.SyncCalendar.Recurrence.Preset.EveryNewMoon',
+          extraLabel: name,
+          paramsTemplate: { moonIndex: index },
+        });
+      });
+    }
+
+    // One "every <season>" per season.
+    if (Array.isArray(seasons)) {
+      seasons.forEach((s) => {
+        const seasonId = s?.id || s?.name || '';
+        if (!seasonId) return;
+        presets.push({
+          id:       PRESETS.EVERY_SEASON,
+          labelKey: 'CHRONICLE.SyncCalendar.Recurrence.Preset.EverySeason',
+          extraLabel: s.name || seasonId,
+          paramsTemplate: { seasonId },
+        });
+      });
+    }
+
+    return presets;
+  }
+
+  /**
+   * Fire-and-forget probe of Chronicle's `/calendar` endpoint. Sets
+   * `_chronicleCalendarState` based on the response, then re-renders
+   * so the import banner appears (or hides). Runs through the existing
+   * api-client so retry queue + error logging behavior is consistent.
+   *
+   * @private
+   */
+  async #probeChronicleCalendar() {
+    const apiClient = this.#getChronicleApiClient();
+    if (!apiClient || typeof apiClient.get !== 'function') {
+      this._chronicleCalendarState = 'unreachable';
+      this.#scheduleRerender();
+      return;
+    }
+    try {
+      const result = await apiClient.get('/calendar');
+      this._chronicleCalendarState = result ? 'present' : 'absent';
+    } catch (err) {
+      const msg = String(err?.message || '');
+      // 404 on /calendar means Chronicle has none; 401/403 means we
+      // can't tell. Translate either by checking the error message
+      // since the api-client throws on non-OK.
+      if (/404/.test(msg)) this._chronicleCalendarState = 'absent';
+      else                 this._chronicleCalendarState = 'unreachable';
+    }
+    this.#scheduleRerender();
+  }
+
+  /**
+   * Resolve Chronicle's REST api-client via the module's public api
+   * surface. The Sync Calendar editor doesn't hold a direct reference
+   * to SyncManager — instead, we look it up the same way external
+   * code would, via `game.modules.get('chronicle-sync').api.getAPI()`.
+   *
+   * @private
+   */
+  #getChronicleApiClient() {
+    try {
+      const mod = game.modules.get?.(MODULE_ID);
+      return mod?.api?.getAPI?.() || null;
+    } catch { return null; }
   }
 
   /**
@@ -452,6 +691,7 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
     this.#registerHooksOnce();
     this.#wireFormInputs();
     this.#wireDragSelect();
+    this.#wireMoonStripClicks();
     try {
       game.user?.setFlag?.(FLAG_SCOPE, 'syncCalendarLastSeen', {
         schemaVersion: SCHEMA_VERSION,
@@ -460,6 +700,32 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
         seenAt: new Date().toISOString(),
       });
     } catch { /* user-flag is best-effort */ }
+  }
+
+  /**
+   * Attach click handlers to moon-strip rows. ApplicationV2 actions
+   * only delegate `click` events to elements with `data-action`, but
+   * strip clicks need pixel-relative math so they live as direct
+   * listeners. Per F-PR2-1 footgun: pointer/non-button-click work
+   * always lives in `_onRender`.
+   *
+   * @private
+   */
+  #wireMoonStripClicks() {
+    const root = this.element;
+    if (!root) return;
+    if (this._viewMode !== 'month') return;
+    const strips = root.querySelectorAll?.('.moon-strip[data-strip-days]') || [];
+    strips.forEach((stripEl) => {
+      stripEl.addEventListener('click', (evt) => {
+        const days = Number(stripEl.dataset.stripDays);
+        if (!Number.isFinite(days) || days < 1) return;
+        const rect = stripEl.getBoundingClientRect();
+        const day = dayFromStripClick(evt.clientX - rect.left, rect.width, days);
+        this._selectedDate = { ...this._selectedDate, day };
+        this.render(false);
+      });
+    });
   }
 
   /**
@@ -732,6 +998,20 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
     if (this._formBusy) return;
     if (!this._formData) return;
     const errors = validateForm(this._formData);
+    // PR 3: also block save if recurrence tree is structurally invalid.
+    if (this._formData.conditionTree) {
+      const recurrenceErrors = validateTree(this._formData.conditionTree);
+      // Calendaria's silent-ignore for non-group roots is the only
+      // truly fatal case; the rest are advisory. We surface RootMustBeGroup
+      // and EmptyGroup as save-blockers; advisory keys still render but
+      // don't block.
+      const blockers = recurrenceErrors.filter((k) =>
+        k === 'CHRONICLE.SyncCalendar.Recurrence.Errors.RootMustBeGroup' ||
+        k === 'CHRONICLE.SyncCalendar.Recurrence.Errors.EmptyGroup' ||
+        k === 'CHRONICLE.SyncCalendar.Recurrence.Errors.NotAnObject',
+      );
+      if (blockers.length > 0) errors.push(...blockers);
+    }
     if (errors.length > 0) {
       this._formErrors = errors;
       this.render(false);
@@ -815,6 +1095,119 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
     if (!focus) return;
     if (game?.user?.isGM === false) return;
     // Read-only structure focus (PR 5 will wire real navigation).
+  }
+
+  /**
+   * Apply a recurrence preset. The button carries `data-preset` plus a
+   * JSON-encoded `data-params` blob; we parse and run it through the
+   * pure builder. On bad params, the preset button reports inline.
+   */
+  static async #onApplyRecurrencePreset(_event, target) {
+    if (!this._formData) return;
+    const presetId = target?.dataset?.preset || '';
+    let params = {};
+    try { params = JSON.parse(target?.dataset?.params || '{}'); }
+    catch { params = {}; }
+    let tree = null;
+    try { tree = treeFromPreset(presetId, params); }
+    catch (err) {
+      console.warn('Sync Calendar | bad preset', err);
+      return;
+    }
+    if (!tree) {
+      ui.notifications?.warn(game.i18n.localize('CHRONICLE.SyncCalendar.Recurrence.PresetBadParams'));
+      return;
+    }
+    this._formData = { ...this._formData, conditionTree: tree };
+    if (this._formErrors.length > 0) this._formErrors = [];
+    this.render(false);
+  }
+
+  static async #onClearRecurrence(_event, _target) {
+    if (!this._formData) return;
+    this._formData = { ...this._formData, conditionTree: null };
+    this.render(false);
+  }
+
+  /**
+   * POST a Calendaria calendar to Chronicle's per-campaign create
+   * endpoint. Graceful degradation: 404/405 means the endpoint isn't
+   * deployed yet (Chronicle's C-CAL-CREATE-ENDPOINT still in flight)
+   * — surface a clear message instead of a generic API error.
+   */
+  static async #onImportCalendar(_event, target) {
+    const calendarId = target?.dataset?.calendarId || '';
+    if (!calendarId) return;
+    if (this._importBusyByCalendarId.has(calendarId)) return;
+    const api = globalThis.CALENDARIA?.api;
+    if (!api?.getCalendar) {
+      this._lastImportResult = { ok: false, key: 'CHRONICLE.SyncCalendar.Import.CalendariaUnavailable' };
+      this.render(false);
+      return;
+    }
+    let calObj = null;
+    try { calObj = api.getCalendar(calendarId) || null; }
+    catch (err) {
+      console.warn('Sync Calendar | getCalendar failed', err);
+    }
+    if (!calObj) {
+      this._lastImportResult = { ok: false, key: 'CHRONICLE.SyncCalendar.Import.CalendarNotFound', detail: calendarId };
+      this.render(false);
+      return;
+    }
+
+    let transformed;
+    try { transformed = transformCalendariaCalendar(calObj); }
+    catch (err) {
+      console.warn('Sync Calendar | transform failed', err);
+      this._lastImportResult = { ok: false, key: 'CHRONICLE.SyncCalendar.Import.TransformFailed' };
+      this.render(false);
+      return;
+    }
+
+    const apiClient = this.#getChronicleApiClient();
+    if (!apiClient?.post) {
+      this._lastImportResult = { ok: false, key: 'CHRONICLE.SyncCalendar.Import.ChronicleUnreachable' };
+      this.render(false);
+      return;
+    }
+
+    this._importBusyByCalendarId.add(calendarId);
+    this.render(false);
+
+    try {
+      await apiClient.post('/calendar', transformed.payload);
+      this._chronicleCalendarState = 'present';
+      this._lastImportResult = {
+        ok: true,
+        key: 'CHRONICLE.SyncCalendar.Import.Success',
+        detail: calObj.name || calendarId,
+      };
+      ui.notifications?.info(game.i18n.localize('CHRONICLE.SyncCalendar.Import.Success'));
+    } catch (err) {
+      const msg = String(err?.message || '');
+      if (/\b404\b|\b405\b/.test(msg)) {
+        this._chronicleCalendarState = 'no-create-api';
+        this._lastImportResult = { ok: false, key: 'CHRONICLE.SyncCalendar.Import.ChronicleTooOld' };
+      } else {
+        this._lastImportResult = { ok: false, key: 'CHRONICLE.SyncCalendar.Import.PostFailed', detail: msg.slice(0, 200) };
+        console.error('Sync Calendar | import POST failed', err);
+      }
+    } finally {
+      this._importBusyByCalendarId.delete(calendarId);
+      this.render(false);
+    }
+  }
+
+  /**
+   * Re-probe Chronicle's calendar surface. Surfaced as a small refresh
+   * button on the empty-state banner so the operator can confirm a
+   * just-rolled-out C-CAL-CREATE-ENDPOINT without closing the editor.
+   */
+  static async #onRecheckChronicle(_event, _target) {
+    this._chronicleCalendarState = 'unknown';
+    this._lastImportResult = null;
+    this.render(false);
   }
 }
 
