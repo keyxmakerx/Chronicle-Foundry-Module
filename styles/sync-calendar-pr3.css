@@ -216,6 +216,14 @@
   text-align: left;
 }
 
+/* FM-SYNCCAL-IMPORT-SCROLL (#27): when an import banner is present in
+ * the degraded section, top-align (the base rule centers, which clips
+ * a tall banner at the top of the modal). Bare degraded state without
+ * a banner keeps its centered layout via the base rule. */
+.sync-calendar-degraded:has(.import-banner) {
+  justify-content: flex-start;
+}
+
 .sync-calendar .import-banner h3 {
   margin: 0;
   font-size: 13px;
@@ -249,6 +257,14 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  /* FM-SYNCCAL-IMPORT-SCROLL (#27): Calendaria ships a large library
+   * (8+ calendars routine; more after Calendaria 0.4). The parent
+   * `.sync-calendar-degraded` is height:100% + justify-content:center,
+   * so an oversize list clips top + bottom without a scrollbar. Cap
+   * the list height and let it scroll on its own. Header + hint +
+   * Recheck button stay pinned outside this element. */
+  max-height: 50vh;
+  overflow-y: auto;
 }
 
 .sync-calendar .import-calendar-row {
