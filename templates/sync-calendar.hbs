@@ -13,8 +13,17 @@
   binds to the actions map in DEFAULT_OPTIONS. Form-field inputs use
   data-form-field="..." attributes that the application's #wireFormInputs
   hook (in _onRender) listens to.
+
+  Single-root wrapper (`<div class="sync-calendar-root">`) is required:
+  ApplicationV2's `_parsePartHTML` rejects any PARTS template that emits
+  more than one root HTML element across any branch of any conditional
+  ("Template part 'body' must render a single HTML element"). The
+  `else` branch below has three siblings (header + main + footer) and
+  must be wrapped. See F-PR3-4 in `.ai.md` and the CI guard at
+  `tools/test-template-roots.mjs`.
 --}}
 
+<div class="sync-calendar-root">
 {{#if degraded}}
   <section class="sync-calendar-degraded">
     <i class="fa-solid fa-triangle-exclamation"></i>
@@ -580,3 +589,4 @@
     <span class="footer-meta">schema v{{schemaVersion}}</span>
   </footer>
 {{/if}}
+</div>
