@@ -1,32 +1,47 @@
 /**
- * Chronicle Sync — Sync Calendar editor (foundation, read-only)
+ * Chronicle Sync — Sync Calendar editor (foundation + event CRUD)
  *
  * GM-only ApplicationV2 that renders a 3-pane view of the active Calendaria
- * calendar with an always-on validation panel. This is PR 1 of the editor
- * arc described in the FM-CAL-EDITOR-SCOPING scoping report (cordinator
- * `reports/foundry/2026-05-19-fm-cal-editor-scoping.md`). PR 1 is **read-
- * only** — no writes, no drag-select, no structure editing. The "Add event"
- * button is a stub that explains it ships in PR 2.
+ * calendar with an always-on validation panel. PR 1 shipped the read-only
+ * shell; PR 2 (this file's current revision) adds:
+ *
+ *   - Year ↔ month view toggle (year overview + day-grid month view).
+ *   - Day inspector becomes writable: create / edit / delete notes via
+ *     `CALENDARIA.api.createNote / updateNote / deleteNote`.
+ *   - Drag-select in month view → multi-day "Add event" form.
+ *   - Note form (name, content, categories, icon, color, visibility,
+ *     displayStyle, allDay, start+end date+time) with structural
+ *     validation. Pure form ↔ API translation lives in
+ *     `scripts/sync-calendar-note-form.mjs` and is unit-tested.
  *
  * Architecture (per scoping § 3.1):
  *   - Writes go through `CALENDARIA.api`. Never reach into Calendaria's
- *     internal settings. (No writes in this PR — guard still applies for
- *     future PRs that extend this file.)
+ *     internal settings.
  *   - Reads via `CALENDARIA.api.get*`, wrapped in try/catch with a graceful
  *     degraded-mode render when Calendaria is missing or broken.
- *   - Hooks: `calendaria.ready` is the gating hook (we only attach after it
- *     fires elsewhere — the application registers a listener in case the
- *     module loads ahead of Calendaria). After that we listen to the
- *     calendar / time / note / weather hooks for partial re-renders.
+ *   - Writes flow to Chronicle automatically via the existing
+ *     `scripts/calendar-sync.mjs` hook handlers — no editor-side Chronicle
+ *     plumbing required.
+ *
+ * PRs 3-5 still defer: moon strip, recurrence builder, weather, structure
+ * editing, inline category creation. The Application class stays a thin
+ * integration shell — pure validation + form translation live in
+ * separately-unit-tested modules.
  *
  * Naming: per scoping § 7, the UI label is "Sync Calendar" — Calendaria
- * already has a "Chronicle" widget (vertical timeline viewer), so "Chronicle"
- * is reserved for this project's web app, never for an editor surface inside
- * Foundry.
+ * already has a "Chronicle" widget. Don't reuse that name.
  */
 
 import { MODULE_ID, FLAG_SCOPE } from './constants.mjs';
 import { runValidation, SCHEMA_VERSION } from './sync-calendar-validation.mjs';
+import {
+  defaultFormForDate,
+  formFromNote,
+  noteOptionsFromForm,
+  validateForm,
+  VISIBILITY,
+  DISPLAY_STYLE,
+} from './sync-calendar-note-form.mjs';
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -50,12 +65,21 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
     },
     position: { width: 1100, height: 700 },
     actions: {
-      'select-day':    SyncCalendarApplication.#onSelectDay,
-      'select-month':  SyncCalendarApplication.#onSelectMonth,
-      'select-year':   SyncCalendarApplication.#onSelectYear,
-      'jump-today':    SyncCalendarApplication.#onJumpToday,
-      'add-event':     SyncCalendarApplication.#onAddEventStub,
-      'focus-target':  SyncCalendarApplication.#onFocusTarget,
+      // Navigation
+      'select-month':      SyncCalendarApplication.#onSelectMonth,
+      'select-year':       SyncCalendarApplication.#onSelectYear,
+      'jump-today':        SyncCalendarApplication.#onJumpToday,
+      'goto-month':        SyncCalendarApplication.#onGotoMonth,
+      'back-to-year':      SyncCalendarApplication.#onBackToYear,
+      'select-day':        SyncCalendarApplication.#onSelectDay,
+      // Event CRUD
+      'add-event':         SyncCalendarApplication.#onAddEvent,
+      'edit-event':        SyncCalendarApplication.#onEditEvent,
+      'save-event':        SyncCalendarApplication.#onSaveEvent,
+      'delete-event':      SyncCalendarApplication.#onDeleteEvent,
+      'cancel-form':       SyncCalendarApplication.#onCancelForm,
+      // Misc
+      'focus-target':      SyncCalendarApplication.#onFocusTarget,
     },
   };
 
@@ -67,13 +91,26 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
 
   constructor(options = {}) {
     super(options);
-    /**
-     * Selected date drives the day inspector and which month is centered
-     * in the year view. Defaults to whatever Calendaria considers "now" at
-     * render time. Shape: { year, month, day } using Calendaria's public
-     * 1-indexed conventions.
-     */
+    /** Selected date — 1-indexed shape `{year, month, day}`. */
     this._selectedDate = null;
+    /** 'year' or 'month'. PR 2 toggles between year overview + month day-grid. */
+    this._viewMode = 'year';
+    /** 'none' | 'add' | 'edit' — controls right-pane form rendering. */
+    this._formMode = 'none';
+    /** Form values, set when entering 'add' or 'edit' mode. */
+    this._formData = null;
+    /** When editing, the Calendaria note's page id we'll PUT against. */
+    this._formNoteId = null;
+    /** Validation messages from the last save attempt; cleared on field edit. */
+    this._formErrors = [];
+    /** True while a save / delete is in flight — prevents double-submit. */
+    this._formBusy = false;
+
+    /** Drag-select state — engaged in month view via pointer events. */
+    this._dragStartDay = null;
+    this._dragEndDay   = null;
+    this._dragActive   = false;
+
     this._calendariaVersion = '';
     this._activeCalendarId = '';
     this._hooksRegistered = false;
@@ -84,8 +121,7 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
   /**
    * Render entry point. Builds the view-model that `sync-calendar.hbs`
    * consumes. Defensive: every `CALENDARIA.api.*` call lives in a try/catch
-   * with a degraded-mode fallback so a broken Calendaria install never
-   * blanks Foundry.
+   * with a degraded-mode fallback.
    *
    * @override
    */
@@ -107,16 +143,10 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
 
     let cal = null;
     let currentDateTime = null;
-    try {
-      cal = api.getActiveCalendar() || null;
-    } catch (err) {
-      console.warn('Sync Calendar | getActiveCalendar failed', err);
-    }
-    try {
-      currentDateTime = api.getCurrentDateTime?.() || null;
-    } catch (err) {
-      console.warn('Sync Calendar | getCurrentDateTime failed', err);
-    }
+    try { cal = api.getActiveCalendar() || null; }
+    catch (err) { console.warn('Sync Calendar | getActiveCalendar failed', err); }
+    try { currentDateTime = api.getCurrentDateTime?.() || null; }
+    catch (err) { console.warn('Sync Calendar | getCurrentDateTime failed', err); }
 
     if (!cal) {
       return {
@@ -129,12 +159,9 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
 
     this._activeCalendarId = cal?.metadata?.id || cal?.id || '';
 
-    // Initialize the selected date on first render.
     if (!this._selectedDate) {
       this._selectedDate = this.#defaultSelectedDate(cal, currentDateTime);
     } else {
-      // Defensive: if the operator switched calendars, the prior selected
-      // date may be out of range. Clamp to a safe default.
       this._selectedDate = this.#clampSelectedDate(cal, this._selectedDate);
     }
 
@@ -154,51 +181,63 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
       return acc;
     }, {});
 
-    // Build the year-view summary: per-month name/days/note count.
-    // We deliberately do NOT call `getNotesForDate` for every day in the
-    // year — that would be expensive on calendars with many notes. For PR 1
-    // we surface per-month counts (cheap) and pull per-day detail only for
-    // the selected day. PR 3 adds the moon strip with proper batching.
-    const yearOverview = months.map((m) => {
-      const monthIndex0 = monthIndexFromMonth(m, months);
+    const yearOverview = months.map((m, idx) => {
+      const monthIndex0 = monthIndexFromMonth(m, idx);
       const monthOrdinal1 = monthOrdinalFromMonth(m, monthIndex0);
       let noteCount = 0;
       try {
         const notes = api.getNotesForMonth?.(this._selectedDate.year, monthOrdinal1, { includeContent: false });
         if (Array.isArray(notes)) noteCount = notes.length;
-      } catch (err) {
-        // Non-fatal — per-month count just falls back to 0.
-      }
+      } catch {}
       const festivalsThisMonth = festivals.filter((f) => {
         const fm = Number(f?.month ?? -1);
         return fm === monthIndex0 || fm === monthOrdinal1;
       });
       return {
-        id:         m?.id || monthFallbackId(m, monthIndex0),
-        name:       m?.name || 'Month',
+        id:           m?.id || `month-${monthIndex0}`,
+        name:         m?.name || 'Month',
         abbreviation: m?.abbreviation || '',
-        days:       Number(m?.days ?? 0),
-        leapDays:   Number(m?.leapDays ?? 0),
-        ordinal:    monthOrdinal1,
-        index0:     monthIndex0,
+        days:         Number(m?.days ?? 0),
+        leapDays:     Number(m?.leapDays ?? 0),
+        ordinal:      monthOrdinal1,
+        index0:       monthIndex0,
         noteCount,
         festivalCount: festivalsThisMonth.length,
-        isSelected: monthOrdinal1 === this._selectedDate.month,
+        isSelected:   monthOrdinal1 === this._selectedDate.month,
       };
     });
 
-    // Day inspector — only the selected day.
+    // Month view — per-day cell with note count + drag-select handles.
+    const monthDetail = (this._viewMode === 'month')
+      ? this.#buildMonthDetail(api, yearOverview, festivals)
+      : null;
+
     const dayDetail = this.#buildDayDetail(api, cal, moons, seasons);
 
-    // Validation findings localized for display.
     const findingsView = findings.map((f) => ({
-      severity: f.severity,
+      severity:      f.severity,
       severityClass: `severity-${f.severity}`,
-      code: f.code,
-      message: f.message,
-      fixHint: f.fix_hint || '',
-      focusTarget: f.focus_target || '',
+      code:          f.code,
+      message:       f.message,
+      fixHint:       f.fix_hint || '',
+      focusTarget:   f.focus_target || '',
     }));
+
+    // Form view-model — only populated when form is open.
+    let formView = null;
+    if (this._formMode !== 'none' && this._formData) {
+      formView = {
+        mode:                this._formMode,
+        noteId:              this._formNoteId || '',
+        data:                this._formData,
+        errors:              this._formErrors.slice(),
+        busy:                this._formBusy,
+        hasEndDate:          this._formData.endDay != null && this._formData.endMonth != null && this._formData.endYear != null,
+        visibilityOptions:   VISIBILITY_OPTIONS,
+        displayStyleOptions: DISPLAY_STYLE_OPTIONS,
+        categoriesText:      Array.isArray(this._formData.categories) ? this._formData.categories.join(', ') : '',
+      };
+    }
 
     return {
       degraded: false,
@@ -215,17 +254,20 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
       currentDateTime,
       selectedDate: this._selectedDate,
 
+      viewMode: this._viewMode,
       yearOverview,
+      monthDetail,
       dayDetail,
+      formView,
 
       structureCounts: {
-        months:    months.length,
-        weekdays:  weekdays.length,
-        seasons:   seasons.length,
-        moons:     moons.length,
-        eras:      eras.length,
-        festivals: festivals.length,
-        cycles:    cycles.length,
+        months:       months.length,
+        weekdays:     weekdays.length,
+        seasons:      seasons.length,
+        moons:        moons.length,
+        eras:         eras.length,
+        festivals:    festivals.length,
+        cycles:       cycles.length,
         weatherZones: weatherZones.length,
       },
 
@@ -233,53 +275,121 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
       findingCountsBySeverity,
       findingTotal: findings.length,
 
-      // Stub flag: PR 2 wires "Add event"; PR 5 wires structure inspectors.
-      writesEnabled: false,
+      // PR 2: writes are enabled for events. PR 5 enables structure-edit.
+      writesEnabled: true,
+    };
+  }
+
+  /**
+   * Per-day cells for the selected month. Used by the month-view template
+   * to render the day grid where the operator clicks / drag-selects.
+   *
+   * @private
+   */
+  #buildMonthDetail(api, yearOverview, festivals) {
+    const month = yearOverview.find((m) => m.ordinal === this._selectedDate.month);
+    if (!month) return null;
+    const daysInMonth = Math.max(1, Number(month.days) || 28);
+    const monthIndex0 = month.index0;
+
+    // Fetch all notes for the month once; bucket per day.
+    let monthNotes = [];
+    try {
+      const notes = api.getNotesForMonth?.(this._selectedDate.year, month.ordinal, { includeContent: false });
+      if (Array.isArray(notes)) monthNotes = notes;
+    } catch (err) {
+      console.warn('Sync Calendar | getNotesForMonth failed', err);
+    }
+    const notesByDay = new Map();
+    for (const n of monthNotes) {
+      const day = Number(
+        n?.startDate?.day ??
+        n?.flagData?.startDate?.day ??
+        n?.flagData?.startDate?.dayOfMonth,
+      );
+      if (Number.isFinite(day) && day >= 1) {
+        if (!notesByDay.has(day)) notesByDay.set(day, []);
+        notesByDay.get(day).push({
+          id:    n?.id || '',
+          name:  n?.name || 'Untitled',
+          color: n?.color || n?.flagData?.color || '',
+          icon:  n?.icon  || n?.flagData?.icon  || '',
+        });
+      }
+    }
+
+    const festivalDays = new Set(
+      festivals
+        .filter((f) => {
+          const fm = Number(f?.month ?? -1);
+          return fm === monthIndex0 || fm === month.ordinal;
+        })
+        .map((f) => Number(f?.dayOfMonth ?? f?.day ?? -1))
+        .filter((d) => Number.isFinite(d) && d >= 0)
+        // Festivals use 0-indexed dayOfMonth in some exports; bump to 1-indexed.
+        .map((d) => d + 1),
+    );
+
+    const days = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const cellNotes = notesByDay.get(d) || [];
+      days.push({
+        day:          d,
+        ordinal:      month.ordinal,
+        year:         this._selectedDate.year,
+        isSelected:   d === this._selectedDate.day,
+        isFestival:   festivalDays.has(d),
+        noteCount:    cellNotes.length,
+        notesPreview: cellNotes.slice(0, 3),
+      });
+    }
+    return {
+      monthOrdinal: month.ordinal,
+      monthName:    month.name,
+      monthAbbr:    month.abbreviation,
+      year:         this._selectedDate.year,
+      daysInMonth,
+      days,
     };
   }
 
   /**
    * Build the "selected day" inspector data: notes, moon phases, season,
-   * weather. All API calls are individually guarded.
+   * weather. Each API call individually guarded.
    *
    * @private
    */
   #buildDayDetail(api, cal, moons, _seasons) {
     const date = this._selectedDate;
     const detail = {
-      year:   date.year,
-      month:  date.month,
-      day:    date.day,
-      monthName: '',
+      year:        date.year,
+      month:       date.month,
+      day:         date.day,
+      monthName:   '',
       weekdayName: '',
-      notes: [],
-      moonPhases: [],
-      season: null,
-      weather: null,
+      notes:       [],
+      moonPhases:  [],
+      season:      null,
+      weather:     null,
     };
 
-    // Month name lookup.
     const months = readArrayLike(cal.monthsArray, cal.months?.values);
     const monthEntry = months[date.month - 1] || null;
     detail.monthName = monthEntry?.name || '';
 
-    // Notes on the selected day.
     try {
       const notes = api.getNotesForDate?.(date.year, date.month, date.day, { includeContent: false });
       if (Array.isArray(notes)) {
         detail.notes = notes.map((n) => ({
-          id: n?.id || '',
-          name: n?.name || 'Untitled',
-          icon: n?.icon || n?.flagData?.icon || '',
-          color: n?.color || n?.flagData?.color || '',
+          id:         n?.id || '',
+          name:       n?.name || 'Untitled',
+          icon:       n?.icon || n?.flagData?.icon || '',
+          color:      n?.color || n?.flagData?.color || '',
           visibility: n?.visibility || n?.flagData?.visibility || '',
         }));
       }
-    } catch (err) {
-      console.warn('Sync Calendar | getNotesForDate failed', err);
-    }
+    } catch (err) { console.warn('Sync Calendar | getNotesForDate failed', err); }
 
-    // Moon phases on the selected day.
     try {
       const phases = api.getAllMoonPhases?.() || [];
       detail.moonPhases = (Array.isArray(phases) ? phases : []).map((p, idx) => ({
@@ -288,25 +398,13 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
         position:  Number(p?.position ?? p?.phasePosition ?? 0),
         color:     moons[idx]?.color || '',
       }));
-    } catch (err) {
-      console.warn('Sync Calendar | getAllMoonPhases failed', err);
-    }
+    } catch (err) { console.warn('Sync Calendar | getAllMoonPhases failed', err); }
 
-    // Current season.
     try {
       const s = api.getCurrentSeason?.() || null;
-      if (s) {
-        detail.season = {
-          name:  s.name || '',
-          color: s.color || '',
-          icon:  s.icon || '',
-        };
-      }
-    } catch (err) {
-      console.warn('Sync Calendar | getCurrentSeason failed', err);
-    }
+      if (s) detail.season = { name: s.name || '', color: s.color || '', icon: s.icon || '' };
+    } catch (err) { console.warn('Sync Calendar | getCurrentSeason failed', err); }
 
-    // Current weather (zone may be empty — handled gracefully).
     try {
       const w = api.getCurrentWeather?.() || null;
       if (w) {
@@ -318,19 +416,11 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
           description: w.description || '',
         };
       }
-    } catch (err) {
-      // Weather often unconfigured; no console noise here.
-    }
+    } catch { /* weather often unconfigured */ }
 
     return detail;
   }
 
-  /**
-   * Default selected date — Calendaria's "now" if available, else the start
-   * of the calendar's year-zero. Always returns a 1-indexed shape.
-   *
-   * @private
-   */
   #defaultSelectedDate(cal, currentDateTime) {
     if (currentDateTime && typeof currentDateTime === 'object') {
       return {
@@ -339,19 +429,9 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
         day:   Number(currentDateTime.dayOfMonth ?? currentDateTime.day ?? 1),
       };
     }
-    return {
-      year:  Number(cal?.years?.yearZero ?? 0),
-      month: 1,
-      day:   1,
-    };
+    return { year: Number(cal?.years?.yearZero ?? 0), month: 1, day: 1 };
   }
 
-  /**
-   * Clamp a selected date to ranges valid for the current calendar.
-   * Used when the operator switches calendars mid-edit.
-   *
-   * @private
-   */
   #clampSelectedDate(cal, date) {
     const months = readArrayLike(cal.monthsArray, cal.months?.values);
     const monthCount = months.length || 1;
@@ -366,18 +446,12 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
     };
   }
 
-  /**
-   * Register hooks once per app lifetime. Throttled re-render hook handler
-   * batches rapid time-change ticks.
-   *
-   * @override
-   */
+  /** @override */
   _onRender(context, options) {
     super._onRender?.(context, options);
     this.#registerHooksOnce();
-    // Persist a slim record of which calendar we last rendered against, so
-    // PR 5's snapshot system has a hook to start from. Always carry the
-    // schemaVersion forward so future updates can detect stale flag data.
+    this.#wireFormInputs();
+    this.#wireDragSelect();
     try {
       game.user?.setFlag?.(FLAG_SCOPE, 'syncCalendarLastSeen', {
         schemaVersion: SCHEMA_VERSION,
@@ -385,21 +459,110 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
         calendariaVersion: this._calendariaVersion,
         seenAt: new Date().toISOString(),
       });
-    } catch {
-      // User flag persistence is best-effort.
+    } catch { /* user-flag is best-effort */ }
+  }
+
+  /**
+   * Attach `input` / `change` listeners to form fields. Updates
+   * `this._formData` on each keystroke so the operator's input persists
+   * across re-renders (e.g. a `dateTimeChange` hook firing mid-edit).
+   *
+   * @private
+   */
+  #wireFormInputs() {
+    const root = this.element;
+    if (!root) return;
+    const inputs = root.querySelectorAll?.('[data-form-field]') || [];
+    inputs.forEach((el) => {
+      const field = el.dataset.formField;
+      if (!field) return;
+      const onInput = (evt) => this.#onFormFieldInput(field, evt?.target ?? el);
+      el.addEventListener('input', onInput);
+      el.addEventListener('change', onInput);
+    });
+  }
+
+  /**
+   * Attach pointer events to month-view day cells for drag-select. Each
+   * cell has a `data-day="N"` attribute; drag-select records the start
+   * and end days and opens the multi-day add form on pointerup.
+   *
+   * @private
+   */
+  #wireDragSelect() {
+    const root = this.element;
+    if (!root) return;
+    if (this._viewMode !== 'month') return;
+    const cells = root.querySelectorAll?.('.day-cell') || [];
+
+    const setHighlight = () => {
+      const lo = Math.min(this._dragStartDay ?? 0, this._dragEndDay ?? 0);
+      const hi = Math.max(this._dragStartDay ?? 0, this._dragEndDay ?? 0);
+      cells.forEach((c) => {
+        const d = Number(c.dataset?.day ?? -1);
+        c.classList.toggle('drag-range', d >= lo && d <= hi && this._dragActive);
+      });
+    };
+
+    cells.forEach((cell) => {
+      cell.addEventListener('pointerdown', (evt) => {
+        evt.preventDefault();
+        const d = Number(cell.dataset?.day);
+        if (!Number.isFinite(d)) return;
+        this._dragActive = true;
+        this._dragStartDay = d;
+        this._dragEndDay = d;
+        setHighlight();
+      });
+      cell.addEventListener('pointerenter', () => {
+        if (!this._dragActive) return;
+        const d = Number(cell.dataset?.day);
+        if (Number.isFinite(d)) {
+          this._dragEndDay = d;
+          setHighlight();
+        }
+      });
+    });
+
+    // Window-level pointerup so a drag that releases outside the cells
+    // still closes cleanly.
+    const onUp = () => {
+      if (!this._dragActive) return;
+      this._dragActive = false;
+      const lo = Math.min(this._dragStartDay ?? 0, this._dragEndDay ?? 0);
+      const hi = Math.max(this._dragStartDay ?? 0, this._dragEndDay ?? 0);
+      cells.forEach((c) => c.classList.remove('drag-range'));
+      window.removeEventListener('pointerup', onUp);
+      // Single click vs drag-select range:
+      this.#openAddEventForRange(lo, hi);
+    };
+    window.addEventListener('pointerup', onUp);
+  }
+
+  #onFormFieldInput(field, target) {
+    if (!this._formData) return;
+    let value;
+    if (target.type === 'checkbox') {
+      value = !!target.checked;
+    } else if (target.type === 'number') {
+      value = target.value === '' ? null : Number(target.value);
+    } else {
+      value = target.value ?? '';
     }
+    if (field === 'categories' && typeof value === 'string') {
+      value = value.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+    this._formData = { ...this._formData, [field]: value };
+    if (this._formErrors.length > 0) this._formErrors = [];
   }
 
   #registerHooksOnce() {
     if (this._hooksRegistered) return;
     const rerender = () => this.#scheduleRerender();
-
     const subs = {
-      // Lifecycle.
       'calendaria.calendarSwitched':       rerender,
       'calendaria.remoteCalendarSwitch':   rerender,
       'calendaria.calendarUpdated':        rerender,
-      // Time.
       'calendaria.dateTimeChange':         rerender,
       'calendaria.dayChange':              rerender,
       'calendaria.monthChange':            rerender,
@@ -408,48 +571,31 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
       'calendaria.moonPhaseChange':        rerender,
       'calendaria.restDayChange':          rerender,
       'calendaria.remoteDateChange':       rerender,
-      // Notes.
       'calendaria.noteCreated':            rerender,
       'calendaria.noteUpdated':            rerender,
       'calendaria.noteDeleted':            rerender,
-      // Weather.
       'calendaria.weatherChange':          rerender,
     };
     for (const [name, fn] of Object.entries(subs)) {
-      try {
-        Hooks.on(name, fn);
-        this._hookHandlers[name] = fn;
-      } catch (err) {
-        console.warn(`Sync Calendar | failed to register hook ${name}`, err);
-      }
+      try { Hooks.on(name, fn); this._hookHandlers[name] = fn; }
+      catch (err) { console.warn(`Sync Calendar | failed to register hook ${name}`, err); }
     }
     this._hooksRegistered = true;
   }
 
   #unregisterHooks() {
     for (const [name, fn] of Object.entries(this._hookHandlers)) {
-      try {
-        Hooks.off(name, fn);
-      } catch {
-        // Idempotent unregister; never crash close().
-      }
+      try { Hooks.off(name, fn); } catch { /* best-effort */ }
     }
     this._hookHandlers = {};
     this._hooksRegistered = false;
   }
 
-  /**
-   * Throttle re-renders. Hooks like `dateTimeChange` can fire in rapid
-   * succession (real-time clock visualTicks); we coalesce them.
-   *
-   * @private
-   */
   #scheduleRerender() {
     if (this._renderPending) return;
     this._renderPending = true;
     setTimeout(() => {
       this._renderPending = false;
-      // Only re-render if the app is still rendered.
       if (this.rendered) this.render(false);
     }, RENDER_THROTTLE_MS);
   }
@@ -460,15 +606,57 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
     return super.close(options);
   }
 
-  // --- Actions ---
+  // -------------------------------------------------------------------
+  // Form lifecycle helpers
+  // -------------------------------------------------------------------
 
-  static async #onSelectDay(_event, target) {
-    const year  = Number(target?.dataset?.year ?? this._selectedDate?.year ?? 0);
-    const month = Number(target?.dataset?.month ?? this._selectedDate?.month ?? 1);
-    const day   = Number(target?.dataset?.day ?? 1);
-    this._selectedDate = { year, month, day };
+  #enterAddMode(anchor) {
+    this._formMode = 'add';
+    this._formNoteId = null;
+    this._formData = defaultFormForDate(anchor);
+    this._formErrors = [];
+    this._formBusy = false;
+  }
+
+  #enterEditMode(noteId) {
+    const api = globalThis.CALENDARIA?.api;
+    let note = null;
+    try { note = api?.getNote?.(noteId) || null; }
+    catch (err) { console.warn('Sync Calendar | getNote failed', err); }
+    if (!note) {
+      ui.notifications.warn(game.i18n.localize('CHRONICLE.SyncCalendar.NoteForm.NotFound'));
+      return false;
+    }
+    this._formMode = 'edit';
+    this._formNoteId = noteId;
+    this._formData = formFromNote(note);
+    this._formErrors = [];
+    this._formBusy = false;
+    return true;
+  }
+
+  #exitForm() {
+    this._formMode = 'none';
+    this._formNoteId = null;
+    this._formData = null;
+    this._formErrors = [];
+    this._formBusy = false;
+  }
+
+  #openAddEventForRange(lo, hi) {
+    const month = this._selectedDate.month;
+    const year  = this._selectedDate.year;
+    const anchor = lo === hi
+      ? { year, month, day: lo }
+      : { year, month, day: lo, endYear: year, endMonth: month, endDay: hi };
+    this._selectedDate = { year, month, day: lo };
+    this.#enterAddMode(anchor);
     this.render(false);
   }
+
+  // -------------------------------------------------------------------
+  // Actions
+  // -------------------------------------------------------------------
 
   static async #onSelectMonth(_event, target) {
     const month = Number(target?.dataset?.month ?? this._selectedDate?.month ?? 1);
@@ -495,36 +683,159 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
     this.render(false);
   }
 
-  /**
-   * Stub for the "Add event" button. PR 2 wires the real create-note flow
-   * via `CALENDARIA.api.createNote`. Until then, surface a notification
-   * explaining the gap so the operator's expectations stay calibrated.
-   */
-  static async #onAddEventStub(_event, _target) {
-    const msg = game.i18n.localize('CHRONICLE.SyncCalendar.AddEvent.ComingSoon');
-    ui.notifications.info(msg);
+  static async #onGotoMonth(_event, target) {
+    const month = Number(target?.dataset?.month ?? this._selectedDate?.month ?? 1);
+    this._selectedDate = { ...this._selectedDate, month, day: 1 };
+    this._viewMode = 'month';
+    this.render(false);
+  }
+
+  static async #onBackToYear(_event, _target) {
+    this._viewMode = 'year';
+    this.render(false);
+  }
+
+  static async #onSelectDay(_event, target) {
+    const day = Number(target?.dataset?.day);
+    if (!Number.isFinite(day)) return;
+    this._selectedDate = { ...this._selectedDate, day };
+    this.render(false);
   }
 
   /**
-   * Click-through from a validation finding or a structure group label.
-   * PR 1 is read-only — clicking a focus target just selects the left-rail
-   * group; later PRs will open the inspector against the offending entity.
+   * Open the form to add a new event on the selected day. Triggered by
+   * the "Add event" button in the day inspector. Drag-select uses a
+   * different path (`#wireDragSelect → #openAddEventForRange`).
    */
+  static async #onAddEvent(_event, _target) {
+    this.#enterAddMode(this._selectedDate);
+    this.render(false);
+  }
+
+  static async #onEditEvent(_event, target) {
+    const noteId = target?.dataset?.noteId;
+    if (!noteId) return;
+    if (this.#enterEditMode(noteId)) this.render(false);
+  }
+
+  static async #onCancelForm(_event, _target) {
+    this.#exitForm();
+    this.render(false);
+  }
+
+  /**
+   * Validate and save. Calls `CALENDARIA.api.createNote` or `updateNote`
+   * depending on the form mode. Defensive: API errors surface as inline
+   * `ui.notifications.error` + keep form open with errors visible.
+   */
+  static async #onSaveEvent(_event, _target) {
+    if (this._formBusy) return;
+    if (!this._formData) return;
+    const errors = validateForm(this._formData);
+    if (errors.length > 0) {
+      this._formErrors = errors;
+      this.render(false);
+      return;
+    }
+    const api = globalThis.CALENDARIA?.api;
+    if (!api) {
+      this._formErrors = ['CHRONICLE.SyncCalendar.NoteForm.Errors.ApiUnavailable'];
+      this.render(false);
+      return;
+    }
+
+    let options;
+    try { options = noteOptionsFromForm(this._formData); }
+    catch (err) {
+      this._formErrors = ['CHRONICLE.SyncCalendar.NoteForm.Errors.OptionsBuild'];
+      console.warn('Sync Calendar | noteOptionsFromForm threw', err);
+      this.render(false);
+      return;
+    }
+
+    this._formBusy = true;
+    this.render(false);
+
+    try {
+      if (this._formMode === 'edit') {
+        if (typeof api.updateNote !== 'function') {
+          throw new Error('CALENDARIA.api.updateNote not available');
+        }
+        await api.updateNote(this._formNoteId, options);
+        ui.notifications.info(game.i18n.localize('CHRONICLE.SyncCalendar.NoteForm.Updated'));
+      } else {
+        if (typeof api.createNote !== 'function') {
+          throw new Error('CALENDARIA.api.createNote not available');
+        }
+        await api.createNote(options);
+        ui.notifications.info(game.i18n.localize('CHRONICLE.SyncCalendar.NoteForm.Created'));
+      }
+      this.#exitForm();
+    } catch (err) {
+      console.error('Sync Calendar | save failed', err);
+      ui.notifications.error(game.i18n.localize('CHRONICLE.SyncCalendar.NoteForm.SaveFailed'));
+      this._formErrors = ['CHRONICLE.SyncCalendar.NoteForm.Errors.SaveFailed'];
+    } finally {
+      this._formBusy = false;
+      this.render(false);
+    }
+  }
+
+  /**
+   * Delete an existing event. Confirmation prompt before the API call.
+   * Triggered from the day inspector list (data-action="delete-event"
+   * + data-note-id).
+   */
+  static async #onDeleteEvent(_event, target) {
+    const noteId = target?.dataset?.noteId;
+    if (!noteId) return;
+    const api = globalThis.CALENDARIA?.api;
+    if (!api?.deleteNote) {
+      ui.notifications.error(game.i18n.localize('CHRONICLE.SyncCalendar.NoteForm.Errors.ApiUnavailable'));
+      return;
+    }
+    const confirmed = await Dialog?.confirm?.({
+      title:   game.i18n.localize('CHRONICLE.SyncCalendar.NoteForm.DeleteConfirmTitle'),
+      content: `<p>${game.i18n.localize('CHRONICLE.SyncCalendar.NoteForm.DeleteConfirmBody')}</p>`,
+    });
+    if (!confirmed) return;
+    try {
+      await api.deleteNote(noteId);
+      ui.notifications.info(game.i18n.localize('CHRONICLE.SyncCalendar.NoteForm.Deleted'));
+      if (this._formNoteId === noteId) this.#exitForm();
+      this.render(false);
+    } catch (err) {
+      console.error('Sync Calendar | delete failed', err);
+      ui.notifications.error(game.i18n.localize('CHRONICLE.SyncCalendar.NoteForm.DeleteFailed'));
+    }
+  }
+
   static async #onFocusTarget(_event, target) {
     const focus = target?.dataset?.focus || '';
     if (!focus) return;
-    // No-op for PR 1 beyond an optional notification confirming the click.
-    // The structure groups are read-only in this PR; clicking them already
-    // toggles the rail-section visibility via CSS, no JS needed.
     if (game?.user?.isGM === false) return;
+    // Read-only structure focus (PR 5 will wire real navigation).
   }
 }
 
 /**
+ * Pre-built option lists for the form's `<select>` elements. Templates
+ * iterate these to render `<option>` elements with localized labels.
+ */
+const VISIBILITY_OPTIONS = [
+  { value: VISIBILITY.VISIBLE, labelKey: 'CHRONICLE.SyncCalendar.NoteForm.Visibility.Visible' },
+  { value: VISIBILITY.HIDDEN,  labelKey: 'CHRONICLE.SyncCalendar.NoteForm.Visibility.Hidden' },
+  { value: VISIBILITY.SECRET,  labelKey: 'CHRONICLE.SyncCalendar.NoteForm.Visibility.Secret' },
+];
+
+const DISPLAY_STYLE_OPTIONS = [
+  { value: DISPLAY_STYLE.ICON,   labelKey: 'CHRONICLE.SyncCalendar.NoteForm.DisplayStyle.Icon' },
+  { value: DISPLAY_STYLE.PIP,    labelKey: 'CHRONICLE.SyncCalendar.NoteForm.DisplayStyle.Pip' },
+  { value: DISPLAY_STYLE.BANNER, labelKey: 'CHRONICLE.SyncCalendar.NoteForm.DisplayStyle.Banner' },
+];
+
+/**
  * Helpers — coerce Calendaria's variably-shaped containers into arrays.
- * Calendaria exposes `*Array` getters on calendar instances for ordered
- * iteration, but the JSON-imported shape stores values under `*.values` as
- * a keyed object. Both happen in practice; this helper handles either.
  */
 function readArrayLike(...sources) {
   for (const src of sources) {
@@ -534,18 +845,10 @@ function readArrayLike(...sources) {
   return [];
 }
 
-/**
- * Compute a 0-indexed month index from a month entry. Calendaria stores
- * months 1-indexed via `ordinal`; some imports omit it. Falls back to the
- * array position the caller resolved.
- */
-function monthIndexFromMonth(month, _allMonths) {
+function monthIndexFromMonth(month, arrayIndex) {
   const ord = Number(month?.ordinal ?? 0);
   if (Number.isFinite(ord) && ord > 0) return ord - 1;
-  // No ordinal — caller already resolved the array position; we don't have
-  // access to that here without threading the index in. Fall back to 0 and
-  // rely on the caller for context.
-  return 0;
+  return Number(arrayIndex ?? 0);
 }
 
 function monthOrdinalFromMonth(month, fallbackIndex0) {
@@ -554,14 +857,8 @@ function monthOrdinalFromMonth(month, fallbackIndex0) {
   return Number(fallbackIndex0 ?? 0) + 1;
 }
 
-function monthFallbackId(month, index0) {
-  if (typeof month?.id === 'string' && month.id.length > 0) return month.id;
-  return `month-${index0}`;
-}
-
 /**
- * Convenience: open the application as a singleton. Subsequent calls bring
- * the existing window to the front instead of stacking duplicates.
+ * Convenience: open the application as a singleton.
  */
 let _instance = null;
 
@@ -576,10 +873,6 @@ export function openSyncCalendar() {
   return _instance;
 }
 
-/**
- * Convenience for tests / future PRs: return the current singleton (or
- * null). Never instantiates.
- */
 export function getSyncCalendarInstance() {
   return _instance && _instance.rendered ? _instance : null;
 }

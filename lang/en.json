@@ -43,9 +43,9 @@
         "Hint": "Show the install-time manifest URL Foundry uses for updates and run a manual check against Chronicle.",
         "Label": "Open"
       },
-      "SyncCalendar": {
+      "SyncCalendarMenu": {
         "Name": "Sync Calendar",
-        "Hint": "Open the Sync Calendar — a 3-pane view of your Calendaria calendar with an always-on validation panel. Read-only in PR 1; event authoring lands in PR 2.",
+        "Hint": "Open the Sync Calendar — a 3-pane view of your Calendaria calendar with an always-on validation panel. Event authoring + drag-select multi-day landed in PR 2; recurrence + moon strip + weather + structure editing land in PR 3-5.",
         "Label": "Open"
       }
     },
@@ -395,7 +395,10 @@
       "JumpToday": "Jump to today",
       "YearOverview": "Year overview",
       "YearOverviewHint": "Click a month to focus the inspector.",
-      "YearOverviewFootnote": "PR 1 is read-only — event authoring + drag-select multi-day creation lands in PR 2; moon-phase strip in PR 3; structure editing in PR 5.",
+      "YearOverviewFootnote": "Click a month to drill into the day grid (drag to select a range). Moon-phase strip lands in PR 3; weather + structure editing in PR 4-5.",
+      "MonthViewHint": "Click a day to focus the inspector. Drag across days to create a multi-day event.",
+      "MonthViewFootnote": "Drag from one day to another to open the multi-day event form pre-filled with that range.",
+      "BackToYear": "Back to year",
       "DaysSuffix": "days",
       "NotesSuffix": "notes",
       "ViewMonth": "View month",
@@ -429,11 +432,72 @@
         "NoWeather": "No weather configured."
       },
       "AddEvent": {
-        "Label": "Add event",
-        "ComingSoon": "Chronicle Sync: event authoring lands in FM-CAL-EDITOR-PR2. For now create events via Calendaria's BigCal / MiniCal."
+        "Label": "Add event"
+      },
+      "NoteForm": {
+        "HeaderAdd": "Add event",
+        "HeaderEdit": "Edit event",
+        "Name": "Name",
+        "NamePlaceholder": "What's this event?",
+        "Content": "Content",
+        "ContentPlaceholder": "Optional notes / HTML",
+        "StartDate": "Start date",
+        "EndDate": "End date",
+        "EndDateHint": "Leave blank for a single-day event.",
+        "Year": "Year",
+        "Month": "Month",
+        "Day": "Day",
+        "AllDay": "All-day event",
+        "Time": "Time",
+        "Hour": "Hour",
+        "Minute": "Minute",
+        "EndHour": "End hour",
+        "EndMinute": "End minute",
+        "Visibility": "Visibility",
+        "DisplayStyle": "Display style",
+        "Icon": "Icon",
+        "Color": "Color",
+        "Categories": "Categories",
+        "CategoriesPlaceholder": "festival, session, …",
+        "CategoriesHint": "Comma-separated. Existing preset IDs from Calendaria. PR 4 will add an inline picker.",
+        "Save": "Save changes",
+        "Create": "Create event",
+        "Cancel": "Cancel",
+        "Delete": "Delete event",
+        "DeleteConfirmTitle": "Delete event?",
+        "DeleteConfirmBody": "This deletes the event from Calendaria. The Chronicle copy will also be removed via the existing sync.",
+        "EditTooltip": "Edit",
+        "Created": "Chronicle Sync: event created.",
+        "Updated": "Chronicle Sync: event updated.",
+        "Deleted": "Chronicle Sync: event deleted.",
+        "NotFound": "Chronicle Sync: that event could not be loaded for editing.",
+        "SaveFailed": "Chronicle Sync: failed to save event. See console for details.",
+        "DeleteFailed": "Chronicle Sync: failed to delete event. See console for details.",
+        "Visibility.Visible": "Visible (everyone)",
+        "Visibility.Hidden":  "Hidden (GM only)",
+        "Visibility.Secret":  "Secret (GM only, hidden by default)",
+        "DisplayStyle.Icon":   "Icon",
+        "DisplayStyle.Pip":    "Pip",
+        "DisplayStyle.Banner": "Banner",
+        "Errors": {
+          "NotAnObject":         "Form data is not an object.",
+          "NameRequired":        "Name is required.",
+          "YearInvalid":         "Year must be a number.",
+          "MonthInvalid":        "Month must be a positive integer.",
+          "DayInvalid":          "Day must be a positive integer.",
+          "EndDateInvalid":      "End date is incomplete or invalid.",
+          "EndBeforeStart":      "End date is before start date.",
+          "HourInvalid":         "Hour must be between 0 and 23.",
+          "MinuteInvalid":       "Minute must be between 0 and 59.",
+          "VisibilityInvalid":   "Visibility must be 'visible', 'hidden', or 'secret'.",
+          "DisplayStyleInvalid": "Display style must be 'icon', 'pip', or 'banner'.",
+          "ApiUnavailable":      "Calendaria's API is not available — cannot save.",
+          "OptionsBuild":        "Internal error building Calendaria options from the form.",
+          "SaveFailed":          "Save failed — see browser console for details."
+        }
       },
       "Footer": {
-        "ReadOnly": "Read-only · PR 1"
+        "PR2": "Event CRUD · PR 2"
       },
       "Degraded": {
         "NoCalendaria": "Calendaria is not installed or not enabled. Sync Calendar requires Calendaria to be active.",

@@ -2227,3 +2227,273 @@
   font-size: 10px;
   opacity: 0.6;
 }
+
+/* ====================================================================
+ * Sync Calendar — FM-CAL-EDITOR-PR2 additions
+ * Month-view day grid + drag-select + note form
+ * ==================================================================== */
+
+/* --- Month view: day grid -------------------------------------------- */
+
+.sync-calendar .month-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 4px;
+  user-select: none;
+}
+
+.sync-calendar .day-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 48px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--rail-border);
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.sync-calendar .day-cell:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sync-calendar .day-cell.selected {
+  border-color: var(--finding-info);
+  background: rgba(96, 165, 250, 0.18);
+}
+
+.sync-calendar .day-cell.has-notes {
+  border-left: 3px solid var(--finding-info);
+}
+
+.sync-calendar .day-cell.festival {
+  background: rgba(251, 191, 36, 0.12);
+  border-color: var(--festival-color);
+}
+
+.sync-calendar .day-cell.drag-range {
+  background: rgba(96, 165, 250, 0.32);
+  border-color: var(--finding-info);
+}
+
+.sync-calendar .day-cell .day-number {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sync-calendar .day-cell .day-note-count {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.sync-calendar .day-cell .day-festival {
+  font-size: 10px;
+  color: var(--festival-color);
+}
+
+/* --- Note form -------------------------------------------------------- */
+
+.sync-calendar .note-form {
+  gap: 8px;
+}
+
+.sync-calendar .form-errors {
+  list-style: none;
+  margin: 0;
+  padding: 6px 8px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.sync-calendar .form-errors li {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 2px 0;
+  color: #fecaca;
+}
+
+.sync-calendar .form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sync-calendar .form-row.inline {
+  flex-direction: row;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.sync-calendar .form-row.inline > label {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sync-calendar .form-row.checkbox-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.sync-calendar .form-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.75;
+}
+
+.sync-calendar .form-hint {
+  margin: 0;
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.sync-calendar .form-row input[type="text"],
+.sync-calendar .form-row input[type="number"],
+.sync-calendar .form-row textarea,
+.sync-calendar .form-row select {
+  padding: 4px 6px;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--rail-border);
+  border-radius: 3px;
+  color: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sync-calendar .form-row input[type="number"] {
+  font-variant-numeric: tabular-nums;
+}
+
+.sync-calendar .form-row input:focus,
+.sync-calendar .form-row textarea:focus,
+.sync-calendar .form-row select:focus {
+  outline: none;
+  border-color: var(--finding-info);
+}
+
+.sync-calendar .form-row textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+.sync-calendar .form-fieldset {
+  border: 1px solid var(--rail-border);
+  border-radius: 3px;
+  padding: 6px 8px;
+  margin: 0;
+}
+
+.sync-calendar .form-fieldset legend {
+  padding: 0 4px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.75;
+}
+
+.sync-calendar .form-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.sync-calendar .form-save {
+  background: rgba(96, 165, 250, 0.2);
+  border: 1px solid var(--finding-info);
+  color: #bfdbfe;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 3px;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sync-calendar .form-save:hover:not(:disabled) {
+  background: rgba(96, 165, 250, 0.32);
+}
+
+.sync-calendar .form-save:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.sync-calendar .form-cancel {
+  background: transparent;
+  border: 1px solid var(--rail-border);
+  color: inherit;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.sync-calendar .form-cancel:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sync-calendar .form-delete {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #fecaca;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 3px;
+  font-size: 11px;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sync-calendar .form-delete:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.22);
+}
+
+/* --- Inline event-edit button + "Add event" CTA ---------------------- */
+
+.sync-calendar .event-row .event-edit-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.sync-calendar .event-row .event-edit-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sync-calendar .add-event-btn {
+  font-size: 11px;
+  padding: 4px 10px;
+  align-self: flex-start;
+  background: rgba(96, 165, 250, 0.12);
+  border: 1px solid var(--finding-info);
+  color: #bfdbfe;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.sync-calendar .add-event-btn:hover {
+  background: rgba(96, 165, 250, 0.22);
+}

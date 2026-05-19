@@ -23,6 +23,58 @@ import { getSetting } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 
 /**
+ * Canonical wire-visibility values per the calendar-sync wire contract
+ * (cordinator/decisions/2026-05-17-calendar-sync-wire-contract.md).
+ *
+ * Chronicle's internal storage uses `'gm_only'` (underscore) for historical
+ * reasons; chronicle#316's API handler translates between wire `'gm-only'`
+ * (kebab) and storage at the boundary. The module emits + consumes wire
+ * values. Don't introduce the storage form on the Foundry side.
+ */
+export const WIRE_VISIBILITY = Object.freeze({
+  EVERYONE: 'everyone',
+  GM_ONLY:  'gm-only',
+});
+
+/**
+ * Pure helper: derive the wire-visibility value to emit when sending a
+ * Calendaria note to Chronicle. Exported for unit testing — the hot path
+ * call sites delegate to this so tests can pin the exact wire string.
+ *
+ * Accepts either:
+ *   - A note stub with `gmOnly: boolean` (Calendaria's documented field)
+ *   - A note stub with `visibility: 'visible'|'hidden'|'secret'` —
+ *     anything other than 'visible' is treated as GM-only since Calendaria
+ *     hides those notes from non-GM users by default.
+ *
+ * @param {object|null} noteData
+ * @returns {'everyone'|'gm-only'}
+ */
+export function chronicleVisibilityFromCalendariaNote(noteData) {
+  if (!noteData || typeof noteData !== 'object') return WIRE_VISIBILITY.EVERYONE;
+  if (noteData.gmOnly === true) return WIRE_VISIBILITY.GM_ONLY;
+  if (noteData.gmOnly === false) return WIRE_VISIBILITY.EVERYONE;
+  const v = noteData.visibility ?? noteData.flagData?.visibility;
+  if (v === 'hidden' || v === 'secret') return WIRE_VISIBILITY.GM_ONLY;
+  return WIRE_VISIBILITY.EVERYONE;
+}
+
+/**
+ * Pure helper: should an incoming Chronicle event be treated as GM-only?
+ * Accepts both the canonical wire form `'gm-only'` (kebab) and the legacy
+ * storage form `'gm_only'` (underscore) so a defensive Foundry consumer
+ * survives any future Chronicle translation-layer regression.
+ *
+ * Exported for unit testing.
+ *
+ * @param {string|undefined|null} wireValue
+ * @returns {boolean}
+ */
+export function isWireVisibilityGmOnly(wireValue) {
+  return wireValue === WIRE_VISIBILITY.GM_ONLY || wireValue === 'gm_only';
+}
+
+/**
  * CalendarSync handles calendar ↔ Foundry calendar module synchronization.
  */
 export class CalendarSync {
@@ -416,7 +468,14 @@ export class CalendarSync {
       month: startDate.month,
       day: startDate.day ?? startDate.dayOfMonth ?? 1,
       description: noteData.content || noteData.description || flagData.content || '',
-      visibility: noteData.gmOnly ? 'gm_only' : 'everyone',
+      // Wire visibility is kebab-case per the wire contract
+      // (cordinator/decisions/2026-05-17-calendar-sync-wire-contract.md).
+      // Chronicle's internal storage uses underscore; chronicle#316's
+      // translation layer bridges the two. Foundry MUST emit kebab on
+      // the wire — emitting underscore was masked by the translation
+      // layer in PR 1 but counts as drift. See `chronicleVisibilityFromCalendariaNote`
+      // for the pure helper this delegates to (used by unit tests).
+      visibility: chronicleVisibilityFromCalendariaNote(noteData),
     };
   }
 
@@ -752,7 +811,12 @@ export class CalendarSync {
               day: data.day,
             },
             allDay: true,
-            gmOnly: data.visibility === 'gm_only',
+            // Wire visibility is kebab `'gm-only'`. The pure helper
+            // `isWireVisibilityGmOnly` accepts either kebab or the legacy
+            // underscore form so this code keeps working if a Chronicle
+            // event lands here with stale storage-side data (e.g. from a
+            // mis-translated WS payload).
+            gmOnly: isWireVisibilityGmOnly(data.visibility),
             openSheet: false,
           });
           if (note?.id) {
