@@ -3,6 +3,21 @@
  * Moon strip + recurrence builder + empty-state Calendaria import
  * ==================================================================== */
 
+/* --- FM-SYNCCAL-ROOT-FIX (#26) single-root wrapper -------------------
+ * The PARTS body is wrapped in `<div class="sync-calendar-root">` so
+ * Foundry's `_parsePartHTML` accepts both the degraded branch and the
+ * three-sibling non-degraded branch. Layout migrates from the prior
+ * `.sync-calendar .sync-calendar-content` container (which Foundry no
+ * longer feeds the children directly) onto this wrapper. See F-PR3-4
+ * in `.ai.md` and `tools/test-template-roots.mjs`. */
+
+.sync-calendar .sync-calendar-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 8px;
+}
+
 /* --- Moon-phase strip in month view --------------------------------- */
 
 .sync-calendar .moon-strip-block {
