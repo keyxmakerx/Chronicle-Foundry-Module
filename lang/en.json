@@ -42,6 +42,11 @@
         "Name": "Update Source",
         "Hint": "Show the install-time manifest URL Foundry uses for updates and run a manual check against Chronicle.",
         "Label": "Open"
+      },
+      "SyncCalendar": {
+        "Name": "Sync Calendar",
+        "Hint": "Open the Sync Calendar — a 3-pane view of your Calendaria calendar with an always-on validation panel. Read-only in PR 1; event authoring lands in PR 2.",
+        "Label": "Open"
       }
     },
     "Status": {
@@ -380,6 +385,60 @@
       "AuthFailure": {
         "Prefix": "Chronicle Sync:",
         "Message": "Your install URL is no longer valid. Copy the current Module Install URL from Chronicle's Campaign Settings → Integrations and reinstall this module to recover."
+      }
+    },
+    "SyncCalendar": {
+      "Title": "Sync Calendar",
+      "CalendariaVersion": "Calendaria version",
+      "SelectedDate": "Selected",
+      "YearLabel": "Year",
+      "JumpToday": "Jump to today",
+      "YearOverview": "Year overview",
+      "YearOverviewHint": "Click a month to focus the inspector.",
+      "YearOverviewFootnote": "PR 1 is read-only — event authoring + drag-select multi-day creation lands in PR 2; moon-phase strip in PR 3; structure editing in PR 5.",
+      "DaysSuffix": "days",
+      "NotesSuffix": "notes",
+      "ViewMonth": "View month",
+      "Findings": {
+        "Pill": "validation finding(s)",
+        "None": "No validation findings — calendar looks clean."
+      },
+      "Rail": {
+        "Year": "Year",
+        "Structure": "Structure",
+        "Validation": "Validation",
+        "SelectedDay": "Selected day"
+      },
+      "Structure": {
+        "Months": "Months",
+        "Weekdays": "Weekdays",
+        "Seasons": "Seasons",
+        "Moons": "Moons",
+        "Eras": "Eras",
+        "Festivals": "Festivals",
+        "Cycles": "Cycles",
+        "WeatherZones": "Weather zones",
+        "ReadOnlyHint": "Structure groups are read-only in PR 1. Edit via Calendaria's Calendar Editor for now."
+      },
+      "Day": {
+        "Events": "Events",
+        "NoEvents": "No events on this day.",
+        "Moons": "Moons",
+        "NoMoons": "Calendar has no moons defined.",
+        "Weather": "Weather",
+        "NoWeather": "No weather configured."
+      },
+      "AddEvent": {
+        "Label": "Add event",
+        "ComingSoon": "Chronicle Sync: event authoring lands in FM-CAL-EDITOR-PR2. For now create events via Calendaria's BigCal / MiniCal."
+      },
+      "Footer": {
+        "ReadOnly": "Read-only · PR 1"
+      },
+      "Degraded": {
+        "NoCalendaria": "Calendaria is not installed or not enabled. Sync Calendar requires Calendaria to be active.",
+        "IncompatibleApi": "Calendaria is installed but its API is not exposed. This editor needs CALENDARIA.api to function; check your Calendaria version.",
+        "NoActiveCalendar": "Calendaria is loaded but no active calendar is selected. Open Calendaria's Calendar Editor to set one."
       }
     }
   }
