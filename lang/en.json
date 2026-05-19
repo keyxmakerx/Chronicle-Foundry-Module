@@ -473,12 +473,16 @@
         "NotFound": "Chronicle Sync: that event could not be loaded for editing.",
         "SaveFailed": "Chronicle Sync: failed to save event. See console for details.",
         "DeleteFailed": "Chronicle Sync: failed to delete event. See console for details.",
-        "Visibility.Visible": "Visible (everyone)",
-        "Visibility.Hidden":  "Hidden (GM only)",
-        "Visibility.Secret":  "Secret (GM only, hidden by default)",
-        "DisplayStyle.Icon":   "Icon",
-        "DisplayStyle.Pip":    "Pip",
-        "DisplayStyle.Banner": "Banner",
+        "VisibilityOption": {
+          "Visible": "Visible (everyone)",
+          "Hidden":  "Hidden (GM only)",
+          "Secret":  "Secret (GM only, hidden by default)"
+        },
+        "DisplayStyleOption": {
+          "Icon":   "Icon",
+          "Pip":    "Pip",
+          "Banner": "Banner"
+        },
         "Errors": {
           "NotAnObject":         "Form data is not an object.",
           "NameRequired":        "Name is required.",
