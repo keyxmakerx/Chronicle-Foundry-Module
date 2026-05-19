@@ -24,7 +24,8 @@
   "styles": [
     "styles/chronicle-sync.css",
     "styles/import-wizard.css",
-    "styles/map-viewer.css"
+    "styles/map-viewer.css",
+    "styles/sync-calendar-pr3.css"
   ],
   "languages": [
     {

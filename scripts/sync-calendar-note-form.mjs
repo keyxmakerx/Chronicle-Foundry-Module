@@ -81,6 +81,9 @@ export function defaultFormForDate(anchor) {
     icon:  '',
     color: '',
     categories: [],
+    // PR 3: recurrence builder. Null means "fires once on startDate";
+    // a populated conditionTree means "fires on every matching date".
+    conditionTree: null,
   };
 }
 
@@ -139,6 +142,10 @@ export function formFromNote(note) {
     icon:  pickString(note.icon,  f.icon,  ''),
     color: pickString(note.color, f.color, ''),
     categories: coerceCategories(note.categories ?? f.categories),
+    // PR 3: surface existing recurrence tree if Calendaria attached one.
+    // The shape passes through verbatim — validation/display happens in
+    // the builder module, not here.
+    conditionTree: extractConditionTree(note, f),
   };
 }
 
@@ -206,6 +213,13 @@ export function noteOptionsFromForm(form) {
 
   const categories = coerceCategories(form.categories);
   if (categories.length > 0) options.categories = categories;
+
+  // PR 3: recurrence tree passes through verbatim. We don't ship it as
+  // an empty object — null means "no recurrence" and Calendaria's
+  // create/update API treats absence as such.
+  if (form.conditionTree && typeof form.conditionTree === 'object') {
+    options.conditionTree = form.conditionTree;
+  }
 
   return options;
 }
@@ -311,6 +325,23 @@ export function coerceDisplayStyle(s) {
 // ---------------------------------------------------------------------
 // Internals
 // ---------------------------------------------------------------------
+
+/**
+ * Recurrence tree lookup with the same top-level vs flagData fallback
+ * the rest of `formFromNote` uses. Returns null if neither carries a
+ * usable tree.
+ *
+ * @private
+ */
+function extractConditionTree(note, flagData) {
+  if (note?.conditionTree && typeof note.conditionTree === 'object') {
+    return note.conditionTree;
+  }
+  if (flagData?.conditionTree && typeof flagData.conditionTree === 'object') {
+    return flagData.conditionTree;
+  }
+  return null;
+}
 
 function pickString(...candidates) {
   for (const c of candidates) {
