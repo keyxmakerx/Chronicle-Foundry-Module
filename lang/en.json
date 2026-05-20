@@ -158,7 +158,9 @@
         "Disabled": "Calendar sync is disabled. Enable it in Module Settings.",
         "NoModule": "No calendar module detected.",
         "NoModuleHint": "Install Calendaria or Simple Calendar to enable calendar sync.",
-        "UnableToRead": "Unable to read"
+        "UnableToRead": "Unable to read",
+        "OpenSyncCalendar": "Open Sync Calendar",
+        "OpenSyncCalendarHint": "Open the full Sync Calendar editor — import calendars, edit events, view moon phases."
       },
       "Notes": {
         "Synced": "Synced",
@@ -386,6 +388,9 @@
         "Prefix": "Chronicle Sync:",
         "Message": "Your install URL is no longer valid. Copy the current Module Install URL from Chronicle's Campaign Settings → Integrations and reinstall this module to recover."
       }
+    },
+    "SceneControl": {
+      "SyncCalendar": "Open Sync Calendar"
     },
     "SyncCalendar": {
       "Title": "Sync Calendar",
