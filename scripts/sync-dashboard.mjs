@@ -10,6 +10,7 @@
 
 import { getSetting, setSetting, getSyncDirections, setSyncDirections, getExcludedTags, setExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
+import { openSyncCalendar } from './sync-calendar.mjs';
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**
@@ -54,6 +55,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'dismiss-map-errors': SyncDashboard.#onDismissMapErrorsAction,
       'pull-date': SyncDashboard.#onPullDateAction,
       'push-date': SyncDashboard.#onPushDateAction,
+      'open-sync-calendar': SyncDashboard.#onOpenSyncCalendarAction,
       reconnect: SyncDashboard.#onReconnectAction,
       'clear-log': SyncDashboard.#onClearLogAction,
       'open-settings': SyncDashboard.#onOpenSettingsAction,
@@ -1162,6 +1164,18 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this.render({ force: true });
   }
 
+  /**
+   * Open the Sync Calendar editor.
+   *
+   * Wired via the dashboard's Calendar tab header (FM-CAL-DASHBOARD-LINK).
+   * `openSyncCalendar()` is the singleton helper from sync-calendar.mjs —
+   * it bringToFront's an existing instance or instantiates a new one,
+   * and is GM-only by contract (returns null for non-GMs).
+   */
+  static #onOpenSyncCalendarAction() {
+    openSyncCalendar();
+  }
+
   /** Open Foundry module settings. */
   static #onOpenSettingsAction() {
     const sheet = game.settings.sheet;
@@ -1651,7 +1665,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     if (resp.status === 401) {
       steps.push({ icon: 'check', text: 'API reachable' });
-      steps.push({ icon: 'xmark', text: 'Auth failed: API key invalid or revoked. Create a new key in Chronicle Settings \u2192 Integrations.' });
+      steps.push({ icon: 'xmark', text: 'Auth failed: API key invalid or revoked. Create a new key in Chronicle Settings → Integrations.' });
       this._renderTestResults(resultEl, steps);
       return;
     }

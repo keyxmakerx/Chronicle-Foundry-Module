@@ -656,6 +656,18 @@
     {{!-- CALENDAR TAB                                                      --}}
     {{!-- ================================================================= --}}
     <div class="tab" data-tab="calendar" data-group="primary">
+      {{!-- FM-CAL-DASHBOARD-LINK: surface the Sync Calendar editor. The
+           dashboard's Calendar tab is a status panel; the Sync Calendar
+           app is the full editor (import / events / moon strip /
+           validation). Surface it here so the operator doesn't have to
+           dig through Game Settings → Module Settings to find it. --}}
+      <div class="calendar-tab-actions">
+        <button type="button" data-action="open-sync-calendar" class="dashboard-btn primary-action">
+          <i class="fa-solid fa-calendar-days"></i>
+          {{localize "CHRONICLE.Dashboard.Calendar.OpenSyncCalendar"}}
+        </button>
+        <p class="action-hint">{{localize "CHRONICLE.Dashboard.Calendar.OpenSyncCalendarHint"}}</p>
+      </div>
       {{#if calendar.available}}
       <div class="calendar-panel">
         <div class="calendar-module-info">

@@ -871,6 +871,38 @@
 /* CALENDAR TAB                                                       */
 /* ================================================================= */
 
+/* FM-CAL-DASHBOARD-LINK: launch row above the date-sync status panel.
+ * The primary-action button is sized larger than .dashboard-btn defaults
+ * so the operator sees it first when they land on the Calendar tab. */
+.calendar-tab-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px 0 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 8px;
+}
+
+.calendar-tab-actions .primary-action {
+  font-size: 14px;
+  padding: 8px 14px;
+  background: rgba(96, 165, 250, 0.18);
+  border-color: rgba(96, 165, 250, 0.45);
+  color: #bfdbfe;
+}
+
+.calendar-tab-actions .primary-action:hover {
+  background: rgba(96, 165, 250, 0.28);
+  border-color: rgba(96, 165, 250, 0.6);
+}
+
+.calendar-tab-actions .action-hint {
+  margin: 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
 .calendar-panel {
   padding: 8px 0;
 }

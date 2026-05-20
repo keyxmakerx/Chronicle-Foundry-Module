@@ -19,6 +19,7 @@ import { SyncDashboard } from './sync-dashboard.mjs';
 import { MapViewerSheet } from './map-viewer.mjs';
 import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
+import { openSyncCalendar } from './sync-calendar.mjs';
 
 /** @type {SyncManager|null} */
 let syncManager = null;
@@ -132,6 +133,11 @@ Hooks.on('getSceneControlButtons', (controls) => {
   const openDashboard = () => {
     if (dashboard) dashboard.render({ force: true });
   };
+  // FM-CAL-DASHBOARD-LINK: surface SyncCalendarApplication as a second
+  // tool in the Chronicle Sync scene-control group. The singleton helper
+  // is GM-only by contract; the outer GM guard above is also enforced.
+  const launchSyncCalendar = () => { openSyncCalendar(); };
+  const syncCalendarTitle = game.i18n.localize('CHRONICLE.SceneControl.SyncCalendar');
 
   // v13: controls and tools are keyed objects with onChange callback.
   // v12: controls and tools are arrays with onClick callback.
@@ -148,6 +154,12 @@ Hooks.on('getSceneControlButtons', (controls) => {
         icon: 'fa-solid fa-rotate',
         button: true,
         onClick: openDashboard,
+      }, {
+        name: 'sync-calendar',
+        title: syncCalendarTitle,
+        icon: 'fa-solid fa-calendar-days',
+        button: true,
+        onClick: launchSyncCalendar,
       }],
     });
   } else {
@@ -166,6 +178,13 @@ Hooks.on('getSceneControlButtons', (controls) => {
           icon: 'fa-solid fa-rotate',
           button: true,
           onChange: openDashboard,
+        },
+        'sync-calendar': {
+          name: 'sync-calendar',
+          title: syncCalendarTitle,
+          icon: 'fa-solid fa-calendar-days',
+          button: true,
+          onChange: launchSyncCalendar,
         },
       },
     };
