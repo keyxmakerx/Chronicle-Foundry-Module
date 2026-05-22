@@ -1,3 +1,5 @@
+@layer chronicle-sync {
+
 /* ============================================================
    Chronicle Map Viewer — Interactive Map Journal Page
    All styles scoped to .chronicle-map-viewer / .chronicle-pin-config
@@ -591,3 +593,5 @@
 .chronicle-pin-config-form .form-actions .dashboard-btn {
   flex: 1;
 }
+
+} /* end @layer chronicle-sync */
