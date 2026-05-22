@@ -1732,6 +1732,14 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /**
    * Render multi-step test connection results.
+   *
+   * Per FM-SEC-CHUNK-1 (closes M-1) — uses DOM construction instead of
+   * `innerHTML` interpolation. `s.text` contains Chronicle-side strings
+   * (system names, error messages echoing Chronicle response data); if
+   * Chronicle returned a malicious string, `innerHTML` would execute it
+   * as DOM. textContent renders it as text instead. See `.ai.md` footgun
+   * F-SEC-1 (added by FM-SEC-CHUNK-8).
+   *
    * @param {HTMLElement} resultEl
    * @param {Array<{icon: string, text: string}>} steps
    * @private
@@ -1739,12 +1747,30 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   _renderTestResults(resultEl, steps) {
     if (!resultEl) return;
     const hasError = steps.some(s => s.icon === 'xmark');
-    const icons = {
-      check: '<i class="fa-solid fa-check-circle" style="color:#4ade80"></i>',
-      xmark: '<i class="fa-solid fa-circle-xmark" style="color:#f87171"></i>',
-      warn: '<i class="fa-solid fa-triangle-exclamation" style="color:#fbbf24"></i>',
+    // Static icon-class map — values are constant CSS class strings (no
+    // user input). Safe to assign to a Foundry-icon `<i>` element via class.
+    const iconClasses = {
+      check: { classes: ['fa-solid', 'fa-check-circle'], color: '#4ade80' },
+      xmark: { classes: ['fa-solid', 'fa-circle-xmark'], color: '#f87171' },
+      warn:  { classes: ['fa-solid', 'fa-triangle-exclamation'], color: '#fbbf24' },
     };
-    resultEl.innerHTML = steps.map(s => `<div>${icons[s.icon] || ''} ${s.text}</div>`).join('');
+    // Clear via replaceChildren — accepts a list of Node|string args; strings
+    // become text nodes, NEVER parsed as HTML. Resets the element atomically.
+    resultEl.replaceChildren(...steps.map((s) => {
+      const div = document.createElement('div');
+      const iconSpec = iconClasses[s.icon];
+      if (iconSpec) {
+        const icon = document.createElement('i');
+        icon.classList.add(...iconSpec.classes);
+        icon.style.color = iconSpec.color;
+        div.append(icon, ' ');
+      }
+      // textContent assignment — Chronicle-side strings rendered as TEXT,
+      // never as DOM. Malicious `<img src=x onerror=...>` strings appear
+      // verbatim and execute nothing.
+      div.append(document.createTextNode(s.text ?? ''));
+      return div;
+    }));
     resultEl.className = `config-test-result ${hasError ? 'test-error' : 'test-success'}`;
   }
 
