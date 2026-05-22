@@ -1,4 +1,35 @@
-/* Chronicle Sync - Foundry VTT Module Styles */
+/* Chronicle Sync — Foundry VTT Module Styles
+ *
+ * Cascade layer ordering — per decisions/2026-05-22-ui-modernization-decisions.md Q4 + Q7
+ * (cordinator repo). Foundry-host CSS arrives unlayered (effectively in the implicit
+ * highest layer). Declaring foundry-host as a NAMED layer forces it BELOW chronicle-sync.
+ * Practical effect: any rule inside @layer chronicle-sync { } wins over Foundry's
+ * .window-app cascade, without needing specificity hacks.
+ *
+ * This declaration appears ONCE across the four module CSS files; chronicle-sync.css
+ * loads first per module.json#/styles, so this is the right home.
+ */
+@layer foundry-host, chronicle-sync;
+
+/* Per decisions/2026-05-22-ui-modernization-decisions.md Q6 — total-disable reduced motion.
+ * Respects WCAG 2.1 SC 2.3.3 and the OS-level prefers-reduced-motion: reduce setting.
+ * Lives outside the chronicle-sync layer so it applies to Foundry-host animation too. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+@layer chronicle-sync {
+
 
 /* Claim-status pill on actor sheet headers */
 .chronicle-claim-indicator {
@@ -2529,3 +2560,4 @@
 .sync-calendar .add-event-btn:hover {
   background: rgba(96, 165, 250, 0.22);
 }
+} /* end @layer chronicle-sync */
