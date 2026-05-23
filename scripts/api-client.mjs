@@ -122,6 +122,31 @@ function normalizeNoteResponse(data) {
 }
 
 /**
+ * Strip authorization headers and signed-URL tokens from a text payload
+ * before it lands in the in-memory error log. Defense-in-depth for the
+ * theoretical case where Chronicle's error body echoes the request
+ * — e.g. `"Invalid token: Bearer abc123..."` would leak the apiKey into
+ * the dashboard's diagnostics panel without this scrub.
+ *
+ * Patterns scrubbed:
+ *   - `Bearer <token>` (any non-whitespace token after Bearer)
+ *   - `?token=<value>` query-param tokens (used on WS connect + manifest URLs)
+ *
+ * Per FM-SEC-CHUNK-4 (closes P-8) + FM-SECURITY-AUDIT §0.5 D3=(b).
+ *
+ * Exported for the regression test at tools/test-api-client-secrets.mjs.
+ *
+ * @param {string} text - The text to scrub.
+ * @returns {string} The scrubbed text. Non-string inputs returned as-is.
+ */
+export function _scrubAuthHeaders(text) {
+  if (typeof text !== 'string') return text;
+  return text
+    .replace(/Bearer\s+\S+/gi, 'Bearer [redacted]')
+    .replace(/(\?|&)token=[^&\s"'<>]+/gi, '$1token=[redacted]');
+}
+
+/**
  * ChronicleAPI handles all communication with the Chronicle backend.
  * Combines REST fetch calls and a persistent WebSocket connection.
  */
@@ -576,6 +601,7 @@ export class ChronicleAPI {
    * @private
    */
   _logError(level, method, path, status, message) {
+    const scrubbed = _scrubAuthHeaders(message);
     this._errorLog.unshift({
       time: Date.now(),
       timeFormatted: new Date().toLocaleTimeString(),
@@ -583,7 +609,7 @@ export class ChronicleAPI {
       method,
       path,
       status,
-      message: message.length > 200 ? message.substring(0, 200) + '…' : message,
+      message: scrubbed.length > 200 ? scrubbed.substring(0, 200) + '…' : scrubbed,
     });
     if (this._errorLog.length > this._maxErrorLogEntries) {
       this._errorLog.length = this._maxErrorLogEntries;
