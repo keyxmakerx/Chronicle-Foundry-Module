@@ -8,6 +8,28 @@
  */
 
 import { getSetting } from './settings.mjs';
+import { describeCampaignIdError } from './_settings-validation.mjs';
+
+/**
+ * Validate the campaignId setting and abort with a clear notification if
+ * invalid. Called at every outbound Chronicle API boundary so a typo or
+ * misconfiguration surfaces as an operator-actionable message instead of
+ * a confusing Chronicle 404 / URL escape.
+ *
+ * Per FM-SEC-CHUNK-5 / FM-SECURITY-AUDIT §2 P-7.
+ *
+ * @param {string} campaignId
+ * @returns {string} The validated campaignId (passthrough on success).
+ * @throws {Error} If campaignId is invalid.
+ */
+function _validateCampaignIdOrThrow(campaignId) {
+  const err = describeCampaignIdError(campaignId);
+  if (err) {
+    try { ui?.notifications?.error?.(err); } catch { /* notifications not ready */ }
+    throw new Error(err);
+  }
+  return campaignId;
+}
 
 /**
  * Allowed WebSocket message type prefixes.
@@ -176,7 +198,7 @@ export class ChronicleAPI {
   async fetch(path, options = {}) {
     const baseUrl = getSetting('apiUrl').replace(/\/+$/, '');
     const apiKey = getSetting('apiKey');
-    const campaignId = getSetting('campaignId');
+    const campaignId = _validateCampaignIdOrThrow(getSetting('campaignId'));
 
     const url = `${baseUrl}/api/v1/campaigns/${campaignId}${path}`;
     const method = options.method || 'GET';
@@ -350,7 +372,7 @@ export class ChronicleAPI {
   async uploadMedia(file, filename) {
     const baseUrl = getSetting('apiUrl').replace(/\/+$/, '');
     const apiKey = getSetting('apiKey');
-    const campaignId = getSetting('campaignId');
+    const campaignId = _validateCampaignIdOrThrow(getSetting('campaignId'));
 
     const formData = new FormData();
     formData.append('file', file, filename || file.name);
