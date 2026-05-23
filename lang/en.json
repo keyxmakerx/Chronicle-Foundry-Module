@@ -34,6 +34,10 @@
         "Name": "Sync Characters",
         "Hint": "Sync Foundry actors with Chronicle character entities (requires matching game system)"
       },
+      "SkipIncomingSanitization": {
+        "Name": "Skip incoming HTML sanitization (advanced)",
+        "Hint": "Disable Foundry-side HTML sanitization of Chronicle content at ingress. Chronicle already sanitizes server-side; Foundry sanitizes at render. This is a defense-in-depth middle layer. Turn ON only if you find legitimate inline styling from Chronicle is being stripped."
+      },
       "SyncNotes": {
         "Name": "Sync Notes",
         "Hint": "Sync Chronicle campaign notes with Foundry journal entries"

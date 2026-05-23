@@ -15,6 +15,7 @@
 
 import { getSetting } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
+import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
 
 /** Name of the root Foundry folder for Chronicle notes. */
 const NOTES_FOLDER_NAME = 'Chronicle Notes';
@@ -206,7 +207,7 @@ export class NoteSync {
         ? await this._findNoteFolder(note.parent_id)
         : null;
 
-      const content = note.entry_html || '';
+      const content = _sanitizeIncomingHTML(note.entry_html || '');
 
       // Build ownership from sharing settings.
       const ownership = this._buildNoteOwnership(note);
@@ -254,8 +255,10 @@ export class NoteSync {
         await journal.update({ name: note.title });
       }
 
-      // Update page content.
-      const content = note.entry_html || '';
+      // Update page content. Sanitize Chronicle-supplied HTML at ingress
+      // (FM-SEC-CHUNK-3, M-3 defense-in-depth on top of Chronicle's
+      // server-side bluemonday sanitization).
+      const content = _sanitizeIncomingHTML(note.entry_html || '');
       const textPage = journal.pages.find((p) => p.type === 'text');
       if (textPage) {
         await textPage.update({ 'text.content': content });
