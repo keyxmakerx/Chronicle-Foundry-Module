@@ -12,6 +12,7 @@
 import { getSetting, getSyncExclusions } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
+import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
 
 /**
  * JournalSync handles entity ↔ JournalEntry synchronization.
@@ -199,10 +200,10 @@ export class JournalSync {
       await journal.update({ name: entity.name, ownership });
 
       // Split entity content into pages and sync them.
-      await this._syncPagesToJournal(journal, entity.entry_html || '');
+      await this._syncPagesToJournal(journal, _sanitizeIncomingHTML(entity.entry_html || ''));
 
       // Sync player notes page.
-      await this._syncPlayerNotesPage(journal, entity.player_notes_html || '');
+      await this._syncPlayerNotesPage(journal, _sanitizeIncomingHTML(entity.player_notes_html || ''));
 
       // Update flags with latest entity data.
       await journal.setFlag(FLAG_SCOPE, 'entityType', entity.type_name || '');
@@ -334,7 +335,8 @@ export class JournalSync {
       }
 
       // Split entity content into pages by top-level headings.
-      const sections = this._splitByHeadings(entity.entry_html || '');
+      // Sanitize at ingress before splitting (FM-SEC-CHUNK-3, M-3 defense-in-depth).
+      const sections = this._splitByHeadings(_sanitizeIncomingHTML(entity.entry_html || ''));
 
       let sortIndex = 1;
       for (const section of sections) {
@@ -360,7 +362,7 @@ export class JournalSync {
         pages.push({
           name: 'Player Notes',
           type: 'text',
-          text: { content: entity.player_notes_html },
+          text: { content: _sanitizeIncomingHTML(entity.player_notes_html) },
           sort: sortIndex++,
           ownership: { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER },
           flags: { [FLAG_SCOPE]: { isPlayerNotes: true } },
