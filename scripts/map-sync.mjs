@@ -39,6 +39,7 @@
 
 import { getSetting } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
+import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
 
 /** Folder name for materialized Chronicle maps. */
 const MAPS_FOLDER_NAME = 'Chronicle Maps';
@@ -90,16 +91,22 @@ export const PIN_ICONS = {
  */
 function _mapImageSrc(map) {
   if (!map) return '';
-  // Prefer any full URL Chronicle includes directly.
+  const apiUrl = getSetting('apiUrl');
+  // Prefer any full URL Chronicle includes directly — but only if its
+  // host matches `apiUrl`. A mismatch is dropped here (M-2 host
+  // allowlist); the relative-path branch below may still recover.
   for (const field of ['image_url', 'image_path', 'image']) {
     const v = map[field];
-    if (typeof v === 'string' && /^https?:/i.test(v)) return v;
+    if (typeof v === 'string' && /^https?:/i.test(v)) {
+      if (_isAllowedImageHost(v, apiUrl)) return v;
+      console.warn(_describeRejection('map_image', v, apiUrl));
+    }
   }
   // Relative path (e.g., "/media/foo.png") — prefix with base URL.
   for (const field of ['image_url', 'image_path', 'image']) {
     const v = map[field];
     if (typeof v === 'string' && v.startsWith('/')) {
-      const baseUrl = getSetting('apiUrl')?.replace(/\/+$/, '');
+      const baseUrl = apiUrl?.replace(/\/+$/, '');
       return baseUrl ? `${baseUrl}${v}` : v;
     }
   }
@@ -281,10 +288,21 @@ export class MapSync {
       const url = meta?.url || meta?.path || '';
       if (!url) return '';
 
-      const baseUrl = getSetting('apiUrl')?.replace(/\/+$/, '');
-      const full = /^https?:/i.test(url)
-        ? url
-        : (baseUrl ? `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}` : url);
+      const apiUrl = getSetting('apiUrl');
+      const baseUrl = apiUrl?.replace(/\/+$/, '');
+      let full;
+      if (/^https?:/i.test(url)) {
+        // Full URL — gate on host match (M-2 host allowlist). A mismatch
+        // here means Chronicle returned a media URL pointing elsewhere;
+        // either a misconfigured deployment or tampered response.
+        if (!_isAllowedImageHost(url, apiUrl)) {
+          console.warn(_describeRejection('media_url', url, apiUrl));
+          return '';
+        }
+        full = url;
+      } else {
+        full = baseUrl ? `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}` : url;
+      }
 
       this._mediaUrlCache.set(mediaId, { url: full, cachedAt: Date.now() });
       return full;
@@ -855,7 +873,13 @@ export class MapSync {
       name: mapData.name || '',
       description: mapData.description || '',
       image_id: mapData.image_id || null,
-      image_url: imageSrc || mapData.image_url || mapData.image_path || '',
+      // imageSrc is already the host-validated, fully-resolved URL from
+      // `_mapImageSrc` / `_resolveMediaUrl`. The previous fallback to
+      // raw `mapData.image_url || mapData.image_path` bypassed the host
+      // check; with M-2 it's intentionally dropped — if `_mapImageSrc`
+      // rejected the value, the flag should reflect that (empty), not
+      // re-introduce the rejected URL.
+      image_url: imageSrc || '',
       image_width: mapData.image_width || 0,
       image_height: mapData.image_height || 0,
       background_color: mapData.background_color || '',

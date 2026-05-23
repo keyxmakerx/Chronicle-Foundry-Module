@@ -38,6 +38,7 @@
 import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
 import { PIN_ICONS } from './map-sync.mjs';
 import { getUserMappings } from './settings.mjs';
+import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
 
 /* ============================================================
    Constants
@@ -335,11 +336,20 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
    */
   _mapImageSrc(meta) {
     if (!meta) return '';
-    const baseUrl = (game.settings.get(MODULE_ID, 'apiUrl') || '').replace(/\/+$/, '');
+    const apiUrl = game.settings.get(MODULE_ID, 'apiUrl') || '';
+    const baseUrl = apiUrl.replace(/\/+$/, '');
     for (const field of ['image_url', 'image_path', 'image']) {
       const v = meta[field];
       if (typeof v !== 'string' || !v) continue;
-      if (/^https?:/i.test(v)) return v;
+      if (/^https?:/i.test(v)) {
+        // Player-side host-allowlist (M-2). The GM should have already
+        // dropped cross-host URLs at materialization, but a flag set by
+        // an older module version or hand-edited could still surface
+        // one — fail-closed.
+        if (_isAllowedImageHost(v, apiUrl)) return v;
+        console.warn(_describeRejection('map_image', v, apiUrl));
+        continue;
+      }
       if (v.startsWith('/')) return baseUrl ? `${baseUrl}${v}` : v;
     }
     return '';
@@ -417,12 +427,24 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
     const max = Number(t.max_hp) || 0;
     const cur = Number(t.current_hp) || 0;
     const hpPct = max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : null;
+    // Token image surfaces in the overlay as `<img src="{{image}}">`.
+    // Apply M-2 host-allowlist: a full URL must match apiUrl's host;
+    // anything else (relative path, empty) passes through unchanged.
+    const rawImage = t.image || t.image_url || '';
+    let image = rawImage;
+    if (typeof rawImage === 'string' && /^https?:/i.test(rawImage)) {
+      const apiUrl = game.settings.get(MODULE_ID, 'apiUrl') || '';
+      if (!_isAllowedImageHost(rawImage, apiUrl)) {
+        console.warn(_describeRejection('token_image', rawImage, apiUrl));
+        image = '';
+      }
+    }
     return {
       id: t.id,
       x: Number(t.x) || 0,
       y: Number(t.y) || 0,
       size,
-      image: t.image || t.image_url || '',
+      image,
       name: t.name || '',
       max_hp: max,
       current_hp: cur,
