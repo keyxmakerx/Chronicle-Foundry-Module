@@ -120,8 +120,68 @@ Hooks.once('ready', async () => {
     surfaceManifestRecoveryIfNeeded().catch((err) => {
       console.warn('Chronicle Sync | Manifest recovery probe failed', err);
     });
+
+    // FM-SEC-CHUNK-7: descriptor schema runtime re-validation (D2=b
+    // defense-in-depth per FM-SECURITY-AUDIT §0.5). CI catches drift
+    // at build time; this catches drift when CI is bypassed (hand-
+    // edited release, ad-hoc deployment). GM-only so the surface area
+    // matches the recovery probe's audience.
+    _runtimeValidateDescriptor().catch((err) => {
+      console.warn('Chronicle Sync | Descriptor runtime check failed', err);
+    });
   }
 });
+
+/**
+ * Runtime re-validation of `chronicle-package.json` against the same
+ * rules `tools/check-package-descriptor.mjs` enforces at CI. Defense-
+ * in-depth per FM-SEC-CHUNK-7 / FM-SECURITY-AUDIT §0.5 D2=(b).
+ *
+ * Fetches the deployed descriptor from the module's static-asset path
+ * (`modules/chronicle-sync/chronicle-package.json`), runs
+ * `validateDescriptor`, and on drift logs `console.error` + surfaces a
+ * sticky `ui.notifications.error` so the operator sees it.
+ *
+ * Failures here are non-fatal — the module continues to run on whatever
+ * the descriptor's fallback semantics provide. The signal is "your
+ * release is malformed; check it" rather than "stop sync."
+ *
+ * @private
+ * @returns {Promise<void>}
+ */
+async function _runtimeValidateDescriptor() {
+  let descriptor = null;
+  let moduleJson = null;
+  try {
+    const [descResp, modResp] = await Promise.all([
+      fetch('modules/chronicle-sync/chronicle-package.json', { cache: 'no-store' }),
+      fetch('modules/chronicle-sync/module.json', { cache: 'no-store' }),
+    ]);
+    if (descResp.ok) descriptor = await descResp.json();
+    if (modResp.ok) moduleJson = await modResp.json();
+  } catch (err) {
+    console.warn('Chronicle Sync | Descriptor runtime fetch failed (skipping check)', err);
+    return;
+  }
+
+  const { validateDescriptor } = await import('./_descriptor-validator.mjs');
+  const { errors, warnings } = validateDescriptor(descriptor, moduleJson);
+
+  for (const w of warnings) {
+    console.warn(`Chronicle Sync | descriptor warning: ${w}`);
+  }
+  if (errors.length > 0) {
+    for (const e of errors) {
+      console.error(`Chronicle Sync | descriptor ERROR: ${e}`);
+    }
+    const summary = `Chronicle Sync: chronicle-package.json failed runtime validation (${errors.length} error${errors.length === 1 ? '' : 's'}). Check the browser console for details. The deployed module's descriptor may have drifted from the schema; reinstall from a fresh release.`;
+    try {
+      ui?.notifications?.error?.(summary, { permanent: true });
+    } catch { /* notifications not ready */ }
+  } else {
+    console.debug(`Chronicle Sync | descriptor runtime check OK (${warnings.length} warning${warnings.length === 1 ? '' : 's'})`);
+  }
+}
 
 /**
  * Add a Chronicle Sync button to Foundry's scene controls toolbar.
