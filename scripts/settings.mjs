@@ -105,6 +105,23 @@ export function registerSettings() {
     default: false,
   });
 
+  // Defense-in-depth: pre-sanitize Chronicle-supplied HTML at ingress
+  // via Foundry's TextEditor.cleanHTML before it lands in JournalEntry
+  // pages. Default OFF (false) = sanitization is ON. Operator can flip
+  // ON (true) to skip the layer for high-trust deployments where
+  // cleanHTML strips legitimate inline styling Chronicle deliberately
+  // ships. Chronicle already sanitizes server-side (bluemonday UGCPolicy)
+  // and Foundry sanitizes at render time; this is the middle layer.
+  // Per FM-SEC-CHUNK-3 / FM-SECURITY-AUDIT §2 M-3.
+  game.settings.register(MODULE_ID, 'skipIncomingSanitization', {
+    name: game.i18n.localize('CHRONICLE.Settings.SkipIncomingSanitization.Name'),
+    hint: game.i18n.localize('CHRONICLE.Settings.SkipIncomingSanitization.Hint'),
+    scope: 'world',
+    config: true,
+    type: Boolean,
+    default: false,
+  });
+
   // Internal: detected Chronicle system ID matched from Foundry's game.system.id.
   game.settings.register(MODULE_ID, 'detectedSystem', {
     scope: 'world',
