@@ -14,6 +14,27 @@
  * PostInstallHook (see Chronicle C-FMC-5b) with a fallback to hardcoded
  * defaults if the file is absent or malformed.
  *
+ * The fallback values in Chronicle's `defaultDescriptor()` are PINNED
+ * against this canonical descriptor by a Chronicle-side test
+ * (`internal/plugins/foundry_vtt/descriptor_fallback_test.go`). The pin
+ * uses a committed snapshot of this file at
+ * `internal/plugins/foundry_vtt/testdata/chronicle-package.json`. See:
+ *
+ *   cordinator/decisions/2026-05-22-loadDescriptor-fallback.md
+ *
+ * IMPORTANT: if you change ANY field in this descriptor, the Chronicle-
+ * side snapshot in `testdata/` must be regenerated and the test re-run.
+ * The snapshot is the human-managed wire contract; the test is the
+ * machine-side enforcement on Chronicle's side. Drifting either without
+ * the other will silently break Chronicle's fallback path for older
+ * Foundry installs that don't ship this descriptor file.
+ *
+ * Per FM-SEC-CHUNK-7 the validation rules live in
+ * `scripts/_descriptor-validator.mjs` (shared with the runtime check in
+ * `scripts/module.mjs::Hooks.once('ready')`). This script handles only
+ * the CI-specific bits: file I/O + the `package.moduleJsonPath` exists-
+ * on-disk check (which is meaningless at runtime).
+ *
  * Run locally: `node tools/check-package-descriptor.mjs`
  */
 
@@ -21,6 +42,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import process from 'node:process';
+import { validateDescriptor } from '../scripts/_descriptor-validator.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -29,15 +51,18 @@ const repoRoot = resolve(__dirname, '..');
 const errors = [];
 const warnings = [];
 
-function fail(msg) { errors.push(msg); }
-function warn(msg) { warnings.push(msg); }
-
 async function readJson(path) {
-  const raw = await readFile(path, 'utf8');
+  let raw;
+  try {
+    raw = await readFile(path, 'utf8');
+  } catch (err) {
+    errors.push(`${path}: cannot read (${err.message})`);
+    return null;
+  }
   try {
     return JSON.parse(raw);
   } catch (err) {
-    fail(`${path}: invalid JSON (${err.message})`);
+    errors.push(`${path}: invalid JSON (${err.message})`);
     return null;
   }
 }
@@ -53,74 +78,22 @@ if (!descriptor || !moduleJson) {
   process.exit(1);
 }
 
-// --- Schema version ---
-if (descriptor.schemaVersion !== 1) {
-  fail(`chronicle-package.json: schemaVersion must be 1 (got ${JSON.stringify(descriptor.schemaVersion)})`);
-}
+// Run the shared validation rules.
+const result = validateDescriptor(descriptor, moduleJson);
+errors.push(...result.errors);
+warnings.push(...result.warnings);
 
-// --- package.id matches module.json#/id ---
-const descriptorId = descriptor?.package?.id;
-const moduleId = moduleJson?.id;
-if (!descriptorId) {
-  fail('chronicle-package.json: package.id is required');
-} else if (descriptorId !== moduleId) {
-  fail(`chronicle-package.json: package.id (${JSON.stringify(descriptorId)}) does not match module.json#/id (${JSON.stringify(moduleId)})`);
-}
-
-// --- package.kind ---
-if (descriptor?.package?.kind !== 'foundry-module') {
-  fail(`chronicle-package.json: package.kind must be "foundry-module" (got ${JSON.stringify(descriptor?.package?.kind)})`);
-}
-
-// --- package.moduleJsonPath points at an actual file ---
+// CI-only check: package.moduleJsonPath resolves to an actual file on disk.
+// (Runtime can't easily check this without a fetch; CI verifies the zip
+// would be self-consistent.)
 const moduleJsonPathField = descriptor?.package?.moduleJsonPath;
-if (!moduleJsonPathField) {
-  fail('chronicle-package.json: package.moduleJsonPath is required');
-} else {
+if (moduleJsonPathField && typeof moduleJsonPathField === 'string') {
   const resolved = resolve(repoRoot, moduleJsonPathField);
   try {
     await readFile(resolved, 'utf8');
   } catch {
-    fail(`chronicle-package.json: package.moduleJsonPath (${moduleJsonPathField}) does not resolve to a readable file at ${resolved}`);
+    errors.push(`chronicle-package.json: package.moduleJsonPath (${moduleJsonPathField}) does not resolve to a readable file at ${resolved}`);
   }
-}
-
-// --- serving.rewriteFields ---
-const rewriteFields = descriptor?.serving?.rewriteFields;
-if (!Array.isArray(rewriteFields) || rewriteFields.length === 0) {
-  fail('chronicle-package.json: serving.rewriteFields must be a non-empty array');
-} else {
-  for (const field of rewriteFields) {
-    if (!(field in moduleJson)) {
-      warn(`chronicle-package.json: serving.rewriteFields references "${field}" which is not present in module.json — Chronicle will create the field when serving, which may be intentional but is worth noting`);
-    }
-  }
-}
-
-// --- serving.manifestEndpoint + downloadEndpoint ---
-function validateEndpoint(field, value) {
-  if (typeof value !== 'string' || !value.startsWith('/')) {
-    fail(`chronicle-package.json: serving.${field} must be a path starting with "/" (got ${JSON.stringify(value)})`);
-    return;
-  }
-  if (!value.includes('{campaign_id}')) {
-    fail(`chronicle-package.json: serving.${field} must include the {campaign_id} placeholder`);
-  }
-  if (descriptor?.serving?.perCampaignSignedToken === true && !value.includes('{token}')) {
-    fail(`chronicle-package.json: serving.${field} must include the {token} placeholder when perCampaignSignedToken is true`);
-  }
-}
-validateEndpoint('manifestEndpoint', descriptor?.serving?.manifestEndpoint);
-validateEndpoint('downloadEndpoint', descriptor?.serving?.downloadEndpoint);
-
-// --- serving.perCampaignSignedToken ---
-if (typeof descriptor?.serving?.perCampaignSignedToken !== 'boolean') {
-  fail('chronicle-package.json: serving.perCampaignSignedToken must be boolean');
-}
-
-// --- serving.zipContentRoot ---
-if (typeof descriptor?.serving?.zipContentRoot !== 'string') {
-  fail('chronicle-package.json: serving.zipContentRoot must be a string (empty string means zip root)');
 }
 
 function printResults() {
