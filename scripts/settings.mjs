@@ -177,13 +177,18 @@ export function registerSettings() {
     default: true,
   });
 
-  // Default Foundry ownership level for newly synced documents.
+  // Default Foundry ownership level for player-visible synced documents.
   // Values: 0 (NONE), 1 (LIMITED), 2 (OBSERVER), 3 (OWNER).
+  // Read by `_ownership.defaultLevelForVisibility` (FM-SYNC-HARDENING §1).
+  // Default is OBSERVER (2) — the level the sync hardcoded before the
+  // setting was wired, so honoring the setting is non-breaking for worlds
+  // that never touched it. Operators can lower it (None/Limited) or raise
+  // it to Owner.
   game.settings.register(MODULE_ID, 'defaultOwnership', {
     scope: 'world',
     config: false,
     type: Number,
-    default: 0,
+    default: 2,
   });
 
   // Whether DM-only entities should be hidden in Foundry (ownership NONE).
