@@ -10,6 +10,15 @@ import { ChronicleAPI } from './api-client.mjs';
 import { getSetting, setSetting, isConfigured, getSyncDirections, getExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
 
 /**
+ * How long the connection must stay continuously connected after a reconnect
+ * before we re-pull (FM-SYNC-HARDENING §2). Debouncing collapses a flapping
+ * connection's repeated reconnect events into a single re-pull once the link
+ * has settled, preventing a re-pull storm.
+ * @type {number}
+ */
+const RECONNECT_RESYNC_DEBOUNCE_MS = 3000;
+
+/**
  * SyncManager coordinates all Chronicle sync operations.
  * It owns the API client and delegates to feature-specific sync modules.
  */
@@ -23,6 +32,12 @@ export class SyncManager {
 
     /** @type {boolean} Whether initial sync has completed. */
     this._initialSyncDone = false;
+
+    /** @type {boolean} Whether we've seen a disconnect since the last (re)sync. */
+    this._sawDisconnect = false;
+
+    /** @type {ReturnType<typeof setTimeout>|null} Debounce timer for reconnect re-pull. */
+    this._reconnectResyncTimer = null;
 
     /** @type {Array<{time: number, type: string, message: string}>} Recent activity log. */
     this._activityLog = [];
@@ -100,10 +115,77 @@ export class SyncManager {
       }
     });
 
+    // Re-pull on reconnect (FM-SYNC-HARDENING §2). Driven off the connection
+    // state machine — a deterministic signal independent of the server's
+    // sync.status message shape. The first connect is handled by the
+    // sync.status listener above; this only fires for genuine reconnects
+    // after a drop, so changes made on Chronicle during the disconnect
+    // window aren't lost until a world reload.
+    this.api.onStateChange((state) => this._onConnectionStateChange(state));
+
     // Connect WebSocket.
     this.api.connect();
 
     console.debug('Chronicle: Sync manager started');
+  }
+
+  /**
+   * React to WebSocket connection-state transitions for the reconnect
+   * re-pull (FM-SYNC-HARDENING §2).
+   *
+   * - Any drop ('disconnected' / 'reconnecting') arms `_sawDisconnect`.
+   * - A return to 'connected' after a drop, once the initial sync has already
+   *   happened, schedules a debounced re-pull to catch Chronicle edits made
+   *   during the disconnect window.
+   *
+   * The first connect (before initial sync completes) is intentionally
+   * ignored here — `_performInitialSync` handles it via the sync.status
+   * listener — so we never double-sync on startup.
+   *
+   * @param {string} state - New connection state.
+   * @private
+   */
+  _onConnectionStateChange(state) {
+    if (state === 'disconnected' || state === 'reconnecting') {
+      this._sawDisconnect = true;
+      return;
+    }
+    if (state === 'connected' && this._initialSyncDone && this._sawDisconnect) {
+      this._scheduleReconnectResync();
+    }
+  }
+
+  /**
+   * Debounce a reconnect re-pull. Each reconnect 'connected' event resets the
+   * timer, so a flapping connection only triggers one re-pull after it has
+   * been stable for `RECONNECT_RESYNC_DEBOUNCE_MS`.
+   * @private
+   */
+  _scheduleReconnectResync() {
+    if (this._reconnectResyncTimer) clearTimeout(this._reconnectResyncTimer);
+    this._reconnectResyncTimer = setTimeout(() => {
+      this._reconnectResyncTimer = null;
+      this._resyncAfterReconnect();
+    }, RECONNECT_RESYNC_DEBOUNCE_MS);
+  }
+
+  /**
+   * Re-pull after a reconnect. Resets the disconnect flag and re-runs the
+   * initial-sync pull. That pull is a delta (`/sync/pull?since=lastSyncTime`),
+   * so it's cheap even on large worlds — only mappings changed during the
+   * disconnect are fetched. We call `_performInitialSync` directly rather than
+   * toggling `_initialSyncDone`, so we don't race the sync.status first-sync
+   * listener.
+   * @private
+   */
+  async _resyncAfterReconnect() {
+    this._sawDisconnect = false;
+    try {
+      await this._performInitialSync();
+      this.logActivity('connect', 'Reconnected — re-pulled changes made during the disconnect');
+    } catch (err) {
+      console.warn('Chronicle: Reconnect re-pull failed', err);
+    }
   }
 
   /**
@@ -184,6 +266,11 @@ export class SyncManager {
     }
     this._modules = [];
     this._initialSyncDone = false;
+    this._sawDisconnect = false;
+    if (this._reconnectResyncTimer) {
+      clearTimeout(this._reconnectResyncTimer);
+      this._reconnectResyncTimer = null;
+    }
     console.debug('Chronicle: Sync manager stopped');
   }
 
