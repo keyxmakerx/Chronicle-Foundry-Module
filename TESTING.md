@@ -49,7 +49,25 @@ Requires a running Chronicle instance and Foundry VTT with the chronicle-sync mo
 - [ ] Custom visibility with no player grant → default NONE
 - [ ] Changing journal ownership in Foundry pushes is_private to Chronicle
 - [ ] Changing journal ownership pushes visibility/permissions to Chronicle API
-- [ ] Permission API failure falls back to binary is_private mapping
+- [ ] **(FM-SYNC-HARDENING §3, fail-closed)** Permission API failure on a `custom`-visibility
+      entity → ownership defaults to **NONE** (GM-only), even when `is_private=false`.
+      It must NOT fall open to OBSERVER. To reproduce: stop Chronicle (or block the
+      `/permissions` endpoint) while a custom-visibility entity syncs; confirm players
+      cannot see it.
+
+### Visibility Settings (Config tab → Permissions) — FM-SYNC-HARDENING §1
+These controls were previously dead config (written but never read). Verify they now drive ownership:
+- [ ] **dmOnlyHidden ON (default):** a DM-only / private Chronicle entity → players have NO
+      access to the journal (ownership NONE). Confirm as a player: the journal is hidden.
+- [ ] **dmOnlyHidden OFF:** re-sync (edit the entity on Chronicle so it re-pulls). The same
+      DM-only entity now appears to players at the default-ownership level. Players gain the
+      dm-only content. Toggle back ON → players lose it again on the next sync.
+- [ ] **defaultOwnership = Owner:** a player-visible entity → journal default ownership is OWNER
+      (players can edit). Set it to **None** → public entities sync as GM-only.
+- [ ] **(FM-SYNC-HARDENING §4)** Per-user Chronicle grant: an entity shared with a specific
+      Chronicle user (mapped to a Foundry user via the auto-matched user table) → that Foundry
+      user gets per-user OWNER/OBSERVER ownership; unmapped Chronicle users are dropped (the
+      entity under-shares — no leak to the wrong player).
 
 ### Edge Cases
 - [ ] Rapid successive edits don't create duplicate entities
@@ -198,6 +216,20 @@ map editor. Only markers/pins sync to Foundry as Scene Map Notes.
 - [ ] Network timeout during sync doesn't corrupt state
 - [ ] Partial sync failure (one entity fails) doesn't block others
 - [ ] Module gracefully handles Chronicle server restart
+- [ ] **(FM-SYNC-HARDENING §4)** A failed Foundry→Chronicle push (e.g. Chronicle down)
+      surfaces a `ui.notifications.warn` to the GM and appears in the dashboard error log
+      (not console-only). Journal/note *updates* are queued for retry and re-push on reconnect.
+
+### Reconnect re-pull (FM-SYNC-HARDENING §2)
+Previously, edits made on Chronicle while Foundry was disconnected were lost until a world reload.
+- [ ] With Foundry connected, **disconnect** (stop Chronicle, or pull the network) so the status
+      pill goes red/yellow.
+- [ ] While disconnected, **edit an entity on Chronicle** (e.g. rename it, change its content).
+- [ ] **Reconnect** (restart Chronicle / restore network). After the connection settles
+      (~3 s debounce), the change appears in Foundry automatically — no world reload needed.
+      The activity log shows "Reconnected — re-pulled changes made during the disconnect".
+- [ ] **Flapping** connection (rapid disconnect/reconnect cycles) triggers only ONE re-pull
+      once the link stabilizes, not a re-pull per reconnect (no re-pull storm).
 
 ## Sync Dashboard
 

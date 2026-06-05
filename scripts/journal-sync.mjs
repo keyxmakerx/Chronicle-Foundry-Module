@@ -13,6 +13,7 @@ import { getSetting, getSyncExclusions } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
+import { defaultLevelForVisibility } from './_ownership.mjs';
 
 /**
  * JournalSync handles entity ↔ JournalEntry synchronization.
@@ -481,7 +482,11 @@ export class JournalSync {
         console.debug(`Chronicle: Pushed new journal "${journal.name}" to Chronicle`);
       }
     } catch (err) {
+      // FM-SYNC-HARDENING §4: surface push failures instead of failing
+      // silently. The underlying REST error is already in the dashboard
+      // error log (api-client._logError); this also notifies the GM.
       console.error('Chronicle: Failed to push journal to Chronicle', err);
+      ui.notifications?.warn?.(`Chronicle: Failed to push journal "${journal.name}". Check the sync dashboard for details.`);
     }
   }
 
@@ -552,7 +557,17 @@ export class JournalSync {
 
       console.debug(`Chronicle: Pushed journal update "${journal.name}" to Chronicle`);
     } catch (err) {
+      // FM-SYNC-HARDENING §4: surface push failures + queue the (idempotent)
+      // update for retry on reconnect. The PUT targets a known entity id, so
+      // re-pushing is safe; a stale expected_updated_at would surface as a
+      // conflict on the next pull rather than corrupting data.
       console.error('Chronicle: Failed to push journal update', err);
+      this._api.queueForRetry?.('PUT', `/entities/${entityId}`, {
+        name: journal.name,
+        is_private: (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER,
+        entry: this._collectTextPages(journal),
+      });
+      ui.notifications?.warn?.(`Chronicle: Failed to push update for "${journal.name}" — queued for retry. See the sync dashboard.`);
     }
   }
 
@@ -663,55 +678,74 @@ export class JournalSync {
    * Fetches the entity's permission grants and maps them to Foundry ownership levels.
    *
    * Mapping:
-   * - visibility "default" + is_private=true → { default: NONE }
-   * - visibility "default" + is_private=false → { default: OBSERVER }
-   * - visibility "custom" → uses role-based grants to determine default level,
-   *   and maps user-specific grants to per-Foundry-user ownership where possible.
+   * - visibility "default" → `defaultLevelForVisibility(is_private)`, which
+   *   honors the operator's `dmOnlyHidden` + `defaultOwnership` settings
+   *   (FM-SYNC-HARDENING §1).
+   * - visibility "custom" → explicit Chronicle grants take precedence over the
+   *   generic default. Role "1" (Player) sets the `default` level; per-user
+   *   grants map to specific Foundry users via the user-mapping table
+   *   (FM-SYNC-HARDENING §4) when the Chronicle user is known.
+   *
+   * Security posture (FM-SYNC-HARDENING §3): the custom-visibility error path
+   * fails CLOSED to NONE — a transient permissions-API error must never widen
+   * a GM-restricted entity to player-visible.
    *
    * @param {object} entity - Chronicle entity with id, is_private, visibility fields.
    * @returns {object} Foundry ownership object.
    * @private
    */
   async _buildOwnership(entity) {
-    // Fallback for legacy or simple visibility.
+    const L = CONST.DOCUMENT_OWNERSHIP_LEVELS;
+
+    // Simple / legacy visibility — honor the operator's dmOnlyHidden +
+    // defaultOwnership dashboard controls.
     if (!entity.visibility || entity.visibility === 'default') {
-      return entity.is_private
-        ? { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE }
-        : { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER };
+      return { default: defaultLevelForVisibility(entity.is_private) };
     }
 
-    // Custom visibility — fetch permission grants from API.
+    // Custom visibility — fetch explicit permission grants from the API.
     try {
       const permsData = await this._api.get(`/entities/${entity.id}/permissions`);
       if (!permsData?.permissions) {
-        // Fallback if API call returns no data.
-        return { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE };
+        // No grant data — fail closed (GM-only) rather than guessing.
+        return { default: L.NONE };
       }
 
-      const ownership = { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE };
+      const ownership = { default: L.NONE };
 
       for (const grant of permsData.permissions) {
         if (grant.subject_type === 'role') {
-          // Role "1" = Player. If players have a grant, set default ownership.
-          if (grant.subject_id === '1') {
+          // Role "1" = Player. A player grant sets the default level.
+          if (String(grant.subject_id) === '1') {
             ownership.default =
-              grant.permission === 'edit'
-                ? CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER
-                : CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER;
+              grant.permission === 'edit' ? L.OWNER : L.OBSERVER;
           }
-          // Role "2" = Scribe. Scribes get at least OBSERVER.
-          // (Foundry doesn't have a "scribe" concept; handle via default level.)
+          // Role "2" = Scribe. Foundry has no "scribe" concept; covered by
+          // the default level.
+        } else if (grant.subject_type === 'user') {
+          // Per-user grant → map to a specific Foundry user when we know the
+          // mapping (FM-SYNC-HARDENING §4). Unmapped users are dropped: the
+          // entity under-shares (the user simply doesn't gain access) rather
+          // than leaking to the wrong player.
+          const foundryUserId = this._syncManager?.getFoundryUserId?.(
+            String(grant.subject_id)
+          );
+          if (foundryUserId) {
+            ownership[foundryUserId] =
+              grant.permission === 'edit' ? L.OWNER : L.OBSERVER;
+          }
         }
-        // User-specific and group grants are stored in flags for reference
-        // but can't be mapped to Foundry users without a user ID mapping table.
       }
 
       return ownership;
     } catch (err) {
-      console.warn('Chronicle: Failed to fetch entity permissions, using fallback', err);
-      return entity.is_private
-        ? { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE }
-        : { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER };
+      // FM-SYNC-HARDENING §3: fail CLOSED. Never fall open to OBSERVER on a
+      // transient error — a GM-restricted custom entity stays GM-only (NONE).
+      console.warn(
+        'Chronicle: Failed to fetch entity permissions — failing closed (GM-only)',
+        err
+      );
+      return { default: L.NONE };
     }
   }
 

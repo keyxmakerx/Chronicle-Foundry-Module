@@ -16,6 +16,7 @@
 import { getSetting } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
+import { defaultLevelForVisibility } from './_ownership.mjs';
 
 /** Name of the root Foundry folder for Chronicle notes. */
 const NOTES_FOLDER_NAME = 'Chronicle Notes';
@@ -320,7 +321,10 @@ export class NoteSync {
         console.debug(`Chronicle: Pushed new note "${journal.name}" to Chronicle`);
       }
     } catch (err) {
+      // FM-SYNC-HARDENING §4: surface push failures instead of failing
+      // silently (the REST error is already in the dashboard error log).
       console.error('Chronicle: Failed to push journal as note', err);
+      ui.notifications?.warn?.(`Chronicle: Failed to push note "${journal.name}". Check the sync dashboard for details.`);
     }
   }
 
@@ -359,7 +363,15 @@ export class NoteSync {
 
       console.debug(`Chronicle: Pushed note update "${journal.name}" to Chronicle`);
     } catch (err) {
+      // FM-SYNC-HARDENING §4: surface + queue the idempotent update for retry
+      // on reconnect (the PUT targets a known note id).
       console.error('Chronicle: Failed to push note update', err);
+      this._api.queueForRetry?.('PUT', `/notes/${noteId}`, {
+        title: journal.name,
+        entry_html: this._collectJournalContent(journal),
+        is_shared: (journal.ownership?.default ?? 0) >= CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER,
+      });
+      ui.notifications?.warn?.(`Chronicle: Failed to push update for note "${journal.name}" — queued for retry. See the sync dashboard.`);
     }
   }
 
@@ -425,10 +437,10 @@ export class NoteSync {
    * @private
    */
   _buildNoteOwnership(note) {
-    if (note.is_shared) {
-      return { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER };
-    }
-    return { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE };
+    // Honor the operator's dmOnlyHidden + defaultOwnership controls
+    // (FM-SYNC-HARDENING §1). A shared note is player-visible; an unshared
+    // note is DM-only and is hidden (NONE) unless dmOnlyHidden is off.
+    return { default: defaultLevelForVisibility(!note.is_shared) };
   }
 
   /**
