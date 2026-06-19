@@ -657,7 +657,12 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const characters = actorSync?.getSyncedActors?.() ?? [];
     const hasUnlinkedCharacters = characters.some((c) => !c.synced);
 
-    return { characters, hasUnlinkedCharacters };
+    // Surface a one-time dashboard hint when the addon is off but the GM has
+    // player-owned PC actors — claims exist in Foundry but won't sync.
+    const pcClaimingEnabled = this._syncManager?.isPcClaimingEnabled?.() ?? false;
+    const pcClaimingHint = !pcClaimingEnabled && (actorSync?.hasPlayerOwnedPcs?.() ?? false);
+
+    return { characters, hasUnlinkedCharacters, pcClaimingHint };
   }
 
   // ---------------------------------------------------------------------------

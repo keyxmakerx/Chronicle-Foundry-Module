@@ -535,6 +535,12 @@
     <div class="tab" data-tab="characters" data-group="primary">
       {{#if characterSyncAvailable}}
         {{#if syncCharacters}}
+        {{#if pcClaimingHint}}
+        <div class="dashboard-hint">
+          <i class="fa-solid fa-circle-info"></i>
+          Enable <strong>Player Character Claiming</strong> in Chronicle to sync player claims.
+        </div>
+        {{/if}}
         <div class="dashboard-toolbar">
           <div class="toolbar-actions">
             <span class="system-badge">
