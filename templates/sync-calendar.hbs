@@ -31,6 +31,10 @@
     {{#if calendariaVersion}}
       <p class="meta">{{localize "CHRONICLE.SyncCalendar.CalendariaVersion"}}: {{calendariaVersion}}</p>
     {{/if}}
+    <button type="button" class="footer-tool" data-action="copy-diagnostics"
+            title="{{localize "CHRONICLE.SyncCalendar.Diagnostics.Hint"}}">
+      <i class="fa-solid fa-bug"></i> {{localize "CHRONICLE.SyncCalendar.Diagnostics.Button"}}
+    </button>
     {{#if importBanner}}
       {{!-- Import banner shown even in degraded state if Chronicle has no calendar --}}
       <div class="import-banner">
@@ -582,11 +586,32 @@
   </main>
 
   <footer class="sync-calendar-footer">
-    <span class="footer-meta">{{localize "CHRONICLE.SyncCalendar.Footer.PR3"}}</span>
-    {{#if calendariaVersion}}
-      <span class="footer-meta">Calendaria v{{calendariaVersion}}</span>
-    {{/if}}
-    <span class="footer-meta">schema v{{schemaVersion}}</span>
+    <div class="footer-toolbar">
+      <button type="button" class="footer-tool" data-action="copy-diagnostics"
+              title="{{localize "CHRONICLE.SyncCalendar.Diagnostics.Hint"}}">
+        <i class="fa-solid fa-bug"></i> {{localize "CHRONICLE.SyncCalendar.Diagnostics.Button"}}
+      </button>
+      <button type="button" class="footer-tool sync-toggle {{#if syncToggle.excluded}}is-off{{else}}is-on{{/if}}"
+              data-action="toggle-calendar-sync"
+              title="{{localize "CHRONICLE.SyncCalendar.SyncToggle.Hint"}}">
+        {{#if syncToggle.excluded}}
+          <i class="fa-solid fa-toggle-off"></i> {{localize "CHRONICLE.SyncCalendar.SyncToggle.LabelOff"}}
+        {{else}}
+          <i class="fa-solid fa-toggle-on"></i> {{localize "CHRONICLE.SyncCalendar.SyncToggle.LabelOn"}}
+        {{/if}}
+      </button>
+      <button type="button" class="footer-tool danger" data-action="cleanup-calendar-notes"
+              title="{{localize "CHRONICLE.SyncCalendar.Cleanup.Hint"}}">
+        <i class="fa-solid fa-broom"></i> {{localize "CHRONICLE.SyncCalendar.Cleanup.Button"}}
+      </button>
+    </div>
+    <div class="footer-meta-group">
+      <span class="footer-meta">{{localize "CHRONICLE.SyncCalendar.Footer.PR3"}}</span>
+      {{#if calendariaVersion}}
+        <span class="footer-meta">Calendaria v{{calendariaVersion}}</span>
+      {{/if}}
+      <span class="footer-meta">schema v{{schemaVersion}}</span>
+    </div>
   </footer>
 {{/if}}
 </div>

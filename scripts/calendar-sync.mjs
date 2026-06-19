@@ -19,7 +19,7 @@
  * optionally pushes to the active Foundry calendar module.
  */
 
-import { getSetting } from './settings.mjs';
+import { getSetting, getCalendarSyncExclusions } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 
 /**
@@ -72,6 +72,85 @@ export function chronicleVisibilityFromCalendariaNote(noteData) {
  */
 export function isWireVisibilityGmOnly(wireValue) {
   return wireValue === WIRE_VISIBILITY.GM_ONLY || wireValue === 'gm_only';
+}
+
+/**
+ * Calendaria's Foundry module id. It tags every note JournalEntry it creates
+ * with flags under this scope. (Verified against Sayshal/Calendaria
+ * `scripts/constants.mjs` → `MODULE.ID = 'calendaria'`.)
+ */
+export const CALENDARIA_FLAG_SCOPE = 'calendaria';
+
+/**
+ * SimpleCalendar persists each note as a JournalEntry under one of these module
+ * flag scopes; the namespace's presence on the document is the note signal.
+ * Frozen so a later edit can't silently drop one.
+ */
+export const SIMPLE_CALENDAR_FLAG_SCOPES = Object.freeze([
+  'foundryvtt-simple-calendar',
+  'simple-calendar',
+]);
+
+/**
+ * Pure predicate: is this Foundry JournalEntry a calendar-module note?
+ *
+ * Both supported calendar modules store their notes as JournalEntry documents:
+ *   - **Calendaria** creates one JournalEntry per note in a "Calendar Notes"
+ *     folder, flagged `flags.calendaria.isCalendarNote === true`. This includes
+ *     *festival/holiday notes it auto-seeds* from a calendar's `festivals`
+ *     template (e.g. "Day of Rebirth", "Eve of the Dead") — the exact documents
+ *     that triggered this bug. Calendar-structure journals are tagged
+ *     `isCalendarJournal`. (Verified against Sayshal/Calendaria
+ *     `scripts/notes/note-manager.mjs` + `scripts/festivals/festival-manager.mjs`.)
+ *   - **SimpleCalendar** stores each note as a JournalEntry under its own module
+ *     flag scope (see SIMPLE_CALENDAR_FLAG_SCOPES).
+ *
+ * Those documents belong to CalendarSync — which mirrors them to Chronicle as
+ * *calendar events* — and must NEVER be pushed to Chronicle as worldbuilding
+ * entities. JournalSync calls this to skip them: without the guard a calendar
+ * note is POSTed to `/entities` with `entity_type_id: 0`, which the server
+ * resolves to the campaign's first entity type (typically "Character"), so the
+ * holidays wrongly appear in the Characters list.
+ *
+ * Detection is by the calendar module's own flag (present the moment the note
+ * JournalEntry is created — so it fires on the very first `createJournalEntry`
+ * hook) plus our own `calendarEventId` link flag, which a note carries once
+ * CalendarSync has mirrored it to a Chronicle event.
+ *
+ * Defensive against plain object stubs (tests, partial payloads): reads the
+ * nested `flags` object directly when `getFlag` is unavailable.
+ *
+ * @param {object|null} journal - A Foundry JournalEntry (or test stub).
+ * @returns {boolean}
+ */
+export function isCalendarNoteJournal(journal) {
+  if (!journal || typeof journal !== 'object') return false;
+
+  const flags = journal.flags || {};
+
+  // Calendaria: note / structure journals carry these explicit boolean flags.
+  // Match the specific flags (not merely the presence of a `calendaria` scope)
+  // so an unrelated journal that happens to hold a Calendaria enricher flag is
+  // not wrongly skipped from entity sync.
+  const cal = flags[CALENDARIA_FLAG_SCOPE];
+  if (cal && typeof cal === 'object' && (cal.isCalendarNote === true || cal.isCalendarJournal === true)) {
+    return true;
+  }
+
+  // SimpleCalendar: presence of its note flag scope is the signal.
+  for (const scope of SIMPLE_CALENDAR_FLAG_SCOPES) {
+    if (flags[scope] && typeof flags[scope] === 'object') return true;
+  }
+
+  // A note already mirrored to a Chronicle calendar event carries this flag
+  // under our own scope.
+  if (typeof journal.getFlag === 'function') {
+    if (journal.getFlag(FLAG_SCOPE, 'calendarEventId')) return true;
+  } else if (flags[FLAG_SCOPE]?.calendarEventId) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -334,6 +413,25 @@ export class CalendarSync {
     }
   }
 
+  /**
+   * Whether the operator has opted the currently-active Calendaria calendar out
+   * of Chronicle sync (toggled from the Sync Calendar editor). Push handlers
+   * check this so a local-only calendar stops pushing date/note changes without
+   * disabling calendar sync globally. Defensive: any lookup failure → not
+   * excluded (fail open to existing behaviour). @returns {boolean} @private
+   */
+  _isActiveCalendarExcluded() {
+    try {
+      const exclusions = getCalendarSyncExclusions();
+      if (!exclusions.length) return false;
+      const cal = globalThis.CALENDARIA?.api?.getActiveCalendar?.();
+      const id = cal?.metadata?.id || cal?.id || '';
+      return !!id && exclusions.includes(id);
+    } catch {
+      return false;
+    }
+  }
+
   // --- Foundry → Chronicle (Calendaria Modern Hooks) ---
 
   /**
@@ -345,6 +443,7 @@ export class CalendarSync {
   async _onCalendariaDateTimeChange(data) {
     if (this._syncing) return;
     if (!game.user.isGM) return;
+    if (this._isActiveCalendarExcluded()) return;
 
     try {
       await this._api.put('/calendar/date', {
@@ -367,6 +466,7 @@ export class CalendarSync {
   async _onCalendariaNoteCreated(noteData) {
     if (this._syncing) return;
     if (!game.user.isGM) return;
+    if (this._isActiveCalendarExcluded()) return;
 
     const eventPayload = this._calendariaNoteToChronicleEvent(noteData);
     if (!eventPayload) return;
@@ -389,6 +489,7 @@ export class CalendarSync {
   async _onCalendariaNoteUpdated(noteData) {
     if (this._syncing) return;
     if (!game.user.isGM) return;
+    if (this._isActiveCalendarExcluded()) return;
 
     const chronicleId = this._getChronicleEventId(noteData.id);
     if (!chronicleId) {
@@ -415,6 +516,7 @@ export class CalendarSync {
   async _onCalendariaNoteDeleted(noteData) {
     if (this._syncing) return;
     if (!game.user.isGM) return;
+    if (this._isActiveCalendarExcluded()) return;
 
     const noteId = noteData?.id || noteData?.pageId;
     if (!noteId) return;

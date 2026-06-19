@@ -411,6 +411,29 @@
       "DaysSuffix": "days",
       "NotesSuffix": "notes",
       "ViewMonth": "View month",
+      "Diagnostics": {
+        "Button": "Copy diagnostics",
+        "Hint": "Copy a full diagnostics report (versions, structure, validation findings, selected-day weather, recent sync errors, settings) to the clipboard — paste it into a bug report or to Claude.",
+        "Copied": "Calendar diagnostics copied to clipboard.",
+        "CopyFailed": "Failed to copy diagnostics — see the console (F12)."
+      },
+      "SyncToggle": {
+        "LabelOn": "Syncing this calendar",
+        "LabelOff": "Not syncing this calendar",
+        "Hint": "Toggle whether this Calendaria calendar's date and notes sync to Chronicle. Turning it off keeps the calendar local to Foundry.",
+        "Notify": "Chronicle sync {state} for this calendar.",
+        "On": "enabled",
+        "Off": "disabled"
+      },
+      "Cleanup": {
+        "Button": "Clean up mis-synced notes",
+        "Hint": "Find calendar/festival notes that were wrongly synced to Chronicle as entities (\"Characters\") and safely remove them.",
+        "Title": "Clean up mis-synced calendar notes",
+        "Confirm": "Found {count} calendar note(s) that were wrongly synced to Chronicle as entities. Unlink them locally and delete those entities in Chronicle? Your Calendaria notes are kept; real character Actors are untouched.",
+        "Done": "Cleaned up {count} mis-synced calendar note(s).",
+        "None": "No mis-synced calendar notes found — nothing to clean up.",
+        "NoApi": "Chronicle Sync API unavailable — is sync configured and connected?"
+      },
       "Findings": {
         "Pill": "validation finding(s)",
         "None": "No validation findings — calendar looks clean."
