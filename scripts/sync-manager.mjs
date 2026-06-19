@@ -55,7 +55,7 @@ export class SyncManager {
     this._members = null;
 
     /** @type {boolean} Whether the player-character-claiming addon is enabled for this campaign. */
-    this._playerClaimingEnabled = false;
+    this._pcClaimingEnabled = false;
   }
 
   /**
@@ -95,6 +95,10 @@ export class SyncManager {
 
     // Detect game system and match against Chronicle systems.
     await this._detectSystem();
+
+    // Detect enabled addons (player-character-claiming, etc.) so modules can
+    // read isPcClaimingEnabled() during their init() call below.
+    await this._fetchAddons();
 
     // Initialize all registered modules.
     for (const mod of this._modules) {
@@ -189,35 +193,6 @@ export class SyncManager {
     } catch (err) {
       console.warn('Chronicle: Reconnect re-pull failed', err);
     }
-  }
-
-  /**
-   * Fetch and cache whether the player-character-claiming addon is enabled.
-   * Fails open (treats addon as disabled) on any API error — addon state is
-   * non-critical and must never block the dashboard from loading.
-   * @private
-   */
-  async _fetchAddonState() {
-    try {
-      const addons = await this.api.getAddons();
-      const list = Array.isArray(addons) ? addons : (addons?.data ?? []);
-      const claiming = list.find((a) => a.slug === 'player-character-claiming');
-      this._playerClaimingEnabled = !!(claiming?.enabled);
-      if (this._playerClaimingEnabled) {
-        console.debug('Chronicle: Player Character Claiming addon enabled');
-      }
-    } catch {
-      // Addon endpoint not deployed or campaign has no addons — treat as disabled.
-      this._playerClaimingEnabled = false;
-    }
-  }
-
-  /**
-   * Returns whether the player-character-claiming addon is enabled for this campaign.
-   * @returns {boolean}
-   */
-  isPlayerClaimingEnabled() {
-    return this._playerClaimingEnabled;
   }
 
   /**
@@ -323,6 +298,38 @@ export class SyncManager {
   }
 
   /**
+   * Whether the player-character-claiming addon is enabled for this campaign.
+   * Populated by `_fetchAddons()` during `start()`, before any module `init()`.
+   * @returns {boolean}
+   */
+  isPcClaimingEnabled() {
+    return this._pcClaimingEnabled;
+  }
+
+  /**
+   * Fetch the campaign's enabled addons and cache whether the
+   * player-character-claiming addon is active.
+   * Gracefully degrades when the addons endpoint is not yet deployed.
+   * @private
+   */
+  async _fetchAddons() {
+    try {
+      const addons = await this.api.getAddons();
+      const list = Array.isArray(addons) ? addons : (addons?.data ?? []);
+      this._pcClaimingEnabled = list.some(
+        (a) => a.slug === 'player-character-claiming' && a.enabled !== false
+      );
+      console.debug(`Chronicle: player-character-claiming addon ${this._pcClaimingEnabled ? 'enabled' : 'disabled'}`);
+      if (this._pcClaimingEnabled) {
+        this.logActivity('connect', 'Player Character Claiming addon detected');
+      }
+    } catch {
+      // Addon endpoint not available — claiming feature stays off.
+      this._pcClaimingEnabled = false;
+    }
+  }
+
+  /**
    * Detect the Foundry game system and match it against Chronicle systems.
    * Queries the /systems API endpoint which returns foundry_system_id on each
    * system. Matching is fully API-driven so any installed system package
@@ -399,10 +406,6 @@ export class SyncManager {
 
       // Fetch campaign members for user ID mapping.
       await this.fetchAndCacheMembers();
-
-      // Fetch addon state before module onInitialSync calls so modules can
-      // branch on addon availability without a separate API round-trip.
-      await this._fetchAddonState();
 
       // Pull sync mappings modified since last sync.
       const result = await this.api.get(`/sync/pull?since=${encodeURIComponent(lastSync)}`);
