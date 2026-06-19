@@ -208,7 +208,11 @@
         "NoActivity": "No recent activity.",
         "ClearLog": "Clear Log",
         "Settings": "Settings",
-        "Reconnect": "Reconnect"
+        "Reconnect": "Reconnect",
+        "CopyCalendarDiagnostics": "Copy Calendar Diagnostics",
+        "CopyCalendarDiagnosticsHint": "Copy a calendar diagnostics report (versions, structure, Calendaria API probe, recent sync errors) to the clipboard — paste into a bug report or to Claude.",
+        "CalDiagCopied": "Calendar diagnostics copied to clipboard.",
+        "CalDiagCopyFailed": "Failed to copy calendar diagnostics — check the console (F12)."
       }
     },
     "MapViewer": {
