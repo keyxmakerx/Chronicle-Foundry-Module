@@ -53,6 +53,9 @@ export class SyncManager {
 
     /** @type {Array<object>|null} Cached Chronicle campaign members. */
     this._members = null;
+
+    /** @type {boolean} Whether the player-character-claiming addon is enabled for this campaign. */
+    this._playerClaimingEnabled = false;
   }
 
   /**
@@ -186,6 +189,35 @@ export class SyncManager {
     } catch (err) {
       console.warn('Chronicle: Reconnect re-pull failed', err);
     }
+  }
+
+  /**
+   * Fetch and cache whether the player-character-claiming addon is enabled.
+   * Fails open (treats addon as disabled) on any API error — addon state is
+   * non-critical and must never block the dashboard from loading.
+   * @private
+   */
+  async _fetchAddonState() {
+    try {
+      const addons = await this.api.getAddons();
+      const list = Array.isArray(addons) ? addons : (addons?.data ?? []);
+      const claiming = list.find((a) => a.slug === 'player-character-claiming');
+      this._playerClaimingEnabled = !!(claiming?.enabled);
+      if (this._playerClaimingEnabled) {
+        console.debug('Chronicle: Player Character Claiming addon enabled');
+      }
+    } catch {
+      // Addon endpoint not deployed or campaign has no addons — treat as disabled.
+      this._playerClaimingEnabled = false;
+    }
+  }
+
+  /**
+   * Returns whether the player-character-claiming addon is enabled for this campaign.
+   * @returns {boolean}
+   */
+  isPlayerClaimingEnabled() {
+    return this._playerClaimingEnabled;
   }
 
   /**
@@ -367,6 +399,10 @@ export class SyncManager {
 
       // Fetch campaign members for user ID mapping.
       await this.fetchAndCacheMembers();
+
+      // Fetch addon state before module onInitialSync calls so modules can
+      // branch on addon availability without a separate API round-trip.
+      await this._fetchAddonState();
 
       // Pull sync mappings modified since last sync.
       const result = await this.api.get(`/sync/pull?since=${encodeURIComponent(lastSync)}`);

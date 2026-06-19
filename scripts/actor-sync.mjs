@@ -48,6 +48,12 @@ export class ActorSync {
     /** @type {number|null} Cached Chronicle entity type ID for characters. */
     this._characterTypeId = null;
 
+    /** @type {number|null} Cached Chronicle entity type ID for the PC sub-type (PC-CLAIM-4). */
+    this._pcSubTypeId = null;
+
+    /** @type {boolean} Whether the claiming-off hint has been shown this session. */
+    this._claimHintShown = false;
+
     // Bound hook handlers for cleanup.
     this._onCreateActor = this._handleCreateActor.bind(this);
     this._onUpdateActor = this._handleUpdateActor.bind(this);
@@ -167,24 +173,44 @@ export class ActorSync {
     if (!this._adapter || !getSetting('syncCharacters')) return;
     if (!this._characterTypeId) return;
 
+    // PC-CLAIM-4: addon state is set by SyncManager._fetchAddonState() before
+    // this method is called. Resolve the PC sub-type if claiming is on.
+    const claimingEnabled = this._syncManager?.isPlayerClaimingEnabled() ?? false;
+    if (claimingEnabled) {
+      await this._resolvePcSubTypeId();
+    }
+
     try {
-      const result = await this._api.get(`/entities?type_id=${this._characterTypeId}&per_page=100`);
-      const entities = result?.data || [];
+      // Pull updates for the generic character type, plus the PC sub-type when
+      // claiming is on and the sub-type resolved to a distinct type ID.
+      const typeIds = [this._characterTypeId];
+      if (claimingEnabled && this._pcSubTypeId && this._pcSubTypeId !== this._characterTypeId) {
+        typeIds.push(this._pcSubTypeId);
+      }
 
-      for (const entity of entities) {
-        // Check if already linked to an actor.
-        const existingActor = game.actors.find(
-          (a) => a.getFlag(FLAG_SCOPE, 'entityId') === entity.id
-        );
+      for (const typeId of typeIds) {
+        const result = await this._api.get(`/entities?type_id=${typeId}&per_page=100`);
+        const entities = result?.data || [];
 
-        if (existingActor) {
-          // Update existing actor with latest data.
-          await this._updateActorFromEntity(existingActor, entity);
+        for (const entity of entities) {
+          const existingActor = game.actors.find(
+            (a) => a.getFlag(FLAG_SCOPE, 'entityId') === entity.id
+          );
+          if (existingActor) {
+            // Update existing actor with latest data.
+            await this._updateActorFromEntity(existingActor, entity);
+          }
+          // Don't auto-create actors during initial sync — only update existing links.
         }
-        // Don't auto-create actors during initial sync — only update existing links.
       }
     } catch (err) {
       console.warn('Chronicle: Actor initial sync failed', err);
+    }
+
+    // PC-CLAIM-4: if claiming is off but the world already has player-owned actors,
+    // show a one-time advisory so the GM knows to enable the addon.
+    if (!claimingEnabled && !this._claimHintShown) {
+      this._maybeShowClaimingHint();
     }
   }
 
@@ -394,17 +420,23 @@ export class ActorSync {
     try {
       const fields = this._adapter.toChronicleFields(actor);
 
+      // PC-CLAIM-4: gate owner_user_id on the claiming addon. Without the addon,
+      // Chronicle has no claiming UI and the field would be orphaned data.
+      // When the addon is on and the actor has a player owner, use the PC sub-type
+      // so the entity lands in the right category automatically.
+      const claimingEnabled = this._syncManager?.isPlayerClaimingEnabled() ?? false;
+      const ownerUserId = claimingEnabled ? this._resolveOwnerUserId(actor) : null;
+
       const payload = {
         name: actor.name,
-        entity_type_id: this._characterTypeId,
+        entity_type_id:
+          claimingEnabled && ownerUserId && this._pcSubTypeId
+            ? this._pcSubTypeId
+            : this._characterTypeId,
         is_private: false,
         fields_data: fields,
       };
 
-      // Resolve actor owner → Chronicle user → owner_user_id (FM-CH1).
-      // Omit if no Foundry owner is set or no Chronicle mapping exists; the
-      // host leaves owner_user_id null and the player can claim from chronicle.
-      const ownerUserId = this._resolveOwnerUserId(actor);
       if (ownerUserId) payload.owner_user_id = ownerUserId;
 
       const entity = await this._api.post('/entities', payload);
@@ -620,6 +652,60 @@ export class ActorSync {
   }
 
   /**
+   * Resolve the "Player Characters" sub-type entity type ID from Chronicle.
+   * Identified by preset_category === "player_character" or slug === "player-character".
+   * Only called when the player-character-claiming addon is enabled; when unresolved,
+   * player-owned actors fall back to the generic character type.
+   * @private
+   */
+  async _resolvePcSubTypeId() {
+    try {
+      const result = await this._api.get('/entity-types');
+      const types = result?.data || result || [];
+      const match = types.find(
+        (t) => t.preset_category === 'player_character' || t.slug === 'player-character'
+      );
+      if (match) {
+        this._pcSubTypeId = match.id;
+        console.debug(`Chronicle: PC sub-type resolved — "${match.name}" (ID: ${match.id})`);
+      } else {
+        console.debug(
+          'Chronicle: No PC sub-type found — player-owned actors will use the generic character type'
+        );
+      }
+    } catch (err) {
+      console.warn('Chronicle: Failed to resolve PC sub-type ID', err);
+    }
+  }
+
+  /**
+   * Show a one-time advisory notification when the player-character-claiming
+   * addon is off but the world already has player-owned character actors.
+   * Non-spammy: fires at most once per session and only when relevant.
+   * @private
+   */
+  _maybeShowClaimingHint() {
+    const ownerLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
+    const hasPlayerOwnedPCs = game.actors?.some((a) => {
+      if (a.type !== this._actorType) return false;
+      const ownership = a.ownership ?? {};
+      return Object.entries(ownership).some(([userId, level]) => {
+        if (userId === 'default' || level !== ownerLevel) return false;
+        const user = game.users?.get(userId);
+        return user && !user.isGM;
+      });
+    });
+    if (!hasPlayerOwnedPCs) return;
+
+    this._claimHintShown = true;
+    const msg =
+      game.i18n?.localize('CHRONICLE.ActorSync.EnableClaimingHint') ??
+      'Chronicle: Enable the "Player Character Claiming" addon in your Chronicle campaign to sync which players own their characters.';
+    ui.notifications?.info(msg, { permanent: false });
+    console.debug('Chronicle: Claiming addon off but player-owned actors detected — hint shown');
+  }
+
+  /**
    * Check if an entity is a character type based on type_slug, type_name,
    * or entity_type_id matching.
    * @param {object} entity
@@ -629,15 +715,16 @@ export class ActorSync {
   _isCharacterEntity(entity) {
     // Match by type slug if available.
     if (entity.type_slug && this._adapter?.characterTypeSlug) {
-      return entity.type_slug === this._adapter.characterTypeSlug;
+      if (entity.type_slug === this._adapter.characterTypeSlug) return true;
+    }
+    // Match by type ID (generic character type or PC sub-type).
+    if (entity.entity_type_id) {
+      if (this._characterTypeId && entity.entity_type_id === this._characterTypeId) return true;
+      if (this._pcSubTypeId && entity.entity_type_id === this._pcSubTypeId) return true;
     }
     // Match by type name (fallback).
     if (entity.type_name) {
       return entity.type_name.toLowerCase().includes('character');
-    }
-    // Match by type ID if resolved.
-    if (this._characterTypeId && entity.entity_type_id) {
-      return entity.entity_type_id === this._characterTypeId;
     }
     return false;
   }
