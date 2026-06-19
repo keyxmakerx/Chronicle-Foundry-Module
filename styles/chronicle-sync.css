@@ -1811,6 +1811,21 @@
   padding: 4px;
 }
 
+/*
+ * The single-root wrapper REQUIRED by ApplicationV2 (see F-PR3-4) sits between
+ * `.sync-calendar-content` and the header/grid/footer. It must itself be a
+ * height-constrained flex column, otherwise the grid's `flex: 1 1 auto` and the
+ * rails' `overflow-y: auto` have no effect — the left-rail validation findings
+ * then overflow and visually collide instead of scrolling. (FM-CAL-RAIL-SCROLL)
+ */
+.sync-calendar .sync-calendar-root {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
+}
+
 .sync-calendar-degraded {
   display: flex;
   flex-direction: column;
@@ -2283,13 +2298,48 @@
 
 .sync-calendar-footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   gap: 12px;
   padding: 4px 12px;
   border-top: 1px solid var(--rail-border);
   font-size: 10px;
+}
+
+.sync-calendar-footer .footer-meta-group {
+  display: flex;
+  gap: 12px;
+  align-items: center;
   opacity: 0.6;
 }
+
+.sync-calendar .footer-toolbar {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Toolbar buttons: override Foundry's full-width button reset (rails use 100%). */
+.sync-calendar .footer-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: auto;
+  padding: 3px 9px;
+  font-size: 11px;
+  line-height: 1.4;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--rail-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.sync-calendar .footer-tool:hover { background: rgba(255, 255, 255, 0.10); }
+.sync-calendar .footer-tool.sync-toggle.is-on  { border-color: var(--finding-info); color: var(--finding-info); }
+.sync-calendar .footer-tool.sync-toggle.is-off { opacity: 0.7; }
+.sync-calendar .footer-tool.danger:hover { border-color: var(--finding-error); color: var(--finding-error); }
+.sync-calendar-degraded .footer-tool { margin-top: 10px; }
 
 /* ====================================================================
  * Sync Calendar — FM-CAL-EDITOR-PR2 additions

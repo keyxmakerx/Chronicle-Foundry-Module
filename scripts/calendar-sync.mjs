@@ -19,7 +19,7 @@
  * optionally pushes to the active Foundry calendar module.
  */
 
-import { getSetting } from './settings.mjs';
+import { getSetting, getCalendarSyncExclusions } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 
 /**
@@ -413,6 +413,25 @@ export class CalendarSync {
     }
   }
 
+  /**
+   * Whether the operator has opted the currently-active Calendaria calendar out
+   * of Chronicle sync (toggled from the Sync Calendar editor). Push handlers
+   * check this so a local-only calendar stops pushing date/note changes without
+   * disabling calendar sync globally. Defensive: any lookup failure → not
+   * excluded (fail open to existing behaviour). @returns {boolean} @private
+   */
+  _isActiveCalendarExcluded() {
+    try {
+      const exclusions = getCalendarSyncExclusions();
+      if (!exclusions.length) return false;
+      const cal = globalThis.CALENDARIA?.api?.getActiveCalendar?.();
+      const id = cal?.metadata?.id || cal?.id || '';
+      return !!id && exclusions.includes(id);
+    } catch {
+      return false;
+    }
+  }
+
   // --- Foundry → Chronicle (Calendaria Modern Hooks) ---
 
   /**
@@ -424,6 +443,7 @@ export class CalendarSync {
   async _onCalendariaDateTimeChange(data) {
     if (this._syncing) return;
     if (!game.user.isGM) return;
+    if (this._isActiveCalendarExcluded()) return;
 
     try {
       await this._api.put('/calendar/date', {
@@ -446,6 +466,7 @@ export class CalendarSync {
   async _onCalendariaNoteCreated(noteData) {
     if (this._syncing) return;
     if (!game.user.isGM) return;
+    if (this._isActiveCalendarExcluded()) return;
 
     const eventPayload = this._calendariaNoteToChronicleEvent(noteData);
     if (!eventPayload) return;
@@ -468,6 +489,7 @@ export class CalendarSync {
   async _onCalendariaNoteUpdated(noteData) {
     if (this._syncing) return;
     if (!game.user.isGM) return;
+    if (this._isActiveCalendarExcluded()) return;
 
     const chronicleId = this._getChronicleEventId(noteData.id);
     if (!chronicleId) {
@@ -494,6 +516,7 @@ export class CalendarSync {
   async _onCalendariaNoteDeleted(noteData) {
     if (this._syncing) return;
     if (!game.user.isGM) return;
+    if (this._isActiveCalendarExcluded()) return;
 
     const noteId = noteData?.id || noteData?.pageId;
     if (!noteId) return;

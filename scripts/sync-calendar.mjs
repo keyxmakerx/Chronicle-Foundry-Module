@@ -57,6 +57,9 @@ import {
   transformCalendariaCalendar,
   buildCalendarPreflightSummary,
 } from './sync-calendar-import-from-calendaria.mjs';
+import { buildCalendarDiagnostics } from './sync-calendar-diagnostics.mjs';
+import { getSetting, setSetting, getCalendarSyncExclusions } from './settings.mjs';
+import { isCalendarNoteJournal } from './calendar-sync.mjs';
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -99,6 +102,10 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
       // PR 3: empty-state import-from-Calendaria
       'import-calendar':         SyncCalendarApplication.#onImportCalendar,
       'recheck-chronicle':       SyncCalendarApplication.#onRecheckChronicle,
+      // Diagnostics & maintenance
+      'copy-diagnostics':        SyncCalendarApplication.#onCopyDiagnostics,
+      'toggle-calendar-sync':    SyncCalendarApplication.#onToggleCalendarSync,
+      'cleanup-calendar-notes':  SyncCalendarApplication.#onCleanupCalendarNotes,
       // Misc
       'focus-target':      SyncCalendarApplication.#onFocusTarget,
     },
@@ -175,11 +182,13 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
     }
 
     if (!api || typeof api.getActiveCalendar !== 'function') {
+      const degradedReason = calendariaModule
+        ? 'CHRONICLE.SyncCalendar.Degraded.IncompatibleApi'
+        : 'CHRONICLE.SyncCalendar.Degraded.NoCalendaria';
+      this._lastDiag = { degraded: true, degradedReason };
       return {
         degraded: true,
-        degradedReason: calendariaModule
-          ? 'CHRONICLE.SyncCalendar.Degraded.IncompatibleApi'
-          : 'CHRONICLE.SyncCalendar.Degraded.NoCalendaria',
+        degradedReason,
         calendariaVersion: this._calendariaVersion,
         schemaVersion: SCHEMA_VERSION,
         importBanner: this.#buildImportBanner(api),
@@ -194,6 +203,7 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
     catch (err) { console.warn('Sync Calendar | getCurrentDateTime failed', err); }
 
     if (!cal) {
+      this._lastDiag = { degraded: true, degradedReason: 'CHRONICLE.SyncCalendar.Degraded.NoActiveCalendar' };
       return {
         degraded: true,
         degradedReason: 'CHRONICLE.SyncCalendar.Degraded.NoActiveCalendar',
@@ -264,6 +274,22 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
       : null;
 
     const dayDetail = this.#buildDayDetail(api, cal, moons, seasons);
+
+    // Stash a snapshot for the diagnostics export (the `copy-diagnostics`
+    // action). Holds the raw findings + structure + selected-day detail so the
+    // handler doesn't have to recompute them. See #collectDiagnostics.
+    this._lastDiag = {
+      cal: { name: cal.name || 'Calendar', id: this._activeCalendarId, version: cal.metadata?.version || '' },
+      currentDateTime,
+      selectedDate: this._selectedDate,
+      structureCounts: {
+        months: months.length, weekdays: weekdays.length, seasons: seasons.length,
+        moons: moons.length, eras: eras.length, festivals: festivals.length,
+        cycles: cycles.length, weatherZones: weatherZones.length,
+      },
+      findings,
+      dayDetail,
+    };
 
     const findingsView = findings.map((f) => ({
       severity:      f.severity,
@@ -338,6 +364,13 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
 
       // PR 2: writes are enabled for events. PR 5 enables structure-edit.
       writesEnabled: true,
+
+      // Footer toolbar state: per-calendar sync toggle + global switch.
+      syncToggle: {
+        calendarId:    this._activeCalendarId,
+        excluded:      this.#isCalendarSyncExcluded(this._activeCalendarId),
+        globalEnabled: getSetting('syncCalendar'),
+      },
     };
   }
 
@@ -644,18 +677,34 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
       if (s) detail.season = { name: s.name || '', color: s.color || '', icon: s.icon || '' };
     } catch (err) { console.warn('Sync Calendar | getCurrentSeason failed', err); }
 
-    try {
-      const w = api.getCurrentWeather?.() || null;
-      if (w) {
-        detail.weather = {
-          label:       w.preset_label || w.label || w.preset_id || w.id || '',
-          icon:        w.icon || '',
-          color:       w.color || '',
-          temperature: w.temperature_celsius ?? w.temperature ?? null,
-          description: w.description || '',
-        };
-      }
-    } catch { /* weather often unconfigured */ }
+    // Weather: prefer the SELECTED day's weather so picking a day with e.g. a
+    // "Meteor Shower" preset surfaces it; fall back to the current date's
+    // weather. `getWeatherForDate` may be absent on some Calendaria builds —
+    // optional-chaining degrades gracefully (the diagnostics export reports
+    // which API methods are present). Calendaria resolves the active/default
+    // climate zone internally when zoneId is omitted.
+    let rawForDate = null;
+    let rawCurrent = null;
+    try { rawForDate = api.getWeatherForDate?.(date.year, date.month, date.day) || null; }
+    catch (err) { console.warn('Sync Calendar | getWeatherForDate failed', err); }
+    try { rawCurrent = api.getCurrentWeather?.() || null; }
+    catch { /* weather often unconfigured */ }
+
+    const normalizeWeather = (w) => w ? {
+      label:       w.preset_label || w.label || w.preset_id || w.id || '',
+      icon:        w.icon || '',
+      color:       w.color || '',
+      temperature: w.temperature_celsius ?? w.temperature ?? null,
+      description: w.description || '',
+    } : null;
+
+    detail.weatherForDate = normalizeWeather(rawForDate);
+    detail.weatherCurrent = normalizeWeather(rawCurrent);
+    detail.weather = detail.weatherForDate || detail.weatherCurrent;
+    // Raw shapes stashed for the diagnostics export (field names vary by
+    // Calendaria version); the template only reads `detail.weather`.
+    detail._weatherForDateRaw = rawForDate;
+    detail._weatherCurrentRaw = rawCurrent;
 
     return detail;
   }
@@ -1207,6 +1256,190 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
   static async #onRecheckChronicle(_event, _target) {
     this._chronicleCalendarState = 'unknown';
     this._lastImportResult = null;
+    this.render(false);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Diagnostics & maintenance
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Copy a rich, AI-pasteable diagnostics report (versions, structure, ALL
+   * validation findings, the selected day's notes/moons/weather, the
+   * CALENDARIA.api capability probe, recent sync errors, and sync settings) to
+   * the clipboard. This is the "dump everything for Claude" button.
+   */
+  static async #onCopyDiagnostics(_event, _target) {
+    try {
+      const text = this.#collectDiagnostics();
+      await game.clipboard.copyPlainText(text);
+      ui.notifications?.info(game.i18n.localize('CHRONICLE.SyncCalendar.Diagnostics.Copied'));
+    } catch (err) {
+      console.error('Sync Calendar | diagnostics copy failed', err);
+      ui.notifications?.error(game.i18n.localize('CHRONICLE.SyncCalendar.Diagnostics.CopyFailed'));
+    }
+  }
+
+  /**
+   * Gather the diagnostics input from the last-rendered context plus live
+   * probes (api methods, versions, settings, Chronicle error log) and render it
+   * via the pure {@link buildCalendarDiagnostics} builder.
+   * @returns {string}
+   */
+  #collectDiagnostics() {
+    const api = globalThis.CALENDARIA?.api;
+    const diag = this._lastDiag || {};
+    const chronicleModule = game.modules.get?.('chronicle-sync');
+    const chronicleApi = chronicleModule?.api?.getAPI?.();
+
+    let recentErrors = [];
+    try {
+      const log = chronicleApi?.getErrorLog?.() || [];
+      recentErrors = (Array.isArray(log) ? log : []).slice(0, 25).map((e) => ({
+        time:     e.time || e.timestamp || '',
+        message:  e.message || e.error || (typeof e === 'string' ? e : ''),
+        endpoint: e.endpoint || e.url || e.path || '',
+        status:   e.status || e.code || '',
+      }));
+    } catch { /* error log is best-effort */ }
+
+    const probe = (name) => typeof api?.[name] === 'function';
+
+    return buildCalendarDiagnostics({
+      generatedAt: new Date().toISOString(),
+      degraded: !!diag.degraded,
+      versions: {
+        module:     chronicleModule?.version || '',
+        calendaria: this._calendariaVersion || '',
+        schema:     String(SCHEMA_VERSION),
+        foundry:    game.version || game.release?.version || '',
+        system:     game.system?.title || game.system?.id || '',
+        systemId:   game.system?.id || '',
+      },
+      calendar: diag.cal,
+      syncStatus: {
+        calendarModule: game.modules.get?.('calendaria')?.active ? 'calendaria'
+          : (game.modules.get?.('foundryvtt-simple-calendar')?.active ? 'simple-calendar' : 'none'),
+        calendarSyncEnabled: getSetting('syncCalendar'),
+        syncEnabled:         getSetting('syncEnabled'),
+        thisCalendarExcluded: this.#isCalendarSyncExcluded(diag.cal?.id),
+      },
+      structureCounts: diag.structureCounts,
+      apiMethods: {
+        getActiveCalendar:   probe('getActiveCalendar'),
+        getCurrentDateTime:  probe('getCurrentDateTime'),
+        getNotesForDate:     probe('getNotesForDate'),
+        getNotesForMonth:    probe('getNotesForMonth'),
+        getAllMoonPhases:    probe('getAllMoonPhases'),
+        getCurrentSeason:    probe('getCurrentSeason'),
+        getCurrentWeather:   probe('getCurrentWeather'),
+        getWeatherForDate:   probe('getWeatherForDate'),
+        getWeatherForPeriod: probe('getWeatherForPeriod'),
+      },
+      currentDateTime: diag.currentDateTime,
+      selectedDate:    diag.selectedDate,
+      dayDetail:       diag.dayDetail,
+      findings: (diag.findings || []).map((f) => ({
+        severity: f.severity, code: f.code, message: f.message, fixHint: f.fix_hint || '',
+      })),
+      recentErrors,
+      settings: {
+        syncEnabled:        getSetting('syncEnabled'),
+        syncCalendar:       getSetting('syncCalendar'),
+        syncJournals:       getSetting('syncJournals'),
+        syncNotes:          getSetting('syncNotes'),
+        syncCharacters:     getSetting('syncCharacters'),
+        conflictResolution: getSetting('conflictResolution'),
+        detectedSystem:     getSetting('detectedSystem'),
+      },
+      raw: {
+        weatherForDate: diag.dayDetail?._weatherForDateRaw ?? null,
+        weatherCurrent: diag.dayDetail?._weatherCurrentRaw ?? null,
+      },
+    });
+  }
+
+  /**
+   * Toggle whether the active calendar is synced to Chronicle. Stores excluded
+   * calendar ids in the `calendarSyncExclusions` setting so the operator can
+   * keep some Calendaria calendars local-only. CalendarSync consults this list
+   * before pushing date/note changes. Falls back to toggling the global
+   * `syncCalendar` switch when no active calendar id is known.
+   */
+  static async #onToggleCalendarSync(_event, _target) {
+    const id = this._lastDiag?.cal?.id || this._activeCalendarId || '';
+    if (!id) {
+      // No calendar id — flip the global switch instead.
+      await setSetting('syncCalendar', !getSetting('syncCalendar'));
+      this.render(false);
+      return;
+    }
+    const excluded = new Set(getCalendarSyncExclusions());
+    if (excluded.has(id)) excluded.delete(id);
+    else excluded.add(id);
+    await setSetting('calendarSyncExclusions', JSON.stringify([...excluded]));
+    const nowExcluded = excluded.has(id);
+    ui.notifications?.info(game.i18n.format('CHRONICLE.SyncCalendar.SyncToggle.Notify', {
+      state: game.i18n.localize(nowExcluded
+        ? 'CHRONICLE.SyncCalendar.SyncToggle.Off'
+        : 'CHRONICLE.SyncCalendar.SyncToggle.On'),
+    }));
+    this.render(false);
+  }
+
+  /** Whether the given calendar id is excluded from Chronicle sync. */
+  #isCalendarSyncExcluded(calendarId) {
+    if (!calendarId) return false;
+    return getCalendarSyncExclusions().includes(calendarId);
+  }
+
+  /**
+   * Clean up Calendaria/SimpleCalendar note JournalEntries that an earlier
+   * build wrongly synced to Chronicle as entities ("Characters"). Unlinks each
+   * locally FIRST (so the resulting `entity.deleted` can't cascade back and
+   * delete the calendar note), then deletes the bogus entity in Chronicle.
+   * Confirmed before running; real character Actors are never touched.
+   */
+  static async #onCleanupCalendarNotes(_event, _target) {
+    const chronicleApi = game.modules.get?.('chronicle-sync')?.api?.getAPI?.();
+    if (!chronicleApi) {
+      ui.notifications?.error(game.i18n.localize('CHRONICLE.SyncCalendar.Cleanup.NoApi'));
+      return;
+    }
+
+    const targets = (game.journal?.contents || []).filter(
+      (j) => j.getFlag('chronicle-sync', 'entityId') && isCalendarNoteJournal(j),
+    );
+    if (targets.length === 0) {
+      ui.notifications?.info(game.i18n.localize('CHRONICLE.SyncCalendar.Cleanup.None'));
+      return;
+    }
+
+    const names = targets.map((j) => j.name).filter(Boolean).join(', ');
+    const confirmed = await Dialog.confirm({
+      title: game.i18n.localize('CHRONICLE.SyncCalendar.Cleanup.Title'),
+      content: `<p>${game.i18n.format('CHRONICLE.SyncCalendar.Cleanup.Confirm', { count: targets.length })}</p>`
+        + `<p style="opacity:.8;font-size:.9em;">${foundry.utils.escapeHTML?.(names) ?? names}</p>`,
+      defaultYes: false,
+    });
+    if (!confirmed) return;
+
+    let removed = 0;
+    for (const journal of targets) {
+      const entityId = journal.getFlag('chronicle-sync', 'entityId');
+      try {
+        // 1) Unlink locally FIRST so entity.deleted can't cascade-delete the note.
+        await journal.unsetFlag('chronicle-sync', 'entityId');
+        await journal.unsetFlag('chronicle-sync', 'lastSync');
+        await journal.unsetFlag('chronicle-sync', 'chronicleUpdatedAt');
+        // 2) Delete the bogus entity in Chronicle.
+        await chronicleApi.delete(`/entities/${entityId}`);
+        removed++;
+      } catch (err) {
+        console.warn('Sync Calendar | cleanup failed for', journal?.name, err);
+      }
+    }
+    ui.notifications?.info(game.i18n.format('CHRONICLE.SyncCalendar.Cleanup.Done', { count: removed }));
     this.render(false);
   }
 }

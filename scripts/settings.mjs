@@ -156,6 +156,16 @@ export function registerSettings() {
     default: '{"excludedTypes":[],"excludedEntities":[]}',
   });
 
+  // Internal: per-calendar sync opt-out. JSON array of Calendaria calendar ids
+  // the operator has chosen NOT to sync to Chronicle (toggled from the Sync
+  // Calendar editor). Empty by default → every active calendar syncs as before.
+  game.settings.register(MODULE_ID, 'calendarSyncExclusions', {
+    scope: 'world',
+    config: false,
+    type: String,
+    default: '[]',
+  });
+
   // -----------------------------------------------------------------------
   // Sync Configuration settings (managed via Config tab in dashboard)
   // -----------------------------------------------------------------------
@@ -321,6 +331,20 @@ export function getSyncExclusions() {
  */
 export async function setSyncExclusions(exclusions) {
   await setSetting('syncExclusions', JSON.stringify(exclusions));
+}
+
+/**
+ * Get the list of Calendaria calendar ids the operator has opted OUT of syncing
+ * to Chronicle. Empty array (default) means every active calendar syncs.
+ * @returns {string[]}
+ */
+export function getCalendarSyncExclusions() {
+  try {
+    const parsed = JSON.parse(getSetting('calendarSyncExclusions'));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 /**
