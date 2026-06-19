@@ -75,33 +75,47 @@ export function isWireVisibilityGmOnly(wireValue) {
 }
 
 /**
- * Foundry flag namespaces that the supported calendar modules write onto a
- * JournalEntry to mark it as one of their calendar notes. SimpleCalendar
- * persists every note as a JournalEntry under its module flag; some Calendaria
- * builds do the same. Frozen so a later edit can't silently drop a namespace.
+ * Calendaria's Foundry module id. It tags every note JournalEntry it creates
+ * with flags under this scope. (Verified against Sayshal/Calendaria
+ * `scripts/constants.mjs` → `MODULE.ID = 'calendaria'`.)
  */
-export const CALENDAR_NOTE_FLAG_SCOPES = Object.freeze([
+export const CALENDARIA_FLAG_SCOPE = 'calendaria';
+
+/**
+ * SimpleCalendar persists each note as a JournalEntry under one of these module
+ * flag scopes; the namespace's presence on the document is the note signal.
+ * Frozen so a later edit can't silently drop one.
+ */
+export const SIMPLE_CALENDAR_FLAG_SCOPES = Object.freeze([
   'foundryvtt-simple-calendar',
   'simple-calendar',
-  'calendaria',
 ]);
 
 /**
  * Pure predicate: is this Foundry JournalEntry a calendar-module note?
  *
- * Calendar modules (SimpleCalendar, and Calendaria in JournalEntry-backed
- * configurations) store their notes/holidays as JournalEntry documents. Those
- * documents belong to CalendarSync — which mirrors them to Chronicle as
+ * Both supported calendar modules store their notes as JournalEntry documents:
+ *   - **Calendaria** creates one JournalEntry per note in a "Calendar Notes"
+ *     folder, flagged `flags.calendaria.isCalendarNote === true`. This includes
+ *     *festival/holiday notes it auto-seeds* from a calendar's `festivals`
+ *     template (e.g. "Day of Rebirth", "Eve of the Dead") — the exact documents
+ *     that triggered this bug. Calendar-structure journals are tagged
+ *     `isCalendarJournal`. (Verified against Sayshal/Calendaria
+ *     `scripts/notes/note-manager.mjs` + `scripts/festivals/festival-manager.mjs`.)
+ *   - **SimpleCalendar** stores each note as a JournalEntry under its own module
+ *     flag scope (see SIMPLE_CALENDAR_FLAG_SCOPES).
+ *
+ * Those documents belong to CalendarSync — which mirrors them to Chronicle as
  * *calendar events* — and must NEVER be pushed to Chronicle as worldbuilding
  * entities. JournalSync calls this to skip them: without the guard a calendar
  * note is POSTed to `/entities` with `entity_type_id: 0`, which the server
- * resolves to the campaign's first entity type (typically "Character"), so
- * holidays like "Day of Rebirth" wrongly appear in the Characters list.
+ * resolves to the campaign's first entity type (typically "Character"), so the
+ * holidays wrongly appear in the Characters list.
  *
- * Detection is by the calendar module's own flag namespace (present the moment
- * the note JournalEntry is created — so it works on the very first
- * `createJournalEntry` hook) plus our own `calendarEventId` link flag, which a
- * note carries once CalendarSync has mirrored it to a Chronicle event.
+ * Detection is by the calendar module's own flag (present the moment the note
+ * JournalEntry is created — so it fires on the very first `createJournalEntry`
+ * hook) plus our own `calendarEventId` link flag, which a note carries once
+ * CalendarSync has mirrored it to a Chronicle event.
  *
  * Defensive against plain object stubs (tests, partial payloads): reads the
  * nested `flags` object directly when `getFlag` is unavailable.
@@ -113,7 +127,18 @@ export function isCalendarNoteJournal(journal) {
   if (!journal || typeof journal !== 'object') return false;
 
   const flags = journal.flags || {};
-  for (const scope of CALENDAR_NOTE_FLAG_SCOPES) {
+
+  // Calendaria: note / structure journals carry these explicit boolean flags.
+  // Match the specific flags (not merely the presence of a `calendaria` scope)
+  // so an unrelated journal that happens to hold a Calendaria enricher flag is
+  // not wrongly skipped from entity sync.
+  const cal = flags[CALENDARIA_FLAG_SCOPE];
+  if (cal && typeof cal === 'object' && (cal.isCalendarNote === true || cal.isCalendarJournal === true)) {
+    return true;
+  }
+
+  // SimpleCalendar: presence of its note flag scope is the signal.
+  for (const scope of SIMPLE_CALENDAR_FLAG_SCOPES) {
     if (flags[scope] && typeof flags[scope] === 'object') return true;
   }
 

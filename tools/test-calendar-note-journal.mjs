@@ -36,7 +36,8 @@ globalThis.Hooks = globalThis.Hooks || { on: () => {}, off: () => {} };
 
 const {
   isCalendarNoteJournal,
-  CALENDAR_NOTE_FLAG_SCOPES,
+  CALENDARIA_FLAG_SCOPE,
+  SIMPLE_CALENDAR_FLAG_SCOPES,
 } = await import('../scripts/calendar-sync.mjs');
 
 const FLAG_SCOPE = 'chronicle-sync';
@@ -57,8 +58,25 @@ function journalStub(flags = {}, { withGetFlag = false, chronicleFlags = null } 
 }
 
 // ---------------------------------------------------------------------
-// Positive: calendar-module flag namespaces
+// Positive: calendar-module flags
 // ---------------------------------------------------------------------
+
+test('Calendaria note (flags.calendaria.isCalendarNote) → true', () => {
+  // Shape produced by Calendaria note-manager.mjs:379 and festival-manager.mjs.
+  const j = journalStub({ calendaria: { calendarId: 'therin', isCalendarNote: true } });
+  assert.equal(isCalendarNoteJournal(j), true);
+});
+
+test('Calendaria structure journal (flags.calendaria.isCalendarJournal) → true', () => {
+  assert.equal(isCalendarNoteJournal(journalStub({ calendaria: { isCalendarJournal: true } })), true);
+});
+
+test('Calendaria festival/holiday note (auto-seeded, isCalendarNote) → true', () => {
+  // The exact bug case: a seeded festival note carries isCalendarNote plus a
+  // linkedFestival descriptor.
+  const j = journalStub({ calendaria: { calendarId: 'therin', isCalendarNote: true, linkedFestival: { festivalKey: 'rebirth' } } });
+  assert.equal(isCalendarNoteJournal(j), true);
+});
 
 test('SimpleCalendar note (foundryvtt-simple-calendar flag) → true', () => {
   const j = journalStub({ 'foundryvtt-simple-calendar': { noteData: { startDate: { year: 1 } } } });
@@ -69,8 +87,10 @@ test('legacy simple-calendar flag namespace → true', () => {
   assert.equal(isCalendarNoteJournal(journalStub({ 'simple-calendar': { note: true } })), true);
 });
 
-test('Calendaria journal-backed note (calendaria flag) → true', () => {
-  assert.equal(isCalendarNoteJournal(journalStub({ calendaria: { startDate: {} } })), true);
+test('a bare calendaria flag WITHOUT the note markers → false (precise, no over-skip)', () => {
+  // e.g. an enricher cache or unrelated calendaria flag on a real worldbuilding
+  // journal must NOT be skipped from entity sync.
+  assert.equal(isCalendarNoteJournal(journalStub({ calendaria: { someEnricherCache: true } })), false);
 });
 
 // ---------------------------------------------------------------------
@@ -125,9 +145,9 @@ test('null / undefined / non-object inputs → false', () => {
 // Constant shape
 // ---------------------------------------------------------------------
 
-test('CALENDAR_NOTE_FLAG_SCOPES is frozen and covers the supported modules', () => {
-  assert.ok(Object.isFrozen(CALENDAR_NOTE_FLAG_SCOPES));
-  assert.ok(CALENDAR_NOTE_FLAG_SCOPES.includes('foundryvtt-simple-calendar'));
-  assert.ok(CALENDAR_NOTE_FLAG_SCOPES.includes('simple-calendar'));
-  assert.ok(CALENDAR_NOTE_FLAG_SCOPES.includes('calendaria'));
+test('flag-scope constants are frozen and cover the supported modules', () => {
+  assert.equal(CALENDARIA_FLAG_SCOPE, 'calendaria');
+  assert.ok(Object.isFrozen(SIMPLE_CALENDAR_FLAG_SCOPES));
+  assert.ok(SIMPLE_CALENDAR_FLAG_SCOPES.includes('foundryvtt-simple-calendar'));
+  assert.ok(SIMPLE_CALENDAR_FLAG_SCOPES.includes('simple-calendar'));
 });
