@@ -14,6 +14,7 @@ import { ConflictError } from './api-client.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
 import { defaultLevelForVisibility } from './_ownership.mjs';
+import { isCalendarNoteJournal } from './calendar-sync.mjs';
 
 /**
  * JournalSync handles entity ↔ JournalEntry synchronization.
@@ -443,6 +444,23 @@ export class JournalSync {
     // Skip if this journal was created by Chronicle sync.
     if (journal.getFlag(FLAG_SCOPE, 'entityId')) return;
 
+    // Skip journals that belong to another sync domain. Calendar modules
+    // (SimpleCalendar / Calendaria) and Chronicle Notes both persist their
+    // content as JournalEntries; CalendarSync and NoteSync own those documents
+    // and mirror them to the correct Chronicle resource (calendar events /
+    // notes). Without this guard JournalSync greedily POSTs them to /entities
+    // with entity_type_id:0, which the server files under the campaign's first
+    // entity type (typically "Character") — so e.g. calendar holidays show up
+    // in the Characters list. Mirrors the existing _isHandledByActorSync guard.
+    if (isCalendarNoteJournal(journal)) {
+      console.debug(`Chronicle: Skipping journal "${journal.name}" — calendar note (owned by CalendarSync).`);
+      return;
+    }
+    if (this._isHandledByNoteSync(journal)) {
+      console.debug(`Chronicle: Skipping journal "${journal.name}" — Chronicle Note (owned by NoteSync).`);
+      return;
+    }
+
     // Create entity in Chronicle from this new journal.
     try {
       // Concatenate all text pages into a single entry for Chronicle.
@@ -505,6 +523,13 @@ export class JournalSync {
 
     const entityId = journal.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
+
+    // Defensive: a calendar note / Chronicle Note may carry a stale entityId
+    // from before the create-time guard existed (it was mis-pushed as an
+    // entity). Don't keep pushing edits to that bogus entity — the cleanup
+    // pass unlinks it. New journals never reach here because the create guard
+    // prevents the link in the first place.
+    if (isCalendarNoteJournal(journal) || this._isHandledByNoteSync(journal)) return;
 
     try {
       // Concatenate all text pages into a single entry for Chronicle.
@@ -625,6 +650,25 @@ export class JournalSync {
     if (!actorSync?._adapter) return false;
     return typeof actorSync._isCharacterEntity === 'function'
       ? actorSync._isCharacterEntity(entity)
+      : false;
+  }
+
+  /**
+   * Whether a JournalEntry is a Chronicle Note that NoteSync owns. Note
+   * journals carry an `isNote` flag (or live under the "Chronicle Notes"
+   * folder) and must be mirrored to Chronicle *notes*, not pushed as
+   * entities. Delegates to the registered NoteSync module so the detection
+   * logic lives in one place; mirrors {@link _isHandledByActorSync}.
+   * @param {JournalEntry} journal
+   * @returns {boolean}
+   * @private
+   */
+  _isHandledByNoteSync(journal) {
+    const noteSync = this._syncManager?._modules?.find(
+      (m) => m.constructor?.name === 'NoteSync'
+    );
+    return typeof noteSync?._isNoteJournal === 'function'
+      ? noteSync._isNoteJournal(journal)
       : false;
   }
 

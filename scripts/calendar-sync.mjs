@@ -75,6 +75,60 @@ export function isWireVisibilityGmOnly(wireValue) {
 }
 
 /**
+ * Foundry flag namespaces that the supported calendar modules write onto a
+ * JournalEntry to mark it as one of their calendar notes. SimpleCalendar
+ * persists every note as a JournalEntry under its module flag; some Calendaria
+ * builds do the same. Frozen so a later edit can't silently drop a namespace.
+ */
+export const CALENDAR_NOTE_FLAG_SCOPES = Object.freeze([
+  'foundryvtt-simple-calendar',
+  'simple-calendar',
+  'calendaria',
+]);
+
+/**
+ * Pure predicate: is this Foundry JournalEntry a calendar-module note?
+ *
+ * Calendar modules (SimpleCalendar, and Calendaria in JournalEntry-backed
+ * configurations) store their notes/holidays as JournalEntry documents. Those
+ * documents belong to CalendarSync — which mirrors them to Chronicle as
+ * *calendar events* — and must NEVER be pushed to Chronicle as worldbuilding
+ * entities. JournalSync calls this to skip them: without the guard a calendar
+ * note is POSTed to `/entities` with `entity_type_id: 0`, which the server
+ * resolves to the campaign's first entity type (typically "Character"), so
+ * holidays like "Day of Rebirth" wrongly appear in the Characters list.
+ *
+ * Detection is by the calendar module's own flag namespace (present the moment
+ * the note JournalEntry is created — so it works on the very first
+ * `createJournalEntry` hook) plus our own `calendarEventId` link flag, which a
+ * note carries once CalendarSync has mirrored it to a Chronicle event.
+ *
+ * Defensive against plain object stubs (tests, partial payloads): reads the
+ * nested `flags` object directly when `getFlag` is unavailable.
+ *
+ * @param {object|null} journal - A Foundry JournalEntry (or test stub).
+ * @returns {boolean}
+ */
+export function isCalendarNoteJournal(journal) {
+  if (!journal || typeof journal !== 'object') return false;
+
+  const flags = journal.flags || {};
+  for (const scope of CALENDAR_NOTE_FLAG_SCOPES) {
+    if (flags[scope] && typeof flags[scope] === 'object') return true;
+  }
+
+  // A note already mirrored to a Chronicle calendar event carries this flag
+  // under our own scope.
+  if (typeof journal.getFlag === 'function') {
+    if (journal.getFlag(FLAG_SCOPE, 'calendarEventId')) return true;
+  } else if (flags[FLAG_SCOPE]?.calendarEventId) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * CalendarSync handles calendar ↔ Foundry calendar module synchronization.
  */
 export class CalendarSync {
