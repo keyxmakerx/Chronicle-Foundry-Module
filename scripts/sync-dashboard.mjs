@@ -11,6 +11,7 @@
 import { getSetting, setSetting, getSyncDirections, setSyncDirections, getExcludedTags, setExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import { openSyncCalendar } from './sync-calendar.mjs';
+import { buildCalendarDiagnostics } from './sync-calendar-diagnostics.mjs';
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**
@@ -65,6 +66,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'test-connection': SyncDashboard.#onTestConnectionAction,
       'save-config': SyncDashboard.#onSaveConfigAction,
       'copy-debug': SyncDashboard.#onCopyDebugAction,
+      'copy-calendar-diagnostics': SyncDashboard.#onCopyCalendarDiagnosticsAction,
       'open-wizard': SyncDashboard.#onOpenWizardAction,
       'bulk-set-public': SyncDashboard.#onBulkSetPublicAction,
       'bulk-set-private': SyncDashboard.#onBulkSetPrivateAction,
@@ -1225,6 +1227,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this._onCopyDebug();
   }
 
+  /** Copy calendar diagnostics to clipboard. */
+  static #onCopyCalendarDiagnosticsAction() {
+    this._onCopyCalendarDiagnostics();
+  }
+
   static async #onOpenWizardAction() {
     const { ImportWizard } = await import('./import-wizard.mjs');
     const wizard = ImportWizard.instance;
@@ -2029,6 +2036,122 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       }
     }
     return result;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Calendar Diagnostics Export
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Copy a full Calendaria diagnostic report to the clipboard.
+   * Reuses buildCalendarDiagnostics from sync-calendar-diagnostics.mjs so the
+   * GM can get the same report from the Status tab without opening the editor.
+   * @private
+   */
+  async _onCopyCalendarDiagnostics() {
+    const el = this.element;
+    const resultEl = el?.querySelector('[data-cal-diag-result]');
+    try {
+      const input = this._buildCalendarDiagnosticsInput();
+      const text = buildCalendarDiagnostics(input);
+      await game.clipboard.copyPlainText(text);
+      if (resultEl) {
+        resultEl.textContent = game.i18n.localize('CHRONICLE.Dashboard.StatusTab.CalDiagCopied');
+        resultEl.className = 'debug-copy-result test-success';
+        setTimeout(() => { resultEl.textContent = ''; }, 3000);
+      }
+      ui.notifications.info(game.i18n.localize('CHRONICLE.Dashboard.StatusTab.CalDiagCopied'));
+    } catch (err) {
+      console.error('Chronicle Dashboard: Calendar diagnostics copy failed', err);
+      if (resultEl) {
+        resultEl.textContent = game.i18n.localize('CHRONICLE.Dashboard.StatusTab.CalDiagCopyFailed');
+        resultEl.className = 'debug-copy-result test-error';
+      }
+    }
+  }
+
+  /**
+   * Build the input snapshot for buildCalendarDiagnostics.
+   * Mirrors the shape built by the Sync Calendar editor but sourced entirely
+   * from dashboard-accessible globals so it works without opening the editor.
+   * @returns {object}
+   * @private
+   */
+  _buildCalendarDiagnosticsInput() {
+    const moduleVer = game.modules.get('chronicle-sync')?.version ?? '(unknown)';
+    const calendariaVer = game.modules.get('calendaria')?.version ?? null;
+    const calApi = (typeof CALENDARIA !== 'undefined' ? CALENDARIA?.api : null) ?? null;
+    let apiMethods = null;
+    if (calApi) {
+      const probeKeys = [
+        'getWeatherForDate', 'getCurrentWeather', 'getAllMoonPhases',
+        'getSelectedDay', 'createNote', 'updateNote', 'deleteNote',
+        'getCalendars', 'getActiveCalendar', 'getAllNotes',
+      ];
+      apiMethods = {};
+      for (const k of probeKeys) apiMethods[k] = typeof calApi[k] === 'function';
+    }
+    let calendar = null;
+    let structureCounts = null;
+    let currentDateTime = null;
+    try {
+      const cal = calApi?.getActiveCalendar?.();
+      if (cal) {
+        calendar = { name: cal.name ?? cal.id, id: cal.id, version: cal.version ?? null };
+        structureCounts = {
+          months:       Array.isArray(cal.months)       ? cal.months.length        : undefined,
+          weekdays:     Array.isArray(cal.weekdays)     ? cal.weekdays.length      : undefined,
+          seasons:      Array.isArray(cal.seasons)      ? cal.seasons.length       : undefined,
+          moons:        Array.isArray(cal.moons)        ? cal.moons.length         : undefined,
+          eras:         Array.isArray(cal.eras)         ? cal.eras.length          : undefined,
+          festivals:    Array.isArray(cal.festivals)    ? cal.festivals.length     : undefined,
+          cycles:       Array.isArray(cal.cycles)       ? cal.cycles.length        : undefined,
+          weatherZones: Array.isArray(cal.weather_zones)? cal.weather_zones.length : undefined,
+        };
+      }
+      const dt = calApi?.getCurrentDate?.() ?? calApi?.getDate?.();
+      if (dt) {
+        currentDateTime = `${dt.year ?? '?'}/${dt.month ?? '?'}/${dt.day ?? '?'} ${dt.hour ?? 0}:${String(dt.minute ?? 0).padStart(2, '0')}`;
+      }
+    } catch { /* defensive */ }
+    const calendarModule = this._detectCalendarModule();
+    const syncStatus = {
+      calendarModule: calendarModule ?? 'none',
+      calendarSyncEnabled: getSetting('syncCalendar'),
+      syncEnabled: getSetting('syncEnabled'),
+      thisCalendarExcluded: null,
+    };
+    const errorLog = this.api?.getErrorLog() ?? [];
+    const recentErrors = errorLog.slice(0, 10).map((e) => ({
+      time: e.timeFormatted ?? e.time,
+      message: e.message,
+      endpoint: e.path ?? e.endpoint,
+      status: e.status,
+    }));
+    return {
+      generatedAt: new Date().toISOString(),
+      versions: {
+        module:    moduleVer,
+        calendaria: calendariaVer,
+        schema:    null,
+        foundry:   game.version,
+        system:    game.system?.title,
+        systemId:  game.system?.id,
+      },
+      calendar,
+      syncStatus,
+      structureCounts,
+      apiMethods,
+      currentDateTime,
+      settings: {
+        syncCalendar:       getSetting('syncCalendar'),
+        syncEnabled:        getSetting('syncEnabled'),
+        calendarModule:     calendarModule ?? 'none',
+        conflictResolution: getSetting('conflictResolution'),
+        autoSync:           getSetting('autoSync'),
+      },
+      recentErrors,
+    };
   }
 
   // ---------------------------------------------------------------------------
