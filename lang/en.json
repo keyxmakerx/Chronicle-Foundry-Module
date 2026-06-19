@@ -72,6 +72,9 @@
       "ConnectionLost": "Lost connection to Chronicle. Retrying...",
       "ConnectionRestored": "Connection to Chronicle restored"
     },
+    "ActorSync": {
+      "EnableClaimingHint": "Chronicle: Enable the \"Player Character Claiming\" addon in your Chronicle campaign to sync which players own their characters."
+    },
     "Dashboard": {
       "Title": "Chronicle Sync",
       "OpenSettings": "Open Settings",
