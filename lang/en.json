@@ -72,6 +72,9 @@
       "ConnectionLost": "Lost connection to Chronicle. Retrying...",
       "ConnectionRestored": "Connection to Chronicle restored"
     },
+    "ActorSync": {
+      "EnableClaimingHint": "Chronicle: Enable the \"Player Character Claiming\" addon in your Chronicle campaign to sync which players own their characters."
+    },
     "Dashboard": {
       "Title": "Chronicle Sync",
       "OpenSettings": "Open Settings",
@@ -208,7 +211,11 @@
         "NoActivity": "No recent activity.",
         "ClearLog": "Clear Log",
         "Settings": "Settings",
-        "Reconnect": "Reconnect"
+        "Reconnect": "Reconnect",
+        "CopyCalendarDiagnostics": "Copy Calendar Diagnostics",
+        "CopyCalendarDiagnosticsHint": "Copy a calendar diagnostics report (versions, structure, Calendaria API probe, recent sync errors) to the clipboard — paste into a bug report or to Claude.",
+        "CalDiagCopied": "Calendar diagnostics copied to clipboard.",
+        "CalDiagCopyFailed": "Failed to copy calendar diagnostics — check the console (F12)."
       }
     },
     "MapViewer": {
