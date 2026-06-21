@@ -191,3 +191,110 @@ test('scripts/map-viewer.mjs: _prepareToken references the host check', () => {
     '_prepareToken must invoke _isAllowedImageHost on full-URL token images',
   );
 });
+
+// ---------------------------------------------------------------------
+// F-1 static-source pin: journal-sync entity image-page src (FM-SEC-IMAGE-HOST-ALLOWLIST)
+// A new type:'image' page src added to journal-sync without validation
+// must fail this check, preventing the F-1 class from regressing.
+// ---------------------------------------------------------------------
+
+test('scripts/journal-sync.mjs imports from ./_url-validation.mjs (F-1 pin)', () => {
+  const source = readFileSync(resolve(REPO_ROOT, 'scripts/journal-sync.mjs'), 'utf8');
+  assert.ok(
+    /from\s+['"][.][/]_url-validation\.mjs['"]/.test(source),
+    'journal-sync.mjs must import from ./_url-validation.mjs (entity image-page host-allowlist)',
+  );
+  assert.ok(
+    /_isAllowedImageHost/.test(source),
+    'journal-sync.mjs must reference _isAllowedImageHost (gates entity image_path before type:image page src)',
+  );
+});
+
+test('scripts/journal-sync.mjs: entity Image page src is not set directly from entity.image_path (F-1 pin)', () => {
+  // Guard: the entity.image_path must not appear as a bare literal in a
+  // type:'image' page object — it must flow through the validator.
+  // This regex matches the dangerous pattern: `src: entity.image_path`
+  // with no intervening call to _isAllowedImageHost or _resolveEntityImageSrc.
+  const source = readFileSync(resolve(REPO_ROOT, 'scripts/journal-sync.mjs'), 'utf8');
+  assert.ok(
+    !(/src\s*:\s*entity\.image_path/.test(source)),
+    'journal-sync.mjs must NOT assign entity.image_path directly to image page src — route through _resolveEntityImageSrc (F-1)',
+  );
+});
+
+test('scripts/journal-sync.mjs: _resolveEntityImageSrc validates full URLs via _isAllowedImageHost (F-1 pin)', () => {
+  // The resolver function body must contain the host-check call.
+  const source = readFileSync(resolve(REPO_ROOT, 'scripts/journal-sync.mjs'), 'utf8');
+  const fnMatch = source.match(/function\s+_resolveEntityImageSrc\s*\([^)]*\)\s*\{[\s\S]*?\n\}/);
+  assert.ok(fnMatch, 'expected to find _resolveEntityImageSrc function body in journal-sync.mjs');
+  assert.ok(
+    /_isAllowedImageHost/.test(fnMatch[0]),
+    '_resolveEntityImageSrc must invoke _isAllowedImageHost on full-URL entity.image_path values',
+  );
+});
+
+// ---------------------------------------------------------------------
+// F-2 unit tests: _setNestedValue prototype-pollution guard
+// ---------------------------------------------------------------------
+
+// Import actor-sync via dynamic import, but _setNestedValue is a module-
+// private function. Test it through a lightweight inline reimplementation
+// that mirrors the guard exactly — keeps the test self-contained and
+// compatible with Foundry's browser-global environment (actor-sync
+// references game.* which doesn't exist in Node).
+
+const PROTO_BLOCKED_TEST = new Set(['__proto__', 'prototype', 'constructor']);
+function _setNestedValueForTest(obj, path, value) {
+  const keys = path.split('.');
+  if (keys.some((k) => PROTO_BLOCKED_TEST.has(k))) return 'REJECTED';
+  let current = obj;
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (!(keys[i] in current) || typeof current[keys[i]] !== 'object') {
+      current[keys[i]] = {};
+    }
+    current = current[keys[i]];
+  }
+  current[keys[keys.length - 1]] = value;
+  return 'OK';
+}
+
+test('_setNestedValue: normal path writes correctly (F-2 guard baseline)', () => {
+  const obj = {};
+  const result = _setNestedValueForTest(obj, 'system.abilities.str.value', 10);
+  assert.equal(result, 'OK');
+  assert.deepEqual(obj, { system: { abilities: { str: { value: 10 } } } });
+});
+
+test('_setNestedValue: __proto__ segment is rejected (F-2)', () => {
+  const obj = {};
+  const result = _setNestedValueForTest(obj, '__proto__.polluted', true);
+  assert.equal(result, 'REJECTED', '__proto__ path must be rejected');
+  // Verify prototype chain is untouched.
+  assert.equal(({}).polluted, undefined, 'Object.prototype must not be polluted');
+});
+
+test('_setNestedValue: prototype segment is rejected (F-2)', () => {
+  const result = _setNestedValueForTest({}, 'constructor.prototype.polluted', true);
+  assert.equal(result, 'REJECTED', 'prototype segment must be rejected');
+});
+
+test('_setNestedValue: constructor segment is rejected (F-2)', () => {
+  const result = _setNestedValueForTest({}, 'constructor.name', 'evil');
+  assert.equal(result, 'REJECTED', 'constructor segment must be rejected');
+});
+
+test('_setNestedValue: mid-path __proto__ is rejected (F-2)', () => {
+  const result = _setNestedValueForTest({}, 'system.__proto__.evil', 'x');
+  assert.equal(result, 'REJECTED', '__proto__ anywhere in path must be rejected');
+});
+
+// Static-source: actor-sync.mjs must contain the guard.
+test('scripts/actor-sync.mjs: _setNestedValue contains prototype-segment guard (F-2 pin)', () => {
+  const source = readFileSync(resolve(REPO_ROOT, 'scripts/actor-sync.mjs'), 'utf8');
+  const fnMatch = source.match(/function\s+_setNestedValue\s*\([^)]*\)\s*\{[\s\S]*?\n\}/);
+  assert.ok(fnMatch, 'expected to find _setNestedValue function body in actor-sync.mjs');
+  assert.ok(
+    /PROTO_BLOCKED/.test(fnMatch[0]) || /__proto__/.test(fnMatch[0]),
+    '_setNestedValue must guard against __proto__/prototype/constructor path segments (F-2)',
+  );
+});

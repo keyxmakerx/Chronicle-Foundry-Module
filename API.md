@@ -1,3 +1,5 @@
+> **SUPERSEDED** — this document is superseded by `API-CONTRACT.md`, which is the authoritative Chronicle REST + WebSocket contract.
+
 # Chronicle Sync — API Reference
 
 This document describes every REST API endpoint and WebSocket message that the
