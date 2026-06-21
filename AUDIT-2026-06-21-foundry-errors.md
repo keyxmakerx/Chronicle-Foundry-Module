@@ -241,7 +241,21 @@ Hooks.on('renderSidebar', () => {
 
 ## Issue 2 — calendar says "not found" in the UI (reported)
 
-**Root cause:** NO module code passively prints "calendar not found" — all such
+> **UPDATE (user clarification):** the real symptom is in the **dashboard
+> Calendar tab** — the *Chronicle* calendar shows fine while the **Foundry
+> (local) side shows "Unable to read"** (template `sync-dashboard.hbs:776`).
+> Root cause: `_getLocalCalendarDate` (sync-dashboard.mjs) read ONLY the legacy
+> `game.Calendaria.getDate()`, which doesn't exist on Calendaria 1.x, so it
+> always returned null → "Unable to read", a permanent "Out of Sync" badge, and
+> a no-op Push-date button (`_onPushDate` returns early on null). **Fixed** to
+> read modern `globalThis.CALENDARIA.api.getCurrentDateTime()` first (legacy
+> fallback retained), matching the rest of the module + the diagnostics shape.
+> Test: `tools/test-dashboard-local-calendar-date.mjs`. The Chronicle-side
+> `#probeChronicleCalendar` auth/absent improvement below still applies to the
+> Sync Calendar editor's import banner, but was NOT this symptom's cause.
+
+**Root cause (original Chronicle-side analysis — still valid for the editor banner):**
+NO module code passively prints "calendar not found" — all such
 strings are action-triggered. The Sync Calendar editor itself resolved the active
 calendar fine (diagnostics listed "Calendar of Therin" with full structure counts), so
 the editor isn't broken. Most likely Chronicle returns **404 `calendar_not_configured`**

@@ -631,9 +631,17 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   _getLocalCalendarDate(calModule) {
     try {
-      if (calModule === 'Calendaria' && game.Calendaria?.getDate) {
-        const d = game.Calendaria.getDate();
-        return { year: d.year, month: d.month, day: d.day, hour: d.hour ?? 0, minute: d.minute ?? 0 };
+      if (calModule === 'Calendaria') {
+        // Modern Calendaria (1.x) exposes its API at globalThis.CALENDARIA.api
+        // — the same surface the Sync Calendar editor and calendar-sync use.
+        // getCurrentDateTime() returns { year, month, day, hour, minute, … }.
+        // The legacy game.Calendaria.getDate() is kept only as a fallback for
+        // old installs. Reading ONLY that legacy global was the bug behind the
+        // dashboard's "Foundry: Unable to read", the permanent "Out of Sync"
+        // badge, and the silently no-op Push-date button on Calendaria 1.x.
+        const calApi = globalThis.CALENDARIA?.api;
+        const d = calApi?.getCurrentDateTime?.() ?? calApi?.getCurrentDate?.() ?? game.Calendaria?.getDate?.();
+        if (d) return { year: d.year, month: d.month, day: d.day, hour: d.hour ?? 0, minute: d.minute ?? 0 };
       }
       if (calModule === 'Simple Calendar' && typeof SimpleCalendar !== 'undefined') {
         const ts = SimpleCalendar.api?.currentDateTime?.();
