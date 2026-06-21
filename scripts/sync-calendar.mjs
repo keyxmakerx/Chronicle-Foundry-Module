@@ -61,6 +61,7 @@ import { buildCalendarDiagnostics } from './sync-calendar-diagnostics.mjs';
 import { getSetting, setSetting, getCalendarSyncExclusions } from './settings.mjs';
 import { isCalendarNoteJournal } from './calendar-sync.mjs';
 import { calendarStateFromError } from './_calendar-probe-state.mjs';
+import { confirmDialog } from './_dialogs.mjs';
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -1415,7 +1416,7 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
     }
 
     const names = targets.map((j) => j.name).filter(Boolean).join(', ');
-    const confirmed = await Dialog.confirm({
+    const confirmed = await confirmDialog({
       title: game.i18n.localize('CHRONICLE.SyncCalendar.Cleanup.Title'),
       content: `<p>${game.i18n.format('CHRONICLE.SyncCalendar.Cleanup.Confirm', { count: targets.length })}</p>`
         + `<p style="opacity:.8;font-size:.9em;">${foundry.utils.escapeHTML?.(names) ?? names}</p>`,
@@ -1499,7 +1500,7 @@ export function openSyncCalendar() {
     return _instance;
   }
   _instance = new SyncCalendarApplication();
-  _instance.render(true);
+  _instance.render({ force: true });
   return _instance;
 }
 

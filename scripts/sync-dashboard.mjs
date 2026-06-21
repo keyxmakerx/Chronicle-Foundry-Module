@@ -10,6 +10,7 @@
 
 import { getSetting, setSetting, getSyncDirections, setSyncDirections, getExcludedTags, setExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
+import { confirmDialog, promptDialog } from './_dialogs.mjs';
 import { openSyncCalendar } from './sync-calendar.mjs';
 import { buildCalendarDiagnostics } from './sync-calendar-diagnostics.mjs';
 import { memberKey } from './sync-manager.mjs';
@@ -1195,7 +1196,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const entryId = target.dataset.journalEntryId;
     if (!entryId) return;
     const entry = game.journal.get(entryId);
-    if (entry?.sheet) entry.sheet.render(true);
+    if (entry?.sheet) entry.sheet.render({ force: true });
   }
 
   /** Trigger a verbose full map resync. */
@@ -1299,7 +1300,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     if (sheet.render?.length === 0 || sheet.constructor?.DEFAULT_OPTIONS) {
       sheet.render({ force: true });
     } else {
-      sheet.render(true);
+      sheet.render({ force: true });
     }
   }
 
@@ -1391,7 +1392,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       </form>
     `;
 
-    const result = await Dialog.prompt({
+    const result = await promptDialog({
       title: game.i18n.localize('CHRONICLE.Dashboard.Entities.CreateTypeTitle'),
       content: html,
       callback: (html) => {
@@ -1536,7 +1537,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   async _onResyncAllJournals() {
     let confirmed;
     try {
-      confirmed = await Dialog.confirm({
+      confirmed = await confirmDialog({
         title: game.i18n.localize('CHRONICLE.Dashboard.Entities.ResyncAllJournals'),
         content: `<p>${game.i18n.localize('CHRONICLE.Dashboard.Entities.ResyncAllJournalsHint')}</p>`,
       });
@@ -1564,7 +1565,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   async _onPullAll() {
     let confirmed;
     try {
-      confirmed = await Dialog.confirm({
+      confirmed = await confirmDialog({
         title: 'Pull All from Chronicle',
         content: '<p>Pull all Chronicle entities that don\'t have a Foundry journal yet?</p>',
       });
@@ -1593,7 +1594,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   async _onPushAll() {
     let confirmed;
     try {
-      confirmed = await Dialog.confirm({
+      confirmed = await confirmDialog({
         title: 'Push All to Chronicle',
         content: '<p>Push all Foundry journals that aren\'t linked to Chronicle yet?</p>',
       });
@@ -1731,7 +1732,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     let confirmed;
     try {
-      confirmed = await Dialog.confirm({
+      confirmed = await confirmDialog({
         title: 'Push All Actors to Chronicle',
         content: `<p>Push ${unlinked.length} unlinked actor(s) to Chronicle?</p>`,
       });
@@ -2346,7 +2347,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const count = this._selectedEntities.size;
     let confirmed;
     try {
-      confirmed = await Dialog.confirm({
+      confirmed = await confirmDialog({
         title: game.i18n.localize('CHRONICLE.Dashboard.Bulk.ChangeType'),
         content: `<p>${game.i18n.format('CHRONICLE.Dashboard.Bulk.ConfirmChangeType', { count })}</p>`,
       });
@@ -2414,7 +2415,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const count = this._selectedEntities.size;
     let confirmed;
     try {
-      confirmed = await Dialog.confirm({
+      confirmed = await confirmDialog({
         title: game.i18n.localize('CHRONICLE.Dashboard.Bulk.Delete'),
         content: `<p>${game.i18n.format('CHRONICLE.Dashboard.Bulk.ConfirmDelete', { count })}</p>`,
       });

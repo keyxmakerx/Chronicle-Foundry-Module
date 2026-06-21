@@ -1,11 +1,16 @@
 # Chronicle Sync — Foundry error audit (2026-06-21)
 
-Status: **fixes #1–#5 implemented, tested (suite 499 → 521 green), and pushed to
-`claude/jolly-lamport-755efm`; DialogV2 migration deferred** (tracked in
-CLAUDE.md → TODO). This document remains the verified root-cause record — every
-cause below is anchored to source (file:line), including cross-repo facts in the
-Chronicle backend. Two independent re-audits (security+correctness, regression+
-modularity) found no correctness or security defects in the change set.
+Status: **all issues (#1–#5) AND the Foundry V1→V2 DialogV2 migration
+implemented, tested (suite 499 → 535 green), and pushed to
+`claude/jolly-lamport-755efm`.** This document remains the verified root-cause
+record — every cause below is anchored to source (file:line), including
+cross-repo facts in the Chronicle backend. Two independent re-audits
+(security+correctness, regression+modularity) found no correctness or security
+defects in the change set. The DialogV2 shim was written against the official
+Foundry API docs (`DialogV2.confirm` → true/false, null on dismiss; button
+`callback(event, button, dialog)`). Remaining: a one-time smoke-test of the
+migrated dialogs + the calendar fixes on a live v14 client (dialog rendering
+and Foundry/Calendaria globals can't be exercised headlessly).
 
 Implemented: #4 sanitizer `.implementation` probe (+v14 tests); #1 descriptor
 404 soft-skip; #5 benign lookup-404 log scrub + 409 ConflictError matching +
@@ -296,7 +301,18 @@ re-import a calendar; `401/403 invalid_token` = token issue.
 
 ---
 
-## DEFERRED — Foundry V1 → V2 migration (v16-proofing; NOT applied)
+## DONE — Foundry V1 → V2 migration (v16-proofing)
+
+**Implemented** in `scripts/_dialogs.mjs` (a DialogV2-first shim with a V1
+fallback for the v12 floor + on any DialogV2 error), with all 10 call sites
+migrated to `confirmDialog` / `promptDialog` and all 8 `render(true)` →
+`render({ force: true })`. Covered by `tools/test-dialogs.mjs` (behavioral +
+static "no V1 Dialog / render(true) remains" pins). Verified against the Foundry
+DialogV2 API docs. Original deferral rationale retained below for context.
+
+---
+
+Reason for deferral (historical): only hard-breaks at **v16** (the v14.364 log confirms the dialogs
 
 Reason for deferral: only hard-breaks at **v16** (the v14.364 log confirms the dialogs
 still RENDER — "Foundry VTT | Rendering Dialog" — they only log a deprecation warning);
