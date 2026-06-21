@@ -154,6 +154,138 @@ export class JournalSync {
   }
 
   /**
+   * Re-fetch every Chronicle entity and apply it to Foundry. Unlike `_onPullAll`
+   * (which only creates journals for chronicle-only entities), this method also
+   * UPDATES existing journals — refreshing content, name, and ownership/permissions.
+   * This is the correct fix for journals that synced before a permission change.
+   *
+   * Mirrors MapSync.resyncAll / _runMapSync in structure:
+   *   - Paginated fetch of all entities (same source _prepareContext/_buildEntityGroups uses).
+   *   - For each entity: if a journal already exists → call `_onEntityUpdated` (which
+   *     re-runs `_buildOwnership` so permissions refresh); if none exists → create it.
+   *   - Respects `_syncing` guard (set by callers), `_isExcluded`, `_isHandledByActorSync`,
+   *     `isCalendarNoteJournal`, and `_isHandledByNoteSync`.
+   *   - Sequential/awaited (not parallelized) so a large campaign doesn't hammer the API.
+   *   - Returns a summary {updated, created, skipped, errors} for test assertions; also
+   *     fires a verbose `ui.notifications.info` when the option is set.
+   *
+   * @param {{verbose?: boolean}} [opts]
+   * @returns {Promise<{updated: number, created: number, skipped: number, errors: number}>}
+   */
+  async resyncAll({ verbose = true } = {}) {
+    if (!game.user.isGM || !this._api) {
+      return { updated: 0, created: 0, skipped: 0, errors: 0 };
+    }
+    if (!getSetting('syncJournals')) {
+      return { updated: 0, created: 0, skipped: 0, errors: 0 };
+    }
+
+    if (verbose) ui.notifications.info('Chronicle: fetching entities for resync…');
+
+    // Paginated fetch — mirrors the dashboard's _buildEntityGroups page loop.
+    let allEntities = [];
+    try {
+      let page = 1;
+      let hasMore = true;
+      while (hasMore && page <= 5) {
+        const result = await this._api.get(`/entities?per_page=100&page=${page}`);
+        const entities = Array.isArray(result) ? result
+          : (Array.isArray(result?.entities) ? result.entities
+          : (Array.isArray(result?.data) ? result.data : []));
+        if (entities.length > 0) {
+          allEntities.push(...entities);
+          hasMore = entities.length === 100;
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
+    } catch (err) {
+      const status = err?.status || null;
+      console.warn(`Chronicle JournalSync.resyncAll: GET /entities failed (${status || 'network'})`, err);
+      ui.notifications.error(
+        `Chronicle: could not fetch entities from Chronicle${status ? ` (HTTP ${status})` : ''}. Verify apiUrl, apiKey, and campaignId in Module Settings.`
+      );
+      return { updated: 0, created: 0, skipped: 0, errors: 1 };
+    }
+
+    console.debug(`Chronicle: resyncAll fetched ${allEntities.length} entity(ies).`);
+
+    // Build a fast lookup of already-linked journals by chronicle entity id.
+    const journalByEntityId = new Map();
+    for (const j of game.journal.contents) {
+      const eid = j.getFlag(FLAG_SCOPE, 'entityId');
+      if (eid) journalByEntityId.set(eid, j);
+    }
+
+    let updated = 0;
+    let created = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    for (const entity of allEntities) {
+      if (!entity?.id) { skipped++; continue; }
+
+      // Skip: excluded by dashboard settings.
+      if (this._isExcluded(entity)) { skipped++; continue; }
+
+      // Skip: character entities are handled by ActorSync.
+      if (this._isHandledByActorSync(entity)) { skipped++; continue; }
+
+      const journal = journalByEntityId.get(entity.id);
+
+      try {
+        if (journal) {
+          // Journal exists → fetch full entity data and update (refreshes
+          // content + re-runs _buildOwnership so permissions are current).
+          let fullEntity = entity;
+          try {
+            fullEntity = (await this._api.get(`/entities/${entity.id}`)) || entity;
+          } catch (fetchErr) {
+            console.warn(`Chronicle: resyncAll — failed to fetch full entity ${entity.id}, updating with summary`, fetchErr);
+          }
+          // _onEntityUpdated skips character entities again via _isHandledByActorSync,
+          // but the check above already guards against that; calling it handles the
+          // update path (name, content pages, ownership) cleanly.
+          await this._onEntityUpdated(fullEntity);
+          updated++;
+        } else {
+          // No journal yet → fetch full entity and create.
+          let fullEntity = entity;
+          try {
+            fullEntity = (await this._api.get(`/entities/${entity.id}`)) || entity;
+          } catch (fetchErr) {
+            console.warn(`Chronicle: resyncAll — failed to fetch full entity ${entity.id}, creating with summary`, fetchErr);
+          }
+          // Double-check actor routing on the full payload.
+          if (this._isHandledByActorSync(fullEntity)) { skipped++; continue; }
+          await this._createJournalFromEntity(fullEntity);
+          created++;
+        }
+      } catch (err) {
+        errors++;
+        console.warn(`Chronicle: resyncAll failed for entity "${entity.name || entity.id}":`, err);
+      }
+    }
+
+    console.debug(`Chronicle: resyncAll complete — updated=${updated} created=${created} skipped=${skipped} errors=${errors}`);
+
+    if (verbose) {
+      if (errors > 0) {
+        ui.notifications.warn(
+          `Chronicle: resynced ${updated + created} of ${allEntities.length - skipped} entity(ies); ${errors} failed. See the sync dashboard for details.`
+        );
+      } else {
+        ui.notifications.info(
+          `Chronicle: resynced ${updated + created} entity(ies) (${updated} updated, ${created} created).`
+        );
+      }
+    }
+
+    return { updated, created, skipped, errors };
+  }
+
+  /**
    * Clean up hooks on destroy.
    */
   destroy() {

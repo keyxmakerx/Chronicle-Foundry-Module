@@ -54,6 +54,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'toggle-visibility': SyncDashboard.#onToggleVisibilityAction,
       'open-map-journal': SyncDashboard.#onOpenMapJournalAction,
       'resync-all-maps': SyncDashboard.#onResyncAllMapsAction,
+      'resync-all-journals': SyncDashboard.#onResyncAllJournalsAction,
       'open-maps-folder': SyncDashboard.#onOpenMapsFolderAction,
       'dismiss-map-errors': SyncDashboard.#onDismissMapErrorsAction,
       'pull-date': SyncDashboard.#onPullDateAction,
@@ -1203,6 +1204,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this.render({ force: true });
   }
 
+  /** Trigger a verbose full journal resync (updates existing + creates missing). */
+  static async #onResyncAllJournalsAction() {
+    await this._onResyncAllJournals();
+  }
+
   /**
    * Reveal the "Chronicle Maps" folder in Foundry's journal sidebar.
    * Activates the journal tab and expands the folder.
@@ -1511,6 +1517,36 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       console.error('Chronicle Dashboard: Push failed', err);
       ui.notifications.error(`Failed to push journal: ${err.message}`);
     }
+  }
+
+  /**
+   * Re-fetch every Chronicle entity and apply it to Foundry, updating existing
+   * journals (name, content, AND permissions) as well as creating missing ones.
+   * This is the correct fix for journals with stale permissions.
+   * @private
+   */
+  async _onResyncAllJournals() {
+    let confirmed;
+    try {
+      confirmed = await Dialog.confirm({
+        title: game.i18n.localize('CHRONICLE.Dashboard.Entities.ResyncAllJournals'),
+        content: `<p>${game.i18n.localize('CHRONICLE.Dashboard.Entities.ResyncAllJournalsHint')}</p>`,
+      });
+    } catch {
+      return; // User closed dialog.
+    }
+    if (!confirmed) return;
+
+    const journalSync = this._syncManager?._modules?.find(
+      (m) => m.constructor?.name === 'JournalSync'
+    );
+    if (!journalSync) {
+      ui.notifications.warn('Chronicle: JournalSync is not running.');
+      return;
+    }
+    await journalSync.resyncAll({ verbose: true });
+    this._cache.entities = null;
+    this.render({ force: true });
   }
 
   /**
