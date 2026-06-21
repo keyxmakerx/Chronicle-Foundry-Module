@@ -2108,8 +2108,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // Include API errors so they appear in the debug copy/paste.
     const errorLog = this.api?.getErrorLog() ?? [];
-    const connectionState = this.api?.connected
-      ? 'connected' : (this.api ? 'disconnected' : 'no-client');
+    // ChronicleAPI exposes connection state as `.state` (connected/connecting/
+    // reconnecting/disconnected); there is no `.connected` boolean.
+    const connectionState = this.api?.state ?? (this.api ? 'unknown' : 'no-client');
 
     return {
       _description: 'Chronicle Sync — Foundry System Debug Snapshot. '

@@ -60,6 +60,7 @@ import {
 import { buildCalendarDiagnostics } from './sync-calendar-diagnostics.mjs';
 import { getSetting, setSetting, getCalendarSyncExclusions } from './settings.mjs';
 import { isCalendarNoteJournal } from './calendar-sync.mjs';
+import { calendarStateFromError } from './_calendar-probe-state.mjs';
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -600,22 +601,10 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
       const result = await apiClient.get('/calendar');
       this._chronicleCalendarState = result ? 'present' : 'absent';
     } catch (err) {
-      const msg = String(err?.message || '');
-      // Distinguish the cases so the banner gives the right next step instead
-      // of an ambiguous "not found":
-      //   - 404 / calendar_not_configured → Chronicle has no calendar for this
-      //     campaign (import one).
-      //   - 401 / 403 / invalid_token     → token/auth problem (re-check the
-      //     API key, or reinstall from a fresh campaign URL).
-      //   - anything else                 → unreachable / unknown.
-      // The api-client embeds the HTTP status + JSON body in the thrown message.
-      if (/\b404\b/.test(msg) || /calendar_not_configured/i.test(msg)) {
-        this._chronicleCalendarState = 'absent';
-      } else if (/\b401\b|\b403\b/.test(msg) || /invalid_token|unauthor/i.test(msg)) {
-        this._chronicleCalendarState = 'auth';
-      } else {
-        this._chronicleCalendarState = 'unreachable';
-      }
+      // Classify the failure so the import banner gives an actionable next step
+      // (404 → import a calendar, 401/403 → fix the token). See
+      // calendarStateFromError for the status-anchored classification.
+      this._chronicleCalendarState = calendarStateFromError(err);
     }
     this.#scheduleRerender();
   }

@@ -1,9 +1,22 @@
 # Chronicle Sync — Foundry error audit (2026-06-21)
 
-Status: **diagnosis complete, fixes NOT yet applied.** This document is the
-resumable spec — every root cause below is verified against source (file:line),
-including cross-repo facts in the Chronicle backend. A resume can implement the
-"Fix" sections without re-investigating.
+Status: **fixes #1–#5 implemented, tested (suite 499 → 521 green), and pushed to
+`claude/jolly-lamport-755efm`; DialogV2 migration deferred** (tracked in
+CLAUDE.md → TODO). This document remains the verified root-cause record — every
+cause below is anchored to source (file:line), including cross-repo facts in the
+Chronicle backend. Two independent re-audits (security+correctness, regression+
+modularity) found no correctness or security defects in the change set.
+
+Implemented: #4 sanitizer `.implementation` probe (+v14 tests); #1 descriptor
+404 soft-skip; #5 benign lookup-404 log scrub + 409 ConflictError matching +
+`dropLastErrorLogEntry` array status (+`test-sync-mapping-conflict.mjs`); #5c
+API-CONTRACT.md drift; #3 `api.copyDebug()` escape hatch + `renderSidebar`
+re-attach; #2 calendar `calendarStateFromError` auth/absent/unreachable
+classification + 'auth' banner + lang key (+`test-sync-calendar-probe-state.mjs`).
+The calendar **root cause is environmental** (Chronicle has no calendar for the
+campaign, or the token rotated) — the code change makes the state actionable;
+confirm via the editor's "Recent sync errors" (404 `calendar_not_configured` =
+import one; 401/403 `invalid_token` = token).
 
 Environment from the report: Foundry **v14.364**, Chronicle Sync **v0.1.19**,
 Calendaria 1.1.0, Draw Steel system, served from the operator's Chronicle instance.
