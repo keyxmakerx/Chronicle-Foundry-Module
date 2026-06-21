@@ -1490,6 +1490,114 @@
   flex-shrink: 0;
 }
 
+/* --- Members (permission mapping) tab --- */
+.member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  transition: background 0.1s;
+}
+
+.member-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.member-row.matched {
+  background: rgba(74, 222, 128, 0.04);
+}
+
+.member-row.unmatched {
+  background: rgba(248, 113, 113, 0.06);
+}
+
+.member-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.member-name {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-role {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: capitalize;
+}
+
+.member-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.member-badge.matched {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.12);
+}
+
+.member-badge.unmatched {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.15);
+}
+
+.member-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.member-map-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.member-map-select {
+  max-width: 160px;
+  font-size: 12px;
+}
+
+.member-tab-badge {
+  display: inline-block;
+  margin-left: 4px;
+  min-width: 16px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  color: #fff;
+  background: #f87171;
+  border-radius: 8px;
+}
+
+.member-unmatched-banner {
+  margin-bottom: 8px;
+}
+
+.dm-only-hint {
+  margin-top: 8px;
+}
+
 .character-last-sync {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.4);

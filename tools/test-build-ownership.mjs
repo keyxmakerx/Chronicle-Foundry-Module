@@ -57,6 +57,7 @@ globalThis.game = globalThis.game || {
   modules: { get: () => null },
 };
 globalThis.Hooks = globalThis.Hooks || { on: () => {}, once: () => {}, off: () => {} };
+globalThis.ui = globalThis.ui || { notifications: { warn: () => {}, error: () => {}, info: () => {} } };
 
 const { JournalSync } = await import('../scripts/journal-sync.mjs');
 const { NoteSync } = await import('../scripts/note-sync.mjs');
@@ -243,6 +244,106 @@ test('§4 _buildOwnership: mixed role + user grants combine', async () => {
   const ownership = await js._buildOwnership({ id: 'e1', visibility: 'custom' });
   assert.equal(ownership.default, L.OBSERVER);
   assert.equal(ownership['fu'], L.OWNER);
+});
+
+// ---------------------------------------------------------------------
+// Audit §5 — consume `public` subject + `tag_grants`
+// ---------------------------------------------------------------------
+
+test('§5 _buildOwnership: custom + public "view" grant → OBSERVER default', async () => {
+  resetSettings();
+  const js = makeJournalSync({
+    apiGet: async () => ({ permissions: [{ subject_type: 'public', subject_id: 'public', permission: 'view' }] }),
+  });
+  assert.deepEqual(await js._buildOwnership({ id: 'e1', visibility: 'custom' }), { default: L.OBSERVER });
+});
+
+test('§5 _buildOwnership: custom + public "edit" grant → OWNER default', async () => {
+  resetSettings();
+  const js = makeJournalSync({
+    apiGet: async () => ({ permissions: [{ subject_type: 'public', subject_id: 'public', permission: 'edit' }] }),
+  });
+  assert.deepEqual(await js._buildOwnership({ id: 'e1', visibility: 'custom' }), { default: L.OWNER });
+});
+
+test('§5 _buildOwnership: public never LOWERS an existing higher role grant', async () => {
+  resetSettings();
+  const js = makeJournalSync({
+    apiGet: async () => ({ permissions: [
+      { subject_type: 'role', subject_id: '1', permission: 'edit' }, // OWNER
+      { subject_type: 'public', subject_id: 'public', permission: 'view' }, // OBSERVER
+    ] }),
+  });
+  // Fail-closed-toward-intent: the broader of the two wins, never a downgrade.
+  assert.deepEqual(await js._buildOwnership({ id: 'e1', visibility: 'custom' }), { default: L.OWNER });
+});
+
+test('§5 _buildOwnership: tag_grants present → activity warning, default unchanged', async () => {
+  resetSettings();
+  const logged = [];
+  const js = makeJournalSync({
+    apiGet: async () => ({ permissions: [], tag_grants: [{ tag_id: 't1', permission: 'view' }] }),
+  });
+  js._syncManager.logActivity = (type, msg) => logged.push({ type, msg });
+  const ownership = await js._buildOwnership({ id: 'e1', name: 'Secret', visibility: 'custom' });
+  // Fail-closed: tag grants can't be expanded to Foundry users, so the default
+  // stays NONE — but the operator is warned the tag-scoped access isn't honored.
+  assert.deepEqual(ownership, { default: L.NONE });
+  assert.ok(logged.some((l) => l.type === 'warning' && /tag-based/.test(l.msg)));
+});
+
+// ---------------------------------------------------------------------
+// Audit §3 — surface dropped grants + fail-closed errors
+// ---------------------------------------------------------------------
+
+test('§3 _buildOwnership: dropped per-user grant logs a warning', async () => {
+  resetSettings();
+  const logged = [];
+  const js = makeJournalSync({
+    apiGet: async () => ({ permissions: [{ subject_type: 'user', subject_id: 'stranger', permission: 'view' }] }),
+    getFoundryUserId: () => null,
+  });
+  js._syncManager.logActivity = (type, msg) => logged.push({ type, msg });
+  const ownership = await js._buildOwnership({ id: 'e1', name: 'Plot', visibility: 'custom' });
+  assert.deepEqual(ownership, { default: L.NONE }, 'still under-shares (no leak)');
+  assert.ok(logged.some((l) => l.type === 'warning' && /per-user grant/.test(l.msg)), 'dropped grant warned');
+});
+
+test('§3 _buildOwnership: permissions API error logs a warning (still fails closed)', async () => {
+  resetSettings();
+  const logged = [];
+  const js = makeJournalSync({ apiGet: async () => { throw new Error('boom'); } });
+  js._syncManager.logActivity = (type, msg) => logged.push({ type, msg });
+  const ownership = await js._buildOwnership({ id: 'e1', name: 'X', visibility: 'custom', is_private: false });
+  assert.deepEqual(ownership, { default: L.NONE });
+  assert.ok(logged.some((l) => l.type === 'warning' && /GM-only/.test(l.msg)));
+});
+
+// ---------------------------------------------------------------------
+// Audit §1A — DM-only-hidden counting
+// ---------------------------------------------------------------------
+
+test('§1A _buildOwnership: private+default+dmOnlyHidden increments the hidden counter', async () => {
+  resetSettings();
+  let count = 0;
+  const js = makeJournalSync();
+  js._syncManager.noteDmOnlyHidden = () => { count++; };
+  await js._buildOwnership({ is_private: true });
+  await js._buildOwnership({ visibility: 'default', is_private: true });
+  assert.equal(count, 2, 'each hidden private entity counted');
+  // Public entity does NOT count.
+  await js._buildOwnership({ is_private: false });
+  assert.equal(count, 2);
+});
+
+test('§1A _buildOwnership: dmOnlyHidden OFF does NOT count (entity is visible)', async () => {
+  resetSettings();
+  settings.dmOnlyHidden = false;
+  let count = 0;
+  const js = makeJournalSync();
+  js._syncManager.noteDmOnlyHidden = () => { count++; };
+  await js._buildOwnership({ is_private: true });
+  assert.equal(count, 0, 'not hidden → not counted');
 });
 
 // ---------------------------------------------------------------------

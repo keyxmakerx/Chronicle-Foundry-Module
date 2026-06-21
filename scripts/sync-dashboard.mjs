@@ -12,6 +12,8 @@ import { getSetting, setSetting, getSyncDirections, setSyncDirections, getExclud
 import { FLAG_SCOPE } from './constants.mjs';
 import { openSyncCalendar } from './sync-calendar.mjs';
 import { buildCalendarDiagnostics } from './sync-calendar-diagnostics.mjs';
+import { memberKey } from './sync-manager.mjs';
+import { buildMemberRows } from './_member-mapping.mjs';
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**
@@ -72,6 +74,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'bulk-set-private': SyncDashboard.#onBulkSetPrivateAction,
       'bulk-delete': SyncDashboard.#onBulkDeleteAction,
       'create-entity-type': SyncDashboard.#onCreateEntityTypeAction,
+      'refresh-members': SyncDashboard.#onRefreshMembersAction,
     },
   };
 
@@ -211,6 +214,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     // Build characters tab data.
     const characterData = this._buildCharacterData();
 
+    // Build members (permission mapping) tab data.
+    const membersData = this._buildMembersData();
+
     // Build config tab data.
     const configData = this._buildConfigData(entityGroups);
 
@@ -249,6 +255,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
       // Characters tab.
       ...characterData,
+
+      // Members (permission mapping) tab.
+      members: membersData,
 
       // Notes tab.
       notes: notesData,
@@ -668,6 +677,70 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   // ---------------------------------------------------------------------------
+  // Members (permission mapping) data
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Build the Members tab: one row per Chronicle campaign member with their
+   * current Foundry-user mapping and a matched / UNMATCHED badge. Drives the
+   * manual mapping UI (audit §2) — selecting a user persists the link via
+   * `setUserMappings`, and the UNMATCHED badge is the operator's required
+   * signal that a member's per-player permissions won't sync.
+   * @returns {object}
+   * @private
+   */
+  _buildMembersData() {
+    const members = this._syncManager?.getMembers?.() ?? [];
+    const mappings = getUserMappings();
+    const foundryUsers = (game.users?.contents ?? []).map((u) => ({ id: u.id, name: u.name }));
+
+    const { rows, matchedCount, unmatchedCount } = buildMemberRows({
+      members,
+      mappings,
+      foundryUsers,
+      keyOf: memberKey,
+    });
+
+    return {
+      rows,
+      matchedCount,
+      unmatchedCount,
+      hasUnmatched: unmatchedCount > 0,
+      hasMembers: rows.length > 0,
+    };
+  }
+
+  /**
+   * Persist a manual Chronicle-member → Foundry-user mapping. An empty
+   * `foundryUserId` clears the mapping (back to UNMATCHED). Called from the
+   * Members tab dropdown's change handler (wired in `_onRender`, since
+   * ApplicationV2 `actions` only delegate `click` — F-PR2-1).
+   *
+   * @param {string} memberKeyValue - Chronicle user-id key.
+   * @param {string} foundryUserId - Foundry user id, or '' to unmap.
+   * @private
+   */
+  async _setMemberMapping(memberKeyValue, foundryUserId) {
+    if (!memberKeyValue) return;
+    const mappings = getUserMappings();
+    const member = (this._syncManager?.getMembers?.() ?? []).find(
+      (m) => memberKey(m) === memberKeyValue
+    );
+    const memberName = member?.display_name || memberKeyValue;
+
+    if (foundryUserId) {
+      mappings[memberKeyValue] = foundryUserId;
+      const userName = game.users?.get?.(foundryUserId)?.name || foundryUserId;
+      this._logActivity('link', `Mapped Chronicle member "${memberName}" → Foundry user "${userName}"`);
+    } else {
+      delete mappings[memberKeyValue];
+      this._logActivity('unlink', `Unmapped Chronicle member "${memberName}" — their per-player permissions will no longer sync`);
+    }
+    await setUserMappings(mappings);
+    this.render({ force: true });
+  }
+
+  // ---------------------------------------------------------------------------
   // Config data
   // ---------------------------------------------------------------------------
 
@@ -802,6 +875,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       systemMatched: !!matchedSystem,
       syncCharacters,
       characterSyncAvailable: !!matchedSystem,
+      // Audit §1A: clarify that DM-only entities synced (they reached the GM)
+      // but were intentionally hidden from players — not "didn't sync".
+      dmOnlyHiddenCount: this._syncManager?.getDmOnlyHiddenCount?.() ?? 0,
+      dmOnlyHidden: getSetting('dmOnlyHidden'),
       activityLog: activityLog.slice(0, 50),
 
       // Diagnostics (F-QoL).
@@ -1015,6 +1092,16 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       });
     });
 
+    // --- Members tab: per-member Foundry-user mapping select ---
+    // ApplicationV2 `actions` only delegate `click`, so the `<select>` change
+    // is wired here directly (F-PR2-1).
+    el.querySelectorAll('.member-map-select').forEach((select) => {
+      select.addEventListener('change', (e) => {
+        const key = e.currentTarget.dataset.memberKey;
+        this._setMemberMapping(key, e.currentTarget.value);
+      });
+    });
+
     // Map tab handlers are wired via the `open-map-journal` action above;
     // no additional select listeners are needed in Path B.
   }
@@ -1168,6 +1255,14 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Clear the activity log. */
   static #onClearLogAction() {
     this._syncManager?.clearActivityLog();
+    this.render({ force: true });
+  }
+
+  /** Re-fetch campaign members from Chronicle and re-render the Members tab. */
+  static async #onRefreshMembersAction() {
+    if (this._syncManager?.fetchAndCacheMembers) {
+      await this._syncManager.fetchAndCacheMembers();
+    }
     this.render({ force: true });
   }
 

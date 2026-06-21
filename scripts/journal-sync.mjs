@@ -528,7 +528,7 @@ export class JournalSync {
         // Push initial permissions from Foundry ownership.
         const isPrivate =
           (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER;
-        await this._pushPermissions(entity.id, journal.ownership, isPrivate);
+        await this._pushPermissions(entity.id, journal.ownership, isPrivate, journal.name);
 
         console.debug(`Chronicle: Pushed new journal "${journal.name}" to Chronicle`);
       }
@@ -601,7 +601,7 @@ export class JournalSync {
       }
 
       // Push ownership changes as Chronicle permission updates.
-      await this._pushPermissions(entityId, journal.ownership, isPrivate);
+      await this._pushPermissions(entityId, journal.ownership, isPrivate, journal.name);
 
       this._syncing = true;
       try {
@@ -777,100 +777,216 @@ export class JournalSync {
     // Simple / legacy visibility — honor the operator's dmOnlyHidden +
     // defaultOwnership dashboard controls.
     if (!entity.visibility || entity.visibility === 'default') {
-      return { default: defaultLevelForVisibility(entity.is_private) };
+      const level = defaultLevelForVisibility(entity.is_private);
+      // Audit §1A: a private entity that correctly lands hidden-from-players is
+      // not "didn't sync" — count it so the dashboard can say so explicitly.
+      if (entity.is_private && level <= L.NONE) {
+        this._syncManager?.noteDmOnlyHidden?.();
+      }
+      return { default: level };
     }
 
     // Custom visibility — fetch explicit permission grants from the API.
+    let permsData;
     try {
-      const permsData = await this._api.get(`/entities/${entity.id}/permissions`);
-      if (!permsData?.permissions) {
-        // No grant data — fail closed (GM-only) rather than guessing.
-        return { default: L.NONE };
-      }
-
-      const ownership = { default: L.NONE };
-
-      for (const grant of permsData.permissions) {
-        if (grant.subject_type === 'role') {
-          // Role "1" = Player. A player grant sets the default level.
-          if (String(grant.subject_id) === '1') {
-            ownership.default =
-              grant.permission === 'edit' ? L.OWNER : L.OBSERVER;
-          }
-          // Role "2" = Scribe. Foundry has no "scribe" concept; covered by
-          // the default level.
-        } else if (grant.subject_type === 'user') {
-          // Per-user grant → map to a specific Foundry user when we know the
-          // mapping (FM-SYNC-HARDENING §4). Unmapped users are dropped: the
-          // entity under-shares (the user simply doesn't gain access) rather
-          // than leaking to the wrong player.
-          const foundryUserId = this._syncManager?.getFoundryUserId?.(
-            String(grant.subject_id)
-          );
-          if (foundryUserId) {
-            ownership[foundryUserId] =
-              grant.permission === 'edit' ? L.OWNER : L.OBSERVER;
-          }
-        }
-      }
-
-      return ownership;
+      permsData = await this._api.get(`/entities/${entity.id}/permissions`);
     } catch (err) {
       // FM-SYNC-HARDENING §3: fail CLOSED. Never fall open to OBSERVER on a
       // transient error — a GM-restricted custom entity stays GM-only (NONE).
+      // Audit §3.3: surface it instead of console-only so the operator knows
+      // the entity is locked to GM-only because the permissions fetch failed.
       console.warn(
         'Chronicle: Failed to fetch entity permissions — failing closed (GM-only)',
         err
       );
+      this._syncManager?.logActivity?.(
+        'warning',
+        `Permissions fetch failed for "${entity.name || entity.id}" — locked to GM-only (fail-closed) until it succeeds.`
+      );
+      ui.notifications?.warn?.(
+        `Chronicle: Could not read permissions for "${entity.name || entity.id}" — kept GM-only. See the sync dashboard.`
+      );
       return { default: L.NONE };
     }
+
+    if (!permsData?.permissions) {
+      // No grant data — fail closed (GM-only) rather than guessing.
+      return { default: L.NONE };
+    }
+
+    const ownership = { default: L.NONE };
+    const droppedUsers = [];
+
+    for (const grant of permsData.permissions) {
+      if (grant.subject_type === 'role') {
+        // Role "1" = Player. A player grant sets the default level.
+        if (String(grant.subject_id) === '1') {
+          ownership.default =
+            grant.permission === 'edit' ? L.OWNER : L.OBSERVER;
+        }
+        // Role "2" = Scribe. Foundry has no "scribe" concept; covered by
+        // the default level.
+      } else if (grant.subject_type === 'public') {
+        // Audit §5: a `public` grant means everyone can see it → raise the
+        // default to at least OBSERVER (edit → OWNER). Fail-closed posture is
+        // preserved: this only ever WIDENS toward the explicitly-public intent,
+        // and never below an existing higher role grant.
+        const publicLevel = grant.permission === 'edit' ? L.OWNER : L.OBSERVER;
+        if (publicLevel > ownership.default) ownership.default = publicLevel;
+      } else if (grant.subject_type === 'user') {
+        // Per-user grant → map to a specific Foundry user when we know the
+        // mapping (FM-SYNC-HARDENING §4). Unmapped users are dropped: the
+        // entity under-shares (the user simply doesn't gain access) rather
+        // than leaking to the wrong player — but the drop is now surfaced
+        // (audit §3.2) so the operator can map the member.
+        const foundryUserId = this._syncManager?.getFoundryUserId?.(
+          String(grant.subject_id)
+        );
+        if (foundryUserId) {
+          ownership[foundryUserId] =
+            grant.permission === 'edit' ? L.OWNER : L.OBSERVER;
+        } else {
+          droppedUsers.push(String(grant.subject_id));
+        }
+      }
+    }
+
+    // Audit §5: `tag_grants` apply a grant to whoever holds a Chronicle tag.
+    // Foundry has no tag-membership concept, so we can't expand them to users;
+    // we read the response shape (so the field is consumed, not ignored) and,
+    // keeping the fail-closed posture, do NOT widen the default off a tag grant
+    // — instead we note that tag-scoped access can't be honored.
+    if (Array.isArray(permsData.tag_grants) && permsData.tag_grants.length > 0) {
+      this._syncManager?.logActivity?.(
+        'warning',
+        `"${entity.name || entity.id}" has ${permsData.tag_grants.length} tag-based permission grant(s) Foundry can't map to users — those players may not see it.`
+      );
+    }
+
+    if (droppedUsers.length > 0) {
+      this._syncManager?.logActivity?.(
+        'warning',
+        `"${entity.name || entity.id}": ${droppedUsers.length} per-user grant(s) dropped — no Foundry mapping for those Chronicle members. Map them in the dashboard Members tab.`
+      );
+    }
+
+    return ownership;
+  }
+
+  /**
+   * Build the Chronicle permission grants for a Foundry ownership object.
+   *
+   * Pure / side-effect-free (apart from the injected reverse-map fn) so it can
+   * be unit-tested. Translates each Foundry per-user ownership entry into a
+   * Chronicle `{subject_type:'user', subject_id, permission}` grant by
+   * reverse-mapping the Foundry user id → Chronicle user id via
+   * `getChronicleUserId` (audit §2 — per-user grants were previously detected
+   * but never emitted). Level ≥ OWNER → `'edit'`, otherwise `'view'`.
+   *
+   * Fail CLOSED on the share axis: a Foundry user we cannot reverse-map is
+   * NOT pushed (the grant is dropped and reported in `unmapped`), so a
+   * mis-mapped/unknown user never silently widens Chronicle access.
+   *
+   * @param {object} ownership - Foundry ownership object.
+   * @param {boolean} isPrivate - Whether the entity is private (default ≤ NONE).
+   * @param {(foundryUserId: string) => (string|null)} reverseMap - Foundry→Chronicle user id.
+   * @returns {{permissions: Array<object>, unmapped: string[], hasUserGrants: boolean}}
+   */
+  _buildPermissionGrants(ownership, isPrivate, reverseMap) {
+    const L = CONST.DOCUMENT_OWNERSHIP_LEVELS;
+    const permissions = [];
+    const unmapped = [];
+    let hasUserGrants = false;
+
+    if (!isPrivate) {
+      // Broad case: the entity is player-visible → grant the Player role view.
+      permissions.push({ subject_type: 'role', subject_id: '1', permission: 'view' });
+    }
+
+    for (const [key, level] of Object.entries(ownership || {})) {
+      if (key === 'default') continue;
+      if (!(level > L.NONE)) continue; // No access → no grant to emit.
+      const chronicleId = reverseMap?.(key);
+      if (!chronicleId) {
+        // Unmapped Foundry user — skip (don't over-share) and report.
+        unmapped.push(key);
+        continue;
+      }
+      permissions.push({
+        subject_type: 'user',
+        subject_id: chronicleId,
+        permission: level >= L.OWNER ? 'edit' : 'view',
+      });
+      hasUserGrants = true;
+    }
+
+    return { permissions, unmapped, hasUserGrants };
   }
 
   /**
    * Push Foundry ownership changes to Chronicle as permission updates.
-   * Maps Foundry default ownership level to Chronicle visibility mode:
-   * - NONE → visibility "default", is_private=true
-   * - OBSERVER → visibility "default", is_private=false
-   * - Changes in per-user ownership are logged but not yet pushed
-   *   (requires user ID mapping table).
+   *
+   * - The default level drives `is_private` + the broad Player-role grant.
+   * - Each per-user Foundry ownership entry is reverse-mapped to a Chronicle
+   *   user grant (`subject_type:'user'`); `visibility:'custom'` is sent only
+   *   when real user grants exist, otherwise `'default'` (audit §2).
+   * - Foundry users that can't be reverse-mapped are skipped and surfaced
+   *   (notification + dashboard warning) so the operator knows that player's
+   *   access didn't propagate — never silently dropped (audit §3.4).
+   *
+   * Best-effort: a transport error is surfaced but never fails the journal
+   * sync (mirrors the journal-content push posture, FM-SYNC-HARDENING §4).
    *
    * @param {string} entityId - Chronicle entity ID.
    * @param {object} ownership - Foundry ownership object.
    * @param {boolean} isPrivate - Derived privacy flag from default ownership.
+   * @param {string} [label] - Human-readable entity name for notifications.
    * @private
    */
-  async _pushPermissions(entityId, ownership, isPrivate) {
-    try {
-      // Build permission grants from Foundry ownership.
-      const permissions = [];
+  async _pushPermissions(entityId, ownership, isPrivate, label) {
+    const { permissions, unmapped, hasUserGrants } = this._buildPermissionGrants(
+      ownership,
+      isPrivate,
+      (fid) => this._syncManager?.getChronicleUserId?.(fid) ?? null
+    );
 
-      if (!isPrivate) {
-        // Entity is visible: grant view to player role.
-        permissions.push({
-          subject_type: 'role',
-          subject_id: '1',
-          permission: 'view',
-        });
-      }
-
-      // Determine visibility mode based on whether there are per-user grants.
-      // For now, use "default" mode since we can't map Foundry user IDs
-      // to Chronicle user IDs without a mapping table.
-      const hasPerUserGrants = Object.keys(ownership || {}).some(
-        (key) => key !== 'default' && ownership[key] > CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE
+    // Surface dropped per-user grants — a player whose access didn't propagate
+    // because we have no Chronicle mapping for their Foundry user.
+    if (unmapped.length > 0) {
+      const named = unmapped
+        .map((fid) => game.users?.get?.(fid)?.name || fid)
+        .slice(0, 8)
+        .join(', ');
+      const who = label ? ` on "${label}"` : '';
+      this._syncManager?.logActivity?.(
+        'warning',
+        `Permission push${who}: ${unmapped.length} player grant(s) not sent — no Chronicle mapping for ${named}. Map them in the dashboard Members tab.`
       );
+      ui.notifications?.warn?.(
+        `Chronicle: ${unmapped.length} player permission grant(s)${who} were not sent — unmapped Foundry user(s): ${named}. Map them in the sync dashboard → Members.`
+      );
+    }
 
-      // Only push custom permissions if there are meaningful grants.
-      if (hasPerUserGrants || permissions.length > 0) {
+    try {
+      // Only push when there is something meaningful to say.
+      if (hasUserGrants || permissions.length > 0) {
         await this._api.put(`/entities/${entityId}/permissions`, {
-          visibility: hasPerUserGrants ? 'custom' : 'default',
+          visibility: hasUserGrants ? 'custom' : 'default',
           is_private: isPrivate,
           permissions,
         });
       }
     } catch (err) {
-      // Permission push is best-effort — don't fail the sync.
+      // Permission push is best-effort — don't fail the sync, but don't let it
+      // fail silently either (audit §3.4).
       console.warn('Chronicle: Failed to push permissions update', err);
+      this._syncManager?.logActivity?.(
+        'error',
+        `Failed to push permissions${label ? ` for "${label}"` : ''} — ${err?.message || 'unknown error'}`
+      );
+      ui.notifications?.warn?.(
+        `Chronicle: Failed to push permissions${label ? ` for "${label}"` : ''}. See the sync dashboard for details.`
+      );
     }
   }
 
