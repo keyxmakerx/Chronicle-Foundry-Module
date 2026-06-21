@@ -157,7 +157,21 @@ async function _runtimeValidateDescriptor() {
       fetch('modules/chronicle-sync/chronicle-package.json', { cache: 'no-store' }),
       fetch('modules/chronicle-sync/module.json', { cache: 'no-store' }),
     ]);
-    if (descResp.ok) descriptor = await descResp.json();
+    // Chronicle deliberately strips chronicle-package.json from the module
+    // zips it serves (Chronicle foundry_vtt/handler.go) — the descriptor is
+    // Chronicle-side metadata, not part of the installed module. A 404 here
+    // is therefore the NORMAL served-install case, not schema drift: skip the
+    // check silently. (It still fires for a genuinely malformed descriptor
+    // that WAS shipped — a hand-edited / ad-hoc release — which is the
+    // FM-SEC-CHUNK-7 purpose.)
+    if (!descResp.ok) {
+      console.debug(
+        `Chronicle Sync | chronicle-package.json not served (HTTP ${descResp.status}) — `
+        + 'skipping descriptor runtime check (expected for Chronicle-served installs).'
+      );
+      return;
+    }
+    descriptor = await descResp.json();
     if (modResp.ok) moduleJson = await modResp.json();
   } catch (err) {
     console.warn('Chronicle Sync | Descriptor runtime fetch failed (skipping check)', err);

@@ -33,18 +33,32 @@
 import { MODULE_ID } from './constants.mjs';
 
 /**
- * Look up Foundry's HTML sanitizer across v12 / v13+ namespaces. The
- * function moved from a global `TextEditor` (v12) into
- * `foundry.applications.ux.TextEditor` (v13+). Either may be aliased
- * back to the global in some versions, so we probe both.
+ * Look up Foundry's HTML sanitizer across v12 / v13 / v14+ namespaces.
+ * The class moved from a global `TextEditor` (v12) into
+ * `foundry.applications.ux.TextEditor` (v13), then in v14 the concrete
+ * class that carries the static `cleanHTML` moved again onto that
+ * namespace's `.implementation` property — the v14 deprecation warning
+ * ("now namespaced under foundry.applications.ux.TextEditor.implementation")
+ * names this location explicitly. We probe most-specific-modern → namespace
+ * → deprecated-global, both so we resolve `cleanHTML` on current Foundry and
+ * so we avoid touching the deprecated global (which logs a compatibility
+ * warning on every access) unless nothing else resolves.
  *
  * @returns {((html: string) => string) | null}
  */
 function _resolveCleanHTML() {
+  const ns = globalThis.foundry?.applications?.ux?.TextEditor;
+  // v14+: the static lives on the implementation class.
   try {
-    const v13 = globalThis.foundry?.applications?.ux?.TextEditor?.cleanHTML;
-    if (typeof v13 === 'function') return v13.bind(globalThis.foundry.applications.ux.TextEditor);
+    const impl = ns?.implementation?.cleanHTML;
+    if (typeof impl === 'function') return impl.bind(ns.implementation);
   } catch { /* ignore — fall through */ }
+  // v13: the static lived directly on the namespace object.
+  try {
+    const direct = ns?.cleanHTML;
+    if (typeof direct === 'function') return direct.bind(ns);
+  } catch { /* ignore — fall through */ }
+  // v12: global TextEditor (deprecated in v13+, slated for removal in v15).
   try {
     const v12 = globalThis.TextEditor?.cleanHTML;
     if (typeof v12 === 'function') return v12.bind(globalThis.TextEditor);

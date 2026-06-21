@@ -38,6 +38,10 @@ const REPO_ROOT = resolve(__dirname, '..');
 // per-case via the helpers below.
 // ---------------------------------------------------------------------
 
+function installV14CleanHTML(impl) {
+  // v14: the concrete class (with cleanHTML) lives on `.implementation`.
+  globalThis.foundry = { applications: { ux: { TextEditor: { implementation: { cleanHTML: impl } } } } };
+}
 function installV13CleanHTML(impl) {
   globalThis.foundry = { applications: { ux: { TextEditor: { cleanHTML: impl } } } };
 }
@@ -80,6 +84,25 @@ test('_sanitizeIncomingHTML: prefers v13 over v12 when both present', () => {
   installV13CleanHTML(() => 'v13');
   installV12CleanHTML(() => 'v12');
   assert.equal(_sanitizeIncomingHTML('input'), 'v13');
+});
+
+// v14 relocated cleanHTML onto foundry.applications.ux.TextEditor.implementation.
+// This is the shape that regressed in production (the resolver previously only
+// probed the namespace object + the deprecated global, so it found neither and
+// silently skipped ingress sanitization on v14.364).
+
+test('_sanitizeIncomingHTML: delegates to v14 TextEditor.implementation.cleanHTML', () => {
+  clearCleanHTML();
+  installV14CleanHTML((s) => s.replace(/<script[\s\S]*?<\/script>/gi, ''));
+  const out = _sanitizeIncomingHTML('<p>safe</p><script>alert(1)</script>');
+  assert.equal(out, '<p>safe</p>');
+});
+
+test('_sanitizeIncomingHTML: prefers v14 .implementation over the deprecated global', () => {
+  clearCleanHTML();
+  installV14CleanHTML(() => 'v14impl');
+  installV12CleanHTML(() => 'v12global');
+  assert.equal(_sanitizeIncomingHTML('input'), 'v14impl');
 });
 
 // ---------------------------------------------------------------------

@@ -6,7 +6,7 @@ including cross-repo facts in the Chronicle backend. A resume can implement the
 "Fix" sections without re-investigating.
 
 Environment from the report: Foundry **v14.364**, Chronicle Sync **v0.1.19**,
-Calendaria 1.1.0, Draw Steel system, deployment `chronicle.bnuuy.haus`.
+Calendaria 1.1.0, Draw Steel system, served from the operator's Chronicle instance.
 Branch: `claude/jolly-lamport-755efm`.
 
 Investigation was done by 5 parallel read-only audit agents + direct verification.
