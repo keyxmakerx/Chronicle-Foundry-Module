@@ -111,7 +111,9 @@
         "PublicClickPrivate": "Public — click to make private",
         "EmptyState": "No entities found. Create entities in Chronicle or journals in Foundry to get started.",
         "CreateType": "Create Type",
-        "CreateTypeTitle": "Create Entity Type"
+        "CreateTypeTitle": "Create Entity Type",
+        "ResyncAllJournals": "Resync All Journals",
+        "ResyncAllJournalsHint": "Re-fetch every entity from Chronicle and update existing journals, including their permissions"
       },
       "Bulk": {
         "Selected": "selected",
