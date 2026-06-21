@@ -652,10 +652,11 @@ export class SyncManager {
       return await this.api.post('/sync/mappings', payload);
     } catch (err) {
       if (this._isMappingConflict(err)) {
-        // Absorbed conflict — strip the 400 from the dashboard error log
-        // and return the freshly-fetched mapping.
+        // Absorbed conflict — strip the logged conflict (409, or 400 on older
+        // deployments) from the dashboard error log and return the
+        // freshly-fetched mapping.
         this.api.dropLastErrorLogEntry?.({
-          status: 400,
+          status: [400, 409],
           path: '/sync/mappings',
           messageIncludes: 'already exists',
         });
@@ -667,18 +668,24 @@ export class SyncManager {
   }
 
   /**
-   * Detect Chronicle's specific 400 conflict for sync mappings. Chronicle
-   * returns `{error: "Bad Request", message: "conflict: sync mapping already
-   * exists for this object"}` with HTTP 400 (not 409, so api-client wraps
-   * it in a generic Error). Match on substring rather than relying on the
-   * status code alone so we don't suppress unrelated 400s.
+   * Detect Chronicle's mapping-already-exists conflict. The backend's
+   * CreateMapping returns `apperror.NewConflict("sync mapping already exists
+   * for this object")` → HTTP 409 (Chronicle apperror/errors.go), which
+   * api-client wraps in a `ConflictError` (err.status === 409). Older/other
+   * deployments may surface it as a generic 400, so we match both defensively.
+   * The "already exists" substring is the real discriminator, so unrelated
+   * 409s (e.g. optimistic-concurrency "Entity was modified by another user")
+   * are NOT absorbed.
    * @param {Error} err
    * @returns {boolean}
    * @private
    */
   _isMappingConflict(err) {
     const msg = err?.message || '';
-    return /Chronicle API error 400/.test(msg) && /already exists/i.test(msg);
+    if (!/already exists/i.test(msg)) return false;
+    return err?.status === 409
+      || err?.name === 'ConflictError'
+      || /Chronicle API error 40[09]/.test(msg);
   }
 
   /**
@@ -807,6 +814,16 @@ export class SyncManager {
         `/sync/lookup?chronicle_type=${encodeURIComponent(chronicleType)}&chronicle_id=${encodeURIComponent(chronicleId)}`
       );
     } catch {
+      // A 404 here is the expected "no mapping yet" response — the caller
+      // (ensureMapping) creates the mapping next. api-client.fetch logs every
+      // non-OK response before throwing, so scrub this benign 404 from the
+      // dashboard "Recent sync errors" log (and roll back restErrorCount). A
+      // real 500/network error won't match the criteria, so it still surfaces.
+      this.api.dropLastErrorLogEntry?.({
+        status: 404,
+        path: /\/sync\/lookup/,
+        messageIncludes: 'sync mapping not found',
+      });
       return null;
     }
   }
@@ -822,6 +839,13 @@ export class SyncManager {
         `/sync/lookup?external_system=foundry&external_id=${encodeURIComponent(externalId)}`
       );
     } catch {
+      // Benign "no mapping yet" 404 — scrub it from the dashboard error log
+      // (see findMapping above for rationale).
+      this.api.dropLastErrorLogEntry?.({
+        status: 404,
+        path: /\/sync\/lookup/,
+        messageIncludes: 'sync mapping not found',
+      });
       return null;
     }
   }

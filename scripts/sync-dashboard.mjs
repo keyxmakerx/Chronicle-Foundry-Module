@@ -10,6 +10,7 @@
 
 import { getSetting, setSetting, getSyncDirections, setSyncDirections, getExcludedTags, setExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
+import { confirmDialog, promptDialog } from './_dialogs.mjs';
 import { openSyncCalendar } from './sync-calendar.mjs';
 import { buildCalendarDiagnostics } from './sync-calendar-diagnostics.mjs';
 import { memberKey } from './sync-manager.mjs';
@@ -631,9 +632,17 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   _getLocalCalendarDate(calModule) {
     try {
-      if (calModule === 'Calendaria' && game.Calendaria?.getDate) {
-        const d = game.Calendaria.getDate();
-        return { year: d.year, month: d.month, day: d.day, hour: d.hour ?? 0, minute: d.minute ?? 0 };
+      if (calModule === 'Calendaria') {
+        // Modern Calendaria (1.x) exposes its API at globalThis.CALENDARIA.api
+        // — the same surface the Sync Calendar editor and calendar-sync use.
+        // getCurrentDateTime() returns { year, month, day, hour, minute, … }.
+        // The legacy game.Calendaria.getDate() is kept only as a fallback for
+        // old installs. Reading ONLY that legacy global was the bug behind the
+        // dashboard's "Foundry: Unable to read", the permanent "Out of Sync"
+        // badge, and the silently no-op Push-date button on Calendaria 1.x.
+        const calApi = globalThis.CALENDARIA?.api;
+        const d = calApi?.getCurrentDateTime?.() ?? calApi?.getCurrentDate?.() ?? game.Calendaria?.getDate?.();
+        if (d) return { year: d.year, month: d.month, day: d.day, hour: d.hour ?? 0, minute: d.minute ?? 0 };
       }
       if (calModule === 'Simple Calendar' && typeof SimpleCalendar !== 'undefined') {
         const ts = SimpleCalendar.api?.currentDateTime?.();
@@ -1187,7 +1196,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const entryId = target.dataset.journalEntryId;
     if (!entryId) return;
     const entry = game.journal.get(entryId);
-    if (entry?.sheet) entry.sheet.render(true);
+    if (entry?.sheet) entry.sheet.render({ force: true });
   }
 
   /** Trigger a verbose full map resync. */
@@ -1291,7 +1300,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     if (sheet.render?.length === 0 || sheet.constructor?.DEFAULT_OPTIONS) {
       sheet.render({ force: true });
     } else {
-      sheet.render(true);
+      sheet.render({ force: true });
     }
   }
 
@@ -1383,7 +1392,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       </form>
     `;
 
-    const result = await Dialog.prompt({
+    const result = await promptDialog({
       title: game.i18n.localize('CHRONICLE.Dashboard.Entities.CreateTypeTitle'),
       content: html,
       callback: (html) => {
@@ -1528,7 +1537,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   async _onResyncAllJournals() {
     let confirmed;
     try {
-      confirmed = await Dialog.confirm({
+      confirmed = await confirmDialog({
         title: game.i18n.localize('CHRONICLE.Dashboard.Entities.ResyncAllJournals'),
         content: `<p>${game.i18n.localize('CHRONICLE.Dashboard.Entities.ResyncAllJournalsHint')}</p>`,
       });
@@ -1556,7 +1565,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   async _onPullAll() {
     let confirmed;
     try {
-      confirmed = await Dialog.confirm({
+      confirmed = await confirmDialog({
         title: 'Pull All from Chronicle',
         content: '<p>Pull all Chronicle entities that don\'t have a Foundry journal yet?</p>',
       });
@@ -1585,7 +1594,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   async _onPushAll() {
     let confirmed;
     try {
-      confirmed = await Dialog.confirm({
+      confirmed = await confirmDialog({
         title: 'Push All to Chronicle',
         content: '<p>Push all Foundry journals that aren\'t linked to Chronicle yet?</p>',
       });
@@ -1723,7 +1732,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     let confirmed;
     try {
-      confirmed = await Dialog.confirm({
+      confirmed = await confirmDialog({
         title: 'Push All Actors to Chronicle',
         content: `<p>Push ${unlinked.length} unlinked actor(s) to Chronicle?</p>`,
       });
@@ -2008,8 +2017,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const resultEl = el?.querySelector('[data-debug-result]');
 
     try {
-      const snapshot = this._buildDebugExport();
-      const text = '```json\n' + JSON.stringify(snapshot, null, 2) + '\n```';
+      const text = this._buildDebugText();
       await game.clipboard.copyPlainText(text);
 
       if (resultEl) {
@@ -2025,6 +2033,39 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         resultEl.className = 'debug-copy-result test-error';
       }
     }
+  }
+
+  /**
+   * Format the System Debug snapshot as a fenced JSON block. Shared by the
+   * dashboard "Copy System Debug" button (`_onCopyDebug`) and the module-API
+   * escape hatch (`copyDebugReport`). DOM-independent.
+   * @returns {string}
+   * @private
+   */
+  _buildDebugText() {
+    const snapshot = this._buildDebugExport();
+    return '```json\n' + JSON.stringify(snapshot, null, 2) + '\n```';
+  }
+
+  /**
+   * Build the System Debug report, copy it to the clipboard (best-effort), and
+   * RETURN the report string. DOM-independent, so it works whether or not the
+   * dashboard is rendered — this is what `game.modules.get('chronicle-sync')
+   * .api.copyDebug()` calls so an operator can always produce diagnostics from
+   * the console even if the dashboard's toolbar/sidebar entry points regress
+   * on a Foundry upgrade. Clipboard failure is non-fatal (the returned string
+   * is the fallback the caller can copy from the console).
+   * @returns {Promise<string>}
+   */
+  async copyDebugReport() {
+    const text = this._buildDebugText();
+    try {
+      await game.clipboard?.copyPlainText?.(text);
+      ui.notifications?.info?.('Chronicle: System debug snapshot copied to clipboard.');
+    } catch (err) {
+      console.warn('Chronicle Dashboard: clipboard copy failed; report returned for manual copy', err);
+    }
+    return text;
   }
 
   /**
@@ -2076,8 +2117,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // Include API errors so they appear in the debug copy/paste.
     const errorLog = this.api?.getErrorLog() ?? [];
-    const connectionState = this.api?.connected
-      ? 'connected' : (this.api ? 'disconnected' : 'no-client');
+    // ChronicleAPI exposes connection state as `.state` (connected/connecting/
+    // reconnecting/disconnected); there is no `.connected` boolean.
+    const connectionState = this.api?.state ?? (this.api ? 'unknown' : 'no-client');
 
     return {
       _description: 'Chronicle Sync — Foundry System Debug Snapshot. '
@@ -2305,7 +2347,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const count = this._selectedEntities.size;
     let confirmed;
     try {
-      confirmed = await Dialog.confirm({
+      confirmed = await confirmDialog({
         title: game.i18n.localize('CHRONICLE.Dashboard.Bulk.ChangeType'),
         content: `<p>${game.i18n.format('CHRONICLE.Dashboard.Bulk.ConfirmChangeType', { count })}</p>`,
       });
@@ -2373,7 +2415,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const count = this._selectedEntities.size;
     let confirmed;
     try {
-      confirmed = await Dialog.confirm({
+      confirmed = await confirmDialog({
         title: game.i18n.localize('CHRONICLE.Dashboard.Bulk.Delete'),
         content: `<p>${game.i18n.format('CHRONICLE.Dashboard.Bulk.ConfirmDelete', { count })}</p>`,
       });

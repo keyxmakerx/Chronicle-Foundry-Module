@@ -39,6 +39,7 @@ import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
 import { PIN_ICONS } from './map-sync.mjs';
 import { getUserMappings } from './settings.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
+import { confirmDialog } from './_dialogs.mjs';
 
 /* ============================================================
    Constants
@@ -872,7 +873,7 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
 
     try {
       const doc = fromUuidSync(pin.linkedJournalId);
-      if (doc?.sheet) doc.sheet.render(true);
+      if (doc?.sheet) doc.sheet.render({ force: true });
     } catch (err) {
       console.warn('Chronicle MapViewer: Could not open linked journal', err);
     }
@@ -888,7 +889,7 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
       pinTypes: VIEWER_PIN_TYPES,
       onSave: (updated) => this._updatePin(updated),
       onDelete: (id) => this._deletePin(id),
-    }).render(true);
+    }).render({ force: true });
   }
 
   /* ----------------------------------------------------------
@@ -928,7 +929,7 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
         await mapSync.createMarker(mapId, data);
         this.render(false);
       },
-    }).render(true);
+    }).render({ force: true });
 
     this._setActiveTool(null);
   }
@@ -954,7 +955,7 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
         await mapSync?.deleteMarker(mapId, markerId);
         this.render(false);
       },
-    }).render(true);
+    }).render({ force: true });
   }
 
   _onChronicleMarkerDoubleClick(markerId) {
@@ -964,7 +965,7 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
     if (!marker?.entity_id) return;
 
     const journal = game.journal.find((j) => j.getFlag(FLAG_SCOPE, 'entityId') === marker.entity_id);
-    if (journal?.sheet) journal.sheet.render(true);
+    if (journal?.sheet) journal.sheet.render({ force: true });
   }
 
   /* ----------------------------------------------------------
@@ -1088,7 +1089,7 @@ export class PinConfigDialog extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   static async #onDelete(_event, _target) {
-    const confirmed = await Dialog.confirm({
+    const confirmed = await confirmDialog({
       title: game.i18n.localize('CHRONICLE.MapViewer.PinDelete'),
       content: `<p>${game.i18n.localize('CHRONICLE.MapViewer.PinDeleteConfirm')}</p>`,
     });
@@ -1185,7 +1186,7 @@ export class ChronicleMarkerConfigDialog extends HandlebarsApplicationMixin(Appl
   }
 
   static async #onDelete(_event, _target) {
-    const confirmed = await Dialog.confirm({
+    const confirmed = await confirmDialog({
       title: game.i18n.localize('CHRONICLE.MapViewer.MarkerDelete'),
       content: `<p>${game.i18n.localize('CHRONICLE.MapViewer.MarkerDeleteConfirm')}</p>`,
     });
