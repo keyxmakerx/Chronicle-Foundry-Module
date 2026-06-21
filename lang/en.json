@@ -86,6 +86,7 @@
         "Maps": "Maps",
         "Notes": "Notes",
         "Characters": "Characters",
+        "Members": "Members",
         "Calendar": "Calendar",
         "Status": "Status"
       },
@@ -191,6 +192,18 @@
         "NoSystem": "Character sync requires a matching game system.",
         "NoSystemHint": "Your Foundry system must match a Chronicle game system with character field templates."
       },
+      "Members": {
+        "Title": "Permission Mapping",
+        "Intro": "Map each Chronicle campaign member to a Foundry user so per-player permissions sync. Unmatched members are skipped — their per-player grants won't sync in either direction until mapped.",
+        "FoundryUser": "Foundry user",
+        "Matched": "Matched",
+        "Unmatched": "UNMATCHED",
+        "Refresh": "Refresh Members",
+        "RefreshHint": "Re-fetch campaign members from Chronicle and re-run auto-match",
+        "UnmatchedWarning": "{count} Chronicle member(s) are not mapped to a Foundry user. Their per-player permissions will NOT sync until you map them below.",
+        "NoMembers": "No campaign members loaded.",
+        "NoMembersHint": "Members load when sync connects. Use Refresh Members to fetch them now."
+      },
       "OfflineWarning": "Sync messages are queued while disconnected, but the queue is limited. Extended offline periods may cause missed updates — use Pull All after reconnecting to ensure consistency.",
       "StatusTab": {
         "Connection": "Connection",
@@ -207,6 +220,7 @@
         "CharacterSyncEnabled": "Enabled",
         "CharacterSyncDisabled": "Disabled",
         "CharacterSyncNoSystem": "Requires matching game system",
+        "DmOnlyHiddenNote": "{count} DM-only entit(y/ies) synced this session and were hidden from players (per the \"DM-only hidden\" setting). The GM sees them; players intentionally don't — this is not a sync failure.",
         "RecentActivity": "Recent Activity",
         "NoActivity": "No recent activity.",
         "ClearLog": "Clear Log",

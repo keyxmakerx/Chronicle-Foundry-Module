@@ -19,6 +19,26 @@ import { getSetting, setSetting, isConfigured, getSyncDirections, getExcludedTag
 const RECONNECT_RESYNC_DEBOUNCE_MS = 3000;
 
 /**
+ * Resolve the stable Chronicle user-id key for a campaign member. The
+ * user-mapping table (`userMappings`) is keyed by this value, and
+ * `getFoundryUserId` / `getChronicleUserId` look it up. Different Chronicle
+ * builds surface the member's user id as `user_id` (the historical field this
+ * module keyed on) or `id` (the field the API contract documents for
+ * `GET /members`), so prefer `user_id` then fall back to `id`.
+ *
+ * Exported as a pure helper so the auto-match + manual-mapping paths can't
+ * drift on which field identifies a member, and so it's unit-testable.
+ *
+ * @param {object} member - A campaign member from `GET /members`.
+ * @returns {string|null} The Chronicle user-id key, or null if absent.
+ */
+export function memberKey(member) {
+  if (!member || typeof member !== 'object') return null;
+  const id = member.user_id ?? member.id;
+  return id === null || id === undefined || id === '' ? null : String(id);
+}
+
+/**
  * SyncManager coordinates all Chronicle sync operations.
  * It owns the API client and delegates to feature-specific sync modules.
  */
@@ -41,6 +61,23 @@ export class SyncManager {
 
     /** @type {Array<{time: number, type: string, message: string}>} Recent activity log. */
     this._activityLog = [];
+
+    /**
+     * @type {Array<object>} Chronicle members that could NOT be auto-matched to
+     * a Foundry user on the last `fetchAndCacheMembers`. Surfaced in the
+     * dashboard Members tab so the operator can map them manually (a per-player
+     * grant on an unmatched member is silently dropped, so this is the required
+     * operator signal — audit §2/§3.1).
+     */
+    this._unmatchedMembers = [];
+
+    /**
+     * @type {number} Count of DM-only / private entities synced this session
+     * that landed hidden-from-players (ownership.default = NONE) because the
+     * `dmOnlyHidden` setting is on. Surfaced on the Status tab so a correctly-
+     * hidden private entity isn't mistaken for "didn't sync" (audit §1A).
+     */
+    this._dmOnlyHiddenCount = 0;
 
     /** @type {number} Maximum activity log entries. */
     this._maxLogEntries = 100;
@@ -198,6 +235,16 @@ export class SyncManager {
   /**
    * Fetch campaign members from Chronicle and auto-match to Foundry users.
    * Stores mappings in the `userMappings` setting.
+   *
+   * After the auto-match, any Chronicle member that could NOT be linked to a
+   * Foundry user is surfaced — a `ui.notifications.warn` + a dashboard
+   * `warning` activity entry listing each unmatched member — and cached on
+   * `_unmatchedMembers` for the dashboard Members tab. This is the operator's
+   * required signal: an unmatched member's per-user permission grants are
+   * silently dropped on both push and pull, so a wrong/missing mapping must be
+   * visible, not silent (audit §2/§3.1). Members the operator has mapped by
+   * hand (via `memberKey(member)` already present in `userMappings`) are not
+   * reported as unmatched.
    */
   async fetchAndCacheMembers() {
     try {
@@ -208,14 +255,19 @@ export class SyncManager {
       // Auto-match by display_name → Foundry user name.
       const mappings = getUserMappings();
       let newMappings = 0;
+      const unmatched = [];
       for (const member of this._members) {
-        if (mappings[member.user_id]) continue; // Already mapped.
+        const key = memberKey(member);
+        if (!key) continue;
+        if (mappings[key]) continue; // Already mapped (auto or manual).
         const foundryUser = game.users.find(
           (u) => u.name.toLowerCase() === (member.display_name || '').toLowerCase()
         );
         if (foundryUser) {
-          mappings[member.user_id] = foundryUser.id;
+          mappings[key] = foundryUser.id;
           newMappings++;
+        } else {
+          unmatched.push(member);
         }
       }
       if (newMappings > 0) {
@@ -223,11 +275,65 @@ export class SyncManager {
         this.logActivity('connect', `Auto-matched ${newMappings} Chronicle members to Foundry users`);
       }
 
+      this._unmatchedMembers = unmatched;
+      this._reportUnmatchedMembers(unmatched);
+
       console.debug(`Chronicle: Fetched ${this._members.length} campaign members`);
     } catch (err) {
+      // Members fetch failure is no longer console-only — surface it so the
+      // operator knows per-user permission mapping is unavailable this session
+      // (audit §3.6). Mappings remain whatever was previously persisted.
       console.warn('Chronicle: Failed to fetch campaign members', err);
       this._members = [];
+      this._unmatchedMembers = [];
+      this.logActivity('warning', 'Failed to fetch campaign members — per-user permission mapping is unavailable this session');
+      ui.notifications?.warn?.('Chronicle: Could not fetch campaign members. Per-player permission mapping is unavailable — see the sync dashboard.');
     }
+  }
+
+  /**
+   * Surface the list of Chronicle members that could not be auto-matched to a
+   * Foundry user. Warns once with a names list (truncated for readability) and
+   * logs a dashboard `warning` entry. No-op when everything matched.
+   * @param {Array<object>} unmatched
+   * @private
+   */
+  _reportUnmatchedMembers(unmatched) {
+    if (!unmatched || unmatched.length === 0) return;
+    const names = unmatched.map((m) => m.display_name || memberKey(m) || 'unknown');
+    const shown = names.slice(0, 8).join(', ');
+    const extra = names.length > 8 ? ` (+${names.length - 8} more)` : '';
+    const summary = `${unmatched.length} Chronicle member${unmatched.length === 1 ? '' : 's'} could not be matched to a Foundry user: ${shown}${extra}`;
+    this.logActivity('warning', `${summary}. Map them in the dashboard Members tab — their per-player permissions won't sync until mapped.`);
+    ui.notifications?.warn?.(`Chronicle: ${summary}. Open the sync dashboard → Members to map them.`);
+  }
+
+  /**
+   * Chronicle members that could not be auto-matched to a Foundry user on the
+   * last fetch. Drives the dashboard Members tab "UNMATCHED" badges.
+   * @returns {Array<object>}
+   */
+  getUnmatchedMembers() {
+    return this._unmatchedMembers || [];
+  }
+
+  /**
+   * Number of DM-only / private entities synced this session that landed
+   * hidden-from-players because `dmOnlyHidden` is on. Clarifies the audit §1A
+   * perception gap on the dashboard.
+   * @returns {number}
+   */
+  getDmOnlyHiddenCount() {
+    return this._dmOnlyHiddenCount;
+  }
+
+  /**
+   * Record that a DM-only / private entity synced hidden-from-players. Called
+   * by JournalSync when it builds an ownership with `default = NONE` for a
+   * private entity under the `dmOnlyHidden` setting.
+   */
+  noteDmOnlyHidden() {
+    this._dmOnlyHiddenCount += 1;
   }
 
   /**

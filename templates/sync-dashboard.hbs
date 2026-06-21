@@ -35,6 +35,10 @@
     <a class="item" data-tab="characters">
       <i class="fa-solid fa-users"></i> Characters
     </a>
+    <a class="item" data-tab="members">
+      <i class="fa-solid fa-user-shield"></i> Members
+      {{#if members.hasUnmatched}}<span class="member-tab-badge" title="{{members.unmatchedCount}} unmatched member(s)">{{members.unmatchedCount}}</span>{{/if}}
+    </a>
     <a class="item" data-tab="notes">
       <i class="fa-solid fa-sticky-note"></i> Notes
     </a>
@@ -629,6 +633,67 @@
     </div>
 
     {{!-- ================================================================= --}}
+    {{!-- MEMBERS TAB                                                       --}}
+    {{!-- ================================================================= --}}
+    <div class="tab" data-tab="members" data-group="primary">
+      <div class="dashboard-toolbar">
+        <div class="toolbar-title">
+          <i class="fa-solid fa-user-shield"></i>
+          {{localize "CHRONICLE.Dashboard.Members.Title"}}
+        </div>
+        <div class="toolbar-actions">
+          <button type="button" data-action="refresh-members" class="dashboard-btn btn-sm" title="{{localize "CHRONICLE.Dashboard.Members.RefreshHint"}}">
+            <i class="fa-solid fa-arrows-rotate"></i> {{localize "CHRONICLE.Dashboard.Members.Refresh"}}
+          </button>
+        </div>
+      </div>
+
+      <p class="config-hint">{{localize "CHRONICLE.Dashboard.Members.Intro"}}</p>
+
+      {{#if members.hasUnmatched}}
+      <div class="dashboard-load-errors member-unmatched-banner">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        {{localize "CHRONICLE.Dashboard.Members.UnmatchedWarning" count=members.unmatchedCount}}
+      </div>
+      {{/if}}
+
+      {{#if members.hasMembers}}
+      <div class="member-list">
+        {{#each members.rows}}
+        <div class="member-row {{#if matched}}matched{{else}}unmatched{{/if}}">
+          <div class="member-info">
+            <span class="member-name">{{name}}</span>
+            {{#if role}}<span class="member-role">{{role}}</span>{{/if}}
+            {{#if matched}}
+            <span class="member-badge matched"><i class="fa-solid fa-check"></i> {{localize "CHRONICLE.Dashboard.Members.Matched"}}</span>
+            {{else}}
+            <span class="member-badge unmatched"><i class="fa-solid fa-circle-exclamation"></i> {{localize "CHRONICLE.Dashboard.Members.Unmatched"}}</span>
+            {{/if}}
+          </div>
+          <div class="member-actions">
+            <label class="member-map-label">{{localize "CHRONICLE.Dashboard.Members.FoundryUser"}}</label>
+            <select class="member-map-select" data-member-key="{{key}}">
+              {{#each options}}
+              <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>
+              {{/each}}
+            </select>
+          </div>
+        </div>
+        {{/each}}
+      </div>
+      {{else}}
+      <div class="dashboard-empty-tab">
+        <i class="fa-solid fa-user-shield fa-2x"></i>
+        <p>{{localize "CHRONICLE.Dashboard.Members.NoMembers"}}</p>
+        <p class="hint">{{localize "CHRONICLE.Dashboard.Members.NoMembersHint"}}</p>
+        <button type="button" data-action="refresh-members" class="dashboard-btn">
+          <i class="fa-solid fa-arrows-rotate"></i> {{localize "CHRONICLE.Dashboard.Members.Refresh"}}
+        </button>
+      </div>
+      {{/if}}
+    </div>
+
+    {{!-- ================================================================= --}}
     {{!-- NOTES TAB                                                         --}}
     {{!-- ================================================================= --}}
     <div class="tab" data-tab="notes" data-group="primary">
@@ -769,6 +834,15 @@
             <div class="stat-label">Maps Linked</div>
           </div>
         </div>
+
+        {{!-- DM-only clarification (audit §1A): a private entity that correctly
+              lands hidden-from-players is not "didn't sync" — it reached the GM. --}}
+        {{#if dmOnlyHiddenCount}}
+        <div class="dashboard-hint dm-only-hint">
+          <i class="fa-solid fa-user-secret"></i>
+          {{localize "CHRONICLE.Dashboard.StatusTab.DmOnlyHiddenNote" count=dmOnlyHiddenCount}}
+        </div>
+        {{/if}}
 
         {{!-- Game system detection --}}
         <div class="system-detection">
