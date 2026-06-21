@@ -601,11 +601,21 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
       this._chronicleCalendarState = result ? 'present' : 'absent';
     } catch (err) {
       const msg = String(err?.message || '');
-      // 404 on /calendar means Chronicle has none; 401/403 means we
-      // can't tell. Translate either by checking the error message
-      // since the api-client throws on non-OK.
-      if (/404/.test(msg)) this._chronicleCalendarState = 'absent';
-      else                 this._chronicleCalendarState = 'unreachable';
+      // Distinguish the cases so the banner gives the right next step instead
+      // of an ambiguous "not found":
+      //   - 404 / calendar_not_configured → Chronicle has no calendar for this
+      //     campaign (import one).
+      //   - 401 / 403 / invalid_token     → token/auth problem (re-check the
+      //     API key, or reinstall from a fresh campaign URL).
+      //   - anything else                 → unreachable / unknown.
+      // The api-client embeds the HTTP status + JSON body in the thrown message.
+      if (/\b404\b/.test(msg) || /calendar_not_configured/i.test(msg)) {
+        this._chronicleCalendarState = 'absent';
+      } else if (/\b401\b|\b403\b/.test(msg) || /invalid_token|unauthor/i.test(msg)) {
+        this._chronicleCalendarState = 'auth';
+      } else {
+        this._chronicleCalendarState = 'unreachable';
+      }
     }
     this.#scheduleRerender();
   }

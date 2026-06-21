@@ -2008,8 +2008,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const resultEl = el?.querySelector('[data-debug-result]');
 
     try {
-      const snapshot = this._buildDebugExport();
-      const text = '```json\n' + JSON.stringify(snapshot, null, 2) + '\n```';
+      const text = this._buildDebugText();
       await game.clipboard.copyPlainText(text);
 
       if (resultEl) {
@@ -2025,6 +2024,39 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         resultEl.className = 'debug-copy-result test-error';
       }
     }
+  }
+
+  /**
+   * Format the System Debug snapshot as a fenced JSON block. Shared by the
+   * dashboard "Copy System Debug" button (`_onCopyDebug`) and the module-API
+   * escape hatch (`copyDebugReport`). DOM-independent.
+   * @returns {string}
+   * @private
+   */
+  _buildDebugText() {
+    const snapshot = this._buildDebugExport();
+    return '```json\n' + JSON.stringify(snapshot, null, 2) + '\n```';
+  }
+
+  /**
+   * Build the System Debug report, copy it to the clipboard (best-effort), and
+   * RETURN the report string. DOM-independent, so it works whether or not the
+   * dashboard is rendered — this is what `game.modules.get('chronicle-sync')
+   * .api.copyDebug()` calls so an operator can always produce diagnostics from
+   * the console even if the dashboard's toolbar/sidebar entry points regress
+   * on a Foundry upgrade. Clipboard failure is non-fatal (the returned string
+   * is the fallback the caller can copy from the console).
+   * @returns {Promise<string>}
+   */
+  async copyDebugReport() {
+    const text = this._buildDebugText();
+    try {
+      await game.clipboard?.copyPlainText?.(text);
+      ui.notifications?.info?.('Chronicle: System debug snapshot copied to clipboard.');
+    } catch (err) {
+      console.warn('Chronicle Dashboard: clipboard copy failed; report returned for manual copy', err);
+    }
+    return text;
   }
 
   /**

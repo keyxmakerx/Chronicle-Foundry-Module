@@ -487,37 +487,61 @@ Lists all sync mappings for the campaign.
 ```
 
 #### POST /sync/mappings
-Creates a new sync mapping.
+Creates a new sync mapping. Body shape is `CreateSyncMappingInput`.
 
 **Request:**
 ```json
 {
+  "chronicle_type": "entity",
   "chronicle_id": "entity-uuid",
-  "foundry_id": "foundry-doc-id",
-  "type": "entity"
+  "external_system": "foundry",
+  "external_id": "foundry-doc-id",
+  "sync_direction": "both",
+  "sync_metadata": {}
 }
 ```
+
+- `chronicle_type` — one of `entity, map, calendar_event, marker, drawing, token`
+- `external_system` — `foundry`
+- `sync_direction` — `both | push | pull` (defaults to `both`)
+- `sync_metadata` — optional object
+
+Returns **409 Conflict** (`message: "sync mapping already exists for this object"`)
+if a mapping already exists for the object.
 
 #### DELETE /sync/mappings/:mappingId
 Removes a sync mapping.
 
 #### GET /sync/lookup
-Looks up a mapping by Foundry ID.
+Looks up a mapping by **Chronicle identity** OR **external (Foundry) identity**.
 
-**Used by:** All sync modules to find existing mappings
+**Used by:** all sync modules (`sync-manager.mjs` → `findMapping` /
+`findMappingByExternal`) to find existing mappings before create.
 
-**Query:** `?foundry_id=abc123&type=entity`
+**Query:** `?chronicle_type=entity&chronicle_id=<uuid>`
+&nbsp;— or —&nbsp; `?external_system=foundry&external_id=<foundry-doc-id>`
 
-**Response:**
+**Response:** the full `SyncMapping`
 ```json
 {
+  "id": "mapping-uuid",
+  "campaign_id": "campaign-uuid",
+  "chronicle_type": "entity",
   "chronicle_id": "entity-uuid",
-  "foundry_id": "abc123",
-  "type": "entity"
+  "external_system": "foundry",
+  "external_id": "foundry-doc-id",
+  "sync_version": 1,
+  "last_synced_at": "2026-01-01T00:00:00Z",
+  "sync_direction": "both",
+  "sync_metadata": {},
+  "created_at": "2026-01-01T00:00:00Z",
+  "updated_at": "2026-01-01T00:00:00Z"
 }
 ```
 
-Returns 404 if no mapping exists.
+Returns **404** (`{"error":"Not Found","message":"sync mapping not found"}`) when no
+mapping exists. This is the normal "not yet mapped" signal callers use to decide to
+create one — **not** an error (the client scrubs it from the diagnostics error log).
 
 #### GET /sync/pull
 Pulls all changes since a timestamp.

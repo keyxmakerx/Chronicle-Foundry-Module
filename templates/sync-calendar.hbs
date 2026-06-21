@@ -72,6 +72,8 @@
           <p class="import-too-old"><i class="fa-solid fa-circle-info"></i> {{localize "CHRONICLE.SyncCalendar.Import.ChronicleTooOld"}}</p>
         {{else if (eq importBanner.state "unreachable")}}
           <p class="import-unreachable"><i class="fa-solid fa-plug-circle-xmark"></i> {{localize "CHRONICLE.SyncCalendar.Import.Unreachable"}}</p>
+        {{else if (eq importBanner.state "auth")}}
+          <p class="import-auth"><i class="fa-solid fa-key"></i> {{localize "CHRONICLE.SyncCalendar.Import.NotAuthorized"}}</p>
         {{/if}}
         {{#if importBanner.lastResult}}
           <p class="import-last-result {{#if importBanner.lastResult.ok}}ok{{else}}err{{/if}}">
@@ -160,6 +162,8 @@
         <p class="import-too-old"><i class="fa-solid fa-circle-info"></i> {{localize "CHRONICLE.SyncCalendar.Import.ChronicleTooOld"}}</p>
       {{else if (eq importBanner.state "unreachable")}}
         <p class="import-unreachable"><i class="fa-solid fa-plug-circle-xmark"></i> {{localize "CHRONICLE.SyncCalendar.Import.Unreachable"}}</p>
+      {{else if (eq importBanner.state "auth")}}
+        <p class="import-auth"><i class="fa-solid fa-key"></i> {{localize "CHRONICLE.SyncCalendar.Import.NotAuthorized"}}</p>
       {{/if}}
       {{#if importBanner.lastResult}}
         <p class="import-last-result {{#if importBanner.lastResult.ok}}ok{{else}}err{{/if}}">
