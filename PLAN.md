@@ -1,3 +1,5 @@
+> **SUPERSEDED** — map sync shipped as JournalEntry image-page + MapViewerSheet; see `.ai.md` for the current architecture.
+
 # Implementation Plan: Map Journal Pages, Conflict Resolution, Folders & Multi-Page Journals
 
 ## Overview

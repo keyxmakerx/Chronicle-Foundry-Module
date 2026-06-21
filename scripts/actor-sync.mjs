@@ -778,15 +778,29 @@ export class ActorSync {
 // Utility
 // ---------------------------------------------------------------------------
 
+/** Prototype-pollution guard for _setNestedValue path segments. */
+const PROTO_BLOCKED = new Set(['__proto__', 'prototype', 'constructor']);
+
 /**
  * Set a nested value on an object using dot-notation key.
  * e.g., _setNestedValue(obj, 'system.abilities.str.value', 10)
+ *
+ * Rejects any path segment that is a known prototype-pollution vector
+ * (__proto__, prototype, constructor). Chronicle manifests are
+ * operator-controlled, but an accidental or tampered manifest path
+ * writing through these keys could corrupt the JS prototype chain.
+ *
  * @param {object} obj
  * @param {string} path
  * @param {*} value
  */
 function _setNestedValue(obj, path, value) {
   const keys = path.split('.');
+  // Reject any prototype-pollution segment before touching the object.
+  if (keys.some((k) => PROTO_BLOCKED.has(k))) {
+    console.warn(`Chronicle: _setNestedValue rejected unsafe path segment in "${path}"`);
+    return;
+  }
   let current = obj;
   for (let i = 0; i < keys.length - 1; i++) {
     if (!(keys[i] in current) || typeof current[keys[i]] !== 'object') {

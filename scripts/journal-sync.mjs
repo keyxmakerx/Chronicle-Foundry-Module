@@ -15,6 +15,34 @@ import { FLAG_SCOPE } from './constants.mjs';
 import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
 import { defaultLevelForVisibility } from './_ownership.mjs';
 import { isCalendarNoteJournal } from './calendar-sync.mjs';
+import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
+
+/**
+ * Validate and resolve a Chronicle entity's `image_path` to a safe src string.
+ *
+ * Mirrors the logic in map-sync._mapImageSrc (FM-SEC-IMAGE-HOST-ALLOWLIST):
+ *   - Full http(s) URL → allowed only if scheme+hostname match apiUrl; any
+ *     mismatch is dropped (empty string) and logged via _describeRejection.
+ *   - Relative path (starts with "/") → prefixed with apiUrl base.
+ *   - Anything else (empty/null/undefined) → empty string.
+ *
+ * @param {string|null|undefined} imagePath
+ * @returns {string} Safe image src, or "" if absent/rejected.
+ */
+function _resolveEntityImageSrc(imagePath) {
+  if (!imagePath || typeof imagePath !== 'string') return '';
+  const apiUrl = getSetting('apiUrl');
+  if (/^https?:/i.test(imagePath)) {
+    if (_isAllowedImageHost(imagePath, apiUrl)) return imagePath;
+    console.warn(_describeRejection('entity_image', imagePath, apiUrl));
+    return '';
+  }
+  if (imagePath.startsWith('/')) {
+    const baseUrl = apiUrl?.replace(/\/+$/, '');
+    return baseUrl ? `${baseUrl}${imagePath}` : imagePath;
+  }
+  return '';
+}
 
 /**
  * JournalSync handles entity ↔ JournalEntry synchronization.
@@ -327,11 +355,16 @@ export class JournalSync {
       const pages = [];
 
       // Image page (if entity has an image).
-      if (entity.image_path) {
+      // Route image_path through the same host-allowlist that map-sync uses
+      // (_mapImageSrc). Full http(s) URLs must match the configured apiUrl
+      // scheme+hostname (F-1 / FM-SEC-IMAGE-HOST-ALLOWLIST); relative paths
+      // are prefixed with apiUrl. A rejected host drops to empty src + warn.
+      const resolvedImageSrc = _resolveEntityImageSrc(entity.image_path);
+      if (resolvedImageSrc) {
         pages.push({
           name: 'Image',
           type: 'image',
-          src: entity.image_path,
+          src: resolvedImageSrc,
           sort: 0,
         });
       }
