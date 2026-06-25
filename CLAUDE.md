@@ -66,4 +66,11 @@ Integration — Install & Updates".
 
 ## TODO
 
-- (none currently)
+- (none currently) — the Foundry V1→V2 `DialogV2` migration and the
+  `render(true)` → `render({ force: true })` cleanup are complete, centralized in
+  `scripts/_dialogs.mjs` and pinned by `tools/test-dialogs.mjs`.
+- Recommended once on a live **v14** client (can't be unit-tested headlessly):
+  smoke-test the migrated dialogs (resync / pull / push confirms, the "create
+  entity type" prompt, map pin & marker delete confirms, the calendar cleanup
+  confirm) and the dashboard Calendar tab (Foundry local date now renders, In/Out
+  of Sync badge, Push-date button).

@@ -27,6 +27,9 @@ let syncManager = null;
 /** @type {SyncDashboard|null} */
 let dashboard = null;
 
+/** @type {HTMLElement|null} Sidebar status indicator, re-attached on re-render. */
+let _statusIndicatorEl = null;
+
 /**
  * Module initialization — register settings.
  * This runs before the game is fully ready.
@@ -157,7 +160,21 @@ async function _runtimeValidateDescriptor() {
       fetch('modules/chronicle-sync/chronicle-package.json', { cache: 'no-store' }),
       fetch('modules/chronicle-sync/module.json', { cache: 'no-store' }),
     ]);
-    if (descResp.ok) descriptor = await descResp.json();
+    // Chronicle deliberately strips chronicle-package.json from the module
+    // zips it serves (Chronicle foundry_vtt/handler.go) — the descriptor is
+    // Chronicle-side metadata, not part of the installed module. A 404 here
+    // is therefore the NORMAL served-install case, not schema drift: skip the
+    // check silently. (It still fires for a genuinely malformed descriptor
+    // that WAS shipped — a hand-edited / ad-hoc release — which is the
+    // FM-SEC-CHUNK-7 purpose.)
+    if (!descResp.ok) {
+      console.debug(
+        `Chronicle Sync | chronicle-package.json not served (HTTP ${descResp.status}) — `
+        + 'skipping descriptor runtime check (expected for Chronicle-served installs).'
+      );
+      return;
+    }
+    descriptor = await descResp.json();
     if (modResp.ok) moduleJson = await modResp.json();
   } catch (err) {
     console.warn('Chronicle Sync | Descriptor runtime fetch failed (skipping check)', err);
@@ -355,11 +372,36 @@ function _addStatusIndicator() {
   });
 
   // Append to sidebar header or player list.
+  _statusIndicatorEl = indicator;
   const sidebar = document.getElementById('sidebar');
   if (sidebar) {
     sidebar.prepend(indicator);
   }
 }
+
+/**
+ * Re-attach the sidebar status indicator after the sidebar re-renders.
+ *
+ * Foundry v13+ rebuilt the sidebar as an ApplicationV2 that re-renders (and
+ * wipes injected nodes) on tab changes, so the one-shot injection in
+ * `_addStatusIndicator` does not persist — the indicator (a primary entry
+ * point to the dashboard and its diagnostics) silently vanishes, which reads
+ * to the operator as "the debug button is gone." This handler is purely
+ * additive and fully guarded: if the hook never fires or the DOM shape differs
+ * on a future Foundry version, behavior degrades to "no indicator" rather than
+ * throwing. A version-independent path to diagnostics is also exposed on the
+ * module API (`game.modules.get('chronicle-sync').api.copyDebug()` /
+ * `.openDashboard()`).
+ */
+Hooks.on('renderSidebar', () => {
+  try {
+    if (!_statusIndicatorEl || _statusIndicatorEl.isConnected) return;
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar && !sidebar.contains(_statusIndicatorEl)) sidebar.prepend(_statusIndicatorEl);
+  } catch (err) {
+    console.debug('Chronicle Sync | status-indicator re-attach skipped', err);
+  }
+});
 
 /**
  * Return tooltip text for the connection status indicator.
@@ -392,6 +434,12 @@ Hooks.once('ready', () => {
       dashboard,
       getAPI: () => syncManager?.api,
       openDashboard: () => dashboard?.render({ force: true }),
+      // Version-independent diagnostics escape hatch. Lets an operator always
+      // produce the System Debug snapshot from the console even if the toolbar
+      // button or sidebar indicator regress on a Foundry upgrade. DOM-
+      // independent (builds from game state) and returns the report string in
+      // addition to copying it to the clipboard.
+      copyDebug: () => dashboard?.copyDebugReport(),
     };
   }
 });

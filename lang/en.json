@@ -605,6 +605,7 @@
         "Success": "Chronicle Sync: calendar imported.",
         "ChronicleTooOld": "Chronicle doesn't expose the calendar-create endpoint yet — update Chronicle, then click Recheck.",
         "Unreachable": "Could not reach Chronicle to check for a calendar. Check your sync settings.",
+        "NotAuthorized": "Chronicle rejected the sync token while checking for a calendar. Re-check your API key in Module Settings, or reinstall the module from a fresh campaign URL.",
         "Recheck": "Recheck Chronicle",
         "CalendariaUnavailable": "Calendaria's API is not available — cannot read the source calendar.",
         "CalendarNotFound": "Calendaria has no calendar with that id.",
