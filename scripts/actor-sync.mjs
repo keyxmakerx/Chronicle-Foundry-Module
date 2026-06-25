@@ -195,6 +195,10 @@ export class ActorSync {
         }
         // Don't auto-create actors during initial sync — only update existing links.
       }
+
+      // Surface unresolved character links (broken / missing) so the GM can
+      // fix them in the dashboard's Issues tab rather than silently desyncing.
+      await this._notifySyncIssues();
     } catch (err) {
       console.warn('Chronicle: Actor initial sync failed', err);
     }
@@ -754,6 +758,182 @@ export class ActorSync {
         return a.name.localeCompare(b.name);
       });
   }
+
+  // ---------------------------------------------------------------------------
+  // Sync issue resolver — recover broken / missing character links and re-push
+  // stranded data (Foundry → Chronicle). See sync-dashboard "Issues" tab.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * The candidate pool for matching: every Chronicle character entity (the
+   * system character type plus the PC sub-type, the same set onInitialSync walks).
+   * @returns {Promise<Array<{id:string,name:string,entity_type_id?:number}>>}
+   * @private
+   */
+  async _listCharacterEntities() {
+    if (!this._characterTypeId) return [];
+    const typeIds = [this._characterTypeId];
+    if (this._pcSubtypeId) typeIds.push(this._pcSubtypeId);
+    const out = [];
+    for (const typeId of typeIds) {
+      try {
+        const result = await this._api.get(`/entities?type_id=${typeId}&per_page=100`);
+        out.push(...(result?.data || []));
+      } catch (err) {
+        console.warn('Chronicle: failed to list character entities', err);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Whether a Chronicle entity still exists. Only a definite 404 counts as
+   * "gone"; ambiguous/transient errors return true so a flaky network never
+   * mislabels a healthy link as broken.
+   * @param {string} entityId
+   * @returns {Promise<boolean>}
+   * @private
+   */
+  async _entityExists(entityId) {
+    try {
+      await this._api.get(`/entities/${entityId}`);
+      return true;
+    } catch (err) {
+      const status = err?.status ?? err?.statusCode ?? err?.response?.status;
+      if (status === 404 || /\b404\b|not found/i.test(err?.message || '')) return false;
+      return true;
+    }
+  }
+
+  /**
+   * Best name match for an actor among candidate entities: exact
+   * (case-insensitive), then prefix, then substring. Null when nothing is a
+   * confident match (the resolver then defaults to "Create new").
+   * @param {string} actorName
+   * @param {Array<{id:string,name:string}>} entities
+   * @returns {{id:string,name:string}|null}
+   * @private
+   */
+  _suggestMatch(actorName, entities) {
+    const n = (actorName || '').trim().toLowerCase();
+    if (!n) return null;
+    const norm = (e) => (e.name || '').trim().toLowerCase();
+    let m = entities.find((e) => norm(e) === n);
+    if (m) return m;
+    m = entities.find((e) => { const en = norm(e); return en && (en.startsWith(n) || n.startsWith(en)); });
+    if (m) return m;
+    m = entities.find((e) => { const en = norm(e); return en && (en.includes(n) || n.includes(en)); });
+    return m || null;
+  }
+
+  /**
+   * Scan character actors for issues the resolver can fix:
+   *   - 'unlinked': no entityId flag (never linked)
+   *   - 'broken':   entityId flag points at an entity that 404s — "failed to
+   *                 find existing character" (linked once, now gone)
+   * Linked + valid actors aren't issues (re-pushing their data is the explicit
+   * repushActor action). Each issue carries a name-matched suggestion, and the
+   * result includes the full candidate list so the UI can prefill + offer a pick.
+   * @returns {Promise<{issues:Array, candidates:Array<{id:string,name:string}>}>}
+   */
+  async getSyncIssues() {
+    if (!this._adapter || !this._characterTypeId) return { issues: [], candidates: [] };
+    const entities = await this._listCharacterEntities();
+    const ids = new Set(entities.map((e) => e.id));
+    const issues = [];
+    for (const actor of game.actors.contents) {
+      if (actor.type !== this._actorType) continue;
+      const entityId = actor.getFlag(FLAG_SCOPE, 'entityId') || null;
+      let kind = null;
+      if (!entityId) {
+        kind = 'unlinked';
+      } else if (!ids.has(entityId) && !(await this._entityExists(entityId))) {
+        kind = 'broken';
+      }
+      if (!kind) continue;
+      const suggestion = this._suggestMatch(actor.name, entities);
+      issues.push({ actorId: actor.id, name: actor.name, img: actor.img, kind, suggestionId: suggestion?.id || null });
+    }
+    return {
+      issues,
+      candidates: entities.map((e) => ({ id: e.id, name: e.name }))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || '')),
+    };
+  }
+
+  /**
+   * If any character actors can't be matched to Chronicle (broken / missing
+   * links), nudge the GM toward the dashboard's Issues tab. Quiet when all clear.
+   * @private
+   */
+  async _notifySyncIssues() {
+    try {
+      const { issues } = await this.getSyncIssues();
+      if (!issues.length) return;
+      const n = issues.length;
+      ui.notifications?.warn(
+        `Chronicle Sync: ${n} character${n === 1 ? '' : 's'} need attention — open the Chronicle dashboard (Issues) to match or create.`
+      );
+      console.warn(`Chronicle: ${n} character sync issue(s) detected`, issues);
+    } catch (err) {
+      console.warn('Chronicle: issue check failed', err);
+    }
+  }
+
+  /**
+   * Push a LINKED actor's current fields to its Chronicle entity. Fixes the
+   * "stranded data on a valid link" case (actor edited while the module was
+   * offline, so updateActor never fired).
+   * @param {string} actorId
+   * @returns {Promise<boolean>}
+   */
+  async repushActor(actorId) {
+    const actor = game.actors.get(actorId);
+    const entityId = actor?.getFlag(FLAG_SCOPE, 'entityId');
+    if (!actor || !entityId || !this._adapter) return false;
+    await this._api.put(`/entities/${entityId}/fields`, { fields_data: this._adapter.toChronicleFields(actor) });
+    this._syncing = true;
+    try { await actor.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString()); }
+    finally { this._syncing = false; }
+    console.debug(`Chronicle: Re-pushed actor "${actor.name}" → entity ${entityId}`);
+    return true;
+  }
+
+  /**
+   * Link an orphaned actor to an EXISTING Chronicle entity, then push the
+   * actor's current data up (Foundry is source of truth for characters).
+   * @param {string} actorId
+   * @param {string} entityId
+   * @returns {Promise<boolean>}
+   */
+  async matchActorToEntity(actorId, entityId) {
+    const actor = game.actors.get(actorId);
+    if (!actor || !entityId || !this._adapter) return false;
+    this._syncing = true;
+    try { await actor.setFlag(FLAG_SCOPE, 'entityId', entityId); }
+    finally { this._syncing = false; }
+    return this.repushActor(actorId);
+  }
+
+  /**
+   * Create a NEW Chronicle entity of the SYSTEM'S character type for an orphaned
+   * actor and link it. Clears any stale/broken link first so _handleCreateActor
+   * creates fresh instead of skipping an "already linked" actor.
+   * @param {string} actorId
+   * @returns {Promise<boolean>}
+   */
+  async createEntityForActor(actorId) {
+    const actor = game.actors.get(actorId);
+    if (!actor) return false;
+    if (actor.getFlag(FLAG_SCOPE, 'entityId')) {
+      this._syncing = true;
+      try { await actor.unsetFlag(FLAG_SCOPE, 'entityId'); }
+      finally { this._syncing = false; }
+    }
+    await this._handleCreateActor(actor, {}, game.user.id);
+    return !!actor.getFlag(FLAG_SCOPE, 'entityId');
+  }
+
   /**
    * Return true when any actor of the character type has a non-GM Foundry
    * owner. Used by the dashboard to surface the PC-claiming hint when the
