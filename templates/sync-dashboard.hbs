@@ -35,6 +35,10 @@
     <a class="item" data-tab="characters">
       <i class="fa-solid fa-users"></i> Characters
     </a>
+    <a class="item" data-tab="issues">
+      <i class="fa-solid fa-link-slash"></i> Issues
+      {{#if issues.hasIssues}}<span class="member-tab-badge" title="{{issues.count}} character(s) need attention">{{issues.count}}</span>{{/if}}
+    </a>
     <a class="item" data-tab="members">
       <i class="fa-solid fa-user-shield"></i> Members
       {{#if members.hasUnmatched}}<span class="member-tab-badge" title="{{members.unmatchedCount}} unmatched member(s)">{{members.unmatchedCount}}</span>{{/if}}
@@ -595,6 +599,11 @@
               <span class="character-last-sync" title="{{lastSync}}">
                 {{timeAgo lastSync}}
               </span>
+              <button type="button" class="dashboard-btn btn-xs"
+                      data-action="resolve-repush" data-actor-id="{{id}}"
+                      title="Re-push this actor's current data to Chronicle">
+                <i class="fa-solid fa-rotate"></i> Re-sync
+              </button>
               {{else}}
               <button type="button" class="dashboard-btn btn-xs btn-push"
                       data-action="push-actor" data-actor-id="{{id}}">
@@ -632,6 +641,58 @@
           <li>Is it enabled for this campaign? (Campaign Settings &rarr; Game System)</li>
           <li>Check the browser console for detailed diagnostics.</li>
         </ul>
+      </div>
+      {{/if}}
+    </div>
+
+    {{!-- ================================================================= --}}
+    {{!-- ISSUES TAB (character link resolver)                              --}}
+    {{!-- ================================================================= --}}
+    <div class="tab" data-tab="issues" data-group="primary">
+      {{#if issues.hasIssues}}
+      <div class="dashboard-hint">
+        <i class="fa-solid fa-triangle-exclamation"></i> {{issues.headline}}
+      </div>
+      <div class="character-list">
+        {{#each issues.issues}}
+        <div class="character-row issue-row" data-actor-id="{{actorId}}">
+          <div class="character-info">
+            {{#if img}}
+            <img class="character-portrait" src="{{img}}" alt="{{name}}" />
+            {{else}}
+            <span class="character-portrait-placeholder"><i class="fa-solid fa-user"></i></span>
+            {{/if}}
+            <div class="character-details">
+              <span class="character-name">{{name}}</span>
+              <span class="character-sync-status unlinked"><i class="fa-solid fa-link-slash"></i> {{label}}</span>
+            </div>
+          </div>
+          <div class="character-actions issue-actions">
+            <select class="issue-match-select" title="Match to an existing Chronicle character">
+              <option value="">— Match to existing… —</option>
+              {{#each options}}
+              <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>
+              {{/each}}
+            </select>
+            <button type="button" class="dashboard-btn btn-xs btn-push"
+                    data-action="resolve-match" data-actor-id="{{actorId}}"
+                    title="Link to the selected character and push this actor's data">
+              <i class="fa-solid fa-link"></i> Match
+            </button>
+            <button type="button" class="dashboard-btn btn-xs"
+                    data-action="resolve-create" data-actor-id="{{actorId}}"
+                    title="Create a new Chronicle character of the correct type and link it">
+              <i class="fa-solid fa-plus"></i> Create new
+            </button>
+          </div>
+        </div>
+        {{/each}}
+      </div>
+      {{else}}
+      <div class="dashboard-empty-tab">
+        <i class="fa-solid fa-circle-check fa-2x"></i>
+        <p>No character sync issues.</p>
+        <p class="hint">Every character actor is linked to a Chronicle entity. If a linked character's data looks stale, use the <strong>Re-sync</strong> button on the Characters tab.</p>
       </div>
       {{/if}}
     </div>

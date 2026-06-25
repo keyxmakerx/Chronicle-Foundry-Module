@@ -1490,6 +1490,19 @@
   flex-shrink: 0;
 }
 
+/* --- Issues (character link resolver) tab --- */
+.issue-row .issue-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  max-width: 62%;
+}
+.issue-match-select {
+  max-width: 170px;
+  font-size: 0.8rem;
+  padding: 2px 4px;
+}
+
 /* --- Members (permission mapping) tab --- */
 .member-list {
   display: flex;
