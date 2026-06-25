@@ -77,6 +77,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'bulk-delete': SyncDashboard.#onBulkDeleteAction,
       'create-entity-type': SyncDashboard.#onCreateEntityTypeAction,
       'refresh-members': SyncDashboard.#onRefreshMembersAction,
+      'resolve-match': SyncDashboard.#onResolveMatchAction,
+      'resolve-create': SyncDashboard.#onResolveCreateAction,
+      'resolve-repush': SyncDashboard.#onResolveRepushAction,
     },
   };
 
@@ -216,6 +219,15 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     // Build characters tab data.
     const characterData = this._buildCharacterData();
 
+    // Build sync-issues (resolver) tab data.
+    let issuesData = { issues: [], hasIssues: false, count: 0, headline: '' };
+    try {
+      issuesData = await this._buildIssuesData();
+    } catch (err) {
+      console.error('Chronicle Dashboard: Failed to load sync issues', err);
+      loadErrors.push({ tab: 'issues', message: err.message || 'Failed to load issues' });
+    }
+
     // Build members (permission mapping) tab data.
     const membersData = this._buildMembersData();
 
@@ -231,6 +243,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       activeTab: this._activeTab,
       loadErrors,
       hasLoadErrors: loadErrors.length > 0,
+
+      // Issues (resolver) tab.
+      issues: issuesData,
 
       // Config tab.
       config: configData,
@@ -684,6 +699,39 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const pcClaimingHint = !pcClaimingEnabled && (actorSync?.hasPlayerOwnedPcs?.() ?? false);
 
     return { characters, hasUnlinkedCharacters, pcClaimingHint };
+  }
+
+  /** @returns {object|null} the live ActorSync module, if active. @private */
+  _actorSync() {
+    return this._syncManager?._modules?.find((m) => m.constructor?.name === 'ActorSync') || null;
+  }
+
+  /**
+   * Build the Issues (resolver) tab: character actors that can't be matched to
+   * Chronicle (unlinked, or linked to a now-missing entity). Each row carries a
+   * name-matched suggestion preselected + the full candidate list. Async — it
+   * reaches Chronicle to verify links and list candidates.
+   * @returns {Promise<object>}
+   * @private
+   */
+  async _buildIssuesData() {
+    const actorSync = this._actorSync();
+    if (!actorSync?.getSyncIssues) return { issues: [], hasIssues: false, count: 0, headline: '' };
+    const { issues, candidates } = await actorSync.getSyncIssues();
+    const decorated = issues.map((iss) => ({
+      actorId: iss.actorId,
+      name: iss.name,
+      img: iss.img,
+      label: iss.kind === 'broken' ? 'Failed to find existing character' : 'Not linked to Chronicle',
+      options: candidates.map((c) => ({ id: c.id, name: c.name, selected: c.id === iss.suggestionId })),
+    }));
+    const count = decorated.length;
+    return {
+      issues: decorated,
+      hasIssues: count > 0,
+      count,
+      headline: `${count} character${count === 1 ? '' : 's'} couldn't be matched to Chronicle — match each to an existing character, or create a new one.`,
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -1327,6 +1375,21 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this._onPushAllActors();
   }
 
+  /** Resolver: link an orphaned actor to the row's selected existing entity. */
+  static #onResolveMatchAction(event, target) {
+    return this._onResolveMatch(target);
+  }
+
+  /** Resolver: create a new Chronicle character (the system's type) for an orphan. */
+  static #onResolveCreateAction(event, target) {
+    return this._onResolveCreate(target);
+  }
+
+  /** Resolver / Characters: re-push a linked actor's current data to Chronicle. */
+  static #onResolveRepushAction(event, target) {
+    return this._onResolveRepush(target);
+  }
+
   /** Test connection to Chronicle using current config field values. */
   static #onTestConnectionAction() {
     this._onTestConnection();
@@ -1713,6 +1776,56 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    * Shows a confirmation dialog before proceeding.
    * @private
    */
+  /** Link an orphaned actor (button's data-actor-id) to the row's selected entity. */
+  async _onResolveMatch(target) {
+    const actorId = target?.dataset?.actorId;
+    const row = target?.closest?.('.issue-row');
+    const entityId = row?.querySelector?.('.issue-match-select')?.value;
+    if (!actorId || !entityId) { ui.notifications.warn('Chronicle: Pick a character to match to first.'); return; }
+    const actorSync = this._actorSync();
+    if (!actorSync) { ui.notifications.warn('Chronicle: Character sync not active.'); return; }
+    try {
+      const ok = await actorSync.matchActorToEntity(actorId, entityId);
+      ui.notifications[ok ? 'info' : 'warn'](ok ? 'Chronicle: Matched and synced.' : 'Chronicle: Match failed.');
+    } catch (err) {
+      console.error('Chronicle Dashboard: match failed', err);
+      ui.notifications.error('Chronicle: Match failed — see console.');
+    }
+    this.render({ force: true });
+  }
+
+  /** Create a new Chronicle character (the system's type) for an orphaned actor. */
+  async _onResolveCreate(target) {
+    const actorId = target?.dataset?.actorId;
+    if (!actorId) return;
+    const actorSync = this._actorSync();
+    if (!actorSync) { ui.notifications.warn('Chronicle: Character sync not active.'); return; }
+    try {
+      const ok = await actorSync.createEntityForActor(actorId);
+      ui.notifications[ok ? 'info' : 'warn'](ok ? 'Chronicle: Created and linked.' : 'Chronicle: Create failed.');
+    } catch (err) {
+      console.error('Chronicle Dashboard: create failed', err);
+      ui.notifications.error('Chronicle: Create failed — see console.');
+    }
+    this.render({ force: true });
+  }
+
+  /** Re-push a linked actor's current data to Chronicle (the stranded-data fix). */
+  async _onResolveRepush(target) {
+    const actorId = target?.dataset?.actorId;
+    if (!actorId) return;
+    const actorSync = this._actorSync();
+    if (!actorSync) { ui.notifications.warn('Chronicle: Character sync not active.'); return; }
+    try {
+      const ok = await actorSync.repushActor(actorId);
+      ui.notifications[ok ? 'info' : 'warn'](ok ? 'Chronicle: Re-synced to Chronicle.' : 'Chronicle: Re-sync failed.');
+    } catch (err) {
+      console.error('Chronicle Dashboard: re-sync failed', err);
+      ui.notifications.error('Chronicle: Re-sync failed — see console.');
+    }
+    this.render({ force: true });
+  }
+
   async _onPushAllActors() {
     const actorSync = this._syncManager?._modules?.find(
       (m) => m.constructor?.name === 'ActorSync'
