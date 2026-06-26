@@ -122,6 +122,14 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     /** @type {string} Current search filter text. */
     this._searchFilter = '';
 
+    /**
+     * @type {string|null} Actor id the GM chose to inspect in the Status tab's
+     * Capability Inspector. Null = auto-pick (first linked, else first of type).
+     * Per-session instance state (like _searchFilter): survives re-renders,
+     * resets when the dashboard window is closed.
+     */
+    this._capabilityActorId = null;
+
     /** @type {string} Currently active tab (persisted per-client). */
     this._activeTab = getSetting('dashboardActiveTab') || 'entities';
 
@@ -1026,13 +1034,35 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     );
     const actorType = actorSync?._actorType || actorSync?._adapter?.actorType || 'character';
 
-    // Sample a representative actor: prefer a linked one, else the first of the type.
     const ofType = (game.actors?.contents || []).filter((a) => a?.type === actorType);
-    const sample = ofType.find((a) => a.getFlag?.(FLAG_SCOPE, 'entityId')) || ofType[0] || null;
+
+    // Which actor to inspect. If the GM picked one (and it still exists), use it;
+    // otherwise auto-pick a representative actor: prefer a Chronicle-linked one,
+    // else the first of the type. `autoPicked` drives the UI hint so the GM knows
+    // the panel chose for them and can switch with the dropdown.
+    const chosen = this._capabilityActorId
+      ? ofType.find((a) => a.id === this._capabilityActorId)
+      : null;
+    const autoPicked = !chosen;
+    const sample = chosen
+      || ofType.find((a) => a.getFlag?.(FLAG_SCOPE, 'entityId'))
+      || ofType[0]
+      || null;
     if (!sample) {
       this._capabilityReport = null;
-      return { available: false, actorType, error: `no "${actorType}" actor to sample` };
+      return { available: false, actorType, actors: [], error: `no "${actorType}" actor to sample` };
     }
+
+    // The full pick-list for the dropdown (linked actors flagged so the GM can
+    // tell which heroes already sync to Chronicle).
+    const actors = ofType
+      .map((a) => ({
+        id: a.id,
+        name: a.name || '(unnamed)',
+        linked: !!a.getFlag?.(FLAG_SCOPE, 'entityId'),
+        selected: a.id === sample.id,
+      }))
+      .sort((x, y) => x.name.localeCompare(y.name));
 
     // Fetch the system's declared character fields (same source the adapter uses).
     let fieldDefs = { fields: [] };
@@ -1050,6 +1080,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     return {
       available: !!report.ok,
       actorType,
+      actors,
+      autoPicked,
       summary: report.summary,
       source: report.source,
       gaps: this._capabilityGaps(report),
@@ -1262,6 +1294,17 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         this._setMemberMapping(key, e.currentTarget.value);
       });
     });
+
+    // --- Status tab: Capability Inspector actor picker ---
+    // ApplicationV2 `actions` only delegate `click`, so the `<select>` change is
+    // wired here directly. Picking an actor re-renders the panel against it.
+    const capActorSelect = el.querySelector('.capability-actor-select');
+    if (capActorSelect) {
+      capActorSelect.addEventListener('change', (e) => {
+        this._capabilityActorId = e.currentTarget.value || null;
+        this.render({ force: true });
+      });
+    }
 
     // Map tab handlers are wired via the `open-map-journal` action above;
     // no additional select listeners are needed in Path B.

@@ -1004,7 +1004,15 @@
         {{#if capability}}
         <h3 class="section-heading">Sync Capability</h3>
         {{#if capability.available}}
-        <p class="config-hint">What a Foundry actor exposes vs what Chronicle currently syncs — sampled from <strong>{{capability.source.actorName}}</strong> (type <code>{{capability.source.actorType}}</code>).</p>
+        <p class="config-hint">Compares what a Foundry actor exposes against what Chronicle currently syncs.{{#if capability.autoPicked}} Auto-picked <strong>{{capability.source.actorName}}</strong> (the first <code>{{capability.source.actorType}}</code> actor) — pick a different one below to inspect it.{{else}} Inspecting <strong>{{capability.source.actorName}}</strong> (type <code>{{capability.source.actorType}}</code>).{{/if}}</p>
+        <div class="capability-actor-picker">
+          <label for="capability-actor-select">Inspect actor:</label>
+          <select id="capability-actor-select" class="config-select capability-actor-select">
+            {{#each capability.actors}}
+            <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}{{#if linked}} ✓ synced{{/if}}</option>
+            {{/each}}
+          </select>
+        </div>
         <div class="diagnostics-detail">
           <div class="system-info-row"><span class="system-label">Synced:</span><span class="system-value">{{capability.summary.synced}} / {{capability.summary.totalDeclared}} declared</span></div>
           <div class="system-info-row"><span class="system-label">Declared, unmapped:</span><span class="system-value">{{capability.summary.declaredUnmapped}}</span></div>

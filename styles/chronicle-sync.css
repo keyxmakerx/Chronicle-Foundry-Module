@@ -1166,6 +1166,25 @@
   font-size: 12px;
 }
 
+/* Capability Inspector actor picker (Status tab) */
+.capability-actor-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.capability-actor-picker label {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.capability-actor-picker .config-select {
+  flex: 1;
+  min-width: 0;
+}
+
 .error-value {
   color: #ef4444 !important;
 }
