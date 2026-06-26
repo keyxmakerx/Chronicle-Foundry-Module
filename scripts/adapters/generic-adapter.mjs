@@ -7,11 +7,24 @@
  * without a hand-written adapter, as long as the system manifest includes
  * foundry_path annotations on its character fields.
  *
- * Field definitions specify:
+ * Field definitions specify either a SCALAR mapping or a COLLECTION mapping:
+ *
+ *   Scalar (a single value on actor.system):
  *   - key:             Chronicle field key (e.g. "hp_current")
  *   - foundry_path:    dot-notation path on actor.system (e.g. "system.attributes.hp.value")
  *   - foundry_writable: whether Chronicle may write back to this Foundry path (default true)
  *   - type:            field type ("number", "string", etc.) for casting
+ *
+ *   Collection (embedded documents — abilities, inventory, features — that live in
+ *   actor.items[] etc., which a dot-path cannot reach):
+ *   - key:               Chronicle field key (e.g. "abilities_json")
+ *   - foundry_collection: the actor collection to read ("items", "effects")
+ *   - foundry_item_type:  optional Foundry item type(s) to keep (string or string[])
+ *   - foundry_item_fields: projection { outKey: "dot.path.on.item" }; omit for a
+ *                          default {id,name,type} projection
+ *   - type:              "json"/"string" → serialized JSON string; else a raw array
+ *   Collection fields are READ-ONLY today (pull only); write-back is a future tier,
+ *   so they are never included in the Foundry update path.
  */
 
 /**
@@ -35,14 +48,17 @@ export async function createGenericAdapter(api, chronicleSystemId) {
     return null;
   }
 
-  // Only include fields that have a foundry_path annotation.
-  const mappedFields = fieldDefs.fields.filter((f) => f.foundry_path);
+  // A field is pullable if it maps a scalar (foundry_path) OR a collection
+  // (foundry_collection). Both are read on toChronicleFields.
+  const mappedFields = fieldDefs.fields.filter((f) => f.foundry_path || f.foundry_collection);
   if (mappedFields.length === 0) {
-    console.warn(`Chronicle: Generic adapter — no fields with foundry_path for "${chronicleSystemId}"`);
+    console.warn(`Chronicle: Generic adapter — no fields with foundry_path/foundry_collection for "${chronicleSystemId}"`);
     return null;
   }
 
-  const writableFields = mappedFields.filter((f) => f.foundry_writable !== false);
+  // Only scalar (foundry_path) fields are writable back to Foundry — collection
+  // write-back is a future tier, so it is excluded from the update path here.
+  const writableFields = mappedFields.filter((f) => f.foundry_path && f.foundry_writable !== false);
 
   console.debug(
     `Chronicle: Generic adapter loaded for "${chronicleSystemId}" — ` +
@@ -72,12 +88,7 @@ export async function createGenericAdapter(api, chronicleSystemId) {
      * @returns {object} Chronicle fields_data object.
      */
     toChronicleFields(actor) {
-      const result = {};
-      for (const field of mappedFields) {
-        const value = _getNestedValue(actor, field.foundry_path);
-        result[field.key] = value ?? null;
-      }
-      return result;
+      return buildChronicleFields(actor, mappedFields);
     },
 
     /**
@@ -117,13 +128,14 @@ export async function createGenericAdapter(api, chronicleSystemId) {
 /**
  * Read a nested value from an object using dot-notation path.
  * Supports both nested objects and Foundry's system data.
- * e.g., _getNestedValue(actor, "system.abilities.str.value")
+ * e.g., getNestedValue(actor, "system.abilities.str.value")
  *
  * @param {object} obj
  * @param {string} path
  * @returns {*}
  */
-function _getNestedValue(obj, path) {
+export function getNestedValue(obj, path) {
+  if (!path) return undefined;
   const keys = path.split('.');
   let current = obj;
   for (const key of keys) {
@@ -131,4 +143,73 @@ function _getNestedValue(obj, path) {
     current = current[key];
   }
   return current;
+}
+
+/**
+ * Extract a collection-mapped field (e.g. abilities/inventory from actor.items[]).
+ * Reads field.foundry_collection off the actor, optionally filters by
+ * foundry_item_type, projects each entry per foundry_item_fields (or a default
+ * {id,name,type}), and returns a JSON string (type json/string) or a raw array.
+ * Defensive — a malformed actor/collection yields an empty result, never throws.
+ *
+ * @param {object} actor
+ * @param {object} field - field def with foundry_collection
+ * @returns {string|Array}
+ */
+export function extractCollectionField(actor, field) {
+  const wantJson = field.type === 'json' || field.type === 'string';
+  const empty = wantJson ? '[]' : [];
+  try {
+    const coll = actor?.[field.foundry_collection];
+    if (!coll) return empty;
+    let contents = coll.contents
+      || (typeof coll[Symbol.iterator] === 'function' ? Array.from(coll) : []);
+
+    if (field.foundry_item_type) {
+      const types = Array.isArray(field.foundry_item_type)
+        ? field.foundry_item_type
+        : [field.foundry_item_type];
+      contents = contents.filter((it) => it && types.includes(it.type));
+    }
+
+    const proj = field.foundry_item_fields && typeof field.foundry_item_fields === 'object'
+      ? field.foundry_item_fields
+      : null;
+
+    const items = contents.map((it) => {
+      if (!proj) return { id: it.id ?? null, name: it.name ?? null, type: it.type ?? null };
+      const out = {};
+      for (const [outKey, path] of Object.entries(proj)) {
+        out[outKey] = getNestedValue(it, path) ?? null;
+      }
+      return out;
+    });
+
+    return wantJson ? JSON.stringify(items) : items;
+  } catch (err) {
+    console.warn(`Chronicle: generic adapter — collection extract failed for "${field.key}"`, err);
+    return empty;
+  }
+}
+
+/**
+ * Build a Chronicle fields_data object from a Foundry actor and the mapped field
+ * defs. Scalar fields read their foundry_path; collection fields extract from the
+ * named actor collection. PURE (no Foundry globals) → unit-testable.
+ *
+ * @param {object} actor
+ * @param {Array<object>} mappedFields
+ * @returns {object}
+ */
+export function buildChronicleFields(actor, mappedFields) {
+  const result = {};
+  for (const field of mappedFields) {
+    if (field.foundry_collection) {
+      result[field.key] = extractCollectionField(actor, field);
+    } else {
+      const value = getNestedValue(actor, field.foundry_path);
+      result[field.key] = value ?? null;
+    }
+  }
+  return result;
 }

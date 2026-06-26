@@ -15,6 +15,15 @@ import { openSyncCalendar } from './sync-calendar.mjs';
 import { buildCalendarDiagnostics } from './sync-calendar-diagnostics.mjs';
 import { memberKey } from './sync-manager.mjs';
 import { buildMemberRows } from './_member-mapping.mjs';
+import {
+  captureActorSnapshot,
+  buildCapabilityReport,
+  renderCapabilityMarkdown,
+  renderCapabilityJSON,
+  CAP_STATUS,
+} from './capability-inspector.mjs';
+import { buildDiagnosticBundle } from './sync-diagnostic-bundle.mjs';
+import { log, getLogBuffer } from './logger.mjs';
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**
@@ -70,6 +79,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'test-connection': SyncDashboard.#onTestConnectionAction,
       'save-config': SyncDashboard.#onSaveConfigAction,
       'copy-debug': SyncDashboard.#onCopyDebugAction,
+      'copy-diagnostic-bundle': SyncDashboard.#onCopyDiagnosticBundleAction,
+      'copy-capability': SyncDashboard.#onCopyCapabilityAction,
+      'copy-capability-json': SyncDashboard.#onCopyCapabilityJsonAction,
       'copy-calendar-diagnostics': SyncDashboard.#onCopyCalendarDiagnosticsAction,
       'open-wizard': SyncDashboard.#onOpenWizardAction,
       'bulk-set-public': SyncDashboard.#onBulkSetPublicAction,
@@ -216,6 +228,15 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     // Build status tab data.
     const statusData = this._buildStatusData();
 
+    // Build sync-capability data (what CAN pull vs what DOES) — WS-4.
+    let capabilityData = null;
+    try {
+      capabilityData = await this._buildCapabilityData();
+    } catch (err) {
+      log.error('Dashboard: Failed to build sync capability', err);
+      loadErrors.push({ tab: 'status', message: err.message || 'Failed to build sync capability' });
+    }
+
     // Build characters tab data.
     const characterData = this._buildCharacterData();
 
@@ -284,6 +305,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
       // Status tab.
       ...statusData,
+
+      // Sync Capability (status tab panel) — WS-4.
+      capability: capabilityData,
     };
   }
 
@@ -987,6 +1011,85 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
+   * Build the Sync Capability report (WS-4): what a representative Foundry actor
+   * EXPOSES vs what Chronicle currently SYNCS. Samples one actor of the synced
+   * type and diffs it against the system's declared character-field manifest.
+   * Stashes the full report on `this._capabilityReport` for the copy actions.
+   * Returns null when no system is matched. @private
+   */
+  async _buildCapabilityData() {
+    const matchedSystem = this._syncManager?.getMatchedSystem?.();
+    if (!matchedSystem) return null;
+
+    const actorSync = this._syncManager?._modules?.find(
+      (m) => m.constructor?.name === 'ActorSync'
+    );
+    const actorType = actorSync?._actorType || actorSync?._adapter?.actorType || 'character';
+
+    // Sample a representative actor: prefer a linked one, else the first of the type.
+    const ofType = (game.actors?.contents || []).filter((a) => a?.type === actorType);
+    const sample = ofType.find((a) => a.getFlag?.(FLAG_SCOPE, 'entityId')) || ofType[0] || null;
+    if (!sample) {
+      this._capabilityReport = null;
+      return { available: false, actorType, error: `no "${actorType}" actor to sample` };
+    }
+
+    // Fetch the system's declared character fields (same source the adapter uses).
+    let fieldDefs = { fields: [] };
+    try {
+      const resp = await this.api?.get(`/systems/${matchedSystem}/character-fields`);
+      if (resp && Array.isArray(resp.fields)) fieldDefs = resp;
+    } catch (err) {
+      log.warn('Dashboard: capability — failed to load character-fields', err);
+    }
+
+    const snapshot = captureActorSnapshot(sample);
+    const report = buildCapabilityReport(snapshot, fieldDefs);
+    this._capabilityReport = report; // stashed for the copy actions
+
+    return {
+      available: !!report.ok,
+      actorType,
+      summary: report.summary,
+      source: report.source,
+      gaps: this._capabilityGaps(report),
+      error: report.ok ? null : report.error,
+    };
+  }
+
+  /**
+   * Flatten the non-synced capability rows into {status,label,detail} for the
+   * template (the actionable "what we're missing" list). Caps the available-but-
+   * unmapped list so a large system can't flood the panel. @private
+   */
+  _capabilityGaps(report) {
+    if (!report?.ok) return [];
+    const AVAIL_CAP = 50;
+    const gaps = [];
+    let availCount = 0;
+    for (const r of report.fields) {
+      if (r.status === CAP_STATUS.SYNCED) continue;
+      if (r.status === CAP_STATUS.DECLARED_UNMAPPED) {
+        gaps.push({ status: r.status, label: r.key, detail: 'declared field, no foundry_path' });
+      } else if (r.status === CAP_STATUS.MAPPED_MISSING) {
+        gaps.push({ status: r.status, label: r.key, detail: `${r.foundry_path} — absent on this actor` });
+      } else if (r.status === CAP_STATUS.AVAILABLE_UNMAPPED) {
+        if (availCount < AVAIL_CAP) {
+          gaps.push({ status: r.status, label: r.foundry_path, detail: r.type });
+        }
+        availCount++;
+      }
+    }
+    if (availCount > AVAIL_CAP) {
+      gaps.push({ status: 'available-unmapped', label: `…and ${availCount - AVAIL_CAP} more available paths`, detail: '' });
+    }
+    for (const c of report.collections) {
+      gaps.push({ status: c.status, label: c.source, detail: `${c.count} item(s) [${c.types.join(', ')}] — ${c.note}` });
+    }
+    return gaps;
+  }
+
+  /**
    * @param {string} state
    * @returns {string}
    * @private
@@ -1403,6 +1506,103 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Copy system debug snapshot to clipboard for pasting into AI tools. */
   static #onCopyDebugAction() {
     this._onCopyDebug();
+  }
+
+  /** Copy the troubleshooting Diagnostic Bundle to the clipboard. */
+  static #onCopyDiagnosticBundleAction() {
+    this._onCopyDiagnosticBundle();
+  }
+
+  /**
+   * Gather the live data for a Diagnostic Bundle from the same accessors the
+   * status tab uses (versions, health, logs, field mapping, capability). @private
+   */
+  _buildDiagnosticInput() {
+    const health = this.api?.health ?? {};
+    const matchedSystem = this._syncManager?.getMatchedSystem?.() || null;
+    const cap = this._capabilityReport;
+    return {
+      generatedAt: new Date().toISOString(),
+      versions: {
+        module: game.modules.get('chronicle-sync')?.version ?? null,
+        chronicle: this._syncManager?.getChronicleVersion?.() ?? null,
+        foundry: game.version ?? null,
+        system: game.system?.title ?? null,
+        systemId: game.system?.id ?? null,
+      },
+      connection: {
+        state: this.api?.state ?? 'disconnected',
+        uptimePercent: this.api?.getUptimePercent?.() ?? null,
+        restSuccess: health.restSuccessCount ?? null,
+        restError: health.restErrorCount ?? null,
+        reconnectAttempts: health.reconnectAttempts ?? null,
+        retryQueue: this.api?.getRetryQueueSize?.() ?? null,
+      },
+      fieldMapping: this._buildFieldMappingInfo(matchedSystem),
+      capability: cap && cap.ok ? { source: cap.source, summary: cap.summary } : null,
+      activityLog: (this._syncManager?.getActivityLog?.() ?? []).slice(0, 100),
+      errorLog: (this.api?.getErrorLog?.() ?? []).slice(0, 100),
+      logBuffer: getLogBuffer().slice(-200),
+    };
+  }
+
+  /** Build + copy the troubleshooting Diagnostic Bundle. Mirrors _onCopyDebug. @private */
+  async _onCopyDiagnosticBundle() {
+    const el = this.element;
+    const resultEl = el?.querySelector('[data-bundle-result]');
+    try {
+      const text = buildDiagnosticBundle(this._buildDiagnosticInput());
+      await game.clipboard.copyPlainText(text);
+      if (resultEl) {
+        resultEl.textContent = 'Copied to clipboard!';
+        resultEl.className = 'debug-copy-result test-success';
+        setTimeout(() => { resultEl.textContent = ''; }, 3000);
+      }
+      ui.notifications.info('Chronicle: Diagnostic bundle copied to clipboard.');
+    } catch (err) {
+      log.error('Dashboard: diagnostic bundle copy failed', err);
+      if (resultEl) {
+        resultEl.textContent = 'Copy failed — check console.';
+        resultEl.className = 'debug-copy-result test-error';
+      }
+    }
+  }
+
+  /** Copy the Sync Capability report (markdown) to clipboard. */
+  static #onCopyCapabilityAction() {
+    this._onCopyCapability(false);
+  }
+
+  /** Copy the Sync Capability report (JSON) to clipboard. */
+  static #onCopyCapabilityJsonAction() {
+    this._onCopyCapability(true);
+  }
+
+  /**
+   * Copy the stashed Sync Capability report to the clipboard — markdown (human +
+   * AI friendly) or JSON. Mirrors _onCopyDebug. @private
+   */
+  async _onCopyCapability(asJson = false) {
+    const el = this.element;
+    const resultEl = el?.querySelector('[data-capability-result]');
+    try {
+      const report = this._capabilityReport;
+      if (!report) throw new Error('no capability report available');
+      const text = asJson ? renderCapabilityJSON(report) : renderCapabilityMarkdown(report);
+      await game.clipboard.copyPlainText(text);
+      if (resultEl) {
+        resultEl.textContent = 'Copied to clipboard!';
+        resultEl.className = 'debug-copy-result test-success';
+        setTimeout(() => { resultEl.textContent = ''; }, 3000);
+      }
+      ui.notifications.info('Chronicle: Sync capability report copied to clipboard.');
+    } catch (err) {
+      log.error('Dashboard: capability copy failed', err);
+      if (resultEl) {
+        resultEl.textContent = 'Copy failed — check console.';
+        resultEl.className = 'debug-copy-result test-error';
+      }
+    }
   }
 
   /** Copy calendar diagnostics to clipboard. */

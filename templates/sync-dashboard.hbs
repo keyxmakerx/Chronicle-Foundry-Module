@@ -1000,6 +1000,42 @@
         </div>
         {{/if}}
 
+        {{!-- Sync Capability — what CAN pull vs what DOES (WS-4) --}}
+        {{#if capability}}
+        <h3 class="section-heading">Sync Capability</h3>
+        {{#if capability.available}}
+        <p class="config-hint">What a Foundry actor exposes vs what Chronicle currently syncs — sampled from <strong>{{capability.source.actorName}}</strong> (type <code>{{capability.source.actorType}}</code>).</p>
+        <div class="diagnostics-detail">
+          <div class="system-info-row"><span class="system-label">Synced:</span><span class="system-value">{{capability.summary.synced}} / {{capability.summary.totalDeclared}} declared</span></div>
+          <div class="system-info-row"><span class="system-label">Declared, unmapped:</span><span class="system-value">{{capability.summary.declaredUnmapped}}</span></div>
+          <div class="system-info-row"><span class="system-label">Mapped, missing on actor:</span><span class="system-value">{{capability.summary.mappedMissing}}</span></div>
+          <div class="system-info-row"><span class="system-label">Available, not mapped:</span><span class="system-value">{{capability.summary.availableUnmapped}}</span></div>
+          <div class="system-info-row"><span class="system-label">Collections (items/effects):</span><span class="system-value">{{capability.summary.collectionsAvailable}}</span></div>
+        </div>
+        {{#if capability.gaps.length}}
+        <div class="capability-gaps diagnostics-detail">
+          {{#each capability.gaps}}
+          <div class="system-info-row cap-{{status}}">
+            <span class="system-label">{{status}}</span>
+            <span class="system-value">{{label}}{{#if detail}} — {{detail}}{{/if}}</span>
+          </div>
+          {{/each}}
+        </div>
+        {{/if}}
+        <div class="config-actions">
+          <button type="button" class="dashboard-btn btn-sm" data-action="copy-capability">
+            <i class="fa-solid fa-clipboard-list"></i> Copy Capability Report
+          </button>
+          <button type="button" class="dashboard-btn btn-sm" data-action="copy-capability-json">
+            <i class="fa-solid fa-code"></i> Copy JSON
+          </button>
+          <span class="debug-copy-result" data-capability-result></span>
+        </div>
+        {{else}}
+        <p class="config-hint">No representative actor available to sample{{#if capability.error}} ({{capability.error}}){{/if}}.</p>
+        {{/if}}
+        {{/if}}
+
         {{!-- Error log --}}
         {{#if hasErrors}}
         <h3 class="section-heading">Error Log</h3>
@@ -1047,6 +1083,16 @@
             <i class="fa-solid fa-plug"></i> Reconnect
           </button>
           {{/if}}
+        </div>
+
+        {{!-- Diagnostic Bundle (troubleshooting — versions, health, logs, capability) --}}
+        <h3 class="section-heading">Diagnostic Bundle</h3>
+        <p class="config-hint">One copy-paste troubleshooting report — versions, connection health, sync status, capability, and recent activity/errors. Paste into a bug report or the admin AI.</p>
+        <div class="config-actions">
+          <button type="button" class="dashboard-btn btn-sm" data-action="copy-diagnostic-bundle">
+            <i class="fa-solid fa-clipboard-check"></i> Copy Diagnostic Bundle
+          </button>
+          <span class="debug-copy-result" data-bundle-result></span>
         </div>
 
         {{!-- System Debug Export --}}
