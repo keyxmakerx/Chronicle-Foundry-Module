@@ -23,6 +23,7 @@ import {
   CAP_STATUS,
 } from './capability-inspector.mjs';
 import { buildDiagnosticBundle } from './sync-diagnostic-bundle.mjs';
+import { log, getLogBuffer } from './logger.mjs';
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**
@@ -232,7 +233,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     try {
       capabilityData = await this._buildCapabilityData();
     } catch (err) {
-      console.error('Chronicle Dashboard: Failed to build sync capability', err);
+      log.error('Dashboard: Failed to build sync capability', err);
       loadErrors.push({ tab: 'status', message: err.message || 'Failed to build sync capability' });
     }
 
@@ -1039,7 +1040,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       const resp = await this.api?.get(`/systems/${matchedSystem}/character-fields`);
       if (resp && Array.isArray(resp.fields)) fieldDefs = resp;
     } catch (err) {
-      console.warn('Chronicle Dashboard: capability — failed to load character-fields', err);
+      log.warn('Dashboard: capability — failed to load character-fields', err);
     }
 
     const snapshot = captureActorSnapshot(sample);
@@ -1541,6 +1542,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       capability: cap && cap.ok ? { source: cap.source, summary: cap.summary } : null,
       activityLog: (this._syncManager?.getActivityLog?.() ?? []).slice(0, 100),
       errorLog: (this.api?.getErrorLog?.() ?? []).slice(0, 100),
+      logBuffer: getLogBuffer().slice(-200),
     };
   }
 
@@ -1558,7 +1560,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       }
       ui.notifications.info('Chronicle: Diagnostic bundle copied to clipboard.');
     } catch (err) {
-      console.error('Chronicle Dashboard: diagnostic bundle copy failed', err);
+      log.error('Dashboard: diagnostic bundle copy failed', err);
       if (resultEl) {
         resultEl.textContent = 'Copy failed — check console.';
         resultEl.className = 'debug-copy-result test-error';
@@ -1595,7 +1597,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       }
       ui.notifications.info('Chronicle: Sync capability report copied to clipboard.');
     } catch (err) {
-      console.error('Chronicle Dashboard: capability copy failed', err);
+      log.error('Dashboard: capability copy failed', err);
       if (resultEl) {
         resultEl.textContent = 'Copy failed — check console.';
         resultEl.className = 'debug-copy-result test-error';

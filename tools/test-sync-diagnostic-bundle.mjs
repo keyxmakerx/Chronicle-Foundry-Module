@@ -59,3 +59,15 @@ test('missing values degrade to placeholders, not crashes', () => {
   assert.match(out, /Module: \*\*—\*\*/);
   assert.match(out, /State: \*\*—\*\*/);
 });
+
+test('leveled log buffer renders when present', () => {
+  const out = buildDiagnosticBundle({
+    logBuffer: [
+      { t: Date.parse('2026-06-26T12:00:00Z'), level: 'error', msg: 'PUT failed' },
+      { t: Date.parse('2026-06-26T12:00:01Z'), level: 'debug', msg: 'pull start' },
+    ],
+  });
+  assert.match(out, /## Log buffer \(2\)/);
+  assert.match(out, /ERROR PUT failed/);
+  assert.match(out, /2026-06-26T12:00:01\.000Z` DEBUG pull start/);
+});

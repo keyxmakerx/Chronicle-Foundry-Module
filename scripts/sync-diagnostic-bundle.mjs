@@ -121,6 +121,16 @@ export function buildDiagnosticBundle(input) {
   }
   L.push('');
 
+  // --- Captured log buffer (leveled logger ring) ---
+  if (Array.isArray(d.logBuffer) && d.logBuffer.length) {
+    L.push(`## Log buffer (${d.logBuffer.length})`);
+    for (const e of d.logBuffer) {
+      const ts = e && e.t ? new Date(e.t).toISOString() : '';
+      L.push(`- \`${ts}\` ${String((e && e.level) || '').toUpperCase()} ${_s(e && e.msg)}`);
+    }
+    L.push('');
+  }
+
   return L.join('\n');
 }
 
