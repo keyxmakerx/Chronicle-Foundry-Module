@@ -30,7 +30,8 @@ scripts/                          # ES modules (.mjs)
   item-sync.mjs                   # Item sync
   note-sync.mjs                   # Chronicle Notes ↔ JournalEntry sync
   shop-widget.mjs                 # Shop inventory UI
-  sync-dashboard.mjs              # 8-tab dashboard UI
+  sync-dashboard.mjs              # Dashboard UI: Overview cockpit + grouped vertical rail (Everyday/Library/Setup/Diagnostics)
+  _overview-model.mjs             # Pure builder for the Overview landing cockpit (stats + prioritized "needs attention")
   update-info.mjs                 # "Update Source" diagnostic dialog (install/update flow)
   character-claim-indicator.mjs   # Per-player character-claim status indicator
   import-wizard.mjs               # Initial-import wizard UI
