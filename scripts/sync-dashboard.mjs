@@ -23,6 +23,7 @@ import {
   CAP_STATUS,
 } from './capability-inspector.mjs';
 import { buildDiagnosticBundle } from './sync-diagnostic-bundle.mjs';
+import { buildOverviewModel } from './_overview-model.mjs';
 import { log, getLogBuffer } from './logger.mjs';
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -122,8 +123,17 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     /** @type {string} Current search filter text. */
     this._searchFilter = '';
 
-    /** @type {string} Currently active tab (persisted per-client). */
-    this._activeTab = getSetting('dashboardActiveTab') || 'entities';
+    /**
+     * @type {string|null} Actor id the GM chose to inspect in the Status tab's
+     * Capability Inspector. Null = auto-pick (first linked, else first of type).
+     * Per-session instance state (like _searchFilter): survives re-renders,
+     * resets when the dashboard window is closed.
+     */
+    this._capabilityActorId = null;
+
+    /** @type {string} Currently active tab (persisted per-client). Defaults to
+     * the Overview cockpit so the GM lands on a calm summary, not a dense list. */
+    this._activeTab = getSetting('dashboardActiveTab') || 'overview';
 
     /** @type {Set<string>} Currently selected entity IDs for bulk operations. */
     this._selectedEntities = new Set();
@@ -255,6 +265,23 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     // Build config tab data.
     const configData = this._buildConfigData(entityGroups);
 
+    // Build the Overview cockpit from the pieces already computed above — a
+    // calm landing view that routes problems to the tab that fixes each one.
+    const overview = buildOverviewModel({
+      connectionState: statusData.connectionState,
+      connectionLabel: statusData.connectionLabel,
+      syncedEntities: statusData.syncedEntities,
+      linkedScenes: statusData.linkedScenes,
+      characters: characterData.characters,
+      issuesCount: issuesData.count,
+      unmatchedMembers: membersData.unmatchedCount,
+      calendarAvailable: calendarData.available,
+      calendarInSync: calendarData.inSync,
+      errorCount: statusData.errorLog?.length ?? 0,
+      matchedSystem: statusData.matchedSystem,
+      lastSyncTime: statusData.lastSyncTime,
+    });
+
     this._loading = false;
 
     return {
@@ -264,6 +291,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       activeTab: this._activeTab,
       loadErrors,
       hasLoadErrors: loadErrors.length > 0,
+
+      // Overview (landing cockpit) tab.
+      overview,
 
       // Issues (resolver) tab.
       issues: issuesData,
@@ -1026,13 +1056,35 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     );
     const actorType = actorSync?._actorType || actorSync?._adapter?.actorType || 'character';
 
-    // Sample a representative actor: prefer a linked one, else the first of the type.
     const ofType = (game.actors?.contents || []).filter((a) => a?.type === actorType);
-    const sample = ofType.find((a) => a.getFlag?.(FLAG_SCOPE, 'entityId')) || ofType[0] || null;
+
+    // Which actor to inspect. If the GM picked one (and it still exists), use it;
+    // otherwise auto-pick a representative actor: prefer a Chronicle-linked one,
+    // else the first of the type. `autoPicked` drives the UI hint so the GM knows
+    // the panel chose for them and can switch with the dropdown.
+    const chosen = this._capabilityActorId
+      ? ofType.find((a) => a.id === this._capabilityActorId)
+      : null;
+    const autoPicked = !chosen;
+    const sample = chosen
+      || ofType.find((a) => a.getFlag?.(FLAG_SCOPE, 'entityId'))
+      || ofType[0]
+      || null;
     if (!sample) {
       this._capabilityReport = null;
-      return { available: false, actorType, error: `no "${actorType}" actor to sample` };
+      return { available: false, actorType, actors: [], error: `no "${actorType}" actor to sample` };
     }
+
+    // The full pick-list for the dropdown (linked actors flagged so the GM can
+    // tell which heroes already sync to Chronicle).
+    const actors = ofType
+      .map((a) => ({
+        id: a.id,
+        name: a.name || '(unnamed)',
+        linked: !!a.getFlag?.(FLAG_SCOPE, 'entityId'),
+        selected: a.id === sample.id,
+      }))
+      .sort((x, y) => x.name.localeCompare(y.name));
 
     // Fetch the system's declared character fields (same source the adapter uses).
     let fieldDefs = { fields: [] };
@@ -1050,6 +1102,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     return {
       available: !!report.ok,
       actorType,
+      actors,
+      autoPicked,
       summary: report.summary,
       source: report.source,
       gaps: this._capabilityGaps(report),
@@ -1263,6 +1317,27 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       });
     });
 
+    // --- Overview cockpit: jump-links to other tabs ---
+    // Stat tiles and "needs attention" rows carry data-jump-tab and switch the
+    // active tab (no data-action, so they bypass the ApplicationV2 click router).
+    el.querySelectorAll('[data-jump-tab]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this._switchTab(e.currentTarget.dataset.jumpTab);
+      });
+    });
+
+    // --- Status tab: Capability Inspector actor picker ---
+    // ApplicationV2 `actions` only delegate `click`, so the `<select>` change is
+    // wired here directly. Picking an actor re-renders the panel against it.
+    const capActorSelect = el.querySelector('.capability-actor-select');
+    if (capActorSelect) {
+      capActorSelect.addEventListener('change', (e) => {
+        this._capabilityActorId = e.currentTarget.value || null;
+        this.render({ force: true });
+      });
+    }
+
     // Map tab handlers are wired via the `open-map-journal` action above;
     // no additional select listeners are needed in Path B.
   }
@@ -1276,30 +1351,55 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   _initTabs(el) {
     const tabs = el.querySelectorAll('.dashboard-tabs .item');
-    const panels = el.querySelectorAll('.dashboard-content .tab');
+
+    // If the persisted tab no longer exists in the DOM (renamed/removed), fall
+    // back to the Overview cockpit (or the first available tab) so the window
+    // never opens to a blank panel.
+    const known = new Set([...tabs].map((t) => t.dataset.tab));
+    if (!known.has(this._activeTab)) {
+      this._activeTab = known.has('overview') ? 'overview' : (tabs[0]?.dataset.tab || this._activeTab);
+    }
 
     // Apply the stored active tab.
-    tabs.forEach((tab) => {
-      const tabName = tab.dataset.tab;
-      tab.classList.toggle('active', tabName === this._activeTab);
-    });
-    panels.forEach((panel) => {
-      const tabName = panel.dataset.tab;
-      panel.classList.toggle('active', tabName === this._activeTab);
-    });
+    this._applyActiveTab(el);
 
-    // Listen for tab clicks.
+    // Listen for rail clicks.
     tabs.forEach((tab) => {
       tab.addEventListener('click', (e) => {
         e.preventDefault();
-        const tabName = tab.dataset.tab;
-        this._activeTab = tabName;
-        setSetting('dashboardActiveTab', tabName);
-
-        tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tabName));
-        panels.forEach(p => p.classList.toggle('active', p.dataset.tab === tabName));
+        this._switchTab(tab.dataset.tab);
       });
     });
+  }
+
+  /**
+   * Toggle the `.active` class on the nav item + content panel matching
+   * `this._activeTab`. Shared by initial render and programmatic switches.
+   * @param {HTMLElement} el
+   * @private
+   */
+  _applyActiveTab(el) {
+    el.querySelectorAll('.dashboard-tabs .item').forEach((t) =>
+      t.classList.toggle('active', t.dataset.tab === this._activeTab));
+    el.querySelectorAll('.dashboard-content .tab').forEach((p) =>
+      p.classList.toggle('active', p.dataset.tab === this._activeTab));
+  }
+
+  /**
+   * Switch to a tab by name and persist it. Used by rail clicks and by the
+   * Overview cockpit's jump-links (`data-jump-tab`). Scrolls the content pane
+   * back to the top so the jumped-to tab starts at its heading.
+   * @param {string} tabName
+   * @private
+   */
+  _switchTab(tabName) {
+    if (!tabName) return;
+    this._activeTab = tabName;
+    setSetting('dashboardActiveTab', tabName);
+    const el = this.element;
+    if (!el) return;
+    this._applyActiveTab(el);
+    el.querySelector('.dashboard-content')?.scrollTo?.({ top: 0 });
   }
 
   // ---------------------------------------------------------------------------

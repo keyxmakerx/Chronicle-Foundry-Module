@@ -18,43 +18,7 @@
   </div>
   {{/if}}
 
-  {{!-- Tab navigation --}}
-  <nav class="dashboard-tabs" data-group="primary">
-    <a class="item" data-tab="config">
-      <i class="fa-solid fa-sliders"></i> Config
-    </a>
-    <a class="item" data-tab="entities">
-      <i class="fa-solid fa-book"></i> Entities
-    </a>
-    <a class="item" data-tab="shops">
-      <i class="fa-solid fa-store"></i> Shops
-    </a>
-    <a class="item" data-tab="maps">
-      <i class="fa-solid fa-map"></i> Maps
-    </a>
-    <a class="item" data-tab="characters">
-      <i class="fa-solid fa-users"></i> Characters
-    </a>
-    <a class="item" data-tab="issues">
-      <i class="fa-solid fa-link-slash"></i> Issues
-      {{#if issues.hasIssues}}<span class="member-tab-badge" title="{{issues.count}} character(s) need attention">{{issues.count}}</span>{{/if}}
-    </a>
-    <a class="item" data-tab="members">
-      <i class="fa-solid fa-user-shield"></i> Members
-      {{#if members.hasUnmatched}}<span class="member-tab-badge" title="{{members.unmatchedCount}} unmatched member(s)">{{members.unmatchedCount}}</span>{{/if}}
-    </a>
-    <a class="item" data-tab="notes">
-      <i class="fa-solid fa-sticky-note"></i> Notes
-    </a>
-    <a class="item" data-tab="calendar">
-      <i class="fa-solid fa-calendar"></i> Calendar
-    </a>
-    <a class="item" data-tab="status">
-      <i class="fa-solid fa-signal"></i> Status
-    </a>
-  </nav>
-
-  {{!-- Load error banner --}}
+  {{!-- Load error banner (full width, above the body) --}}
   {{#if hasLoadErrors}}
   <div class="dashboard-load-errors">
     <i class="fa-solid fa-triangle-exclamation"></i>
@@ -68,8 +32,126 @@
   </div>
   {{/if}}
 
+  {{!-- Body: left category rail + right content pane --}}
+  <div class="dashboard-body">
+
+  {{!-- Left rail: vertical nav grouped by how often a GM needs each section --}}
+  <nav class="dashboard-tabs dashboard-rail" data-group="primary">
+    <a class="item item-overview" data-tab="overview">
+      <i class="fa-solid fa-gauge-high"></i> Overview
+    </a>
+
+    <div class="rail-group-label">Everyday</div>
+    <a class="item" data-tab="entities">
+      <i class="fa-solid fa-book"></i> Entities
+    </a>
+    <a class="item" data-tab="characters">
+      <i class="fa-solid fa-users"></i> Characters
+    </a>
+    <a class="item" data-tab="calendar">
+      <i class="fa-solid fa-calendar"></i> Calendar
+    </a>
+    <a class="item" data-tab="issues">
+      <i class="fa-solid fa-link-slash"></i> Issues
+      {{#if issues.hasIssues}}<span class="member-tab-badge" title="{{issues.count}} character(s) need attention">{{issues.count}}</span>{{/if}}
+    </a>
+
+    <div class="rail-group-label">Library</div>
+    <a class="item" data-tab="shops">
+      <i class="fa-solid fa-store"></i> Shops
+    </a>
+    <a class="item" data-tab="maps">
+      <i class="fa-solid fa-map"></i> Maps
+    </a>
+    <a class="item" data-tab="notes">
+      <i class="fa-solid fa-sticky-note"></i> Notes
+    </a>
+
+    <div class="rail-group-label">Setup</div>
+    <a class="item" data-tab="config">
+      <i class="fa-solid fa-sliders"></i> Config
+    </a>
+    <a class="item" data-tab="members">
+      <i class="fa-solid fa-user-shield"></i> Members
+      {{#if members.hasUnmatched}}<span class="member-tab-badge" title="{{members.unmatchedCount}} unmatched member(s)">{{members.unmatchedCount}}</span>{{/if}}
+    </a>
+
+    <div class="rail-group-label">Diagnostics</div>
+    <a class="item" data-tab="status">
+      <i class="fa-solid fa-signal"></i> Status
+    </a>
+  </nav>
+
   {{!-- Tab content --}}
   <section class="dashboard-content">
+
+    {{!-- ================================================================= --}}
+    {{!-- OVERVIEW TAB (landing cockpit)                                    --}}
+    {{!-- ================================================================= --}}
+    <div class="tab" data-tab="overview" data-group="primary">
+      {{#with overview}}
+      <div class="overview-panel">
+
+        {{!-- Connection banner --}}
+        <div class="connection-status overview-connection state-{{connection.state}}">
+          <span class="status-dot"></span>
+          <div class="overview-connection-text">
+            <strong>{{connection.label}}</strong>
+            <span class="overview-sub">{{connection.detail}}</span>
+          </div>
+          {{#unless connection.ok}}
+          <button type="button" class="dashboard-btn btn-sm" data-action="reconnect">
+            <i class="fa-solid fa-rotate"></i> Reconnect
+          </button>
+          {{/unless}}
+        </div>
+
+        {{!-- Headline stats (click to jump to the full tab) --}}
+        <div class="overview-stats">
+          {{#each stats}}
+          <button type="button" class="overview-stat" data-jump-tab="{{tab}}" title="Open {{label}}">
+            <span class="overview-stat-value">{{value}}</span>
+            <span class="overview-stat-label">{{label}}</span>
+          </button>
+          {{/each}}
+        </div>
+
+        {{!-- Needs attention — only problems, each routed to the fixing tab --}}
+        <h3 class="section-heading">Needs Attention</h3>
+        {{#if attention.length}}
+        <div class="overview-attention">
+          {{#each attention}}
+          <button type="button" class="overview-alert sev-{{severity}}" data-jump-tab="{{tab}}">
+            <i class="fa-solid {{icon}}"></i>
+            <span class="overview-alert-text">{{text}}</span>
+            <i class="fa-solid fa-chevron-right overview-alert-go"></i>
+          </button>
+          {{/each}}
+        </div>
+        {{else}}
+        <div class="overview-allclear">
+          <i class="fa-solid fa-circle-check"></i>
+          Everything's in sync — nothing needs your attention.
+        </div>
+        {{/if}}
+
+        {{!-- Quick actions --}}
+        <h3 class="section-heading">Quick Actions</h3>
+        <div class="overview-actions">
+          <button type="button" class="dashboard-btn btn-sm" data-action="resync-all-journals">
+            <i class="fa-solid fa-rotate"></i> Sync Journals Now
+          </button>
+          <button type="button" class="dashboard-btn btn-sm" data-jump-tab="status">
+            <i class="fa-solid fa-stethoscope"></i> Diagnostics
+          </button>
+          <button type="button" class="dashboard-btn btn-sm" data-action="refresh">
+            <i class="fa-solid fa-arrows-rotate"></i> Refresh
+          </button>
+        </div>
+      </div>
+      {{/with}}
+    </div>
+
 
     {{!-- ================================================================= --}}
     {{!-- CONFIG TAB                                                        --}}
@@ -1004,7 +1086,15 @@
         {{#if capability}}
         <h3 class="section-heading">Sync Capability</h3>
         {{#if capability.available}}
-        <p class="config-hint">What a Foundry actor exposes vs what Chronicle currently syncs — sampled from <strong>{{capability.source.actorName}}</strong> (type <code>{{capability.source.actorType}}</code>).</p>
+        <p class="config-hint">Compares what a Foundry actor exposes against what Chronicle currently syncs.{{#if capability.autoPicked}} Auto-picked <strong>{{capability.source.actorName}}</strong> (the first <code>{{capability.source.actorType}}</code> actor) — pick a different one below to inspect it.{{else}} Inspecting <strong>{{capability.source.actorName}}</strong> (type <code>{{capability.source.actorType}}</code>).{{/if}}</p>
+        <div class="capability-actor-picker">
+          <label for="capability-actor-select">Inspect actor:</label>
+          <select id="capability-actor-select" class="config-select capability-actor-select">
+            {{#each capability.actors}}
+            <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}{{#if linked}} ✓ synced{{/if}}</option>
+            {{/each}}
+          </select>
+        </div>
         <div class="diagnostics-detail">
           <div class="system-info-row"><span class="system-label">Synced:</span><span class="system-value">{{capability.summary.synced}} / {{capability.summary.totalDeclared}} declared</span></div>
           <div class="system-info-row"><span class="system-label">Declared, unmapped:</span><span class="system-value">{{capability.summary.declaredUnmapped}}</span></div>
@@ -1118,5 +1208,7 @@
     </div>
 
   </section>
+
+  </div>{{!-- /.dashboard-body --}}
   {{/unless}}
 </div>
