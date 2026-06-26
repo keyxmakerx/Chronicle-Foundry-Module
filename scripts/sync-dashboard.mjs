@@ -22,6 +22,7 @@ import {
   renderCapabilityJSON,
   CAP_STATUS,
 } from './capability-inspector.mjs';
+import { buildDiagnosticBundle } from './sync-diagnostic-bundle.mjs';
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**
@@ -77,6 +78,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'test-connection': SyncDashboard.#onTestConnectionAction,
       'save-config': SyncDashboard.#onSaveConfigAction,
       'copy-debug': SyncDashboard.#onCopyDebugAction,
+      'copy-diagnostic-bundle': SyncDashboard.#onCopyDiagnosticBundleAction,
       'copy-capability': SyncDashboard.#onCopyCapabilityAction,
       'copy-capability-json': SyncDashboard.#onCopyCapabilityJsonAction,
       'copy-calendar-diagnostics': SyncDashboard.#onCopyCalendarDiagnosticsAction,
@@ -1503,6 +1505,65 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Copy system debug snapshot to clipboard for pasting into AI tools. */
   static #onCopyDebugAction() {
     this._onCopyDebug();
+  }
+
+  /** Copy the troubleshooting Diagnostic Bundle to the clipboard. */
+  static #onCopyDiagnosticBundleAction() {
+    this._onCopyDiagnosticBundle();
+  }
+
+  /**
+   * Gather the live data for a Diagnostic Bundle from the same accessors the
+   * status tab uses (versions, health, logs, field mapping, capability). @private
+   */
+  _buildDiagnosticInput() {
+    const health = this.api?.health ?? {};
+    const matchedSystem = this._syncManager?.getMatchedSystem?.() || null;
+    const cap = this._capabilityReport;
+    return {
+      generatedAt: new Date().toISOString(),
+      versions: {
+        module: game.modules.get('chronicle-sync')?.version ?? null,
+        chronicle: this._syncManager?.getChronicleVersion?.() ?? null,
+        foundry: game.version ?? null,
+        system: game.system?.title ?? null,
+        systemId: game.system?.id ?? null,
+      },
+      connection: {
+        state: this.api?.state ?? 'disconnected',
+        uptimePercent: this.api?.getUptimePercent?.() ?? null,
+        restSuccess: health.restSuccessCount ?? null,
+        restError: health.restErrorCount ?? null,
+        reconnectAttempts: health.reconnectAttempts ?? null,
+        retryQueue: this.api?.getRetryQueueSize?.() ?? null,
+      },
+      fieldMapping: this._buildFieldMappingInfo(matchedSystem),
+      capability: cap && cap.ok ? { source: cap.source, summary: cap.summary } : null,
+      activityLog: (this._syncManager?.getActivityLog?.() ?? []).slice(0, 100),
+      errorLog: (this.api?.getErrorLog?.() ?? []).slice(0, 100),
+    };
+  }
+
+  /** Build + copy the troubleshooting Diagnostic Bundle. Mirrors _onCopyDebug. @private */
+  async _onCopyDiagnosticBundle() {
+    const el = this.element;
+    const resultEl = el?.querySelector('[data-bundle-result]');
+    try {
+      const text = buildDiagnosticBundle(this._buildDiagnosticInput());
+      await game.clipboard.copyPlainText(text);
+      if (resultEl) {
+        resultEl.textContent = 'Copied to clipboard!';
+        resultEl.className = 'debug-copy-result test-success';
+        setTimeout(() => { resultEl.textContent = ''; }, 3000);
+      }
+      ui.notifications.info('Chronicle: Diagnostic bundle copied to clipboard.');
+    } catch (err) {
+      console.error('Chronicle Dashboard: diagnostic bundle copy failed', err);
+      if (resultEl) {
+        resultEl.textContent = 'Copy failed — check console.';
+        resultEl.className = 'debug-copy-result test-error';
+      }
+    }
   }
 
   /** Copy the Sync Capability report (markdown) to clipboard. */
