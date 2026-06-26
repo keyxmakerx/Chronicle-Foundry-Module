@@ -150,6 +150,9 @@ export function getNestedValue(obj, path) {
  * Reads field.foundry_collection off the actor, optionally filters by
  * foundry_item_type, projects each entry per foundry_item_fields (or a default
  * {id,name,type}), and returns a JSON string (type json/string) or a raw array.
+ * When field.foundry_item_single is set, collapses to the FIRST matching item's
+ * name (or first projected value) as a plain string — for "exactly one X item"
+ * fields like a hero's class/ancestry/kit.
  * Defensive — a malformed actor/collection yields an empty result, never throws.
  *
  * @param {object} actor
@@ -175,6 +178,19 @@ export function extractCollectionField(actor, field) {
     const proj = field.foundry_item_fields && typeof field.foundry_item_fields === 'object'
       ? field.foundry_item_fields
       : null;
+
+    // Single-item collapse: "exactly one X item" fields (class/ancestry/kit)
+    // want the item's NAME as a plain string, not a one-element JSON array.
+    // Uses the first projected path when a projection is given, else item.name.
+    if (field.foundry_item_single) {
+      const first = contents[0];
+      if (!first) return '';
+      if (proj) {
+        const firstPath = Object.values(proj)[0];
+        return getNestedValue(first, firstPath) ?? '';
+      }
+      return first.name ?? '';
+    }
 
     const items = contents.map((it) => {
       if (!proj) return { id: it.id ?? null, name: it.name ?? null, type: it.type ?? null };

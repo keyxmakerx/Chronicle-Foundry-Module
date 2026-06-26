@@ -132,19 +132,27 @@ function _summarizeCollection(coll, withSampleSchema) {
   }
   result.types = [...typeSet];
   if (withSampleSchema && contents.length > 0) {
+    const readSys = (it) => {
+      try {
+        const raw = it.system;
+        return raw && typeof raw.toObject === 'function' ? raw.toObject() : (raw || {});
+      } catch (err) {
+        return {};
+      }
+    };
     const first = contents[0];
-    let sys = {};
-    try {
-      const raw = first.system;
-      sys = raw && typeof raw.toObject === 'function' ? raw.toObject() : (raw || {});
-    } catch (err) {
-      sys = {};
-    }
     result.sample = {
       name: first.name ?? '(unnamed)',
       type: first.type ?? null,
-      schema: walkSchema(sys, 'system', 3),
+      schema: walkSchema(readSys(first), 'system', 3),
     };
+    // One representative item PER distinct type, so the report exposes the
+    // projectable fields for each (ability vs class vs feature vs kit…) — what
+    // a future collection mapping needs to know to project the right paths.
+    result.samples = result.types.map((t) => {
+      const it = contents.find((c) => c && c.type === t) || {};
+      return { type: t, name: it.name ?? '(unnamed)', schema: walkSchema(readSys(it), 'system', 2) };
+    });
   }
   return result;
 }
@@ -161,6 +169,7 @@ export const CAP_STATUS = Object.freeze({
   SYNCED: 'synced',
   MAPPED_MISSING: 'mapped-missing',
   DECLARED_UNMAPPED: 'declared-unmapped',
+  COLLECTION_MAPPED: 'collection-mapped',
   AVAILABLE_UNMAPPED: 'available-unmapped',
   COLLECTION: 'collection',
 });
@@ -190,6 +199,22 @@ export function buildCapabilityReport(snapshot, fieldDefs) {
   // 1. Walk the manifest: classify each declared field.
   for (const f of defs) {
     if (!f.foundry_path) {
+      // A field with no foundry_path may still be MAPPED via a collection
+      // (e.g. abilities_json → actor.items[type=ability], or class → the one
+      // class item). Only a field with neither is genuinely unmapped.
+      if (f.foundry_collection) {
+        const types = Array.isArray(f.foundry_item_type) ? f.foundry_item_type.join(',') : (f.foundry_item_type || '');
+        const desc = `${f.foundry_collection}[${types}]${f.foundry_item_single ? ' (single)' : ''}`;
+        rows.push({
+          status: CAP_STATUS.COLLECTION_MAPPED,
+          key: f.key,
+          foundry_path: desc,
+          type: f.type || null,
+          writable: f.foundry_writable !== false,
+          sample: undefined,
+        });
+        continue;
+      }
       rows.push({
         status: CAP_STATUS.DECLARED_UNMAPPED,
         key: f.key,
@@ -233,8 +258,9 @@ export function buildCapabilityReport(snapshot, fieldDefs) {
       source: 'actor.items',
       count: snapshot.items.count,
       types: snapshot.items.types,
-      note: 'Embedded items (abilities/inventory) — not pullable by the dot-path adapter yet (WS-3).',
+      note: 'Embedded items. Pullable via a collection mapping (foundry_collection + foundry_item_type[, foundry_item_single]); per-type schemas below show the projectable fields.',
       sample: snapshot.items.sample,
+      samples: snapshot.items.samples || [],
     });
   }
   if (snapshot.effects && snapshot.effects.available) {
@@ -267,6 +293,7 @@ function _summarize(rows, collections) {
     synced: 0,
     mappedMissing: 0,
     declaredUnmapped: 0,
+    collectionMapped: 0,
     availableUnmapped: 0,
     collectionsAvailable: collections.length,
     totalDeclared: 0,
@@ -275,9 +302,10 @@ function _summarize(rows, collections) {
     if (r.status === CAP_STATUS.SYNCED) c.synced++;
     else if (r.status === CAP_STATUS.MAPPED_MISSING) c.mappedMissing++;
     else if (r.status === CAP_STATUS.DECLARED_UNMAPPED) c.declaredUnmapped++;
+    else if (r.status === CAP_STATUS.COLLECTION_MAPPED) c.collectionMapped++;
     else if (r.status === CAP_STATUS.AVAILABLE_UNMAPPED) c.availableUnmapped++;
   }
-  c.totalDeclared = c.synced + c.mappedMissing + c.declaredUnmapped;
+  c.totalDeclared = c.synced + c.mappedMissing + c.declaredUnmapped + c.collectionMapped;
   return c;
 }
 
@@ -296,7 +324,8 @@ export function renderCapabilityMarkdown(report) {
   lines.push(`Sampled actor: **${report.source.actorName}** (type \`${report.source.actorType}\`)`);
   lines.push('');
   lines.push(`- Synced: **${s.synced}** / ${s.totalDeclared} declared`);
-  lines.push(`- Declared but unmapped (no foundry_path): **${s.declaredUnmapped}**`);
+  lines.push(`- Collection-mapped (items, e.g. abilities/class): **${s.collectionMapped}**`);
+  lines.push(`- Declared but unmapped (no foundry_path/collection): **${s.declaredUnmapped}**`);
   lines.push(`- Mapped but missing on this actor: **${s.mappedMissing}**`);
   lines.push(`- Available but not mapped (candidates): **${s.availableUnmapped}**`);
   lines.push(`- Collections available (items/effects): **${s.collectionsAvailable}**`);
@@ -308,9 +337,15 @@ export function renderCapabilityMarkdown(report) {
   }
   if (report.collections.length) {
     lines.push('');
-    lines.push('## Collections (not yet pullable)');
+    lines.push('## Collections');
     for (const c of report.collections) {
       lines.push(`- \`${c.source}\` — ${c.count} item(s), types: ${c.types.join(', ') || '—'} — ${c.note}`);
+      // Per-type item schemas — the projectable fields for each item type, so a
+      // collection mapping can target the right foundry_item_fields paths.
+      for (const sample of (c.samples || [])) {
+        const paths = (sample.schema || []).map((r) => `\`${r.path}\` (${r.type})`).join(', ');
+        lines.push(`  - **${sample.type}** — e.g. "${sample.name}": ${paths || '(no system fields)'}`);
+      }
     }
   }
   return lines.join('\n') + '\n';

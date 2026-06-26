@@ -30,6 +30,8 @@ function makeActor() {
         { id: 'i1', name: 'Ashfall Strike', type: 'ability', system: { keywords: ['melee'], heroic: 3 } },
         { id: 'i2', name: 'Mountain Stance', type: 'ability', system: { keywords: ['stance'] } },
         { id: 'i3', name: 'Ashbrand', type: 'equipment', system: { equipped: true } },
+        { id: 'i4', name: 'Conduit', type: 'class', system: { level: 4 } },
+        { id: 'i5', name: 'Hakaan', type: 'ancestry', system: {} },
       ],
     },
   };
@@ -69,6 +71,37 @@ test('extractCollectionField supports multiple types + default projection + raw 
   assert.ok(Array.isArray(arr)); // type !== json/string → raw array
   assert.equal(arr.length, 1);
   assert.deepEqual(arr[0], { id: 'i3', name: 'Ashbrand', type: 'equipment' });
+});
+
+test('extractCollectionField single → first matching item name (class/ancestry/kit)', () => {
+  const cls = extractCollectionField(makeActor(), {
+    key: 'class', type: 'string',
+    foundry_collection: 'items', foundry_item_type: 'class', foundry_item_single: true,
+  });
+  assert.equal(cls, 'Conduit'); // plain string, not a JSON array
+
+  const anc = extractCollectionField(makeActor(), {
+    key: 'ancestry', type: 'string',
+    foundry_collection: 'items', foundry_item_type: ['ancestry'], foundry_item_single: true,
+  });
+  assert.equal(anc, 'Hakaan');
+});
+
+test('extractCollectionField single honors a projection path and is empty when none match', () => {
+  // projection → use the first projected path instead of name
+  const lvl = extractCollectionField(makeActor(), {
+    key: 'class_level', type: 'string',
+    foundry_collection: 'items', foundry_item_type: 'class', foundry_item_single: true,
+    foundry_item_fields: { level: 'system.level' },
+  });
+  assert.equal(lvl, 4);
+
+  // no matching item → empty string (a string field, not '[]')
+  const none = extractCollectionField(makeActor(), {
+    key: 'kit', type: 'string',
+    foundry_collection: 'items', foundry_item_type: 'kit', foundry_item_single: true,
+  });
+  assert.equal(none, '');
 });
 
 test('extractCollectionField is defensive (missing collection / bad actor → empty)', () => {
