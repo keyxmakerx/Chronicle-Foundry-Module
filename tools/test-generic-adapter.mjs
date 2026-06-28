@@ -12,8 +12,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { getNestedValue, extractCollectionField, buildChronicleFields } =
+const { getNestedValue, extractCollectionField, buildChronicleFields, normalizeFoundryValue } =
   await import('../scripts/adapters/generic-adapter.mjs');
+
+// ── Foundry-ish data structures for the normalizer tests ──────────────────
+// A Foundry Collection is a Map subclass exposing members via `.contents`.
+class FakeCollection extends Map {
+  constructor(members) {
+    super(members.map((m, i) => [m._id ?? String(i), m]));
+  }
+  get contents() { return Array.from(this.values()); }
+}
+// A pseudo-document / DataModel exposes data via toObject(), not own props —
+// the schema fields here are GETTERS so a naive key-copy would miss them.
+class FakeModel {
+  constructor(source) { this._source = source; }
+  get tier1() { return this._source.tier1; }
+  toObject() { return JSON.parse(JSON.stringify(this._source)); }
+}
 
 // A Foundry-ish actor with system data + an items collection (Map-like w/ .contents).
 function makeActor() {
@@ -133,4 +149,70 @@ test('buildChronicleFields mixes scalar + collection fields into one fields_data
 test('buildChronicleFields sets null for a missing scalar path', () => {
   const out = buildChronicleFields(makeActor(), [{ key: 'speed', foundry_path: 'system.movement.speed', type: 'number' }]);
   assert.equal(out.speed, null);
+});
+
+// ── normalizeFoundryValue ─────────────────────────────────────────────────
+
+test('normalizeFoundryValue passes primitives and plain values through', () => {
+  assert.equal(normalizeFoundryValue(7), 7);
+  assert.equal(normalizeFoundryValue('hi'), 'hi');
+  assert.equal(normalizeFoundryValue(null), null);
+  assert.equal(normalizeFoundryValue(undefined), undefined);
+  assert.deepEqual(normalizeFoundryValue([1, 2, 3]), [1, 2, 3]);
+  assert.deepEqual(normalizeFoundryValue({ a: 1, b: 'x' }), { a: 1, b: 'x' });
+});
+
+test('normalizeFoundryValue turns a Set into an array (keywords/skills/statuses)', () => {
+  assert.deepEqual(normalizeFoundryValue(new Set(['magic', 'ranged'])), ['magic', 'ranged']);
+  assert.deepEqual(normalizeFoundryValue(new Set()), []);
+});
+
+test('normalizeFoundryValue normalizes nested Sets inside a plain object', () => {
+  const v = normalizeFoundryValue({ type: 'damage', types: new Set(['fire']), n: 2 });
+  assert.deepEqual(v, { type: 'damage', types: ['fire'], n: 2 });
+});
+
+test('normalizeFoundryValue unrolls a Foundry Collection via .contents + toObject', () => {
+  const effects = new FakeCollection([
+    new FakeModel({ _id: 'a', type: 'damage', tier1: { value: '2 + @chr', types: ['fire'] } }),
+    new FakeModel({ _id: 'b', type: 'damage', tier1: { value: '3', types: [] } }),
+  ]);
+  const out = normalizeFoundryValue(effects);
+  assert.ok(Array.isArray(out));
+  assert.equal(out.length, 2);
+  assert.deepEqual(out[0], { _id: 'a', type: 'damage', tier1: { value: '2 + @chr', types: ['fire'] } });
+  assert.equal(out[1].tier1.value, '3');
+});
+
+test('extractCollectionField projects a Set sub-field to a JSON array (ability keywords)', () => {
+  const actor = {
+    items: { contents: [
+      { id: 'i1', name: 'Ray of Wrath', type: 'ability',
+        system: { type: 'main', category: 'signature', keywords: new Set(['magic', 'ranged']) } },
+    ] },
+  };
+  const json = extractCollectionField(actor, {
+    key: 'abilities_json', type: 'string',
+    foundry_collection: 'items', foundry_item_type: 'ability',
+    foundry_item_fields: { name: 'name', type: 'system.type', keywords: 'system.keywords' },
+  });
+  const abilities = JSON.parse(json);
+  assert.deepEqual(abilities[0], { name: 'Ray of Wrath', type: 'main', keywords: ['magic', 'ranged'] });
+});
+
+test('buildChronicleFields serializes a Set scalar on a string field to JSON (skills)', () => {
+  const actor = { system: { skills: { value: new Set(['alchemy', 'timescape']) } } };
+  const out = buildChronicleFields(actor, [
+    { key: 'skills_json', foundry_path: 'system.skills.value', type: 'string' },
+  ]);
+  assert.equal(typeof out.skills_json, 'string');
+  assert.deepEqual(JSON.parse(out.skills_json), ['alchemy', 'timescape']);
+});
+
+test('buildChronicleFields serializes actor.statuses (Set) for conditions', () => {
+  const actor = { system: {}, statuses: new Set(['slowed', 'weakened']) };
+  const out = buildChronicleFields(actor, [
+    { key: 'conditions_json', foundry_path: 'statuses', type: 'string' },
+  ]);
+  assert.deepEqual(JSON.parse(out.conditions_json), ['slowed', 'weakened']);
 });
