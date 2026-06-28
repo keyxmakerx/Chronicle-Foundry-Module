@@ -25,6 +25,12 @@
  *   - type:              "json"/"string" → serialized JSON string; else a raw array
  *   Collection fields are READ-ONLY today (pull only); write-back is a future tier,
  *   so they are never included in the Foundry update path.
+ *
+ * Every extracted value (scalar or projected) is run through
+ * `normalizeFoundryValue` so live Foundry structures that `JSON.stringify`
+ * cannot serialize — Sets (keywords, skills, characteristics, actor.statuses)
+ * and Collections of pseudo-documents (an ability's `system.power.effects` tier
+ * ladder) — become plain arrays/objects instead of `{}`.
  */
 
 /**
@@ -146,6 +152,68 @@ export function getNestedValue(obj, path) {
 }
 
 /**
+ * Normalize a value read off a live Foundry document into a JSON-safe plain
+ * value. Foundry models many fields as data structures that `JSON.stringify`
+ * cannot serialize meaningfully:
+ *   - a **Set** (keywords, skills, power-roll characteristics, actor.statuses)
+ *     serializes to `{}` — must become an array;
+ *   - a **Collection / ModelCollection** (a Map subclass — e.g. a CollectionField
+ *     of pseudo-documents like an ability's `system.power.effects` tier ladder)
+ *     also serializes to `{}` — must become an array of its members;
+ *   - a **DataModel / pseudo-document** member exposes its data via `toObject()`,
+ *     not own-enumerable properties (the schema fields are getters).
+ *
+ * This walks such structures recursively and returns arrays / plain objects /
+ * primitives only. It is defensive (never throws) and depth-guarded against
+ * cycles. Primitives and already-plain values pass straight through, so it is
+ * safe to apply to every extracted field.
+ *
+ * @param {*} value
+ * @param {number} [depth]
+ * @returns {*} a JSON-safe value (primitive | array | plain object | null)
+ */
+export function normalizeFoundryValue(value, depth) {
+  depth = depth || 0;
+  if (value == null) return value;
+  if (typeof value !== 'object') return value; // primitives pass through
+  if (depth > 8) return null;                   // cycle / runaway guard
+
+  // Native Set OR Foundry Set → array of normalized members.
+  if (value instanceof Set) {
+    return Array.from(value, (v) => normalizeFoundryValue(v, depth + 1));
+  }
+  // Native array → map members.
+  if (Array.isArray(value)) {
+    return value.map((v) => normalizeFoundryValue(v, depth + 1));
+  }
+  // Foundry Collection (a Map subclass) exposes its members as `.contents`.
+  // This covers CollectionField values (pseudo-document tier ladders) and the
+  // actor's items/effects collections when a path points straight at one.
+  if (Array.isArray(value.contents)) {
+    return value.contents.map((v) => normalizeFoundryValue(v, depth + 1));
+  }
+  // Plain Map (no `.contents`) → array of its values.
+  if (value instanceof Map) {
+    return Array.from(value.values(), (v) => normalizeFoundryValue(v, depth + 1));
+  }
+  // DataModel / pseudo-document → its source object (schema fields are getters,
+  // not own-enumerable props, so a key-copy would miss them). `toObject(false)`
+  // yields the stored source (Sets already serialized to arrays); re-normalize
+  // it to catch any nested live structures.
+  if (typeof value.toObject === 'function') {
+    try {
+      return normalizeFoundryValue(value.toObject(false), depth + 1);
+    } catch (e) { /* fall through to a shallow copy */ }
+  }
+  // Plain-ish object → normalize own enumerable props (catches nested Sets).
+  const out = {};
+  for (const k of Object.keys(value)) {
+    out[k] = normalizeFoundryValue(value[k], depth + 1);
+  }
+  return out;
+}
+
+/**
  * Extract a collection-mapped field (e.g. abilities/inventory from actor.items[]).
  * Reads field.foundry_collection off the actor, optionally filters by
  * foundry_item_type, projects each entry per foundry_item_fields (or a default
@@ -187,7 +255,7 @@ export function extractCollectionField(actor, field) {
       if (!first) return '';
       if (proj) {
         const firstPath = Object.values(proj)[0];
-        return getNestedValue(first, firstPath) ?? '';
+        return normalizeFoundryValue(getNestedValue(first, firstPath)) ?? '';
       }
       return first.name ?? '';
     }
@@ -196,7 +264,7 @@ export function extractCollectionField(actor, field) {
       if (!proj) return { id: it.id ?? null, name: it.name ?? null, type: it.type ?? null };
       const out = {};
       for (const [outKey, path] of Object.entries(proj)) {
-        out[outKey] = getNestedValue(it, path) ?? null;
+        out[outKey] = normalizeFoundryValue(getNestedValue(it, path)) ?? null;
       }
       return out;
     });
@@ -223,7 +291,14 @@ export function buildChronicleFields(actor, mappedFields) {
     if (field.foundry_collection) {
       result[field.key] = extractCollectionField(actor, field);
     } else {
-      const value = getNestedValue(actor, field.foundry_path);
+      let value = normalizeFoundryValue(getNestedValue(actor, field.foundry_path));
+      // A Set/array/object scalar (e.g. system.skills.value, actor.statuses)
+      // declared on a string/json field is serialized to a JSON string so it
+      // arrives as parseable JSON, mirroring how collection fields are stored.
+      if (value != null && typeof value === 'object'
+          && (field.type === 'string' || field.type === 'json')) {
+        value = JSON.stringify(value);
+      }
       result[field.key] = value ?? null;
     }
   }

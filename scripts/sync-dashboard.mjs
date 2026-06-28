@@ -66,6 +66,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'open-map-journal': SyncDashboard.#onOpenMapJournalAction,
       'resync-all-maps': SyncDashboard.#onResyncAllMapsAction,
       'resync-all-journals': SyncDashboard.#onResyncAllJournalsAction,
+      'resync-everything': SyncDashboard.#onResyncEverythingAction,
       'open-maps-folder': SyncDashboard.#onOpenMapsFolderAction,
       'dismiss-map-errors': SyncDashboard.#onDismissMapErrorsAction,
       'pull-date': SyncDashboard.#onPullDateAction,
@@ -1469,6 +1470,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     await this._onResyncAllJournals();
   }
 
+  /** Re-sync EVERYTHING: journals + every linked character + maps. */
+  static async #onResyncEverythingAction() {
+    await this._onResyncEverything();
+  }
+
   /**
    * Reveal the "Chronicle Maps" folder in Foundry's journal sidebar.
    * Activates the journal tab and expands the folder.
@@ -2170,6 +2176,71 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this._logActivity('push', `Pushed ${count} actors to Chronicle`);
     ui.notifications.info(`Chronicle: Pushed ${count} actor(s) to Chronicle.`);
     this.render({ force: true });
+  }
+
+  /**
+   * Re-sync everything that's already connected to Chronicle in one action:
+   * all journals, every LINKED character (re-pushes current field data — Foundry
+   * is source of truth for characters), and all maps. This is the Overview's
+   * "Sync Everything Now"; the previous button only did journals, which left
+   * actor field data (and inventory/notes) stale after a manifest/path change.
+   *
+   * Unlinked actors are intentionally NOT auto-created here — that's a heavier,
+   * entity-creating operation kept on the Characters tab's "Push All Actors".
+   * Each module's resyncAll / repushActor is the same proven path the per-tab
+   * buttons use; failures are isolated per item so one bad actor can't abort the
+   * sweep.
+   */
+  async _onResyncEverything() {
+    let confirmed;
+    try {
+      confirmed = await confirmDialog({
+        title: 'Sync Everything Now',
+        content: '<p>Re-sync <strong>all</strong> journals, linked characters, and maps with Chronicle?</p>'
+          + '<p class="hint">Foundry is the source of truth for characters — their current data is pushed up.</p>',
+      });
+    } catch {
+      return; // User dismissed the dialog.
+    }
+    if (!confirmed) return;
+
+    ui.notifications.info('Chronicle: Re-syncing everything…');
+    const mods = this._syncManager?._modules || [];
+    const find = (name) => mods.find((m) => m.constructor?.name === name);
+    const done = [];
+
+    // 1. Journals (verbose=false to avoid a flood of per-entry toasts mid-sweep).
+    const journalSync = find('JournalSync');
+    if (journalSync?.resyncAll) {
+      try { await journalSync.resyncAll({ verbose: false }); done.push('journals'); }
+      catch (err) { console.error('Chronicle: journal resync failed', err); }
+    }
+
+    // 2. Characters — re-push every LINKED actor so stale fields refresh.
+    const actorSync = find('ActorSync');
+    if (actorSync?.repushActor) {
+      const chars = actorSync.getSyncedActors?.() ?? [];
+      let pushed = 0;
+      for (const c of chars) {
+        if (!c.synced) continue; // unlinked → use "Push All Actors" (creates entities)
+        try { if (await actorSync.repushActor(c.id)) pushed++; }
+        catch (err) { console.error(`Chronicle: re-push failed for "${c.name}"`, err); }
+      }
+      if (pushed) done.push(`${pushed} character(s)`);
+    }
+
+    // 3. Maps.
+    const mapSync = find('MapSync');
+    if (mapSync?.resyncAll) {
+      try { await mapSync.resyncAll({ verbose: false }); done.push('maps'); }
+      catch (err) { console.error('Chronicle: map resync failed', err); }
+    }
+
+    this._cache.maps = null;
+    this._cache.entities = null;
+    this._logActivity('push', `Re-synced everything (${done.join(', ') || 'nothing'})`);
+    this.render({ force: true });
+    ui.notifications.info(`Chronicle: Re-sync complete — ${done.join(', ') || 'nothing to sync'}.`);
   }
 
   // ---------------------------------------------------------------------------
