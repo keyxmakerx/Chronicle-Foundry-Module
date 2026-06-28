@@ -31,6 +31,27 @@ let dashboard = null;
 let _statusIndicatorEl = null;
 
 /**
+ * Open the Sync Dashboard, recreating the singleton if it isn't currently
+ * rendered. An ApplicationV2 instance can be left in a non-re-renderable state
+ * after a close (notably when the close interrupts an in-flight render), which
+ * made the dashboard intermittently fail to reopen. Mirrors the SyncCalendar
+ * singleton helper: bring an already-open window to the front; otherwise build,
+ * (re)bind, and render a fresh instance. `bind()` only sets a reference, so
+ * recreating leaks nothing.
+ * @returns {SyncDashboard|null}
+ */
+function openDashboard() {
+  if (dashboard && dashboard.rendered) {
+    dashboard.bringToFront?.();
+    return dashboard;
+  }
+  dashboard = new SyncDashboard();
+  if (syncManager) dashboard.bind(syncManager);
+  dashboard.render({ force: true });
+  return dashboard;
+}
+
+/**
  * Module initialization — register settings.
  * This runs before the game is fully ready.
  */
@@ -207,9 +228,9 @@ async function _runtimeValidateDescriptor() {
 Hooks.on('getSceneControlButtons', (controls) => {
   if (!game.user.isGM) return;
 
-  const openDashboard = () => {
-    if (dashboard) dashboard.render({ force: true });
-  };
+  // openDashboard() is the module-level helper above: it recreates the
+  // dashboard when a prior close left the instance non-re-renderable, fixing
+  // the intermittent "can't reopen the dashboard" bug.
   // FM-CAL-DASHBOARD-LINK: surface SyncCalendarApplication as a second
   // tool in the Chronicle Sync scene-control group. The singleton helper
   // is GM-only by contract; the outer GM guard above is also enforced.
@@ -342,15 +363,15 @@ function _addStatusIndicator() {
     if (syncManager.api.state === 'disconnected') {
       syncManager.api.connect();
       ui.notifications.info('Chronicle: Reconnecting...');
-    } else if (dashboard) {
-      dashboard.render({ force: true });
+    } else {
+      openDashboard();
     }
   });
 
   // Right-click always opens the dashboard (even when disconnected).
   indicator.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    if (dashboard) dashboard.render({ force: true });
+    openDashboard();
   });
 
   // Flash the dot briefly when a WS message arrives (activity indicator).
@@ -431,9 +452,11 @@ Hooks.once('ready', () => {
   if (module) {
     module.api = {
       syncManager,
-      dashboard,
+      // Getter (not a snapshot): openDashboard() may recreate the instance, so
+      // expose the live reference rather than the one captured at ready time.
+      get dashboard() { return dashboard; },
       getAPI: () => syncManager?.api,
-      openDashboard: () => dashboard?.render({ force: true }),
+      openDashboard: () => openDashboard(),
       // Version-independent diagnostics escape hatch. Lets an operator always
       // produce the System Debug snapshot from the console even if the toolbar
       // button or sidebar indicator regress on a Foundry upgrade. DOM-
