@@ -116,6 +116,39 @@ test('buildCapabilityReport classifies synced / mapped-missing / declared-unmapp
   assert.ok(report.summary.availableUnmapped >= 2);
 });
 
+test('buildCapabilityReport: a foundry_collection field is collection-mapped, not declared-unmapped', () => {
+  const defs = {
+    preset_slug: 'drawsteel-character',
+    foundry_actor_type: 'hero',
+    fields: [
+      { key: 'abilities_json', type: 'string', foundry_collection: 'items', foundry_item_type: ['ability'] },
+      { key: 'class', type: 'string', foundry_collection: 'items', foundry_item_type: ['class'], foundry_item_single: true },
+      { key: 'immunities', type: 'string' }, // genuinely unmapped (no path, no collection)
+    ],
+  };
+  const report = buildCapabilityReport(captureActorSnapshot(makeActor()), defs);
+  const byKey = Object.fromEntries(report.fields.filter((r) => r.key).map((r) => [r.key, r]));
+  assert.equal(byKey.abilities_json.status, CAP_STATUS.COLLECTION_MAPPED);
+  assert.equal(byKey.class.status, CAP_STATUS.COLLECTION_MAPPED);
+  assert.match(byKey.class.foundry_path, /items\[class\] \(single\)/); // descriptor surfaced
+  assert.equal(byKey.immunities.status, CAP_STATUS.DECLARED_UNMAPPED);
+  assert.equal(report.summary.collectionMapped, 2);
+  assert.equal(report.summary.declaredUnmapped, 1);
+});
+
+test('collections expose a sample item schema per type (enables item-field mapping)', () => {
+  const report = buildCapabilityReport(captureActorSnapshot(makeActor()), FIELD_DEFS);
+  const items = report.collections.find((c) => c.source === 'actor.items');
+  assert.ok(items, 'expected actor.items collection');
+  const byType = Object.fromEntries((items.samples || []).map((s) => [s.type, s]));
+  assert.ok(byType.ability && byType.kit, 'expected one sample per distinct type');
+  // the ability sample exposes its system fields (e.g. keywords) for projection
+  assert.ok(byType.ability.schema.some((r) => r.path === 'system.keywords'));
+  // and the markdown renders the per-type schema lines
+  const md = renderCapabilityMarkdown(report);
+  assert.match(md, /\*\*ability\*\* — e\.g\. "Ashfall Strike"/);
+});
+
 test('renderers produce a titled markdown report and valid JSON; bad input tolerated', () => {
   const report = buildCapabilityReport(captureActorSnapshot(makeActor()), FIELD_DEFS);
   const md = renderCapabilityMarkdown(report);
