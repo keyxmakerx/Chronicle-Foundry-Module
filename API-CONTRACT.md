@@ -790,10 +790,27 @@ Replaces all weekday definitions.
 Returns calendar structure in Calendaria-compatible format.
 
 #### GET /calendar/weather
-Returns current weather state, or `{}` if none set.
+Returns current weather state, or `{}` if none set. Post-unification-seam
+(chronicle cordinator#53) this reads the CURRENT day's canonical per-day
+weather row — the same store the Chronicle sky band renders and the GM
+console writes — falling back to the legacy single-row state for pre-seam
+data. `preset_id` is 1:1 with Calendaria preset ids (W1 vocabulary parity).
 
 #### PUT /calendar/weather
-Sets current weather state (GM override).
+Sets current weather state (GM override / Calendaria weatherChange push).
+Writes the CURRENT day's canonical row (null-preserve merge: unsent fields
+keep their stored values); Chronicle re-broadcasts
+`calendar.weather.changed` + `calendar.worldstate.changed`.
+
+#### GET /calendar/world-state
+Returns the world-state seed for the campaign's calendar: `{ date, timeOfDay,
+season, weather: {type, intensity}, moons: [...], events: [...], moodTint,
+timeControl }`. Celestial `events[]` entries carry
+`{ type, name, start_time, duration, visibility }` — Bearer keys get
+GM-level visibility, so `dm_only` events ARE included and the consumer must
+honor `visibility` (the celestial-note projection maps it to Calendaria's
+`secret`). Optional `?year=&month=&day=` pins a date; absent = the
+calendar's current date. ADDITIVE endpoint (W5 bridge, cordinator#34).
 
 #### GET /calendar/export
 Exports the full calendar as Chronicle JSON. Add `?events=true` to include events.
@@ -1133,10 +1150,11 @@ If the token is invalid, the server rejects the upgrade.
 | `calendar.event.created` | Full event object | Calendar event created |
 | `calendar.event.updated` | Full event object | Calendar event modified |
 | `calendar.event.deleted` | `{ id }` | Calendar event deleted |
-| `calendar.date.advanced` | `{ year, month, day, hour, minute }` | Date/time changed |
+| `calendar.date.advanced` | `{ year, month, day, hour, minute }` | Date/time changed via the legacy advance/set endpoints (NOT the GM console — see worldstate.changed). Consumed with value+window dedup |
+| `calendar.worldstate.changed` | `{ date: {year, month, day}, moodTint }` | ANY GM-console worldstate write (date/time advance, weather, celestial trigger/clear, mood). Minimal payload by design — the module re-GETs `/calendar/date` (date+time+weather) and `/calendar/world-state` (celestials) with dedup against `date.advanced` |
 | `calendar.season.changed` | `{ id, name, color }` | Season boundary crossed |
 | `calendar.moon.phase_changed` | `{ moon_id, moon_name, phase_name, phase_position }` | Moon phase changed |
-| `calendar.weather.changed` | Weather input object | Weather set or generated |
+| `calendar.weather.changed` | Weather input object | Weather set or generated. Consumed: triggers a re-GET of `/calendar/weather` and a Calendaria apply (echo-guarded) |
 | `calendar.structure.updated` | `null` | Calendar structure modified |
 | `calendar.era.changed` | `{ id, name, color }` | Era boundary crossed |
 | `sync.status` | `{ connected: bool }` | Connection state change |

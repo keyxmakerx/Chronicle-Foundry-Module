@@ -85,6 +85,20 @@ export function registerSettings() {
     default: false,
   });
 
+  // Worldstate sync toggle (cordinator#34 W5 bridge): gates the weather
+  // push in BOTH directions and the celestial-event note projection, so a
+  // GM who finds the projected notes noisy can silence worldstate sync
+  // without losing date/event sync (which stays under syncCalendar).
+  // Default ON per the locked design ruling.
+  game.settings.register(MODULE_ID, 'syncWorldstate', {
+    name: game.i18n.localize('CHRONICLE.Settings.SyncWorldstate.Name'),
+    hint: game.i18n.localize('CHRONICLE.Settings.SyncWorldstate.Hint'),
+    scope: 'world',
+    config: true,
+    type: Boolean,
+    default: true,
+  });
+
   // Notes sync toggle.
   game.settings.register(MODULE_ID, 'syncNotes', {
     name: game.i18n.localize('CHRONICLE.Settings.SyncNotes.Name'),

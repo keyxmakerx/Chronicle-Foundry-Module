@@ -30,6 +30,10 @@
         "Name": "Sync Calendar",
         "Hint": "Sync Chronicle calendar with Calendaria or Simple Calendar module"
       },
+      "SyncWorldstate": {
+        "Name": "Sync Worldstate (weather + sky events)",
+        "Hint": "Push Chronicle weather to Calendaria (and back), and mirror Chronicle celestial events as notes in a reserved category. Turn off to keep date/event sync without the worldstate layer."
+      },
       "SyncCharacters": {
         "Name": "Sync Characters",
         "Hint": "Sync Foundry actors with Chronicle character entities (requires matching game system)"
@@ -49,7 +53,7 @@
       },
       "SyncCalendarMenu": {
         "Name": "Sync Calendar",
-        "Hint": "Open the Sync Calendar — a 3-pane view of your Calendaria calendar with an always-on validation panel. Event authoring + drag-select multi-day landed in PR 2; recurrence + moon strip + weather + structure editing land in PR 3-5.",
+        "Hint": "Open the Sync Calendar — a 3-pane view of your Calendaria calendar with an always-on validation panel. Event authoring, drag-select multi-day, recurrence, and the moon strip have all landed; weather now syncs natively via the worldstate bridge (the day inspector shows it read-only). Structure editing remains import-driven.",
         "Label": "Open"
       }
     },
@@ -427,7 +431,7 @@
       "JumpToday": "Jump to today",
       "YearOverview": "Year overview",
       "YearOverviewHint": "Click a month to focus the inspector.",
-      "YearOverviewFootnote": "Click a month to drill into the day grid (drag to select a range). Moon-phase strip lands in PR 3; weather + structure editing in PR 4-5.",
+      "YearOverviewFootnote": "Click a month to drill into the day grid (drag to select a range).",
       "MonthViewHint": "Click a day to focus the inspector. Drag across days to create a multi-day event.",
       "MonthViewFootnote": "Drag from one day to another to open the multi-day event form pre-filled with that range.",
       "BackToYear": "Back to year",

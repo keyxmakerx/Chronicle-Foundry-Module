@@ -23,10 +23,12 @@
  *     `scripts/calendar-sync.mjs` hook handlers — no editor-side Chronicle
  *     plumbing required.
  *
- * PRs 3-5 still defer: moon strip, recurrence builder, weather, structure
- * editing, inline category creation. The Application class stays a thin
- * integration shell — pure validation + form translation live in
- * separately-unit-tested modules.
+ * Moon strip + recurrence builder shipped (PR 3); weather now syncs
+ * natively via the worldstate bridge in calendar-sync.mjs (cordinator#34
+ * W5) — the day inspector's weather display here stays read-only.
+ * Still deferred: structure editing (import-driven), inline category
+ * creation. The Application class stays a thin integration shell — pure
+ * validation + form translation live in separately-unit-tested modules.
  *
  * Naming: per scoping § 7, the UI label is "Sync Calendar" — Calendaria
  * already has a "Chronicle" widget. Don't reuse that name.
