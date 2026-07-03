@@ -190,6 +190,42 @@ export function worldstateDateKey(d) {
 }
 
 /**
+ * Time-of-day key companion to worldstateDateKey; null when the payload
+ * carries no time (the legacy AdvanceDate broadcast is date-only).
+ */
+export function worldstateTimeKey(d) {
+  if (!d || d.hour === undefined || d.hour === null) return null;
+  return `${d.hour}:${d.minute ?? 0}`;
+}
+
+/**
+ * Build the {date, time} record the date echo guards store for a payload.
+ * Returns null for payloads without a full date.
+ */
+export function dateRecordFor(d) {
+  const date = worldstateDateKey(d);
+  if (!date) return null;
+  return { date, time: worldstateTimeKey(d) };
+}
+
+/**
+ * Date variant of the echo guard. Matching is time-AWARE: the date parts
+ * must match exactly, and the time parts must match unless either side
+ * lacks a time (date-only payloads dedupe by date alone). This keeps a
+ * same-day TIME change (08:00 → 20:00) from being swallowed as an "echo"
+ * of an earlier same-day apply — the review's date-key finding — while
+ * date-only channels still dedupe.
+ */
+export function isDateEchoWithinWindow(rec, recAt, d, now, windowMs = WORLDSTATE_ECHO_WINDOW_MS) {
+  if (!rec) return false;
+  if ((now - recAt) >= windowMs) return false;
+  const dk = worldstateDateKey(d);
+  if (!dk || rec.date !== dk) return false;
+  const tk = worldstateTimeKey(d);
+  return rec.time === null || tk === null || rec.time === tk;
+}
+
+/**
  * Machine marker embedded in the content of every Calendaria note this
  * module projects from a Chronicle celestial event. It is the load-bearing
  * identity signal: the projection diffs by it (one note per type per day)
@@ -241,10 +277,17 @@ export function celestialNoteVisibility(seedEvent) {
  * @returns {{creates: Array, updates: Array<{note, event}>, deletes: Array}}
  */
 export function planCelestialProjection(existingNotes, seedEvents) {
+  // First marker note per type is the canonical one; SURPLUS notes of the
+  // same type (concurrent-refresh or user-duplication artifacts) go to
+  // deletes so the one-note-per-type-per-day invariant self-heals instead
+  // of duplicates lingering forever (review finding).
   const existingByType = new Map();
+  const surplus = [];
   for (const n of existingNotes || []) {
     const t = celestialTypeFromNote(n);
-    if (t && !existingByType.has(t)) existingByType.set(t, n);
+    if (!t) continue;
+    if (existingByType.has(t)) surplus.push(n);
+    else existingByType.set(t, n);
   }
   const wantByType = new Map();
   for (const e of seedEvents || []) {
@@ -252,7 +295,7 @@ export function planCelestialProjection(existingNotes, seedEvents) {
   }
   const creates = [];
   const updates = [];
-  const deletes = [];
+  const deletes = [...surplus];
   for (const [t, ev] of wantByType) {
     const existing = existingByType.get(t);
     if (existing) updates.push({ note: existing, event: ev });
@@ -291,12 +334,23 @@ export class CalendarSync {
      * Chronicle, so a change never loops (Chronicle → Calendaria →
      * weatherChange hook → Chronicle …) even when async hook timing slips
      * past the _syncing flag.
+     *
+     * INVARIANT (revert correctness): every successful apply CLEARS the
+     * pushed record and vice versa. State only ever moves via one side at
+     * a time, so the "other side's" stale record must not suppress a
+     * legitimate flip-back to an earlier value within the window (the
+     * review's revert-suppression finding). Date records are {date, time}
+     * objects (dateRecordFor); weather records are preset-id strings.
+     * lastCustomApplyAt one-shots the setCustomWeather fallback, whose
+     * resulting weatherChange hook reports Calendaria's own custom id —
+     * a vocabulary the value guard can't match.
      */
     this._wsGuard = {
       lastAppliedDate: null, lastAppliedDateAt: 0,
       lastPushedDate: null, lastPushedDateAt: 0,
       lastAppliedWeather: null, lastAppliedWeatherAt: 0,
       lastPushedWeather: null, lastPushedWeatherAt: 0,
+      lastCustomApplyAt: 0,
     };
 
     /**
@@ -537,13 +591,14 @@ export class CalendarSync {
    */
   async _onChronicleDateAdvanced(data) {
     if (!data) return;
-    const key = worldstateDateKey(data);
+    const rec = dateRecordFor(data);
     const now = Date.now();
-    if (key && isEchoWithinWindow(this._wsGuard.lastPushedDate, this._wsGuard.lastPushedDateAt, key, now)) return;
-    if (key && isEchoWithinWindow(this._wsGuard.lastAppliedDate, this._wsGuard.lastAppliedDateAt, key, now)) return;
-    if (key) {
-      this._wsGuard.lastAppliedDate = key;
+    if (isDateEchoWithinWindow(this._wsGuard.lastPushedDate, this._wsGuard.lastPushedDateAt, data, now)) return;
+    if (isDateEchoWithinWindow(this._wsGuard.lastAppliedDate, this._wsGuard.lastAppliedDateAt, data, now)) return;
+    if (rec) {
+      this._wsGuard.lastAppliedDate = rec;
       this._wsGuard.lastAppliedDateAt = now;
+      this._wsGuard.lastPushedDate = null; // state moved via apply → old push record is stale
     }
     await this._setLocalDate(data);
   }
@@ -567,13 +622,14 @@ export class CalendarSync {
     try {
       const cur = await this._api.get('/calendar/date');
       if (cur && cur.year !== undefined) {
-        const key = worldstateDateKey(cur);
+        const rec = dateRecordFor(cur);
         const now = Date.now();
-        const pushedEcho = isEchoWithinWindow(this._wsGuard.lastPushedDate, this._wsGuard.lastPushedDateAt, key, now);
-        const appliedDup = isEchoWithinWindow(this._wsGuard.lastAppliedDate, this._wsGuard.lastAppliedDateAt, key, now);
-        if (key && !pushedEcho && !appliedDup) {
-          this._wsGuard.lastAppliedDate = key;
+        const pushedEcho = isDateEchoWithinWindow(this._wsGuard.lastPushedDate, this._wsGuard.lastPushedDateAt, cur, now);
+        const appliedDup = isDateEchoWithinWindow(this._wsGuard.lastAppliedDate, this._wsGuard.lastAppliedDateAt, cur, now);
+        if (rec && !pushedEcho && !appliedDup) {
+          this._wsGuard.lastAppliedDate = rec;
           this._wsGuard.lastAppliedDateAt = now;
+          this._wsGuard.lastPushedDate = null; // state moved via apply
           await this._setLocalDate(cur);
         }
         if (getSetting('syncWorldstate') && cur.current_weather) {
@@ -696,6 +752,9 @@ export class CalendarSync {
   async _applyChronicleWeather(weather) {
     if (this._calendarModule !== 'calendaria' || !this._hasModernCalendariaApi) return;
     if (!getSetting('syncWorldstate')) return;
+    // Exclusion covers worldstate BOTH directions: an excluded "local-only"
+    // calendar neither pushes nor receives Chronicle weather.
+    if (this._isActiveCalendarExcluded()) return;
     const presetId = weather?.preset_id;
     if (!presetId) return;
 
@@ -724,9 +783,15 @@ export class CalendarSync {
           color: weather.color || undefined,
           description: weather.description || undefined,
         });
+        // The weatherChange hook this fires reports Calendaria's own
+        // custom-weather id, which the value guard can't match against
+        // the Chronicle preset id — one-shot a time window instead so
+        // the fallback can't bounce 'custom' back into Chronicle.
+        this._wsGuard.lastCustomApplyAt = now;
       }
       this._wsGuard.lastAppliedWeather = presetId;
       this._wsGuard.lastAppliedWeatherAt = now;
+      this._wsGuard.lastPushedWeather = null; // state moved via apply
     } catch (err) {
       console.warn('Chronicle: failed to apply weather to Calendaria', err);
     } finally {
@@ -750,6 +815,13 @@ export class CalendarSync {
     if (!presetId) return;
 
     const now = Date.now();
+    // One-shot after a setCustomWeather fallback: the hook reports
+    // Calendaria's own custom id (not the Chronicle preset), so the value
+    // guards below can't match it — suppress by time instead. Costs at
+    // most one real GM change inside the window right after a custom
+    // apply; without it the fallback clobbers Chronicle's canonical
+    // weather with 'custom'.
+    if ((now - this._wsGuard.lastCustomApplyAt) < WORLDSTATE_ECHO_WINDOW_MS) return;
     // A weatherChange fired by our own setWeather apply → not a GM change.
     if (isEchoWithinWindow(this._wsGuard.lastAppliedWeather, this._wsGuard.lastAppliedWeatherAt, presetId, now)) return;
     if (isEchoWithinWindow(this._wsGuard.lastPushedWeather, this._wsGuard.lastPushedWeatherAt, presetId, now)) return;
@@ -762,6 +834,7 @@ export class CalendarSync {
       });
       this._wsGuard.lastPushedWeather = presetId;
       this._wsGuard.lastPushedWeatherAt = now;
+      this._wsGuard.lastAppliedWeather = null; // state moved via push
     } catch (err) {
       console.error('Chronicle: failed to push Calendaria weather to Chronicle', err);
     }
@@ -774,13 +847,41 @@ export class CalendarSync {
    * dated setter, so day boundaries are where authored future weather
    * lands) and refresh the celestial-note projection. Also self-heals
    * offline drift per the locked design.
+   *
+   * Every read is PINNED to Calendaria's new local date: the sibling
+   * dateTimeChange handler's PUT /calendar/date races these GETs, so an
+   * un-pinned "current day" read can return the OLD day's state (review
+   * finding) — yesterday's weather applied to the new day and the new
+   * day's celestials never projected.
+   * @param {object} data - hook payload (date fields when provided).
    * @private
    */
-  async _onCalendariaDayChange() {
+  async _onCalendariaDayChange(data) {
     if (this._syncing || !game.user.isGM) return;
+    if (this._isActiveCalendarExcluded()) return;
     if (!getSetting('syncWorldstate')) return;
-    await this._refreshWeatherFromChronicle();
-    await this._refreshCelestialProjection();
+
+    const d = (data && data.year !== undefined) ? data
+      : globalThis.CALENDARIA?.api?.getCurrentDateTime?.();
+    if (!d || d.year === undefined) return;
+    const pinned = { year: d.year, month: d.month, day: d.day ?? d.dayOfMonth };
+
+    try {
+      const seed = await this._api.get(
+        `/calendar/world-state?year=${pinned.year}&month=${pinned.month}&day=${pinned.day}`);
+      if (!seed || !seed.date) return;
+      // The pinned seed's weather IS the day's canonical store projection.
+      // 'clear' is ambiguous (authored-clear vs the no-row default), so the
+      // day-boundary sync applies only real conditions — an actively-set
+      // 'clear' still arrives via weather.changed/worldstate.changed.
+      const t = seed.weather?.type;
+      if (t && t !== 'clear') {
+        await this._applyChronicleWeather({ preset_id: t });
+      }
+      await this._projectCelestialsFromSeed(seed);
+    } catch (err) {
+      console.warn('Chronicle: day-change worldstate refresh failed', err);
+    }
   }
 
   // --- Foundry → Chronicle (Calendaria Modern Hooks) ---
@@ -803,18 +904,20 @@ export class CalendarSync {
       hour: data.hour ?? 0,
       minute: data.minute ?? 0,
     };
-    const key = worldstateDateKey(body);
+    const rec = dateRecordFor(body);
     const now = Date.now();
     // A dateTimeChange fired late by our OWN _setLocalDate (after its
     // finally cleared _syncing) must not PUT the same date back — that was
-    // the latent date-echo loop (W5 item 6).
-    if (key && isEchoWithinWindow(this._wsGuard.lastAppliedDate, this._wsGuard.lastAppliedDateAt, key, now)) return;
+    // the latent date-echo loop (W5 item 6). Time-aware: a genuine
+    // same-day TIME move within the window still pushes.
+    if (isDateEchoWithinWindow(this._wsGuard.lastAppliedDate, this._wsGuard.lastAppliedDateAt, body, now)) return;
 
     try {
       await this._api.put('/calendar/date', body);
-      if (key) {
-        this._wsGuard.lastPushedDate = key;
+      if (rec) {
+        this._wsGuard.lastPushedDate = rec;
         this._wsGuard.lastPushedDateAt = now;
+        this._wsGuard.lastAppliedDate = null; // state moved via push
       }
     } catch (err) {
       console.error('Chronicle: Failed to push Calendaria date/time to Chronicle', err);
@@ -1244,21 +1347,35 @@ export class CalendarSync {
   async _refreshCelestialProjection() {
     if (this._calendarModule !== 'calendaria' || !this._hasModernCalendariaApi) return;
     if (!getSetting('syncWorldstate')) return;
-    const api = globalThis.CALENDARIA?.api;
-    if (typeof api?.getNotesForDate !== 'function' || typeof api?.createNote !== 'function') return;
-
+    if (this._isActiveCalendarExcluded()) return;
     try {
       const seed = await this._api.get('/calendar/world-state');
-      const date = seed?.date;
-      if (!date || date.year === undefined) return;
-
-      const all = api.getNotesForDate(date.year, date.month, date.day);
-      const ours = (Array.isArray(all) ? all : []).filter(isChronicleCelestialNote);
-      const plan = planCelestialProjection(ours, seed.events);
-      await this._applyCelestialPlan(plan, date);
+      await this._projectCelestialsFromSeed(seed);
     } catch (err) {
       console.warn('Chronicle: celestial projection refresh failed', err);
     }
+  }
+
+  /**
+   * Diff+apply the projection for an already-fetched seed (shared by the
+   * current-day refresh and the date-pinned day-change path).
+   * @param {object} seed - world-state seed ({date, events, ...}).
+   * @private
+   */
+  async _projectCelestialsFromSeed(seed) {
+    if (this._calendarModule !== 'calendaria' || !this._hasModernCalendariaApi) return;
+    if (!getSetting('syncWorldstate')) return;
+    if (this._isActiveCalendarExcluded()) return;
+    const api = globalThis.CALENDARIA?.api;
+    if (typeof api?.getNotesForDate !== 'function' || typeof api?.createNote !== 'function') return;
+
+    const date = seed?.date;
+    if (!date || date.year === undefined) return;
+
+    const all = api.getNotesForDate(date.year, date.month, date.day);
+    const ours = (Array.isArray(all) ? all : []).filter(isChronicleCelestialNote);
+    const plan = planCelestialProjection(ours, seed.events);
+    await this._applyCelestialPlan(plan, date);
   }
 
   /**

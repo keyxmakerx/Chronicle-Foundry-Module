@@ -374,3 +374,91 @@ test('note->event payload carries color/icon/all_day/start time when present', a
   assert.equal(allDay.all_day, true);
   assert.equal(allDay.start_hour, undefined);
 });
+
+// ---------------------------------------------------------------------
+// Review-round fixes (adversarial review of the first bridge commit)
+// ---------------------------------------------------------------------
+
+test('revert within the window still syncs: apply rain -> push clear -> flip back to rain PUTs', async () => {
+  resetSettings();
+  const { sync, calls } = makeSync();
+  await sync._applyChronicleWeather({ preset_id: 'rain' });     // Chronicle set rain
+  await sync._onCalendariaWeatherChange({ presetId: 'clear' }); // GM sets clear locally
+  await sync._onCalendariaWeatherChange({ presetId: 'rain' });  // GM flips BACK within 10s
+  const presets = calls.put.map((p) => p.body.preset_id);
+  assert.deepEqual(presets, ['clear', 'rain'], 'the deliberate flip-back must not be swallowed as an echo');
+});
+
+test('reverse revert: push clear -> Chronicle sets rain -> Chronicle flips back to clear applies', async () => {
+  resetSettings();
+  const { sync, calCalls } = makeSync();
+  await sync._onCalendariaWeatherChange({ presetId: 'clear' }); // our push
+  await sync._applyChronicleWeather({ preset_id: 'rain' });     // Chronicle moved on
+  await sync._applyChronicleWeather({ preset_id: 'clear' });    // Chronicle flips back within 10s
+  const applied = calCalls.setWeather.map((w) => w.id);
+  assert.deepEqual(applied, ['rain', 'clear'], 'flip-back to a previously-pushed value must still apply');
+});
+
+test('same-day TIME change is not swallowed by the date echo guard', async () => {
+  resetSettings();
+  const cur = { year: 1492, month: 6, day: 16, hour: 8, minute: 0 };
+  const { sync, calls } = makeSync({
+    getResponses: { '/calendar/date': cur, '/calendar/world-state': { date: { year: 1492, month: 6, day: 16 }, events: [] } },
+  });
+  await sync.onMessage({ type: 'calendar.worldstate.changed', payload: {} }); // applies 08:00, records it
+  // GM advances local time 08:00 -> 20:00 the same day.
+  await sync._onCalendariaDateTimeChange({ year: 1492, month: 6, dayOfMonth: 16, hour: 20, minute: 0 });
+  assert.equal(calls.put.length, 1, 'the time move must PUT');
+  assert.equal(calls.put[0].body.hour, 20);
+});
+
+test('setCustomWeather fallback one-shots the weatherChange hook (no custom-id bounce)', async () => {
+  resetSettings();
+  const { sync, calls } = makeSync({
+    calendaria: { setWeather: async () => { throw new Error('unknown preset'); } },
+  });
+  await sync._applyChronicleWeather({ preset_id: 'fireflies', preset_label: 'Fireflies' });
+  // Calendaria's custom-weather hook reports ITS id, not the Chronicle one.
+  await sync._onCalendariaWeatherChange({ presetId: 'custom' });
+  assert.equal(calls.put.length, 0, "the fallback's hook must not PUT 'custom' back to Chronicle");
+});
+
+test('dayChange pins reads to the NEW local date and applies the seed weather', async () => {
+  resetSettings();
+  const seed = {
+    date: { year: 1492, month: 7, day: 1 },
+    weather: { type: 'heavy-rain', intensity: 1 },
+    events: [{ type: 'aurora', name: 'Lights', visibility: 'everyone' }],
+  };
+  const { sync, calls, calCalls } = makeSync({
+    getResponses: { '/calendar/world-state?year=1492&month=7&day=1': seed },
+  });
+  await sync._onCalendariaDayChange({ year: 1492, month: 7, day: 1 });
+  assert.deepEqual(calls.get, ['/calendar/world-state?year=1492&month=7&day=1'],
+    'reads must be date-pinned (an un-pinned current-day GET races our own date PUT)');
+  assert.equal(calCalls.setWeather.length, 1);
+  assert.equal(calCalls.setWeather[0].id, 'heavy-rain');
+  assert.equal(calCalls.createNote.length, 1, 'celestials project from the same pinned seed');
+});
+
+test("dayChange does not force 'clear' onto Calendaria (ambiguous no-row default)", async () => {
+  resetSettings();
+  const seed = { date: { year: 1492, month: 7, day: 2 }, weather: { type: 'clear', intensity: 1 }, events: [] };
+  const { sync, calCalls } = makeSync({
+    getResponses: { '/calendar/world-state?year=1492&month=7&day=2': seed },
+  });
+  await sync._onCalendariaDayChange({ year: 1492, month: 7, day: 2 });
+  assert.equal(calCalls.setWeather.length, 0);
+  assert.equal(calCalls.setCustomWeather.length, 0);
+});
+
+test('projection deletes SURPLUS duplicate notes of the same type', () => {
+  const existing = [
+    { id: 'n1', content: celestialMarkerFor('aurora') + 'Aurora' },
+    { id: 'n1-dup', content: celestialMarkerFor('aurora') + 'Aurora (copy)' },
+  ];
+  const plan = planCelestialProjection(existing, [{ type: 'aurora', name: 'Aurora' }]);
+  assert.equal(plan.updates.length, 1);
+  assert.equal(plan.updates[0].note.id, 'n1');
+  assert.deepEqual(plan.deletes.map((n) => n.id), ['n1-dup'], 'duplicates self-heal');
+});
