@@ -29,9 +29,12 @@ jobs:
       - name: Validate chronicle-package.json
         run: node tools/check-package-descriptor.mjs
 
-      # Full off-DOM test suite (B-R8). The glob is quoted so the shell passes
-      # it to Node literally — Node's own glob matches each tools/test-*.mjs file
-      # (the bare directory form `node --test tools/` errors on Node 20). This
-      # supersedes the old single-file test-update-info step.
+      # Full off-DOM test suite (B-R8). The glob is UNQUOTED so the bash shell
+      # expands tools/test-*.mjs to explicit file args — Node's own glob for
+      # --test only landed in Node 21+, and this workflow pins Node 20, so a
+      # quoted glob reaches Node literally and "cannot be found". The bare
+      # directory form (`node --test tools/`) also errors on Node 20. Shell
+      # expansion works on every Node version. This supersedes the old
+      # single-file test-update-info step.
       - name: Run test suite
-        run: node --test 'tools/test-*.mjs'
+        run: node --test tools/test-*.mjs
