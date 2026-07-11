@@ -69,7 +69,14 @@ test('missing/invalid startDate returns null', () => {
 // ── Item 1: _calendariaNoteToChronicleEvent wiring (raw vs getNote) ───────────
 
 function makeCalendarSync(overrides) {
-  return Object.assign(Object.create(CalendarSync.prototype), { _hasModernCalendariaApi: false }, overrides);
+  // _syncDepth: 0 mirrors the constructor's reentrant-guard init (the guard is
+  // now a depth counter read through the _syncing getter — FM-CAL-BACKCATALOG-FIX
+  // item 3). Object.create skips the constructor, so seed it here.
+  return Object.assign(
+    Object.create(CalendarSync.prototype),
+    { _hasModernCalendariaApi: false, _syncDepth: 0 },
+    overrides,
+  );
 }
 
 test('_calendariaNoteToChronicleEvent: raw hook payload (no modern API) is +1 corrected', () => {
@@ -149,9 +156,10 @@ test('back-catalog sync holds _syncing while creating local notes (no echo re-pu
   const syncingAtCreate = [];
   const cs = makeCalendarSync({
     _hasModernCalendariaApi: true,
-    _syncing: false,
     _chronicleCalendar: { current_year: 1492, months: new Array(12).fill({ days: 30 }) },
-    _api: { get: async () => [{ id: 'e1' }] }, // each month-window returns the same event
+    // Stub the REAL Chronicle envelope { data:[...], total:N } — not a bare array
+    // (the #76 stub that masked the BLOCKER). FM-CAL-BACKCATALOG-FIX item 1.
+    _api: { get: async () => ({ data: [{ id: 'e1' }], total: 1 }) },
     _getLocalEventId: () => null, // nothing mapped yet
     _createLocalEvent(event) {
       // _createLocalEvent → CALENDARIA.api.createNote fires the noteCreated hook
@@ -161,7 +169,7 @@ test('back-catalog sync holds _syncing while creating local notes (no echo re-pu
     },
   });
   await cs._syncChronicleEventsToCalendariaNotes();
-  assert.ok(syncingAtCreate.length > 0, 'at least one event was created');
+  assert.ok(syncingAtCreate.length > 0, 'at least one event was created (envelope was unwrapped)');
   assert.ok(syncingAtCreate.every((v) => v === true), '_syncing must be held true during every create');
   assert.equal(cs._syncing, false, '_syncing is reset after the loop');
 });
