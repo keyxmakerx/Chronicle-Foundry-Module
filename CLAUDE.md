@@ -59,7 +59,11 @@ Integration — Install & Updates".
 ## Code Conventions
 
 - **ES modules** (`.mjs`) with `export default class` pattern.
-- Sync modules use a `_syncing` boolean guard to prevent infinite loops.
+- Sync modules use a `_syncing` guard to prevent infinite loops. Most back it
+  with a boolean; `calendar-sync.mjs` backs it with a reentrant `_syncDepth`
+  counter (read through a `_syncing` getter) because its back-catalog loop and
+  WebSocket handlers can overlap, and a boolean's `finally` would unmask the
+  loop mid-flight (FM-CAL-BACKCATALOG-FIX item 3).
 - System adapters implement `toChronicleFields()` / `fromChronicleFields()`.
 - All REST calls use Bearer token auth via `api-client.mjs`.
 - WebSocket messages are routed by type through `SyncManager`.

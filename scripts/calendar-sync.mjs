@@ -175,6 +175,12 @@ export function isCalendarNoteJournal(journal) {
  * correct with zero double-correction risk. The YEAR is absolute in both and is
  * never adjusted (an earlier yearZero hypothesis was wrong — audit §2).
  *
+ * CAUTION: do NOT pass a raw Foundry `game.time.components` spread (e.g. the
+ * `.current` of a Calendaria `dateTimeChange` payload) straight in — it carries
+ * BOTH a `dayOfMonth` (day-of-month, 0-indexed) AND a day-of-YEAR `day`, and the
+ * `day` would trip the passthrough branch. Extract `{year, month, dayOfMonth}`
+ * first (see `_onCalendariaDateTimeChange`). FM-CAL-BACKCATALOG-FIX item 2.
+ *
  * @param {object} startDate - Calendaria startDate ({year, month, day?|dayOfMonth?}).
  * @returns {{year:number, month:number, day:number}|null} 1-indexed, or null.
  */
@@ -227,6 +233,21 @@ export function calendarEventFetchCoordinates(calendar, yearSpan = 1) {
  * Compares month count, per-month day counts, and weekday count ONLY — moons,
  * seasons, and eras are cosmetic to date coordinates and excluded (B-R2).
  *
+ * Two ride-along refinements (FM-CAL-BACKCATALOG-FIX, RC-9):
+ *   - The weekday comparison is SKIPPED when EITHER side reports 0 weekdays. A
+ *     real calendar always has ≥1 weekday, so 0 means the list was unreadable
+ *     (e.g. the Foundry reader didn't recognize Calendaria's weekday storage).
+ *     Pausing sync on an unreadable weekday list while the month structure
+ *     matches is a false positive — degrade to comparing what is readable. The
+ *     month structure stays fail-closed (a genuine month divergence still pauses).
+ *   - Leap-year month-length variants are a DOCUMENTED EXCLUSION. Chronicle's
+ *     wire exposes leap rules (leap_year_every/offset + per-month leap_year_days,
+ *     GetCalendar), but the active-Foundry structure reader surfaces only base
+ *     per-month `days`, and pinning Calendaria's leap representation for a
+ *     symmetric comparison is out of scope (RC-9: do NOT build leap inference).
+ *     The base month/day + weekday comparison catches genuine structural
+ *     divergence; leap variance is intentionally not compared.
+ *
  * @param {object} chronicle - Chronicle calendar ({months:[{days}], weekdays:[]}).
  * @param {object} foundry - normalized active Foundry structure
  *   ({name, monthDays:number[], weekdayCount:number}).
@@ -252,7 +273,10 @@ export function compareCalendarStructures(chronicle, foundry) {
       }
     }
   }
-  if (chronicleWeekdays !== fWeekdays) {
+  // Only compare weekday counts when BOTH sides expose a real count (> 0). A 0
+  // on either side signals an unreadable list, not a genuine mismatch — see the
+  // doc comment's ride-along note.
+  if (chronicleWeekdays > 0 && fWeekdays > 0 && chronicleWeekdays !== fWeekdays) {
     reasons.push(`weekday count (Chronicle ${chronicleWeekdays} vs Foundry ${fWeekdays})`);
   }
 
@@ -282,7 +306,13 @@ export class CalendarSync {
   constructor() {
     /** @type {import('./api-client.mjs').ChronicleAPI|null} */
     this._api = null;
-    this._syncing = false;
+    /**
+     * Reentrant echo-suppression guard, backed by a DEPTH COUNTER (not a
+     * boolean). Read it through the `_syncing` getter. FM-CAL-BACKCATALOG-FIX
+     * item 3 — see the getter for why a counter is required.
+     * @type {number}
+     */
+    this._syncDepth = 0;
 
     /** @type {'calendaria'|'simple-calendar'|null} */
     this._calendarModule = null;
@@ -306,6 +336,23 @@ export class CalendarSync {
 
     // Bound hook handlers for cleanup.
     this._boundHandlers = {};
+  }
+
+  /**
+   * Reentrant echo-suppression guard. Reads `true` whenever ANY sync operation
+   * is in flight. Backed by the `_syncDepth` COUNTER rather than a boolean so
+   * that a Chronicle WebSocket handler firing MID back-catalog does not clear
+   * the guard the still-running back-catalog loop depends on. With a boolean,
+   * the WS handler's `finally { _syncing = false }` unmasked the loop, and the
+   * loop's subsequent `_createLocalEvent` calls fired `calendaria.noteCreated`
+   * unsuppressed → `_onCalendariaNoteCreated` re-POSTed just-pulled events as
+   * duplicates. A counter (`_syncDepth++` on enter, `--` in `finally`; active
+   * while `> 0`) nests correctly. FM-CAL-BACKCATALOG-FIX item 3.
+   * @returns {boolean}
+   * @private
+   */
+  get _syncing() {
+    return this._syncDepth > 0;
   }
 
   /**
@@ -477,7 +524,8 @@ export class CalendarSync {
     this._calendarMismatchDetail =
       `Chronicle: ${chronicleName} ${chronicleShape} · Foundry: ${foundryName} ${foundryShape} — ${detail}`;
     const msg = `Chronicle Sync: calendar structures differ (${this._calendarMismatchDetail}). `
-      + 'Calendar sync is paused for this session — import or author the matching calendar in Chronicle. '
+      + 'Calendar sync is paused for this session — import or author the matching calendar in Chronicle, '
+      + 'then reload the world. '
       + '(Journals, characters, and maps still sync.)';
     console.warn(msg);
     try { globalThis.ui?.notifications?.warn(msg, { permanent: true }); } catch { /* headless */ }
@@ -583,11 +631,11 @@ export class CalendarSync {
    */
   async _onChronicleEventCreated(data) {
     if (!data) return;
-    this._syncing = true;
+    this._syncDepth++;
     try {
       await this._createLocalEvent(data);
     } finally {
-      this._syncing = false;
+      this._syncDepth--;
     }
   }
 
@@ -598,11 +646,11 @@ export class CalendarSync {
    */
   async _onChronicleEventUpdated(data) {
     if (!data) return;
-    this._syncing = true;
+    this._syncDepth++;
     try {
       await this._updateLocalEvent(data);
     } finally {
-      this._syncing = false;
+      this._syncDepth--;
     }
   }
 
@@ -613,11 +661,11 @@ export class CalendarSync {
    */
   async _onChronicleEventDeleted(data) {
     if (!data) return;
-    this._syncing = true;
+    this._syncDepth++;
     try {
       await this._deleteLocalEvent(data);
     } finally {
-      this._syncing = false;
+      this._syncDepth--;
     }
   }
 
@@ -654,13 +702,38 @@ export class CalendarSync {
     if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
     if (this._isActiveCalendarExcluded()) return;
 
+    // Calendaria 1.1.3's dateTimeChange payload NESTS the raw date components
+    // under `.current` (verified in Calendaria source: time-tracker.mjs
+    // #fireDateTimeChangeHook spreads game.time.components into hookData.current;
+    // release-1.1.3 @ ee04e44). The old code read data.month / data.dayOfMonth
+    // off the TOP level → every field was undefined → the PUT pushed a garbage
+    // date. The nested components are RAW 0-indexed (month, dayOfMonth), the same
+    // shape the note* hooks deliver; `year` is already yearZero-adjusted.
+    //
+    // We route the correction through chronicleDateFromCalendariaStartDate so the
+    // 0→1 math lives in ONE place (exactly like the note paths after #76). BUT
+    // because `.current` is a spread of game.time.components it ALSO carries a
+    // day-of-YEAR `day` sibling; handing `.current` straight to the shape-keyed
+    // helper would trip its "has `day` → already public" branch and use
+    // day-of-year as day-of-month. So we feed it a CLEAN raw stub
+    // ({year, month, dayOfMonth}) whenever the raw dayOfMonth is present, and
+    // otherwise pass the source through (a genuinely public/flat payload still
+    // takes the helper's passthrough branch). FM-CAL-BACKCATALOG-FIX item 2.
+    const src = (data && data.current) ? data.current : data;
+    if (!src) return;
+    const startDate = (src.dayOfMonth !== undefined)
+      ? { year: src.year, month: src.month, dayOfMonth: src.dayOfMonth }
+      : src;
+    const date = chronicleDateFromCalendariaStartDate(startDate);
+    if (!date) return;
+
     try {
       await this._api.put('/calendar/date', {
-        year: data.year,
-        month: data.month,
-        day: data.dayOfMonth ?? data.day,
-        hour: data.hour ?? 0,
-        minute: data.minute ?? 0,
+        year: date.year,
+        month: date.month,
+        day: date.day,
+        hour: src.hour ?? 0,
+        minute: src.minute ?? 0,
       });
     } catch (err) {
       console.error('Chronicle: Failed to push Calendaria date/time to Chronicle', err);
@@ -1068,7 +1141,7 @@ export class CalendarSync {
    * @private
    */
   async _setLocalDate(data) {
-    this._syncing = true;
+    this._syncDepth++;
     try {
       if (this._calendarModule === 'calendaria') {
         if (this._hasModernCalendariaApi) {
@@ -1105,7 +1178,7 @@ export class CalendarSync {
     } catch (err) {
       console.error('Chronicle: Failed to set local calendar date', err);
     } finally {
-      this._syncing = false;
+      this._syncDepth--;
     }
   }
 
@@ -1299,20 +1372,31 @@ export class CalendarSync {
     // just-pulled event back to Chronicle as a DUPLICATE. Hold the _syncing guard
     // across the create loop, exactly as the WS pull path _onChronicleEventCreated
     // does around the same call.
-    this._syncing = true;
+    this._syncDepth++;
     try {
       for (const coord of fetches) {
         const path = coord
           ? `/calendar/events?year=${coord.year}&month=${coord.month}`
           : '/calendar/events';
-        let events;
+        let payload;
         try {
-          events = await this._api.get(path);
+          payload = await this._api.get(path);
         } catch (err) {
           console.debug('Chronicle: back-catalog fetch failed for', path, err.message);
           continue;
         }
-        if (!Array.isArray(events)) continue;
+        // Chronicle's GET /calendar/events returns an ENVELOPE
+        // { "data": [...events], "total": N } (syncapi/calendar_api_handler.go),
+        // NOT a bare array — the same shape getNotes() unwraps (api-client.mjs).
+        // The #76 test masked this by stubbing a bare array, so every window hit
+        // the old `if (!Array.isArray(events)) continue` and the back-catalog
+        // created ZERO events. Accept the envelope (real API) AND a bare array
+        // (tolerance). Kept local to this call site so get()'s contract for the
+        // other 25 callers is unchanged. FM-CAL-BACKCATALOG-FIX item 1 (BLOCKER).
+        const events = Array.isArray(payload)
+          ? payload
+          : (payload && Array.isArray(payload.data) ? payload.data : null);
+        if (!events) continue;
         for (const event of events) {
           // Dedupe across months: a recurring event can surface in several
           // month windows, but maps to ONE Chronicle event id.
@@ -1331,7 +1415,7 @@ export class CalendarSync {
       // Calendar events endpoint may not exist yet; not critical.
       console.debug('Chronicle: Could not sync calendar events back-catalog', err.message);
     } finally {
-      this._syncing = false;
+      this._syncDepth--;
     }
   }
 
