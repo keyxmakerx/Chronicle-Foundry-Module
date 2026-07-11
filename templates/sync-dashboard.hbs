@@ -887,6 +887,16 @@
         <p class="action-hint">{{localize "CHRONICLE.Dashboard.Calendar.OpenSyncCalendarHint"}}</p>
       </div>
       {{#if calendar.available}}
+      {{#if calendar.structureMismatch}}
+      <div class="dashboard-load-errors calendar-mismatch-banner">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <div>
+          <strong>Calendar sync paused — structure mismatch.</strong>
+          <div>{{calendar.mismatchDetail}}</div>
+          <div class="action-hint">Import or author the matching calendar in Chronicle. Journals, characters, and maps still sync.</div>
+        </div>
+      </div>
+      {{/if}}
       <div class="calendar-panel">
         <div class="calendar-module-info">
           <i class="fa-solid fa-check-circle" style="color: #4ade80"></i>
@@ -922,7 +932,9 @@
         </div>
 
         <div class="calendar-status">
-          {{#if calendar.inSync}}
+          {{#if calendar.structureMismatch}}
+          <span class="sync-badge out-of-sync"><i class="fa-solid fa-pause"></i> Sync Paused</span>
+          {{else if calendar.inSync}}
           <span class="sync-badge synced"><i class="fa-solid fa-check"></i> In Sync</span>
           {{else}}
           <span class="sync-badge out-of-sync"><i class="fa-solid fa-exclamation-triangle"></i> Out of Sync</span>

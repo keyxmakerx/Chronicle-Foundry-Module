@@ -104,6 +104,8 @@ export function buildCalendarDiagnostics(input = {}) {
   L.push(kv('Calendar sync enabled (global)', boolLabel(s.calendarSyncEnabled)));
   L.push(kv('Master sync enabled', boolLabel(s.syncEnabled)));
   L.push(kv('This calendar excluded from sync', boolLabel(s.thisCalendarExcluded)));
+  L.push(kv('Calendar sync paused (structure mismatch)', boolLabel(s.calendarSyncPaused)));
+  if (s.mismatchDetail) L.push(kv('Mismatch detail', s.mismatchDetail));
   L.push('');
 
   // --- Calendar identity + structure ---

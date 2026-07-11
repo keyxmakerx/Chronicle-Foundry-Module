@@ -44,6 +44,7 @@ export function buildOverviewModel(p = {}) {
     unmatchedMembers = 0,
     calendarAvailable = false,
     calendarInSync = false,
+    calendarSyncPaused = false,
     errorCount = 0,
     matchedSystem = null,
     lastSyncTime = 'Never',
@@ -94,7 +95,16 @@ export function buildOverviewModel(p = {}) {
       tab: 'members',
     });
   }
-  if (calendarAvailable && !calendarInSync) {
+  if (calendarAvailable && calendarSyncPaused) {
+    // Structure mismatch (B-R2): a hard pause, not a mere date drift — flag it
+    // as an error so it sorts above ordinary warnings.
+    attention.push({
+      severity: 'error',
+      icon: 'fa-calendar-xmark',
+      text: 'Calendar sync paused — Foundry and Chronicle calendars have different structures.',
+      tab: 'calendar',
+    });
+  } else if (calendarAvailable && !calendarInSync) {
     attention.push({
       severity: 'warn',
       icon: 'fa-calendar-xmark',
