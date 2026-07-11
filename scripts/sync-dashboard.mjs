@@ -278,6 +278,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       unmatchedMembers: membersData.unmatchedCount,
       calendarAvailable: calendarData.available,
       calendarInSync: calendarData.inSync,
+      calendarSyncPaused: calendarData.structureMismatch,
       errorCount: statusData.errorLog?.length ?? 0,
       matchedSystem: statusData.matchedSystem,
       lastSyncTime: statusData.lastSyncTime,
@@ -666,6 +667,13 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       && chronicle.current_month === localDate?.month
       && chronicle.current_day === localDate?.day;
 
+    // Structure-mismatch guard state (FM-CAL-SYNC-HOTFIX item 3, B-R2): surfaced
+    // from the live CalendarSync instance so the dashboard can show a persistent
+    // warning + a "paused" badge when calendar sync has been paused this session.
+    const calSync = this._getCalendarSyncModule();
+    const structureMismatch = !!calSync?._calendarSyncDisabled;
+    const mismatchDetail = calSync?._calendarMismatchDetail || null;
+
     return {
       available: true,
       enabled: calendarEnabled,
@@ -680,7 +688,20 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       },
       localDate,
       inSync,
+      structureMismatch,
+      mismatchDetail,
     };
+  }
+
+  /**
+   * Resolve the live CalendarSync module instance from the SyncManager (for the
+   * structure-mismatch guard state). Mirrors the class-name lookup used
+   * elsewhere in the dashboard. Returns null when unavailable.
+   * @returns {object|null}
+   * @private
+   */
+  _getCalendarSyncModule() {
+    return this._syncManager?._modules?.find((m) => m?.constructor?.name === 'CalendarSync') ?? null;
   }
 
   /**
@@ -2777,11 +2798,15 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       }
     } catch { /* defensive */ }
     const calendarModule = this._detectCalendarModule();
+    const calSync = this._getCalendarSyncModule();
     const syncStatus = {
       calendarModule: calendarModule ?? 'none',
       calendarSyncEnabled: getSetting('syncCalendar'),
       syncEnabled: getSetting('syncEnabled'),
       thisCalendarExcluded: null,
+      // Structure-mismatch guard (B-R2) — surfaced in the bug-report block.
+      calendarSyncPaused: !!calSync?._calendarSyncDisabled,
+      mismatchDetail: calSync?._calendarMismatchDetail || null,
     };
     const errorLog = this.api?.getErrorLog() ?? [];
     const recentErrors = errorLog.slice(0, 10).map((e) => ({

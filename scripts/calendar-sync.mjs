@@ -154,6 +154,128 @@ export function isCalendarNoteJournal(journal) {
 }
 
 /**
+ * Normalize a Calendaria note startDate to Chronicle's 1-indexed month/day.
+ *
+ * Calendaria stores dates 0-indexed internally: a raw note startDate carries a
+ * 0-indexed `month` and `dayOfMonth`, with an ABSOLUTE `year` (already includes
+ * yearZero). Its `toPublic` conversion (returned by CALENDARIA.api.getNote)
+ * instead yields a 1-indexed `month` + `day` (dayOfMonth deleted), same
+ * absolute year. Verified against Calendaria release-1.1.3 source
+ * (scripts/api.mjs `toPublic`: `month = (month ?? 0) + 1`,
+ * `day = (dayOfMonth ?? 0) + 1`, year untouched; note* hooks fire the RAW stub).
+ *
+ * The realtime `calendaria.note*` hooks deliver the RAW (0-indexed) stub, so
+ * reading it verbatim mis-dated every pushed event by −1 month / −1 day (a
+ * first-of-month or January note became month 0 / day 0 = an INVALID Chronicle
+ * date). FM-CAL-SYNC-HOTFIX item 1.
+ *
+ * The correction is keyed on the SHAPE, never on the code path: a `day` field
+ * means already-public (no correction); a `dayOfMonth` field means raw
+ * (0-indexed → +1). So both the getNote (public) and raw-hook sources are
+ * correct with zero double-correction risk. The YEAR is absolute in both and is
+ * never adjusted (an earlier yearZero hypothesis was wrong — audit §2).
+ *
+ * @param {object} startDate - Calendaria startDate ({year, month, day?|dayOfMonth?}).
+ * @returns {{year:number, month:number, day:number}|null} 1-indexed, or null.
+ */
+export function chronicleDateFromCalendariaStartDate(startDate) {
+  if (!startDate || startDate.year === undefined) return null;
+  const year = startDate.year; // absolute — never adjust (no yearZero math)
+  // A public (toPublic) date carries a 1-indexed `day` with `dayOfMonth`
+  // deleted; a raw hook/stored date carries a 0-indexed `month` + `dayOfMonth`.
+  if (startDate.day !== undefined) {
+    return { year, month: startDate.month, day: startDate.day };
+  }
+  return {
+    year,
+    month: (startDate.month ?? 0) + 1,
+    day: (startDate.dayOfMonth ?? 0) + 1,
+  };
+}
+
+/**
+ * Build the (year, month) fetch coordinates for the initial event back-catalog
+ * sync. Chronicle's GET /calendar/events is MONTH-FILTERED (defaults to the
+ * calendar's current year+month), so a bare fetch silently misses every event
+ * outside the current month (FM-CAL-SYNC-HOTFIX item 2). We enumerate each
+ * month of the calendar across the current year ±`yearSpan` — bounded, never
+ * unbounded history.
+ *
+ * @param {object} calendar - Chronicle calendar ({current_year, months:[...]}).
+ * @param {number} [yearSpan=1] - Years to fetch on each side of current_year.
+ * @returns {Array<{year:number, month:number}>}
+ */
+export function calendarEventFetchCoordinates(calendar, yearSpan = 1) {
+  if (!calendar) return [];
+  const monthCount = Array.isArray(calendar.months) ? calendar.months.length : 0;
+  if (monthCount < 1) return [];
+  const current = Number(calendar.current_year);
+  const baseYear = Number.isFinite(current) ? current : 0;
+  const span = Number.isFinite(yearSpan) && yearSpan >= 0 ? Math.floor(yearSpan) : 1;
+  const coords = [];
+  for (let y = baseYear - span; y <= baseYear + span; y++) {
+    for (let m = 1; m <= monthCount; m++) {
+      coords.push({ year: y, month: m });
+    }
+  }
+  return coords;
+}
+
+/**
+ * Compare Chronicle's calendar structure to the active Foundry calendar's, for
+ * the structure-mismatch guard (FM-CAL-SYNC-HOTFIX item 3, ruling B-R2).
+ * Compares month count, per-month day counts, and weekday count ONLY — moons,
+ * seasons, and eras are cosmetic to date coordinates and excluded (B-R2).
+ *
+ * @param {object} chronicle - Chronicle calendar ({months:[{days}], weekdays:[]}).
+ * @param {object} foundry - normalized active Foundry structure
+ *   ({name, monthDays:number[], weekdayCount:number}).
+ * @returns {{match:boolean, detail:string}}
+ */
+export function compareCalendarStructures(chronicle, foundry) {
+  const cMonths = Array.isArray(chronicle?.months) ? chronicle.months : [];
+  const cWeekdays = Array.isArray(chronicle?.weekdays) ? chronicle.weekdays : [];
+  const chronicleMonthDays = cMonths.map((m) => Number(m?.days) || 0);
+  const chronicleWeekdays = cWeekdays.length;
+
+  const fMonthDays = Array.isArray(foundry?.monthDays) ? foundry.monthDays.map((d) => Number(d) || 0) : [];
+  const fWeekdays = Number(foundry?.weekdayCount) || 0;
+
+  const reasons = [];
+  if (chronicleMonthDays.length !== fMonthDays.length) {
+    reasons.push(`month count (Chronicle ${chronicleMonthDays.length} vs Foundry ${fMonthDays.length})`);
+  } else {
+    for (let i = 0; i < chronicleMonthDays.length; i++) {
+      if (chronicleMonthDays[i] !== fMonthDays[i]) {
+        reasons.push(`month ${i + 1} day count (Chronicle ${chronicleMonthDays[i]} vs Foundry ${fMonthDays[i]})`);
+        break; // one representative day-count difference is enough to pause
+      }
+    }
+  }
+  if (chronicleWeekdays !== fWeekdays) {
+    reasons.push(`weekday count (Chronicle ${chronicleWeekdays} vs Foundry ${fWeekdays})`);
+  }
+
+  if (!reasons.length) return { match: true, detail: '' };
+  return { match: false, detail: reasons.join('; ') };
+}
+
+/**
+ * Coerce a Calendaria collection (array, or an id-keyed `{values:{...}}` object)
+ * into a plain array. Mirrors sync-calendar.mjs's reader — Calendaria stores
+ * months/weekdays as id-keyed maps.
+ * @param {...*} sources
+ * @returns {Array}
+ */
+function readArrayLike(...sources) {
+  for (const src of sources) {
+    if (Array.isArray(src)) return src;
+    if (src && typeof src === 'object') return Object.values(src);
+  }
+  return [];
+}
+
+/**
  * CalendarSync handles calendar ↔ Foundry calendar module synchronization.
  */
 export class CalendarSync {
@@ -170,6 +292,17 @@ export class CalendarSync {
 
     /** @type {boolean} Whether modern Calendaria API (CALENDARIA.api) is available. */
     this._hasModernCalendariaApi = false;
+
+    /**
+     * Session-scoped structure-mismatch guard (FM-CAL-SYNC-HOTFIX item 3,
+     * ruling B-R2). When the active Foundry calendar's structure differs from
+     * Chronicle's, calendar sync is paused for the session (both directions) to
+     * avoid guaranteed mis-dating; journals/characters/maps are untouched.
+     * @type {boolean}
+     */
+    this._calendarSyncDisabled = false;
+    /** @type {string|null} Human-readable mismatch detail for the dashboard + diagnostics. */
+    this._calendarMismatchDetail = null;
 
     // Bound hook handlers for cleanup.
     this._boundHandlers = {};
@@ -209,6 +342,7 @@ export class CalendarSync {
    */
   async onMessage(msg) {
     if (!getSetting('syncCalendar') || !this._calendarModule) return;
+    if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): no pull
 
     switch (msg.type) {
       case 'calendar.date.advanced':
@@ -234,6 +368,7 @@ export class CalendarSync {
   async onSyncMapping(mapping) {
     if (mapping.chronicle_type !== 'calendar_event') return;
     if (!getSetting('syncCalendar') || !this._calendarModule) return;
+    if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2)
 
     // Store the mapping so we can correlate local ↔ Chronicle events.
     if (mapping.external_id && mapping.chronicle_id) {
@@ -247,12 +382,33 @@ export class CalendarSync {
    */
   async onInitialSync() {
     if (!getSetting('syncCalendar') || !this._calendarModule) return;
+    if (this._calendarSyncDisabled) return;
 
     try {
       this._chronicleCalendar = await this._api.get('/calendar');
       if (!this._chronicleCalendar) {
         console.debug('Chronicle: No calendar configured for this campaign');
         return;
+      }
+
+      // Structure-mismatch guard (B-R2): if the active Calendaria calendar's
+      // structure differs from Chronicle's, date coordinates are meaningless
+      // across the wire — pause calendar sync for the session (both directions)
+      // and warn loudly, rather than push a Gregorian date into a custom
+      // calendar. Fails OPEN: only a CONFIRMED mismatch pauses; an unreadable
+      // structure does not. Other sync (journals/characters/maps) is untouched.
+      // Require BOTH sides readable before comparing — a degraded /calendar
+      // response (no months) must fail OPEN (don't pause), not report a false
+      // 0-vs-N mismatch.
+      if (this._calendarModule === 'calendaria' && this._chronicleCalendar.months?.length > 0) {
+        const foundryStruct = this._readActiveCalendariaStructure();
+        if (foundryStruct) {
+          const cmp = compareCalendarStructures(this._chronicleCalendar, foundryStruct);
+          if (!cmp.match) {
+            this._pauseCalendarSyncForMismatch(this._chronicleCalendar, foundryStruct, cmp.detail);
+            return;
+          }
+        }
       }
 
       // Sync the current date from Chronicle to the Foundry calendar module.
@@ -273,6 +429,58 @@ export class CalendarSync {
     } catch (err) {
       console.error('Chronicle: Calendar initial sync failed', err);
     }
+  }
+
+  /**
+   * Read the active Calendaria calendar's structure (per-month day counts +
+   * weekday count) for the mismatch guard. Calendaria stores months/weekdays as
+   * id-keyed `{values:{...}}` maps and calls weekdays "days" (`cal.days`).
+   * Returns null when the structure can't be read — the guard then fails OPEN
+   * (sync is only paused on a CONFIRMED mismatch, never on inability to compare).
+   * @returns {{name:string, monthDays:number[], weekdayCount:number}|null}
+   * @private
+   */
+  _readActiveCalendariaStructure() {
+    try {
+      const api = globalThis.CALENDARIA?.api;
+      const cal = api?.getActiveCalendar?.();
+      if (!cal) return null;
+      const months = readArrayLike(cal.monthsArray, cal.months?.values, cal.months);
+      const weekdays = readArrayLike(cal.weekdaysArray, cal.days?.values, cal.days);
+      if (!months.length) return null;
+      return {
+        name: cal.name || cal.metadata?.name || 'active Foundry calendar',
+        monthDays: months.map((m) => Number(m?.days ?? 0)),
+        weekdayCount: weekdays.length,
+      };
+    } catch (err) {
+      console.debug('Chronicle: could not read active Calendaria structure', err?.message);
+      return null;
+    }
+  }
+
+  /**
+   * Pause calendar sync for the session on a structure mismatch (B-R2): set the
+   * guard flag + detail (which suppresses both push and pull), log, and emit ONE
+   * persistent ui.notifications.warn. The dashboard surfaces the same state.
+   * @param {object} chronicleCal - Chronicle calendar ({name, months, weekdays}).
+   * @param {{name:string, monthDays:number[], weekdayCount:number}} foundryStruct
+   * @param {string} detail - the specific mismatch (from compareCalendarStructures).
+   * @private
+   */
+  _pauseCalendarSyncForMismatch(chronicleCal, foundryStruct, detail) {
+    this._calendarSyncDisabled = true;
+    const chronicleName = chronicleCal?.name || 'Chronicle calendar';
+    const chronicleShape = `${(chronicleCal?.months || []).length}mo/${(chronicleCal?.weekdays || []).length}wd`;
+    const foundryName = foundryStruct?.name || 'active Foundry calendar';
+    const foundryShape = `${(foundryStruct?.monthDays || []).length}mo/${foundryStruct?.weekdayCount ?? 0}wd`;
+    this._calendarMismatchDetail =
+      `Chronicle: ${chronicleName} ${chronicleShape} · Foundry: ${foundryName} ${foundryShape} — ${detail}`;
+    const msg = `Chronicle Sync: calendar structures differ (${this._calendarMismatchDetail}). `
+      + 'Calendar sync is paused for this session — import or author the matching calendar in Chronicle. '
+      + '(Journals, characters, and maps still sync.)';
+    console.warn(msg);
+    try { globalThis.ui?.notifications?.warn(msg, { permanent: true }); } catch { /* headless */ }
   }
 
   /**
@@ -443,6 +651,7 @@ export class CalendarSync {
   async _onCalendariaDateTimeChange(data) {
     if (this._syncing) return;
     if (!game.user.isGM) return;
+    if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
     if (this._isActiveCalendarExcluded()) return;
 
     try {
@@ -466,6 +675,7 @@ export class CalendarSync {
   async _onCalendariaNoteCreated(noteData) {
     if (this._syncing) return;
     if (!game.user.isGM) return;
+    if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
     if (this._isActiveCalendarExcluded()) return;
 
     const eventPayload = this._calendariaNoteToChronicleEvent(noteData);
@@ -489,6 +699,7 @@ export class CalendarSync {
   async _onCalendariaNoteUpdated(noteData) {
     if (this._syncing) return;
     if (!game.user.isGM) return;
+    if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
     if (this._isActiveCalendarExcluded()) return;
 
     const chronicleId = this._getChronicleEventId(noteData.id);
@@ -516,6 +727,7 @@ export class CalendarSync {
   async _onCalendariaNoteDeleted(noteData) {
     if (this._syncing) return;
     if (!game.user.isGM) return;
+    if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
     if (this._isActiveCalendarExcluded()) return;
 
     const noteId = noteData?.id || noteData?.pageId;
@@ -541,34 +753,34 @@ export class CalendarSync {
   _calendariaNoteToChronicleEvent(noteData) {
     if (!noteData) return null;
 
-    // Calendaria notes store date in flagData or startDate.
-    const flagData = noteData.flagData || noteData;
-    const startDate = flagData.startDate || flagData;
-
-    // Validate we have date info.
-    if (startDate.year === undefined && startDate.month === undefined) {
-      // Try getting the date from the note's page document via API.
-      if (this._hasModernCalendariaApi && noteData.id) {
-        try {
-          const note = CALENDARIA.api.getNote(noteData.id);
-          if (note?.flagData?.startDate) {
-            return this._calendariaNoteToChronicleEvent({
-              ...noteData,
-              flagData: note.flagData,
-              name: note.name || noteData.name,
-            });
-          }
-        } catch { /* fall through */ }
-      }
-      return null;
+    // Prefer the authoritative note from the modern Calendaria API: getNote()
+    // returns toPublic (1-indexed) dates — the single source of truth, per
+    // CALENDARIA-INTEGRATION.md's "use the API, don't read raw stored dates".
+    // The realtime note* hook payload instead carries RAW 0-indexed dates; both
+    // shapes are normalized by chronicleDateFromCalendariaStartDate below, which
+    // keys the +1 on the date SHAPE (dayOfMonth vs day) so there is no
+    // double-correction (FM-CAL-SYNC-HOTFIX item 1).
+    let flagData = noteData.flagData || noteData;
+    let name = noteData.name || noteData.title;
+    if (this._hasModernCalendariaApi && noteData.id && typeof globalThis.CALENDARIA?.api?.getNote === 'function') {
+      try {
+        const note = CALENDARIA.api.getNote(noteData.id);
+        if (note?.flagData?.startDate) {
+          flagData = note.flagData;
+          name = note.name || name;
+        }
+      } catch { /* fall through to the raw hook payload */ }
     }
 
-    // Calendaria uses 1-indexed months (same as Chronicle).
+    const startDate = flagData.startDate || flagData;
+    const date = chronicleDateFromCalendariaStartDate(startDate);
+    if (!date) return null;
+
     return {
-      name: noteData.name || noteData.title || 'Untitled Note',
-      year: startDate.year,
-      month: startDate.month,
-      day: startDate.day ?? startDate.dayOfMonth ?? 1,
+      name: name || 'Untitled Note',
+      year: date.year,
+      month: date.month,
+      day: date.day,
       description: noteData.content || noteData.description || flagData.content || '',
       // Wire visibility is kebab-case per the wire contract
       // (cordinator/decisions/2026-05-17-calendar-sync-wire-contract.md).
@@ -591,6 +803,7 @@ export class CalendarSync {
   async _onLocalDateChange(dateData) {
     if (this._syncing) return;
     if (!game.user.isGM) return;
+    if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
 
     try {
       await this._api.put('/calendar/date', {
@@ -614,6 +827,7 @@ export class CalendarSync {
   async _onSimpleCalendarDateChange(data) {
     if (this._syncing) return;
     if (!game.user.isGM) return;
+    if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
 
     // SimpleCalendar uses different data shape depending on version.
     // The hook provides { date: { year, month, day, ... }, diff: N, ... }
@@ -642,6 +856,7 @@ export class CalendarSync {
   async _onLocalEventCreate(eventData) {
     if (this._syncing) return;
     if (!game.user.isGM) return;
+    if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
 
     try {
       const result = await this._api.post('/calendar/events', {
@@ -670,6 +885,7 @@ export class CalendarSync {
   async _onLocalEventUpdate(eventData) {
     if (this._syncing) return;
     if (!game.user.isGM) return;
+    if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
 
     const chronicleId = this._getChronicleEventId(eventData.id);
     if (!chronicleId) {
@@ -699,6 +915,7 @@ export class CalendarSync {
   async _onLocalEventDelete(eventData) {
     if (this._syncing) return;
     if (!game.user.isGM) return;
+    if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
 
     const chronicleId = this._getChronicleEventId(eventData.id);
     if (!chronicleId) return;
@@ -1065,19 +1282,56 @@ export class CalendarSync {
   async _syncChronicleEventsToCalendariaNotes() {
     if (!this._hasModernCalendariaApi && !game.Calendaria?.createEvent) return;
 
+    // GET /calendar/events is MONTH-FILTERED (defaults to the calendar's current
+    // year+month), so the old bare fetch silently mapped only current-month
+    // events and missed the entire back-catalog (FM-CAL-SYNC-HOTFIX item 2).
+    // Enumerate each month across the current year ±1 from the cached Chronicle
+    // structure — bounded, never unbounded history.
+    const coords = calendarEventFetchCoordinates(this._chronicleCalendar, 1);
+    // No cached structure to enumerate (e.g. /calendar returned no months) →
+    // fall back to the single default (current-month) fetch rather than nothing.
+    const fetches = coords.length ? coords : [null];
+
+    const seen = new Set();
+    let created = 0;
+    // Suppress the echo: _createLocalEvent → CALENDARIA.api.createNote fires the
+    // synchronous calendaria.noteCreated hook, which would otherwise re-POST the
+    // just-pulled event back to Chronicle as a DUPLICATE. Hold the _syncing guard
+    // across the create loop, exactly as the WS pull path _onChronicleEventCreated
+    // does around the same call.
+    this._syncing = true;
     try {
-      const events = await this._api.get('/calendar/events');
-      if (!Array.isArray(events)) return;
-
-      for (const event of events) {
-        const localId = this._getLocalEventId(event.id);
-        if (localId) continue; // Already synced.
-
-        await this._createLocalEvent(event);
+      for (const coord of fetches) {
+        const path = coord
+          ? `/calendar/events?year=${coord.year}&month=${coord.month}`
+          : '/calendar/events';
+        let events;
+        try {
+          events = await this._api.get(path);
+        } catch (err) {
+          console.debug('Chronicle: back-catalog fetch failed for', path, err.message);
+          continue;
+        }
+        if (!Array.isArray(events)) continue;
+        for (const event of events) {
+          // Dedupe across months: a recurring event can surface in several
+          // month windows, but maps to ONE Chronicle event id.
+          if (!event || event.id == null || seen.has(event.id)) continue;
+          seen.add(event.id);
+          if (this._getLocalEventId(event.id)) continue; // already synced
+          await this._createLocalEvent(event);
+          created++;
+        }
       }
+      const bound = coords.length
+        ? `years ${this._chronicleCalendar.current_year - 1}–${this._chronicleCalendar.current_year + 1}, ${fetches.length} month-window(s)`
+        : 'current month only (no calendar structure cached)';
+      console.debug(`Chronicle: back-catalog event sync complete — scanned ${bound}; created ${created} local note(s).`);
     } catch (err) {
       // Calendar events endpoint may not exist yet; not critical.
-      console.debug('Chronicle: Could not fetch calendar events for initial sync', err.message);
+      console.debug('Chronicle: Could not sync calendar events back-catalog', err.message);
+    } finally {
+      this._syncing = false;
     }
   }
 
