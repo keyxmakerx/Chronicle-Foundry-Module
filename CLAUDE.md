@@ -66,6 +66,17 @@ Integration — Install & Updates".
   loop mid-flight (FM-CAL-BACKCATALOG-FIX item 3).
 - System adapters implement `toChronicleFields()` / `fromChronicleFields()`.
 - All REST calls use Bearer token auth via `api-client.mjs`.
+- **List responses come in two shapes.** Chronicle returns some list endpoints
+  as a bare JSON array and others wrapped in an envelope `{"data":[…],"total":N}`
+  (envelope: `/entities`, `/entity-types`, `/systems`, `/addons`, `/tags`,
+  `/relations/types`, `/calendar/events`; bare: `/maps`, `/maps/:id/*`,
+  `/members`, `/entities/:id/relations`, `/notes`). Every list-consuming caller
+  MUST unwrap defensively — accept a bare array AND `{data:[…]}` — via
+  `result?.data || result || []`, `_normalizeArray()`, `_coerceArray()`, or an
+  `Array.isArray(x) ? x : (x?.data ?? [])` guard, never assuming one shape. A
+  caller that consumes an envelope endpoint as a bare array is a silent no-op
+  (the #77 back-catalog bug). All call sites were audited under
+  FM-ENVELOPE-AUDIT (see `tools/test-envelope-audit.mjs`).
 - WebSocket messages are routed by type through `SyncManager`.
 - Chronicle-side serving rules live in `chronicle-package.json` at repo root; CI validates it against `module.json` via `tools/check-package-descriptor.mjs`.
 
