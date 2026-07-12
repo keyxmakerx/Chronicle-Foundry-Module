@@ -77,6 +77,18 @@ Integration — Install & Updates".
   caller that consumes an envelope endpoint as a bare array is a silent no-op
   (the #77 back-catalog bug). All call sites were audited under
   FM-ENVELOPE-AUDIT (see `tools/test-envelope-audit.mjs`).
+- **Real-time calendars are read-only for dates.** `GET /calendar/date` carries
+  `tracks_real_time` (the composed `UsesRealTime()` predicate; RC-4,
+  FM-REALTIME-DATE-SIGNAL) — `GET /calendar` never does. When true, the module
+  pauses its own date-**push** only (pull/event sync unaffected). All four push
+  sites (`calendar-sync.mjs`'s three hook-triggered pushes,
+  `sync-dashboard.mjs`'s manual push button) route through the shared
+  `scripts/_realtime-date-guard.mjs`: a fetch-before-push `GET` re-probed on
+  every push (never trust a session-long cached value — pushes are rare, so
+  the extra round trip is cheap and self-heals a mid-session enable), plus a
+  422-from-`PUT`-is-the-same-condition backstop (never a retryable sync
+  error). The GM notice fires once per session, shared across both files via
+  a module-level singleton. See `tools/test-realtime-date-signal.mjs`.
 - WebSocket messages are routed by type through `SyncManager`.
 - Chronicle-side serving rules live in `chronicle-package.json` at repo root; CI validates it against `module.json` via `tools/check-package-descriptor.mjs`.
 

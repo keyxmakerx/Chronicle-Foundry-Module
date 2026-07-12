@@ -630,7 +630,8 @@ moons, seasons, eras, event_categories, cycles, festivals.
 #### GET /calendar/date
 Returns current date/time with computed state: current season, moon phases, era, weather.
 
-**Used by:** `calendar-sync.mjs` → poll current state
+**Used by:** `calendar-sync.mjs` → poll current state; `_realtime-date-guard.mjs` →
+fetch-before-push real-time check (see below)
 
 **Response:**
 ```json
@@ -641,6 +642,7 @@ Returns current date/time with computed state: current season, moon phases, era,
   "day": 15,
   "hour": 14,
   "minute": 30,
+  "tracks_real_time": false,
   "current_season": { "id": 1, "name": "Winter", "color": "#a0c4ff" },
   "current_moon_phases": [
     { "moon_id": 1, "moon_name": "Selûne", "phase_name": "Full Moon", "phase_position": 0.5, "phase_icon": "moon" }
@@ -664,8 +666,23 @@ Returns current date/time with computed state: current season, moon phases, era,
 **Key:** `current_season`, `current_moon_phases`, `current_era`, and `current_weather` are
 computed server-side. They may be `null`/absent if no data is configured.
 
+**`tracks_real_time`** (RC-4, FM-REALTIME-DATE-SIGNAL): the composed
+`UsesRealTime()` predicate (`mode == reallife AND` the real-time flag), so the
+wire signal can never disagree with the write-guard below. Read it
+defensively — `payload?.tracks_real_time === true` — never assume the field
+is present (older Chronicle deployments and `GET /calendar`, the structure
+endpoint, never carry it). When `true`, the module treats dates as
+**read-only**: it skips its own `PUT /calendar/date` pushes (fetch-before-push
+check via `scripts/_realtime-date-guard.mjs`, re-probed on every push attempt
+so a mid-session enable self-heals) and shows one GM notice per session. Pull
+and event sync are unaffected.
+
 #### PUT /calendar/date
-Sets current calendar date/time to an absolute value.
+Sets current calendar date/time to an absolute value. Rejected with **422**
+(Chronicle's W3 guard) when the target calendar's `tracks_real_time` is true —
+the module treats a 422 here identically to a pre-emptive `tracks_real_time`
+read (sets the same session guard, shows the same one-time notice), never as
+a retryable sync error.
 
 **Request:**
 ```json
