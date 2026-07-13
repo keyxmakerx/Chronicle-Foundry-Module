@@ -21,6 +21,7 @@
 
 import { getSetting, getCalendarSyncExclusions } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
+import { shouldSkipDatePush, isRealTimeRejection, notifyRealTimePushPaused } from './_realtime-date-guard.mjs';
 
 /**
  * Canonical wire-visibility values per the calendar-sync wire contract
@@ -728,6 +729,7 @@ export class CalendarSync {
     if (!date) return;
 
     try {
+      if (await shouldSkipDatePush(this._api)) return;
       await this._api.put('/calendar/date', {
         year: date.year,
         month: date.month,
@@ -736,6 +738,7 @@ export class CalendarSync {
         minute: src.minute ?? 0,
       });
     } catch (err) {
+      if (isRealTimeRejection(err)) { notifyRealTimePushPaused(); return; }
       console.error('Chronicle: Failed to push Calendaria date/time to Chronicle', err);
     }
   }
@@ -879,6 +882,7 @@ export class CalendarSync {
     if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
 
     try {
+      if (await shouldSkipDatePush(this._api)) return;
       await this._api.put('/calendar/date', {
         year: dateData.year,
         month: dateData.month,
@@ -887,6 +891,7 @@ export class CalendarSync {
         minute: dateData.minute || 0,
       });
     } catch (err) {
+      if (isRealTimeRejection(err)) { notifyRealTimePushPaused(); return; }
       console.error('Chronicle: Failed to push date to Chronicle', err);
     }
   }
@@ -908,6 +913,7 @@ export class CalendarSync {
     if (!date) return;
 
     try {
+      if (await shouldSkipDatePush(this._api)) return;
       await this._api.put('/calendar/date', {
         year: date.year,
         // SimpleCalendar months are 0-indexed; Chronicle is 1-indexed.
@@ -917,6 +923,7 @@ export class CalendarSync {
         minute: date.minute || 0,
       });
     } catch (err) {
+      if (isRealTimeRejection(err)) { notifyRealTimePushPaused(); return; }
       console.error('Chronicle: Failed to push SimpleCalendar date to Chronicle', err);
     }
   }

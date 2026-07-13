@@ -25,6 +25,7 @@ import {
 import { buildDiagnosticBundle } from './sync-diagnostic-bundle.mjs';
 import { buildOverviewModel } from './_overview-model.mjs';
 import { log, getLogBuffer } from './logger.mjs';
+import { shouldSkipDatePush, isRealTimeRejection, notifyRealTimePushPaused } from './_realtime-date-guard.mjs';
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**
@@ -2054,6 +2055,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!localDate) return;
 
     try {
+      if (await shouldSkipDatePush(this.api)) return;
       await this.api.put('/calendar/date', {
         year: localDate.year,
         month: localDate.month,
@@ -2064,6 +2066,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       this._logActivity('push', 'Pushed calendar date to Chronicle');
       this.render({ force: true });
     } catch (err) {
+      if (isRealTimeRejection(err)) { notifyRealTimePushPaused(); return; }
       console.error('Chronicle Dashboard: Push date failed', err);
     }
   }
