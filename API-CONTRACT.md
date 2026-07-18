@@ -689,6 +689,38 @@ a retryable sync error.
 { "year": 1492, "month": 3, "day": 1, "hour": 8, "minute": 0 }
 ```
 
+#### POST /calendar/date/confirm
+**Optional — Chronicle ≥ the applied-beacon release (C-SYNC-APPLIED-BEACON).**
+Confirms that Foundry successfully *applied* a date pulled from Chronicle to
+the active local calendar module (Calendaria or SimpleCalendar), as opposed
+to merely having fetched/seen it. Chronicle's sync chip uses this to
+distinguish "Foundry SAW this date" (the `GET /calendar/date` beacon) from
+"Foundry APPLIED this date."
+
+**Used by:** `calendar-sync.mjs` → `_confirmAppliedDate` via
+`scripts/_applied-date-confirm.mjs`, called from both the poll apply path
+(`onInitialSync`) and the WebSocket-driven apply path
+(`_onChronicaleDateAdvanced`, `calendar.date.advanced`) — **only** after the
+local calendar-module setter (`_setLocalDate`) reports it actually ran
+without throwing. Never sent on a bare fetch/pull, and never on an apply
+failure. An already-current date that still round-trips through a real
+setter call counts as applied and is confirmed.
+
+**Request:**
+```json
+{ "year": 1492, "month": 3, "day": 1 }
+```
+
+**Response:** `204 No Content`
+
+**Graceful degradation:** a Chronicle deployment that predates this endpoint
+returns 404 (route doesn't exist) or 405 (method not recognized). The module
+tolerates both silently — one `console.debug` per session, no retries — so
+it keeps working unchanged against pre-upgrade Chronicle servers. Any other
+failure (network, 5xx) is debug-logged and swallowed; a missed confirmation
+only leaves Chronicle's applied-beacon stale, it never blocks or retries
+sync. See `scripts/_applied-date-confirm.mjs::isConfirmNotSupported`.
+
 #### POST /calendar/advance
 Advances the calendar by N days (1-3650).
 
