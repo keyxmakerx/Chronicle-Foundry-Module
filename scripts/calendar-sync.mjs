@@ -22,6 +22,7 @@
 import { getSetting, getCalendarSyncExclusions } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import { shouldSkipDatePush, isRealTimeRejection, notifyRealTimePushPaused } from './_realtime-date-guard.mjs';
+import { confirmAppliedDate } from './_applied-date-confirm.mjs';
 
 /**
  * Canonical wire-visibility values per the calendar-sync wire contract
@@ -460,13 +461,24 @@ export class CalendarSync {
       }
 
       // Sync the current date from Chronicle to the Foundry calendar module.
-      await this._setLocalDate({
+      // This is the "poll" apply path (a fetch of GET /calendar on connect/
+      // reconnect, as opposed to the WebSocket-driven _onChronicaleDateAdvanced
+      // below) — confirm back to Chronicle only when _setLocalDate reports a
+      // real apply (FM-SYNC-CONFIRMED-DATE).
+      const applied = await this._setLocalDate({
         year: this._chronicleCalendar.current_year,
         month: this._chronicleCalendar.current_month,
         day: this._chronicleCalendar.current_day,
         hour: this._chronicleCalendar.current_hour,
         minute: this._chronicleCalendar.current_minute,
       });
+      if (applied) {
+        await confirmAppliedDate(this._api, {
+          year: this._chronicleCalendar.current_year,
+          month: this._chronicleCalendar.current_month,
+          day: this._chronicleCalendar.current_day,
+        });
+      }
 
       // Sync Chronicle calendar events to Calendaria notes (if using Calendaria).
       if (this._calendarModule === 'calendaria') {
@@ -616,13 +628,19 @@ export class CalendarSync {
   // --- Chronicle → Foundry ---
 
   /**
-   * Update the local Foundry calendar date from Chronicle.
+   * Update the local Foundry calendar date from Chronicle. This is the
+   * WebSocket-driven apply path (`calendar.date.advanced`) — confirm back to
+   * Chronicle only when `_setLocalDate` reports a real apply
+   * (FM-SYNC-CONFIRMED-DATE).
    * @param {object} data - { year, month, day, hour, minute }
    * @private
    */
   async _onChronicaleDateAdvanced(data) {
     if (!data) return;
-    await this._setLocalDate(data);
+    const applied = await this._setLocalDate(data);
+    if (applied) {
+      await confirmAppliedDate(this._api, { year: data.year, month: data.month, day: data.day });
+    }
   }
 
   /**
@@ -1144,11 +1162,24 @@ export class CalendarSync {
   /**
    * Set the date on the active Foundry calendar module.
    * Uses CALENDARIA.api.setDateTime() when available for full hour/minute support.
+   *
+   * "Successfully applied" (FM-SYNC-CONFIRMED-DATE): the code offers no ack
+   * from either calendar module's date setter beyond "the call didn't
+   * throw" — neither Calendaria's `setDateTime`/`setDate` nor
+   * SimpleCalendar's `setDate` returns a result we can inspect for success.
+   * So the return value here is a best-effort signal: `true` means a real
+   * setter for the detected module was found and invoked without throwing;
+   * `false` means either no setter was available (module detected but its
+   * API surface wasn't there — a no-op, nothing was applied) or the setter
+   * threw (already logged below). Flagged per the dispatch's stop-and-flag:
+   * there is no stronger "it actually took effect" hook to key off.
    * @param {object} data - { year, month, day, hour, minute }
+   * @returns {Promise<boolean>} true if a local setter was invoked and did not throw.
    * @private
    */
   async _setLocalDate(data) {
     this._syncDepth++;
+    let applied = false;
     try {
       if (this._calendarModule === 'calendaria') {
         if (this._hasModernCalendariaApi) {
@@ -1160,6 +1191,7 @@ export class CalendarSync {
             hour: data.hour ?? 0,
             minute: data.minute ?? 0,
           });
+          applied = true;
         } else if (game.Calendaria?.setDate) {
           // Legacy Calendaria: setDate only supports date (no time).
           await game.Calendaria.setDate({
@@ -1167,11 +1199,15 @@ export class CalendarSync {
             month: data.month,
             day: data.day,
           });
+          applied = true;
         }
       } else if (this._calendarModule === 'simple-calendar') {
         const sc = SimpleCalendar?.api;
         if (sc?.setDate) {
-          sc.setDate({
+          // Awaited (unlike the pre-FM-SYNC-CONFIRMED-DATE code) so a
+          // promise-returning setDate is actually settled before this method
+          // reports success to its callers.
+          await sc.setDate({
             year: data.year,
             // SimpleCalendar months are 0-indexed.
             month: (data.month || 1) - 1,
@@ -1180,13 +1216,16 @@ export class CalendarSync {
             minute: data.minute || 0,
             seconds: 0,
           });
+          applied = true;
         }
       }
     } catch (err) {
       console.error('Chronicle: Failed to set local calendar date', err);
+      applied = false;
     } finally {
       this._syncDepth--;
     }
+    return applied;
   }
 
   /**
