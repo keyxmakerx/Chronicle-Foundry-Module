@@ -39,6 +39,14 @@ export class ItemSync {
     /** @type {number|null} Cached Chronicle entity type ID for items. */
     this._itemTypeId = null;
 
+    /**
+     * One-shot guard so the "custom item has no linked Chronicle entity to relate
+     * to — skipping relation push" notice logs once per session, not per item
+     * (FM-SYNC-WIRE-FIX fix 5).
+     * @type {boolean}
+     */
+    this._loggedSkipNoTarget = false;
+
     // Bound hook handlers for cleanup.
     this._onCreateItem = this._handleCreateItem.bind(this);
     this._onDeleteItem = this._handleDeleteItem.bind(this);
@@ -301,17 +309,37 @@ export class ItemSync {
     const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return; // Actor not synced.
 
+    // FM-SYNC-WIRE-FIX fix 5: Chronicle relations REQUIRE a target entity
+    // (CreateRelation 400s on an empty target_entity_id). A custom Foundry item
+    // has no corresponding Chronicle item entity to point at — the pre-fix code
+    // hard-coded `targetEntityId: null`, so every one of these POSTs 400'd. Only
+    // an item already linked to a Chronicle entity (its own `entityId` flag,
+    // e.g. pulled from Chronicle) can carry a relation; skip the rest. Logged
+    // once per session so bulk-adding custom items doesn't spam the console.
+    const targetEntityId = item.getFlag(FLAG_SCOPE, 'entityId');
+    if (!targetEntityId) {
+      if (!this._loggedSkipNoTarget) {
+        this._loggedSkipNoTarget = true;
+        console.debug(`Chronicle: Item "${item.name}" has no linked Chronicle entity — skipping relation push (custom items aren't stored as relations; further skips silenced this session).`);
+      }
+      return;
+    }
+
     try {
-      // Create a "Has Item" relation in Chronicle.
+      // Create a "Has Item" relation in Chronicle. Body is snake_case — Chronicle
+      // binds target_entity_id/relation_type/reverse_relation_type (the response
+      // is camelCase, but the write binding is snake_case). Metadata is a raw
+      // object (json.RawMessage), not a JSON-encoded string, so it round-trips as
+      // structured JSON rather than a double-encoded string.
       const relation = await this._api.post(`/entities/${entityId}/relations`, {
-        targetEntityId: null, // No linked Chronicle item entity (custom item).
-        relationType: 'Has Item',
-        reverseRelationType: 'In Inventory Of',
-        metadata: JSON.stringify({
+        target_entity_id: targetEntityId,
+        relation_type: 'Has Item',
+        reverse_relation_type: 'In Inventory Of',
+        metadata: {
           quantity: item.system?.quantity ?? 1,
           equipped: item.system?.equipped ?? false,
           foundry_item_name: item.name,
-        }),
+        },
       });
 
       if (relation) {
@@ -348,7 +376,10 @@ export class ItemSync {
     if (!entityId) return;
 
     try {
-      await this._api.delete(`/entities/${entityId}/relations/${relationId}`);
+      // FM-SYNC-WIRE-FIX fix 5: Chronicle serves a FLAT relation route
+      // (DELETE /relations/:relationId), not the nested
+      // /entities/:id/relations/:relId the module used to call (which 404'd).
+      await this._api.delete(`/relations/${relationId}`);
       console.debug(`Chronicle: Removed item relation for "${item.name}" from Chronicle`);
     } catch (err) {
       console.warn(`Chronicle: Failed to remove item relation for "${item.name}"`, err);
@@ -382,8 +413,13 @@ export class ItemSync {
         equipped: item.system?.equipped ?? false,
       };
 
-      await this._api.put(`/entities/${entityId}/relations/${relationId}/metadata`, {
-        metadata: JSON.stringify(meta),
+      // FM-SYNC-WIRE-FIX fix 5: flat route PUT /relations/:relationId (was the
+      // nested /entities/:id/relations/:relId/metadata, which 404'd), and the
+      // metadata is a raw object — Chronicle's UpdateRelation binds only
+      // {metadata} as json.RawMessage, so an object stores structured JSON
+      // instead of the old double-encoded JSON string.
+      await this._api.put(`/relations/${relationId}`, {
+        metadata: meta,
       });
     } catch (err) {
       console.warn(`Chronicle: Failed to update item metadata for "${item.name}"`, err);

@@ -100,5 +100,12 @@ Integration — Install & Updates".
 - Recommended once on a live **v14** client (can't be unit-tested headlessly):
   smoke-test the migrated dialogs (resync / pull / push confirms, the "create
   entity type" prompt, map pin & marker delete confirms, the calendar cleanup
-  confirm) and the dashboard Calendar tab (Foundry local date now renders, In/Out
-  of Sync badge, Push-date button).
+  confirm) and the dashboard Calendar tab (Foundry local date now renders, the
+  four-state sync badge — in-sync / date-drift with direction /
+  incompatible-structures / paused, FM-SYNC-WIRE-FIX — and Push-date button).
+- Recommended on a live client after FM-SYNC-WIRE-FIX (can't be unit-tested):
+  confirm initial sync now fires on a fresh world AND a world with pre-existing
+  synced data (console shows `_performInitialSync` / "Initial sync complete");
+  confirm a SimpleCalendar world with a mismatched structure pauses + badges
+  "incompatible"; confirm the entity visibility toggle round-trips (via
+  `/reveal`) and item add/remove/update relations round-trip.

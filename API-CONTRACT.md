@@ -251,9 +251,23 @@ Updates entity permissions.
 ```
 
 #### POST /entities/:entityId/reveal
-Toggles entity reveal state (NPC reveal to players).
+Toggles entity reveal state (NPC reveal to players). Body is exactly
+`{ "is_private": <bool> }` (a `*bool`); an explicit value matching the current
+state is a no-op. This is the ONLY correct way to flip visibility from the
+module — a bare `PUT /entities/:id` with just `{is_private}` 400s because
+UpdateEntity requires a name.
 
-**Used by:** `actor-sync.mjs`
+**Request:**
+```json
+{ "is_private": true }
+```
+
+**Used by:** `actor-sync.mjs`; `sync-dashboard.mjs` (single + bulk visibility
+toggles, routed here as of FM-SYNC-WIRE-FIX-R1)
+
+> **Erratum (FM-SYNC-WIRE-FIX-R1):** the dashboard visibility toggles
+> previously PUT `/entities/:id` with only `{is_private}` → 400 (swallowed), so
+> visibility never changed. Now routed to `POST /entities/:id/reveal`.
 
 ---
 
@@ -418,31 +432,55 @@ forward/reverse string pairs (17 built-in pairs like "parent of" / "child of").
 
 #### POST /entities/:entityId/relations
 Create a relation on an entity. Uses the forward label string to identify
-the relation type (not a numeric ID).
+the relation type (not a numeric ID). The write body binds **snake_case**
+(`target_entity_id` / `relation_type` / `reverse_relation_type`) and
+`target_entity_id` is **required** (empty → 400). Note the read/WS payload is
+camelCase — the shapes are deliberately asymmetric.
 
 **Request:**
 ```json
 {
   "target_entity_id": "uuid",
   "relation_type": "parent of",
+  "reverse_relation_type": "child of",
   "metadata": {}
 }
 ```
+
+> **Erratum (FM-SYNC-WIRE-FIX-R1):** `item-sync.mjs` previously sent this body
+> camelCase (`targetEntityId`/`relationType`) with a null target, so every
+> create 400'd. Now snake_case, and it SKIPS the create when the item has no
+> linked Chronicle target entity (a custom Foundry item has nothing to relate
+> to). Metadata is sent as a raw object (bound as `json.RawMessage`), not a
+> JSON-encoded string.
 
 #### GET /entities/:entityId/relations
 List all relations on an entity.
 
 **Used by:** `item-sync.mjs` → pull inventory relations for actors
 
-#### DELETE /entities/:entityId/relations/:relationId
-Delete a relation.
+#### DELETE /relations/:relationId
+Delete a relation (and its reverse). `relationId` is the numeric relation id.
 
 **Used by:** `item-sync.mjs` → remove item from actor inventory
 
-#### PUT /entities/:entityId/relations/:relationId/metadata
-Update relation metadata (e.g., item quantity, equipped state).
+> **Erratum (FM-SYNC-WIRE-FIX-R1):** the route is FLAT. Earlier revisions of
+> this doc (and `item-sync.mjs`) used a nested
+> `DELETE /entities/:entityId/relations/:relationId`, which Chronicle does not
+> serve (404). Chronicle's real route is `DELETE /relations/:relationId`
+> (`syncapi/routes.go`).
+
+#### PUT /relations/:relationId
+Update relation metadata (e.g., item quantity, equipped state). Body is
+`{ "metadata": { ... } }` only (bound as `json.RawMessage`); relation type and
+target are immutable via this route.
 
 **Used by:** `item-sync.mjs` → update inventory item metadata
+
+> **Erratum (FM-SYNC-WIRE-FIX-R1):** the route is FLAT and takes no
+> `/metadata` suffix. Earlier revisions used
+> `PUT /entities/:entityId/relations/:relationId/metadata` (404). Chronicle's
+> real route is `PUT /relations/:relationId` (`syncapi/routes.go`).
 
 ---
 

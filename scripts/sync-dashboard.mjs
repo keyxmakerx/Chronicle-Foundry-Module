@@ -26,6 +26,8 @@ import { buildDiagnosticBundle } from './sync-diagnostic-bundle.mjs';
 import { buildOverviewModel } from './_overview-model.mjs';
 import { log, getLogBuffer } from './logger.mjs';
 import { shouldSkipDatePush, isRealTimeRejection, notifyRealTimePushPaused } from './_realtime-date-guard.mjs';
+import { compareCalendarStructures } from './calendar-sync.mjs';
+import { classifyCalendarSyncState } from './_calendar-sync-state.mjs';
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**
@@ -664,33 +666,70 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     // Get local Foundry calendar date.
     const localDate = this._getLocalCalendarDate(calModule);
 
-    const inSync = chronicle.current_year === localDate?.year
-      && chronicle.current_month === localDate?.month
-      && chronicle.current_day === localDate?.day;
-
-    // Structure-mismatch guard state (FM-CAL-SYNC-HOTFIX item 3, B-R2): surfaced
-    // from the live CalendarSync instance so the dashboard can show a persistent
-    // warning + a "paused" badge when calendar sync has been paused this session.
+    // Honest four-state badge (FM-SYNC-WIRE-FIX fix 3). The pre-fix badge was
+    // raw y/m/d equality plus a `structureMismatch` flag the SimpleCalendar path
+    // never set. We now classify into exactly one of:
+    //   in-sync · date-drift (with direction) · incompatible-structures · paused
+    //
+    // Inputs, in priority order handled by the classifier:
+    //   - `paused` from the live CalendarSync instance — its
+    //     `_calendarSyncDisabled` guard, now set by BOTH module paths (fix 2).
+    //   - a dashboard-side structure comparison, so an incompatibility is still
+    //     surfaced when the module failed OPEN (unreadable structure at connect)
+    //     or isn't running. Fails open: `structureCmp` stays null unless BOTH
+    //     structures were readable here.
     const calSync = this._getCalendarSyncModule();
-    const structureMismatch = !!calSync?._calendarSyncDisabled;
-    const mismatchDetail = calSync?._calendarMismatchDetail || null;
+    const paused = !!calSync?._calendarSyncDisabled;
+    const pausedDetail = calSync?._calendarMismatchDetail || null;
+
+    const chronicleDate = {
+      year: chronicle.current_year,
+      month: chronicle.current_month,
+      day: chronicle.current_day,
+    };
+
+    let structureCmp = null;
+    let chronicleShape = null;
+    let foundryShape = null;
+    if (Array.isArray(chronicle.months) && chronicle.months.length > 0) {
+      const foundryStruct = calSync?._readActiveFoundryStructure?.() ?? null;
+      if (foundryStruct) {
+        structureCmp = compareCalendarStructures(chronicle, foundryStruct);
+        chronicleShape = `${(chronicle.months || []).length}mo/${(chronicle.weekdays || []).length}wd`;
+        foundryShape = `${(foundryStruct.monthDays || []).length}mo/${foundryStruct.weekdayCount ?? 0}wd`;
+      }
+    }
+
+    const cls = classifyCalendarSyncState({
+      paused,
+      pausedDetail,
+      structureCmp,
+      chronicleShape,
+      foundryShape,
+      chronicleDate,
+      foundryDate: localDate ? { year: localDate.year, month: localDate.month, day: localDate.day } : null,
+    });
 
     return {
       available: true,
       enabled: calendarEnabled,
       module: calModule,
       chronicleDate: {
-        year: chronicle.current_year,
-        month: chronicle.current_month,
-        day: chronicle.current_day,
+        ...chronicleDate,
         hour: chronicle.current_hour ?? 0,
         minute: chronicle.current_minute ?? 0,
         calendarName: chronicle.name || 'Campaign Calendar',
       },
       localDate,
-      inSync,
-      structureMismatch,
-      mismatchDetail,
+      // Four-state model + supporting display fields.
+      syncState: cls.state,               // 'in-sync' | 'date-drift' | 'incompatible-structures' | 'paused'
+      syncDirection: cls.direction,       // 'chronicle-ahead' | 'foundry-ahead' | null
+      syncStateDetail: cls.detail,        // reason string for paused / incompatible-structures
+      // Convenience booleans for the template (derived from syncState).
+      inSync: cls.state === 'in-sync',
+      isPaused: cls.state === 'paused',
+      isIncompatible: cls.state === 'incompatible-structures',
+      isDrift: cls.state === 'date-drift',
     };
   }
 
@@ -2011,7 +2050,12 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   async _onToggleVisibility(entityId, currentlyPrivate) {
     try {
-      await this.api.put(`/entities/${entityId}`, {
+      // FM-SYNC-WIRE-FIX fix 4: use the purpose-built reveal endpoint. A bare
+      // PUT /entities/:id with only {is_private} fails Chronicle's UpdateEntity
+      // name-required validation → 400 (silently swallowed in the catch below),
+      // so visibility never actually toggled. POST /entities/:id/reveal
+      // (ToggleEntityReveal) accepts exactly {is_private}.
+      await this.api.post(`/entities/${entityId}/reveal`, {
         is_private: !currentlyPrivate,
       });
 
@@ -2895,7 +2939,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     for (const entityId of ids) {
       try {
-        await this.api.put(`/entities/${entityId}`, { is_private: makePrivate });
+        // FM-SYNC-WIRE-FIX fix 4: reveal endpoint (see _onToggleVisibility). A
+        // bare PUT /entities/:id with only {is_private} 400s on UpdateEntity's
+        // name-required check; POST /entities/:id/reveal accepts {is_private}.
+        await this.api.post(`/entities/${entityId}/reveal`, { is_private: makePrivate });
 
         const journal = game.journal.find(j => j.getFlag(FLAG_SCOPE, 'entityId') === entityId);
         if (journal) {

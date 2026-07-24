@@ -887,13 +887,22 @@
         <p class="action-hint">{{localize "CHRONICLE.Dashboard.Calendar.OpenSyncCalendarHint"}}</p>
       </div>
       {{#if calendar.available}}
-      {{#if calendar.structureMismatch}}
+      {{#if calendar.isPaused}}
       <div class="dashboard-load-errors calendar-mismatch-banner">
         <i class="fa-solid fa-triangle-exclamation"></i>
         <div>
           <strong>Calendar sync paused — structure mismatch.</strong>
-          <div>{{calendar.mismatchDetail}}</div>
+          <div>{{calendar.syncStateDetail}}</div>
           <div class="action-hint">Import or author the matching calendar in Chronicle. Journals, characters, and maps still sync.</div>
+        </div>
+      </div>
+      {{else if calendar.isIncompatible}}
+      <div class="dashboard-load-errors calendar-mismatch-banner">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <div>
+          <strong>Calendar structures don’t match.</strong>
+          <div>{{calendar.syncStateDetail}}</div>
+          <div class="action-hint">The dates below aren’t comparable across the wire. Sync will pause on the next world reload — import or author the matching calendar in Chronicle.</div>
         </div>
       </div>
       {{/if}}
@@ -932,12 +941,20 @@
         </div>
 
         <div class="calendar-status">
-          {{#if calendar.structureMismatch}}
-          <span class="sync-badge out-of-sync"><i class="fa-solid fa-pause"></i> Sync Paused</span>
-          {{else if calendar.inSync}}
-          <span class="sync-badge synced"><i class="fa-solid fa-check"></i> In Sync</span>
+          {{#if calendar.isPaused}}
+          <span class="sync-badge out-of-sync" title="{{calendar.syncStateDetail}}"><i class="fa-solid fa-pause"></i> Sync Paused</span>
+          {{else if calendar.isIncompatible}}
+          <span class="sync-badge out-of-sync" title="{{calendar.syncStateDetail}}"><i class="fa-solid fa-triangle-exclamation"></i> Incompatible Structures</span>
+          {{else if calendar.isDrift}}
+            {{#if (eq calendar.syncDirection "chronicle-ahead")}}
+            <span class="sync-badge out-of-sync" title="Chronicle is ahead of Foundry — pull to advance the Foundry calendar."><i class="fa-solid fa-arrow-right"></i> Date Drift — Chronicle Ahead</span>
+            {{else if (eq calendar.syncDirection "foundry-ahead")}}
+            <span class="sync-badge out-of-sync" title="Foundry is ahead of Chronicle — push to advance the Chronicle calendar."><i class="fa-solid fa-arrow-left"></i> Date Drift — Foundry Ahead</span>
+            {{else}}
+            <span class="sync-badge out-of-sync" title="Dates differ (Foundry date unreadable)."><i class="fa-solid fa-exclamation-triangle"></i> Out of Sync</span>
+            {{/if}}
           {{else}}
-          <span class="sync-badge out-of-sync"><i class="fa-solid fa-exclamation-triangle"></i> Out of Sync</span>
+          <span class="sync-badge synced"><i class="fa-solid fa-check"></i> In Sync</span>
           {{/if}}
         </div>
 
