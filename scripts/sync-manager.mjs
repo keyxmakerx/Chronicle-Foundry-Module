@@ -152,12 +152,7 @@ export class SyncManager {
     this.api.on('*', (msg) => this._routeMessage(msg));
 
     // Listen for connection state changes (must be registered BEFORE connect).
-    this.api.on('sync.status', async (msg) => {
-      if (msg.payload?.status === 'connected' && !this._initialSyncDone) {
-        await this._performInitialSync();
-        this._initialSyncDone = true;
-      }
-    });
+    this.api.on('sync.status', (msg) => this._onSyncStatus(msg));
 
     // Re-pull on reconnect (FM-SYNC-HARDENING §2). Driven off the connection
     // state machine — a deterministic signal independent of the server's
@@ -171,6 +166,35 @@ export class SyncManager {
     this.api.connect();
 
     console.debug('Chronicle: Sync manager started');
+  }
+
+  /**
+   * Handle a `sync.status` event from the API client and fire the one-time
+   * initial sync on the first 'connected'.
+   *
+   * FM-SYNC-WIRE-FIX (FM-SYNC-1): the previous listener read ONLY
+   * `msg.payload?.status`, but `api-client.mjs` emits `sync.status` UNWRAPPED
+   * (`_emit('sync.status', { status: 'connected' })` → the listener receives
+   * `{ status: 'connected' }` directly, with no `payload` envelope). The guard
+   * was therefore never true, so `_performInitialSync` — and every module's
+   * `onInitialSync`, plus the journal duplicate-deletion post-pass — never ran
+   * on first load, and the reconnect resync (gated on the never-set
+   * `_initialSyncDone`) was dead too. Reading `status` from BOTH shapes revives
+   * both. The fix is on the LISTENER, not the emit: client emit shapes are
+   * intentionally inconsistent (`sync.retryComplete` uses `{ payload }`) and the
+   * same object is fanned out to the wildcard router, so normalizing at the emit
+   * would ripple. This handler is idempotent: `_initialSyncDone` latches it to a
+   * single run, and the reconnect resync path (`_onConnectionStateChange`) owns
+   * subsequent re-pulls.
+   * @param {{status?: string, payload?: {status?: string}}} msg
+   * @private
+   */
+  async _onSyncStatus(msg) {
+    const status = msg?.status ?? msg?.payload?.status;
+    if (status === 'connected' && !this._initialSyncDone) {
+      await this._performInitialSync();
+      this._initialSyncDone = true;
+    }
   }
 
   /**
