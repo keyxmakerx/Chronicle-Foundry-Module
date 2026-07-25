@@ -440,7 +440,7 @@ export class CalendarSync {
         return;
       }
 
-      // Structure-mismatch guard (B-R2): if the active Calendaria calendar's
+      // Structure-mismatch guard (B-R2): if the active Foundry calendar's
       // structure differs from Chronicle's, date coordinates are meaningless
       // across the wire — pause calendar sync for the session (both directions)
       // and warn loudly, rather than push a Gregorian date into a custom
@@ -449,8 +449,14 @@ export class CalendarSync {
       // Require BOTH sides readable before comparing — a degraded /calendar
       // response (no months) must fail OPEN (don't pause), not report a false
       // 0-vs-N mismatch.
-      if (this._calendarModule === 'calendaria' && this._chronicleCalendar.months?.length > 0) {
-        const foundryStruct = this._readActiveCalendariaStructure();
+      //
+      // FM-SYNC-WIRE-FIX: this guard now covers BOTH module paths (was
+      // Calendaria-only; the SimpleCalendar path fell through to _setLocalDate
+      // unguarded). It MUST stay hot before fix-1 revives initial sync's
+      // date-writes into SimpleCalendar worlds. `_readActiveFoundryStructure`
+      // returns null for an unreadable structure, preserving fail-open.
+      if (this._chronicleCalendar.months?.length > 0) {
+        const foundryStruct = this._readActiveFoundryStructure();
         if (foundryStruct) {
           const cmp = compareCalendarStructures(this._chronicleCalendar, foundryStruct);
           if (!cmp.match) {
@@ -517,6 +523,68 @@ export class CalendarSync {
       console.debug('Chronicle: could not read active Calendaria structure', err?.message);
       return null;
     }
+  }
+
+  /**
+   * Read the active SimpleCalendar calendar's structure (per-month day counts +
+   * weekday count) for the mismatch guard — the SimpleCalendar sibling of
+   * `_readActiveCalendariaStructure`. Before FM-SYNC-WIRE-FIX the structure guard
+   * was Calendaria-only (`onInitialSync` gated on `_calendarModule === 'calendaria'`),
+   * so a SimpleCalendar world with a mismatched structure fell through unguarded
+   * and `_setLocalDate` wrote Chronicle's coordinates into an incompatible calendar.
+   *
+   * SimpleCalendar's public API exposes months via `numberOfDays` (base year; the
+   * `numberOfLeapYearDays` variant is a DOCUMENTED EXCLUSION mirroring the
+   * Calendaria reader — see `compareCalendarStructures`). Prefer the single
+   * `getCurrentCalendar()` read; fall back to the flat `getAllMonths()` /
+   * `getAllWeekdays()` getters for API surfaces that don't expose it. Returns null
+   * when the structure can't be read — the guard then fails OPEN (sync is only
+   * paused on a CONFIRMED mismatch, never on inability to compare).
+   * @returns {{name:string, monthDays:number[], weekdayCount:number}|null}
+   * @private
+   */
+  _readActiveSimpleCalendarStructure() {
+    try {
+      const sc = globalThis.SimpleCalendar?.api;
+      if (!sc) return null;
+      let months = [];
+      let weekdays = [];
+      let name = 'active Foundry calendar';
+      const cal = typeof sc.getCurrentCalendar === 'function' ? sc.getCurrentCalendar() : null;
+      if (cal) {
+        months = readArrayLike(cal.months);
+        weekdays = readArrayLike(cal.weekdays);
+        name = cal.name || cal.id || name;
+      }
+      if (!months.length && typeof sc.getAllMonths === 'function') {
+        months = readArrayLike(sc.getAllMonths());
+      }
+      if (!weekdays.length && typeof sc.getAllWeekdays === 'function') {
+        weekdays = readArrayLike(sc.getAllWeekdays());
+      }
+      if (!months.length) return null;
+      return {
+        name,
+        monthDays: months.map((m) => Number(m?.numberOfDays ?? m?.days ?? 0)),
+        weekdayCount: weekdays.length,
+      };
+    } catch (err) {
+      console.debug('Chronicle: could not read active SimpleCalendar structure', err?.message);
+      return null;
+    }
+  }
+
+  /**
+   * Read the active Foundry calendar's structure for the mismatch guard,
+   * dispatching to the per-module reader. Returns null for an unknown module or
+   * an unreadable structure (guard fails OPEN). FM-SYNC-WIRE-FIX.
+   * @returns {{name:string, monthDays:number[], weekdayCount:number}|null}
+   * @private
+   */
+  _readActiveFoundryStructure() {
+    if (this._calendarModule === 'calendaria') return this._readActiveCalendariaStructure();
+    if (this._calendarModule === 'simple-calendar') return this._readActiveSimpleCalendarStructure();
+    return null;
   }
 
   /**
