@@ -1203,6 +1203,46 @@
   justify-content: center;
 }
 
+/* Chronicle world-state panel (FM-SYNC-SUBRESOURCES-P1): weather / season /
+   era / moon phases folded from the sub-resource WebSocket stream. Read-only
+   display, styled as a quiet block under the date-compare + actions so it
+   never competes with the sync badge above it. */
+.calendar-worldstate {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.calendar-worldstate .worldstate-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.calendar-worldstate .worldstate-rows {
+  margin: 0 0 8px;
+}
+
+.calendar-worldstate .worldstate-row {
+  display: flex;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12px;
+}
+
+.calendar-worldstate .worldstate-row dt {
+  flex: 0 0 90px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.calendar-worldstate .worldstate-row dd {
+  margin: 0;
+  flex: 1 1 auto;
+}
+
 /* ================================================================= */
 /* STATUS TAB                                                         */
 /* ================================================================= */

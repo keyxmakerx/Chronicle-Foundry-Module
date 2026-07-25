@@ -28,6 +28,7 @@ import { log, getLogBuffer } from './logger.mjs';
 import { shouldSkipDatePush, isRealTimeRejection, notifyRealTimePushPaused } from './_realtime-date-guard.mjs';
 import { compareCalendarStructures } from './calendar-sync.mjs';
 import { classifyCalendarSyncState } from './_calendar-sync-state.mjs';
+import { projectSubresourcePanel } from './_calendar-subresources.mjs';
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**
@@ -681,6 +682,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const calSync = this._getCalendarSyncModule();
     const paused = !!calSync?._calendarSyncDisabled;
     const pausedDetail = calSync?._calendarMismatchDetail || null;
+    // FM-SYNC-SUBRESOURCES-P1: advisory 5th state — Chronicle's structure moved
+    // this session and CalendarSync's re-compare found it still compatible.
+    // Outranked by paused/incompatible in the classifier; see its doc comment.
+    const structureChangedDetail = calSync?._structureChangedDetail || null;
 
     const chronicleDate = {
       year: chronicle.current_year,
@@ -708,7 +713,14 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       foundryShape,
       chronicleDate,
       foundryDate: localDate ? { year: localDate.year, month: localDate.month, day: localDate.day } : null,
+      structureChangedDetail,
     });
+
+    // Chronicle world-state panel (weather / season / era / moons) — the
+    // display surface for the sub-resource broadcasts CalendarSync now folds
+    // into `_subresourceState`. Read-only projection; the dashboard never
+    // writes any of it back into the Foundry calendar.
+    const worldState = projectSubresourcePanel(calSync?._subresourceState ?? null);
 
     return {
       available: true,
@@ -721,15 +733,17 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         calendarName: chronicle.name || 'Campaign Calendar',
       },
       localDate,
-      // Four-state model + supporting display fields.
-      syncState: cls.state,               // 'in-sync' | 'date-drift' | 'incompatible-structures' | 'paused'
+      // Five-state model + supporting display fields.
+      syncState: cls.state,               // 'in-sync' | 'date-drift' | 'structure-changed' | 'incompatible-structures' | 'paused'
       syncDirection: cls.direction,       // 'chronicle-ahead' | 'foundry-ahead' | null
-      syncStateDetail: cls.detail,        // reason string for paused / incompatible-structures
+      syncStateDetail: cls.detail,        // reason string for paused / incompatible / structure-changed
       // Convenience booleans for the template (derived from syncState).
       inSync: cls.state === 'in-sync',
       isPaused: cls.state === 'paused',
       isIncompatible: cls.state === 'incompatible-structures',
+      isStructureChanged: cls.state === 'structure-changed',
       isDrift: cls.state === 'date-drift',
+      worldState,
     };
   }
 
@@ -2813,10 +2827,18 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const calApi = (typeof CALENDARIA !== 'undefined' ? CALENDARIA?.api : null) ?? null;
     let apiMethods = null;
     if (calApi) {
+      // The trailing three are WRITE probes added by FM-SYNC-SUBRESOURCES-P1.
+      // Calendaria publishes weather reads but no documented setter, so
+      // `CalendarSync._applyWeatherToCalendaria` probes these names and falls
+      // back to a GM chat line when none exists. Reporting them here means an
+      // operator on a build that DOES expose one shows up in the bug report and
+      // we can pin the real name instead of guessing. Keep this list in sync
+      // with CALENDARIA_WEATHER_SETTERS in calendar-sync.mjs.
       const probeKeys = [
         'getWeatherForDate', 'getCurrentWeather', 'getAllMoonPhases',
         'getSelectedDay', 'createNote', 'updateNote', 'deleteNote',
         'getCalendars', 'getActiveCalendar', 'getAllNotes',
+        'setWeather', 'setCurrentWeather', 'setWeatherForDate',
       ];
       apiMethods = {};
       for (const k of probeKeys) apiMethods[k] = typeof calApi[k] === 'function';

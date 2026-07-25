@@ -150,17 +150,75 @@ test('in-sync also holds when structures were simply not comparable but dates ma
   assert.equal(r.state, 'in-sync');
 });
 
-// ── all four states are reachable (the honest-badge contract) ─────────────────
+// ── structure-changed (FM-SYNC-SUBRESOURCES-P1) ──────────────────────────────
 
-test('the classifier yields exactly the four documented states across inputs', () => {
+test('structure-changed advisory raises even when the dates agree', () => {
+  // The whole point: without this state the badge would say a confident
+  // "In Sync" seconds after Chronicle re-shaped the calendar underneath it.
+  const r = classifyCalendarSyncState({
+    paused: false,
+    structureCmp: { match: true, detail: '' },
+    chronicleDate: D(1492, 3, 15),
+    foundryDate: D(1492, 3, 15),
+    structureChangedDetail: 'Chronicle\'s calendar structure changed — re-compared: still compatible.',
+  });
+  assert.equal(r.state, 'structure-changed');
+  assert.equal(r.direction, null);
+  assert.match(r.detail, /still compatible/);
+});
+
+test('structure-changed is outranked by paused and by incompatible-structures', () => {
+  // Both describe actual breakage; the advisory must never mask them.
+  const paused = classifyCalendarSyncState({
+    paused: true,
+    pausedDetail: 'month count',
+    structureChangedDetail: 'advisory',
+  });
+  assert.equal(paused.state, 'paused');
+
+  const incompatible = classifyCalendarSyncState({
+    paused: false,
+    structureCmp: { match: false, detail: 'weekday count' },
+    structureChangedDetail: 'advisory',
+  });
+  assert.equal(incompatible.state, 'incompatible-structures');
+});
+
+test('structure-changed outranks date-drift', () => {
+  // "The structure moved under you" is the bigger fact than a one-day delta.
+  const r = classifyCalendarSyncState({
+    paused: false,
+    structureCmp: { match: true },
+    chronicleDate: D(1492, 3, 15),
+    foundryDate: D(1492, 3, 14),
+    structureChangedDetail: 'advisory',
+  });
+  assert.equal(r.state, 'structure-changed');
+});
+
+test('a null structureChangedDetail leaves the pre-existing states untouched', () => {
+  const r = classifyCalendarSyncState({
+    paused: false,
+    structureCmp: { match: true },
+    chronicleDate: D(1, 1, 1),
+    foundryDate: D(1, 1, 1),
+    structureChangedDetail: null,
+  });
+  assert.equal(r.state, 'in-sync');
+});
+
+// ── all five states are reachable (the honest-badge contract) ─────────────────
+
+test('the classifier yields exactly the five documented states across inputs', () => {
   const states = new Set([
     classifyCalendarSyncState({ paused: true }).state,
     classifyCalendarSyncState({ paused: false, structureCmp: { match: false, detail: 'x' } }).state,
+    classifyCalendarSyncState({ paused: false, structureCmp: { match: true }, chronicleDate: D(1, 1, 1), foundryDate: D(1, 1, 1), structureChangedDetail: 'advisory' }).state,
     classifyCalendarSyncState({ paused: false, structureCmp: { match: true }, chronicleDate: D(1, 1, 1), foundryDate: D(1, 1, 2) }).state,
     classifyCalendarSyncState({ paused: false, structureCmp: { match: true }, chronicleDate: D(1, 1, 1), foundryDate: D(1, 1, 1) }).state,
   ]);
   assert.deepEqual(
     [...states].sort(),
-    ['date-drift', 'in-sync', 'incompatible-structures', 'paused'],
+    ['date-drift', 'in-sync', 'incompatible-structures', 'paused', 'structure-changed'],
   );
 });

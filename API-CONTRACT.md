@@ -1221,14 +1221,65 @@ If the token is invalid, the server rejects the upgrade.
 | `calendar.event.updated` | Full event object | Calendar event modified |
 | `calendar.event.deleted` | `{ id }` | Calendar event deleted |
 | `calendar.date.advanced` | `{ year, month, day, hour, minute }` | Date/time changed |
-| `calendar.season.changed` | `{ id, name, color }` | Season boundary crossed |
+| `calendar.season.changed` | `{ id, name, color }` — **or `null`** when the date left a season without entering another | Season boundary crossed |
 | `calendar.moon.phase_changed` | `{ moon_id, moon_name, phase_name, phase_position }` | Moon phase changed |
-| `calendar.weather.changed` | Weather input object | Weather set or generated |
+| `calendar.weather.changed` | merged `WeatherInput` (FLAT snake_case) — **or `null`** from the weather-zone paths, where it is a "refetch me" ping | Weather set or generated |
 | `calendar.structure.updated` | `null` | Calendar structure modified |
+| `calendar.cycle.changed` | `null` | Cycle edited (always fires alongside `structure.updated`) |
+| `calendar.festival.changed` | `null` | Festival edited (always fires alongside `structure.updated`) |
 | `calendar.era.changed` | `{ id, name, color }` | Era boundary crossed |
+| `calendar.worldstate.changed` | `{ date: {year, month, day}, moodTint: {color, intensity} }` | World state changed — **see the gap note below; does not currently reach the wire** |
 | `sync.status` | `{ connected: bool }` | Connection state change |
 | `sync.error` | `{ message }` | Synchronization error |
 | `sync.conflict` | Conflict details | Data conflict detected |
+
+### What the module does with each `calendar.*` type
+
+Wired by FM-SYNC-SUBRESOURCES-P1 (`scripts/calendar-sync.mjs` `onMessage` +
+`scripts/_calendar-subresources.mjs`). Before that dispatch only the first four
+rows were handled and the switch had no `default:`, so every other type was
+dropped with no trace.
+
+P1 is **display-level and non-destructive**: no branch below writes a Chronicle
+value into the Foundry calendar's stored structure, and none creates a note.
+Chat announcements are **GM whispers only** — never public chat, so a payload
+Chronicle gated to the DM is not laundered into a player-visible one.
+
+| Type | Module behavior | Calendaria | Simple Calendar |
+|------|-----------------|-----------|-----------------|
+| `calendar.date.advanced` | Applies the date, confirms it back | `CALENDARIA.api.setDateTime` | `SimpleCalendar.api` date set |
+| `calendar.event.created/updated/deleted` | Mirrors to a calendar note | Full (notes API) | Full (journal-flag notes) |
+| `calendar.weather.changed` | Updates the dashboard world-state panel; applies to the calendar module if it exposes a weather **setter**, else whispers a GM chat line. A `null` payload triggers one `GET /calendar/weather` refetch. | Reads only on shipped builds — the module probes `setWeather` / `setCurrentWeather` / `setWeatherForDate` and falls back to chat when absent (the probe result is reported in the diagnostics bundle) | No weather surface → chat fallback |
+| `calendar.season.changed` | Panel + GM chat line (`calendarAnnounceSeasonEra`, default **on**) | Display only | Display only |
+| `calendar.era.changed` | Panel + GM chat line (`calendarAnnounceSeasonEra`, default **on**) | Display only | Display only |
+| `calendar.moon.phase_changed` | Panel + GM chat line (`calendarAnnounceMoon`, default **off** — moons change phase every few in-world days) | Display only | Display only |
+| `calendar.worldstate.changed` | Panel + GM chat line (`calendarAnnounceWorldstate`, default **on**). Handler is wired and tested but **currently unreachable** — see the gap note. | Display only | Display only |
+| `calendar.structure.updated`, `calendar.cycle.changed`, `calendar.festival.changed` | Refetches `GET /calendar`, re-runs the structure comparison, and sets the badge: pause if now incompatible, clear a prior mismatch pause if now compatible, otherwise raise the advisory `structure-changed` state. **Never auto-applies the structure** — rewriting months/weekdays would silently re-date every existing note. Processed even while sync is paused (the only recovery path). | Both | Both |
+| any other `calendar.*` | `default:` branch logs one `console.debug` line **per type per session** — no more silent drops | — | — |
+
+#### Gap: `calendar.worldstate.changed` never reaches the wire
+
+Verified against Chronicle `main` on 2026-07-25 (FM-SYNC-SUBRESOURCES-P1
+Step 0). Three independent blockers, all Chronicle-side:
+
+1. **Not published.** `worldstate_service.go:265` calls
+   `PublishCalendarEvent("calendar.worldstate.changed", …)`, but the adapter
+   that translates internal event names to `ws.MessageType`
+   (`calendarEventPublisherAdapter.PublishCalendarEvent`,
+   `internal/app/routes.go`) has no `case` for it and hits `default: return`.
+   The event is dropped before the bus. `calendar.weather.zones.changed` is
+   dropped the same way.
+2. **No celestial detail in the payload.** Even once published, the payload is
+   `{date, moodTint}` — the meteor/eclipse rows in `calendar_celestial_events`
+   that motivated the dispatch are not in it.
+3. **No syncapi read path.** `GET /calendar/world-state` is registered on the
+   web plugin group, not the Bearer-token `syncapi` group, so the module cannot
+   fetch the detail either (`internal/plugins/calendar/routes.go:157` vs
+   `internal/plugins/syncapi/routes.go`).
+
+The module-side handler ships wired and tested so the feature lights up the
+moment Chronicle closes (1); until then it is dormant. Closing (2) and (3) is
+Chronicle-side work.
 
 ### Reconnection
 

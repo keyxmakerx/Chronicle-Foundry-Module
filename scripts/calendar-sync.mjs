@@ -23,6 +23,15 @@ import { getSetting, getCalendarSyncExclusions } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import { shouldSkipDatePush, isRealTimeRejection, notifyRealTimePushPaused } from './_realtime-date-guard.mjs';
 import { confirmAppliedDate } from './_applied-date-confirm.mjs';
+import {
+  ROUTED_CALENDAR_TYPES,
+  STRUCTURE_SIGNAL_TYPES,
+  announceSettingFor,
+  emptySubresourceState,
+  formatSubresourceLine,
+  normalizeWeather,
+  reduceSubresourceState,
+} from './_calendar-subresources.mjs';
 
 /**
  * Canonical wire-visibility values per the calendar-sync wire contract
@@ -82,6 +91,42 @@ export function isWireVisibilityGmOnly(wireValue) {
  * `scripts/constants.mjs` → `MODULE.ID = 'calendaria'`.)
  */
 export const CALENDARIA_FLAG_SCOPE = 'calendaria';
+
+/**
+ * Candidate Calendaria weather-setter method names, probed in order by
+ * `_applyWeatherToCalendaria`. Calendaria's published API surface exposes
+ * weather READS (`getCurrentWeather`, `getWeatherForDate` — the two the
+ * diagnostics bundle already probes) but no documented setter; its weather is
+ * generated from zone/preset tables rather than assigned. Probing a short list
+ * and degrading to chat beats hard-coding one speculative name that silently
+ * no-ops on every build. Mirrored into the diagnostics probe list so an
+ * operator whose build DOES expose one shows up in their bug report.
+ * FM-SYNC-SUBRESOURCES-P1 Step 0.
+ */
+export const CALENDARIA_WEATHER_SETTERS = Object.freeze([
+  'setWeather',
+  'setCurrentWeather',
+  'setWeatherForDate',
+]);
+
+/**
+ * Escape a plain-text line for safe interpolation into a ChatMessage body.
+ * Chronicle-authored strings (weather descriptions, season names) are operator
+ * content, but they arrive over the wire and land in innerHTML-rendered chat —
+ * so they get escaped at the boundary like every other ingress in this module
+ * (FM-SEC-CHUNK-3 discipline). Not exported as HTML: the announcements are
+ * one-line plain text by design.
+ * @param {string} s
+ * @returns {string}
+ */
+function escapeChatHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 /**
  * SimpleCalendar persists each note as a JournalEntry under one of these module
@@ -336,6 +381,33 @@ export class CalendarSync {
     /** @type {string|null} Human-readable mismatch detail for the dashboard + diagnostics. */
     this._calendarMismatchDetail = null;
 
+    /**
+     * Last-known Chronicle sub-resource snapshot (weather / season / era / moon
+     * phases), folded from the WebSocket stream by `reduceSubresourceState`.
+     * The dashboard's Calendar tab renders it; nothing here drives a write into
+     * Foundry. FM-SYNC-SUBRESOURCES-P1.
+     * @type {ReturnType<typeof emptySubresourceState>}
+     */
+    this._subresourceState = emptySubresourceState();
+
+    /**
+     * Set when a `calendar.structure.updated` (or cycle/festival) broadcast
+     * arrived this session AND the re-compare found the structures still
+     * compatible. Feeds the dashboard's advisory `structure-changed` badge. We
+     * never auto-apply the new structure — see `_onChronicleStructureUpdated`.
+     * @type {string|null}
+     */
+    this._structureChangedDetail = null;
+
+    /**
+     * Types already logged by the `default:` branch of `onMessage`, so an
+     * unhandled `calendar.*` type produces exactly ONE debug line per session
+     * instead of one per broadcast. The dispatch's "no more silent drops"
+     * requirement, without turning a busy calendar into console spam.
+     * @type {Set<string>}
+     */
+    this._loggedUnhandledTypes = new Set();
+
     // Bound hook handlers for cleanup.
     this._boundHandlers = {};
   }
@@ -391,6 +463,20 @@ export class CalendarSync {
    */
   async onMessage(msg) {
     if (!getSetting('syncCalendar') || !this._calendarModule) return;
+
+    // Structure signals are processed EVEN WHILE PAUSED, ahead of the
+    // mismatch guard. They are the only broadcast that can legitimately CLEAR
+    // a structure-mismatch pause: the operator's remedy for the pause is to fix
+    // the calendar in Chronicle, and fixing it is exactly what emits
+    // `calendar.structure.updated`. Leaving this behind the guard would make
+    // the pause unrecoverable without a world reload — the same
+    // dead-on-arrival shape FM-SYNC-WIRE-FIX just removed from initial sync.
+    // The handler itself performs NO writes into Foundry (see its doc comment).
+    if (STRUCTURE_SIGNAL_TYPES.includes(msg?.type)) {
+      await this._onChronicleStructureUpdated(msg.type);
+      return;
+    }
+
     if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): no pull
 
     switch (msg.type) {
@@ -406,7 +492,50 @@ export class CalendarSync {
       case 'calendar.event.deleted':
         await this._onChronicleEventDeleted(msg.payload);
         break;
+
+      // --- Sub-resources (FM-SYNC-SUBRESOURCES-P1) ---------------------------
+      // Display-level only: every branch below folds the payload into
+      // `_subresourceState` for the dashboard and optionally posts a GM-only
+      // chat line. None of them writes a Chronicle value into the Foundry
+      // calendar's stored structure.
+      case 'calendar.weather.changed':
+        await this._onChronicleWeatherChanged(msg.payload);
+        break;
+      case 'calendar.worldstate.changed':
+      case 'calendar.season.changed':
+      case 'calendar.era.changed':
+      case 'calendar.moon.phase_changed':
+        await this._onChronicleSubresourceChanged(msg.type, msg.payload);
+        break;
+
+      default:
+        this._logUnhandledCalendarType(msg?.type);
+        break;
     }
+  }
+
+  /**
+   * Log an unhandled `calendar.*` type ONCE per session.
+   *
+   * Before this dispatch the switch above had no `default:` at all, so seven of
+   * Chronicle's eleven calendar broadcasts fell off the end and vanished with no
+   * trace anywhere — the operator's "celestial events unfindable/unsyncable"
+   * report had no console breadcrumb to follow. Non-calendar types are ignored
+   * silently: `SyncManager._routeMessage` fans EVERY message to EVERY module, so
+   * entity/map/note traffic reaching CalendarSync is normal, not a gap.
+   *
+   * @param {string|undefined} type
+   * @private
+   */
+  _logUnhandledCalendarType(type) {
+    if (typeof type !== 'string' || !type.startsWith('calendar.')) return;
+    if (ROUTED_CALENDAR_TYPES.includes(type)) return;
+    if (this._loggedUnhandledTypes.has(type)) return;
+    this._loggedUnhandledTypes.add(type);
+    console.debug(
+      `Chronicle: unhandled calendar WebSocket type "${type}" — dropped. `
+      + 'If this carries state the table should see, wire it in calendar-sync.mjs onMessage.',
+    );
   }
 
   /**
@@ -708,6 +837,276 @@ export class CalendarSync {
     const applied = await this._setLocalDate(data);
     if (applied) {
       await confirmAppliedDate(this._api, { year: data.year, month: data.month, day: data.day });
+    }
+  }
+
+  // --- Chronicle → Foundry: sub-resources (FM-SYNC-SUBRESOURCES-P1) ----------
+
+  /**
+   * Whisper one line to the GMs. Every sub-resource announcement goes through
+   * here, and it is deliberately the ONLY chat surface this arc adds.
+   *
+   * **Why whisper rather than broadcast.** Chronicle's WS hub gates dm_only
+   * traffic server-side via `Message.RequiresDM` (`internal/websocket/hub.go`
+   * :159-167), so a payload that reaches this module is already cleared for the
+   * GM — but "cleared for the GM" is not "cleared for the table". Weather zones
+   * and world state routinely encode information the DM is holding back (an
+   * unnatural darkness, a zone the party hasn't discovered). Re-broadcasting a
+   * DM-gated payload into public chat would launder a server-side permission
+   * decision into a player-visible one, which is exactly the leak class
+   * cordinator#32 hardened against on the Chronicle side. `whisper` to the GM
+   * user ids keeps the audience identical to the one Chronicle authorized.
+   *
+   * The GM decides what to share; the module never decides for them.
+   *
+   * @param {string|null} line
+   * @private
+   */
+  _announceToGM(line) {
+    if (!line) return;
+    try {
+      const gmIds = globalThis.ChatMessage?.getWhisperRecipients?.('GM')?.map((u) => u.id) ?? [];
+      globalThis.ChatMessage?.create?.({
+        content: `<p>${escapeChatHtml(line)}</p>`,
+        whisper: gmIds,
+        speaker: { alias: 'Chronicle' },
+      });
+    } catch (err) {
+      // Chat is a courtesy surface — never let it break message routing.
+      console.debug('Chronicle: sub-resource chat announcement failed', err?.message);
+    }
+  }
+
+  /**
+   * Should this sub-resource type announce in chat right now? Reads the
+   * per-type world setting (`announceSettingFor`). Unknown settings fail
+   * CLOSED (no announcement) rather than spamming a world whose settings
+   * predate this release.
+   * @param {string} type
+   * @returns {boolean}
+   * @private
+   */
+  _shouldAnnounce(type) {
+    const key = announceSettingFor(type);
+    if (!key) return false;
+    try {
+      return getSetting(key) === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Handle `calendar.weather.changed`.
+   *
+   * Two payload shapes arrive on this type (see `_calendar-subresources.mjs`):
+   * the merged `WeatherInput` from `SetWeather`, and `null` from the
+   * weather-zone paths, which publish the type purely as a "refetch me" ping.
+   * A null payload therefore triggers one `GET /calendar/weather` rather than
+   * being discarded — without it, every active-zone change would land as a
+   * no-op, which is the same silent-drop shape this dispatch is closing.
+   *
+   * Apply order, honestly degrading:
+   *   1. If the active module is Calendaria AND it exposes a weather SETTER,
+   *      hand it the reading (see `_applyWeatherToCalendaria`).
+   *   2. Otherwise — SimpleCalendar, or a Calendaria build with read-only
+   *      weather — fall back to the GM chat line. The dashboard panel is
+   *      updated either way.
+   *
+   * @param {object|null} payload
+   * @private
+   */
+  async _onChronicleWeatherChanged(payload) {
+    this._syncDepth++;
+    try {
+      let raw = payload;
+      if (!raw) {
+        // Zone-change ping: the type fired with no body. Refetch the reading.
+        try {
+          raw = await this._api.get('/calendar/weather');
+        } catch (err) {
+          console.debug('Chronicle: weather refetch after zone change failed', err?.message);
+        }
+      }
+      const weather = normalizeWeather(raw);
+      if (!weather) return;
+
+      this._subresourceState = reduceSubresourceState(
+        this._subresourceState, 'calendar.weather.changed', raw,
+      );
+
+      const appliedToModule = await this._applyWeatherToCalendaria(weather);
+      if (!appliedToModule && this._shouldAnnounce('calendar.weather.changed')) {
+        this._announceToGM(this._subresourceState.weatherLine);
+      }
+    } finally {
+      this._syncDepth--;
+    }
+  }
+
+  /**
+   * Push a weather reading into Calendaria when — and only when — its API
+   * exposes a setter.
+   *
+   * Step-0 inventory (this dispatch): the module's existing Calendaria probe
+   * list (`sync-dashboard.mjs` `_buildCalendarDiagnosticsInput`) covers
+   * `getWeatherForDate` and `getCurrentWeather` — both READS, used for the
+   * diagnostics bundle. No Calendaria build the module has been pointed at
+   * exposes a documented weather *setter*, and Calendaria's own weather is
+   * generated from its zone/preset tables rather than assigned. So rather than
+   * pin one speculative method name, we probe the plausible names and no-op
+   * when none is present, returning false so the caller falls back to chat.
+   * The probe names are mirrored into the diagnostics bundle, so an operator on
+   * a build that DOES expose one can see it in their report and we can pin the
+   * real name in a follow-up instead of guessing now.
+   *
+   * @param {ReturnType<typeof normalizeWeather>} weather
+   * @returns {Promise<boolean>} true when the reading was handed to Calendaria
+   * @private
+   */
+  async _applyWeatherToCalendaria(weather) {
+    if (this._calendarModule !== 'calendaria' || !weather) return false;
+    try {
+      const api = globalThis.CALENDARIA?.api;
+      if (!api) return false;
+      const setter = CALENDARIA_WEATHER_SETTERS.find((n) => typeof api[n] === 'function');
+      if (!setter) return false;
+      await api[setter]({
+        label:         weather.presetLabel,
+        temperature:   weather.temperatureC,
+        windTier:      weather.windTier,
+        windSpeed:     weather.windSpeedKph,
+        windDirection: weather.windDirection,
+        precipitation: weather.precipType,
+        intensity:     weather.precipIntensity,
+        zone:          weather.zoneName,
+        description:   weather.description,
+      });
+      console.debug(`Chronicle: applied Chronicle weather via CALENDARIA.api.${setter}`);
+      return true;
+    } catch (err) {
+      // A failed apply must degrade to the chat line, not swallow the update.
+      console.debug('Chronicle: Calendaria weather apply failed, falling back to chat', err?.message);
+      return false;
+    }
+  }
+
+  /**
+   * Handle the display-only sub-resource types: world state, season, era and
+   * moon phase. Each folds into `_subresourceState` (which the dashboard's
+   * Calendar tab renders) and optionally posts a GM-only chat line, gated by
+   * that type's world setting.
+   *
+   * **No writes into Foundry.** P1 is display-level by dispatch: nothing here
+   * creates a note, mutates a calendar, or touches a document. In particular
+   * the world-state branch does NOT auto-create a same-day Calendaria note for
+   * celestial events, for two reasons found in Step 0 and recorded in full in
+   * the PR body: the payload carries no celestial detail to put in a note
+   * (`{date, moodTint}` — service side, `worldstate_service.go`:265), and it
+   * carries no stable event id, so a re-broadcast or a reconnect would create
+   * duplicate notes with no way to dedupe them. Announcing what the payload
+   * actually contains is honest; inventing a "Meteor Shower" note from a mood
+   * tint would not be.
+   *
+   * @param {string} type
+   * @param {object|null} payload
+   * @private
+   */
+  async _onChronicleSubresourceChanged(type, payload) {
+    this._syncDepth++;
+    try {
+      this._subresourceState = reduceSubresourceState(this._subresourceState, type, payload);
+      if (!this._shouldAnnounce(type)) return;
+      this._announceToGM(formatSubresourceLine(type, payload));
+    } finally {
+      this._syncDepth--;
+    }
+  }
+
+  /**
+   * Handle `calendar.structure.updated` and its granular siblings
+   * (`calendar.cycle.changed`, `calendar.festival.changed`, which Chronicle
+   * fires alongside it — `service.go`:1594-1595, :1629-1630).
+   *
+   * **Deliberately does NOT auto-apply the new structure.** Rewriting the
+   * Foundry calendar's months/weekdays from a broadcast would be the most
+   * destructive write in the module: Calendaria stores notes against month/day
+   * coordinates, so re-shaping the calendar underneath them silently re-dates
+   * every note in the world. Non-destructive auto-merge is a later arc
+   * (calendar-remodel requirements §1 item 10). What we do instead:
+   *
+   *   1. Refetch `GET /calendar` so the cached structure isn't stale.
+   *   2. Re-run the SAME comparison `onInitialSync` runs, with the same
+   *      fail-open discipline — an unreadable structure on either side never
+   *      pauses anything.
+   *   3. Now incompatible → pause (the existing B-R2 path, one warning).
+   *      Still compatible → record the advisory `structure-changed` badge
+   *      detail so the dashboard stops claiming a clean "In Sync" the operator
+   *      hasn't eyeballed.
+   *   4. Compatible AND we were previously paused for a mismatch → CLEAR the
+   *      pause. This is the recovery path: the operator's documented remedy for
+   *      a mismatch pause is "fix the calendar in Chronicle", and doing so is
+   *      precisely what emits this broadcast. Without step 4 the pause would
+   *      survive until a world reload even after the cause was removed.
+   *
+   * Runs even while paused — it's the one handler that must (see `onMessage`).
+   *
+   * @param {string} [type] - the signal type, for the log line.
+   * @private
+   */
+  async _onChronicleStructureUpdated(type = 'calendar.structure.updated') {
+    this._syncDepth++;
+    try {
+      let cal = null;
+      try {
+        cal = await this._api.get('/calendar');
+      } catch (err) {
+        console.debug('Chronicle: structure re-compare could not refetch /calendar', err?.message);
+      }
+      if (cal) this._chronicleCalendar = cal;
+
+      const chronicleCal = this._chronicleCalendar;
+      // Fail open, exactly as onInitialSync does: no readable structure on
+      // either side means no verdict, so we neither pause nor un-pause.
+      if (!(chronicleCal?.months?.length > 0)) {
+        console.debug(`Chronicle: ${type} received; Chronicle structure unreadable — no re-compare.`);
+        return;
+      }
+      const foundryStruct = this._readActiveFoundryStructure();
+      if (!foundryStruct) {
+        console.debug(`Chronicle: ${type} received; Foundry structure unreadable — no re-compare.`);
+        return;
+      }
+
+      const cmp = compareCalendarStructures(chronicleCal, foundryStruct);
+      if (!cmp.match) {
+        this._structureChangedDetail = null;
+        if (!this._calendarSyncDisabled) {
+          this._pauseCalendarSyncForMismatch(chronicleCal, foundryStruct, cmp.detail);
+        }
+        return;
+      }
+
+      // Compatible. Recover from a prior mismatch pause if there was one.
+      if (this._calendarSyncDisabled) {
+        this._calendarSyncDisabled = false;
+        this._calendarMismatchDetail = null;
+        const msg = 'Chronicle Sync: the Chronicle calendar structure now matches the active '
+          + 'Foundry calendar — calendar sync resumed for this session.';
+        console.warn(msg);
+        try { globalThis.ui?.notifications?.info(msg); } catch { /* headless */ }
+      }
+
+      const chronicleShape = `${(chronicleCal.months || []).length}mo/${(chronicleCal.weekdays || []).length}wd`;
+      const foundryShape = `${(foundryStruct.monthDays || []).length}mo/${foundryStruct.weekdayCount ?? 0}wd`;
+      this._structureChangedDetail =
+        `Chronicle's calendar structure changed (${type}). Re-compared: still compatible `
+        + `(Chronicle ${chronicleShape} vs Foundry ${foundryShape}). Month names, cycles, festivals `
+        + 'and era boundaries are outside this comparison — re-check the calendar. '
+        + 'The Foundry calendar was NOT modified.';
+      console.debug(`Chronicle: ${this._structureChangedDetail}`);
+    } finally {
+      this._syncDepth--;
     }
   }
 

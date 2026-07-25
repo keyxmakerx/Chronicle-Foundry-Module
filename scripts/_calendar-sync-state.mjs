@@ -21,14 +21,29 @@
  *                                 an unreadable structure, or isn't running, yet the
  *                                 dates on the wire are still meaningless. Carries
  *                                 the month/weekday counts.
+ *   - `structure-changed`       — FM-SYNC-SUBRESOURCES-P1. Chronicle broadcast
+ *                                 `calendar.structure.updated` (or its granular
+ *                                 `cycle`/`festival` siblings) THIS SESSION, the
+ *                                 module re-ran the comparison, and it came back
+ *                                 compatible. Advisory, not an error: the counts
+ *                                 we compare (month count, per-month day counts,
+ *                                 weekday count) still match, but month NAMES,
+ *                                 cycles, festivals and era boundaries are outside
+ *                                 the comparison, so the operator should eyeball
+ *                                 the calendar. We deliberately do NOT auto-apply
+ *                                 the new structure — auto-merge is a later arc.
  *   - `date-drift`              — structures compatible (or not comparable) but the
  *                                 dates differ. Carries a direction.
  *   - `in-sync`                 — structures compatible and the dates match.
  *
  * `paused` outranks `incompatible-structures` because a paused module is the
  * stronger operational fact (sync is actually off); its detail string already
- * spells out the structural reason. Both remain independently reachable, so the
- * badge never has to invent a state it can't back with data.
+ * spells out the structural reason. `structure-changed` sits BELOW both — it is
+ * an advisory that only makes sense once we've established nothing is actually
+ * broken — and ABOVE `date-drift`/`in-sync`, because "the structure moved under
+ * you" is more important than a one-day date delta. All four remain
+ * independently reachable, so the badge never has to invent a state it can't
+ * back with data.
  */
 
 /**
@@ -63,7 +78,13 @@ function compareDates(a, b) {
  * @param {string|null} [input.foundryShape] - e.g. `"15mo/6wd"`.
  * @param {{year:number, month:number, day:number}|null} [input.chronicleDate]
  * @param {{year:number, month:number, day:number}|null} [input.foundryDate]
- * @returns {{state:('in-sync'|'date-drift'|'incompatible-structures'|'paused'),
+ * @param {string|null} [input.structureChangedDetail] - set by CalendarSync when
+ *   a `calendar.structure.updated` (or cycle/festival) broadcast arrived this
+ *   session and the re-compare found the structures still compatible
+ *   (FM-SYNC-SUBRESOURCES-P1). A truthy value raises the advisory
+ *   `structure-changed` state; it is deliberately outranked by `paused` and
+ *   `incompatible-structures`, which describe actual breakage.
+ * @returns {{state:('in-sync'|'date-drift'|'structure-changed'|'incompatible-structures'|'paused'),
  *   direction:('chronicle-ahead'|'foundry-ahead'|null), detail:string}}
  */
 export function classifyCalendarSyncState(input) {
@@ -75,6 +96,7 @@ export function classifyCalendarSyncState(input) {
     foundryShape = null,
     chronicleDate = null,
     foundryDate = null,
+    structureChangedDetail = null,
   } = input || {};
 
   // 1. Module has paused sync for the session — the strongest fact.
@@ -99,7 +121,15 @@ export function classifyCalendarSyncState(input) {
     };
   }
 
-  // 3/4. Structures compatible (or not comparable). Compare dates.
+  // 3. Chronicle's structure moved this session and the re-compare came back
+  //    compatible (FM-SYNC-SUBRESOURCES-P1). Advisory — sync keeps running, but
+  //    the badge stops claiming a clean "In Sync" the operator hasn't verified.
+  //    Reached only after the two breakage states above have been ruled out.
+  if (structureChangedDetail) {
+    return { state: 'structure-changed', direction: null, detail: structureChangedDetail };
+  }
+
+  // 4/5. Structures compatible (or not comparable). Compare dates.
   //     A missing local date can never be confirmed in-sync — report drift with
   //     an unknown direction rather than claiming synchronization.
   if (!foundryDate || !chronicleDate) {
