@@ -122,6 +122,53 @@ export function registerSettings() {
     default: false,
   });
 
+  // Calendar sub-resource chat announcements (FM-SYNC-SUBRESOURCES-P1).
+  //
+  // Chronicle broadcasts weather / world-state / season / era / moon-phase
+  // changes; the module surfaces them as GM-ONLY whispers (never public chat —
+  // see CalendarSync._announceToGM for why re-broadcasting a DM-gated payload
+  // would launder a server-side permission decision).
+  //
+  // Defaults follow the dispatch: season/era and weather ON because they change
+  // rarely and matter at the table; moon phases OFF because a moon crosses a
+  // phase boundary every few in-world days and would flood the log. All four
+  // are independent so a GM can keep the dashboard panel without the chat.
+  game.settings.register(MODULE_ID, 'calendarAnnounceWeather', {
+    name: game.i18n.localize('CHRONICLE.Settings.CalendarAnnounceWeather.Name'),
+    hint: game.i18n.localize('CHRONICLE.Settings.CalendarAnnounceWeather.Hint'),
+    scope: 'world',
+    config: true,
+    type: Boolean,
+    default: true,
+  });
+
+  game.settings.register(MODULE_ID, 'calendarAnnounceWorldstate', {
+    name: game.i18n.localize('CHRONICLE.Settings.CalendarAnnounceWorldstate.Name'),
+    hint: game.i18n.localize('CHRONICLE.Settings.CalendarAnnounceWorldstate.Hint'),
+    scope: 'world',
+    config: true,
+    type: Boolean,
+    default: true,
+  });
+
+  game.settings.register(MODULE_ID, 'calendarAnnounceSeasonEra', {
+    name: game.i18n.localize('CHRONICLE.Settings.CalendarAnnounceSeasonEra.Name'),
+    hint: game.i18n.localize('CHRONICLE.Settings.CalendarAnnounceSeasonEra.Hint'),
+    scope: 'world',
+    config: true,
+    type: Boolean,
+    default: true,
+  });
+
+  game.settings.register(MODULE_ID, 'calendarAnnounceMoon', {
+    name: game.i18n.localize('CHRONICLE.Settings.CalendarAnnounceMoon.Name'),
+    hint: game.i18n.localize('CHRONICLE.Settings.CalendarAnnounceMoon.Hint'),
+    scope: 'world',
+    config: true,
+    type: Boolean,
+    default: false,
+  });
+
   // Internal: detected Chronicle system ID matched from Foundry's game.system.id.
   game.settings.register(MODULE_ID, 'detectedSystem', {
     scope: 'world',

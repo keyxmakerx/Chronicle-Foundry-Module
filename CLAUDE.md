@@ -26,6 +26,7 @@ scripts/                          # ES modules (.mjs)
   map-sync.mjs                    # Chronicle map + sub-resources ↔ JournalEntry (image page); markers/drawings/tokens/fog/layers rendered as overlays via MapViewerSheet
   map-viewer.mjs                  # MapViewerSheet (ApplicationV2): image + SVG overlay
   calendar-sync.mjs               # Calendar adapter (Calendaria/SimpleCalendar)
+  _calendar-subresources.mjs      # Pure: weather/season/era/moon payload normalization, GM chat lines, dashboard snapshot reducer
   actor-sync.mjs                  # Character entity ↔ Actor sync
   item-sync.mjs                   # Item sync
   note-sync.mjs                   # Chronicle Notes ↔ JournalEntry sync
@@ -89,6 +90,18 @@ Integration — Install & Updates".
   422-from-`PUT`-is-the-same-condition backstop (never a retryable sync
   error). The GM notice fires once per session, shared across both files via
   a module-level singleton. See `tools/test-realtime-date-signal.mjs`.
+- **Calendar sub-resources are display-only.** `calendar.weather/season/era/
+  moon/worldstate` land on the dashboard's world-state panel and (per-type world
+  setting) a **GM-whispered** chat line — never public chat, since Chronicle's
+  dm_only gating is server-side and re-broadcasting would launder it into a
+  player-visible decision. `calendar.structure.updated` (+ its `cycle`/`festival`
+  siblings) re-runs the structure comparison and badges the result but **never
+  auto-applies the structure** — that would silently re-date every Calendaria
+  note. It is routed AHEAD of the `_calendarSyncDisabled` guard because it is
+  the only signal that can clear a mismatch pause. Every other `calendar.*` type
+  hits a `default:` that logs once per type per session. See
+  `scripts/_calendar-subresources.mjs`, `tools/test-calendar-subresources.mjs`,
+  `tools/test-calendar-subresource-routing.mjs` (FM-SYNC-SUBRESOURCES-P1).
 - WebSocket messages are routed by type through `SyncManager`.
 - Chronicle-side serving rules live in `chronicle-package.json` at repo root; CI validates it against `module.json` via `tools/check-package-descriptor.mjs`.
 
@@ -103,6 +116,25 @@ Integration — Install & Updates".
   confirm) and the dashboard Calendar tab (Foundry local date now renders, the
   four-state sync badge — in-sync / date-drift with direction /
   incompatible-structures / paused, FM-SYNC-WIRE-FIX — and Push-date button).
+- **Blocked on Chronicle (FM-SYNC-SUBRESOURCES-P1 Step 0):**
+  `calendar.worldstate.changed` is published by
+  `internal/plugins/calendar/worldstate_service.go` but has no `case` in
+  `calendarEventPublisherAdapter.PublishCalendarEvent`
+  (`internal/app/routes.go`), so it hits `default: return` and never reaches
+  the bus (`calendar.weather.zones.changed` is dropped the same way). The
+  payload also carries no celestial detail (`{date, moodTint}`) and
+  `GET /calendar/world-state` isn't on the syncapi group. The module handler
+  is wired + tested and dormant until Chronicle closes these. See
+  API-CONTRACT.md → "Gap: `calendar.worldstate.changed` never reaches the wire".
+- Recommended once on a live client after FM-SYNC-SUBRESOURCES-P1 (can't be
+  unit-tested): set weather / cross a season or era boundary in Chronicle and
+  confirm the GM whisper lands and the Calendar tab's "Chronicle world state"
+  panel fills; edit the calendar structure in Chronicle and confirm the badge
+  flips to "Structure Changed — Re-check" without the Foundry calendar being
+  modified; confirm a structure-mismatch pause CLEARS when the Chronicle
+  calendar is fixed (no world reload needed); check the diagnostics bundle's
+  `CALENDARIA.api methods available` block for whether the build exposes any of
+  `setWeather` / `setCurrentWeather` / `setWeatherForDate`.
 - Recommended on a live client after FM-SYNC-WIRE-FIX (can't be unit-tested):
   confirm initial sync now fires on a fresh world AND a world with pre-existing
   synced data (console shows `_performInitialSync` / "Initial sync complete");

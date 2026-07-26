@@ -30,6 +30,22 @@
         "Name": "Sync Calendar",
         "Hint": "Sync Chronicle calendar with Calendaria or Simple Calendar module"
       },
+      "CalendarAnnounceWeather": {
+        "Name": "Announce Chronicle weather in chat",
+        "Hint": "Whisper a GM-only chat line when weather changes in Chronicle. Used when the active Foundry calendar module has no weather setter to apply the reading to (Simple Calendar, and Calendaria builds with read-only weather). Never posted to players."
+      },
+      "CalendarAnnounceWorldstate": {
+        "Name": "Announce Chronicle world-state changes in chat",
+        "Hint": "Whisper a GM-only chat line when Chronicle's world state changes (date + ambient mood tint). Never posted to players."
+      },
+      "CalendarAnnounceSeasonEra": {
+        "Name": "Announce season and era changes in chat",
+        "Hint": "Whisper a GM-only chat line when the Chronicle calendar crosses a season or era boundary. Never posted to players."
+      },
+      "CalendarAnnounceMoon": {
+        "Name": "Announce moon phase changes in chat",
+        "Hint": "Whisper a GM-only chat line each time a moon crosses a phase boundary. Off by default — moons change phase every few in-world days and can flood the chat log. The Calendar tab's world-state panel shows current phases regardless."
+      },
       "SyncCharacters": {
         "Name": "Sync Characters",
         "Hint": "Sync Foundry actors with Chronicle character entities (requires matching game system)"
@@ -170,7 +186,10 @@
         "NoModuleHint": "Install Calendaria or Simple Calendar to enable calendar sync.",
         "UnableToRead": "Unable to read",
         "OpenSyncCalendar": "Open Sync Calendar",
-        "OpenSyncCalendarHint": "Open the full Sync Calendar editor — import calendars, edit events, view moon phases."
+        "OpenSyncCalendarHint": "Open the full Sync Calendar editor — import calendars, edit events, view moon phases.",
+        "WorldStateTitle": "Chronicle world state",
+        "WorldStateHint": "Latest weather, season, era and moon phases received from Chronicle this session. Display only — the Foundry calendar is never modified from these.",
+        "WorldStateEmpty": "No world-state broadcasts received yet this session."
       },
       "Notes": {
         "Synced": "Synced",

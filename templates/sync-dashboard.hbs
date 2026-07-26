@@ -945,6 +945,13 @@
           <span class="sync-badge out-of-sync" title="{{calendar.syncStateDetail}}"><i class="fa-solid fa-pause"></i> Sync Paused</span>
           {{else if calendar.isIncompatible}}
           <span class="sync-badge out-of-sync" title="{{calendar.syncStateDetail}}"><i class="fa-solid fa-triangle-exclamation"></i> Incompatible Structures</span>
+          {{else if calendar.isStructureChanged}}
+          {{!-- FM-SYNC-SUBRESOURCES-P1: Chronicle broadcast structure.updated
+                this session; the re-compare came back compatible. Advisory —
+                sync keeps running, but the badge stops claiming a clean
+                "In Sync" the operator hasn't eyeballed. The Foundry calendar
+                was NOT modified. --}}
+          <span class="sync-badge out-of-sync" title="{{calendar.syncStateDetail}}"><i class="fa-solid fa-rotate"></i> Structure Changed — Re-check</span>
           {{else if calendar.isDrift}}
             {{#if (eq calendar.syncDirection "chronicle-ahead")}}
             <span class="sync-badge out-of-sync" title="Chronicle is ahead of Foundry — pull to advance the Foundry calendar."><i class="fa-solid fa-arrow-right"></i> Date Drift — Chronicle Ahead</span>
@@ -965,6 +972,48 @@
           <button type="button" data-action="push-date" class="dashboard-btn">
             <i class="fa-solid fa-upload"></i> Push Date to Chronicle
           </button>
+        </div>
+
+        {{!-- FM-SYNC-SUBRESOURCES-P1: Chronicle world state. Weather, season,
+              era and moon phases folded from the WebSocket stream this
+              session. Read-only — nothing here is written back into the
+              Foundry calendar. --}}
+        <div class="calendar-worldstate">
+          <div class="worldstate-title">
+            <i class="fa-solid fa-cloud-sun"></i>
+            {{localize "CHRONICLE.Dashboard.Calendar.WorldStateTitle"}}
+          </div>
+          {{#if calendar.worldState.has}}
+          <dl class="worldstate-rows">
+            {{#if calendar.worldState.weatherLine}}
+            <div class="worldstate-row">
+              <dt>Weather</dt>
+              <dd>{{calendar.worldState.weatherLine}}</dd>
+            </div>
+            {{/if}}
+            {{#if calendar.worldState.seasonName}}
+            <div class="worldstate-row">
+              <dt>Season</dt>
+              <dd>{{calendar.worldState.seasonName}}</dd>
+            </div>
+            {{/if}}
+            {{#if calendar.worldState.eraName}}
+            <div class="worldstate-row">
+              <dt>Era</dt>
+              <dd>{{calendar.worldState.eraName}}</dd>
+            </div>
+            {{/if}}
+            {{#each calendar.worldState.moons}}
+            <div class="worldstate-row">
+              <dt>{{this.name}}</dt>
+              <dd>{{#if this.phase}}{{this.phase}}{{else}}phase changed{{/if}}</dd>
+            </div>
+            {{/each}}
+          </dl>
+          {{else}}
+          <p class="action-hint">{{localize "CHRONICLE.Dashboard.Calendar.WorldStateEmpty"}}</p>
+          {{/if}}
+          <p class="action-hint">{{localize "CHRONICLE.Dashboard.Calendar.WorldStateHint"}}</p>
         </div>
       </div>
 
