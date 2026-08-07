@@ -26,6 +26,7 @@ import { buildDiagnosticBundle } from './sync-diagnostic-bundle.mjs';
 import { buildOverviewModel } from './_overview-model.mjs';
 import { log, getLogBuffer } from './logger.mjs';
 import { shouldSkipDatePush, isRealTimeRejection, notifyRealTimePushPaused } from './_realtime-date-guard.mjs';
+import { walkEntityPages } from './_entity-page-walk.mjs';
 import { compareCalendarStructures } from './calendar-sync.mjs';
 import { classifyCalendarSyncState } from './_calendar-sync-state.mjs';
 import { projectSubresourcePanel } from './_calendar-subresources.mjs';
@@ -365,23 +366,20 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     }
     const types = this._cache.entityTypes;
 
-    // Fetch all entities (paginated, up to 500 for now).
+    // Fetch all entities. Shares the walk with JournalSync.resyncAll
+    // (scripts/_entity-page-walk.mjs). Both used to stop after five pages, so
+    // a campaign past 500 entities showed a dashboard that looked complete
+    // and silently listed none of the rest.
     if (!this._cache.entities) {
-      const allEntities = [];
-      let page = 1;
-      let hasMore = true;
-      while (hasMore && page <= 5) {
-        const result = await this.api.get(`/entities?per_page=100&page=${page}`);
-        const entities = this._normalizeArray(result, 'entities');
-        if (entities.length > 0) {
-          allEntities.push(...entities);
-          hasMore = entities.length === 100;
-          page++;
-        } else {
-          hasMore = false;
-        }
+      const walked = await walkEntityPages(
+        (page, perPage) => this.api.get(`/entities?per_page=${perPage}&page=${page}`),
+        (result) => this._normalizeArray(result, 'entities'),
+      );
+      this._cache.entities = walked.entities;
+      this._cache.entitiesTruncated = walked.truncated;
+      if (walked.truncated) {
+        console.warn(`Chronicle: dashboard entity list stopped at ${walked.entities.length}; the campaign has more.`);
       }
-      this._cache.entities = allEntities;
     }
     const chronicleEntities = this._cache.entities || [];
 

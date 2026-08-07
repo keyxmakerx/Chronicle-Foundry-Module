@@ -16,6 +16,7 @@ import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
 import { defaultLevelForVisibility } from './_ownership.mjs';
 import { isCalendarNoteJournal } from './calendar-sync.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
+import { walkEntityPages } from './_entity-page-walk.mjs';
 
 /**
  * Validate and resolve a Chronicle entity's `image_path` to a safe src string.
@@ -182,24 +183,21 @@ export class JournalSync {
 
     if (verbose) ui.notifications.info('Chronicle: fetching entities for resync…');
 
-    // Paginated fetch — mirrors the dashboard's _buildEntityGroups page loop.
+    // Paginated fetch — shares the walk with the dashboard's
+    // _buildEntityGroups (scripts/_entity-page-walk.mjs). Both used to stop
+    // after five pages, so a campaign past 500 entities resynced only its
+    // first 500 and reported a clean finish.
     let allEntities = [];
+    let truncated = false;
     try {
-      let page = 1;
-      let hasMore = true;
-      while (hasMore && page <= 5) {
-        const result = await this._api.get(`/entities?per_page=100&page=${page}`);
-        const entities = Array.isArray(result) ? result
+      const walked = await walkEntityPages(
+        (page, perPage) => this._api.get(`/entities?per_page=${perPage}&page=${page}`),
+        (result) => (Array.isArray(result) ? result
           : (Array.isArray(result?.entities) ? result.entities
-          : (Array.isArray(result?.data) ? result.data : []));
-        if (entities.length > 0) {
-          allEntities.push(...entities);
-          hasMore = entities.length === 100;
-          page++;
-        } else {
-          hasMore = false;
-        }
-      }
+          : (Array.isArray(result?.data) ? result.data : []))),
+      );
+      allEntities = walked.entities;
+      truncated = walked.truncated;
     } catch (err) {
       const status = err?.status || null;
       console.warn(`Chronicle JournalSync.resyncAll: GET /entities failed (${status || 'network'})`, err);
@@ -210,6 +208,16 @@ export class JournalSync {
     }
 
     console.debug(`Chronicle: resyncAll fetched ${allEntities.length} entity(ies).`);
+
+    // A truncated walk means entities exist that this pass never saw. Say so
+    // — a resync that quietly covers part of the campaign and reports success
+    // is worse than one that refuses.
+    if (truncated) {
+      console.warn(`Chronicle: resyncAll stopped at ${allEntities.length} entities; the campaign has more.`);
+      ui.notifications.warn(
+        `Chronicle: resync covered the first ${allEntities.length} entities only — the campaign has more. Run it again or narrow your sync exclusions.`
+      );
+    }
 
     // Build a fast lookup of already-linked journals by chronicle entity id.
     const journalByEntityId = new Map();

@@ -117,6 +117,18 @@ Integration — Install & Updates".
   player**, and the calendar pushes turned `is_recurring` and `all_day` off.
   The one surviving echo is the marker dialog's spread, kept deliberately:
   harmless against a merging server, load-bearing against a pre-R4 one.
+- **Never walk a list with a small hard-coded page cap.** The two places that
+  need every entity in the campaign — `JournalSync.resyncAll` and the
+  dashboard's `_buildEntityGroups` — both had `while (hasMore && page <= 5)`
+  inline, a silent 500-entity ceiling: past it entities were never seen, and
+  the GM got a completed resync and a full-looking dashboard anyway. Both now
+  share `scripts/_entity-page-walk.mjs`, whose bound is 200 pages and whose
+  `truncated` flag MUST be surfaced by the caller. A bound is fine; a bound
+  nobody is told about is the defect. See `tools/test-entity-page-walk.mjs`.
+  Chronicle's server-side twin (`POST /sync` capped at 1000 with no cursor)
+  was fixed in Chronicle sweep R4 stage 18 — that endpoint now returns
+  `next_cursor`, which this module does not yet consume because it pulls via
+  `GET /entities`, not `POST /sync`.
 - WebSocket messages are routed by type through `SyncManager`.
 - Chronicle-side serving rules live in `chronicle-package.json` at repo root; CI validates it against `module.json` via `tools/check-package-descriptor.mjs`.
 
