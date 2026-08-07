@@ -1337,6 +1337,13 @@ export class CalendarSync {
     const date = chronicleDateFromCalendariaStartDate(startDate);
     if (!date) return null;
 
+    // Six keys, and no more. This payload is used for BOTH create and update;
+    // on the update path Chronicle's PUT /calendar/events/:id is a partial
+    // update — absent preserves, explicit null clears, a value replaces
+    // (API-CONTRACT.md). Before that contract, the keys missing here also
+    // wrote is_recurring=false, all_day=false and a cleared entity_id onto
+    // the event. Do not widen this to echo them back: an echo re-arms the
+    // endpoint for the next writer and goes stale.
     return {
       name: name || 'Untitled Note',
       year: date.year,
@@ -1460,6 +1467,13 @@ export class CalendarSync {
     }
 
     try {
+      // Narrow body ON PURPOSE: a Foundry note edit means the name, the date
+      // and the body. Chronicle's PUT /calendar/events/:id is a partial
+      // update — absent preserves, explicit null clears, a value replaces
+      // (API-CONTRACT.md). Before that contract, this exact five-key body
+      // also wrote is_recurring=false, all_day=false and a cleared entity_id
+      // onto the event, because those were value-typed / clear-on-nil on the
+      // server. Do not widen this to echo them back.
       await this._api.put(`/calendar/events/${chronicleId}`, {
         name: eventData.name || 'Untitled Event',
         year: eventData.year,
@@ -1557,6 +1571,8 @@ export class CalendarSync {
     }
 
     try {
+      // Narrow body ON PURPOSE — see _onLocalEventUpdate for why this stays
+      // five keys and must not grow an echo of the event's other columns.
       await this._api.put(`/calendar/events/${chronicleId}`, {
         name: scData.name,
         year: scData.year,
