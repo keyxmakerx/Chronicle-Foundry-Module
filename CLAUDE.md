@@ -102,6 +102,33 @@ Integration — Install & Updates".
   hits a `default:` that logs once per type per session. See
   `scripts/_calendar-subresources.mjs`, `tools/test-calendar-subresources.mjs`,
   `tools/test-calendar-subresource-routing.mjs` (FM-SYNC-SUBRESOURCES-P1).
+- **Chronicle update endpoints are PARTIAL: absent preserves, an explicit
+  `null` clears, a present value replaces** (Chronicle sweep R4, 2026-08-07;
+  API-CONTRACT.md → "The partial-update contract"). Chronicle's request
+  structs bind `patch.Field[T]`, which records presence during decoding, so
+  absent and `null` are genuinely different. **Send only the fields you mean
+  to change**, and do NOT "harden" a narrow body by echoing the untouched
+  fields back: an echo re-arms the endpoint for the next writer and goes
+  stale — that is how `ChronicleMarkerConfigDialog` lost the pairing key. The
+  narrow bodies are pinned by `tools/test-partial-put-contract.mjs`
+  (`actor-sync`'s `{name}` rename push; `calendar-sync`'s three note-edit
+  pushes). Before the contract existed, `{name}` alone bound
+  `is_private=false` and **published a hidden character entity to every
+  player**, and the calendar pushes turned `is_recurring` and `all_day` off.
+  The one surviving echo is the marker dialog's spread, kept deliberately:
+  harmless against a merging server, load-bearing against a pre-R4 one.
+- **Never walk a list with a small hard-coded page cap.** The two places that
+  need every entity in the campaign — `JournalSync.resyncAll` and the
+  dashboard's `_buildEntityGroups` — both had `while (hasMore && page <= 5)`
+  inline, a silent 500-entity ceiling: past it entities were never seen, and
+  the GM got a completed resync and a full-looking dashboard anyway. Both now
+  share `scripts/_entity-page-walk.mjs`, whose bound is 200 pages and whose
+  `truncated` flag MUST be surfaced by the caller. A bound is fine; a bound
+  nobody is told about is the defect. See `tools/test-entity-page-walk.mjs`.
+  Chronicle's server-side twin (`POST /sync` capped at 1000 with no cursor)
+  was fixed in Chronicle sweep R4 stage 18 — that endpoint now returns
+  `next_cursor`, which this module does not yet consume because it pulls via
+  `GET /entities`, not `POST /sync`.
 - WebSocket messages are routed by type through `SyncManager`.
 - Chronicle-side serving rules live in `chronicle-package.json` at repo root; CI validates it against `module.json` via `tools/check-package-descriptor.mjs`.
 

@@ -1170,7 +1170,17 @@ export class ChronicleMarkerConfigDialog extends HandlebarsApplicationMixin(Appl
     const safeCategory = CHRONICLE_MARKER_CATEGORIES.includes(category) ? category : 'note';
     const safeVisibility = VISIBILITY_VALUES.includes(visibility) ? visibility : 'everyone';
 
+    // `PUT /maps/:id/markers/:mid` is a FULL REPLACE: Chronicle binds the body
+    // into a struct with pointer fields and UPDATEs entity_id, visibility_rules
+    // and foundry_id unconditionally, so any of those keys missing from the
+    // body is written back as NULL — clearing the entity link, the per-user
+    // allow/deny list, and the module's own Foundry pairing key. Spread the
+    // stored marker under the edited fields (as PinConfigDialog.#onSave above
+    // does for local pins); the read-only keys the spread carries along
+    // (id, map_id, created_at, entity_name, …) are undeclared on the wire
+    // struct and ignored by the binder.
     const data = {
+      ...this._marker,
       name,
       description,
       x: this._marker.x,

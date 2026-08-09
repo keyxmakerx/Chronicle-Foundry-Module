@@ -214,9 +214,55 @@ Creates a new entity.
 Returns a single entity with full content.
 
 #### PUT /entities/:entityId
-Updates an entity.
+Updates an entity. **PARTIAL update** — see the contract below.
 
-**Request:** Same shape as POST (partial updates supported).
+##### The partial-update contract (Chronicle sweep R4, 2026-08-07)
+
+Every JSON update endpoint in Chronicle now reads a request body three ways:
+
+| what the body does with a key | what happens to the stored value |
+|---|---|
+| **absent** | **preserved** |
+| present with a **value** | replaced |
+| present and **explicitly `null`** | cleared (nullable columns only) |
+
+The distinction is real on the server, not incidental: the request structs
+bind `patch.Field[T]`, which records presence during JSON decoding, so
+"absent" and `null` are different things. Non-nullable columns have no
+cleared state, so an explicit `null` on one of those preserves rather than
+writing a zero.
+
+This **replaced** the previous behaviour, which had no contract at all — it
+was whatever each Go field's type happened to do. Pointer fields preserved
+on absence; value-typed fields (`string`, `bool`, `int`) wrote their zero.
+Two consequences were live on this module's own traffic:
+
+- **`is_private` was value-typed.** `actor-sync.mjs` pushes `{name}` alone
+  on a rename, which bound `is_private = false` and **published a hidden
+  character entity to every player in the campaign.** The old wording of
+  this document said absent meant public. Nobody designed that; it was the
+  Go zero value being read as an intention.
+- **`parent_id` was not on the request struct at all**, so every update
+  from this module detached the entity from the Chronicle hierarchy.
+
+Both are fixed on the server. Send only the fields you mean to change.
+
+**Request:** any subset of the POST shape, plus `parent_id`:
+
+```json
+{ "name": "Renamed Character" }
+```
+
+```json
+{ "parent_id": null }
+```
+&nbsp;&nbsp;↑ explicitly unparents. Omitting `parent_id` leaves the parent alone.
+
+> **Version skew.** A module talking to a Chronicle older than sweep R4 still
+> gets the old whole-replace behaviour. Where a client-side echo already
+> exists for that reason — `ChronicleMarkerConfigDialog.#onSave` spreads the
+> stored marker under the edited fields — it is kept: it is harmless against
+> a merging server and load-bearing against an old one.
 
 #### DELETE /entities/:entityId
 Deletes an entity.
@@ -253,9 +299,13 @@ Updates entity permissions.
 #### POST /entities/:entityId/reveal
 Toggles entity reveal state (NPC reveal to players). Body is exactly
 `{ "is_private": <bool> }` (a `*bool`); an explicit value matching the current
-state is a no-op. This is the ONLY correct way to flip visibility from the
-module — a bare `PUT /entities/:id` with just `{is_private}` 400s because
-UpdateEntity requires a name.
+state is a no-op. This remains the correct way to flip visibility from the
+module.
+
+> Post-sweep-R4, a bare `PUT /entities/:id` with just `{is_private}` no longer
+> 400s — an absent name means "not editing the name" rather than "empty name".
+> Keep using `/reveal` anyway: it is the named, single-purpose route, and it
+> works against every Chronicle version this module supports.
 
 **Request:**
 ```json
@@ -620,7 +670,15 @@ Lists map markers (pins/notes on the map).
 Creates a map marker.
 
 #### PUT /maps/:mapId/markers/:markerId
-Updates a map marker.
+Updates a map marker. **PARTIAL update** — absent preserves, an explicit
+`null` clears, a present value replaces (see "The partial-update contract"
+under `PUT /entities/:entityId`).
+
+`foundry_id` is this module's pairing key. It stays clearable HERE — send
+`{"foundry_id": null}` to unpair — while Chronicle's own web marker form,
+which never sends the key, can no longer NULL it by omission. That omission
+used to unpair every marker a GM edited in the browser, which showed up later
+as duplicate markers on the next sync.
 
 #### DELETE /maps/:mapId/markers/:markerId
 Deletes a map marker.
@@ -852,7 +910,17 @@ Creates a calendar event.
 - `recurrence_max_occurrences` — Maximum number of recurrences
 
 #### PUT /calendar/events/:eventId
-Updates a calendar event. Same fields as POST.
+Updates a calendar event. Same fields as POST, but it is a **PARTIAL update**
+— absent preserves, an explicit `null` clears, a present value replaces (see
+"The partial-update contract" under `PUT /entities/:entityId`).
+
+This is the endpoint `calendar-sync.mjs` pushes note edits to, from three
+paths (`_onCalendariaNoteUpdated`, `_onLocalEventUpdate`,
+`_onSimpleCalendarNoteUpdate`), each with a five-key body. Before sweep R4
+every one of those pushes also wrote `is_recurring = false`, `all_day = false`
+and a cleared `entity_id`, because those were value-typed / clear-on-nil on
+the server. They are preserved now. Keep the bodies narrow: a Foundry note
+edit means the name, the date and the body, and nothing else.
 
 #### DELETE /calendar/events/:eventId
 Deletes a calendar event.

@@ -517,6 +517,21 @@ export class ActorSync {
 
       // Update name separately if changed, with conflict detection.
       if (change.name) {
+        // A rename means ONE thing, so the body carries one field.
+        //
+        // Chronicle's PUT /entities/:id is a partial update: an absent key
+        // preserves, an explicit null clears, a present value replaces
+        // (API-CONTRACT.md → "The partial-update contract"). Before that
+        // contract existed, `is_private` was a value-typed bool on the
+        // server's request struct, so THIS body — {name} alone — bound
+        // is_private=false and published a hidden character entity to every
+        // player in the campaign. The fix is the server's; what belongs here
+        // is the discipline that made it visible.
+        //
+        // Do NOT "fix" this by echoing is_private / type_label / parent_id
+        // back. Echoing re-arms the endpoint for the next writer and would
+        // reintroduce the same break the moment one of the echoed values is
+        // stale. Visibility has its own route: POST /entities/:id/reveal.
         const nameBody = { name: change.name };
         const chronicleUpdatedAt = actor.getFlag(FLAG_SCOPE, 'chronicleUpdatedAt');
         if (chronicleUpdatedAt) {
