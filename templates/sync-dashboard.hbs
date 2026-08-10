@@ -893,7 +893,14 @@
         <div>
           <strong>Calendar sync paused — structure mismatch.</strong>
           <div>{{calendar.syncStateDetail}}</div>
-          <div class="action-hint">Import or author the matching calendar in Chronicle. Journals, characters, and maps still sync.</div>
+          {{!-- THE REMEDY IS AN EDIT. "Import or author the matching calendar
+               in Chronicle" was unreachable both ways: the create endpoint
+               409s whenever the campaign has any calendar (always true here),
+               and an authored calendar is not is_default with no control
+               anywhere to make it one, so this module keeps being served the
+               old one. Editing either calendar's months/weekdays IS one page
+               away. See tools/test-calendar-mismatch-remedy.mjs. --}}
+          <div class="action-hint">Edit either calendar so the two agree — in Chronicle, Calendar Settings &rarr; Months / Weekdays; in Foundry, your calendar module. Journals, characters, and maps still sync.</div>
         </div>
       </div>
       {{else if calendar.isIncompatible}}
@@ -902,7 +909,7 @@
         <div>
           <strong>Calendar structures don’t match.</strong>
           <div>{{calendar.syncStateDetail}}</div>
-          <div class="action-hint">The dates below aren’t comparable across the wire. Sync will pause on the next world reload — import or author the matching calendar in Chronicle.</div>
+          <div class="action-hint">The dates below aren’t comparable across the wire. Sync will pause on the next world reload — edit either calendar so the two agree, in Chronicle&rsquo;s Calendar Settings (Months / Weekdays) or in your Foundry calendar module.</div>
         </div>
       </div>
       {{/if}}

@@ -143,6 +143,28 @@ Integration — Install & Updates".
   confirm) and the dashboard Calendar tab (Foundry local date now renders, the
   four-state sync badge — in-sync / date-drift with direction /
   incompatible-structures / paused, FM-SYNC-WIRE-FIX — and Push-date button).
+- **Blocked on Chronicle (calv4 fix R1, item 6) — THE MODULE CANNOT BE POINTED
+  AT A DIFFERENT CHRONICLE CALENDAR, and until it can, "author the matching
+  calendar in Chronicle" is not advice.** Measured against Chronicle's source:
+  `POST /api/v1/campaigns/:cid/calendar` answers a structured 409
+  `calendar_already_exists` whenever `GetCalendar(campaignID)` returns anything,
+  and that query is `… WHERE campaign_id = ? ORDER BY is_default DESC,
+  sort_order ASC LIMIT 1` — ANY calendar. A campaign showing a structure
+  mismatch has one by construction, so the import door is closed 100% of the
+  time. And `calendarService.CreateCalendar` sets `IsDefault: isFirst`, so a
+  calendar authored in the builder is never the default, while the module is
+  served the default by that same ordering; `SetDefaultCalendar` is on
+  Chronicle's service interface with **no route, no handler and no control on
+  any page**. The mismatch remedy therefore now says the reachable thing — edit
+  either calendar so the two agree — and the unreachable thing is booked here
+  rather than printed. **What Chronicle owes:** a way to mark a calendar as the
+  campaign default (wire `SetDefaultCalendar` to a route and a control), and/or
+  a `?calId=` the syncapi honours so the module can name the calendar it wants.
+  Either one turns "author the matching calendar" back into real advice.
+  Guarded by `tools/test-calendar-mismatch-remedy.mjs`, which fails if any of
+  the three mismatch prints starts recommending an import or a new calendar
+  again.
+
 - **Blocked on Chronicle (FM-SYNC-SUBRESOURCES-P1 Step 0):**
   `calendar.worldstate.changed` is published by
   `internal/plugins/calendar/worldstate_service.go` but has no `case` in

@@ -733,8 +733,41 @@ export class CalendarSync {
     const foundryShape = `${(foundryStruct?.monthDays || []).length}mo/${foundryStruct?.weekdayCount ?? 0}wd`;
     this._calendarMismatchDetail =
       `Chronicle: ${chronicleName} ${chronicleShape} · Foundry: ${foundryName} ${foundryShape} — ${detail}`;
+    // THE REMEDY IS AN EDIT, NOT AN IMPORT AND NOT A NEW CALENDAR.
+    //
+    // This line used to read "import or author the matching calendar in
+    // Chronicle" and NEITHER HALF WAS REACHABLE, measured against Chronicle's
+    // source:
+    //
+    //   IMPORT — `POST /api/v1/campaigns/:cid/calendar` answers a structured
+    //   409 `calendar_already_exists` whenever the campaign has ANY calendar
+    //   (`… ORDER BY is_default DESC, sort_order ASC LIMIT 1`). When this
+    //   warning fires the campaign HAS one by construction: the mismatch was
+    //   computed by comparing against it. The door is closed 100% of the time
+    //   this advice appears.
+    //
+    //   AUTHOR — Chronicle's `CreateCalendar` sets `IsDefault: isFirst`, so a
+    //   newly authored calendar is not the default; this module is served the
+    //   default (same ordering); and `SetDefaultCalendar` exists on Chronicle's
+    //   service interface with NO route, handler or control anywhere. An
+    //   authored calendar therefore never reaches the wire and the operator has
+    //   nothing to click that would change that.
+    //
+    // What IS reachable is making the two structures agree by editing one of
+    // the calendars that already exist — Chronicle's Calendar Settings owns
+    // months and weekdays, which are exactly the facts compared here, and
+    // Calendaria / Simple Calendar own the Foundry side. Either edit clears it.
+    //
+    // Pointing this module at a DIFFERENT Chronicle calendar remains genuinely
+    // impossible and is BOOKED (CLAUDE.md → Blocked on Chronicle) rather than
+    // printed as an instruction. Advice that cannot be followed is worse than
+    // no advice: the operator spends the session believing the fix is theirs.
+    //
+    // Pinned by tools/test-calendar-mismatch-remedy.mjs, which holds this
+    // string and the dashboard's two banners to the same verdict.
     const msg = `Chronicle Sync: calendar structures differ (${this._calendarMismatchDetail}). `
-      + 'Calendar sync is paused for this session — import or author the matching calendar in Chronicle, '
+      + 'Calendar sync is paused for this session — edit either calendar so the two agree '
+      + '(Chronicle: Calendar Settings → Months / Weekdays; Foundry: your calendar module), '
       + 'then reload the world. '
       + '(Journals, characters, and maps still sync.)';
     console.warn(msg);
