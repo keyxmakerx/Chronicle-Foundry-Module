@@ -99,6 +99,11 @@ map editor. Only markers/pins sync to Foundry as Scene Map Notes.
 
 ## Calendar Sync
 
+> **BLACKOUT (2026-08-21):** Chronicle's calendar is deleted pending V5, so the
+> checks in this section cannot be performed end to end. See API-CONTRACT.md →
+> "CALENDAR BLACKOUT". The three boxes that ARE the blackout test are in the
+> API section above.
+
 ### Chronicle -> Foundry
 - [ ] Advance date in Chronicle -> Calendaria/SimpleCalendar date updates
 - [ ] Create calendar event -> Event appears in calendar module
@@ -149,7 +154,10 @@ map editor. Only markers/pins sync to Foundry as Scene Map Notes.
 
 - [ ] API key with read-only permission can't write via sync
 - [ ] API key scoped to campaign A can't access campaign B data
-- [ ] Disabled calendar addon -> Calendar API returns 404
+- [ ] Calendar API returns `503 calendar_rebuilding` (blackout, 2026-08-21).
+      The addon-disabled 404 case is untestable until V5.
+- [ ] The dashboard Calendar tab does NOT claim "No calendar configured"
+- [ ] Maps / actors / items / notes still sync while the calendar is down
 - [ ] Disabled maps addon -> Maps API returns 404
 - [ ] Private entities hidden from non-owner API keys
 - [ ] Rate limiting enforced (60 req/min default)
