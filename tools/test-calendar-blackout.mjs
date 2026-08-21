@@ -264,3 +264,33 @@ test('a real pause reports the classifier’s reason, not a hardcoded one', asyn
     'the reason is data from the classifier — this line used to hardcode '
     + '"different structures" for every pause, so any other cause got a remedy that could not help');
 });
+
+test('the sync-state classifier ranks "unavailable" above every other verdict', async () => {
+  const { classifyCalendarSyncState } = await import('../scripts/_calendar-sync-state.mjs');
+
+  // Defence in depth. The dashboard returns before reaching this function
+  // during the blackout, so this branch is unreachable today — which is
+  // exactly why it is pinned. Without it the fall-through below answers
+  // 'date-drift' for a missing date, rendering a Chronicle-side outage as
+  // "out of sync" and sending the GM to check settings that are fine.
+  const out = classifyCalendarSyncState({
+    unavailable: true,
+    unavailableDetail: 'Chronicle’s calendar is being rebuilt.',
+    // Everything that would otherwise win, to prove the ranking:
+    paused: true,
+    pausedDetail: 'structures differ',
+    structureCmp: { match: false, detail: 'month 3 differs' },
+    chronicleDate: { year: 1523, month: 1, day: 1 },
+    foundryDate: { year: 1522, month: 1, day: 1 },
+  });
+  assert.equal(out.state, 'unavailable',
+    'an outage outranks a pause: with no server-side calendar there is nothing '
+    + 'to be paused against, and no other verdict is computable');
+  assert.match(out.detail, /rebuilt/);
+
+  // And the fall-through it defends against, for the record:
+  const drift = classifyCalendarSyncState({ chronicleDate: null, foundryDate: null });
+  assert.equal(drift.state, 'date-drift',
+    'a missing date still reads as drift — which is why "unavailable" must be '
+    + 'passed explicitly rather than inferred from absent data');
+});
