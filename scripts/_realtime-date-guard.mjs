@@ -14,6 +14,8 @@
  * read it from there.
  */
 
+import { handleIfCalendarRebuilding } from './_calendar-blackout-guard.mjs';
+
 /**
  * Session-scoped notice state. A module-level singleton (not a class field)
  * so calendar-sync.mjs and sync-dashboard.mjs — two independent classes —
@@ -89,7 +91,17 @@ export async function shouldSkipDatePush(api) {
   let payload;
   try {
     payload = await api.get('/calendar/date');
-  } catch {
+  } catch (err) {
+    // FM-CAL-BLACKOUT: one probe failure is classified rather than swallowed.
+    // A `503 calendar_rebuilding` means the PUT this guard is about to wave
+    // through is certain to fail too, so arming the session guard here and
+    // answering "skip" costs the caller one request instead of two — and every
+    // later push costs none, because the caller returns before probing.
+    //
+    // Every OTHER failure keeps the original fail-open contract below: a probe
+    // that could not be read is not this guard's business, and the push
+    // proceeds to succeed or fail on its own terms.
+    if (handleIfCalendarRebuilding(err)) return true;
     return false;
   }
   if (!tracksRealTime(payload)) return false;

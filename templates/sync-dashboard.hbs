@@ -1026,7 +1026,15 @@
 
       {{else}}
       <div class="dashboard-empty-tab">
-        {{#if calendar.noCampaignCalendar}}
+        {{#if calendar.calendarRebuilding}}
+        <i class="fa-solid fa-screwdriver-wrench fa-2x"></i>
+        <p>{{calendar.rebuildingDetail}}</p>
+        <p class="hint">Calendar sync is paused for this session. Journals, maps, characters, items and notes are unaffected.</p>
+        {{else if calendar.calendarUnreachable}}
+        <i class="fa-solid fa-plug-circle-exclamation fa-2x"></i>
+        <p>Chronicle's calendar API did not respond.</p>
+        <p class="hint">Other sync is unaffected. Check the Diagnostics tab for the failing request.</p>
+        {{else if calendar.noCampaignCalendar}}
         <i class="fa-solid fa-calendar-xmark fa-2x"></i>
         <p>No calendar configured for this campaign in Chronicle.</p>
         {{else if calendar.enabled}}

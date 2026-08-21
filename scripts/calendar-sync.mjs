@@ -22,6 +22,7 @@
 import { getSetting, getCalendarSyncExclusions } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import { shouldSkipDatePush, isRealTimeRejection, notifyRealTimePushPaused } from './_realtime-date-guard.mjs';
+import { calendarBlackoutActive, handleIfCalendarRebuilding } from './_calendar-blackout-guard.mjs';
 import { confirmAppliedDate } from './_applied-date-confirm.mjs';
 import {
   ROUTED_CALENDAR_TYPES,
@@ -559,14 +560,22 @@ export class CalendarSync {
    * Fetches Chronicle calendar structure and syncs current date.
    */
   async onInitialSync() {
-    if (!getSetting('syncCalendar') || !this._calendarModule) return;
-    if (this._calendarSyncDisabled) return;
+    // FM-CAL-BLACKOUT: reports whether a date was actually pulled.
+    //
+    // It used to return undefined on every path — success, "no calendar", a
+    // structure-mismatch pause, and a thrown 503 alike — so the dashboard's
+    // "Pull date" button logged "Pulled calendar date from Chronicle" into the
+    // activity feed even when the pull had failed. A feed that records things
+    // that did not happen is worse than no feed.
+    // @returns {Promise<boolean>} true only when a date was applied locally.
+    if (!getSetting('syncCalendar') || !this._calendarModule) return false;
+    if (this._calendarSyncDisabled) return false;
 
     try {
       this._chronicleCalendar = await this._api.get('/calendar');
       if (!this._chronicleCalendar) {
         console.debug('Chronicle: No calendar configured for this campaign');
-        return;
+        return false;
       }
 
       // Structure-mismatch guard (B-R2): if the active Foundry calendar's
@@ -590,7 +599,7 @@ export class CalendarSync {
           const cmp = compareCalendarStructures(this._chronicleCalendar, foundryStruct);
           if (!cmp.match) {
             this._pauseCalendarSyncForMismatch(this._chronicleCalendar, foundryStruct, cmp.detail);
-            return;
+            return false;
           }
         }
       }
@@ -621,8 +630,13 @@ export class CalendarSync {
       }
 
       console.debug('Chronicle: Calendar initial sync complete');
+      return true;
     } catch (err) {
+      // The blackout is expected, not a fault: arm the session guard and say so
+      // once, rather than printing a red stack on every reconnect.
+      if (handleIfCalendarRebuilding(err)) return false;
       console.error('Chronicle: Calendar initial sync failed', err);
+      return false;
     }
   }
 
@@ -1246,6 +1260,11 @@ export class CalendarSync {
     const date = chronicleDateFromCalendariaStartDate(startDate);
     if (!date) return;
 
+    // FM-CAL-BLACKOUT: return before the pre-push probe, not after it. Once
+    // the blackout is known this session, a push costs zero requests
+    // instead of two.
+    if (calendarBlackoutActive()) return;
+
     try {
       if (await shouldSkipDatePush(this._api)) return;
       await this._api.put('/calendar/date', {
@@ -1257,6 +1276,11 @@ export class CalendarSync {
       });
     } catch (err) {
       if (isRealTimeRejection(err)) { notifyRealTimePushPaused(); return; }
+      // FM-CAL-BLACKOUT: a 503 calendar_rebuilding is not a fault to shout
+      // about on every world-time tick — arm the session guard, notify once,
+      // and let the check at the top of this method skip the next one before
+      // it costs a request.
+      if (handleIfCalendarRebuilding(err)) return;
       console.error('Chronicle: Failed to push Calendaria date/time to Chronicle', err);
     }
   }
@@ -1406,6 +1430,11 @@ export class CalendarSync {
     if (!game.user.isGM) return;
     if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
 
+    // FM-CAL-BLACKOUT: return before the pre-push probe, not after it. Once
+    // the blackout is known this session, a push costs zero requests
+    // instead of two.
+    if (calendarBlackoutActive()) return;
+
     try {
       if (await shouldSkipDatePush(this._api)) return;
       await this._api.put('/calendar/date', {
@@ -1417,6 +1446,11 @@ export class CalendarSync {
       });
     } catch (err) {
       if (isRealTimeRejection(err)) { notifyRealTimePushPaused(); return; }
+      // FM-CAL-BLACKOUT: a 503 calendar_rebuilding is not a fault to shout
+      // about on every world-time tick — arm the session guard, notify once,
+      // and let the check at the top of this method skip the next one before
+      // it costs a request.
+      if (handleIfCalendarRebuilding(err)) return;
       console.error('Chronicle: Failed to push date to Chronicle', err);
     }
   }
@@ -1437,6 +1471,11 @@ export class CalendarSync {
     const date = data?.date || data;
     if (!date) return;
 
+    // FM-CAL-BLACKOUT: return before the pre-push probe, not after it. Once
+    // the blackout is known this session, a push costs zero requests
+    // instead of two.
+    if (calendarBlackoutActive()) return;
+
     try {
       if (await shouldSkipDatePush(this._api)) return;
       await this._api.put('/calendar/date', {
@@ -1449,6 +1488,11 @@ export class CalendarSync {
       });
     } catch (err) {
       if (isRealTimeRejection(err)) { notifyRealTimePushPaused(); return; }
+      // FM-CAL-BLACKOUT: a 503 calendar_rebuilding is not a fault to shout
+      // about on every world-time tick — arm the session guard, notify once,
+      // and let the check at the top of this method skip the next one before
+      // it costs a request.
+      if (handleIfCalendarRebuilding(err)) return;
       console.error('Chronicle: Failed to push SimpleCalendar date to Chronicle', err);
     }
   }
