@@ -4,6 +4,12 @@ Bidirectional real-time sync between [Chronicle](https://github.com/keyxmakerx/C
 
 ## Features
 
+> **Calendar sync is paused (since 2026-08-21).** Chronicle's calendar is being
+> rebuilt from scratch, and its API answers `503` while that work is under way.
+> Journals, maps, characters, items and notes are unaffected and sync normally.
+> The module detects this and pauses calendar sync for the session rather than
+> reporting an error — nothing is wrong on your side and there is nothing to fix.
+
 - **Journal Sync** — Chronicle entities ↔ Foundry journal entries (with multi-page splitting)
 - **Map Sync** — Chronicle map markers ↔ Foundry scene pins (with "View in Chronicle" for full map editor)
 - **Calendar Sync** — Calendaria and Simple Calendar integration

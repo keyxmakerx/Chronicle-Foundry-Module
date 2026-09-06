@@ -84,7 +84,7 @@ function compareDates(a, b) {
  *   (FM-SYNC-SUBRESOURCES-P1). A truthy value raises the advisory
  *   `structure-changed` state; it is deliberately outranked by `paused` and
  *   `incompatible-structures`, which describe actual breakage.
- * @returns {{state:('in-sync'|'date-drift'|'structure-changed'|'incompatible-structures'|'paused'),
+ * @returns {{state:('in-sync'|'date-drift'|'structure-changed'|'incompatible-structures'|'paused'|'unavailable'),
  *   direction:('chronicle-ahead'|'foundry-ahead'|null), detail:string}}
  */
 export function classifyCalendarSyncState(input) {
@@ -97,7 +97,30 @@ export function classifyCalendarSyncState(input) {
     chronicleDate = null,
     foundryDate = null,
     structureChangedDetail = null,
+    unavailable = false,
+    unavailableDetail = null,
   } = input || {};
+
+  // 0. Chronicle's calendar endpoint is not answering (FM-CAL-BLACKOUT).
+  //
+  //    Ranked ABOVE `paused` because it is the stronger operational fact: with
+  //    no server-side calendar there is nothing to be paused against, and no
+  //    other verdict below is even computable.
+  //
+  //    This is defence in depth. The dashboard returns before reaching this
+  //    function during the blackout, so today the branch is unreachable — but
+  //    the fall-through at step 4 answers `date-drift` for a missing date,
+  //    which would render an outage as "out of sync with Chronicle" and send
+  //    the GM to check settings that are fine. An invariant that holds only
+  //    because every caller remembers to guard it is not an invariant.
+  if (unavailable) {
+    return {
+      state: 'unavailable',
+      direction: null,
+      detail: unavailableDetail
+        || 'Chronicle’s calendar is unavailable — sync is paused. Other sync is unaffected.',
+    };
+  }
 
   // 1. Module has paused sync for the session — the strongest fact.
   if (paused) {

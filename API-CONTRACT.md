@@ -56,6 +56,29 @@ HTTP status codes:
 
 ---
 
+
+### Structured errors on the syncapi group (added 2026-08-21)
+
+Some syncapi endpoints answer with a **machine-readable code** instead of
+prose, which inverts the field roles documented above — `error` is the code and
+`message` is the human sentence:
+
+```
+HTTP 503
+{"error":"calendar_rebuilding","message":"Chronicle's calendar is being rebuilt and is temporarily unavailable. Calendar sync is paused; maps, actors, items and notes are unaffected."}
+```
+
+- `503` — a subsystem is deliberately unavailable. Distinct from `500` (a
+  fault) and from `404` (the endpoint does not exist on this build). Callers
+  MUST NOT read it as an empty resource.
+- The module's `scripts/api-client.mjs` attaches `err.status`, `err.code` and
+  `err.serverMessage` to the thrown error, so callers key on the code rather
+  than on the message format. The message format is nonetheless stable
+  (`Chronicle API error <status>: <body>`) because the classifiers keep a regex
+  fallback for transports that lose the status.
+
+**Re-verify by: when calendar V5 ships.**
+
 ## REST Endpoints
 
 ### Systems
@@ -687,6 +710,24 @@ Deletes a map marker.
 
 ### Calendar
 
+> ### ⚠ CALENDAR BLACKOUT — every route in this section answers 503 (2026-08-21)
+>
+> Chronicle deleted its calendar plugin for a ground-up rebuild (V5). All 34
+> routes below stay REGISTERED and answer
+> `503 {"error":"calendar_rebuilding","message":"…"}`.
+>
+> 503 rather than 404 **deliberately**: a 404 would send the module down its
+> old-build compatibility path and hide the reason from the GM. Maps, actors,
+> items, notes, media and entities are unaffected.
+>
+> Chronicle commits: the routes were held open first, then the plugin was
+> deleted. The module's handling is FM-CAL-BLACKOUT — see CLAUDE.md →
+> "Calendar blackout".
+>
+> **The specifications below describe the pre-blackout contract and are kept as
+> the starting point for V5 — they do not describe what the server does today.**
+> **Re-verify by: when calendar V5 ships.**
+
 All calendar endpoints require the calendar addon to be enabled.
 
 #### GET /calendar
@@ -1252,6 +1293,13 @@ If Chronicle's URL shape ever changes, three places update together:
 
 ## WebSocket Protocol
 
+> **Every `calendar.*` message type below is DORMANT (2026-08-21).** Chronicle's
+> calendar event publisher was deleted with the plugin, so no `calendar.*`
+> message reaches the wire. Consequence worth knowing: a structure-mismatch
+> pause taken before the blackout cannot be cleared by its documented recovery
+> path (a `calendar.structure.updated` broadcast) until V5 — reload the world.
+> **Re-verify by: when calendar V5 ships.**
+
 ### Connection
 ```
 GET /ws?token=<api-key>
@@ -1325,29 +1373,21 @@ Chronicle gated to the DM is not laundered into a player-visible one.
 | `calendar.structure.updated`, `calendar.cycle.changed`, `calendar.festival.changed` | Refetches `GET /calendar`, re-runs the structure comparison, and sets the badge: pause if now incompatible, clear a prior mismatch pause if now compatible, otherwise raise the advisory `structure-changed` state. **Never auto-applies the structure** — rewriting months/weekdays would silently re-date every existing note. Processed even while sync is paused (the only recovery path). | Both | Both |
 | any other `calendar.*` | `default:` branch logs one `console.debug` line **per type per session** — no more silent drops | — | — |
 
-#### Gap: `calendar.worldstate.changed` never reaches the wire
 
-Verified against Chronicle `main` on 2026-07-25 (FM-SYNC-SUBRESOURCES-P1
-Step 0). Three independent blockers, all Chronicle-side:
+#### History: worldstate wire (closed 2026-07-26, moot 2026-08-21)
 
-1. **Not published.** `worldstate_service.go:265` calls
-   `PublishCalendarEvent("calendar.worldstate.changed", …)`, but the adapter
-   that translates internal event names to `ws.MessageType`
-   (`calendarEventPublisherAdapter.PublishCalendarEvent`,
-   `internal/app/routes.go`) has no `case` for it and hits `default: return`.
-   The event is dropped before the bus. `calendar.weather.zones.changed` is
-   dropped the same way.
-2. **No celestial detail in the payload.** Even once published, the payload is
-   `{date, moodTint}` — the meteor/eclipse rows in `calendar_celestial_events`
-   that motivated the dispatch are not in it.
-3. **No syncapi read path.** `GET /calendar/world-state` is registered on the
-   web plugin group, not the Bearer-token `syncapi` group, so the module cannot
-   fetch the detail either (`internal/plugins/calendar/routes.go:157` vs
-   `internal/plugins/syncapi/routes.go`).
+This section documented `calendar.worldstate.changed` as a live gap — published
+but with no `case` in Chronicle's publisher adapter, so it dead-lettered. It was
+stamped "verified against Chronicle `main` on 2026-07-25".
 
-The module-side handler ships wired and tested so the feature lights up the
-moment Chronicle closes (1); until then it is dormant. Closing (2) and (3) is
-Chronicle-side work.
+Chronicle closed all three sub-gaps the very next day (`f8d3550`, 2026-07-26):
+the adapter case, the enriched payload and the syncapi read route. Nobody here
+re-checked for 26 days, and the module's docs advertised a blocker that no
+longer existed. The plugin — publisher included — was then deleted on
+2026-08-21.
+
+Kept as a record so nobody re-opens the investigation, and as the reason every
+cross-repo claim in this document now carries a `Re-verify by:` line.
 
 ### Reconnection
 

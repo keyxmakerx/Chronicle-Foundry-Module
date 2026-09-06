@@ -45,6 +45,8 @@ export function buildOverviewModel(p = {}) {
     calendarAvailable = false,
     calendarInSync = false,
     calendarSyncPaused = false,
+    calendarPausedText = '',
+    calendarRebuilding = false,
     errorCount = 0,
     matchedSystem = null,
     lastSyncTime = 'Never',
@@ -95,13 +97,32 @@ export function buildOverviewModel(p = {}) {
       tab: 'members',
     });
   }
-  if (calendarAvailable && calendarSyncPaused) {
-    // Structure mismatch (B-R2): a hard pause, not a mere date drift — flag it
-    // as an error so it sorts above ordinary warnings.
+  if (calendarRebuilding) {
+    // FM-CAL-BLACKOUT: severity INFO, not error. Chronicle's calendar is
+    // deliberately switched off while it is rebuilt; nothing is broken and
+    // there is nothing the GM can do. The row exists only so the calendar's
+    // silence on this panel is not mistaken for health.
+    attention.push({
+      severity: 'info',
+      icon: 'fa-screwdriver-wrench',
+      text: 'Chronicle’s calendar is being rebuilt — calendar sync is paused. Other sync is unaffected.',
+      tab: 'calendar',
+    });
+  } else if (calendarAvailable && calendarSyncPaused) {
+    // A hard pause, not a mere date drift — flag it as an error so it sorts
+    // above ordinary warnings.
+    //
+    // FM-CAL-BLACKOUT: the reason is now DATA, not an assumption. This line
+    // hardcoded "different structures" for every pause, while the honest
+    // reason already existed one call away in the classifier's detail string —
+    // so a pause taken for any other reason was reported with a remedy that
+    // could not help.
     attention.push({
       severity: 'error',
       icon: 'fa-calendar-xmark',
-      text: 'Calendar sync paused — Foundry and Chronicle calendars have different structures.',
+      text: calendarPausedText
+        ? `Calendar sync paused — ${calendarPausedText}`
+        : 'Calendar sync paused — see the Calendar tab.',
       tab: 'calendar',
     });
   } else if (calendarAvailable && !calendarInSync) {

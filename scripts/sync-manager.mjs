@@ -554,9 +554,27 @@ export class SyncManager {
       }
 
       // Let each module perform its own initial sync (e.g., calendar structure).
+      //
+      // FM-CAL-BLACKOUT: isolated per module, mirroring the onPostInitialSync
+      // loop below (which has always done this).
+      //
+      // Unguarded, ONE module throwing here aborted the whole pass: every
+      // module after it in the list lost its initial sync, the post-pass never
+      // ran, and — quietly the worst part — the `lastSyncTime` write at the end
+      // was skipped, so the next connect re-pulled from the same point forever.
+      //
+      // The calendar could not actually trigger it (CalendarSync catches
+      // internally), but that made the isolation of every OTHER module rest on
+      // one `catch` inside an unrelated one, which is not isolation. A backend
+      // outage in any single subsystem must degrade that subsystem only.
       for (const mod of this._modules) {
         if (typeof mod.onInitialSync === 'function') {
-          await mod.onInitialSync();
+          try {
+            await mod.onInitialSync();
+          } catch (err) {
+            console.warn(`Chronicle: ${mod.constructor.name}.onInitialSync failed`, err);
+            this.logActivity('error', `${mod.constructor.name} initial sync failed`);
+          }
         }
       }
 

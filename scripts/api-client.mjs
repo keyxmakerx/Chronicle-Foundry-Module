@@ -261,7 +261,25 @@ export class ChronicleAPI {
         throw new ConflictError(data);
       }
 
-      throw new Error(`Chronicle API error ${response.status}: ${errorBody}`);
+      // FM-CAL-BLACKOUT: attach the facts to the error instead of only
+      // formatting them into its message. Every downstream classifier used to
+      // re-derive the status by regexing "Chronicle API error <status>:" out of
+      // the prose — which works, but rests on a message format nothing pins,
+      // and gives callers no way at all to read a structured error CODE.
+      //
+      // The message is deliberately UNCHANGED so the existing regex fallbacks
+      // keep working; this only adds.
+      const err = new Error(`Chronicle API error ${response.status}: ${errorBody}`);
+      err.status = response.status;
+      try {
+        const parsed = JSON.parse(errorBody);
+        if (parsed && typeof parsed.error === 'string') err.code = parsed.error;
+        if (parsed && typeof parsed.message === 'string') err.serverMessage = parsed.message;
+      } catch {
+        // Not JSON — a plain-text body or an HTML error page from a proxy.
+        // status alone still classifies it.
+      }
+      throw err;
     }
 
     // Success.
@@ -602,6 +620,33 @@ export class ChronicleAPI {
    */
   _logError(level, method, path, status, message) {
     const scrubbed = _scrubAuthHeaders(message);
+
+    // FM-CAL-BLACKOUT: coalesce an identical repeat into the newest entry
+    // instead of unshifting a duplicate.
+    //
+    // This log is ONE 50-entry ring shared by every subsystem, and it is what
+    // the dashboard's "Recent sync errors" panel and the diagnostics bundle
+    // both read. A single endpoint failing in a loop — the calendar answering
+    // 503 on every world-time tick during the V5 rebuild is the case that
+    // found this — used to flush every map, actor, item and note error out of
+    // it within seconds. The outage would then destroy the diagnostic surface
+    // for the subsystems that were still working, which is the opposite of
+    // what a diagnostic is for.
+    //
+    // Coalescing keeps the fact (and counts it) without letting it crowd out
+    // its neighbours. Only the NEWEST entry coalesces, so an alternating
+    // A,B,A,B pattern still records both.
+    const head = this._errorLog[0];
+    if (head && head.level === level && head.method === method
+      && head.path === path && head.status === status && head.message === (
+        scrubbed.length > 200 ? scrubbed.substring(0, 200) + '…' : scrubbed
+      )) {
+      head.count = (head.count || 1) + 1;
+      head.time = Date.now();
+      head.timeFormatted = new Date().toLocaleTimeString();
+      return;
+    }
+
     this._errorLog.unshift({
       time: Date.now(),
       timeFormatted: new Date().toLocaleTimeString(),
@@ -609,6 +654,7 @@ export class ChronicleAPI {
       method,
       path,
       status,
+      count: 1,
       message: scrubbed.length > 200 ? scrubbed.substring(0, 200) + '…' : scrubbed,
     });
     if (this._errorLog.length > this._maxErrorLogEntries) {

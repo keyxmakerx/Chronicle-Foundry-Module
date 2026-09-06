@@ -67,6 +67,13 @@ Integration — Install & Updates".
   loop mid-flight (FM-CAL-BACKCATALOG-FIX item 3).
 - System adapters implement `toChronicleFields()` / `fromChronicleFields()`.
 - All REST calls use Bearer token auth via `api-client.mjs`.
+- **The API key is a CLIENT-scoped setting, never world-scoped.** A world
+  setting is synced to every connected client — `config: false` only hides it
+  from the UI — so a world-scoped key hands the campaign's Bearer token to
+  every player's browser console. It was world-scoped until 2026-09-06
+  (FM-SEC-KEY-SCOPE); `migrateApiKeyToClientScope()` moves a legacy value into
+  the GM's browser and deletes the world document. Pinned by
+  `tools/test-api-key-scope.mjs`.
 - **List responses come in two shapes.** Chronicle returns some list endpoints
   as a bare JSON array and others wrapped in an envelope `{"data":[…],"total":N}`
   (envelope: `/entities`, `/entity-types`, `/systems`, `/addons`, `/tags`,
@@ -132,6 +139,53 @@ Integration — Install & Updates".
 - WebSocket messages are routed by type through `SyncManager`.
 - Chronicle-side serving rules live in `chronicle-package.json` at repo root; CI validates it against `module.json` via `tools/check-package-descriptor.mjs`.
 
+## Calendar blackout (2026-08-21)
+
+Chronicle deleted its calendar plugin wholesale for a ground-up rebuild (V5):
+~37k lines of Go, three coexisting UI generations, 76 routes. Its data was not
+preserved — the operator chose a clean slate.
+
+**What the server does now.** All 34 syncapi calendar routes stay REGISTERED
+and answer:
+
+```
+HTTP 503
+{"error":"calendar_rebuilding","message":"Chronicle's calendar is being rebuilt and is temporarily unavailable. Calendar sync is paused; maps, actors, items and notes are unaffected."}
+```
+
+503 rather than 404 **on purpose**: a 404 would send this module down its
+"that Chronicle is too old to have the endpoint" compatibility path and hide
+the real reason from the GM. Note the field roles are inverted from the usual
+Chronicle error shape — here `error` is a machine-readable CODE, not prose.
+
+**What this module does about it** (FM-CAL-BLACKOUT):
+
+- `_calendar-probe-state.mjs` classifies it as its own `'rebuilding'` state —
+  never `'absent'` (which advises importing a calendar that has nowhere to go)
+  and never `'unreachable'` (which blames settings that are fine).
+- `_calendar-blackout-guard.mjs` is a session singleton: the first blackout
+  response arms it, the GM is told exactly once, and every later push returns
+  before spending a request. Twenty world-time ticks cost one request, not
+  forty. Reload the world to clear it once V5 lands.
+- The api-client attaches `status`, `code` and `serverMessage` to thrown
+  errors, so no caller regexes prose. Identical error-log repeats coalesce
+  with a count, so one failing endpoint cannot flush the shared 50-entry ring
+  that the dashboard and the diagnostics bundle both read.
+- Pulls, journals, maps, characters, items and notes are **unaffected** and
+  must stay that way — `sync-manager.mjs`'s initial-sync loop now isolates
+  each module so one subsystem's outage cannot cost the others their sync.
+
+Pinned by `tools/test-calendar-blackout.mjs`, which also pins the four
+behaviours that were already safe (no whole-sync abort, no date written, no
+local note deleted, no false structure-mismatch pause) — those are the ones a
+future edit would break silently.
+
+**Every `calendar.*` WebSocket type is dormant**: Chronicle's calendar event
+publisher was deleted with the plugin, so none reach the wire. A
+structure-mismatch pause taken BEFORE the blackout cannot be cleared by its
+documented recovery path (a `calendar.structure.updated` broadcast) until V5 —
+reload the world instead.
+
 ## TODO
 
 - (none currently) — the Foundry V1→V2 `DialogV2` migration and the
@@ -143,7 +197,12 @@ Integration — Install & Updates".
   confirm) and the dashboard Calendar tab (Foundry local date now renders, the
   four-state sync badge — in-sync / date-drift with direction /
   incompatible-structures / paused, FM-SYNC-WIRE-FIX — and Push-date button).
-- **Blocked on Chronicle (calv4 fix R1, item 6) — THE MODULE CANNOT BE POINTED
+- **SUSPENDED by the calendar blackout — measured against Chronicle source
+  deleted on 2026-08-21; re-measure against V5 before acting on any of it.**
+  The guard test still runs and should: it stops the *import* advice coming
+  back, which will be just as wrong in V5.
+
+  Blocked on Chronicle (calv4 fix R1, item 6) — THE MODULE CANNOT BE POINTED
   AT A DIFFERENT CHRONICLE CALENDAR, and until it can, "author the matching
   calendar in Chronicle" is not advice.** Measured against Chronicle's source:
   `POST /api/v1/campaigns/:cid/calendar` answers a structured 409
@@ -165,18 +224,23 @@ Integration — Install & Updates".
   the three mismatch prints starts recommending an import or a new calendar
   again.
 
-- **Blocked on Chronicle (FM-SYNC-SUBRESOURCES-P1 Step 0):**
-  `calendar.worldstate.changed` is published by
-  `internal/plugins/calendar/worldstate_service.go` but has no `case` in
-  `calendarEventPublisherAdapter.PublishCalendarEvent`
-  (`internal/app/routes.go`), so it hits `default: return` and never reaches
-  the bus (`calendar.weather.zones.changed` is dropped the same way). The
-  payload also carries no celestial detail (`{date, moodTint}`) and
-  `GET /calendar/world-state` isn't on the syncapi group. The module handler
-  is wired + tested and dormant until Chronicle closes these. See
-  API-CONTRACT.md → "Gap: `calendar.worldstate.changed` never reaches the wire".
-- Recommended once on a live client after FM-SYNC-SUBRESOURCES-P1 (can't be
-  unit-tested): set weather / cross a season or era boundary in Chronicle and
+- **`calendar.worldstate.changed` — CLOSED, then moot. Do not re-open.**
+  This entry stood for weeks as "Blocked on Chronicle", claiming the event was
+  published but had no `case` in the publisher adapter and so hit
+  `default: return`. Chronicle fixed all three sub-gaps (adapter case, enriched
+  payload, syncapi read route) in commit `f8d3550` on **2026-07-26** — the day
+  after the claim was last verified — and nobody here re-checked for 26 days.
+  The whole calendar plugin, publisher included, was then deleted on
+  2026-08-21. Re-verify against V5 when it lands; there is nothing to
+  investigate before then.
+
+  **The lesson is the process, not the bug:** a claim measured against another
+  repo's source is only true on the day it is measured. Every such claim in
+  these docs now carries a `Re-verify by:` date, and a claim past its date is
+  to be treated as unknown rather than as fact.
+
+- **BLOCKED by the calendar blackout — no Chronicle calendar exists to test
+  against.** Recommended once V5 lands (can't be unit-tested): set weather / cross a season or era boundary in Chronicle and
   confirm the GM whisper lands and the Calendar tab's "Chronicle world state"
   panel fills; edit the calendar structure in Chronicle and confirm the badge
   flips to "Structure Changed — Re-check" without the Foundry calendar being
@@ -184,7 +248,9 @@ Integration — Install & Updates".
   calendar is fixed (no world reload needed); check the diagnostics bundle's
   `CALENDARIA.api methods available` block for whether the build exposes any of
   `setWeather` / `setCurrentWeather` / `setWeatherForDate`.
-- Recommended on a live client after FM-SYNC-WIRE-FIX (can't be unit-tested):
+- **PARTLY BLOCKED by the calendar blackout** (the calendar halves cannot be
+  tested until V5; the entity-visibility and item-relation halves still can).
+  Recommended on a live client (can't be unit-tested):
   confirm initial sync now fires on a fresh world AND a world with pre-existing
   synced data (console shows `_performInitialSync` / "Initial sync complete");
   confirm a SimpleCalendar world with a mismatched structure pauses + badges

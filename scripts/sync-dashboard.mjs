@@ -30,6 +30,8 @@ import { walkEntityPages } from './_entity-page-walk.mjs';
 import { compareCalendarStructures } from './calendar-sync.mjs';
 import { classifyCalendarSyncState } from './_calendar-sync-state.mjs';
 import { projectSubresourcePanel } from './_calendar-subresources.mjs';
+import { calendarStateFromError } from './_calendar-probe-state.mjs';
+import { handleIfCalendarRebuilding } from './_calendar-blackout-guard.mjs';
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**
@@ -283,7 +285,13 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       unmatchedMembers: membersData.unmatchedCount,
       calendarAvailable: calendarData.available,
       calendarInSync: calendarData.inSync,
-      calendarSyncPaused: calendarData.structureMismatch,
+      // FM-CAL-BLACKOUT: was `calendarData.structureMismatch`, a key
+      // _buildCalendarData never sets — so this was permanently undefined and
+      // the Overview's calendar-paused alert was dead code that could not fire.
+      // The real flags are the two the classifier produces.
+      calendarSyncPaused: !!(calendarData.isPaused || calendarData.isIncompatible),
+      calendarPausedText: calendarData.syncStateDetail || '',
+      calendarRebuilding: !!calendarData.calendarRebuilding,
       errorCount: statusData.errorLog?.length ?? 0,
       matchedSystem: statusData.matchedSystem,
       lastSyncTime: statusData.lastSyncTime,
@@ -652,13 +660,57 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     let chronicle = null;
+    let probeError = null;
     try {
       chronicle = await this.api.get('/calendar');
-    } catch {
-      // No calendar configured.
+    } catch (err) {
+      probeError = err;
+    }
+
+    // FM-CAL-BLACKOUT: classify the failure instead of assuming its cause.
+    //
+    // This catch used to be bare, with the comment "No calendar configured." —
+    // so EVERY failure became `noCampaignCalendar`, which the template renders
+    // as the flat sentence "No calendar configured for this campaign in
+    // Chronicle." During the V5 rebuild that told the GM, as fact, the one
+    // thing that was not true: their campaign HAD a calendar, Chronicle just
+    // was not serving it. A 401, a proxy timeout and a DNS failure read the
+    // same way.
+    //
+    // The classifier already existed and already handled this — the Sync
+    // Calendar editor has run its probe through `calendarStateFromError` for
+    // months (sync-calendar.mjs). The dashboard simply never got it.
+    if (probeError) {
+      const state = calendarStateFromError(probeError);
+      if (state === 'rebuilding') {
+        // Keep the expected failure out of the shared 50-entry error ring: the
+        // dashboard re-probes on every render, and this is a known, benign
+        // condition — exactly what SyncManager already does for benign 404s.
+        this.api.dropLastErrorLogEntry?.({ path: '/calendar', status: 503 });
+        return {
+          available: false,
+          enabled: calendarEnabled,
+          module: calModule,
+          calendarRebuilding: true,
+          rebuildingDetail: typeof probeError?.serverMessage === 'string' && probeError.serverMessage
+            ? probeError.serverMessage
+            : 'Chronicle’s calendar is being rebuilt and is temporarily unavailable.',
+        };
+      }
+      if (state !== 'absent') {
+        return {
+          available: false,
+          enabled: calendarEnabled,
+          module: calModule,
+          calendarUnreachable: true,
+          unreachableState: state,
+        };
+      }
     }
 
     if (!chronicle) {
+      // Reached only when the probe SUCCEEDED and returned nothing, or failed
+      // with a genuine 404 — i.e. this campaign really has no calendar.
       return { available: false, enabled: calendarEnabled, module: calModule, noCampaignCalendar: true };
     }
 
@@ -2095,8 +2147,15 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   async _onPullDate() {
     const calSync = this._syncManager?._modules?.find(m => m.constructor?.name === 'CalendarSync');
     if (calSync && typeof calSync.onInitialSync === 'function') {
-      await calSync.onInitialSync();
-      this._logActivity('pull', 'Pulled calendar date from Chronicle');
+      // FM-CAL-BLACKOUT: log what happened, not what was attempted. This used
+      // to record a successful pull unconditionally — including when the pull
+      // had just failed with a 503.
+      const pulled = await calSync.onInitialSync();
+      if (pulled) {
+        this._logActivity('pull', 'Pulled calendar date from Chronicle');
+      } else {
+        this._logActivity('error', 'Calendar pull failed — no date was applied');
+      }
       this.render({ force: true });
     }
   }
@@ -2123,6 +2182,14 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       this.render({ force: true });
     } catch (err) {
       if (isRealTimeRejection(err)) { notifyRealTimePushPaused(); return; }
+      // FM-CAL-BLACKOUT: a failed push used to be silent to the GM — only a
+      // console.error they would never see. A button that reports nothing at
+      // all reads as success.
+      if (handleIfCalendarRebuilding(err)) {
+        this._logActivity('error', 'Calendar push skipped — Chronicle’s calendar is being rebuilt');
+        return;
+      }
+      this._logActivity('error', 'Calendar push failed — see the Diagnostics tab');
       console.error('Chronicle Dashboard: Push date failed', err);
     }
   }

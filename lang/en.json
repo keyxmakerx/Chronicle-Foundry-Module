@@ -8,7 +8,7 @@
       },
       "ApiKey": {
         "Name": "API Key",
-        "Hint": "API key with 'sync' permission from your Chronicle campaign settings"
+        "Hint": "API key with 'sync' permission from your Chronicle campaign settings. Stored in THIS browser only and never sent to players; each GM enters it once per browser."
       },
       "CampaignId": {
         "Name": "Campaign ID",
