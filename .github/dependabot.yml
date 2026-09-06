@@ -1,0 +1,15 @@
+# Dependabot: this repo has no package-manager dependencies (plain JS, no
+# lockfile), so the only thing to keep current is the GitHub Actions the
+# workflows pin. Weekly, grouped into one PR.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "deps(actions)"
+    groups:
+      actions:
+        patterns: ["*"]
