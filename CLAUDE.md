@@ -67,6 +67,13 @@ Integration — Install & Updates".
   loop mid-flight (FM-CAL-BACKCATALOG-FIX item 3).
 - System adapters implement `toChronicleFields()` / `fromChronicleFields()`.
 - All REST calls use Bearer token auth via `api-client.mjs`.
+- **The API key is a CLIENT-scoped setting, never world-scoped.** A world
+  setting is synced to every connected client — `config: false` only hides it
+  from the UI — so a world-scoped key hands the campaign's Bearer token to
+  every player's browser console. It was world-scoped until 2026-09-06
+  (FM-SEC-KEY-SCOPE); `migrateApiKeyToClientScope()` moves a legacy value into
+  the GM's browser and deletes the world document. Pinned by
+  `tools/test-api-key-scope.mjs`.
 - **List responses come in two shapes.** Chronicle returns some list endpoints
   as a bare JSON array and others wrapped in an envelope `{"data":[…],"total":N}`
   (envelope: `/entities`, `/entity-types`, `/systems`, `/addons`, `/tags`,

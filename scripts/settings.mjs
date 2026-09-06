@@ -25,11 +25,23 @@ export function registerSettings() {
     requiresReload: true,
   });
 
-  // API key (hidden from non-GMs).
+  // API key — CLIENT scope, deliberately (FM-SEC-KEY-SCOPE, 2026-09-06).
+  //
+  // It was 'world' for the module's whole life, and a world-scoped setting
+  // is synced to EVERY connected client: config:false only hides it from the
+  // settings UI, and nothing stops a player from running
+  // game.settings.get('chronicle-sync', 'apiKey') in their console and
+  // holding the campaign's Bearer token. The sync runs GM-only, so the key
+  // only ever needs to exist in the GM's browser — which is exactly what
+  // client scope is. Cost: each GM enters it once per browser, and it does
+  // not follow the world to a new machine. migrateApiKeyToClientScope()
+  // moves an existing world-side value across and DELETES the world document
+  // (merely re-registering would leave it in the world settings collection,
+  // still synced to players).
   game.settings.register(MODULE_ID, 'apiKey', {
     name: game.i18n.localize('CHRONICLE.Settings.ApiKey.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.ApiKey.Hint'),
-    scope: 'world',
+    scope: 'client',
     config: true,
     type: String,
     default: '',
@@ -349,6 +361,44 @@ export function registerSettings() {
  */
 export function getSetting(key) {
   return game.settings.get(MODULE_ID, key);
+}
+
+/**
+ * One-time migration for FM-SEC-KEY-SCOPE: move a world-scoped API key into
+ * the GM's client scope and delete the world-side Setting document.
+ *
+ * Runs GM-only, before the sync manager starts (so start() reads the moved
+ * value). Idempotent: with no legacy document it does nothing and returns
+ * false. Deleting the world document is the load-bearing step — the value
+ * is otherwise still in the world settings collection every client receives,
+ * whatever scope the key is registered under now.
+ *
+ * @returns {Promise<boolean>} true if a legacy world value was found and handled
+ */
+export async function migrateApiKeyToClientScope() {
+  const worldStore = game.settings?.storage?.get?.('world');
+  const legacy = worldStore?.getSetting?.(`${MODULE_ID}.apiKey`);
+  if (!legacy) return false;
+
+  let value = '';
+  try {
+    // Setting#value is the parsed value on v12+; fall back to the raw field.
+    value = typeof legacy.value === 'string' ? legacy.value : String(legacy.value ?? '');
+  } catch (_) { value = ''; }
+
+  if (value && !game.settings.get(MODULE_ID, 'apiKey')) {
+    await game.settings.set(MODULE_ID, 'apiKey', value);
+  }
+  if (typeof legacy.delete === 'function') await legacy.delete();
+
+  console.info('Chronicle Sync | API key moved out of world settings (which every player could read) into this browser only.');
+  ui?.notifications?.warn?.(
+    'Chronicle Sync: your API key now lives in THIS browser only, not in the world. '
+    + 'Other GMs (or this GM on another machine) must re-enter it in Module Settings. '
+    + 'Consider rotating the key in Chronicle: it was readable by every player until now.',
+    { permanent: true }
+  );
+  return true;
 }
 
 /**

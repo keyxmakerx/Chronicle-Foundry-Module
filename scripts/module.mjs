@@ -6,7 +6,7 @@
  * through the SyncManager which owns the WebSocket connection.
  */
 
-import { registerSettings } from './settings.mjs';
+import { registerSettings, migrateApiKeyToClientScope } from './settings.mjs';
 import { SyncManager } from './sync-manager.mjs';
 import { JournalSync } from './journal-sync.mjs';
 import { MapSync } from './map-sync.mjs';
@@ -113,6 +113,17 @@ Hooks.once('ready', async () => {
   dashboard.bind(syncManager);
   _addStatusIndicator();
   registerCharacterClaimIndicator();
+
+  // FM-SEC-KEY-SCOPE: move a world-scoped API key into this GM's client
+  // scope and delete the world copy BEFORE start() reads the setting. GM
+  // only — players never held a legitimate copy and must not write one.
+  if (game.user.isGM) {
+    try {
+      await migrateApiKeyToClientScope();
+    } catch (err) {
+      console.error('Chronicle Sync | API key scope migration failed', err);
+    }
+  }
 
   // Start the sync manager (connects WebSocket, performs initial sync).
   // Failure is non-fatal; the dashboard remains accessible for diagnostics.
