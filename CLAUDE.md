@@ -186,6 +186,64 @@ structure-mismatch pause taken BEFORE the blackout cannot be cleared by its
 documented recovery path (a `calendar.structure.updated` broadcast) until V5 —
 reload the world instead.
 
+## Working with this project
+
+These rules come from the old coordination repo (Cordinator), which is now a
+frozen archive. The same block is in the CLAUDE.md of Chronicle, the Foundry
+module and the Draw Steel package; change all three together. The binding
+tenets the PR templates name (T-B1 security first, T-B2 plugin isolation, T-B3
+production-grade UI, T-B4 docs for humans and AI alike) are defined in
+Cordinator's `decisions/2026-05-21-core-tenets.md`.
+
+**With the operator** (the maintainer, who reviews and deploys):
+- Explain things in plain language, without code. Give each trade-off in one sentence.
+- Give live checks as click-paths: the exact URL, what to click, and what working
+  and broken look like. Docker, OS and network commands are fine; never ask the
+  operator to read code or run a test suite.
+- The operator checks things later, not while you wait. Put checks in an issue
+  labelled `needs-operator`, and when work is blocked on them, name the exact action.
+- Decide and recommend. Don't offer a menu of options for things you can judge;
+  ask only about real product, visual or scheduling choices.
+- Stop at natural stopping points rather than interrupting with status questions.
+- UI work gets a mockup first, and a mockup the operator signed stays the contract
+  until they sign a new one. A decision about motion is shown as playable clips,
+  never stills.
+
+**Safety**
+- Chronicle runs in production. Verify, then fix; back up before deploys; put
+  anything risky behind an operator step. Security wins every tie.
+- A merged PR is not a deployed fix. Deploy settings and gates are separate steps
+  with their own checks.
+
+**Verify before you claim**
+- Read the source in the same turn before naming files, lines, identifiers or wire
+  values. Verify a wire contract from the code that consumes it.
+- Check any claim about state (open, merged, shipped, deployed) against git or
+  GitHub first. A claim measured against another repo is true only on the day it
+  was measured.
+- A root cause is a guess until the code confirms it; a bug-fix PR says why the bug
+  existed. When the scope is unclear, start by reading, not changing.
+- CI red with local green on the same commit means an environment difference until
+  proven otherwise.
+- If a rule can't be followed or the task is wrong, stop and say so instead of
+  pressing on.
+
+**Scope and reporting**
+- The PR description is what gets reviewed: what and why, the load-bearing lines,
+  honest deviations, the exact test commands and their pass counts.
+- Stay inside the task. Open an issue for anything else; ship the smallest useful
+  change and split the follow-ups.
+
+**Sessions**
+- No large agent fleets: about five agents at most, and only for genuinely
+  parallel work. Usage is a real limit.
+- One session per piece of work, ended when it ships. Don't sit in a loop polling
+  for CI or PR events.
+- Work only on the branch you were given. Never push to another branch without
+  explicit permission.
+- File the issue before handing work on, and never point anyone at something that
+  hasn't landed.
+
 ## Open work
 
 Tracked in GitHub issues, not in this file:
