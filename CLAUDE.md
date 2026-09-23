@@ -235,8 +235,9 @@ Cordinator's `decisions/2026-05-21-core-tenets.md`.
   change and split the follow-ups.
 
 **Sessions**
-- No large agent fleets: about five agents at most, and only for genuinely
-  parallel work. Usage is a real limit.
+- Big agent fleets are welcome for work that splits cleanly, but run them on a
+  lighter model. Never fan a large fleet out on the most expensive model; keep
+  that for the few agents that need it. Usage is a real limit.
 - One session per piece of work, ended when it ships. Don't sit in a loop polling
   for CI or PR events.
 - Work only on the branch you were given. Never push to another branch without
