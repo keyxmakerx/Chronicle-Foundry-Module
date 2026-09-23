@@ -1,12 +1,16 @@
-# Module releases moved to Chronicle (FM-CSU).
-# Admins upload module .zip builds via /admin/modules/foundry on the
-# Chronicle instance; campaign owners pin a version per-campaign and
-# Foundry pulls updates from the per-campaign signed manifest URL.
+# This workflow is NOT the release path.
 #
-# This workflow remains for emergency manual dispatches only — the
-# tag-push trigger is intentionally commented out to stop automatic
-# GitHub releases. To produce an ad-hoc artifact, use the
-# `workflow_dispatch` button in the Actions tab.
+# A release is a GitHub release on this repo: Releases -> Draft a new release,
+# tag it (e.g. 0.1.30), "Generate release notes", Publish. Chronicle's packages
+# plugin imports releases from here ("Check for updates" in Admin -> Packages),
+# falling back to GitHub's source zip when a release has no attached asset.
+# Campaign owners then pin a version per campaign, and Foundry pulls updates
+# from the per-campaign signed manifest URL.
+#
+# This workflow remains for emergency manual dispatches only; the tag-push
+# trigger is intentionally commented out. It takes the version from the ref it
+# runs on, so dispatch it on a tag ("Use workflow from" -> Tags), never on main,
+# or the version comes out as "main". Fixing or retiring it is tracked in #89.
 name: Release Module
 
 on:
