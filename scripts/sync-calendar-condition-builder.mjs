@@ -1,19 +1,14 @@
 /**
  * Visual conditionTree builder (pure logic). Calendaria's `conditionTree`
- * schema lets a note fire on any subset of dates matching a logical
- * expression (every full moon, every 3rd weekday of winter, every Nth of
- * every month, etc). The full schema is too rich for an inline picker, so
- * this ships preset compositions covering common workflows; advanced trees
- * fall through to Calendaria's own builder via a "Need more?" link.
+ * schema is too rich for an inline picker, so this ships preset
+ * compositions for common workflows (every full moon, every 3rd weekday
+ * of winter, etc); advanced trees fall through to Calendaria's own builder
+ * via a "Need more?" link. Pure: preset → tree, tree validation, tree →
+ * summary; the Application class only renders presets and persists the tree.
  *
- * Pure logic: preset → tree, tree validation, tree → human-readable
- * summary. The Application class only orchestrates rendering the preset
- * buttons and persisting the chosen tree.
- *
- * Calendaria root-group rule: a `conditionTree` whose root is not
- * `{type: 'group'}` is silently ignored by Calendaria's matcher (documented
- * in their API-Reference). `validateTree()` flags this; the form's save
- * path blocks on it.
+ * Calendaria silently ignores a `conditionTree` whose root isn't
+ * `{type: 'group'}` (their API-Reference). `validateTree()` flags this and
+ * the form's save path blocks on it.
  *
  * Tests: `tools/test-sync-calendar-condition-builder.mjs`.
  */

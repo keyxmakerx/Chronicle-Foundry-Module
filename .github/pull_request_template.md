@@ -1,4 +1,5 @@
-**Fixes:** #<issue> (one line per issue; "none" for a trivial change)
+Fixes #<issue>
+<!-- One plain line per issue, exactly "Fixes #123" (no bold, no colon), so GitHub closes it on merge. No issue: "Fixes: none". -->
 **Security implication:** <one line; can be "none — pure refactor / CSS / docs">
 **Consumer-verified:** <file:line citation of Chronicle-side wire surface this PR consumes; "n/a" otherwise>
 **Foundry compatibility:** <verified against Foundry v12 / v13 / v14 — list which; "n/a" if not Foundry-runtime-touching>

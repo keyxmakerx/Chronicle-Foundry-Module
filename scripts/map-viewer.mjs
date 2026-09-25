@@ -3,33 +3,23 @@
  *
  * Custom JournalEntryPage sheet for image-type pages that renders both
  * local journal-flag pins and Chronicle map data (markers, drawings,
- * tokens, fog, layers). Two pin systems coexist on the same SVG/DOM
- * surface:
+ * tokens, fog, layers) on one SVG/DOM surface. Local pins
+ * (`flags.chronicle-sync.pins`) never sync to Chronicle; Chronicle markers
+ * come from MapSync via `flags.chronicle-sync.chronicleMarkers` (a
+ * player-safe subset written by the GM client) plus GM-only memory data.
  *
- *   - Local pins: stored in `flags.chronicle-sync.pins` on the page; not
- *     synced to Chronicle. Visual: dotted outline. Tooltip: "Personal
- *     annotation".
- *   - Chronicle markers: pulled from Chronicle via MapSync; rendered from
- *     `flags.chronicle-sync.chronicleMarkers` (player-safe subset written
- *     by the GM client) plus GM-only memory data. Visual: solid fill.
- *     Tooltip: "Chronicle marker".
- *
- * Visibility filtering happens at render time:
- *   - `visibility=dm_only` markers and the entire fog overlay never render
- *     for non-GMs (they are absent from the flag data; GM-only memory
- *     supplies them only on the GM client).
- *   - `visibility_rules.allowed_users` / `denied_users` are honored
- *     against the current user's mapped Chronicle user id.
+ * Security: `visibility=dm_only` markers and the whole fog overlay never
+ * render for non-GMs — they're absent from the flag data, and GM-only
+ * memory supplies them only on the GM client. `visibility_rules.
+ * allowed_users`/`denied_users` are honored against the mapped Chronicle
+ * user id.
  *
  * Drawings, tokens, fog, and layers are read-only; markers stay editable
- * (with a visibility=dm_only checkbox) for GM users via the existing
- * right-click and toolbar affordances.
+ * (with a visibility=dm_only checkbox) for GMs.
  *
- * This sheet extends the v13/v14 `JournalEntryPageSheet` (under
- * `foundry.applications.sheets.journal`) with `HandlebarsApplicationMixin`.
- * The AppV1 `JournalPageSheet` base is dead in v14 — its outer wrapper
- * template no longer exists on disk, so any AppV1 subclass throws `ENOENT`
- * at render time.
+ * Extends v13/v14 `JournalEntryPageSheet` with `HandlebarsApplicationMixin`
+ * — the AppV1 `JournalPageSheet` base is dead in v14 (its wrapper template
+ * no longer exists on disk; an AppV1 subclass throws `ENOENT` at render).
  */
 
 import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
@@ -1166,15 +1156,15 @@ export class ChronicleMarkerConfigDialog extends HandlebarsApplicationMixin(Appl
     const safeCategory = CHRONICLE_MARKER_CATEGORIES.includes(category) ? category : 'note';
     const safeVisibility = VISIBILITY_VALUES.includes(visibility) ? visibility : 'everyone';
 
-    // `PUT /maps/:id/markers/:mid` is a FULL REPLACE: Chronicle binds the body
-    // into a struct with pointer fields and UPDATEs entity_id, visibility_rules
-    // and foundry_id unconditionally, so any of those keys missing from the
-    // body is written back as NULL — clearing the entity link, the per-user
-    // allow/deny list, and the module's own Foundry pairing key. Spread the
-    // stored marker under the edited fields (as PinConfigDialog.#onSave above
-    // does for local pins); the read-only keys the spread carries along
-    // (id, map_id, created_at, entity_name, …) are undeclared on the wire
-    // struct and ignored by the binder.
+    // Older Chronicle servers treat `PUT /maps/:id/markers/:mid` as a full
+    // replace: a missing entity_id, visibility_rules or foundry_id is written
+    // back as NULL, clearing the entity link, the per-user allow/deny list and
+    // the module's own Foundry pairing key. Current Chronicle merges (absent
+    // keys are kept), so spreading the stored marker under the edited fields
+    // (as PinConfigDialog.#onSave above does for local pins) is harmless there
+    // and still protects older servers. The read-only keys the spread carries
+    // (id, map_id, created_at, entity_name, …) aren't on the wire struct and
+    // are ignored.
     const data = {
       ...this._marker,
       name,

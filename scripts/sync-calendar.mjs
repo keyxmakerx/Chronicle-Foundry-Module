@@ -1,26 +1,22 @@
 /**
  * Chronicle Sync — Sync Calendar editor
  *
- * GM-only ApplicationV2 that renders a 3-pane view of the active Calendaria
- * calendar with an always-on validation panel: year/month view toggle, a
- * writable day inspector (create/edit/delete notes via `CALENDARIA.api`),
- * drag-select multi-day event creation, moon-phase strip, and a recurrence
- * builder. Still deferred: structure editing and inline category creation.
+ * GM-only ApplicationV2: 3-pane view of the active Calendaria calendar with
+ * an always-on validation panel, year/month toggle, a writable day
+ * inspector (create/edit/delete notes via `CALENDARIA.api`), drag-select
+ * multi-day event creation, moon-phase strip, recurrence builder. Structure
+ * editing and inline category creation are still deferred.
  *
- * Architecture:
- *   - Writes go through `CALENDARIA.api`, never Calendaria's internal
- *     settings directly.
- *   - Reads via `CALENDARIA.api.get*`, wrapped in try/catch with a graceful
- *     degraded-mode render when Calendaria is missing or broken.
- *   - Writes flow to Chronicle automatically via the existing
- *     `scripts/calendar-sync.mjs` hook handlers — no editor-side Chronicle
- *     plumbing required.
+ * Writes go through `CALENDARIA.api` only, never Calendaria's internal
+ * settings; reads are wrapped in try/catch for a degraded-mode render when
+ * Calendaria is missing or broken. Writes reach Chronicle automatically via
+ * `scripts/calendar-sync.mjs`'s existing hook handlers.
  *
- * The Application class stays a thin integration shell — pure validation
- * and form translation live in separately-unit-tested modules.
+ * The Application class is a thin shell; validation and form translation
+ * live in separately-unit-tested modules.
  *
- * Naming: the UI label is "Sync Calendar" — Calendaria already has a
- * "Chronicle" widget, so that name is reserved.
+ * Naming: the UI label is "Sync Calendar" because Calendaria already has a
+ * "Chronicle" widget.
  */
 
 import { MODULE_ID, FLAG_SCOPE } from './constants.mjs';

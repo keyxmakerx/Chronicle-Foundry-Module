@@ -2,38 +2,26 @@
  * Chronicle Sync - Map Sync
  *
  * Orchestrates Chronicle map data into Foundry. Maps materialize as
- * JournalEntries (one entry per map, image-type page) inside a
- * "Chronicle Maps" folder, and `MapViewerSheet` renders the map with all
- * sub-resources via SVG overlays.
+ * JournalEntries (one entry per map, image-type page, idempotent by
+ * `mapId` page flag) inside a "Chronicle Maps" folder; `MapViewerSheet`
+ * renders the map with all sub-resources (markers, drawings, tokens, fog,
+ * layers) as SVG overlays. Handles Chronicle WebSocket events for `map.*`,
+ * `marker.*`, `drawing.*`, `token.*`, `layer.*`, `fog.*` (5s polling
+ * fallback for types Chronicle doesn't yet emit — TODO(#90) markers), and
+ * provides the marker CRUD helpers MapViewerSheet's edit affordances use.
  *
- * Responsibilities:
- *   - Materialize Chronicle maps as JournalEntry documents (idempotent by
- *     `mapId` page flag).
- *   - Maintain an in-memory cache of all map sub-resources (markers,
- *     drawings, tokens, fog, layers) for the current GM session.
- *   - Filter sub-resources by audience, writing only player-safe data into
- *     JournalEntry page flags so Foundry's native document sync delivers
- *     them to players. DM-only data lives only in GM memory.
- *   - Handle Chronicle WebSocket events for `map.*`, `marker.*`, `drawing.*`,
- *     `token.*`, `layer.*`, `fog.*` (with a 5s polling fallback for types
- *     Chronicle does not yet emit — see TODO(#90) markers).
- *   - Provide marker CRUD helpers used by MapViewerSheet's edit affordances.
- *
- * Visibility model:
- *   - Markers with `visibility=dm_only` → GM memory only, never in flags.
- *   - Markers with `visibility=everyone` → flag-stored. Per-user
- *     `visibility_rules` are embedded for client-side render-time filtering.
- *     This trades a known DOM-inspection leak (the marker name is in flags
- *     even for non-allowed users) for feature parity.
- *   - Drawings with `is_hidden=true` → GM memory only.
- *   - Drawings with `is_visible=false` → not rendered (not stored in flags).
- *   - Drawings with `is_visible=true && is_hidden=false` → flag-stored.
- *   - Tokens, layers → flag-stored (no per-user visibility in schema).
- *   - Fog of war → GM memory only.
+ * Visibility gate (DM-only data must never reach flags, which sync to
+ * players): `dm_only` markers and all fog stay in GM memory only;
+ * `everyone` markers are flag-stored with per-user `visibility_rules`
+ * embedded for client-side filtering (a known DOM-inspection leak — the
+ * marker name is visible in flags to non-allowed users — traded for
+ * feature parity); drawings are flag-stored only when
+ * `is_visible=true && is_hidden=false`; tokens/layers are always
+ * flag-stored (no per-user visibility in their schema).
  *
  * Player-side this module is inert (SyncManager.start exits early for
- * non-GM users, so init() is never called). MapViewerSheet on the player's
- * machine reads only from page flags written by the GM client.
+ * non-GM users, so init() is never called); MapViewerSheet on the
+ * player's machine reads only the page flags the GM client wrote.
  */
 
 import { getSetting } from './settings.mjs';

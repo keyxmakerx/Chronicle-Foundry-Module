@@ -1,26 +1,11 @@
 #!/usr/bin/env node
 /**
- * Regression pins for the two affordances that surface
- * `SyncCalendarApplication` from outside the settings menu:
- *
- *   1. Dashboard Calendar tab → "Open Sync Calendar" button.
- *      - `templates/sync-dashboard.hbs` must contain a button with
- *        `data-action="open-sync-calendar"` inside the Calendar tab.
- *      - `scripts/sync-dashboard.mjs` must register the action handler
- *        on `DEFAULT_OPTIONS.actions['open-sync-calendar']`.
- *      - The handler must invoke `openSyncCalendar()` (the singleton
- *        helper exported from sync-calendar.mjs).
- *
- *   2. Scene-controls toolbar → `sync-calendar` tool.
- *      - `scripts/module.mjs` must register a `sync-calendar` tool
- *        inside the `chronicle-sync` scene-control group, with the
- *        `fa-calendar-days` icon and a callback that opens the app.
- *
- * These are static-source pins (string-grep on the source) — no Foundry
- * runtime is involved. They prevent silent removal of the discoverability
- * affordances; behavior testing is operator-side.
- *
- * Run: `node --test tools/test-sync-calendar-discoverability.mjs`
+ * Static-source pins (string-grep, no Foundry runtime) for the two
+ * affordances that surface `SyncCalendarApplication` outside the settings
+ * menu: the dashboard's Calendar-tab "Open Sync Calendar" button
+ * (`data-action="open-sync-calendar"` wired to `openSyncCalendar()`), and
+ * the scene-controls `sync-calendar` tool in the `chronicle-sync` group.
+ * Guards against silent removal; behavior testing is operator-side.
  */
 
 import test from 'node:test';

@@ -5,17 +5,15 @@
  * classifies it as Chronicle or legacy GitHub releases, and provides a
  * manual "Check Chronicle for updates" button.
  *
- * On a failed check, Chronicle's JSON error body
- * ({ error, message, category }, category one of `auth | config |
- * not_found | validation | internal`) is rendered via `body.message`
- * verbatim — Chronicle's classification is authoritative. Failures
- * Chronicle didn't classify (network, non-JSON body, no install URL)
- * get a client-built 4-clause diagnostic from the `Errors.*` i18n trees.
+ * On a failed check, Chronicle's JSON error body ({ error, message,
+ * category }) is rendered via `body.message` verbatim — Chronicle's
+ * classification is authoritative. Failures Chronicle didn't classify
+ * (network, non-JSON body, no install URL) get a client-built diagnostic
+ * from the `Errors.*` i18n trees.
  *
  * Wired into the module settings panel via `game.settings.registerMenu`
  * in `settings.mjs`. See `.ai.md` → "Chronicle Integration — Install &
- * Updates" and `API-CONTRACT.md` → "Chronicle-served Module
- * Distribution".
+ * Updates" and `API-CONTRACT.md`.
  */
 
 import { MODULE_ID } from './constants.mjs';
@@ -117,25 +115,15 @@ export function parseChronicleErrorBody(body) {
 }
 
 /**
- * Passive manifest health probe. Fetches the install-time URL and
- * classifies the result via `parseChronicleErrorBody` + `categorize`,
- * the same path the "Check for updates" button uses. Pure data return —
- * no `ui.notifications`, no render; caller decides what to do.
+ * Passive manifest health probe: fetches the install-time URL and
+ * classifies it via `parseChronicleErrorBody` + `categorize`. Pure data
+ * return — no `ui.notifications`, no render; caller decides what to do.
  *
- * Outcome shape:
- *   { ok: false, state: 'no_url' }                               — Foundry has no install URL
- *   { ok: true,  state: 'ok', httpStatus, url }                  — 200 reachable
- *   { ok: false, state: <category>, httpStatus, url, code,
- *     message, body? }                                           — Chronicle (or HTTP-fallback) error
- *   { ok: false, state: 'network', url, error }                  — fetch threw
- *   { ok: false, state: 'parse',   url, httpStatus, error }      — body not JSON / unreadable
+ * `state` is `no_url`, `ok`, one of `categorize()`'s buckets (`auth |
+ * config | not_found | validation | internal`), or the Foundry-only
+ * `network` / `parse`. Callers branch on `state`, render `message` verbatim.
  *
- * `state` values mirror `categorize()`'s output (`auth | config |
- * not_found | validation | internal`) plus the Foundry-only buckets
- * (`network`, `parse`) and the precondition state `no_url`. Callers
- * branch on `state` for routing, render `message` verbatim.
- *
- * @returns {Promise<object>} Outcome object — see shape above.
+ * @returns {Promise<object>} Outcome object keyed by `state` (see body).
  */
 export async function probeManifest() {
   const url = readInstallManifestUrl();

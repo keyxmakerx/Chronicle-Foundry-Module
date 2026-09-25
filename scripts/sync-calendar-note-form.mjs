@@ -1,34 +1,19 @@
 /**
  * Pure-function translation between the editor's note-form view-model and
  * Calendaria's documented `CALENDARIA.api.createNote` / `updateNote` input
- * shape. No Foundry globals touched, so it's independently unit-testable;
- * the Application class stays a thin integration shell around it.
+ * shape. No Foundry globals, so it's independently unit-testable; the
+ * Application class stays a thin integration shell around it.
  *
- * Form schema (the editor's interchange shape, all fields explicit):
- *   {
- *     name:         string,
- *     content:      string,                       // HTML
- *     year, month, day:           integer,        // 1-indexed start
- *     endYear, endMonth, endDay:  integer | null, // 1-indexed end; null → same as start
- *     hour, minute:               integer,        // 0-indexed time of day
- *     endHour, endMinute:         integer | null,
- *     allDay:       boolean,
- *     visibility:   'visible' | 'hidden' | 'secret',
- *     displayStyle: 'icon' | 'pip' | 'banner',
- *     icon:         string,                       // FA class or path
- *     color:        string,                       // hex
- *     categories:   string[],                     // preset IDs
- *   }
+ * Form schema (editor side): name, content (HTML), year/month/day (1-indexed
+ * start), endYear/endMonth/endDay (1-indexed end, null → same as start),
+ * hour/minute (0-indexed), endHour/endMinute, allDay, visibility
+ * ('visible'|'hidden'|'secret'), displayStyle ('icon'|'pip'|'banner'), icon,
+ * color (hex), categories (preset IDs). Translates to Calendaria's
+ * `createNote`/`updateNote` shape: name, content, startDate, endDate?,
+ * allDay, categories, icon, color, visibility, displayStyle, openSheet: false.
  *
- * Calendaria-side note shape (what we hand to `createNote` / `updateNote`):
- *   {
- *     name, content, startDate, endDate?, allDay, categories,
- *     icon, color, visibility, displayStyle, openSheet: false,
- *   }
- *
- * This module handles only the documented `CALENDARIA.api` options. The
- * `gmOnly` boolean used for Chronicle wire translation is out of scope
- * here — it lives in `calendar-sync.mjs`.
+ * Only the documented `CALENDARIA.api` options are handled here; the
+ * `gmOnly` boolean for Chronicle wire translation lives in `calendar-sync.mjs`.
  */
 
 export const VISIBILITY = Object.freeze({

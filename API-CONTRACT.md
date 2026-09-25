@@ -1,8 +1,6 @@
 # Chronicle API Contract
 
-This document defines every Chronicle REST API endpoint and WebSocket message
-that the Foundry module depends on. A new AI working on this module MUST
-understand this contract to avoid breaking changes.
+Every Chronicle REST endpoint and WebSocket message the Foundry module depends on.
 
 ## Authentication
 
@@ -56,25 +54,22 @@ HTTP status codes:
 
 ---
 
+### Structured errors on the syncapi group
 
-### Structured errors on the syncapi group (added 2026-08-21)
-
-Some syncapi endpoints answer with a **machine-readable code** instead of
-prose, which inverts the field roles documented above — `error` is the code and
-`message` is the human sentence:
+Some syncapi endpoints invert the field roles above: `error` is a
+machine-readable code, `message` is the human sentence.
 
 ```
 HTTP 503
 {"error":"calendar_rebuilding","message":"Chronicle's calendar is being rebuilt and is temporarily unavailable. Calendar sync is paused; maps, actors, items and notes are unaffected."}
 ```
 
-- `503` — a subsystem is deliberately unavailable. Distinct from `500` (a
-  fault) and from `404` (the endpoint does not exist on this build). Callers
-  MUST NOT read it as an empty resource.
-- The module's `scripts/api-client.mjs` attaches `err.status`, `err.code` and
-  `err.serverMessage` to the thrown error, so callers key on the code rather
-  than on the message format. The message format is nonetheless stable
-  (`Chronicle API error <status>: <body>`) because the classifiers keep a regex
+- `503` — a subsystem is deliberately unavailable, distinct from `500`
+  (fault) and `404` (route absent on this build). Never read it as an empty
+  resource.
+- `scripts/api-client.mjs` attaches `err.status`, `err.code`,
+  `err.serverMessage` to the thrown error; callers key on the code. Message
+  format stays stable (`Chronicle API error <status>: <body>`) as a regex
   fallback for transports that lose the status.
 
 **Re-verify by: when calendar V5 ships.**
@@ -92,15 +87,9 @@ Lists all available game systems for this campaign.
 ```json
 {
   "data": [
-    {
-      "id": "dnd5e",
-      "name": "D&D 5th Edition",
-      "status": "available",
-      "enabled": true,
-      "has_character_fields": true,
-      "has_item_fields": true,
-      "foundry_system_id": "dnd5e"
-    }
+    { "id": "dnd5e", "name": "D&D 5th Edition", "status": "available",
+      "enabled": true, "has_character_fields": true, "has_item_fields": true,
+      "foundry_system_id": "dnd5e" }
   ]
 }
 ```
@@ -113,26 +102,14 @@ Returns character preset field definitions with Foundry annotations.
 **Response:**
 ```json
 {
-  "system_id": "drawsteel",
-  "preset_slug": "drawsteel-character",
-  "preset_name": "Draw Steel Hero",
-  "foundry_system_id": "draw-steel",
+  "system_id": "drawsteel", "preset_slug": "drawsteel-character",
+  "preset_name": "Draw Steel Hero", "foundry_system_id": "draw-steel",
   "foundry_actor_type": "hero",
   "fields": [
-    {
-      "key": "might",
-      "label": "Might",
-      "type": "number",
-      "foundry_path": "system.characteristics.might.value",
-      "foundry_writable": true
-    },
-    {
-      "key": "stamina_max",
-      "label": "Stamina (Max)",
-      "type": "number",
-      "foundry_path": "system.stamina.max",
-      "foundry_writable": false
-    }
+    { "key": "might", "label": "Might", "type": "number",
+      "foundry_path": "system.characteristics.might.value", "foundry_writable": true },
+    { "key": "stamina_max", "label": "Stamina (Max)", "type": "number",
+      "foundry_path": "system.stamina.max", "foundry_writable": false }
   ]
 }
 ```
@@ -144,40 +121,37 @@ Returns character preset field definitions with Foundry annotations.
 
 ##### Multi-Preset Systems (e.g., Draw Steel Creatures)
 
-A single game system may expose multiple entity presets, each with its own
-`foundry_actor_type` and field mappings. For example, Draw Steel has both a
-**hero** preset (`drawsteel-character`, actor type `"hero"`) and a **creature**
-preset (`drawsteel-creature`, actor type `"npc"`).
+A system can expose multiple entity presets, each with its own
+`foundry_actor_type` and field mappings. Draw Steel: **hero** preset
+(`drawsteel-character`, type `"hero"`), **creature** preset
+(`drawsteel-creature`, type `"npc"`).
 
 **Expected creature preset response:**
 ```json
 {
-  "system_id": "drawsteel",
-  "preset_slug": "drawsteel-creature",
-  "preset_name": "Draw Steel Creature",
-  "foundry_system_id": "draw-steel",
+  "system_id": "drawsteel", "preset_slug": "drawsteel-creature",
+  "preset_name": "Draw Steel Creature", "foundry_system_id": "draw-steel",
   "foundry_actor_type": "npc",
   "fields": [
-    { "key": "stamina_max",   "label": "Stamina (Max)",     "type": "number", "foundry_path": "system.stamina.max",                     "foundry_writable": false },
-    { "key": "stamina_value", "label": "Stamina (Current)", "type": "number", "foundry_path": "system.stamina.value",                   "foundry_writable": true },
-    { "key": "might",         "label": "Might",             "type": "number", "foundry_path": "system.characteristics.might.value",      "foundry_writable": true },
-    { "key": "agility",       "label": "Agility",           "type": "number", "foundry_path": "system.characteristics.agility.value",    "foundry_writable": true },
-    { "key": "reason",        "label": "Reason",            "type": "number", "foundry_path": "system.characteristics.reason.value",     "foundry_writable": true },
-    { "key": "intuition",     "label": "Intuition",         "type": "number", "foundry_path": "system.characteristics.intuition.value",  "foundry_writable": true },
-    { "key": "presence",      "label": "Presence",          "type": "number", "foundry_path": "system.characteristics.presence.value",   "foundry_writable": true },
-    { "key": "speed",         "label": "Speed",             "type": "number", "foundry_path": "system.speed.value",                     "foundry_writable": true },
-    { "key": "stability",     "label": "Stability",         "type": "number", "foundry_path": "system.stability.value",                 "foundry_writable": true },
-    { "key": "level",         "label": "Level",             "type": "number", "foundry_path": "system.level",                           "foundry_writable": false },
-    { "key": "ev",            "label": "EV",                "type": "number", "foundry_path": "system.ev",                              "foundry_writable": false }
+    { "key": "stamina_max", "label": "Stamina (Max)", "type": "number", "foundry_path": "system.stamina.max", "foundry_writable": false },
+    { "key": "stamina_value", "label": "Stamina (Current)", "type": "number", "foundry_path": "system.stamina.value", "foundry_writable": true },
+    { "key": "might", "label": "Might", "type": "number", "foundry_path": "system.characteristics.might.value", "foundry_writable": true },
+    { "key": "agility", "label": "Agility", "type": "number", "foundry_path": "system.characteristics.agility.value", "foundry_writable": true },
+    { "key": "reason", "label": "Reason", "type": "number", "foundry_path": "system.characteristics.reason.value", "foundry_writable": true },
+    { "key": "intuition", "label": "Intuition", "type": "number", "foundry_path": "system.characteristics.intuition.value", "foundry_writable": true },
+    { "key": "presence", "label": "Presence", "type": "number", "foundry_path": "system.characteristics.presence.value", "foundry_writable": true },
+    { "key": "speed", "label": "Speed", "type": "number", "foundry_path": "system.speed.value", "foundry_writable": true },
+    { "key": "stability", "label": "Stability", "type": "number", "foundry_path": "system.stability.value", "foundry_writable": true },
+    { "key": "level", "label": "Level", "type": "number", "foundry_path": "system.level", "foundry_writable": false },
+    { "key": "ev", "label": "EV", "type": "number", "foundry_path": "system.ev", "foundry_writable": false }
   ]
 }
 ```
 
-> **Current limitation:** The Foundry module's generic adapter (`generic-adapter.mjs`)
-> and actor sync (`actor-sync.mjs`) currently support only **one preset per system**.
-> If the primary preset is `drawsteel-character`, creature entities with slug
-> `drawsteel-creature` will not sync. Multi-preset support requires extending the
-> adapter architecture to load multiple presets and route entities by `type_slug`.
+> **Current limitation:** the generic adapter (`generic-adapter.mjs`) and
+> `actor-sync.mjs` support only **one preset per system** — with primary
+> preset `drawsteel-character`, entities of slug `drawsteel-creature` won't
+> sync. Needs the adapter to load multiple presets and route by `type_slug`.
 
 #### GET /systems/:systemId/item-fields
 Returns item preset field definitions. Same shape as character-fields.
@@ -200,16 +174,11 @@ Lists entities in the campaign. Supports pagination and filtering.
 {
   "data": [
     {
-      "id": "uuid",
-      "name": "Entity Name",
-      "content": "<p>HTML content</p>",
-      "summary": "Short text",
-      "entity_type_id": 1,
+      "id": "uuid", "name": "Entity Name", "content": "<p>HTML content</p>",
+      "summary": "Short text", "entity_type_id": 1,
       "fields_data": { "hp_current": 45, "str": 18 },
-      "tags": ["npc", "villain"],
-      "visibility": "public",
-      "created_at": "2026-01-01T00:00:00Z",
-      "updated_at": "2026-01-15T12:00:00Z"
+      "tags": ["npc", "villain"], "visibility": "public",
+      "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-15T12:00:00Z"
     }
   ],
   "pagination": { "page": 1, "per_page": 50, "total": 120 }
@@ -223,12 +192,7 @@ Creates a new entity.
 
 **Request:**
 ```json
-{
-  "name": "Entity Name",
-  "content": "<p>HTML content</p>",
-  "entity_type_id": 1,
-  "visibility": "public"
-}
+{ "name": "Entity Name", "content": "<p>HTML content</p>", "entity_type_id": 1, "visibility": "public" }
 ```
 
 **Response:** The created entity object (same shape as GET).
@@ -239,9 +203,9 @@ Returns a single entity with full content.
 #### PUT /entities/:entityId
 Updates an entity. **PARTIAL update** — see the contract below.
 
-##### The partial-update contract (Chronicle sweep R4, 2026-08-07)
+##### The partial-update contract
 
-Every JSON update endpoint in Chronicle now reads a request body three ways:
+Every JSON update endpoint in Chronicle reads a request body three ways:
 
 | what the body does with a key | what happens to the stored value |
 |---|---|
@@ -249,26 +213,19 @@ Every JSON update endpoint in Chronicle now reads a request body three ways:
 | present with a **value** | replaced |
 | present and **explicitly `null`** | cleared (nullable columns only) |
 
-The distinction is real on the server, not incidental: the request structs
-bind `patch.Field[T]`, which records presence during JSON decoding, so
-"absent" and `null` are different things. Non-nullable columns have no
-cleared state, so an explicit `null` on one of those preserves rather than
-writing a zero.
+The distinction is real on the server: request structs bind `patch.Field[T]`,
+which records presence during JSON decoding, so absent and `null` differ.
+Non-nullable columns have no cleared state, so an explicit `null` there
+preserves rather than writing a zero.
 
-This **replaced** the previous behaviour, which had no contract at all — it
-was whatever each Go field's type happened to do. Pointer fields preserved
-on absence; value-typed fields (`string`, `bool`, `int`) wrote their zero.
-Two consequences were live on this module's own traffic:
-
-- **`is_private` was value-typed.** `actor-sync.mjs` pushes `{name}` alone
-  on a rename, which bound `is_private = false` and **published a hidden
-  character entity to every player in the campaign.** The old wording of
-  this document said absent meant public. Nobody designed that; it was the
-  Go zero value being read as an intention.
-- **`parent_id` was not on the request struct at all**, so every update
-  from this module detached the entity from the Chronicle hierarchy.
-
+Before this contract, value-typed fields wrote their zero when absent. Two
+consequences hit this module's own traffic: `actor-sync.mjs`'s `{name}`-only
+rename bound `is_private = false` and **published a hidden character entity
+to every player** in the campaign, and **`parent_id` was not on the request
+struct at all**, so every update detached the entity from the hierarchy.
 Both are fixed on the server. Send only the fields you mean to change.
+
+Send only the fields you mean to change.
 
 **Request:** any subset of the POST shape, plus `parent_id`:
 
@@ -281,11 +238,10 @@ Both are fixed on the server. Send only the fields you mean to change.
 ```
 &nbsp;&nbsp;↑ explicitly unparents. Omitting `parent_id` leaves the parent alone.
 
-> **Version skew.** A module talking to a Chronicle older than sweep R4 still
-> gets the old whole-replace behaviour. Where a client-side echo already
-> exists for that reason — `ChronicleMarkerConfigDialog.#onSave` spreads the
-> stored marker under the edited fields — it is kept: it is harmless against
-> a merging server and load-bearing against an old one.
+> **Version skew.** A pre-partial-update Chronicle does whole-replace instead.
+> `ChronicleMarkerConfigDialog.#onSave` still spreads the stored marker under
+> edited fields for this reason: harmless on a merging server, load-bearing
+> on an older one.
 
 #### DELETE /entities/:entityId
 Deletes an entity.
@@ -297,13 +253,7 @@ Updates only the `fields_data` on an entity.
 
 **Request:**
 ```json
-{
-  "fields_data": {
-    "hp_current": 45,
-    "str": 18,
-    "level": 5
-  }
-}
+{ "fields_data": { "hp_current": 45, "str": 18, "level": 5 } }
 ```
 
 #### GET /entities/:entityId/permissions
@@ -314,33 +264,21 @@ Updates entity permissions.
 
 **Request:**
 ```json
-{
-  "visibility": "public"
-}
+{ "visibility": "public" }
 ```
 
 #### POST /entities/:entityId/reveal
 Toggles entity reveal state (NPC reveal to players). Body is exactly
-`{ "is_private": <bool> }` (a `*bool`); an explicit value matching the current
-state is a no-op. This remains the correct way to flip visibility from the
-module.
-
-> Post-sweep-R4, a bare `PUT /entities/:id` with just `{is_private}` no longer
-> 400s — an absent name means "not editing the name" rather than "empty name".
-> Keep using `/reveal` anyway: it is the named, single-purpose route, and it
-> works against every Chronicle version this module supports.
+`{ "is_private": <bool> }` (a `*bool`); a matching value is a no-op. Use this
+route, not a bare `PUT /entities/:id`, to flip visibility — it works against
+every Chronicle version this module supports.
 
 **Request:**
 ```json
 { "is_private": true }
 ```
 
-**Used by:** `actor-sync.mjs`; `sync-dashboard.mjs` (single + bulk visibility
-toggles, routed here as of FM-SYNC-WIRE-FIX-R1)
-
-> **Erratum (FM-SYNC-WIRE-FIX-R1):** the dashboard visibility toggles
-> previously PUT `/entities/:id` with only `{is_private}` → 400 (swallowed), so
-> visibility never changed. Now routed to `POST /entities/:id/reveal`.
+**Used by:** `actor-sync.mjs`; `sync-dashboard.mjs` (single + bulk visibility toggles)
 
 ---
 
@@ -353,13 +291,7 @@ Lists all entity types in the campaign.
 ```json
 {
   "data": [
-    {
-      "id": 1,
-      "name": "Character",
-      "slug": "dnd5e-character",
-      "icon": "fa-user",
-      "color": "#7C3AED"
-    }
+    { "id": 1, "name": "Character", "slug": "dnd5e-character", "icon": "fa-user", "color": "#7C3AED" }
   ]
 }
 ```
@@ -374,12 +306,7 @@ Create a new entity type in the campaign.
 
 **Request** (all 4 fields required):
 ```json
-{
-  "name": "Quest",
-  "name_plural": "Quests",
-  "icon": "fa-solid fa-scroll",
-  "color": "#fbbf24"
-}
+{ "name": "Quest", "name_plural": "Quests", "icon": "fa-solid fa-scroll", "color": "#fbbf24" }
 ```
 
 **Response:** The created entity type object (same shape as GET /entity-types items).
@@ -442,11 +369,7 @@ request — the Foundry module auto-batches larger sets.
 
 **Request:**
 ```json
-{
-  "entity_ids": ["uuid1", "uuid2"],
-  "tag_ids": [1, 2],
-  "action": "add"
-}
+{ "entity_ids": ["uuid1", "uuid2"], "tag_ids": [1, 2], "action": "add" }
 ```
 
 `action` must be `"add"`, `"remove"`, or `"set"` (replace all tags).
@@ -454,12 +377,8 @@ request — the Foundry module auto-batches larger sets.
 **Response:**
 ```json
 {
-  "status": "ok",
-  "processed": 2,
-  "results": [
-    { "entity_id": "uuid1", "status": "ok" },
-    { "entity_id": "uuid2", "status": "ok" }
-  ]
+  "status": "ok", "processed": 2,
+  "results": [ { "entity_id": "uuid1", "status": "ok" }, { "entity_id": "uuid2", "status": "ok" } ]
 }
 ```
 
@@ -476,10 +395,7 @@ Bulk update entity type for multiple entities.
 
 **Request:**
 ```json
-{
-  "entity_ids": ["uuid1", "uuid2"],
-  "entity_type_id": 5
-}
+{ "entity_ids": ["uuid1", "uuid2"], "entity_type_id": 5 }
 ```
 
 ---
@@ -504,28 +420,19 @@ forward/reverse string pairs (17 built-in pairs like "parent of" / "child of").
 ```
 
 #### POST /entities/:entityId/relations
-Create a relation on an entity. Uses the forward label string to identify
-the relation type (not a numeric ID). The write body binds **snake_case**
-(`target_entity_id` / `relation_type` / `reverse_relation_type`) and
-`target_entity_id` is **required** (empty → 400). Note the read/WS payload is
-camelCase — the shapes are deliberately asymmetric.
+Create a relation. Identifies the type by forward label string, not a
+numeric ID. Write body is **snake_case** (`target_entity_id` /
+`relation_type` / `reverse_relation_type`), `target_entity_id` **required**
+(empty → 400). Read/WS payload is camelCase — deliberately asymmetric.
+`metadata` is a raw object (`json.RawMessage`), not a JSON-encoded string.
 
 **Request:**
 ```json
-{
-  "target_entity_id": "uuid",
-  "relation_type": "parent of",
-  "reverse_relation_type": "child of",
-  "metadata": {}
-}
+{ "target_entity_id": "uuid", "relation_type": "parent of", "reverse_relation_type": "child of", "metadata": {} }
 ```
 
-> **Erratum (FM-SYNC-WIRE-FIX-R1):** `item-sync.mjs` previously sent this body
-> camelCase (`targetEntityId`/`relationType`) with a null target, so every
-> create 400'd. Now snake_case, and it SKIPS the create when the item has no
-> linked Chronicle target entity (a custom Foundry item has nothing to relate
-> to). Metadata is sent as a raw object (bound as `json.RawMessage`), not a
-> JSON-encoded string.
+`item-sync.mjs` skips the create when the item has no linked Chronicle target
+entity (a custom Foundry item has nothing to relate to).
 
 #### GET /entities/:entityId/relations
 List all relations on an entity.
@@ -534,26 +441,18 @@ List all relations on an entity.
 
 #### DELETE /relations/:relationId
 Delete a relation (and its reverse). `relationId` is the numeric relation id.
+The route is flat — `DELETE /relations/:relationId` (`syncapi/routes.go`),
+never nested under `/entities`.
 
 **Used by:** `item-sync.mjs` → remove item from actor inventory
 
-> **Erratum (FM-SYNC-WIRE-FIX-R1):** the route is FLAT. Earlier revisions of
-> this doc (and `item-sync.mjs`) used a nested
-> `DELETE /entities/:entityId/relations/:relationId`, which Chronicle does not
-> serve (404). Chronicle's real route is `DELETE /relations/:relationId`
-> (`syncapi/routes.go`).
-
 #### PUT /relations/:relationId
 Update relation metadata (e.g., item quantity, equipped state). Body is
-`{ "metadata": { ... } }` only (bound as `json.RawMessage`); relation type and
-target are immutable via this route.
+`{ "metadata": { ... } }` only (`json.RawMessage`); relation type and target
+are immutable via this route. Flat route, no `/metadata` suffix
+(`syncapi/routes.go`).
 
 **Used by:** `item-sync.mjs` → update inventory item metadata
-
-> **Erratum (FM-SYNC-WIRE-FIX-R1):** the route is FLAT and takes no
-> `/metadata` suffix. Earlier revisions used
-> `PUT /entities/:entityId/relations/:relationId/metadata` (404). Chronicle's
-> real route is `PUT /relations/:relationId` (`syncapi/routes.go`).
 
 ---
 
@@ -586,13 +485,8 @@ Lists all sync mappings for the campaign.
 ```json
 {
   "data": [
-    {
-      "id": "uuid",
-      "chronicle_id": "entity-uuid",
-      "foundry_id": "foundry-doc-id",
-      "type": "entity",
-      "last_synced": "2026-01-15T12:00:00Z"
-    }
+    { "id": "uuid", "chronicle_id": "entity-uuid", "foundry_id": "foundry-doc-id",
+      "type": "entity", "last_synced": "2026-01-15T12:00:00Z" }
   ]
 }
 ```
@@ -603,12 +497,9 @@ Creates a new sync mapping. Body shape is `CreateSyncMappingInput`.
 **Request:**
 ```json
 {
-  "chronicle_type": "entity",
-  "chronicle_id": "entity-uuid",
-  "external_system": "foundry",
-  "external_id": "foundry-doc-id",
-  "sync_direction": "both",
-  "sync_metadata": {}
+  "chronicle_type": "entity", "chronicle_id": "entity-uuid",
+  "external_system": "foundry", "external_id": "foundry-doc-id",
+  "sync_direction": "both", "sync_metadata": {}
 }
 ```
 
@@ -635,18 +526,12 @@ Looks up a mapping by **Chronicle identity** OR **external (Foundry) identity**.
 **Response:** the full `SyncMapping`
 ```json
 {
-  "id": "mapping-uuid",
-  "campaign_id": "campaign-uuid",
-  "chronicle_type": "entity",
-  "chronicle_id": "entity-uuid",
-  "external_system": "foundry",
-  "external_id": "foundry-doc-id",
-  "sync_version": 1,
-  "last_synced_at": "2026-01-01T00:00:00Z",
-  "sync_direction": "both",
-  "sync_metadata": {},
-  "created_at": "2026-01-01T00:00:00Z",
-  "updated_at": "2026-01-01T00:00:00Z"
+  "id": "mapping-uuid", "campaign_id": "campaign-uuid",
+  "chronicle_type": "entity", "chronicle_id": "entity-uuid",
+  "external_system": "foundry", "external_id": "foundry-doc-id",
+  "sync_version": 1, "last_synced_at": "2026-01-01T00:00:00Z",
+  "sync_direction": "both", "sync_metadata": {},
+  "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z"
 }
 ```
 
@@ -663,13 +548,7 @@ Pulls all changes since a timestamp.
 
 **Response:**
 ```json
-{
-  "entities": [ ],
-  "deleted_entities": [ "uuid1", "uuid2" ],
-  "drawings": [ ],
-  "tokens": [ ],
-  "calendar_events": [ ]
-}
+{ "entities": [ ], "deleted_entities": [ "uuid1", "uuid2" ], "drawings": [ ], "tokens": [ ], "calendar_events": [ ] }
 ```
 
 #### POST /sync
@@ -682,10 +561,10 @@ Generic sync endpoint for batch operations.
 #### GET /maps
 Lists all maps in the campaign.
 
-> **Note:** The Foundry module renders a Chronicle map as a JournalEntry image
-> page with an SVG overlay (`MapViewerSheet`), not as a Foundry Scene. Drawing,
-> token, fog, and layer endpoints (below) are pulled read-only for that
-> overlay; only markers are editable from Foundry and pushed back.
+> **Note:** the module renders a Chronicle map as a JournalEntry image page
+> with an SVG overlay (`MapViewerSheet`), not a Foundry Scene. Drawing, token,
+> fog and layer endpoints below are read-only for that overlay; only markers
+> are editable and pushed back.
 
 #### GET /maps/:mapId/drawings
 All coordinates are percentage-based (0–100), not pixels. `drawing_type` is
@@ -693,12 +572,9 @@ one of `freehand`, `rectangle`, `ellipse`, `polygon`, `text`.
 
 ```json
 {
-  "id": "drw_001", "map_id": "map_001", "layer_id": null,
-  "drawing_type": "rectangle", "points": [],
-  "stroke_color": "#ff0000", "stroke_width": 2,
-  "fill_color": "#00ff00", "fill_alpha": 0.5,
-  "text_content": null, "font_size": null, "rotation": 0,
-  "visibility": "everyone", "visibility_rules": null,
+  "id": "drw_001", "map_id": "map_001", "layer_id": null, "drawing_type": "rectangle", "points": [],
+  "stroke_color": "#ff0000", "stroke_width": 2, "fill_color": "#00ff00", "fill_alpha": 0.5,
+  "text_content": null, "font_size": null, "rotation": 0, "visibility": "everyone", "visibility_rules": null,
   "created_by": "user_001", "foundry_id": null
 }
 ```
@@ -708,16 +584,14 @@ Coordinates are percentage-based (0–100); `width`/`height` are grid units.
 
 ```json
 {
-  "id": "tok_001", "map_id": "map_001", "layer_id": null,
-  "entity_id": "ent_goblin01", "name": "Goblin Archer",
-  "image_path": "/uploads/tokens/goblin.png",
-  "x": 45.2, "y": 67.8, "width": 5.0, "height": 5.0,
-  "rotation": 0, "scale": 1.0, "is_hidden": false, "is_locked": false,
+  "id": "tok_001", "map_id": "map_001", "layer_id": null, "entity_id": "ent_goblin01",
+  "name": "Goblin Archer", "image_path": "/uploads/tokens/goblin.png",
+  "x": 45.2, "y": 67.8, "width": 5.0, "height": 5.0, "rotation": 0, "scale": 1.0,
+  "is_hidden": false, "is_locked": false,
   "bar1_value": 15, "bar1_max": 15, "bar2_value": null, "bar2_max": null,
   "aura_radius": null, "aura_color": null,
   "light_radius": null, "light_dim_radius": null, "light_color": null,
-  "vision_enabled": false, "vision_range": null,
-  "elevation": 0, "sort_order": 0,
+  "vision_enabled": false, "vision_range": null, "elevation": 0, "sort_order": 0,
   "status_effects": null, "flags": null, "foundry_id": null
 }
 ```
@@ -754,10 +628,8 @@ Updates a map marker. **PARTIAL update** — absent preserves, an explicit
 under `PUT /entities/:entityId`).
 
 `foundry_id` is this module's pairing key. It stays clearable HERE — send
-`{"foundry_id": null}` to unpair — while Chronicle's own web marker form,
-which never sends the key, can no longer NULL it by omission. That omission
-used to unpair every marker a GM edited in the browser, which showed up later
-as duplicate markers on the next sync.
+`{"foundry_id": null}` to unpair — while Chronicle's web marker form, which
+never sends the key, can no longer NULL it by omission.
 
 #### DELETE /maps/:mapId/markers/:markerId
 Deletes a map marker.
@@ -766,23 +638,17 @@ Deletes a map marker.
 
 ### Calendar
 
-> ### ⚠ CALENDAR BLACKOUT — every route in this section answers 503 (2026-08-21)
+> ### CALENDAR BLACKOUT — every route in this section answers 503
 >
 > Chronicle deleted its calendar plugin for a ground-up rebuild (V5). All 34
-> routes below stay REGISTERED and answer
-> `503 {"error":"calendar_rebuilding","message":"…"}`.
+> routes stay REGISTERED and answer `503
+> {"error":"calendar_rebuilding","message":"…"}` — 503, not 404, so the module
+> doesn't fall back to old-build compatibility and hide the reason from the
+> GM. Maps, actors, items, notes, media and entities are unaffected. See
+> CLAUDE.md → "Calendar blackout".
 >
-> 503 rather than 404 **deliberately**: a 404 would send the module down its
-> old-build compatibility path and hide the reason from the GM. Maps, actors,
-> items, notes, media and entities are unaffected.
->
-> Chronicle commits: the routes were held open first, then the plugin was
-> deleted. The module's handling is FM-CAL-BLACKOUT — see CLAUDE.md →
-> "Calendar blackout".
->
-> **The specifications below describe the pre-blackout contract and are kept as
-> the starting point for V5 — they do not describe what the server does today.**
-> **Re-verify by: when calendar V5 ships.**
+> **The specs below are the pre-blackout contract, kept as the V5 starting
+> point, not today's behavior. Re-verify by: when calendar V5 ships.**
 
 All calendar endpoints require the calendar addon to be enabled.
 
@@ -793,22 +659,12 @@ moons, seasons, eras, event_categories, cycles, festivals.
 **Response:**
 ```json
 {
-  "id": "uuid",
-  "campaign_id": "uuid",
-  "mode": "fantasy",
-  "name": "Calendar of Harptos",
-  "description": "...",
-  "epoch_name": "DR",
-  "current_year": 1492,
-  "current_month": 1,
-  "current_day": 15,
-  "current_hour": 14,
-  "current_minute": 30,
-  "hours_per_day": 24,
-  "minutes_per_hour": 60,
-  "seconds_per_minute": 60,
-  "leap_year_every": 4,
-  "leap_year_offset": 0,
+  "id": "uuid", "campaign_id": "uuid", "mode": "fantasy",
+  "name": "Calendar of Harptos", "description": "...", "epoch_name": "DR",
+  "current_year": 1492, "current_month": 1, "current_day": 15,
+  "current_hour": 14, "current_minute": 30,
+  "hours_per_day": 24, "minutes_per_hour": 60, "seconds_per_minute": 60,
+  "leap_year_every": 4, "leap_year_offset": 0,
   "months": [{ "id": 1, "name": "Hammer", "days": 30, "sort_order": 0, "is_intercalary": false, "leap_year_days": 0 }],
   "weekdays": [{ "id": 1, "name": "First Day", "sort_order": 0, "is_rest_day": false }],
   "moons": [{ "id": 1, "name": "Selûne", "cycle_days": 30.0, "phase_offset": 0.0, "color": "#c0c0ff" }],
@@ -829,12 +685,7 @@ fetch-before-push real-time check (see below)
 **Response:**
 ```json
 {
-  "mode": "fantasy",
-  "year": 1492,
-  "month": 1,
-  "day": 15,
-  "hour": 14,
-  "minute": 30,
+  "mode": "fantasy", "year": 1492, "month": 1, "day": 15, "hour": 14, "minute": 30,
   "tracks_real_time": false,
   "current_season": { "id": 1, "name": "Winter", "color": "#a0c4ff" },
   "current_moon_phases": [
@@ -842,16 +693,11 @@ fetch-before-push real-time check (see below)
   ],
   "current_era": { "id": 1, "name": "Dale Reckoning", "start_year": 1, "color": "#6366f1" },
   "current_weather": {
-    "preset_id": "rain",
-    "preset_label": "Rain",
-    "icon": "cloud-rain",
-    "color": "#6b9bd2",
+    "preset_id": "rain", "preset_label": "Rain", "icon": "cloud-rain", "color": "#6b9bd2",
     "temperature_celsius": 12.0,
     "wind": { "speed_kph": 25.0, "speed_tier": "moderate", "direction": "NW", "direction_degrees": 315 },
     "precipitation": { "type": "rain", "intensity": 0.6 },
-    "zone_id": "temperate",
-    "zone_name": "Temperate",
-    "description": "Steady rainfall"
+    "zone_id": "temperate", "zone_name": "Temperate", "description": "Steady rainfall"
   }
 }
 ```
@@ -859,16 +705,13 @@ fetch-before-push real-time check (see below)
 **Key:** `current_season`, `current_moon_phases`, `current_era`, and `current_weather` are
 computed server-side. They may be `null`/absent if no data is configured.
 
-**`tracks_real_time`** (RC-4, FM-REALTIME-DATE-SIGNAL): the composed
-`UsesRealTime()` predicate (`mode == reallife AND` the real-time flag), so the
-wire signal can never disagree with the write-guard below. Read it
-defensively — `payload?.tracks_real_time === true` — never assume the field
-is present (older Chronicle deployments and `GET /calendar`, the structure
-endpoint, never carry it). When `true`, the module treats dates as
-**read-only**: it skips its own `PUT /calendar/date` pushes (fetch-before-push
-check via `scripts/_realtime-date-guard.mjs`, re-probed on every push attempt
-so a mid-session enable self-heals) and shows one GM notice per session. Pull
-and event sync are unaffected.
+**`tracks_real_time`**: the composed `UsesRealTime()` predicate (`mode == reallife AND` the real-time flag).
+Read defensively — `payload?.tracks_real_time === true` — never assume it's
+present (older deployments and `GET /calendar` never carry it). When `true`,
+dates are **read-only**: the module skips `PUT /calendar/date` pushes
+(fetch-before-push check via `scripts/_realtime-date-guard.mjs`, re-probed
+each push so a mid-session enable self-heals) and shows one GM notice per
+session. Pull and event sync are unaffected.
 
 #### PUT /calendar/date
 Sets current calendar date/time to an absolute value. Rejected with **422**
@@ -883,21 +726,16 @@ a retryable sync error.
 ```
 
 #### POST /calendar/date/confirm
-**Optional — Chronicle ≥ the applied-beacon release (C-SYNC-APPLIED-BEACON).**
-Confirms that Foundry successfully *applied* a date pulled from Chronicle to
-the active local calendar module (Calendaria or SimpleCalendar), as opposed
-to merely having fetched/seen it. Chronicle's sync chip uses this to
-distinguish "Foundry SAW this date" (the `GET /calendar/date` beacon) from
-"Foundry APPLIED this date."
+**Optional** (newer Chronicle deployments only). Confirms Foundry *applied* a
+date pulled from Chronicle to the active local calendar module (Calendaria or
+SimpleCalendar), not merely fetched it — drives the sync chip's "SAW" vs.
+"APPLIED" distinction (SAW = the `GET /calendar/date` beacon).
 
 **Used by:** `calendar-sync.mjs` → `_confirmAppliedDate` via
-`scripts/_applied-date-confirm.mjs`, called from both the poll apply path
-(`onInitialSync`) and the WebSocket-driven apply path
-(`_onChronicaleDateAdvanced`, `calendar.date.advanced`) — **only** after the
-local calendar-module setter (`_setLocalDate`) reports it actually ran
-without throwing. Never sent on a bare fetch/pull, and never on an apply
-failure. An already-current date that still round-trips through a real
-setter call counts as applied and is confirmed.
+`scripts/_applied-date-confirm.mjs`, from the poll path (`onInitialSync`) and
+the WebSocket path (`_onChronicaleDateAdvanced`, `calendar.date.advanced`) —
+only after the local setter (`_setLocalDate`) runs without throwing. Never
+sent on a bare fetch or an apply failure.
 
 **Request:**
 ```json
@@ -906,13 +744,11 @@ setter call counts as applied and is confirmed.
 
 **Response:** `204 No Content`
 
-**Graceful degradation:** a Chronicle deployment that predates this endpoint
-returns 404 (route doesn't exist) or 405 (method not recognized). The module
-tolerates both silently — one `console.debug` per session, no retries — so
-it keeps working unchanged against pre-upgrade Chronicle servers. Any other
-failure (network, 5xx) is debug-logged and swallowed; a missed confirmation
-only leaves Chronicle's applied-beacon stale, it never blocks or retries
-sync. See `scripts/_applied-date-confirm.mjs::isConfirmNotSupported`.
+**Graceful degradation:** a Chronicle predating this endpoint returns 404 or
+405; the module tolerates both silently (one `console.debug`, no retries).
+Any other failure is debug-logged and swallowed — a missed confirmation only
+leaves the applied-beacon stale, never blocks sync. See
+`scripts/_applied-date-confirm.mjs::isConfirmNotSupported`.
 
 #### POST /calendar/advance
 Advances the calendar by N days (1-3650).
@@ -928,41 +764,16 @@ Advances time by hours/minutes (rolls over into days).
 
 #### Calendar Sub-Resources
 
-#### GET /calendar/seasons
-Returns all season definitions.
+Each resource has a `GET` (returns all definitions) and a `PUT` (bulk-replaces all definitions):
 
-#### PUT /calendar/seasons
-Replaces all season definitions (bulk replace).
-
-#### GET /calendar/moons
-Returns all moon definitions.
-
-#### PUT /calendar/moons
-Replaces all moon definitions.
-
-#### GET /calendar/eras
-Returns all era definitions.
-
-#### PUT /calendar/eras
-Replaces all era definitions.
-
-#### GET /calendar/event-categories
-Returns all event category definitions.
-
-#### PUT /calendar/event-categories
-Replaces all event categories.
-
-#### GET /calendar/cycles
-Returns zodiac/elemental cycle definitions with entries.
-
-#### PUT /calendar/cycles
-Replaces all cycle definitions (including entries).
-
-#### GET /calendar/festivals
-Returns fixed calendar festival entries.
-
-#### PUT /calendar/festivals
-Replaces all festival definitions.
+| Resource | Routes | Notes |
+|---|---|---|
+| Seasons | `GET`/`PUT /calendar/seasons` | |
+| Moons | `GET`/`PUT /calendar/moons` | |
+| Eras | `GET`/`PUT /calendar/eras` | |
+| Event categories | `GET`/`PUT /calendar/event-categories` | |
+| Cycles | `GET`/`PUT /calendar/cycles` | zodiac/elemental cycles, `PUT` includes entries |
+| Festivals | `GET`/`PUT /calendar/festivals` | fixed calendar entries |
 
 ---
 
@@ -981,43 +792,30 @@ Creates a calendar event.
   "description": "ProseMirror JSON or plain text",
   "description_html": "<p>Rendered HTML</p>",
   "entity_id": "optional-entity-uuid",
-  "year": 1492, "month": 11, "day": 30,
-  "start_hour": 8, "start_minute": 0,
-  "end_year": 1492, "end_month": 12, "end_day": 1,
-  "end_hour": 23, "end_minute": 59,
-  "is_recurring": true,
-  "recurrence_type": "yearly",
-  "recurrence_interval": 1,
+  "year": 1492, "month": 11, "day": 30, "start_hour": 8, "start_minute": 0,
+  "end_year": 1492, "end_month": 12, "end_day": 1, "end_hour": 23, "end_minute": 59,
+  "is_recurring": true, "recurrence_type": "yearly", "recurrence_interval": 1,
   "recurrence_end_year": null, "recurrence_end_month": null, "recurrence_end_day": null,
   "recurrence_max_occurrences": null,
-  "visibility": "everyone",
-  "category": "festival",
-  "color": "#ffd700",
-  "icon": "star",
-  "all_day": true
+  "visibility": "everyone", "category": "festival",
+  "color": "#ffd700", "icon": "star", "all_day": true
 }
 ```
 
-**New fields (Calendaria parity):**
-- `color` — Hex color for calendar display
-- `icon` — Icon identifier (FontAwesome or custom)
-- `all_day` — Whether event spans entire day(s) vs. specific times
-- `recurrence_interval` — How many periods between recurrences (e.g., every 2 years)
-- `recurrence_end_year/month/day` — When recurrence stops
-- `recurrence_max_occurrences` — Maximum number of recurrences
+**Fields (Calendaria parity):** `color` (hex), `icon` (FontAwesome/custom id),
+`all_day`, `recurrence_interval` (periods between recurrences),
+`recurrence_end_year/month/day`, `recurrence_max_occurrences`.
 
 #### PUT /calendar/events/:eventId
-Updates a calendar event. Same fields as POST, but it is a **PARTIAL update**
-— absent preserves, an explicit `null` clears, a present value replaces (see
-"The partial-update contract" under `PUT /entities/:entityId`).
+Updates a calendar event. Same fields as POST; **PARTIAL update** — absent
+preserves, an explicit `null` clears, a present value replaces (see "The
+partial-update contract" under `PUT /entities/:entityId`).
 
-This is the endpoint `calendar-sync.mjs` pushes note edits to, from three
-paths (`_onCalendariaNoteUpdated`, `_onLocalEventUpdate`,
-`_onSimpleCalendarNoteUpdate`), each with a five-key body. Before sweep R4
-every one of those pushes also wrote `is_recurring = false`, `all_day = false`
-and a cleared `entity_id`, because those were value-typed / clear-on-nil on
-the server. They are preserved now. Keep the bodies narrow: a Foundry note
-edit means the name, the date and the body, and nothing else.
+`calendar-sync.mjs` pushes note edits here from three paths
+(`_onCalendariaNoteUpdated`, `_onLocalEventUpdate`,
+`_onSimpleCalendarNoteUpdate`), each with a five-key body. Keep bodies
+narrow: a Foundry note edit means the name, the date and the body, nothing
+else.
 
 #### DELETE /calendar/events/:eventId
 Deletes a calendar event.
@@ -1029,29 +827,16 @@ Returns a single event by ID.
 
 #### Calendar Settings & Structure
 
-#### PUT /calendar/settings
-Updates calendar name, time system, leap year, current date/time.
-
-#### PUT /calendar/months
-Replaces all month definitions.
-
-#### PUT /calendar/weekdays
-Replaces all weekday definitions.
-
-#### GET /calendar/structure
-Returns calendar structure in Calendaria-compatible format.
-
-#### GET /calendar/weather
-Returns current weather state, or `{}` if none set.
-
-#### PUT /calendar/weather
-Sets current weather state (GM override).
-
-#### GET /calendar/export
-Exports the full calendar as Chronicle JSON. Add `?events=true` to include events.
-
-#### POST /calendar/import
-Imports a calendar from JSON (Chronicle, Simple Calendar, Calendaria, Fantasy-Calendar formats).
+| Route | Behavior |
+|---|---|
+| `PUT /calendar/settings` | Updates calendar name, time system, leap year, current date/time |
+| `PUT /calendar/months` | Replaces all month definitions |
+| `PUT /calendar/weekdays` | Replaces all weekday definitions |
+| `GET /calendar/structure` | Returns calendar structure in Calendaria-compatible format |
+| `GET /calendar/weather` | Returns current weather state, or `{}` if none set |
+| `PUT /calendar/weather` | Sets current weather state (GM override) |
+| `GET /calendar/export` | Exports the full calendar as Chronicle JSON; `?events=true` includes events |
+| `POST /calendar/import` | Imports a calendar from JSON (Chronicle, Simple Calendar, Calendaria, Fantasy-Calendar formats) |
 
 ---
 
@@ -1066,13 +851,8 @@ Uploads a media file (image, etc.).
 
 **Response:**
 ```json
-{
-  "id": "media-uuid",
-  "url": "/media/media-uuid.png",
-  "filename": "map-background.png",
-  "content_type": "image/png",
-  "size": 1048576
-}
+{ "id": "media-uuid", "url": "/media/media-uuid.png", "filename": "map-background.png",
+  "content_type": "image/png", "size": 1048576 }
 ```
 
 #### GET /media/:mediaId
@@ -1092,14 +872,9 @@ Lists relations for an entity (used for shop inventory).
 ```json
 {
   "data": [
-    {
-      "id": "relation-uuid",
-      "source_id": "shop-entity-uuid",
-      "target_id": "item-entity-uuid",
-      "relation_type_id": 1,
-      "metadata": { "quantity": 5, "equipped": false },
-      "target": { "id": "item-uuid", "name": "Longsword", "fields_data": {} }
-    }
+    { "id": "relation-uuid", "source_id": "shop-entity-uuid", "target_id": "item-entity-uuid",
+      "relation_type_id": 1, "metadata": { "quantity": 5, "equipped": false },
+      "target": { "id": "item-uuid", "name": "Longsword", "fields_data": {} } }
   ]
 }
 ```
@@ -1108,27 +883,22 @@ Lists relations for an entity (used for shop inventory).
 
 ## Chronicle-served Module Distribution
 
-This section documents the install/update contract — the URLs Foundry hits to
-fetch the module's manifest and zip from Chronicle (rather than GitHub).
-Settled by FM-CONSOLIDATE-R1 D1 and codified in `chronicle-package.json` at
-this repo's root (`serving.manifestEndpoint`, `serving.downloadEndpoint`).
+The install/update contract: the URLs Foundry hits to fetch the module's
+manifest and zip from Chronicle (not GitHub), codified in
+`chronicle-package.json` at this repo's root (`serving.manifestEndpoint`,
+`serving.downloadEndpoint`). Hit by **Foundry itself** (install, every update
+check) and by the Update Source diagnostic dialog
+(`scripts/update-info.mjs`), which also hits the manifest endpoint manually
+so the operator can confirm reachability.
 
-Unlike the REST endpoints above, these endpoints are hit by **Foundry itself**
-(both at install and on every update check), not by this module's runtime
-code. The Update Source diagnostic dialog (`scripts/update-info.mjs`) also
-hits the manifest endpoint manually so the operator can confirm reachability.
-
-> **For the Foundry-side narrative** (how Foundry stores the install-time
-> URL, how rotation affects already-installed instances, how update-info.mjs
-> classifies errors), see `.ai.md` → "Chronicle Integration — Install &
-> Updates".
+> Install-time URL storage, rotation effects, and `update-info.mjs` error
+> classification: `.ai.md` → "Chronicle Integration — Install & Updates".
 
 ### Authentication
 
 Per-campaign signed token in the query string — not the Bearer-token API key.
-Each token is tied to a specific campaign; Chronicle rotates them on request
-from the campaign owner. The token is generated when the owner first opens
-the Foundry VTT disclosure in their campaign settings.
+Chronicle rotates it on request from the campaign owner. Generated when the
+owner first opens the Foundry VTT disclosure in campaign settings.
 
 ```
 ?token=<signed>
@@ -1136,23 +906,17 @@ the Foundry VTT disclosure in their campaign settings.
 
 ### Token rotation behavior
 
-The campaign owner can rotate their token at any time from the Foundry VTT
-disclosure in campaign settings (the rotate button hits the `token/rotate`
-endpoint documented below). After rotation:
+The owner rotates their token any time from the Foundry VTT disclosure in
+campaign settings (rotate button → `token/rotate` below). After rotation:
 
-- The old token is **immediately invalidated**. Any Foundry instance that
-  installed before the rotation will start getting `403` with
-  `{ "error": "invalid_token", "category": "auth", ... }` on its next
-  update check.
-- The new token is the one embedded in the per-campaign URLs Chronicle
-  emits going forward. Players who reinstall via the freshly-displayed
-  URL get a working install again.
-- Recovery for existing installs is **reinstall**, not in-place repair —
-  Foundry stores the install-time URL on its own and we don't have a
-  supported way to swap it out from within the module. The Update Source
-  diagnostic dialog detects this case (`auth` category in
-  `update-info.mjs`) and surfaces a "reinstall using the fresh install
-  URL" action message.
+- The old token is **immediately invalidated**: a pre-rotation install gets
+  `403` with `{ "error": "invalid_token", "category": "auth", ... }` on its
+  next update check.
+- The new token is embedded in URLs Chronicle emits going forward;
+  reinstalling via the freshly-displayed URL works again.
+- Recovery is **reinstall**, not repair — Foundry stores the install-time URL
+  with no supported way to swap it from the module. The Update Source dialog
+  detects this (`auth` category) and suggests reinstalling.
 
 ### GET /api/v1/campaigns/:campaignId/foundry-vtt/module.json
 
@@ -1171,8 +935,7 @@ and `download`) carry Chronicle URLs:
 
 ```json
 {
-  "id": "chronicle-sync",
-  "version": "0.1.11",
+  "id": "chronicle-sync", "version": "0.1.11",
   "manifest": "https://chronicle.example.com/api/v1/campaigns/<cid>/foundry-vtt/module.json?token=<signed>",
   "download": "https://chronicle.example.com/api/v1/campaigns/<cid>/foundry-vtt/module.zip?token=<signed>",
   "...": "all other fields unchanged from the on-disk module.json"
@@ -1184,79 +947,54 @@ and `download`) carry Chronicle URLs:
 strings:
 
 ```json
-{
-  "error": "invalid_token",
-  "category": "auth",
-  "message": "The install-time token was rotated by the campaign owner..."
-}
+{ "error": "invalid_token", "category": "auth", "message": "The install-time token was rotated by the campaign owner..." }
 ```
 
-- `error` — machine-readable code from the catalog below. **Opaque
-  identifier**, used for logs / debugging. Foundry consumers MUST NOT
-  branch on this field; treating it as a public enum couples Foundry to
-  Chronicle's internal naming. Branch on `category` instead.
-- `category` — snake_case bucket from the five-value enum below
-  (`auth`, `config`, `not_found`, `validation`, `internal`). Pinned by
-  cordinator `decisions/2026-05-17-error-catalog-wire-contract.md`. This
-  is the canonical wire field name (Chronicle marshals it as
-  `json:"category"`); the `chronicleCategory` identifier seen inside
-  `scripts/update-info.mjs` is a local function-parameter rename, not a
-  wire field.
-- `message` — human-readable, operator-actionable string. Render verbatim;
-  do not re-construct on the client side.
+- `error` — code from the catalog below. **Opaque**, logs/debugging only.
+  Foundry MUST NOT branch on it — that couples Foundry to Chronicle's
+  internal naming. Branch on `category` instead.
+- `category` — snake_case bucket, one of `auth`, `config`, `not_found`,
+  `validation`, `internal`. Pinned by cordinator
+  `decisions/2026-05-17-error-catalog-wire-contract.md`; canonical wire field
+  (`json:"category"`) — `update-info.mjs`'s `chronicleCategory` is a local
+  rename, not the wire field.
+- `message` — human-readable, operator-actionable. Render verbatim.
 
-**Authoritative catalog.** The live source of truth is `error-catalog.json`
-at the Chronicle repo, pinned by the wire-contract decision:
+**Authoritative catalog:** `error-catalog.json` at the Chronicle repo, pinned
+by the wire-contract decision above:
 
 ```
 https://raw.githubusercontent.com/keyxmakerx/Chronicle/main/internal/plugins/foundry_vtt/error-catalog.json
 ```
 
-The artifact is treated as **implicit schema v1** — it does not currently
-carry an explicit `schema_version` field, and the decision to add one is
-deferred to the FM-DRIFT-GUARD dispatch (which will pin both the field
-shape and the CI mismatch behavior). FM-DRIFT-GUARD CI (queued) will
-fetch this URL on every Foundry PR and assert the table below matches.
+The artifact is treated as **implicit schema v1** — it carries no explicit
+`schema_version` field.
 
-| `error` code                   | `category`   | Description                                                                                                                       |
-|--------------------------------|--------------|-----------------------------------------------------------------------------------------------------------------------------------|
-| `campaign_not_found`           | `not_found`  | Campaign id in the URL does not exist (deleted by the owner, or never existed). HTTP 404.                                         |
-| `descriptor_invalid`           | `validation` | The release zip's `chronicle-package.json` failed schema validation on Chronicle's `PostInstallHook`. HTTP 422.                   |
-| `invalid_token`                | `auth`       | Token signature does not match (rotated, forged, or truncated). HTTP 403.                                                         |
-| `module_json_missing`          | `internal`   | The resolved release zip is missing its `module.json` at the descriptor's `moduleJsonPath`. Chronicle-side packaging bug. HTTP 500. |
-| `no_package_registered`        | `config`     | Chronicle has no package registered for this campaign's Foundry serving slot. Owner needs to install / re-pin a release. HTTP 503. |
-| `no_version_available`         | `config`     | Campaign has no pinned version and no auto-latest is available (e.g., catalog is empty). HTTP 503.                                |
-| `pinned_version_not_installed` | `config`     | Campaign is pinned to a version that isn't in Chronicle's installed catalog (race after admin-side unpublish, or stale pin). HTTP 503. |
-| `token_not_initialized`        | `config`     | Owner has never opened the Foundry VTT disclosure for this campaign, so no token has been generated yet. HTTP 503.                |
+| `error` code | `category` | Description | HTTP |
+|---|---|---|---|
+| `campaign_not_found` | `not_found` | Campaign id in the URL doesn't exist (deleted, or never existed) | 404 |
+| `descriptor_invalid` | `validation` | Release zip's `chronicle-package.json` failed schema validation (`PostInstallHook`) | 422 |
+| `invalid_token` | `auth` | Token signature doesn't match (rotated, forged, truncated) | 403 |
+| `module_json_missing` | `internal` | Release zip is missing `module.json` at the descriptor's `moduleJsonPath` (Chronicle packaging bug) | 500 |
+| `no_package_registered` | `config` | No package registered for this campaign's Foundry serving slot — install / re-pin a release | 503 |
+| `no_version_available` | `config` | No pinned version and no auto-latest available (catalog empty) | 503 |
+| `pinned_version_not_installed` | `config` | Pinned version isn't in Chronicle's installed catalog (race after unpublish, or stale pin) | 503 |
+| `token_not_initialized` | `config` | Owner has never opened the Foundry VTT disclosure for this campaign | 503 |
 
-`error-catalog.json` also lists Chronicle's catch-all `ErrInternal`
-constructor with `wildcard: true`, category `internal`, HTTP 500. In the
-catalog file this entry's `code` is the literal placeholder `<dynamic>`;
-on the wire, the runtime `error` value is the underlying Go error
-message, **not** the literal text `<dynamic>`. Consumer rules per
-cordinator `decisions/2026-05-17-error-catalog-wire-contract.md`:
+`error-catalog.json` also lists a catch-all `ErrInternal` constructor:
+`wildcard: true`, category `internal`, HTTP 500. Its catalog `code` is the
+placeholder `<dynamic>`; the wire `error` value is the actual Go error
+message. Treat wildcard codes as valid but **opaque** — never enumerate or
+branch on the runtime `error` value; `category` (`internal`) is authoritative
+for routing, `message` renders verbatim.
 
-- Treat wildcard codes as valid but **opaque**. Do not enumerate them in
-  any code→category map; do not branch on the runtime `error` value.
-- The `category` field remains authoritative for routing (here,
-  `internal`). Render `message` verbatim as with any other error.
-- Documentation lists the wildcard as a placeholder row, not an
-  enumerable code. FM-DRIFT-GUARD CI will treat any `wildcard: true`
-  entry as "any code value matches the placeholder" so the doc keeps
-  passing even though the wire payload differs from the literal
-  `<dynamic>` string.
-
-**Fallback when `category` is missing or unrecognized.**
-`scripts/update-info.mjs`'s `categorize()` (file:line
-`scripts/update-info.mjs:104-110`) trusts `body.category` if it appears
-in the local `CHRONICLE_CATEGORIES` set; otherwise it derives a category
-from HTTP status: 401 / 403 → `auth`, 404 → `not_found`, 5xx → `internal`,
-anything else → `internal`. There is intentionally **no** code-to-category
-lookup table on the Foundry side — branching on `error` would re-create
-the cross-repo drift the wire contract was written to prevent. New
-Chronicle categories therefore need a paired Foundry-side update; until
-that update lands, an unrecognized `category` falls through to HTTP-status
-classification (less precise, but never wrong).
+**Fallback when `category` is missing or unrecognized:**
+`categorize()` in `scripts/update-info.mjs` trusts `body.category` if it's in
+the local `CHRONICLE_CATEGORIES` set, else derives one from HTTP status
+(401/403 → `auth`, 404 → `not_found`, else → `internal`). No
+code-to-category lookup exists by design — branching on `error` would
+reintroduce cross-repo drift; a new Chronicle category needs a paired
+Foundry-side update first.
 
 ### GET /api/v1/campaigns/:campaignId/foundry-vtt/module.zip
 
@@ -1266,30 +1004,25 @@ the manifest endpoint.
 **Used by:** Foundry's install/update flow, after reading the `download` URL
 from the manifest response.
 
-**Response:** `application/zip` body. The embedded `module.json` inside the
-zip carries Chronicle URLs (not the GitHub URLs in the source zip), so
-Foundry's subsequent update checks go to Chronicle. This rewrite happens at
-download time per-campaign, so two campaigns hitting the same on-disk source
-zip get two zips whose embedded `module.json` carries different
-campaign-specific URLs. Settled by C-FMC-7.
+**Response:** `application/zip` body. The embedded `module.json` carries
+Chronicle URLs (not the source zip's GitHub URLs), so subsequent update
+checks go to Chronicle. Rewritten at download time per-campaign, so two
+campaigns hitting the same source zip get differently-addressed zips.
 
 **Error response:** Same JSON error shape as the manifest endpoint (same
 `error` / `message` / `category` triple, same code catalog).
 
 ### Owner-side endpoints (Chronicle web app)
 
-These endpoints are part of Chronicle's web UI, **not** called by Foundry or
-by anything in this module. They are documented here because they affect the
-contract Foundry depends on — token rotation invalidates installs, pin
-changes change the version served to Foundry — and a future contributor
-reading this file should know they exist.
+Part of Chronicle's web UI, **not** called by Foundry or this module.
+Documented because they affect the contract: token rotation invalidates
+installs, pin changes change the version served to Foundry.
 
 #### POST /api/v1/campaigns/:campaignId/foundry-vtt/token/rotate
 
 Owner-only. Rotates the per-campaign signed token. After rotation, all
-existing Foundry installs of this campaign's module will get
-`invalid_token` errors on their next update check (see "Token rotation
-behavior" above).
+existing Foundry installs of this campaign's module get `invalid_token`
+errors on their next update check (see "Token rotation behavior" above).
 
 **Used by:** Chronicle's owner-side Foundry VTT disclosure (rotate button).
 
@@ -1304,11 +1037,9 @@ absent pin means "track latest". A specific version (e.g., `0.1.11`) means
 
 **Used by:** Chronicle's owner-side Foundry VTT disclosure (pin selector).
 
-**Effect on Foundry:** Already-installed instances will see the new version
-on their next `module.json` update check. Foundry will offer an update if
-the new pin's version is greater than the installed version, a downgrade
-prompt if it's lower (Foundry's native behavior — not module-specific), or
-do nothing if it's equal.
+**Effect on Foundry:** installed instances see the new version on their next
+`module.json` check — an update offer if the pin's version is greater, a
+downgrade prompt if lower (Foundry's native behavior), nothing if equal.
 
 ### Serving descriptor
 
@@ -1334,12 +1065,11 @@ this module. Schema v1:
 ```
 
 This is the **contract between this repo and Chronicle's `packages` plugin**.
-Chronicle reads it from the extracted zip via `PostInstallHook` (C-FMC-5b);
-absent or invalid descriptor falls back to hardcoded defaults matching the
-schema above. CI validates the descriptor on every push via
-`tools/check-package-descriptor.mjs`.
+Chronicle reads it from the extracted zip via `PostInstallHook`; an absent or
+invalid descriptor falls back to hardcoded defaults matching the schema
+above. `tools/check-package-descriptor.mjs` validates it on every push.
 
-If Chronicle's URL shape ever changes, three places update together:
+If Chronicle's URL shape changes, update all three together:
 
 1. `chronicle-package.json` (`serving.manifestEndpoint` / `downloadEndpoint`)
 2. `scripts/update-info.mjs` (`CHRONICLE_MANIFEST_RE` classifier)
@@ -1349,11 +1079,10 @@ If Chronicle's URL shape ever changes, three places update together:
 
 ## WebSocket Protocol
 
-> **Every `calendar.*` message type below is DORMANT (2026-08-21).** Chronicle's
-> calendar event publisher was deleted with the plugin, so no `calendar.*`
-> message reaches the wire. Consequence worth knowing: a structure-mismatch
-> pause taken before the blackout cannot be cleared by its documented recovery
-> path (a `calendar.structure.updated` broadcast) until V5 — reload the world.
+> **Every `calendar.*` message type below is DORMANT.** Chronicle's calendar
+> event publisher was deleted with the plugin, so none reach the wire. A
+> structure-mismatch pause from before the blackout can't be cleared by its
+> recovery path (`calendar.structure.updated`) until V5 — reload the world.
 > **Re-verify by: when calendar V5 ships.**
 
 ### Connection
@@ -1376,7 +1105,7 @@ If the token is invalid, the server rejects the upgrade.
 ### Message Types
 
 | Type | Data Payload | Description |
-|------|-------------|-------------|
+|---|---|---|
 | `entity.created` | Full entity object | New entity created |
 | `entity.updated` | Full entity object | Entity modified |
 | `entity.deleted` | `{ id: "uuid" }` | Entity deleted |
@@ -1408,27 +1137,24 @@ If the token is invalid, the server rejects the upgrade.
 ### What the module does with each `calendar.*` type
 
 Handled in `scripts/calendar-sync.mjs` `onMessage` + `scripts/_calendar-subresources.mjs`.
-The handling is **display-level and non-destructive**: no branch below writes
-a Chronicle value into the Foundry calendar's stored structure, and none
-creates a note. Chat announcements are **GM whispers only** — never public
-chat, so a payload Chronicle gated to the DM is not laundered into a
-player-visible one.
+**Display-level and non-destructive**: no branch writes a Chronicle value
+into the Foundry calendar's stored structure, and none creates a note. Chat
+announcements are **GM whispers only** — never public, so a DM-gated payload
+is never laundered into a player-visible one.
 
 | Type | Module behavior | Calendaria | Simple Calendar |
-|------|-----------------|-----------|-----------------|
+|---|---|---|---|
 | `calendar.date.advanced` | Applies the date, confirms it back | `CALENDARIA.api.setDateTime` | `SimpleCalendar.api` date set |
 | `calendar.event.created/updated/deleted` | Mirrors to a calendar note | Full (notes API) | Full (journal-flag notes) |
-| `calendar.weather.changed` | Updates the dashboard world-state panel; applies to the calendar module if it exposes a weather **setter**, else whispers a GM chat line. A `null` payload triggers one `GET /calendar/weather` refetch. | Reads only on shipped builds — the module probes `setWeather` / `setCurrentWeather` / `setWeatherForDate` and falls back to chat when absent (the probe result is reported in the diagnostics bundle) | No weather surface → chat fallback |
+| `calendar.weather.changed` | Updates the dashboard world-state panel; applies to the calendar module if it exposes a weather **setter**, else whispers a GM chat line. `null` payload → one `GET /calendar/weather` refetch. | Probes `setWeather` / `setCurrentWeather` / `setWeatherForDate`, falls back to chat when absent (probe result in diagnostics bundle) | No weather surface → chat fallback |
 | `calendar.season.changed` | Panel + GM chat line (`calendarAnnounceSeasonEra`, default **on**) | Display only | Display only |
 | `calendar.era.changed` | Panel + GM chat line (`calendarAnnounceSeasonEra`, default **on**) | Display only | Display only |
 | `calendar.moon.phase_changed` | Panel + GM chat line (`calendarAnnounceMoon`, default **off** — moons change phase every few in-world days) | Display only | Display only |
-| `calendar.worldstate.changed` | Panel + GM chat line (`calendarAnnounceWorldstate`, default **on**). Handler is wired and tested but currently unreachable (blackout). | Display only | Display only |
-| `calendar.structure.updated`, `calendar.cycle.changed`, `calendar.festival.changed` | Refetches `GET /calendar`, re-runs the structure comparison, and sets the badge: pause if now incompatible, clear a prior mismatch pause if now compatible, otherwise raise the advisory `structure-changed` state. **Never auto-applies the structure** — rewriting months/weekdays would silently re-date every existing note. Processed even while sync is paused (the only recovery path). | Both | Both |
-| any other `calendar.*` | `default:` branch logs one `console.debug` line **per type per session** — no silent drops | — | — |
+| `calendar.worldstate.changed` | Panel + GM chat line (`calendarAnnounceWorldstate`, default **on**). Wired and tested, unreachable during blackout. | Display only | Display only |
+| `calendar.structure.updated`, `calendar.cycle.changed`, `calendar.festival.changed` | Refetches `GET /calendar`, re-runs the structure comparison, sets the badge: pause if now incompatible, clear a prior pause if compatible, else raise advisory `structure-changed`. **Never auto-applies the structure** — rewriting months/weekdays would silently re-date every note. Runs even while sync is paused (the only recovery path). | Both | Both |
+| any other `calendar.*` | `default:` logs one `console.debug` line **per type per session** — no silent drops | — | — |
 
-Every cross-repo claim in this document carries a `Re-verify by:` line: a
-calendar wire gap here was once reported fixed, then the whole plugin was
-deleted before anyone re-checked, and the stale claim stood for weeks.
+Every cross-repo claim here carries a `Re-verify by:` line.
 
 ### Reconnection
 

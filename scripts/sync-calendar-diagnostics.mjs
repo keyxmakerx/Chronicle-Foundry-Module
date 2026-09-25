@@ -51,8 +51,8 @@ function kv(key, value, keepEmpty = true) {
 /**
  * Build the diagnostics report.
  *
- * Every field is optional; missing data degrades to "—"/"(unknown)" rather than
- * throwing, because the collector gathers each piece under its own try/catch.
+ * Every field is optional; missing data degrades to "—"/"(unknown)" instead
+ * of throwing, since the collector gathers each piece under its own try/catch.
  *
  * @param {object} [input]
  * @param {string} [input.generatedAt] - ISO timestamp.

@@ -1,21 +1,11 @@
 #!/usr/bin/env node
 /**
- * Tests for JournalSync.resyncAll.
- *
- * Covers:
- *   - Updates existing journals (calls _onEntityUpdated path).
- *   - Creates journals for entities without one (calls _createJournalFromEntity path).
- *   - Honors skip routing: excludes excluded entities, entities handled by ActorSync,
- *     and tolerates entities with no id.
- *   - Handles paginated fetch (stops after page returns < 100 results).
- *   - Returns correct {updated, created, skipped, errors} summary.
- *   - Fires verbose ui.notifications when verbose=true, quiet when verbose=false.
- *   - Early-exits when not GM, API absent, or syncJournals disabled.
- *   - Tolerates per-entity fetch failures gracefully (errors count up, doesn't abort).
- *
- * Pure-function tested — no Foundry runtime. Node's built-in `node:test`.
- *
- * Run: `node --test tools/test-journal-resync-all.mjs`
+ * Tests for JournalSync.resyncAll: update vs. create routing, skip rules
+ * (excluded entities, ActorSync-handled entities, missing id), paginated
+ * fetch termination, the {updated, created, skipped, errors} summary,
+ * verbose vs. quiet notifications, early-exit guards (not GM / no API /
+ * syncJournals disabled), and per-entity fetch failures counting up
+ * instead of aborting.
  */
 
 import test from 'node:test';

@@ -1,21 +1,14 @@
 #!/usr/bin/env node
 /**
- * Chronicle's calendar plugin is being rebuilt (V5); all calendar routes
- * stay registered and answer `503 {"error":"calendar_rebuilding", …}` — 503
- * rather than 404 on purpose, so this module doesn't take its "too old
- * Chronicle" compatibility path. Pins:
- *
- *   1. `calendarStateFromError` classifies 503/calendar_rebuilding as its own
- *      'rebuilding' state — never 'absent' (advises importing a calendar
- *      that has nowhere to go) and never 'auth' (blames the GM's token).
- *   2. The api-client attaches `status` and `code` to the thrown error, so no
- *      caller has to regex the message prose.
- *   3. The push storm stays dead: many world-time ticks cost one request and
- *      one GM notice, not one per tick.
- *   4. The error log coalesces identical repeats, so a failing endpoint can't
- *      evict every other error from the shared ring buffer.
- *   5. SAFE-HALF PINS: a calendar 503 must never abort the rest of initial
- *      sync, and must never write a date into the Foundry world.
+ * Chronicle's calendar plugin is mid-rebuild (V5); all calendar routes
+ * answer `503 {"error":"calendar_rebuilding", …}` (503, not 404, so this
+ * module doesn't take its "too old Chronicle" compatibility path). Pins:
+ * `calendarStateFromError` maps it to its own 'rebuilding' state (never
+ * 'absent' or 'auth'); the thrown error carries `status`/`code` so callers
+ * don't regex the message; many world-time ticks cost one request and one
+ * GM notice, not one per tick; the error log coalesces identical repeats;
+ * and a calendar 503 must never abort the rest of initial sync or write a
+ * date into the Foundry world.
  */
 
 import test from 'node:test';

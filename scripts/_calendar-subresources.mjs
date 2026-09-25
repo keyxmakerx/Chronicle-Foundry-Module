@@ -2,34 +2,19 @@
  * Chronicle Sync — calendar sub-resource projection.
  *
  * Holds the PURE half of routing Chronicle's `calendar.*` WebSocket types:
- * payload normalization, the human-readable one-liners the chat/dashboard
- * surfaces render, and the reducer that maintains the "last known
- * sub-resource state" snapshot the dashboard's Calendar tab reads.
- * Everything that touches Foundry globals (ChatMessage, CALENDARIA.api,
- * ui.notifications) stays in `calendar-sync.mjs` so this file is
- * unit-testable off-DOM.
+ * payload normalization, the one-liners the chat/dashboard surfaces render,
+ * and the reducer that maintains the "last known sub-resource state"
+ * snapshot the dashboard's Calendar tab reads. Everything touching Foundry
+ * globals (ChatMessage, CALENDARIA.api, ui.notifications) stays in
+ * `calendar-sync.mjs` so this file is unit-testable off-DOM.
  *
- * ## Payload shapes
- *
- * | Type                          | Payload                                              |
- * |-------------------------------|------------------------------------------------------|
- * | `calendar.season.changed`     | `{id, name, color}` — **or `null`** when the date left a season without entering another |
- * | `calendar.era.changed`        | `{id, name, color}`                                  |
- * | `calendar.moon.phase_changed` | `{moon_id, moon_name, phase_name, phase_position}`   |
- * | `calendar.weather.changed`    | merged `WeatherInput` (FLAT snake_case) — **or `null`** from the weather-zone paths |
- * | `calendar.structure.updated`  | `null`                                               |
- * | `calendar.cycle.changed`      | `null`                                               |
- * | `calendar.festival.changed`   | `null`                                               |
- * | `calendar.worldstate.changed` | `{date:{year,month,day}, moodTint:{color,intensity}}` |
- *
- * 1. **A null payload is normal, not an error.** Four of the eight types can
- *    arrive with `payload: null` by design. Handlers must treat null as "this
- *    changed — refetch if you care", never as a malformed message.
- * 2. **Weather arrives in two different shapes.** The WS payload is the FLAT
- *    `WeatherInput` (`wind_speed_kph`, `precipitation_type`); a refetch of
- *    `GET /calendar/weather` returns the NESTED `Weather` model
- *    (`wind: {speed_kph}`, `precipitation: {type}`). `normalizeWeather` accepts
- *    both so the refetch path and the push path render identically.
+ * `calendar.season/structure/cycle/festival.changed` and
+ * `calendar.weather.changed` (from weather-zone paths) can arrive with
+ * `payload: null` by design — treat null as "this changed, refetch if you
+ * care", never as malformed. Weather itself arrives in two shapes: the WS
+ * payload is flat `WeatherInput` (`wind_speed_kph`, ...); a refetch of
+ * `GET /calendar/weather` returns nested `Weather` (`wind: {speed_kph}`,
+ * ...). `normalizeWeather` accepts both so refetch and push render alike.
  */
 
 /**
@@ -115,18 +100,10 @@ function num(v) {
 }
 
 /**
- * Normalize either weather shape into one flat record for rendering.
- *
- * Accepts BOTH:
- *   - the WS payload: flat merged `WeatherInput`
- *     (`wind_speed_kph`, `wind_speed_tier`, `wind_direction`,
- *     `precipitation_type`, `precipitation_intensity`)
- *   - a `GET /calendar/weather` response: nested `Weather`
- *     (`wind: {speed_kph, speed_tier, direction}`,
- *     `precipitation: {type, intensity}`)
- *
- * Returns null when the input carries no renderable field at all — the caller
- * treats that as "nothing to announce" rather than posting an empty line.
+ * Normalize either weather shape (flat WS `WeatherInput`, or nested
+ * `GET /calendar/weather` `Weather`) into one flat record for rendering.
+ * Returns null when nothing renderable is present, so callers skip an
+ * announcement instead of posting an empty one.
  *
  * @param {object|null|undefined} raw
  * @returns {{presetLabel:string|null, temperatureC:number|null, windTier:string|null,
