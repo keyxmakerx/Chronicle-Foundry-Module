@@ -10,14 +10,14 @@
  * fallback for types Chronicle doesn't yet emit — TODO(#90) markers), and
  * provides the marker CRUD helpers MapViewerSheet's edit affordances use.
  *
- * Visibility gate (DM-only data must never reach flags, which sync to
- * players): `dm_only` markers and all fog stay in GM memory only;
- * `everyone` markers are flag-stored with per-user `visibility_rules`
- * embedded for client-side filtering (a known DOM-inspection leak — the
- * marker name is visible in flags to non-allowed users — traded for
- * feature parity); drawings are flag-stored only when
- * `is_visible=true && is_hidden=false`; tokens/layers are always
- * flag-stored (no per-user visibility in their schema).
+ * Visibility gate (restricted data must never reach flags, which sync to
+ * players): `dm_only` markers/drawings, markers/drawings whose
+ * `visibility_rules` narrow them to specific allowed/denied users, hidden
+ * (`is_hidden`) tokens, and all fog stay in GM memory only — flags have no
+ * per-recipient delivery, so anything written there is readable by every
+ * observer regardless of render-time filtering (`_map-flag-filter.mjs`);
+ * layers are always flag-stored (names and display settings only, nothing
+ * that reveals restricted content).
  *
  * Player-side this module is inert (SyncManager.start exits early for
  * non-GM users, so init() is never called); MapViewerSheet on the
@@ -27,6 +27,11 @@
 import { getSetting } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
+import {
+  isMarkerSafeForPlayerFlags,
+  isDrawingSafeForPlayerFlags,
+  isTokenSafeForPlayerFlags,
+} from './_map-flag-filter.mjs';
 
 /** Folder name for materialized Chronicle maps. */
 const MAPS_FOLDER_NAME = 'Chronicle Maps';
@@ -832,6 +837,31 @@ export class MapSync {
       if (!page.getFlag('core', 'sheetClass')) {
         updates['flags.core.sheetClass'] = MAP_VIEWER_SHEET_CLASS;
       }
+
+      // Reconcile markers/drawings/tokens an older module version wrote
+      // into shared flags before these filters existed (or before they
+      // covered this kind). Every full sync (GM login, "Resync All Maps")
+      // re-checks the stored flags, not just new writes, so restricted
+      // data already on a player's client is removed instead of waiting
+      // for a viewer-open or a live event to clean it up.
+      const storedMarkers = page.getFlag(FLAG_SCOPE, 'chronicleMarkers') || [];
+      const safeStoredMarkers = storedMarkers.filter(isMarkerSafeForPlayerFlags);
+      if (safeStoredMarkers.length !== storedMarkers.length) {
+        updates[`flags.${FLAG_SCOPE}.chronicleMarkers`] = safeStoredMarkers;
+      }
+
+      const storedDrawings = page.getFlag(FLAG_SCOPE, 'chronicleDrawings') || [];
+      const safeStoredDrawings = storedDrawings.filter(isDrawingSafeForPlayerFlags);
+      if (safeStoredDrawings.length !== storedDrawings.length) {
+        updates[`flags.${FLAG_SCOPE}.chronicleDrawings`] = safeStoredDrawings;
+      }
+
+      const storedTokens = page.getFlag(FLAG_SCOPE, 'chronicleTokens') || [];
+      const safeStoredTokens = storedTokens.filter(isTokenSafeForPlayerFlags);
+      if (safeStoredTokens.length !== storedTokens.length) {
+        updates[`flags.${FLAG_SCOPE}.chronicleTokens`] = safeStoredTokens;
+      }
+
       await page.update(updates);
 
       const entry = page.parent;
@@ -934,7 +964,10 @@ export class MapSync {
 
   /**
    * Write the player-safe subset of sub-resource data to the JournalEntry
-   * page flags. DM-only data is filtered out and stays only in GM memory.
+   * page flags. DM-only, per-user-restricted, and hidden data is filtered
+   * out (`_map-flag-filter.mjs`) and stays only in GM memory. Layers carry
+   * no restricted content (names and display settings only) and are
+   * written through unfiltered.
    * @param {string} mapId
    * @param {{ markers: object[], drawings: object[], tokens: object[], layers: object[] }} data
    * @private
@@ -943,15 +976,14 @@ export class MapSync {
     const page = this.findPageByMapId(mapId);
     if (!page) return;
 
-    const safeMarkers = (markers || []).filter((m) => m?.visibility !== 'dm_only');
-    const safeDrawings = (drawings || []).filter(
-      (d) => d?.is_visible !== false && d?.is_hidden !== true
-    );
+    const safeMarkers = (markers || []).filter(isMarkerSafeForPlayerFlags);
+    const safeDrawings = (drawings || []).filter(isDrawingSafeForPlayerFlags);
+    const safeTokens = (tokens || []).filter(isTokenSafeForPlayerFlags);
 
     await page.update({
       [`flags.${FLAG_SCOPE}.chronicleMarkers`]: safeMarkers,
       [`flags.${FLAG_SCOPE}.chronicleDrawings`]: safeDrawings,
-      [`flags.${FLAG_SCOPE}.chronicleTokens`]: tokens || [],
+      [`flags.${FLAG_SCOPE}.chronicleTokens`]: safeTokens,
       [`flags.${FLAG_SCOPE}.chronicleLayers`]: layers || [],
     });
   }
