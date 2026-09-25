@@ -17,6 +17,7 @@ import { defaultLevelForVisibility } from './_ownership.mjs';
 import { isCalendarNoteJournal } from './calendar-sync.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
 import { walkEntityPages } from './_entity-page-walk.mjs';
+import { JournalPushDebouncer } from './_journal-push-debounce.mjs';
 
 /**
  * Validate and resolve a Chronicle entity's `image_path` to a safe src
@@ -60,6 +61,17 @@ export class JournalSync {
     this._onCreateJournal = this._handleCreateJournal.bind(this);
     this._onUpdateJournal = this._handleUpdateJournal.bind(this);
     this._onDeleteJournal = this._handleDeleteJournal.bind(this);
+    this._onCloseJournalSheet = this._handleCloseJournalSheet.bind(this);
+    this._onBeforeUnload = () => this._journalPushDebouncer.flushAll();
+
+    // Debounce Foundry -> Chronicle pushes per journal: a GM typing fires
+    // updateJournalEntry repeatedly, and a PUT per edit would run into the
+    // API key's 60 requests/minute limit (API-CONTRACT.md). A pending push
+    // is flushed on journal close and world unload, so the last edit is
+    // never left behind a timer that doesn't get to fire.
+    this._journalPushDebouncer = new JournalPushDebouncer(
+      (journal, entityId) => { this._pushJournalUpdate(journal, entityId); }
+    );
   }
 
   /**
@@ -75,6 +87,11 @@ export class JournalSync {
     Hooks.on('createJournalEntry', this._onCreateJournal);
     Hooks.on('updateJournalEntry', this._onUpdateJournal);
     Hooks.on('deleteJournalEntry', this._onDeleteJournal);
+    // v12's sheet fires closeJournalSheet; v13+ (ApplicationV2) fires
+    // closeJournalEntrySheet.
+    Hooks.on('closeJournalSheet', this._onCloseJournalSheet);
+    Hooks.on('closeJournalEntrySheet', this._onCloseJournalSheet);
+    globalThis.window?.addEventListener?.('beforeunload', this._onBeforeUnload);
 
     console.debug('Chronicle: Journal sync initialized');
   }
@@ -291,6 +308,11 @@ export class JournalSync {
     Hooks.off('createJournalEntry', this._onCreateJournal);
     Hooks.off('updateJournalEntry', this._onUpdateJournal);
     Hooks.off('deleteJournalEntry', this._onDeleteJournal);
+    Hooks.off('closeJournalSheet', this._onCloseJournalSheet);
+    Hooks.off('closeJournalEntrySheet', this._onCloseJournalSheet);
+    globalThis.window?.removeEventListener?.('beforeunload', this._onBeforeUnload);
+    // Module stop is itself a form of "unload" — never drop the last edit.
+    this._journalPushDebouncer.flushAll();
   }
 
   // --- Chronicle → Foundry ---
@@ -687,6 +709,33 @@ export class JournalSync {
     // that bogus entity — the cleanup pass unlinks it.
     if (isCalendarNoteJournal(journal) || this._isHandledByNoteSync(journal)) return;
 
+    // Debounced: collapse a typing burst into one push, ~2s after
+    // the last edit. `journal` reflects the live document state by the
+    // time the timer fires, so re-reading it at push time (not now)
+    // captures whatever the GM last typed.
+    this._journalPushDebouncer.schedule(journal.id, journal, entityId);
+  }
+
+  /**
+   * Flush a debounced journal push on journal-sheet close, so the last
+   * edit is never stranded behind a timer the GM won't wait out.
+   * @param {Application} sheet
+   * @private
+   */
+  _handleCloseJournalSheet(sheet) {
+    const journalId = sheet?.document?.id;
+    if (journalId) this._journalPushDebouncer.flush(journalId);
+  }
+
+  /**
+   * Push a journal's current state to Chronicle. Called by the debouncer
+   * after its window elapses, or immediately on flush (journal close /
+   * world unload).
+   * @param {JournalEntry} journal
+   * @param {string} entityId
+   * @private
+   */
+  async _pushJournalUpdate(journal, entityId) {
     try {
       // Concatenate all text pages into a single entry for Chronicle.
       const entryHtml = this._collectTextPages(journal);
@@ -761,6 +810,11 @@ export class JournalSync {
   async _handleDeleteJournal(journal, options, userId) {
     if (this._syncing) return;
     if (userId !== game.user.id) return;
+
+    // Drop any push still pending for this journal before deleting.
+    // Otherwise it fires after the delete, and the queueForRetry in its
+    // catch block can resurrect the deleted entity's data on Chronicle.
+    this._journalPushDebouncer.cancel(journal.id);
 
     const entityId = journal.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
