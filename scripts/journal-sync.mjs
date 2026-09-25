@@ -1036,12 +1036,12 @@ export class JournalSync {
   /**
    * Push Foundry ownership changes to Chronicle as permission updates.
    *
-   * - The default level drives `is_private` + the broad Player-role grant.
-   * - Each per-user Foundry ownership entry is reverse-mapped to a Chronicle
-   *   user grant (`subject_type:'user'`); `visibility:'custom'` is sent only
-   *   when real user grants exist, otherwise `'default'`.
-   * - Foundry users that can't be reverse-mapped are skipped and surfaced
-   *   (notification + dashboard warning) rather than silently dropped.
+   * The default level drives `is_private` plus the broad Player-role grant.
+   * Each per-user Foundry ownership entry reverse-maps to a Chronicle user
+   * grant (`subject_type:'user'`); `visibility:'custom'` is sent only when
+   * real user grants exist, else `'default'`. Foundry users that can't be
+   * reverse-mapped are skipped and surfaced (notification + dashboard
+   * warning), never silently dropped.
    *
    * Best-effort: a transport error is surfaced but never fails the journal
    * sync, mirroring the journal-content push posture.

@@ -3,33 +3,23 @@
  *
  * Custom JournalEntryPage sheet for image-type pages that renders both
  * local journal-flag pins and Chronicle map data (markers, drawings,
- * tokens, fog, layers). Two pin systems coexist on the same SVG/DOM
- * surface:
+ * tokens, fog, layers) on one SVG/DOM surface. Local pins
+ * (`flags.chronicle-sync.pins`) never sync to Chronicle; Chronicle markers
+ * come from MapSync via `flags.chronicle-sync.chronicleMarkers` (a
+ * player-safe subset written by the GM client) plus GM-only memory data.
  *
- *   - Local pins: stored in `flags.chronicle-sync.pins` on the page; not
- *     synced to Chronicle. Visual: dotted outline. Tooltip: "Personal
- *     annotation".
- *   - Chronicle markers: pulled from Chronicle via MapSync; rendered from
- *     `flags.chronicle-sync.chronicleMarkers` (player-safe subset written
- *     by the GM client) plus GM-only memory data. Visual: solid fill.
- *     Tooltip: "Chronicle marker".
- *
- * Visibility filtering happens at render time:
- *   - `visibility=dm_only` markers and the entire fog overlay never render
- *     for non-GMs (they are absent from the flag data; GM-only memory
- *     supplies them only on the GM client).
- *   - `visibility_rules.allowed_users` / `denied_users` are honored
- *     against the current user's mapped Chronicle user id.
+ * Security: `visibility=dm_only` markers and the whole fog overlay never
+ * render for non-GMs — they're absent from the flag data, and GM-only
+ * memory supplies them only on the GM client. `visibility_rules.
+ * allowed_users`/`denied_users` are honored against the mapped Chronicle
+ * user id.
  *
  * Drawings, tokens, fog, and layers are read-only; markers stay editable
- * (with a visibility=dm_only checkbox) for GM users via the existing
- * right-click and toolbar affordances.
+ * (with a visibility=dm_only checkbox) for GMs.
  *
- * This sheet extends the v13/v14 `JournalEntryPageSheet` (under
- * `foundry.applications.sheets.journal`) with `HandlebarsApplicationMixin`.
- * The AppV1 `JournalPageSheet` base is dead in v14 — its outer wrapper
- * template no longer exists on disk, so any AppV1 subclass throws `ENOENT`
- * at render time.
+ * Extends v13/v14 `JournalEntryPageSheet` with `HandlebarsApplicationMixin`
+ * — the AppV1 `JournalPageSheet` base is dead in v14 (its wrapper template
+ * no longer exists on disk; an AppV1 subclass throws `ENOENT` at render).
  */
 
 import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';

@@ -1,26 +1,14 @@
 /**
  * Chronicle Sync — Sync Calendar validation rule engine
  *
- * Pure-function rules over the Calendaria active-calendar object returned by
- * `CALENDARIA.api.getActiveCalendar()`. Each rule inspects the calendar and
- * returns either `null` (rule passes) or a finding describing what's off.
+ * Pure-function rules over the Calendaria active-calendar object
+ * (`CALENDARIA.api.getActiveCalendar()`). Each rule returns `null` (passes)
+ * or a finding: `{severity: 'error'|'warning'|'info', code, message,
+ * fix_hint?, focus_target?}`.
  *
- * Findings shape:
- *   {
- *     severity: 'error' | 'warning' | 'info',
- *     code:     'STABLE_RULE_CODE',
- *     message:  'human-readable text (already localized by the rule)',
- *     fix_hint: 'one-line action (optional, localized)',
- *     focus_target: 'left-rail navigation target (optional)',
- *   }
- *
- * Rules are pure — no Foundry globals touched. The `runValidation` entry
- * point swallows per-rule exceptions so a single buggy rule never blanks the
- * validation panel.
- *
- * Schema versioning: the user-flag state persisted by the editor carries a
- * `schemaVersion` integer (see `SCHEMA_VERSION` below). Bump on any rule-
- * output shape change so the editor can ignore stale flag data.
+ * `runValidation` swallows per-rule exceptions so one buggy rule never
+ * blanks the panel. Bump `SCHEMA_VERSION` on any finding-shape change so
+ * the editor ignores stale persisted flag data.
  */
 
 export const SCHEMA_VERSION = 1;

@@ -1,22 +1,17 @@
 /**
- * Calendaria → Chronicle calendar-import transform (pure).
+ * Calendaria → Chronicle calendar-import transform (pure). Turns a full
+ * Calendaria calendar (`CALENDARIA.api.getCalendar(id)`) into a Chronicle
+ * create-calendar payload POSTed to `/api/v1/campaigns/:cid/calendar`.
  *
- * The Sync Calendar editor's empty-state import flow takes a Calendaria
- * calendar (full object via `CALENDARIA.api.getCalendar(id)`) and turns
- * it into a Chronicle create-calendar payload that the operator POSTs to
- * `POST /api/v1/campaigns/:cid/calendar`.
+ * Maps: name, description, current date, months, weekdays, seasons, moons,
+ * eras. Skips cycles/festivals/weather zones — added via Chronicle's UI
+ * after import.
  *
- * Maps:  name, description, current date, months, weekdays (days),
- *        seasons, moons, eras.
- * Skips: cycles, festivals, weather zones — the operator can add these
- *        via Chronicle's internal UI after the import.
+ * One-shot: post-import, Chronicle is the source of truth and the existing
+ * two-way sync in `calendar-sync.mjs` handles date + events; structure
+ * fields are not kept in sync after import.
  *
- * The transform is one-shot: post-import, Chronicle is the source of
- * truth and the existing two-way sync in `calendar-sync.mjs` handles date
- * + events. Structure-level fields are not kept in sync after import.
- *
- * Pure: no DOM, no Foundry globals, no Calendaria coupling beyond the
- * input shape. Unit-tested at
+ * Pure, no Foundry globals. Tests:
  * `tools/test-sync-calendar-import-from-calendaria.mjs`.
  */
 

@@ -1,22 +1,15 @@
 /**
  * Chronicle Sync - Calendar/Calendaria/SimpleCalendar Sync
  *
- * Bidirectional sync between Chronicle's calendar system and Foundry VTT
- * calendar modules. Supports both Calendaria and SimpleCalendar via an
- * adapter pattern. When neither is active, this module is a no-op.
- *
- * Sync flow:
- * - Chronicle → Foundry: Calendar changes arrive via WebSocket, update
- *   the active Foundry calendar module (date, events/notes).
- * - Foundry → Chronicle: Calendar changes detected via Hooks, push to
- *   Chronicle API (PUT /calendar/date, POST/PUT/DELETE /calendar/events).
- *
- * Calendaria notes are synced as Chronicle calendar events. The module uses
- * Calendaria's modern hook names (calendaria.dateTimeChange, calendaria.note*)
- * with fallbacks for older versions.
- *
- * Initial sync: On first connect, fetches Chronicle calendar structure and
- * optionally pushes to the active Foundry calendar module.
+ * Bidirectional sync between Chronicle's calendar system and Foundry's
+ * calendar modules (Calendaria or SimpleCalendar, via an adapter pattern;
+ * a no-op when neither is active). Chronicle → Foundry arrives via
+ * WebSocket and updates the active module's date/events/notes; Foundry →
+ * Chronicle is detected via Hooks and pushed to the Chronicle API (PUT
+ * /calendar/date, POST/PUT/DELETE /calendar/events). Calendaria notes sync
+ * as Chronicle calendar events, using Calendaria's modern hook names with
+ * fallbacks for older versions. On first connect, fetches Chronicle's
+ * calendar structure and optionally pushes it to the active module.
  */
 
 import { getSetting, getCalendarSyncExclusions } from './settings.mjs';
@@ -135,24 +128,16 @@ export const SIMPLE_CALENDAR_FLAG_SCOPES = Object.freeze([
 /**
  * Pure predicate: is this Foundry JournalEntry a calendar-module note?
  *
- * Both supported calendar modules store their notes as JournalEntry
- * documents: Calendaria flags `flags.calendaria.isCalendarNote === true`
- * (including auto-seeded festival/holiday notes; structure journals carry
- * `isCalendarJournal`); SimpleCalendar stores each note under its own
- * module flag scope (SIMPLE_CALENDAR_FLAG_SCOPES).
- *
- * These documents belong to CalendarSync, which mirrors them to Chronicle
- * as calendar events, and must never be pushed as worldbuilding entities:
- * JournalSync calls this to skip them, since an unguarded POST to
+ * Detects Calendaria's `flags.calendaria.isCalendarNote`/`isCalendarJournal`
+ * or a SimpleCalendar flag scope (SIMPLE_CALENDAR_FLAG_SCOPES), plus our
+ * own `calendarEventId` link flag once CalendarSync has mirrored a note.
+ * JournalSync calls this to skip these documents: an unguarded POST to
  * `/entities` with `entity_type_id: 0` resolves to the campaign's first
- * entity type and wrongly surfaces holidays in that list.
+ * entity type, wrongly surfacing holidays there instead of as calendar
+ * events.
  *
- * Detection is by the calendar module's own flag (present the moment the
- * note is created) plus our own `calendarEventId` link flag, set once
- * CalendarSync has mirrored a note to a Chronicle event.
- *
- * Defensive against plain object stubs (tests, partial payloads): reads the
- * nested `flags` object directly when `getFlag` is unavailable.
+ * Reads the nested `flags` object directly when `getFlag` is unavailable,
+ * so it also works against plain object stubs in tests.
  *
  * @param {object|null} journal - A Foundry JournalEntry (or test stub).
  * @returns {boolean}
@@ -190,20 +175,17 @@ export function isCalendarNoteJournal(journal) {
 /**
  * Normalize a Calendaria note startDate to Chronicle's 1-indexed month/day.
  *
- * Calendaria stores dates 0-indexed internally: a raw note startDate carries
- * a 0-indexed `month`/`dayOfMonth` with an absolute `year`. Its `toPublic`
- * conversion (CALENDARIA.api.getNote) instead yields a 1-indexed
- * `month`/`day` (dayOfMonth deleted), same absolute year. The realtime
- * `calendaria.note*` hooks deliver the raw stub, so the correction is keyed
- * on the SHAPE, never the code path: a `day` field means already-public (no
- * correction); a `dayOfMonth` field means raw (0-indexed → +1). The year is
- * never adjusted.
+ * Calendaria stores dates 0-indexed internally (`month`/`dayOfMonth`), but
+ * its `toPublic` conversion yields 1-indexed `month`/`day` (dayOfMonth
+ * deleted); realtime `calendaria.note*` hooks deliver the raw form. So the
+ * correction is keyed on SHAPE, never code path: a `day` field means
+ * already-public (no correction), `dayOfMonth` means raw (0-indexed → +1).
+ * Year is never adjusted.
  *
- * CAUTION: a raw Foundry `game.time.components` spread (e.g. the `.current`
- * of a Calendaria `dateTimeChange` payload) carries both `dayOfMonth`
- * (0-indexed) AND a day-of-YEAR `day`, which would wrongly trip the
- * passthrough branch — extract `{year, month, dayOfMonth}` first (see
- * `_onCalendariaDateTimeChange`).
+ * CAUTION: a raw Foundry `game.time.components` spread carries both
+ * `dayOfMonth` (0-indexed) AND a day-of-YEAR `day`, which would wrongly
+ * trip the passthrough branch — extract `{year, month, dayOfMonth}` first
+ * (see `_onCalendariaDateTimeChange`).
  *
  * @param {object} startDate - Calendaria startDate ({year, month, day?|dayOfMonth?}).
  * @returns {{year:number, month:number, day:number}|null} 1-indexed, or null.
@@ -251,16 +233,15 @@ export function calendarEventFetchCoordinates(calendar, yearSpan = 1) {
 
 /**
  * Compare Chronicle's calendar structure to the active Foundry calendar's,
- * for the structure-mismatch guard (B-R2). Compares month count, per-month
- * day counts, and weekday count only — moons, seasons, and eras are cosmetic
- * to date coordinates and excluded.
+ * for the structure-mismatch guard. Compares month count, per-month day
+ * counts, and weekday count only — moons, seasons, eras are cosmetic to
+ * date coordinates and excluded.
  *
- * The weekday comparison is skipped when either side reports 0 weekdays,
- * since a real calendar always has ≥1: that means the list was unreadable,
- * and pausing sync on an unreadable list while months match would be a
- * false positive. Leap-year month-length variants are excluded: the active
- * Foundry structure reader only surfaces base per-month `days`, so leap
- * representation is not pinned for a symmetric comparison.
+ * Weekday comparison is skipped when either side reports 0 weekdays (a real
+ * calendar always has ≥1, so 0 means the list was unreadable — pausing sync
+ * on an unreadable list while months match would be a false positive). Leap
+ * variants are excluded too: the Foundry structure reader only surfaces
+ * base per-month `days`, so leap representation isn't pinned symmetrically.
  *
  * @param {object} chronicle - Chronicle calendar ({months:[{days}], weekdays:[]}).
  * @param {object} foundry - normalized active Foundry structure
@@ -851,20 +832,15 @@ export class CalendarSync {
   }
 
   /**
-   * Handle `calendar.weather.changed`.
+   * Handle `calendar.weather.changed`. A `null` payload is a "refetch me"
+   * ping from the weather-zone paths, so it triggers one `GET
+   * /calendar/weather` instead of being discarded; otherwise it's the
+   * merged `WeatherInput` from `SetWeather`.
    *
-   * Two payload shapes arrive on this type (see `_calendar-subresources.mjs`):
-   * the merged `WeatherInput` from `SetWeather`, and `null` from the
-   * weather-zone paths, which publish the type purely as a "refetch me" ping
-   * — a null payload triggers one `GET /calendar/weather` rather than being
-   * discarded.
-   *
-   * Apply order, honestly degrading:
-   *   1. If the active module is Calendaria AND it exposes a weather SETTER,
-   *      hand it the reading (see `_applyWeatherToCalendaria`).
-   *   2. Otherwise — SimpleCalendar, or a Calendaria build with read-only
-   *      weather — fall back to the GM chat line. The dashboard panel is
-   *      updated either way.
+   * Applies to Calendaria's weather setter when the active build exposes
+   * one (see `_applyWeatherToCalendaria`); otherwise (SimpleCalendar, or
+   * read-only Calendaria weather) falls back to the GM chat line. The
+   * dashboard panel updates either way.
    *
    * @param {object|null} payload
    * @private
@@ -966,20 +942,15 @@ export class CalendarSync {
    * Handle `calendar.structure.updated` and its granular siblings
    * (`calendar.cycle.changed`, `calendar.festival.changed`).
    *
-   * **Deliberately does NOT auto-apply the new structure.** Rewriting the
-   * Foundry calendar's months/weekdays from a broadcast would be the most
-   * destructive write in the module: Calendaria stores notes against
-   * month/day coordinates, so re-shaping the calendar underneath them
-   * silently re-dates every note in the world. Instead:
-   *
-   *   1. Refetch `GET /calendar` so the cached structure isn't stale.
-   *   2. Re-run the same comparison `onInitialSync` runs, fail-open — an
-   *      unreadable structure on either side never pauses anything.
-   *   3. Incompatible → pause (the B-R2 path). Still compatible → record
-   *      the advisory `structure-changed` badge detail.
-   *   4. Compatible AND previously paused for a mismatch → clear the pause;
-   *      fixing the calendar in Chronicle is what emits this broadcast, so
-   *      this is the only way the pause recovers without a world reload.
+   * **Deliberately does NOT auto-apply the new structure**: Calendaria
+   * stores notes against month/day coordinates, so re-shaping the calendar
+   * underneath them would silently re-date every note in the world.
+   * Instead: refetch `GET /calendar`, re-run the same fail-open comparison
+   * `onInitialSync` runs (an unreadable structure on either side never
+   * pauses anything), then pause on incompatible or record the advisory
+   * `structure-changed` badge on still-compatible. Compatible AND
+   * previously paused for a mismatch clears the pause — this is the only
+   * recovery path that doesn't need a world reload.
    *
    * Runs even while paused — it's the one handler that must (see `onMessage`).
    *

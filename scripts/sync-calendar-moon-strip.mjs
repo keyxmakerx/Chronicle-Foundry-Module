@@ -4,18 +4,16 @@
  * per-day phase-position array across the visible range; the application
  * class renders these as color-coded horizontal strips.
  *
- * Pure: no DOM, no Foundry globals, no Calendaria coupling beyond the
- * injected `getPosition` lookup, so it stays unit-testable independent of
- * the ApplicationV2 integration shell. See
+ * Pure aside from the injected `getPosition` lookup, so it's unit-testable
+ * independent of the ApplicationV2 shell. See
  * `tools/test-sync-calendar-moon-strip.mjs`.
  */
 
 /**
- * Build per-moon strip data for the visible range.
- *
- * The caller supplies a `getPosition(moonIndex, date)` lookup — in
- * production this is `CALENDARIA.api.getMoonPhasePosition`; in tests a
- * deterministic stub. The function is pure: same inputs → same outputs.
+ * Build per-moon strip data for the visible range. Pure: same inputs →
+ * same outputs. `getPosition(moonIndex, date)` is
+ * `CALENDARIA.api.getMoonPhasePosition` in production, a deterministic
+ * stub in tests.
  *
  * @param {object} args
  * @param {object[]} args.moons - Array of moon definitions, in order. Each

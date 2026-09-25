@@ -30,23 +30,19 @@ function compareDates(a, b) {
  * Classify the calendar sync state from the dashboard's already-gathered inputs.
  *
  * @param {object} input
- * @param {boolean} input.paused - CalendarSync `_calendarSyncDisabled` (module
- *   paused this session). When true the state is `paused` regardless of dates.
- * @param {string|null} [input.pausedDetail] - CalendarSync `_calendarMismatchDetail`
- *   (human-readable reason the module paused).
+ * @param {boolean} input.paused - module paused this session; forces `paused` regardless of dates.
+ * @param {string|null} [input.pausedDetail] - human-readable reason the module paused.
  * @param {{match:boolean, detail:string}|null} [input.structureCmp] - result of
- *   `compareCalendarStructures` when BOTH structures were readable; null when the
- *   dashboard could not compare (fail-open — never reports incompatible on a
- *   missing read).
- * @param {string|null} [input.chronicleShape] - e.g. `"12mo/7wd"` (for the
- *   incompatible-structures detail).
+ *   `compareCalendarStructures` when both structures were readable; null when
+ *   the dashboard couldn't compare (fail-open, never reports incompatible on
+ *   a missing read).
+ * @param {string|null} [input.chronicleShape] - e.g. `"12mo/7wd"`.
  * @param {string|null} [input.foundryShape] - e.g. `"15mo/6wd"`.
  * @param {{year:number, month:number, day:number}|null} [input.chronicleDate]
  * @param {{year:number, month:number, day:number}|null} [input.foundryDate]
- * @param {string|null} [input.structureChangedDetail] - set by CalendarSync when
- *   a structure-updated broadcast arrived this session and the re-compare found
- *   the structures still compatible; truthy raises the advisory
- *   `structure-changed` state.
+ * @param {string|null} [input.structureChangedDetail] - set when a
+ *   structure-updated broadcast re-compared as still compatible; truthy
+ *   raises the advisory `structure-changed` state.
  * @returns {{state:('in-sync'|'date-drift'|'structure-changed'|'incompatible-structures'|'paused'|'unavailable'),
  *   direction:('chronicle-ahead'|'foundry-ahead'|null), detail:string}}
  */
