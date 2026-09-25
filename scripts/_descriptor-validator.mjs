@@ -1,25 +1,12 @@
 /**
- * Chronicle Sync — Descriptor schema validator (FM-SEC-CHUNK-7)
+ * Shared validation logic for `chronicle-package.json`, used by both CI
+ * (`tools/check-package-descriptor.mjs`) and the Foundry runtime
+ * (`scripts/module.mjs::Hooks.once('ready')`, fetching the deployed
+ * descriptor). The runtime check is defense-in-depth for drift CI didn't
+ * catch (hand-edited release zip, ad-hoc deployment).
  *
- * Shared validation logic for `chronicle-package.json`, used by BOTH:
- *
- *   1. CI build-time: `tools/check-package-descriptor.mjs` (Node, reads
- *      both files from disk via `node:fs/promises`).
- *   2. Foundry runtime: `scripts/module.mjs::Hooks.once('ready')`
- *      (Foundry runtime; reads the descriptor via `fetch` of the module's
- *      deployed location).
- *
- * The runtime check is defense-in-depth per FM-SECURITY-AUDIT §0.5 D2=(b).
- * CI catches drift on every PR; the runtime check catches drift when CI
- * was bypassed (hand-edited release zip, ad-hoc deployment, etc).
- *
- * This module is pure (no Foundry / Node imports beyond the function
- * signature). Both call sites pass in the parsed descriptor + parsed
- * module.json; the validator returns a structured result that callers
- * format for their own surface (CI stderr, Foundry console.error +
- * ui.notifications.error).
- *
- * Per FM-SEC-CHUNK-7 / FM-SECURITY-AUDIT §1.7, §4 Chunk 7.
+ * Pure — no Foundry/Node imports. Callers pass the parsed descriptor +
+ * module.json and format the structured result for their own surface.
  */
 
 /**
@@ -61,8 +48,8 @@ export function validateDescriptor(descriptor, moduleJson) {
     errors.push(`chronicle-package.json: package.kind must be "foundry-module" (got ${JSON.stringify(descriptor?.package?.kind)})`);
   }
 
-  // --- package.moduleJsonPath required (existence-on-disk is a CI-only concern; the runtime path
-  //     can't easily verify "file exists" without an extra fetch, so we only check the field shape) ---
+  // --- package.moduleJsonPath (only the field shape is checked here; file
+  //     existence is a CI-only concern) ---
   const moduleJsonPathField = descriptor?.package?.moduleJsonPath;
   if (!moduleJsonPathField || typeof moduleJsonPathField !== 'string') {
     errors.push('chronicle-package.json: package.moduleJsonPath is required (string)');

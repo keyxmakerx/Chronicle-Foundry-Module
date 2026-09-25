@@ -1,17 +1,12 @@
 #!/usr/bin/env node
 /**
  * Regression pin: the dashboard's local-calendar-date read must use modern
- * Calendaria's `globalThis.CALENDARIA.api` (`getCurrentDateTime`), not ONLY the
- * legacy `game.Calendaria.getDate()`.
+ * Calendaria's `globalThis.CALENDARIA.api` (`getCurrentDateTime`), not only
+ * the legacy `game.Calendaria.getDate()` — the legacy-only read returns null
+ * on Calendaria 1.x, which breaks the sync badge and the Push-date button.
  *
- * Reading only the legacy global made `_getLocalCalendarDate` return null on
- * Calendaria 1.x, so the dashboard Calendar tab showed "Foundry: Unable to
- * read", the sync badge was permanently "Out of Sync", and the Push-date button
- * silently no-op'd (it returns early on a null local date). See
- * AUDIT-2026-06-21-foundry-errors.md §2.
- *
- * Static-source pin — mirrors the other sync-dashboard tests, which avoid
- * importing the heavy ApplicationV2 class.
+ * Static-source pin, like the other sync-dashboard tests, to avoid importing
+ * the heavy ApplicationV2 class.
  *
  * Run: node --test tools/test-dashboard-local-calendar-date.mjs
  */

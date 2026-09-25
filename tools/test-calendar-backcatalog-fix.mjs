@@ -1,20 +1,13 @@
-// test-calendar-backcatalog-fix.mjs — FM-CAL-BACKCATALOG-FIX regression tests.
+// test-calendar-backcatalog-fix.mjs — regression tests for calendar-sync.mjs.
 //
 // Run: node --test tools/test-calendar-backcatalog-fix.mjs
 //
-// Pins the three post-merge-review fixes to PR #76:
-//   1. BLOCKER — back-catalog unwraps Chronicle's { data, total } envelope
-//      (the #76 stub used a bare array and masked a total no-op).
-//   2. HIGH — the Calendaria dateTimeChange push reads the RAW 0-indexed
-//      components nested under `.current` and corrects them +1, ignoring the
-//      day-of-YEAR `day` sibling that rides in game.time.components.
-//   3. MEDIUM — the echo-suppression guard is a reentrant depth counter, so a
-//      WS event resolving mid-back-catalog does not unmask the loop.
-// Plus the two RC-9 ride-alongs on compareCalendarStructures.
-//
-// Payload shape verified against Calendaria release-1.1.3 source (commit
-// ee04e441…): time-tracker.mjs #fireDateTimeChangeHook nests raw components
-// under hookData.current; api.mjs toPublic is the (un-applied here) 0→1 +1.
+// Pins: back-catalog unwraps Chronicle's { data, total } envelope; the
+// Calendaria dateTimeChange push reads the raw 0-indexed components nested
+// under `.current` and corrects them +1, ignoring the day-of-YEAR `day`
+// sibling in game.time.components; the echo-suppression guard is a reentrant
+// depth counter so a WS event resolving mid-back-catalog can't unmask the
+// loop. Also covers two fixes to compareCalendarStructures.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';

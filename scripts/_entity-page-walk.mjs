@@ -1,35 +1,24 @@
 /**
- * Shared entity-list page walk.
+ * Shared entity-list page walk, used by both places that need "every
+ * entity in the campaign" (JournalSync.resyncAll, the dashboard's entity
+ * groups). Never hard-code a small page cap: a silent ceiling means
+ * entities are never seen at all while the caller reports a completed
+ * resync, which is worse than no cap. Use `walkEntityPages` and surface
+ * its `truncated` flag instead.
  *
- * Both places that need "every entity in the campaign" — JournalSync.resyncAll
- * and the dashboard's entity groups — had the same loop inline, and both
- * stopped after five pages:
- *
- *     while (hasMore && page <= 5) { … per_page=100 … }
- *
- * That is a hard 500-entity ceiling with no signal. Past it, entities were
- * not synced late or partially; they were never seen at all, and the GM was
- * shown a completed resync and a full-looking dashboard. Chronicle's own sync
- * pull carried the matching ceiling on the server side, fixed in sweep R4
- * stage 18; fixing that half and leaving this one would have left the
- * operator exactly as stuck.
- *
- * This module is pure — no Foundry globals, no api-client import — so it is
- * unit-testable and both callers share one implementation instead of two that
- * drift. See tools/test-entity-page-walk.mjs.
+ * Pure — no Foundry globals, no api-client import — so both callers share
+ * one implementation instead of two that drift. See
+ * tools/test-entity-page-walk.mjs.
  */
 
 /** Page size used for entity list requests. Matches Chronicle's list default. */
 export const ENTITY_PAGE_SIZE = 100;
 
 /**
- * Upper bound on pages walked in one pass: 200 pages x 100 = 20,000 entities.
- *
- * A bound is still wanted — a broken server that always answers with a full
- * page would otherwise spin forever — but it is set where no real campaign
- * reaches it, and unlike the old cap, hitting it is REPORTED rather than
- * silently swallowed. A ceiling nobody is told about is the actual defect;
- * the number is secondary.
+ * Upper bound on pages walked in one pass: 200 pages x 100 = 20,000
+ * entities. A bound is still needed — a broken server that always answers
+ * with a full page would otherwise spin forever — but hitting it must be
+ * reported (`truncated`), never silently swallowed.
  */
 export const MAX_ENTITY_PAGES = 200;
 

@@ -1,18 +1,12 @@
 /**
- * Sync Calendar — Diagnostics report builder (pure).
- *
  * `buildCalendarDiagnostics(input)` takes an already-collected, plain snapshot
- * of the Sync Calendar's state and returns a Markdown report string designed to
- * be copied to the clipboard and pasted into an AI tool (e.g. Claude) or a bug
- * report. It surfaces exactly the things that are otherwise invisible from
- * outside the operator's Foundry world: Calendaria/module versions, the active
- * calendar's structure, the live validation findings (errors/warnings/info),
- * the selected day's notes/moons/season/weather, the API methods Calendaria
- * actually exposes, recent sync errors, and the relevant sync settings.
+ * of the Sync Calendar's state and returns a Markdown report meant to be
+ * pasted into a bug report or AI tool: versions, active calendar structure,
+ * live validation findings, the selected day's detail, the API methods
+ * Calendaria exposes, recent sync errors, and relevant settings.
  *
- * Kept PURE (no Foundry globals, never throws) so it unit-tests cleanly and so
- * the collection side — which must touch `CALENDARIA.api` + Foundry — stays a
- * thin, defensive adapter in `sync-calendar.mjs`.
+ * Kept pure (no Foundry globals, never throws) so it unit-tests cleanly; the
+ * collection side that touches `CALENDARIA.api` lives in `sync-calendar.mjs`.
  */
 
 /** Severity ordering for grouping findings in the report. */

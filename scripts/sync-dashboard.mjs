@@ -246,7 +246,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     // Build status tab data.
     const statusData = this._buildStatusData();
 
-    // Build sync-capability data (what CAN pull vs what DOES) — WS-4.
+    // Build sync-capability data (what CAN pull vs what DOES).
     let capabilityData = null;
     try {
       capabilityData = await this._buildCapabilityData();
@@ -285,10 +285,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       unmatchedMembers: membersData.unmatchedCount,
       calendarAvailable: calendarData.available,
       calendarInSync: calendarData.inSync,
-      // FM-CAL-BLACKOUT: was `calendarData.structureMismatch`, a key
-      // _buildCalendarData never sets — so this was permanently undefined and
-      // the Overview's calendar-paused alert was dead code that could not fire.
-      // The real flags are the two the classifier produces.
       calendarSyncPaused: !!(calendarData.isPaused || calendarData.isIncompatible),
       calendarPausedText: calendarData.syncStateDetail || '',
       calendarRebuilding: !!calendarData.calendarRebuilding,
@@ -351,7 +347,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       // Status tab.
       ...statusData,
 
-      // Sync Capability (status tab panel) — WS-4.
+      // Sync Capability (status tab panel).
       capability: capabilityData,
     };
   }
@@ -374,10 +370,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     }
     const types = this._cache.entityTypes;
 
-    // Fetch all entities. Shares the walk with JournalSync.resyncAll
-    // (scripts/_entity-page-walk.mjs). Both used to stop after five pages, so
-    // a campaign past 500 entities showed a dashboard that looked complete
-    // and silently listed none of the rest.
+    // Fetch all entities, sharing the bounded walk with JournalSync.resyncAll
+    // (scripts/_entity-page-walk.mjs) so this never silently truncates past
+    // a fixed page count.
     if (!this._cache.entities) {
       const walked = await walkEntityPages(
         (page, perPage) => this.api.get(`/entities?per_page=${perPage}&page=${page}`),
@@ -497,9 +492,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   // ---------------------------------------------------------------------------
 
   /**
-   * Build map tab data. Path B: Chronicle maps materialize as JournalEntries
-   * with image-type pages; the dashboard surfaces them as journal links and
-   * a Chronicle deep-link, not as scene bindings.
+   * Build map tab data. Chronicle maps materialize as JournalEntries with
+   * image-type pages; the dashboard surfaces them as journal links and a
+   * Chronicle deep-link, not as scene bindings.
    * @returns {Promise<object>}
    * @private
    */
@@ -667,19 +662,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       probeError = err;
     }
 
-    // FM-CAL-BLACKOUT: classify the failure instead of assuming its cause.
-    //
-    // This catch used to be bare, with the comment "No calendar configured." —
-    // so EVERY failure became `noCampaignCalendar`, which the template renders
-    // as the flat sentence "No calendar configured for this campaign in
-    // Chronicle." During the V5 rebuild that told the GM, as fact, the one
-    // thing that was not true: their campaign HAD a calendar, Chronicle just
-    // was not serving it. A 401, a proxy timeout and a DNS failure read the
-    // same way.
-    //
-    // The classifier already existed and already handled this — the Sync
-    // Calendar editor has run its probe through `calendarStateFromError` for
-    // months (sync-calendar.mjs). The dashboard simply never got it.
+    // Classify the failure instead of assuming it means "no calendar
+    // configured" — a 401, a proxy timeout and the calendar-rebuild 503
+    // must not all collapse into that one sentence.
     if (probeError) {
       const state = calendarStateFromError(probeError);
       if (state === 'rebuilding') {
@@ -717,24 +702,19 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     // Get local Foundry calendar date.
     const localDate = this._getLocalCalendarDate(calModule);
 
-    // Honest four-state badge (FM-SYNC-WIRE-FIX fix 3). The pre-fix badge was
-    // raw y/m/d equality plus a `structureMismatch` flag the SimpleCalendar path
-    // never set. We now classify into exactly one of:
+    // Four-state badge, classified in priority order:
     //   in-sync · date-drift (with direction) · incompatible-structures · paused
-    //
-    // Inputs, in priority order handled by the classifier:
-    //   - `paused` from the live CalendarSync instance — its
-    //     `_calendarSyncDisabled` guard, now set by BOTH module paths (fix 2).
-    //   - a dashboard-side structure comparison, so an incompatibility is still
-    //     surfaced when the module failed OPEN (unreadable structure at connect)
-    //     or isn't running. Fails open: `structureCmp` stays null unless BOTH
-    //     structures were readable here.
+    // `paused` comes from CalendarSync's `_calendarSyncDisabled` guard (set by
+    // both module paths). The dashboard also runs its own structure comparison
+    // so an incompatibility still surfaces when CalendarSync failed OPEN or
+    // isn't running; `structureCmp` stays null unless both structures were
+    // readable here.
     const calSync = this._getCalendarSyncModule();
     const paused = !!calSync?._calendarSyncDisabled;
     const pausedDetail = calSync?._calendarMismatchDetail || null;
-    // FM-SYNC-SUBRESOURCES-P1: advisory 5th state — Chronicle's structure moved
-    // this session and CalendarSync's re-compare found it still compatible.
-    // Outranked by paused/incompatible in the classifier; see its doc comment.
+    // Advisory 5th state: Chronicle's structure moved this session and
+    // CalendarSync's re-compare found it still compatible. Outranked by
+    // paused/incompatible in the classifier.
     const structureChangedDetail = calSync?._structureChangedDetail || null;
 
     const chronicleDate = {
@@ -828,13 +808,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   _getLocalCalendarDate(calModule) {
     try {
       if (calModule === 'Calendaria') {
-        // Modern Calendaria (1.x) exposes its API at globalThis.CALENDARIA.api
-        // — the same surface the Sync Calendar editor and calendar-sync use.
+        // Calendaria (1.x) exposes its API at globalThis.CALENDARIA.api — the
+        // same surface the Sync Calendar editor and calendar-sync use.
         // getCurrentDateTime() returns { year, month, day, hour, minute, … }.
-        // The legacy game.Calendaria.getDate() is kept only as a fallback for
-        // old installs. Reading ONLY that legacy global was the bug behind the
-        // dashboard's "Foundry: Unable to read", the permanent "Out of Sync"
-        // badge, and the silently no-op Push-date button on Calendaria 1.x.
+        // game.Calendaria.getDate() is kept only as a fallback for old installs;
+        // it must not be the only path read, or old installs read as unsynced.
         const calApi = globalThis.CALENDARIA?.api;
         const d = calApi?.getCurrentDateTime?.() ?? calApi?.getCurrentDate?.() ?? game.Calendaria?.getDate?.();
         if (d) return { year: d.year, month: d.month, day: d.day, hour: d.hour ?? 0, minute: d.minute ?? 0 };
@@ -920,10 +898,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /**
    * Build the Members tab: one row per Chronicle campaign member with their
-   * current Foundry-user mapping and a matched / UNMATCHED badge. Drives the
-   * manual mapping UI (audit §2) — selecting a user persists the link via
-   * `setUserMappings`, and the UNMATCHED badge is the operator's required
-   * signal that a member's per-player permissions won't sync.
+   * current Foundry-user mapping and a matched / UNMATCHED badge. Selecting a
+   * user persists the link via `setUserMappings`; the UNMATCHED badge is the
+   * operator's signal that a member's per-player permissions won't sync.
    * @returns {object}
    * @private
    */
@@ -952,7 +929,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    * Persist a manual Chronicle-member → Foundry-user mapping. An empty
    * `foundryUserId` clears the mapping (back to UNMATCHED). Called from the
    * Members tab dropdown's change handler (wired in `_onRender`, since
-   * ApplicationV2 `actions` only delegate `click` — F-PR2-1).
+   * ApplicationV2 `actions` only delegate `click`).
    *
    * @param {string} memberKeyValue - Chronicle user-id key.
    * @param {string} foundryUserId - Foundry user id, or '' to unmap.
@@ -1080,7 +1057,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       j => j.getFlag(FLAG_SCOPE, 'entityId')
     ).length;
 
-    // Count Chronicle maps materialized as JournalEntry pages (Path B).
+    // Count Chronicle maps materialized as JournalEntry pages.
     let linkedScenes = 0;
     for (const entry of game.journal.contents) {
       for (const page of entry.pages.contents) {
@@ -1093,7 +1070,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const matchedSystem = this._syncManager?.getMatchedSystem() || null;
     const syncCharacters = getSetting('syncCharacters');
 
-    // Health metrics (F-QoL).
+    // Health metrics.
     const health = this.api?.health ?? {};
     const errorLog = this.api?.getErrorLog() ?? [];
     const retryQueueSize = this.api?.getRetryQueueSize() ?? 0;
@@ -1113,13 +1090,13 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       systemMatched: !!matchedSystem,
       syncCharacters,
       characterSyncAvailable: !!matchedSystem,
-      // Audit §1A: clarify that DM-only entities synced (they reached the GM)
-      // but were intentionally hidden from players — not "didn't sync".
+      // DM-only entities synced (they reached the GM) but were intentionally
+      // hidden from players — not "didn't sync".
       dmOnlyHiddenCount: this._syncManager?.getDmOnlyHiddenCount?.() ?? 0,
       dmOnlyHidden: getSetting('dmOnlyHidden'),
       activityLog: activityLog.slice(0, 50),
 
-      // Diagnostics (F-QoL).
+      // Diagnostics.
       healthMetrics: {
         restSuccessCount: health.restSuccessCount ?? 0,
         restErrorCount: health.restErrorCount ?? 0,
@@ -1167,7 +1144,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Build the Sync Capability report (WS-4): what a representative Foundry actor
+   * Build the Sync Capability report: what a representative Foundry actor
    * EXPOSES vs what Chronicle currently SYNCS. Samples one actor of the synced
    * type and diffs it against the system's declared character-field manifest.
    * Stashes the full report on `this._capabilityReport` for the copy actions.
@@ -1435,7 +1412,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // --- Members tab: per-member Foundry-user mapping select ---
     // ApplicationV2 `actions` only delegate `click`, so the `<select>` change
-    // is wired here directly (F-PR2-1).
+    // is wired here directly.
     el.querySelectorAll('.member-map-select').forEach((select) => {
       select.addEventListener('change', (e) => {
         const key = e.currentTarget.dataset.memberKey;
@@ -1465,7 +1442,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     // Map tab handlers are wired via the `open-map-journal` action above;
-    // no additional select listeners are needed in Path B.
+    // no additional select listeners are needed.
   }
 
   /**
@@ -1664,12 +1641,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Open the Sync Calendar editor.
-   *
-   * Wired via the dashboard's Calendar tab header (FM-CAL-DASHBOARD-LINK).
-   * `openSyncCalendar()` is the singleton helper from sync-calendar.mjs —
-   * it bringToFront's an existing instance or instantiates a new one,
-   * and is GM-only by contract (returns null for non-GMs).
+   * Open the Sync Calendar editor via the singleton helper from
+   * sync-calendar.mjs, which bringToFront's an existing instance or
+   * instantiates a new one, and is GM-only by contract (returns null for
+   * non-GMs).
    */
   static #onOpenSyncCalendarAction() {
     openSyncCalendar();
@@ -2114,11 +2089,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   async _onToggleVisibility(entityId, currentlyPrivate) {
     try {
-      // FM-SYNC-WIRE-FIX fix 4: use the purpose-built reveal endpoint. A bare
-      // PUT /entities/:id with only {is_private} fails Chronicle's UpdateEntity
-      // name-required validation → 400 (silently swallowed in the catch below),
-      // so visibility never actually toggled. POST /entities/:id/reveal
-      // (ToggleEntityReveal) accepts exactly {is_private}.
+      // Use the purpose-built reveal endpoint: a bare PUT /entities/:id
+      // with only {is_private} fails Chronicle's UpdateEntity name-required
+      // validation. POST /entities/:id/reveal accepts exactly {is_private}.
       await this.api.post(`/entities/${entityId}/reveal`, {
         is_private: !currentlyPrivate,
       });
@@ -2147,9 +2120,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   async _onPullDate() {
     const calSync = this._syncManager?._modules?.find(m => m.constructor?.name === 'CalendarSync');
     if (calSync && typeof calSync.onInitialSync === 'function') {
-      // FM-CAL-BLACKOUT: log what happened, not what was attempted. This used
-      // to record a successful pull unconditionally — including when the pull
-      // had just failed with a 503.
+      // Log what actually happened, not what was attempted — onInitialSync
+      // can fail (e.g. a 503) without throwing.
       const pulled = await calSync.onInitialSync();
       if (pulled) {
         this._logActivity('pull', 'Pulled calendar date from Chronicle');
@@ -2182,9 +2154,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       this.render({ force: true });
     } catch (err) {
       if (isRealTimeRejection(err)) { notifyRealTimePushPaused(); return; }
-      // FM-CAL-BLACKOUT: a failed push used to be silent to the GM — only a
-      // console.error they would never see. A button that reports nothing at
-      // all reads as success.
+      // A failure must be logged to the GM, not just to the console — a
+      // button that reports nothing reads as success.
       if (handleIfCalendarRebuilding(err)) {
         this._logActivity('error', 'Calendar push skipped — Chronicle’s calendar is being rebuilt');
         return;
@@ -2224,11 +2195,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     }
   }
 
-  /**
-   * Push all unlinked actors to Chronicle.
-   * Shows a confirmation dialog before proceeding.
-   * @private
-   */
   /** Link an orphaned actor (button's data-actor-id) to the row's selected entity. */
   async _onResolveMatch(target) {
     const actorId = target?.dataset?.actorId;
@@ -2327,16 +2293,14 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /**
    * Re-sync everything that's already connected to Chronicle in one action:
-   * all journals, every LINKED character (re-pushes current field data — Foundry
-   * is source of truth for characters), and all maps. This is the Overview's
-   * "Sync Everything Now"; the previous button only did journals, which left
-   * actor field data (and inventory/notes) stale after a manifest/path change.
+   * all journals, every LINKED character (re-pushes current field data —
+   * Foundry is source of truth for characters), and all maps.
    *
-   * Unlinked actors are intentionally NOT auto-created here — that's a heavier,
-   * entity-creating operation kept on the Characters tab's "Push All Actors".
-   * Each module's resyncAll / repushActor is the same proven path the per-tab
-   * buttons use; failures are isolated per item so one bad actor can't abort the
-   * sweep.
+   * Unlinked actors are intentionally NOT auto-created here — that's a
+   * heavier, entity-creating operation kept on the Characters tab's "Push
+   * All Actors". Each module's resyncAll / repushActor is the same path the
+   * per-tab buttons use; failures are isolated per item so one bad actor
+   * can't abort the rest.
    */
   async _onResyncEverything() {
     let confirmed;
@@ -2516,12 +2480,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   /**
    * Render multi-step test connection results.
    *
-   * Per FM-SEC-CHUNK-1 (closes M-1) — uses DOM construction instead of
-   * `innerHTML` interpolation. `s.text` contains Chronicle-side strings
-   * (system names, error messages echoing Chronicle response data); if
-   * Chronicle returned a malicious string, `innerHTML` would execute it
-   * as DOM. textContent renders it as text instead. See `.ai.md` footgun
-   * F-SEC-1 (added by FM-SEC-CHUNK-8).
+   * Uses DOM construction, never `innerHTML`: `s.text` contains
+   * Chronicle-side strings (system names, error messages echoing Chronicle
+   * response data), and a malicious string there must render as text
+   * (`textContent`), never execute as HTML. See `.ai.md` → "Security
+   * footguns".
    *
    * @param {HTMLElement} resultEl
    * @param {Array<{icon: string, text: string}>} steps
@@ -2892,13 +2855,12 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const calApi = (typeof CALENDARIA !== 'undefined' ? CALENDARIA?.api : null) ?? null;
     let apiMethods = null;
     if (calApi) {
-      // The trailing three are WRITE probes added by FM-SYNC-SUBRESOURCES-P1.
-      // Calendaria publishes weather reads but no documented setter, so
-      // `CalendarSync._applyWeatherToCalendaria` probes these names and falls
-      // back to a GM chat line when none exists. Reporting them here means an
-      // operator on a build that DOES expose one shows up in the bug report and
-      // we can pin the real name instead of guessing. Keep this list in sync
-      // with CALENDARIA_WEATHER_SETTERS in calendar-sync.mjs.
+      // The trailing three are WRITE probes: Calendaria publishes weather
+      // reads but no documented setter, so `CalendarSync._applyWeatherToCalendaria`
+      // probes these names and falls back to a GM chat line when none exists.
+      // Reporting them here surfaces the real name on a build that does
+      // expose one. Keep this list in sync with CALENDARIA_WEATHER_SETTERS
+      // in calendar-sync.mjs.
       const probeKeys = [
         'getWeatherForDate', 'getCurrentWeather', 'getAllMoonPhases',
         'getSelectedDay', 'createNote', 'updateNote', 'deleteNote',
@@ -3026,9 +2988,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     for (const entityId of ids) {
       try {
-        // FM-SYNC-WIRE-FIX fix 4: reveal endpoint (see _onToggleVisibility). A
-        // bare PUT /entities/:id with only {is_private} 400s on UpdateEntity's
-        // name-required check; POST /entities/:id/reveal accepts {is_private}.
+        // Reveal endpoint (see _onToggleVisibility): a bare PUT /entities/:id
+        // with only {is_private} 400s on UpdateEntity's name-required check;
+        // POST /entities/:id/reveal accepts {is_private}.
         await this.api.post(`/entities/${entityId}/reveal`, { is_private: makePrivate });
 
         const journal = game.journal.find(j => j.getFlag(FLAG_SCOPE, 'entityId') === entityId);

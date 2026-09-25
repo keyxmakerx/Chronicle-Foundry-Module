@@ -1,33 +1,17 @@
 #!/usr/bin/env node
 /**
- * Regression pin for FM-SEC-CHUNK-6 (G-S1 / G-S2 / G-S3 from the
- * Foundry-side security audit, §3 + §4 Chunk 6).
+ * `api-client.mjs` is the single auth-construction point for every
+ * Chronicle call this module makes. Pins:
  *
- * `api-client.mjs` is the SINGLE auth-construction point for every
- * Chronicle call this module makes. The chronicle#323 incident was
- * a wire-contract drift caught at this seam — the consumer-side pin
- * for that lesson is here:
- *
- *   - REST methods build their URL as
- *     `${apiUrl}/api/v1/campaigns/${campaignId}${path}` (never bare
- *     `/api/`, never `/syncapi/`).
- *   - Every REST method sends `Authorization: Bearer ${apiKey}` from
- *     `getSetting('apiKey')`.
- *   - WebSocket connect uses `?token=${apiKey}` query — NOT the Bearer
- *     header (browsers don't allow setting headers on the upgrade
- *     anyway, but pinning the absence of Bearer in the WS URL guards
- *     against any future refactor that tries to "be clever").
- *   - WebSocket message dispatch silently ignores any `type` that
- *     doesn't match an entry in `ALLOWED_WS_TYPE_PREFIXES`.
- *
- * A failure here means the auth contract drifted. Per the audit §3:
- *   - G-S1: every REST method routes through the same authenticated
- *     fetch.
- *   - G-S2: the auth model is Bearer-for-REST + token-for-WS, never
- *     cross-used.
- *   - G-S3: the WS message dispatch is allowlisted, not denylisted.
- *
- * Run: `node --test tools/test-api-client-security.mjs`
+ *   - REST URLs are always `${apiUrl}/api/v1/campaigns/${campaignId}${path}`
+ *     (never bare `/api/`, never `/syncapi/`).
+ *   - Every REST method sends `Authorization: Bearer ${apiKey}`.
+ *   - WebSocket connect uses `?token=${apiKey}` query, never the Bearer
+ *     header (browsers can't set headers on the upgrade, but this also
+ *     guards against a refactor introducing one).
+ *   - WebSocket message dispatch is allowlisted via
+ *     `ALLOWED_WS_TYPE_PREFIXES`, not denylisted — an unrecognized `type`
+ *     is silently ignored rather than acted on.
  */
 
 import test from 'node:test';
@@ -39,11 +23,8 @@ import { dirname, resolve } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
 
-// ---------------------------------------------------------------------
-// Fixture values — chosen so failure messages are obvious. The
-// campaignId MUST be a valid UUID because api-client.mjs calls
-// `_validateCampaignIdOrThrow` on it (FM-SEC-CHUNK-5 / P-7).
-// ---------------------------------------------------------------------
+// campaignId must be a valid UUID: api-client.mjs calls
+// `_validateCampaignIdOrThrow` on it.
 
 const FIXTURE = {
   apiUrl: 'https://chronicle.example.test',
@@ -57,12 +38,8 @@ const SETTINGS_VALUES = {
   campaignId: FIXTURE.campaignId,
 };
 
-// ---------------------------------------------------------------------
-// Stub Foundry globals BEFORE importing api-client.mjs. The module
-// reads getSetting() through settings.mjs at call time (not import
-// time), so we install the stubs first and let the import chain run
-// without throwing.
-// ---------------------------------------------------------------------
+// Stub Foundry globals before importing api-client.mjs: it reads
+// getSetting() through settings.mjs at call time, not import time.
 
 globalThis.foundry = globalThis.foundry || {
   applications: { api: { ApplicationV2: class {}, HandlebarsApplicationMixin: (cls) => cls } },

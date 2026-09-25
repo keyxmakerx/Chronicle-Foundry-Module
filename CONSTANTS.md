@@ -9,23 +9,23 @@ module. Useful when debugging sync behavior or tuning performance.
 
 | Constant | Value | Location | Purpose |
 |----------|-------|----------|---------|
-| Token position debounce | 100ms | `map-sync.mjs:904` | Batches rapid token drags into single API call |
+| Map-viewer notify debounce | 200ms | `map-sync.mjs` `NOTIFY_DEBOUNCE_MS` | Collapses a burst of WS updates for a map into one viewer re-render |
 | Status dot activity flash | 300ms | `module.mjs:150` | Brief white flash on WS message |
-| WS initial reconnect delay | 1000ms | `api-client.mjs:28` | First reconnect attempt delay |
-| WS max reconnect delay | 30000ms | `api-client.mjs:528` | Cap on exponential backoff |
-| WS backoff multiplier | 2x | `api-client.mjs:536` | Delay doubles each attempt |
+| WS initial reconnect delay | 1000ms | `api-client.mjs` `_reconnectDelay` | First reconnect attempt delay |
+| WS max reconnect delay | 30000ms | `api-client.mjs` `_scheduleReconnect` | Cap on exponential backoff |
+| WS backoff multiplier | 2x | `api-client.mjs` `_scheduleReconnect` | Delay doubles each attempt |
 
 ## Queue & Cache Limits
 
 | Constant | Value | Location | Purpose |
 |----------|-------|----------|---------|
-| Message queue cap | 100 | `api-client.mjs:408` | Max buffered WS messages while disconnected |
-| Retry queue cap | 50 | `api-client.mjs:234` | Max failed REST operations to retry on reconnect |
-| Retry max attempts | 3 | `api-client.mjs:234` | Per-operation retry limit |
-| Activity log max | 100 | `sync-manager.mjs:43` | Dashboard activity log entries |
-| Error log max | 50 | `api-client.mjs:66` | Dashboard error log entries |
-| Error message truncation | 200 chars | `api-client.mjs:322` | Truncated with `…` |
-| Entity pagination | 100/page, 5 pages | `sync-dashboard.mjs:215` | Max 500 entities loaded |
+| Message queue cap | 100 | `api-client.mjs` `_messageQueue` | Max buffered WS messages while disconnected |
+| Retry queue cap | 50 | `api-client.mjs` `queueForRetry` | Max failed REST operations to retry on reconnect |
+| Retry max attempts | 3 | `api-client.mjs` `queueForRetry` | Per-operation retry limit |
+| Activity log max | 100 | `sync-manager.mjs` `_maxLogEntries` | Dashboard activity log entries |
+| Error log max | 50 | `api-client.mjs` `_maxErrorLogEntries` | Dashboard error log entries |
+| Error message truncation | 200 chars | `api-client.mjs` `_logError` | Truncated with `…` |
+| Entity pagination | 100/page, 200 pages | `_entity-page-walk.mjs` `ENTITY_PAGE_SIZE`/`MAX_ENTITY_PAGES` | Bound is 20,000 entities; a walk that hits it sets a `truncated` flag the caller must surface |
 
 ## Coordinate Systems
 
@@ -39,16 +39,6 @@ The module converts between two coordinate systems:
 Conversion: `percentage = (pixel / sceneDimension) * 100`
 
 Applies to: drawings, tokens, fog regions, polygon points.
-
-## Fog Detection Heuristics
-
-When converting Foundry drawings to Chronicle fog regions:
-
-| Heuristic | Threshold | Location | Purpose |
-|-----------|-----------|----------|---------|
-| Dark color luminance | < 0.15 | `map-sync.mjs:798` | Identifies fog-like fill colors |
-| Fill alpha (fog threshold) | >= 0.5 | `map-sync.mjs:766` | Minimum opacity for fog detection |
-| Explored vs unexplored | opacity < 0.9 | `map-sync.mjs:869` | Semi-transparent = explored |
 
 ## Permission Mapping
 
@@ -87,8 +77,8 @@ The module adds/subtracts 1 when converting between SimpleCalendar and Chronicle
 ## System Matching
 
 System matching is API-driven: the `/systems` endpoint returns each system's
-`foundry_system_id`, which `sync-manager.mjs:231` matches against
-`game.system.id`. There is no in-module fallback table.
+`foundry_system_id`, which `sync-manager.mjs`'s `_detectSystem()` matches
+against `game.system.id`. There is no in-module fallback table.
 
 ### Actor Type by System
 
@@ -98,16 +88,6 @@ System matching is API-driven: the `/systems` endpoint returns each system's
 | Pathfinder 2e | `"character"` |
 | Draw Steel | `"hero"` |
 | Generic | Via `foundry_actor_type` in system manifest |
-
-## Drawing Type Codes
-
-| Foundry code | Chronicle type |
-|-------------|---------------|
-| `"f"` | `"freehand"` |
-| `"r"` | `"rectangle"` |
-| `"e"` | `"ellipse"` |
-| `"p"` | `"polygon"` |
-| `"t"` | `"text"` |
 
 ## Relation Types (Inventory)
 

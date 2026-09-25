@@ -25,19 +25,12 @@ export function registerSettings() {
     requiresReload: true,
   });
 
-  // API key — CLIENT scope, deliberately (FM-SEC-KEY-SCOPE, 2026-09-06).
-  //
-  // It was 'world' for the module's whole life, and a world-scoped setting
-  // is synced to EVERY connected client: config:false only hides it from the
-  // settings UI, and nothing stops a player from running
-  // game.settings.get('chronicle-sync', 'apiKey') in their console and
-  // holding the campaign's Bearer token. The sync runs GM-only, so the key
-  // only ever needs to exist in the GM's browser — which is exactly what
-  // client scope is. Cost: each GM enters it once per browser, and it does
-  // not follow the world to a new machine. migrateApiKeyToClientScope()
-  // moves an existing world-side value across and DELETES the world document
-  // (merely re-registering would leave it in the world settings collection,
-  // still synced to players).
+  // CLIENT scope, deliberately: a world-scoped setting syncs to every
+  // connected client (config:false only hides it from the UI), which would
+  // hand the campaign's Bearer token to any player's console. Sync runs
+  // GM-only, so client scope is sufficient. migrateApiKeyToClientScope()
+  // moves a legacy world-scoped value into the GM's browser and deletes the
+  // world document so it stops syncing to players.
   game.settings.register(MODULE_ID, 'apiKey', {
     name: game.i18n.localize('CHRONICLE.Settings.ApiKey.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.ApiKey.Hint'),
@@ -117,14 +110,10 @@ export function registerSettings() {
     default: false,
   });
 
-  // Defense-in-depth: pre-sanitize Chronicle-supplied HTML at ingress
-  // via Foundry's TextEditor.cleanHTML before it lands in JournalEntry
-  // pages. Default OFF (false) = sanitization is ON. Operator can flip
-  // ON (true) to skip the layer for high-trust deployments where
-  // cleanHTML strips legitimate inline styling Chronicle deliberately
-  // ships. Chronicle already sanitizes server-side (bluemonday UGCPolicy)
-  // and Foundry sanitizes at render time; this is the middle layer.
-  // Per FM-SEC-CHUNK-3 / FM-SECURITY-AUDIT §2 M-3.
+  // Defense-in-depth layer on top of Chronicle's server-side sanitization
+  // and Foundry's render-time sanitization: see _html-sanitizer.mjs.
+  // Default false = sanitization ON; an operator can set true for
+  // high-trust deployments where it strips legitimate inline styling.
   game.settings.register(MODULE_ID, 'skipIncomingSanitization', {
     name: game.i18n.localize('CHRONICLE.Settings.SkipIncomingSanitization.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.SkipIncomingSanitization.Hint'),
@@ -134,17 +123,14 @@ export function registerSettings() {
     default: false,
   });
 
-  // Calendar sub-resource chat announcements (FM-SYNC-SUBRESOURCES-P1).
-  //
-  // Chronicle broadcasts weather / world-state / season / era / moon-phase
-  // changes; the module surfaces them as GM-ONLY whispers (never public chat —
-  // see CalendarSync._announceToGM for why re-broadcasting a DM-gated payload
-  // would launder a server-side permission decision).
-  //
-  // Defaults follow the dispatch: season/era and weather ON because they change
-  // rarely and matter at the table; moon phases OFF because a moon crosses a
-  // phase boundary every few in-world days and would flood the log. All four
-  // are independent so a GM can keep the dashboard panel without the chat.
+  // Calendar sub-resource chat announcements: Chronicle broadcasts weather /
+  // world-state / season / era / moon-phase changes, surfaced as GM-ONLY
+  // whispers, never public chat (re-broadcasting a dm_only payload publicly
+  // would launder a server-side permission decision — see
+  // CalendarSync._announceToGM). Season/era and weather default ON since
+  // they change rarely; moon phases default OFF since they change every
+  // few in-world days and would flood the log. All four toggle
+  // independently of the dashboard panel.
   game.settings.register(MODULE_ID, 'calendarAnnounceWeather', {
     name: game.i18n.localize('CHRONICLE.Settings.CalendarAnnounceWeather.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.CalendarAnnounceWeather.Hint'),
@@ -248,11 +234,7 @@ export function registerSettings() {
 
   // Default Foundry ownership level for player-visible synced documents.
   // Values: 0 (NONE), 1 (LIMITED), 2 (OBSERVER), 3 (OWNER).
-  // Read by `_ownership.defaultLevelForVisibility` (FM-SYNC-HARDENING §1).
-  // Default is OBSERVER (2) — the level the sync hardcoded before the
-  // setting was wired, so honoring the setting is non-breaking for worlds
-  // that never touched it. Operators can lower it (None/Limited) or raise
-  // it to Owner.
+  // Read by `_ownership.defaultLevelForVisibility`.
   game.settings.register(MODULE_ID, 'defaultOwnership', {
     scope: 'world',
     config: false,
@@ -336,14 +318,11 @@ export function registerSettings() {
     restricted: true,
   });
 
-  // "Sync Calendar" — GM-only 3-pane view of the active Calendaria calendar
-  // with an always-on validation panel. Read-only in PR 1; event authoring,
-  // recurrence builder, weather + structure editing land in PR 2-5 per
-  // cordinator reports/foundry/2026-05-19-fm-cal-editor-scoping.md.
-  // i18n keys live under `CHRONICLE.Settings.SyncCalendarMenu.*` (not
-  // `CHRONICLE.Settings.SyncCalendar.*`) — that latter namespace is the
-  // existing `syncCalendar` boolean toggle's hint/name. PR 1 collided
-  // the two; PR 2's carry-in fix B renamed the menu entry's keys.
+  // "Sync Calendar" — GM-only view of the active Calendaria calendar with
+  // an always-on validation panel. i18n keys live under
+  // `CHRONICLE.Settings.SyncCalendarMenu.*`, distinct from
+  // `CHRONICLE.Settings.SyncCalendar.*` (the `syncCalendar` boolean
+  // toggle's own hint/name).
   game.settings.registerMenu(MODULE_ID, 'syncCalendarMenu', {
     name: game.i18n.localize('CHRONICLE.Settings.SyncCalendarMenu.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.SyncCalendarMenu.Hint'),
@@ -364,14 +343,14 @@ export function getSetting(key) {
 }
 
 /**
- * One-time migration for FM-SEC-KEY-SCOPE: move a world-scoped API key into
- * the GM's client scope and delete the world-side Setting document.
+ * One-time migration: move a legacy world-scoped API key into the GM's
+ * client scope and delete the world-side Setting document. Deleting it is
+ * the load-bearing step — otherwise the value stays in the world settings
+ * collection every client receives, regardless of the key's registered
+ * scope now.
  *
- * Runs GM-only, before the sync manager starts (so start() reads the moved
- * value). Idempotent: with no legacy document it does nothing and returns
- * false. Deleting the world document is the load-bearing step — the value
- * is otherwise still in the world settings collection every client receives,
- * whatever scope the key is registered under now.
+ * Runs GM-only, before the sync manager starts. Idempotent: with no legacy
+ * document it does nothing and returns false.
  *
  * @returns {Promise<boolean>} true if a legacy world value was found and handled
  */

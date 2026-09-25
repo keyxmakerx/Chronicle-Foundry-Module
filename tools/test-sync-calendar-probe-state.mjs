@@ -3,12 +3,12 @@
  * Tests for `calendarStateFromError` (scripts/_calendar-probe-state.mjs) plus a
  * static pin for the 'auth' import-banner localization wiring.
  *
- * Background (AUDIT-2026-06-21 §2): a failed `GET /calendar` probe must map to
- * an actionable banner state — 404 → 'absent' (import a calendar), 401/403 →
- * 'auth' (fix the token), else 'unreachable'. The classifier keys on the HTTP
- * status (numeric `err.status`, or the api-client's "Chronicle API error
- * <status>:" prefix), NOT on a bare digit run, so a response body that merely
- * contains "404" can't misclassify the banner.
+ * A failed `GET /calendar` probe must map to an actionable banner state: 503
+ * → 'rebuilding', 404 → 'absent' (import a calendar), 401/403 → 'auth' (fix
+ * the token), else 'unreachable'. The classifier keys on the HTTP status
+ * (numeric `err.status`, or the api-client's "Chronicle API error <status>:"
+ * prefix), not on a bare digit run, so a response body that merely contains
+ * "404" can't misclassify the banner.
  *
  * Run: `node --test tools/test-sync-calendar-probe-state.mjs`
  */

@@ -1,16 +1,10 @@
 /**
- * Chronicle Sync — leveled logger with an in-memory ring buffer.
+ * Leveled logger with an in-memory ring buffer. Gates console noise by a
+ * current level (error < warn < info < debug < trace) and always captures
+ * recent messages into the ring so the dashboard can export them
+ * (Diagnostic Bundle) even when the console wasn't open.
  *
- * Two jobs:
- *   1. Gate console noise by a current level (error < warn < info < debug < trace).
- *   2. ALWAYS capture recent messages into a ring buffer, so the dashboard can
- *      export them (Diagnostic Bundle) even when the console wasn't open.
- *
- * Adoption is incremental: modules migrate `console.*` → `log.*` over time. The
- * level control is wired into the UI only once enough call sites route through
- * here for it to actually govern output (so we never ship a no-op control).
- *
- * PURE except for `console` and the clock — unit-tested in tools/test-logger.mjs.
+ * Pure except for `console` and the clock — unit-tested in tools/test-logger.mjs.
  */
 
 /** Numeric severities; lower = more severe. `silent` suppresses all console output. */

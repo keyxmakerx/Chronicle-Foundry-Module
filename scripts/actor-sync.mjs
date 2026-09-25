@@ -337,9 +337,9 @@ export class ActorSync {
       if (entity.updated_at) {
         await actor.setFlag(FLAG_SCOPE, 'chronicleUpdatedAt', entity.updated_at);
       }
-      // Cache claim status for the actor-sheet indicator (FM-CH2). Falls
-      // through `null` when the entity is unclaimed so the indicator can
-      // show "Unclaimed" rather than stale data.
+      // Cache claim status for the actor-sheet indicator; falls through
+      // `null` when unclaimed so the indicator shows "Unclaimed" rather
+      // than stale data.
       if (Object.prototype.hasOwnProperty.call(entity, 'owner_user_id')) {
         await actor.setFlag(FLAG_SCOPE, 'chronicleOwnerUserId', entity.owner_user_id ?? null);
       }
@@ -413,7 +413,7 @@ export class ActorSync {
       // When the player-character-claiming addon is enabled, auto-resolve the
       // owner and route player-owned actors to the "Player Characters" sub-type.
       // When the addon is off, skip owner resolution — the player claims manually
-      // in Chronicle. (FM-CH1 / PC-CLAIM-4)
+      // in Chronicle.
       const addonOn = this._syncManager?.isPcClaimingEnabled() ?? false;
       const ownerUserId = addonOn ? this._resolveOwnerUserId(actor) : null;
 
@@ -439,8 +439,8 @@ export class ActorSync {
           this._syncing = true;
           await actor.setFlag(FLAG_SCOPE, 'entityId', entity.id);
           await actor.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
-          // Cache owner for the claim-status indicator (FM-CH2). Prefer the
-          // server's value if returned; fall back to what we sent.
+          // Cache owner for the claim-status indicator; prefer the server's
+          // value if returned, else fall back to what we sent.
           const cachedOwner = entity.owner_user_id ?? ownerUserId ?? null;
           await actor.setFlag(FLAG_SCOPE, 'chronicleOwnerUserId', cachedOwner);
         } finally {
@@ -517,21 +517,12 @@ export class ActorSync {
 
       // Update name separately if changed, with conflict detection.
       if (change.name) {
-        // A rename means ONE thing, so the body carries one field.
-        //
-        // Chronicle's PUT /entities/:id is a partial update: an absent key
-        // preserves, an explicit null clears, a present value replaces
-        // (API-CONTRACT.md → "The partial-update contract"). Before that
-        // contract existed, `is_private` was a value-typed bool on the
-        // server's request struct, so THIS body — {name} alone — bound
-        // is_private=false and published a hidden character entity to every
-        // player in the campaign. The fix is the server's; what belongs here
-        // is the discipline that made it visible.
-        //
-        // Do NOT "fix" this by echoing is_private / type_label / parent_id
-        // back. Echoing re-arms the endpoint for the next writer and would
-        // reintroduce the same break the moment one of the echoed values is
-        // stale. Visibility has its own route: POST /entities/:id/reveal.
+        // Chronicle's PUT /entities/:id is a partial update: absent preserves,
+        // explicit null clears, present replaces (API-CONTRACT.md → "The
+        // partial-update contract"). Send only {name} — do NOT echo
+        // is_private/type_label/parent_id back, which would re-arm the
+        // endpoint for the next writer with a stale value. Visibility has
+        // its own route: POST /entities/:id/reveal.
         const nameBody = { name: change.name };
         const chronicleUpdatedAt = actor.getFlag(FLAG_SCOPE, 'chronicleUpdatedAt');
         if (chronicleUpdatedAt) {

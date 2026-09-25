@@ -19,13 +19,10 @@ import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
 import { walkEntityPages } from './_entity-page-walk.mjs';
 
 /**
- * Validate and resolve a Chronicle entity's `image_path` to a safe src string.
- *
- * Mirrors the logic in map-sync._mapImageSrc (FM-SEC-IMAGE-HOST-ALLOWLIST):
- *   - Full http(s) URL → allowed only if scheme+hostname match apiUrl; any
- *     mismatch is dropped (empty string) and logged via _describeRejection.
- *   - Relative path (starts with "/") → prefixed with apiUrl base.
- *   - Anything else (empty/null/undefined) → empty string.
+ * Validate and resolve a Chronicle entity's `image_path` to a safe src
+ * string. Mirrors map-sync._mapImageSrc's host allowlist: a full http(s)
+ * URL is allowed only if scheme+hostname match apiUrl (any mismatch drops
+ * to "" and is logged); a relative path is prefixed with the apiUrl base.
  *
  * @param {string|null|undefined} imagePath
  * @returns {string} Safe image src, or "" if absent/rejected.
@@ -155,20 +152,14 @@ export class JournalSync {
   }
 
   /**
-   * Re-fetch every Chronicle entity and apply it to Foundry. Unlike `_onPullAll`
-   * (which only creates journals for chronicle-only entities), this method also
-   * UPDATES existing journals — refreshing content, name, and ownership/permissions.
-   * This is the correct fix for journals that synced before a permission change.
+   * Re-fetch every Chronicle entity and apply it to Foundry. Unlike
+   * `_onPullAll` (which only creates journals for chronicle-only entities),
+   * this also updates existing journals — refreshing content, name, and
+   * ownership — the fix for journals that synced before a permission change.
    *
-   * Mirrors MapSync.resyncAll / _runMapSync in structure:
-   *   - Paginated fetch of all entities (same source _prepareContext/_buildEntityGroups uses).
-   *   - For each entity: if a journal already exists → call `_onEntityUpdated` (which
-   *     re-runs `_buildOwnership` so permissions refresh); if none exists → create it.
-   *   - Respects `_syncing` guard (set by callers), `_isExcluded`, `_isHandledByActorSync`,
-   *     `isCalendarNoteJournal`, and `_isHandledByNoteSync`.
-   *   - Sequential/awaited (not parallelized) so a large campaign doesn't hammer the API.
-   *   - Returns a summary {updated, created, skipped, errors} for test assertions; also
-   *     fires a verbose `ui.notifications.info` when the option is set.
+   * Paginated fetch of all entities; for each, update if a journal exists
+   * (re-running `_buildOwnership`) or create it otherwise. Sequential, not
+   * parallelized, so a large campaign doesn't hammer the API.
    *
    * @param {{verbose?: boolean}} [opts]
    * @returns {Promise<{updated: number, created: number, skipped: number, errors: number}>}
@@ -494,11 +485,9 @@ export class JournalSync {
       // Build journal pages.
       const pages = [];
 
-      // Image page (if entity has an image).
-      // Route image_path through the same host-allowlist that map-sync uses
-      // (_mapImageSrc). Full http(s) URLs must match the configured apiUrl
-      // scheme+hostname (F-1 / FM-SEC-IMAGE-HOST-ALLOWLIST); relative paths
-      // are prefixed with apiUrl. A rejected host drops to empty src + warn.
+      // Image page (if entity has an image). Route through the same
+      // host-allowlist map-sync uses (_mapImageSrc); a rejected host
+      // drops to empty src + warn.
       const resolvedImageSrc = _resolveEntityImageSrc(entity.image_path);
       if (resolvedImageSrc) {
         pages.push({
@@ -510,7 +499,7 @@ export class JournalSync {
       }
 
       // Split entity content into pages by top-level headings.
-      // Sanitize at ingress before splitting (FM-SEC-CHUNK-3, M-3 defense-in-depth).
+      // Sanitize at ingress before splitting (defense-in-depth).
       const sections = this._splitByHeadings(_sanitizeIncomingHTML(entity.entry_html || ''));
 
       let sortIndex = 1;
@@ -617,14 +606,11 @@ export class JournalSync {
     // Skip if this journal was created by Chronicle sync.
     if (journal.getFlag(FLAG_SCOPE, 'entityId')) return;
 
-    // Skip journals that belong to another sync domain. Calendar modules
-    // (SimpleCalendar / Calendaria) and Chronicle Notes both persist their
-    // content as JournalEntries; CalendarSync and NoteSync own those documents
-    // and mirror them to the correct Chronicle resource (calendar events /
-    // notes). Without this guard JournalSync greedily POSTs them to /entities
-    // with entity_type_id:0, which the server files under the campaign's first
-    // entity type (typically "Character") — so e.g. calendar holidays show up
-    // in the Characters list. Mirrors the existing _isHandledByActorSync guard.
+    // Skip journals owned by another sync domain: calendar modules and
+    // Chronicle Notes also persist as JournalEntries, and CalendarSync /
+    // NoteSync mirror them to their own Chronicle resource. Without this
+    // guard they'd be POSTed to /entities with entity_type_id:0 and filed
+    // under the campaign's first entity type. Mirrors _isHandledByActorSync.
     if (isCalendarNoteJournal(journal)) {
       console.debug(`Chronicle: Skipping journal "${journal.name}" — calendar note (owned by CalendarSync).`);
       return;
@@ -673,9 +659,8 @@ export class JournalSync {
         console.debug(`Chronicle: Pushed new journal "${journal.name}" to Chronicle`);
       }
     } catch (err) {
-      // FM-SYNC-HARDENING §4: surface push failures instead of failing
-      // silently. The underlying REST error is already in the dashboard
-      // error log (api-client._logError); this also notifies the GM.
+      // Surface push failures to the GM instead of failing silently; the
+      // REST error itself is already in the dashboard's error log.
       console.error('Chronicle: Failed to push journal to Chronicle', err);
       ui.notifications?.warn?.(`Chronicle: Failed to push journal "${journal.name}". Check the sync dashboard for details.`);
     }
@@ -698,10 +683,8 @@ export class JournalSync {
     if (!entityId) return;
 
     // Defensive: a calendar note / Chronicle Note may carry a stale entityId
-    // from before the create-time guard existed (it was mis-pushed as an
-    // entity). Don't keep pushing edits to that bogus entity — the cleanup
-    // pass unlinks it. New journals never reach here because the create guard
-    // prevents the link in the first place.
+    // from before the create-time guard existed. Don't keep pushing edits to
+    // that bogus entity — the cleanup pass unlinks it.
     if (isCalendarNoteJournal(journal) || this._isHandledByNoteSync(journal)) return;
 
     try {
@@ -755,10 +738,9 @@ export class JournalSync {
 
       console.debug(`Chronicle: Pushed journal update "${journal.name}" to Chronicle`);
     } catch (err) {
-      // FM-SYNC-HARDENING §4: surface push failures + queue the (idempotent)
-      // update for retry on reconnect. The PUT targets a known entity id, so
-      // re-pushing is safe; a stale expected_updated_at would surface as a
-      // conflict on the next pull rather than corrupting data.
+      // Surface the failure and queue the (idempotent) update for retry on
+      // reconnect; a stale expected_updated_at surfaces as a conflict on
+      // the next pull rather than corrupting data.
       console.error('Chronicle: Failed to push journal update', err);
       this._api.queueForRetry?.('PUT', `/entities/${entityId}`, {
         name: journal.name,
@@ -892,20 +874,16 @@ export class JournalSync {
 
   /**
    * Build a Foundry ownership object from Chronicle entity permissions.
-   * Fetches the entity's permission grants and maps them to Foundry ownership levels.
    *
-   * Mapping:
-   * - visibility "default" → `defaultLevelForVisibility(is_private)`, which
-   *   honors the operator's `dmOnlyHidden` + `defaultOwnership` settings
-   *   (FM-SYNC-HARDENING §1).
-   * - visibility "custom" → explicit Chronicle grants take precedence over the
-   *   generic default. Role "1" (Player) sets the `default` level; per-user
-   *   grants map to specific Foundry users via the user-mapping table
-   *   (FM-SYNC-HARDENING §4) when the Chronicle user is known.
+   * Mapping: visibility "default" → `defaultLevelForVisibility(is_private)`,
+   * honoring the operator's `dmOnlyHidden` + `defaultOwnership` settings.
+   * Visibility "custom" → explicit Chronicle grants take precedence; role
+   * "1" (Player) sets the `default` level, and per-user grants map to
+   * specific Foundry users via the user-mapping table when known.
    *
-   * Security posture (FM-SYNC-HARDENING §3): the custom-visibility error path
-   * fails CLOSED to NONE — a transient permissions-API error must never widen
-   * a GM-restricted entity to player-visible.
+   * Security: the custom-visibility error path fails closed to NONE — a
+   * transient permissions-API error must never widen a GM-restricted
+   * entity to player-visible.
    *
    * @param {object} entity - Chronicle entity with id, is_private, visibility fields.
    * @returns {object} Foundry ownership object.
@@ -918,8 +896,8 @@ export class JournalSync {
     // defaultOwnership dashboard controls.
     if (!entity.visibility || entity.visibility === 'default') {
       const level = defaultLevelForVisibility(entity.is_private);
-      // Audit §1A: a private entity that correctly lands hidden-from-players is
-      // not "didn't sync" — count it so the dashboard can say so explicitly.
+      // A private entity that correctly lands hidden-from-players is not
+      // "didn't sync" — count it so the dashboard can say so explicitly.
       if (entity.is_private && level <= L.NONE) {
         this._syncManager?.noteDmOnlyHidden?.();
       }
@@ -931,10 +909,9 @@ export class JournalSync {
     try {
       permsData = await this._api.get(`/entities/${entity.id}/permissions`);
     } catch (err) {
-      // FM-SYNC-HARDENING §3: fail CLOSED. Never fall open to OBSERVER on a
-      // transient error — a GM-restricted custom entity stays GM-only (NONE).
-      // Audit §3.3: surface it instead of console-only so the operator knows
-      // the entity is locked to GM-only because the permissions fetch failed.
+      // Fail closed: never fall open to OBSERVER on a transient error — a
+      // GM-restricted custom entity stays GM-only (NONE). Surface it so the
+      // operator knows why, instead of console-only.
       console.warn(
         'Chronicle: Failed to fetch entity permissions — failing closed (GM-only)',
         err
@@ -967,18 +944,15 @@ export class JournalSync {
         // Role "2" = Scribe. Foundry has no "scribe" concept; covered by
         // the default level.
       } else if (grant.subject_type === 'public') {
-        // Audit §5: a `public` grant means everyone can see it → raise the
-        // default to at least OBSERVER (edit → OWNER). Fail-closed posture is
-        // preserved: this only ever WIDENS toward the explicitly-public intent,
-        // and never below an existing higher role grant.
+        // A `public` grant means everyone can see it → raise the default to
+        // at least OBSERVER (edit → OWNER). Only ever widens toward the
+        // explicitly-public intent, never below an existing higher grant.
         const publicLevel = grant.permission === 'edit' ? L.OWNER : L.OBSERVER;
         if (publicLevel > ownership.default) ownership.default = publicLevel;
       } else if (grant.subject_type === 'user') {
-        // Per-user grant → map to a specific Foundry user when we know the
-        // mapping (FM-SYNC-HARDENING §4). Unmapped users are dropped: the
-        // entity under-shares (the user simply doesn't gain access) rather
-        // than leaking to the wrong player — but the drop is now surfaced
-        // (audit §3.2) so the operator can map the member.
+        // Per-user grant → map to a specific Foundry user when known.
+        // Unmapped users are dropped and surfaced to the operator: the
+        // entity under-shares rather than leaking to the wrong player.
         const foundryUserId = this._syncManager?.getFoundryUserId?.(
           String(grant.subject_id)
         );
@@ -991,11 +965,9 @@ export class JournalSync {
       }
     }
 
-    // Audit §5: `tag_grants` apply a grant to whoever holds a Chronicle tag.
-    // Foundry has no tag-membership concept, so we can't expand them to users;
-    // we read the response shape (so the field is consumed, not ignored) and,
-    // keeping the fail-closed posture, do NOT widen the default off a tag grant
-    // — instead we note that tag-scoped access can't be honored.
+    // `tag_grants` apply a grant to whoever holds a Chronicle tag. Foundry
+    // has no tag-membership concept, so keep the fail-closed posture: don't
+    // widen the default off a tag grant, just note it can't be honored.
     if (Array.isArray(permsData.tag_grants) && permsData.tag_grants.length > 0) {
       this._syncManager?.logActivity?.(
         'warning',
@@ -1016,16 +988,14 @@ export class JournalSync {
   /**
    * Build the Chronicle permission grants for a Foundry ownership object.
    *
-   * Pure / side-effect-free (apart from the injected reverse-map fn) so it can
-   * be unit-tested. Translates each Foundry per-user ownership entry into a
-   * Chronicle `{subject_type:'user', subject_id, permission}` grant by
-   * reverse-mapping the Foundry user id → Chronicle user id via
-   * `getChronicleUserId` (audit §2 — per-user grants were previously detected
-   * but never emitted). Level ≥ OWNER → `'edit'`, otherwise `'view'`.
+   * Pure / side-effect-free (apart from the injected reverse-map fn) so it
+   * can be unit-tested. Translates each Foundry per-user ownership entry
+   * into a Chronicle `{subject_type:'user', subject_id, permission}` grant
+   * via `reverseMap`. Level ≥ OWNER → `'edit'`, otherwise `'view'`.
    *
-   * Fail CLOSED on the share axis: a Foundry user we cannot reverse-map is
-   * NOT pushed (the grant is dropped and reported in `unmapped`), so a
-   * mis-mapped/unknown user never silently widens Chronicle access.
+   * Fails closed on the share axis: a Foundry user that cannot be
+   * reverse-mapped is not pushed (dropped and reported in `unmapped`), so
+   * an unknown user never silently widens Chronicle access.
    *
    * @param {object} ownership - Foundry ownership object.
    * @param {boolean} isPrivate - Whether the entity is private (default ≤ NONE).
@@ -1069,13 +1039,12 @@ export class JournalSync {
    * - The default level drives `is_private` + the broad Player-role grant.
    * - Each per-user Foundry ownership entry is reverse-mapped to a Chronicle
    *   user grant (`subject_type:'user'`); `visibility:'custom'` is sent only
-   *   when real user grants exist, otherwise `'default'` (audit §2).
+   *   when real user grants exist, otherwise `'default'`.
    * - Foundry users that can't be reverse-mapped are skipped and surfaced
-   *   (notification + dashboard warning) so the operator knows that player's
-   *   access didn't propagate — never silently dropped (audit §3.4).
+   *   (notification + dashboard warning) rather than silently dropped.
    *
    * Best-effort: a transport error is surfaced but never fails the journal
-   * sync (mirrors the journal-content push posture, FM-SYNC-HARDENING §4).
+   * sync, mirroring the journal-content push posture.
    *
    * @param {string} entityId - Chronicle entity ID.
    * @param {object} ownership - Foundry ownership object.
@@ -1117,8 +1086,7 @@ export class JournalSync {
         });
       }
     } catch (err) {
-      // Permission push is best-effort — don't fail the sync, but don't let it
-      // fail silently either (audit §3.4).
+      // Best-effort — don't fail the sync, but don't fail silently either.
       console.warn('Chronicle: Failed to push permissions update', err);
       this._syncManager?.logActivity?.(
         'error',

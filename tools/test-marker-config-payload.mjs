@@ -1,34 +1,18 @@
 #!/usr/bin/env node
 /**
- * Regression pin for the partial-PUT marker bug
- * (FM-MARKER-DIALOG-PARTIAL-PUT).
- *
  * `PUT /api/v1/campaigns/:id/maps/:mapID/markers/:markerID` is a FULL
- * REPLACE. Chronicle binds the body into `apiUpdateMarkerRequest` (pointer
- * fields for the optional columns) and `mapService.UpdateMarker` assigns
- * every one of them onto the loaded row before
- * `mapRepo.UpdateMarker` UPDATEs `entity_id`, `visibility_rules` and
- * `foundry_id` unconditionally. A key absent from the JSON body therefore
- * binds to nil and lands on disk as NULL.
+ * REPLACE: a key absent from the JSON body binds to nil and lands on disk
+ * as NULL. `ChronicleMarkerConfigDialog.#onSave` must therefore spread the
+ * stored marker under the edited fields (matching the sibling
+ * `PinConfigDialog.#onSave`), never rebuild the payload from only the
+ * form's own fields — otherwise every GM edit silently clears `entity_id`
+ * (the marker→entity link), `visibility_rules` (the per-user allow/deny
+ * list), and `foundry_id` (this module's own pairing key).
  *
- * `ChronicleMarkerConfigDialog.#onSave` used to rebuild its payload from
- * scratch with exactly eight keys — name, description, x, y, pin_category,
- * color, icon, visibility — so every GM edit of a Chronicle marker from the
- * Foundry map viewer silently cleared:
- *
- *   - `entity_id`        the marker → entity link (double-click navigation)
- *   - `visibility_rules` the per-user allow/deny list
- *   - `foundry_id`       the module's OWN pairing key
- *
- * The fix spreads the stored marker under the edited fields, matching the
- * sibling `PinConfigDialog.#onSave` in the same file.
- *
- * These tests drive the REAL save action off
+ * These tests drive the real save action off
  * `ChronicleMarkerConfigDialog.DEFAULT_OPTIONS.actions['save-marker']`
  * against a stubbed form, and assert on the object handed to the onSave
  * callback (which map-sync.mjs passes verbatim as the PUT body).
- *
- * Run: `node --test tools/test-marker-config-payload.mjs`
  */
 
 import test from 'node:test';

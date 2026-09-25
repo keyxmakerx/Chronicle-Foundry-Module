@@ -11,9 +11,8 @@ import { getSetting, setSetting, isConfigured, getSyncDirections, getExcludedTag
 
 /**
  * How long the connection must stay continuously connected after a reconnect
- * before we re-pull (FM-SYNC-HARDENING §2). Debouncing collapses a flapping
- * connection's repeated reconnect events into a single re-pull once the link
- * has settled, preventing a re-pull storm.
+ * before we re-pull. Debouncing collapses a flapping connection's repeated
+ * reconnect events into a single re-pull once the link has settled.
  * @type {number}
  */
 const RECONNECT_RESYNC_DEBOUNCE_MS = 3000;
@@ -65,9 +64,8 @@ export class SyncManager {
     /**
      * @type {Array<object>} Chronicle members that could NOT be auto-matched to
      * a Foundry user on the last `fetchAndCacheMembers`. Surfaced in the
-     * dashboard Members tab so the operator can map them manually (a per-player
-     * grant on an unmatched member is silently dropped, so this is the required
-     * operator signal — audit §2/§3.1).
+     * dashboard Members tab so the operator can map them manually — a
+     * per-player grant on an unmatched member is silently dropped otherwise.
      */
     this._unmatchedMembers = [];
 
@@ -75,7 +73,7 @@ export class SyncManager {
      * @type {number} Count of DM-only / private entities synced this session
      * that landed hidden-from-players (ownership.default = NONE) because the
      * `dmOnlyHidden` setting is on. Surfaced on the Status tab so a correctly-
-     * hidden private entity isn't mistaken for "didn't sync" (audit §1A).
+     * hidden private entity isn't mistaken for "didn't sync".
      */
     this._dmOnlyHiddenCount = 0;
 
@@ -154,10 +152,9 @@ export class SyncManager {
     // Listen for connection state changes (must be registered BEFORE connect).
     this.api.on('sync.status', (msg) => this._onSyncStatus(msg));
 
-    // Re-pull on reconnect (FM-SYNC-HARDENING §2). Driven off the connection
-    // state machine — a deterministic signal independent of the server's
-    // sync.status message shape. The first connect is handled by the
-    // sync.status listener above; this only fires for genuine reconnects
+    // Re-pull on reconnect, driven off the connection state machine rather
+    // than the server's sync.status shape. The first connect is handled by
+    // the sync.status listener above; this only fires for genuine reconnects
     // after a drop, so changes made on Chronicle during the disconnect
     // window aren't lost until a world reload.
     this.api.onStateChange((state) => this._onConnectionStateChange(state));
@@ -172,20 +169,11 @@ export class SyncManager {
    * Handle a `sync.status` event from the API client and fire the one-time
    * initial sync on the first 'connected'.
    *
-   * FM-SYNC-WIRE-FIX (FM-SYNC-1): the previous listener read ONLY
-   * `msg.payload?.status`, but `api-client.mjs` emits `sync.status` UNWRAPPED
-   * (`_emit('sync.status', { status: 'connected' })` → the listener receives
-   * `{ status: 'connected' }` directly, with no `payload` envelope). The guard
-   * was therefore never true, so `_performInitialSync` — and every module's
-   * `onInitialSync`, plus the journal duplicate-deletion post-pass — never ran
-   * on first load, and the reconnect resync (gated on the never-set
-   * `_initialSyncDone`) was dead too. Reading `status` from BOTH shapes revives
-   * both. The fix is on the LISTENER, not the emit: client emit shapes are
-   * intentionally inconsistent (`sync.retryComplete` uses `{ payload }`) and the
-   * same object is fanned out to the wildcard router, so normalizing at the emit
-   * would ripple. This handler is idempotent: `_initialSyncDone` latches it to a
-   * single run, and the reconnect resync path (`_onConnectionStateChange`) owns
-   * subsequent re-pulls.
+   * Client emit shapes are inconsistent — `sync.status` is unwrapped
+   * (`{ status }`) while `sync.retryComplete` uses `{ payload }` — so this
+   * reads `status` from both shapes rather than assuming one. Idempotent:
+   * `_initialSyncDone` latches it to a single run; `_onConnectionStateChange`
+   * owns subsequent re-pulls.
    * @param {{status?: string, payload?: {status?: string}}} msg
    * @private
    */
@@ -198,8 +186,7 @@ export class SyncManager {
   }
 
   /**
-   * React to WebSocket connection-state transitions for the reconnect
-   * re-pull (FM-SYNC-HARDENING §2).
+   * React to WebSocket connection-state transitions for the reconnect re-pull.
    *
    * - Any drop ('disconnected' / 'reconnecting') arms `_sawDisconnect`.
    * - A return to 'connected' after a drop, once the initial sync has already
@@ -263,12 +250,10 @@ export class SyncManager {
    * After the auto-match, any Chronicle member that could NOT be linked to a
    * Foundry user is surfaced — a `ui.notifications.warn` + a dashboard
    * `warning` activity entry listing each unmatched member — and cached on
-   * `_unmatchedMembers` for the dashboard Members tab. This is the operator's
-   * required signal: an unmatched member's per-user permission grants are
-   * silently dropped on both push and pull, so a wrong/missing mapping must be
-   * visible, not silent (audit §2/§3.1). Members the operator has mapped by
-   * hand (via `memberKey(member)` already present in `userMappings`) are not
-   * reported as unmatched.
+   * `_unmatchedMembers` for the dashboard Members tab. This must stay visible:
+   * an unmatched member's per-user permission grants are silently dropped on
+   * both push and pull. Members already mapped by hand are not reported as
+   * unmatched.
    */
   async fetchAndCacheMembers() {
     try {
@@ -304,9 +289,8 @@ export class SyncManager {
 
       console.debug(`Chronicle: Fetched ${this._members.length} campaign members`);
     } catch (err) {
-      // Members fetch failure is no longer console-only — surface it so the
-      // operator knows per-user permission mapping is unavailable this session
-      // (audit §3.6). Mappings remain whatever was previously persisted.
+      // Surface the failure so the operator knows per-user permission mapping
+      // is unavailable this session. Mappings remain whatever was persisted.
       console.warn('Chronicle: Failed to fetch campaign members', err);
       this._members = [];
       this._unmatchedMembers = [];
@@ -343,8 +327,7 @@ export class SyncManager {
 
   /**
    * Number of DM-only / private entities synced this session that landed
-   * hidden-from-players because `dmOnlyHidden` is on. Clarifies the audit §1A
-   * perception gap on the dashboard.
+   * hidden-from-players because `dmOnlyHidden` is on.
    * @returns {number}
    */
   getDmOnlyHiddenCount() {
@@ -554,19 +537,9 @@ export class SyncManager {
       }
 
       // Let each module perform its own initial sync (e.g., calendar structure).
-      //
-      // FM-CAL-BLACKOUT: isolated per module, mirroring the onPostInitialSync
-      // loop below (which has always done this).
-      //
-      // Unguarded, ONE module throwing here aborted the whole pass: every
-      // module after it in the list lost its initial sync, the post-pass never
-      // ran, and — quietly the worst part — the `lastSyncTime` write at the end
-      // was skipped, so the next connect re-pulled from the same point forever.
-      //
-      // The calendar could not actually trigger it (CalendarSync catches
-      // internally), but that made the isolation of every OTHER module rest on
-      // one `catch` inside an unrelated one, which is not isolation. A backend
-      // outage in any single subsystem must degrade that subsystem only.
+      // Isolated per module, mirroring the onPostInitialSync loop below: one
+      // module throwing here must not abort the pass for the rest, or skip
+      // the `lastSyncTime` write and re-pull from the same point forever.
       for (const mod of this._modules) {
         if (typeof mod.onInitialSync === 'function') {
           try {
@@ -666,16 +639,13 @@ export class SyncManager {
   /**
    * Idempotent sync-mapping POST.
    *
-   * 1. Look up an existing mapping for `(chronicle_type, chronicle_id)`.
-   *    If one exists, return it — the happy path for already-synced
-   *    docs (no Chronicle round-trip beyond the GET; no 400 noise).
+   * 1. Look up an existing mapping for `(chronicle_type, chronicle_id)`; if
+   *    found, return it without a POST.
    * 2. Otherwise POST `/sync/mappings`.
-   * 3. If the POST returns a 400 with body containing "already exists",
-   *    refetch via `findMapping` and return that — covers the race
-   *    window between our GET and POST where a concurrent client
-   *    created the mapping. The absorbed 400 is also stripped from the
-   *    api-client error log so it does not pollute the FM-MAP-DIAG
-   *    dashboard.
+   * 3. If the POST reports a conflict ("already exists"), refetch via
+   *    `findMapping` — covers the race window between our GET and POST
+   *    where a concurrent client created the mapping — and strip the
+   *    absorbed error from the api-client's logged errors.
    * 4. Any other failure propagates.
    *
    * @param {object} payload - `{chronicle_type, chronicle_id, external_system, external_id, sync_direction, sync_metadata?}`
@@ -710,14 +680,10 @@ export class SyncManager {
   }
 
   /**
-   * Detect Chronicle's mapping-already-exists conflict. The backend's
-   * CreateMapping returns `apperror.NewConflict("sync mapping already exists
-   * for this object")` → HTTP 409 (Chronicle apperror/errors.go), which
-   * api-client wraps in a `ConflictError` (err.status === 409). Older/other
-   * deployments may surface it as a generic 400, so we match both defensively.
-   * The "already exists" substring is the real discriminator, so unrelated
-   * 409s (e.g. optimistic-concurrency "Entity was modified by another user")
-   * are NOT absorbed.
+   * Detect Chronicle's mapping-already-exists conflict (HTTP 409, or a
+   * generic 400 on older deployments). The "already exists" substring is the
+   * real discriminator, so unrelated 409s (e.g. optimistic-concurrency
+   * conflicts) are NOT absorbed.
    * @param {Error} err
    * @returns {boolean}
    * @private

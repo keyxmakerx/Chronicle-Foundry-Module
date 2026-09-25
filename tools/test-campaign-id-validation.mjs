@@ -1,27 +1,17 @@
 #!/usr/bin/env node
 /**
- * Regression pin for FM-SEC-CHUNK-5 (closes P-7 from FM-SECURITY-AUDIT).
+ * `campaignId` is read from the Foundry world setting and interpolated into
+ * every Chronicle request URL: `${baseUrl}/api/v1/campaigns/${campaignId}${path}`.
+ * A misconfigured value (empty, non-UUID, whitespace, `../`) could silently
+ * 404 or escape the campaign scope, so `api-client.mjs::fetch` and
+ * `uploadMedia` must validate it at the call boundary via
+ * `isValidCampaignId(id)` / `describeCampaignIdError(id)` in
+ * `scripts/_settings-validation.mjs`, throwing with an actionable
+ * `ui.notifications.error` on failure.
  *
- * `campaignId` is read from the Foundry world setting at every Chronicle
- * API call boundary and interpolated into the request URL:
- *
- *   `${baseUrl}/api/v1/campaigns/${campaignId}${path}`
- *
- * A misconfigured value (typo, empty, non-UUID, whitespace, `../`)
- * silently 404s or — worst case — escapes the campaign scope.
- *
- * The fix: `isValidCampaignId(id)` + `describeCampaignIdError(id)` in
- * `scripts/_settings-validation.mjs`. `api-client.mjs::fetch` and
- * `uploadMedia` validate at the call boundary; invalid → throw +
- * `ui.notifications.error` with an actionable message.
- *
- * This test covers:
- *   - the validator's behavioral pattern (accept/reject cases)
- *   - the error-message helper's coverage
- *   - the static-source integration: api-client.mjs calls the validator
- *     at fetch AND uploadMedia boundaries.
- *
- * Run: `node --test tools/test-campaign-id-validation.mjs`
+ * This covers the validator's accept/reject behavior, the error-message
+ * helper's coverage, and the static-source check that both call sites
+ * actually invoke the validator.
  */
 
 import test from 'node:test';

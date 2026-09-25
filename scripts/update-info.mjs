@@ -2,34 +2,19 @@
  * Chronicle Sync — Update Source Info dialog
  *
  * Shows the install-time manifest URL Foundry stored for this module,
- * pattern-matches it to detect whether the module is wired up to
- * Chronicle's per-campaign update endpoint or still pointing at the
- * legacy GitHub releases. Adds a manual "Check Chronicle for updates"
- * button so operators can confirm reachability without going through
- * Foundry's native Setup → Modules → Update All UX.
+ * classifies it as Chronicle or legacy GitHub releases, and provides a
+ * manual "Check Chronicle for updates" button.
  *
- * On a failed check, this dialog renders a category-tagged diagnostic.
- * Chronicle ships a JSON error body with shape:
- *   { error: <code>, message: <human-readable string>, category: <bucket> }
- * where `category` is one of `auth | config | not_found | validation |
- * internal`. We trust Chronicle's classification (it's the source of
- * truth) and render `body.message` directly — Chronicle's message is
- * already operator-actionable, so the Foundry side does not re-construct
- * cause/action strings for Chronicle errors.
- *
- * For non-Chronicle failures (network unreachable, non-JSON body, JSON
- * parse failed, no install-time URL recorded), we build a 4-clause
- * diagnostic client-side using the `Errors.Network` / `Errors.Parse` /
- * `Errors.NoUrl` / `Errors.HttpFallback` i18n trees.
+ * On a failed check, Chronicle's JSON error body
+ * ({ error, message, category }, category one of `auth | config |
+ * not_found | validation | internal`) is rendered via `body.message`
+ * verbatim — Chronicle's classification is authoritative. Failures
+ * Chronicle didn't classify (network, non-JSON body, no install URL)
+ * get a client-built 4-clause diagnostic from the `Errors.*` i18n trees.
  *
  * Wired into the module settings panel via `game.settings.registerMenu`
- * in `settings.mjs`.
- *
- * Architecture context: see `.ai.md` → "Chronicle Integration — Install
- * & Updates" for the Foundry-side narrative (how Foundry stores the
- * install-time URL, how rotation breaks installs, what counts as
- * recovery). For the wire-level contract (response shapes, error
- * codes), see `API-CONTRACT.md` → "Chronicle-served Module
+ * in `settings.mjs`. See `.ai.md` → "Chronicle Integration — Install &
+ * Updates" and `API-CONTRACT.md` → "Chronicle-served Module
  * Distribution".
  */
 
@@ -38,21 +23,16 @@ import { MODULE_ID } from './constants.mjs';
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**
- * Patterns used to classify the install-time manifest URL.
- *
- * Chronicle pattern matches the per-campaign signed manifest endpoint
- * served by Chronicle's `foundry_vtt` sub-plugin:
+ * Chronicle's per-campaign signed manifest endpoint:
  *   `/api/v1/campaigns/<uuid>/foundry-vtt/module.json?token=<signed>`
- * The URL shape is defined in `chronicle-package.json` at repo root
- * (`serving.manifestEndpoint`) and locked by FM-CONSOLIDATE-R1 D1.
+ * Shape defined in `chronicle-package.json` (`serving.manifestEndpoint`).
  */
 const CHRONICLE_MANIFEST_RE = /\/api\/v1\/campaigns\/[^/]+\/foundry-vtt\/module\.json/i;
 const GITHUB_MANIFEST_RE = /github\.com/i;
 
 /**
- * Chronicle's category enum. Foundry rejects any value outside this set
- * and falls back to HTTP-status classification — so a typo or unknown
- * Chronicle release can't render an unstyled `result-{whatever}` class.
+ * Chronicle's category enum. A value outside this set falls back to
+ * HTTP-status classification instead of rendering an unstyled class.
  */
 const CHRONICLE_CATEGORIES = new Set([
   'auth',
@@ -65,9 +45,6 @@ const CHRONICLE_CATEGORIES = new Set([
 /**
  * Read the install-time manifest URL Foundry stored for this module.
  * v13+ exposes it as `module.manifest`; v12 nested it under `module.data`.
- *
- * Exported for reuse by the startup recovery probe in `module.mjs` and by
- * the unit tests in `tools/test-update-info.mjs`.
  *
  * @returns {string} The manifest URL, or empty string if not available.
  */
@@ -92,15 +69,9 @@ function classifyManifestSource(url) {
 
 /**
  * Categorize a failed manifest fetch. Chronicle's server-side `category`
- * field is authoritative; only fall back to HTTP-status mapping when
- * Chronicle did not return a JSON body (proxy error, CDN, etc.).
- *
- * Categories produced here are exactly Chronicle's enum (auth | config |
- * not_found | validation | internal) — no kebab-case mutation. Foundry-
- * specific buckets `network` and `parse` are set by the call sites, not
- * by this function.
- *
- * Exported for testability — see `tools/test-update-info.mjs`.
+ * is authoritative; falls back to HTTP-status mapping only when
+ * Chronicle didn't return a JSON body. `network`/`parse` buckets are set
+ * by call sites, not here.
  *
  * @param {{httpStatus: number, chronicleCategory: string|undefined}} args
  * @returns {'auth'|'config'|'not_found'|'validation'|'internal'}
@@ -115,11 +86,7 @@ export function categorize({ httpStatus, chronicleCategory }) {
   return 'internal';
 }
 
-/**
- * FontAwesome icon class per category. Chronicle categories use icons
- * that reinforce the actor cue: gear for "config you need to set",
- * triangle for "data malformed", etc.
- */
+/** FontAwesome icon class per category. */
 const CATEGORY_ICONS = {
   // Chronicle-driven
   auth:       'fa-key',
@@ -133,15 +100,10 @@ const CATEGORY_ICONS = {
 };
 
 /**
- * Parse Chronicle's error body shape.
- *
+ * Parse Chronicle's error body shape:
  *   { error: <code-string>, message: <human-string>, category: <bucket> }
- *
- * Defensive: any field may be missing. Returns nullish-safe object with
- * empty-string defaults so callers can render without optional-chaining
- * everywhere.
- *
- * Exported for testability.
+ * Any field may be missing; returns empty-string defaults so callers
+ * don't need optional-chaining.
  */
 export function parseChronicleErrorBody(body) {
   if (!body || typeof body !== 'object') {
@@ -155,17 +117,10 @@ export function parseChronicleErrorBody(body) {
 }
 
 /**
- * Passive manifest health probe. Fetches the install-time URL Foundry
- * stored for this module and classifies the result using the same
- * `parseChronicleErrorBody` + `categorize` path the "Check for updates"
- * button uses. Pure data return — does not touch `ui.notifications`,
- * does not render. Caller decides what to do with the result.
- *
- * Used by `surfaceManifestRecoveryIfNeeded()` on `ready` to detect a
- * stuck install (post-restart secret rotation, token-version bump, or
- * any other auth-category failure) and surface a recovery notification
- * to the GM. Designed so future callers (e.g. a periodic re-probe) can
- * reuse the same shape.
+ * Passive manifest health probe. Fetches the install-time URL and
+ * classifies the result via `parseChronicleErrorBody` + `categorize`,
+ * the same path the "Check for updates" button uses. Pure data return —
+ * no `ui.notifications`, no render; caller decides what to do.
  *
  * Outcome shape:
  *   { ok: false, state: 'no_url' }                               — Foundry has no install URL
@@ -224,21 +179,12 @@ export async function probeManifest() {
 /**
  * Startup recovery hook. Probes the install-time manifest URL and, on an
  * `auth`-category failure, surfaces a sticky `ui.notifications.error`
- * with Chronicle's `body.message` (or a localized fallback) so the GM
- * sees a clear recovery prompt in the Foundry UI instead of having to
- * open DevTools.
+ * with Chronicle's `body.message` (or a localized fallback).
  *
- * GM-only — players can't reinstall a module, so the banner would be
- * unactionable noise. Callers should gate on `game.user.isGM`.
- *
- * One-shot per session. Fire-and-forget from the `ready` hook; failures
- * inside this function never propagate. Non-`auth` failures (network,
- * parse, server, etc.) intentionally do NOT surface here — the "Check
- * for updates" dialog covers diagnostic cases that aren't actionable as
- * "reinstall from a fresh URL".
- *
- * Resolves the Foundry-side companion to cordinator Issue #17
- * (`FM-UPDATER-RECOVERY-UX`).
+ * GM-only — players can't reinstall a module, so callers should gate on
+ * `game.user.isGM`. One-shot per session, fire-and-forget from `ready`;
+ * failures inside never propagate. Non-`auth` failures are left to the
+ * "Check for updates" dialog since they aren't actionable as reinstall.
  *
  * @returns {Promise<void>}
  */
@@ -261,9 +207,7 @@ export async function surfaceManifestRecoveryIfNeeded() {
 
   // Sticky banner so the GM can't miss it between sessions.
   ui.notifications.error(text, { permanent: true, console: false });
-  // Mirror to the console for support / log-scraping operators. Reusing
-  // the existing structured log path from PR #40's error log would be
-  // overkill for a one-shot startup notice.
+  // Mirror to the console for support / log-scraping operators.
   console.warn('Chronicle Sync | Manifest auth failure on startup:', {
     httpStatus: result.httpStatus,
     code:       result.code,

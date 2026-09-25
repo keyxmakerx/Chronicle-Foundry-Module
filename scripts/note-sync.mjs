@@ -1,16 +1,9 @@
 /**
- * Chronicle Sync - Notes Sync
- *
  * Bidirectional sync between Chronicle Notes and Foundry JournalEntries.
- * Chronicle Notes are a separate resource from entities — they map to
- * JournalEntries in a dedicated "Chronicle Notes" folder tree.
- *
- * Sync flow:
- * - Chronicle → Foundry: Note changes arrive via WebSocket, create/update JournalEntry.
- * - Foundry → Chronicle: JournalEntry changes detected via Hooks, push to Chronicle API.
- *
- * Note: Chronicle Notes API responses use camelCase keys, but requests use snake_case.
- * The api-client.mjs getNotes/postNote/putNote methods handle this conversion.
+ * Notes are a separate resource from entities — they map to JournalEntries in
+ * a dedicated "Chronicle Notes" folder tree. Chronicle → Foundry via
+ * WebSocket; Foundry → Chronicle via Hooks. Chronicle Notes API responses use
+ * camelCase keys, requests use snake_case; `_normalizeNote` converts.
  */
 
 import { getSetting } from './settings.mjs';
@@ -256,9 +249,8 @@ export class NoteSync {
         await journal.update({ name: note.title });
       }
 
-      // Update page content. Sanitize Chronicle-supplied HTML at ingress
-      // (FM-SEC-CHUNK-3, M-3 defense-in-depth on top of Chronicle's
-      // server-side bluemonday sanitization).
+      // Sanitize Chronicle-supplied HTML at ingress — defense-in-depth on
+      // top of Chronicle's server-side bluemonday sanitization.
       const content = _sanitizeIncomingHTML(note.entry_html || '');
       const textPage = journal.pages.find((p) => p.type === 'text');
       if (textPage) {
@@ -321,8 +313,7 @@ export class NoteSync {
         console.debug(`Chronicle: Pushed new note "${journal.name}" to Chronicle`);
       }
     } catch (err) {
-      // FM-SYNC-HARDENING §4: surface push failures instead of failing
-      // silently (the REST error is already in the dashboard error log).
+      // Surface push failures instead of failing silently.
       console.error('Chronicle: Failed to push journal as note', err);
       ui.notifications?.warn?.(`Chronicle: Failed to push note "${journal.name}". Check the sync dashboard for details.`);
     }
@@ -363,8 +354,7 @@ export class NoteSync {
 
       console.debug(`Chronicle: Pushed note update "${journal.name}" to Chronicle`);
     } catch (err) {
-      // FM-SYNC-HARDENING §4: surface + queue the idempotent update for retry
-      // on reconnect (the PUT targets a known note id).
+      // Queue the idempotent update for retry on reconnect (PUT targets a known note id).
       console.error('Chronicle: Failed to push note update', err);
       this._api.queueForRetry?.('PUT', `/notes/${noteId}`, {
         title: journal.name,
@@ -437,9 +427,9 @@ export class NoteSync {
    * @private
    */
   _buildNoteOwnership(note) {
-    // Honor the operator's dmOnlyHidden + defaultOwnership controls
-    // (FM-SYNC-HARDENING §1). A shared note is player-visible; an unshared
-    // note is DM-only and is hidden (NONE) unless dmOnlyHidden is off.
+    // Honor the operator's dmOnlyHidden + defaultOwnership controls: a shared
+    // note is player-visible; an unshared note is DM-only, hidden (NONE)
+    // unless dmOnlyHidden is off.
     return { default: defaultLevelForVisibility(!note.is_shared) };
   }
 

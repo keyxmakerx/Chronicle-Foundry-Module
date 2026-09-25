@@ -1,14 +1,10 @@
 #!/usr/bin/env node
 /**
- * Integration pin for the "Copy calendar diagnostics" button added to the
- * Status tab of the Sync Dashboard (sync-dashboard.mjs).
- *
- * Tests that:
- *  1. The `copy-calendar-diagnostics` action is registered in DEFAULT_OPTIONS.
- *  2. `buildCalendarDiagnostics` is imported from sync-calendar-diagnostics.mjs.
- *  3. The template exposes the action button and feedback element.
- *  4. A stub input shaped like _buildCalendarDiagnosticsInput()'s output produces
- *     a valid Markdown report via buildCalendarDiagnostics.
+ * Integration pin for the "Copy calendar diagnostics" button on the Status
+ * tab of the Sync Dashboard (sync-dashboard.mjs): the action is registered in
+ * DEFAULT_OPTIONS, buildCalendarDiagnostics is imported and wired, the
+ * template exposes the button and feedback element, and a stub shaped like
+ * _buildCalendarDiagnosticsInput()'s output produces a valid Markdown report.
  *
  * Run: node --test tools/test-sync-dashboard-calendar-diagnostics.mjs
  */

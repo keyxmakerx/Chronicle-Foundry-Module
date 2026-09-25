@@ -1,22 +1,10 @@
 #!/usr/bin/env node
 /**
- * CI guard for `lang/en.json` — simulates Foundry's `expandObject` and
- * fails loud on any structural collision that would cause Foundry to
- * reject the entire localization file.
+ * CI guard for `lang/en.json` — simulates Foundry's `expandObject` (which
+ * walks dotted keys as nested paths) and fails loud on any structural
+ * collision that would make Foundry reject the whole localization file.
  *
- * Bug context: 2026-05-19, FM-LANG-COLLISION-FIX. Operator's Foundry
- * console threw `TypeError: Cannot create property 'Visible' on string
- * 'Visibility'` because `lang/en.json` had both:
- *
- *   "Visibility": "Visibility",            // string at .Visibility
- *   "Visibility.Visible": "Visible..."     // expects .Visibility to be an object
- *
- * Foundry's `expandObject` (foundry.mjs:_expand) walks dotted keys as
- * nested paths, hits the string at `.Visibility`, and explodes. The
- * entire file was rejected — every `CHRONICLE.*` key on the Sync
- * dashboard rendered raw for an entire release cycle.
- *
- * This guard checks two failure modes:
+ * Checks two failure modes:
  *
  *   (A) STRING-VS-OBJECT collision: a sibling key `X` is a string while
  *       `X.Y` exists as a dotted-flat key. Foundry's expansion throws.
@@ -26,8 +14,6 @@
  *       `"Foo": { "Bar": "y" }`. JSON parses; one silently overrides
  *       the other; the lossy one is invisible until the operator
  *       wonders why a string changed.
- *
- * Run: `node --test tools/test-lang-expand.mjs`
  */
 
 import test from 'node:test';
@@ -140,11 +126,8 @@ test('lang/en.json has no duplicate-after-expansion paths', () => {
   }
 });
 
-// ---------------------------------------------------------------------
-// Regression pins for the specific keys that broke FM-LANG-COLLISION-FIX.
-// If these tests start failing, somebody re-introduced the dotted-vs-
-// string pattern. Run the sweep above to find all instances.
-// ---------------------------------------------------------------------
+// Regression pins for specific keys prone to the dotted-vs-string
+// collision. If these fail, run the sweep above to find all instances.
 
 test('regression: Visibility field label remains a flat string', () => {
   const obj = JSON.parse(readFileSync(LANG_PATH, 'utf8'));

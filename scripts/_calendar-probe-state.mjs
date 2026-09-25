@@ -1,16 +1,11 @@
 /**
- * Chronicle Sync — calendar probe state classifier.
+ * Pure helper mapping a failed `GET /calendar` probe (thrown by api-client)
+ * to the Sync Calendar editor's import-banner state.
  *
- * Pure helper mapping a failed `GET /calendar` probe (thrown by api-client) to
- * the Sync Calendar editor's import-banner state. Extracted from
- * sync-calendar.mjs so the classification is unit-testable in isolation and so
- * a future edit can't silently regress the 401/403 → "auth" banner.
- *
- * Classification anchors on an explicit numeric `err.status` when present (e.g.
- * the api-client's ConflictError) and otherwise on the authoritative
- * "Chronicle API error <status>:" prefix the api-client formats — NOT on a bare
- * digit run, so a response body that merely contains "404" (an entity named
- * "Room 404", a UUID, …) cannot misclassify the banner. Body-keyword fallbacks
+ * Classification anchors on an explicit numeric `err.status` when present,
+ * otherwise on the authoritative "Chronicle API error <status>:" prefix the
+ * api-client formats — never a bare digit run in the body (which could
+ * misfire on an entity named "Room 404" or a UUID). Body-keyword fallbacks
  * cover transports that don't surface a numeric status.
  */
 
@@ -21,13 +16,11 @@
  *     calendar for this campaign (import one).
  *   - `'auth'`        — 401 / 403 / `invalid_token`: token/auth problem
  *     (re-check the API key, or reinstall from a fresh campaign URL).
- *   - `'rebuilding'`  — 503 / `calendar_rebuilding`: Chronicle is up and every
- *     other subsystem still syncs; its CALENDAR is deliberately switched off
- *     while it is rebuilt (V5). Distinct from both 'absent' and 'unreachable'
- *     because the remedy differs and both of those would mislead: 'absent'
- *     says "import a calendar" (there is nowhere to import it to) and
- *     'unreachable' says "check your connection and settings" (they are fine).
- *     Nothing the GM can do fixes it, and nothing is wrong on their side.
+ *   - `'rebuilding'`  — 503 / `calendar_rebuilding`: Chronicle's calendar is
+ *     deliberately unavailable during its V5 rebuild; every other subsystem
+ *     still syncs. Kept distinct from 'absent' (which would wrongly suggest
+ *     importing a calendar) and 'unreachable' (which would wrongly blame
+ *     connection/settings) — nothing the GM can do fixes it.
  *   - `'unreachable'` — anything else (network error, other 5xx, unknown).
  */
 export function calendarStateFromError(err) {
@@ -50,13 +43,10 @@ export function calendarStateFromError(err) {
 }
 
 /**
- * True when a failed call is the calendar-rebuild blackout rather than a fault.
- *
- * The push/pull paths need this as a one-line predicate (they do not want a
- * banner state), and sharing it with `calendarStateFromError` keeps a single
- * definition of "is this the blackout" instead of the two-or-three that would
- * otherwise appear at the call sites.
- *
+ * True when a failed call is the calendar-rebuild blackout rather than a
+ * fault. A one-line predicate for push/pull paths that don't want a full
+ * banner state, sharing `calendarStateFromError`'s single definition of
+ * "is this the blackout".
  * @param {{status?: number, code?: string, message?: string}|null|undefined} err
  * @returns {boolean}
  */

@@ -1,5 +1,5 @@
 /**
- * Chronicle Sync - Interactive Map Viewer Journal Page (FM-MAP1, Path B)
+ * Chronicle Sync - Interactive Map Viewer Journal Page
  *
  * Custom JournalEntryPage sheet for image-type pages that renders both
  * local journal-flag pins and Chronicle map data (markers, drawings,
@@ -21,18 +21,15 @@
  *   - `visibility_rules.allowed_users` / `denied_users` are honored
  *     against the current user's mapped Chronicle user id.
  *
- * Phase A is read-only for drawings, tokens, fog, and layers; markers stay
- * editable (with a visibility=dm_only checkbox) for GM users via the
- * existing right-click and toolbar affordances.
- *
- * ## ApplicationV2 (FM-MAP-V2 port)
+ * Drawings, tokens, fog, and layers are read-only; markers stay editable
+ * (with a visibility=dm_only checkbox) for GM users via the existing
+ * right-click and toolbar affordances.
  *
  * This sheet extends the v13/v14 `JournalEntryPageSheet` (under
  * `foundry.applications.sheets.journal`) with `HandlebarsApplicationMixin`.
- * The previous AppV1 `JournalPageSheet` base is dead in v14 — its outer
- * wrapper template (`templates/journal/page-image-view.html`) no longer
- * exists on disk, so any AppV1 subclass throws `ENOENT` at render time.
- * See FM-MAP-V2 PR for the conversion details.
+ * The AppV1 `JournalPageSheet` base is dead in v14 — its outer wrapper
+ * template no longer exists on disk, so any AppV1 subclass throws `ENOENT`
+ * at render time.
  */
 
 import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
@@ -192,7 +189,7 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
     this._isPanning = false;
     this._panStart = null;
 
-    // Pin drag state (local pins; Chronicle markers are not draggable in Phase A).
+    // Pin drag state (local pins; Chronicle markers are not draggable).
     this._draggingPin = null;
     this._dragMoved = false;
     this._dragStartPos = null;
@@ -343,10 +340,9 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
       const v = meta[field];
       if (typeof v !== 'string' || !v) continue;
       if (/^https?:/i.test(v)) {
-        // Player-side host-allowlist (M-2). The GM should have already
-        // dropped cross-host URLs at materialization, but a flag set by
-        // an older module version or hand-edited could still surface
-        // one — fail-closed.
+        // Player-side host-allowlist. The GM should have already dropped
+        // cross-host URLs at materialization, but a flag set by an older
+        // module version or hand-edited could still surface one — fail-closed.
         if (_isAllowedImageHost(v, apiUrl)) return v;
         console.warn(_describeRejection('map_image', v, apiUrl));
         continue;

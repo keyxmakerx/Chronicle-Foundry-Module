@@ -1,25 +1,16 @@
 #!/usr/bin/env node
 /**
- * Regression pin for FM-SEC-CHUNK-3 (M-3 journal HTML pre-sanitization,
- * defense-in-depth on top of Chronicle's server-side sanitization).
+ * Defense-in-depth pin: `_sanitizeIncomingHTML` (a wrapper around Foundry's
+ * `TextEditor.cleanHTML`) must run on Chronicle-supplied HTML before
+ * journal-sync.mjs or note-sync.mjs store it in a Foundry JournalEntry page,
+ * even though Chronicle already sanitizes on write server-side.
  *
  * Two-layer test:
  *
- *   1. Behavioral tests for `_sanitizeIncomingHTML` — the wrapper around
- *      Foundry's `TextEditor.cleanHTML` that journal-sync.mjs and
- *      note-sync.mjs call before storing Chronicle-supplied HTML in
- *      Foundry JournalEntry pages.
- *
- *   2. Static-source integration: pin that both consumer files import
- *      the helper AND that every known ingestion site references it.
- *      A future refactor that adds a new ingestion path without wiring
- *      the sanitizer trips the static-source pin.
- *
- * Per FM-SECURITY-AUDIT §2 M-3, §4 Chunk 3, §0.5 D1=(c).
- * Cross-reference C-SECURITY-AUDIT §1.3 (Chronicle already sanitizes
- * EntryHTML on write via bluemonday UGCPolicy at 8 plugins).
- *
- * Run: `node --test tools/test-html-sanitizer.mjs`
+ *   1. Behavioral tests for `_sanitizeIncomingHTML` itself.
+ *   2. Static-source integration: pins that both consumer files import the
+ *      helper AND that every known ingestion site references it, so a new
+ *      ingestion path added without wiring the sanitizer trips this pin.
  */
 
 import test from 'node:test';

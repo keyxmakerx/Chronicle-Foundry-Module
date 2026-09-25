@@ -1,33 +1,16 @@
 #!/usr/bin/env node
 /**
- * Regression pin for FM-SEC-CHUNK-1 (closes M-1 from FM-SECURITY-AUDIT).
- *
  * `_renderTestResults` in scripts/sync-dashboard.mjs renders the
- * test-connection diagnostic into the Config tab. The result strings
- * (`s.text`) include Chronicle-side data: entity-type names, system
- * names, error messages echoing Chronicle responses. If Chronicle
- * returns a malicious string (e.g. `<img src=x onerror=alert(1)>` as
- * a system name), an `innerHTML`-based renderer would execute the
- * payload in the dashboard's DOM context.
+ * test-connection diagnostic into the Config tab, including Chronicle-side
+ * strings (entity-type names, system names, echoed error messages). It must
+ * build the DOM with `textContent` / `createTextNode`, never `innerHTML`, or
+ * a malicious Chronicle-returned string (e.g. a system name containing
+ * `<img onerror=...>`) executes in the dashboard's DOM context.
  *
- * The fix: DOM construction with `textContent` / `createTextNode` so
- * Chronicle strings are rendered as text, never as DOM.
- *
- * This guard is a static-source pin (string-grep on the source) — same
- * shape as `tools/test-sync-calendar-discoverability.mjs` and
- * `tools/test-no-instance-hostname.mjs`. The dispatch asks for a
- * runtime-DOM-injection test; we use the static-source pin because:
- *
- *   1. No DOM in the Node test runner (no jsdom dependency).
- *   2. `_renderTestResults` is a private method on a heavyweight
- *      Application class (constructor needs Foundry stubs).
- *   3. The static pin catches the exact regression we want to prevent:
- *      "someone re-introduces `innerHTML = ...` inside _renderTestResults".
- *
- * If a future contributor wants a runtime DOM test, the rendering can
- * first be extracted into a pure helper; this pin still applies.
- *
- * Run: `node --test tools/test-sync-dashboard-xss.mjs`
+ * This is a static-source pin (string-grep on the source), not a runtime DOM
+ * test: there's no DOM in the Node test runner and `_renderTestResults` is a
+ * private method on a heavyweight Application class. It still catches the
+ * regression that matters — `innerHTML = ...` reappearing in the method.
  */
 
 import test from 'node:test';

@@ -1,11 +1,10 @@
 /**
- * Chronicle Sync - Map Sync (FM-MAP1, Path B)
+ * Chronicle Sync - Map Sync
  *
- * Orchestrates Chronicle map data into Foundry. The previous architecture
- * bound Chronicle markers to Foundry Scene Notes; that path is gone. Maps
- * now materialize as JournalEntries (one entry per map, image-type page)
- * inside a "Chronicle Maps" folder, and `MapViewerSheet` renders the map
- * with all sub-resources via SVG overlays.
+ * Orchestrates Chronicle map data into Foundry. Maps materialize as
+ * JournalEntries (one entry per map, image-type page) inside a
+ * "Chronicle Maps" folder, and `MapViewerSheet` renders the map with all
+ * sub-resources via SVG overlays.
  *
  * Responsibilities:
  *   - Materialize Chronicle maps as JournalEntry documents (idempotent by
@@ -17,15 +16,15 @@
  *     them to players. DM-only data lives only in GM memory.
  *   - Handle Chronicle WebSocket events for `map.*`, `marker.*`, `drawing.*`,
  *     `token.*`, `layer.*`, `fog.*` (with a 5s polling fallback for types
- *     Chronicle does not yet emit — see TODO(FM-MAP1-WS) markers).
+ *     Chronicle does not yet emit — see TODO(#90) markers).
  *   - Provide marker CRUD helpers used by MapViewerSheet's edit affordances.
  *
- * Visibility model (Phase A):
+ * Visibility model:
  *   - Markers with `visibility=dm_only` → GM memory only, never in flags.
  *   - Markers with `visibility=everyone` → flag-stored. Per-user
  *     `visibility_rules` are embedded for client-side render-time filtering.
  *     This trades a known DOM-inspection leak (the marker name is in flags
- *     even for non-allowed users) for feature parity. Flagged in PR.
+ *     even for non-allowed users) for feature parity.
  *   - Drawings with `is_hidden=true` → GM memory only.
  *   - Drawings with `is_visible=false` → not rendered (not stored in flags).
  *   - Drawings with `is_visible=true && is_hidden=false` → flag-stored.
@@ -64,8 +63,8 @@ const NOTIFY_DEBOUNCE_MS = 200;
 
 /** Sub-resource types we currently poll. `marker.*` is omitted because
  *  Chronicle's `MapEventPublisher` already emits marker events. */
-// TODO(FM-MAP1-WS): remove drawing/token/layer/fog from this list once
-// Chronicle's C-MAP1 work ships event emission for those resource types.
+// TODO(#90): remove drawing/token/layer/fog from this list once Chronicle
+// ships event emission for those resource types.
 const POLLED_SUBRESOURCES = Object.freeze(['drawings', 'tokens', 'layers', 'fog']);
 
 /**
@@ -93,8 +92,8 @@ function _mapImageSrc(map) {
   if (!map) return '';
   const apiUrl = getSetting('apiUrl');
   // Prefer any full URL Chronicle includes directly — but only if its
-  // host matches `apiUrl`. A mismatch is dropped here (M-2 host
-  // allowlist); the relative-path branch below may still recover.
+  // host matches `apiUrl`. A mismatch is dropped here; the relative-path
+  // branch below may still recover.
   for (const field of ['image_url', 'image_path', 'image']) {
     const v = map[field];
     if (typeof v === 'string' && /^https?:/i.test(v)) {
@@ -292,9 +291,9 @@ export class MapSync {
       const baseUrl = apiUrl?.replace(/\/+$/, '');
       let full;
       if (/^https?:/i.test(url)) {
-        // Full URL — gate on host match (M-2 host allowlist). A mismatch
-        // here means Chronicle returned a media URL pointing elsewhere;
-        // either a misconfigured deployment or tampered response.
+        // Full URL — gate on host match. A mismatch here means Chronicle
+        // returned a media URL pointing elsewhere: a misconfigured
+        // deployment or a tampered response.
         if (!_isAllowedImageHost(url, apiUrl)) {
           console.warn(_describeRejection('media_url', url, apiUrl));
           return '';
@@ -486,14 +485,13 @@ export class MapSync {
 
   /**
    * Backward-compat with SyncManager.runWizardImport: handle "map" mappings
-   * during wizard import. Phase B no-op (we materialize from /maps directly,
-   * not from sync mappings) but kept for legacy mappings to be ignored
-   * gracefully without errors.
+   * during wizard import. No-op — maps materialize from `/maps` directly,
+   * not from sync mappings — kept so legacy mappings are ignored gracefully.
    * @param {object} mapping
    */
   async onSyncMapping(mapping) {
     if (mapping?.chronicle_type !== 'map') return;
-    // No-op. Path B materializes from the /maps endpoint, not from
+    // No-op. Materialization reads from the /maps endpoint, not from
     // sync mappings. Legacy mappings are tolerated silently.
   }
 
@@ -840,9 +838,9 @@ export class MapSync {
       };
       if (imageSrc && page.src !== imageSrc) updates.src = imageSrc;
       if (page.name !== mapData.name && mapData.name) updates.name = mapData.name;
-      // Backfill the sheet-class flag for pages materialized before this
-      // fix. Only set it when missing so a user who explicitly switched
-      // to a different sheet via Sheet Configuration keeps their choice.
+      // Backfill the sheet-class flag on older pages that predate it. Only
+      // set it when missing so a user who explicitly switched to a
+      // different sheet via Sheet Configuration keeps their choice.
       if (!page.getFlag('core', 'sheetClass')) {
         updates['flags.core.sheetClass'] = MAP_VIEWER_SHEET_CLASS;
       }
@@ -874,11 +872,9 @@ export class MapSync {
       description: mapData.description || '',
       image_id: mapData.image_id || null,
       // imageSrc is already the host-validated, fully-resolved URL from
-      // `_mapImageSrc` / `_resolveMediaUrl`. The previous fallback to
-      // raw `mapData.image_url || mapData.image_path` bypassed the host
-      // check; with M-2 it's intentionally dropped — if `_mapImageSrc`
-      // rejected the value, the flag should reflect that (empty), not
-      // re-introduce the rejected URL.
+      // `_mapImageSrc` / `_resolveMediaUrl`. Never fall back to the raw
+      // `mapData.image_url`/`image_path` here — that would bypass the
+      // host check and re-introduce a rejected URL.
       image_url: imageSrc || '',
       image_width: mapData.image_width || 0,
       image_height: mapData.image_height || 0,
@@ -1011,15 +1007,14 @@ export class MapSync {
   /**
    * Start polling sub-resources for a map. Used while at least one viewer
    * is open. Markers are NOT polled — Chronicle emits `marker.*` events.
-   * Other types poll until Chronicle ships C-MAP1 event emission.
    * @param {string} mapId
    * @private
    */
   _startPolling(mapId) {
     if (this._pollTimers.has(mapId)) return;
 
-    // TODO(FM-MAP1-WS): remove this entire polling path once Chronicle
-    // emits drawing/token/layer/fog events. Markers are already real-time.
+    // TODO(#90): remove this entire polling path once Chronicle emits
+    // drawing/token/layer/fog events. Markers are already real-time.
     const timer = setInterval(async () => {
       try {
         await this._pollSubResources(mapId);

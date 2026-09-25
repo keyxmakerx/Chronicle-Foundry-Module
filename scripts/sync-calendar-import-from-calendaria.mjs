@@ -1,35 +1,28 @@
 /**
- * Chronicle Sync — Calendaria → Chronicle calendar-import transform (pure).
+ * Calendaria → Chronicle calendar-import transform (pure).
  *
  * The Sync Calendar editor's empty-state import flow takes a Calendaria
  * calendar (full object via `CALENDARIA.api.getCalendar(id)`) and turns
  * it into a Chronicle create-calendar payload that the operator POSTs to
- * `POST /api/v1/campaigns/:cid/calendar` (new endpoint added by the
- * concurrent C-CAL-CREATE-ENDPOINT dispatch).
+ * `POST /api/v1/campaigns/:cid/calendar`.
  *
- * v1 transform scope (per dispatch):
- *
- *   Maps:    name, description, current date, months, weekdays (days),
- *            seasons, moons, eras.
- *   Skips:   cycles, festivals, weather zones (the operator can add
- *            them via Chronicle's internal UI after the import — see
- *            C-CAL-WCF-UI).
+ * Maps:  name, description, current date, months, weekdays (days),
+ *        seasons, moons, eras.
+ * Skips: cycles, festivals, weather zones — the operator can add these
+ *        via Chronicle's internal UI after the import.
  *
  * The transform is one-shot: post-import, Chronicle is the source of
- * truth and the existing two-way sync in `calendar-sync.mjs` handles
- * date + events. Structure-level two-way sync is PR 5.
+ * truth and the existing two-way sync in `calendar-sync.mjs` handles date
+ * + events. Structure-level fields are not kept in sync after import.
  *
  * Pure: no DOM, no Foundry globals, no Calendaria coupling beyond the
  * input shape. Unit-tested at
- * `tools/test-sync-calendar-import-from-calendaria.mjs` against the
- * three operator fixture calendars.
+ * `tools/test-sync-calendar-import-from-calendaria.mjs`.
  */
 
 /**
- * Wire-contract version stamp. Bumped by Chronicle's
- * `2026-05-XX-calendar-create-wire.md` decision doc when the create-
- * payload shape changes; matched here so older Foundry clients can
- * detect a contract mismatch.
+ * Wire-contract version stamp, matched against Chronicle's create-payload
+ * shape so older Foundry clients can detect a contract mismatch.
  */
 export const IMPORT_WIRE_VERSION = 1;
 
@@ -120,9 +113,9 @@ export function transformCalendariaCalendar(calendariaCalendar) {
       cycle_variance:      Number.isFinite(moon.cycleVariance) ? Number(moon.cycleVariance) : 0,
       reference_phase:     Number.isFinite(moon.referencePhase) ? Number(moon.referencePhase) : 0,
       reference_date:      moonReferenceDateToWire(moon.referenceDate),
-      // Phase table is opaque to Chronicle; we ship the keyed object as
-      // an array of `{id, name, icon, start, end}` so round-tripping
-      // back into Calendaria is feasible (PR 5 work).
+      // Phase table is opaque to Chronicle; ship the keyed object as an
+      // array of `{id, name, icon, start, end}` so round-tripping back
+      // into Calendaria stays feasible.
       phases:              extractPhases(moon.phases),
     })),
 

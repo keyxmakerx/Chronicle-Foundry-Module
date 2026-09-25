@@ -1,19 +1,13 @@
 /**
- * Chronicle Sync — Moon-phase strip builder (pure logic).
- *
- * Powers the Sync Calendar editor's month-view moon strip diagram. For each
- * moon defined on the active calendar, builds a per-day phase-position array
- * across the visible range. The application class then renders these as
- * color-coded horizontal strips.
+ * Moon-phase strip builder (pure logic) for the Sync Calendar editor's
+ * month-view diagram. For each moon on the active calendar, builds a
+ * per-day phase-position array across the visible range; the application
+ * class renders these as color-coded horizontal strips.
  *
  * Pure: no DOM, no Foundry globals, no Calendaria coupling beyond the
- * injected `getPosition` lookup. Unit-tested at
- * `tools/test-sync-calendar-moon-strip.mjs` against the three operator
- * fixture calendars (Therin, Tyr, Forbidden Lands).
- *
- * Why this is its own module: per F-PR1 footgun #4, view-model logic that
- * needs unit tests does not belong inside an ApplicationV2 class — the
- * class is the integration shell, this is the pure logic.
+ * injected `getPosition` lookup, so it stays unit-testable independent of
+ * the ApplicationV2 integration shell. See
+ * `tools/test-sync-calendar-moon-strip.mjs`.
  */
 
 /**

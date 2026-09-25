@@ -1,28 +1,15 @@
 /**
- * Chronicle Sync — URL validation helpers (FM-SEC-CHUNK-2)
+ * Host-allowlist for image URLs accepted from Chronicle. Without it a
+ * tampered Chronicle response could point `image_url` at an
+ * attacker-controlled host, and the Foundry client would fetch it, leaking
+ * the player's IP, referer, and any applicable cookies/credentials.
  *
- * Host-allowlist for image URLs accepted from Chronicle. Closes M-2 — a
- * latent exfiltration vector where a tampered Chronicle response could
- * return an `image_url` pointing at an attacker-controlled host; the
- * Foundry client would then fetch the resource, leaking the player's
- * IP, referer, and any cookies/credentials that happen to apply to the
- * attacker domain.
- *
- * The rule: any full-URL image source supplied by Chronicle MUST resolve
- * to the same scheme + hostname as the configured `apiUrl` setting.
- * Relative paths (`/media/foo.png`) are handled by the existing
- * baseURL-prefix logic in the callers — they can never carry a
- * cross-host destination so they bypass the check.
- *
- * Port is intentionally NOT required to match — Chronicle deployments
- * may serve media on a different port (e.g., reverse-proxied
- * media-server) than the API itself; that shape doesn't change the
- * exfiltration risk because the host has to remain the operator's
- * configured Chronicle. Subdomains (e.g. `media.chronicle.example.com`
- * when apiUrl is `chronicle.example.com`) DO need to match — strict
- * hostname equality is the default per FM-SEC-AUDIT §0.5 D1.1.
- *
- * Per FM-SECURITY-AUDIT §2 M-2, §4 Chunk 2, §0.5 D1=(c).
+ * Rule: any full-URL image source from Chronicle MUST resolve to the same
+ * scheme + hostname as the configured `apiUrl` setting (port need not
+ * match — media may be reverse-proxied on a different port — but
+ * subdomains must match exactly). Relative paths (`/media/foo.png`) go
+ * through the callers' existing baseURL-prefix logic and can never carry
+ * a cross-host destination, so they bypass this check.
  */
 
 /**

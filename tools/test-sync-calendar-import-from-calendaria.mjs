@@ -2,13 +2,10 @@
 /**
  * Unit tests for the Calendaria → Chronicle calendar-import transform.
  *
- * Fixtures: the three operator calendars under
- * `cordinator/references/calendars/`. We load them at runtime from
- * a path that's set via the `CHRONICLE_FIXTURE_DIR` env var, falling
- * back to a relative `../../Cordinator/references/calendars/` for the
- * agent environment. If the fixtures aren't reachable, the tests skip
- * the fixture suite with a clear console warning — they don't fail CI
- * for an environmental issue.
+ * Fixtures are the three operator calendars, loaded from the
+ * `CHRONICLE_FIXTURE_DIR` env var (falling back to a relative Cordinator
+ * path). If the fixtures aren't reachable, the fixture suite skips with a
+ * warning rather than failing CI for an environmental issue.
  *
  * Run: `node --test tools/test-sync-calendar-import-from-calendaria.mjs`
  */

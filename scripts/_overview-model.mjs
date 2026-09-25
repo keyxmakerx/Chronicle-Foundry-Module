@@ -1,13 +1,8 @@
 /**
- * Chronicle Sync — Overview cockpit model
- *
- * Pure builder for the dashboard's Overview landing tab. Takes already-computed
- * pieces from the other tab-data builders and distills them into a "cockpit":
- * a connection banner, a few headline stats, and a prioritized "needs attention"
- * list that routes the GM straight to the tab that can fix each problem.
- *
- * Kept pure (no Foundry globals) so it can be unit-tested headlessly — the
- * dashboard passes plain values in and renders the returned model.
+ * Pure builder for the dashboard's Overview tab: a connection banner, a few
+ * headline stats, and a prioritized "needs attention" list that routes the GM
+ * to the tab that can fix each problem. Pure (no Foundry globals) so it is
+ * unit-testable headlessly.
  */
 
 /** Pluralize helper: "" for 1, "s" otherwise. */
@@ -98,10 +93,8 @@ export function buildOverviewModel(p = {}) {
     });
   }
   if (calendarRebuilding) {
-    // FM-CAL-BLACKOUT: severity INFO, not error. Chronicle's calendar is
-    // deliberately switched off while it is rebuilt; nothing is broken and
-    // there is nothing the GM can do. The row exists only so the calendar's
-    // silence on this panel is not mistaken for health.
+    // Info, not error: calendar sync is deliberately paused during the
+    // rebuild, nothing is broken and the GM can't act on it.
     attention.push({
       severity: 'info',
       icon: 'fa-screwdriver-wrench',
@@ -109,14 +102,8 @@ export function buildOverviewModel(p = {}) {
       tab: 'calendar',
     });
   } else if (calendarAvailable && calendarSyncPaused) {
-    // A hard pause, not a mere date drift — flag it as an error so it sorts
-    // above ordinary warnings.
-    //
-    // FM-CAL-BLACKOUT: the reason is now DATA, not an assumption. This line
-    // hardcoded "different structures" for every pause, while the honest
-    // reason already existed one call away in the classifier's detail string —
-    // so a pause taken for any other reason was reported with a remedy that
-    // could not help.
+    // A hard pause, not mere date drift — error severity so it sorts above
+    // warnings. Use the classifier's own reason text rather than assuming why.
     attention.push({
       severity: 'error',
       icon: 'fa-calendar-xmark',

@@ -2,15 +2,12 @@
 /**
  * Tests for the shared entity-list page walk (scripts/_entity-page-walk.mjs).
  *
- * The regression: both callers that need "every entity in the campaign" —
- * JournalSync.resyncAll and the dashboard's _buildEntityGroups — stopped
- * after five pages of 100. That is a hard 500-entity ceiling with no signal.
- * Entities past it were not synced late; they were never seen, and the GM was
- * shown a completed resync and a full-looking dashboard either way.
- *
- * Chronicle's server-side sync pull carried the matching ceiling, fixed in
- * sweep R4 stage 18. Fixing the server and leaving the client capped at 500
- * would have left the operator exactly as stuck.
+ * Both callers that need every entity in the campaign — JournalSync.resyncAll
+ * and the dashboard's _buildEntityGroups — must walk through this shared
+ * helper rather than a small hard-coded page cap: a silent ceiling looks like
+ * a completed resync or a full dashboard while entities past it are never
+ * seen. The walk is bounded (MAX_ENTITY_PAGES) but its `truncated` flag must
+ * be surfaced by the caller.
  *
  * Run: `node --test tools/test-entity-page-walk.mjs`
  */

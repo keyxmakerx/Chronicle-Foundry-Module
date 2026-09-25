@@ -1,28 +1,19 @@
 #!/usr/bin/env node
 /**
- * test-calendar-blackout.mjs — FM-CAL-BLACKOUT regression tests.
- *
- * Run: node --test tools/test-calendar-blackout.mjs
- *
- * Chronicle deleted its calendar plugin on 2026-08-21 for a ground-up rebuild
- * (V5). All 34 calendar routes stay registered and answer
- * `503 {"error":"calendar_rebuilding", …}` — 503 rather than 404 on purpose, so
- * this module does not take its "that Chronicle is too old" compatibility path.
- *
- * An audit of what the module ACTUALLY did under that 503 found four defects
- * and confirmed four safe behaviours. This file pins both halves, because the
- * safe half is the part a future edit would silently break:
+ * Chronicle's calendar plugin is being rebuilt (V5); all calendar routes
+ * stay registered and answer `503 {"error":"calendar_rebuilding", …}` — 503
+ * rather than 404 on purpose, so this module doesn't take its "too old
+ * Chronicle" compatibility path. Pins:
  *
  *   1. `calendarStateFromError` classifies 503/calendar_rebuilding as its own
- *      'rebuilding' state — never 'absent' (which advises importing a calendar
- *      that has nowhere to go) and never 'auth' (which blames the GM's token).
+ *      'rebuilding' state — never 'absent' (advises importing a calendar
+ *      that has nowhere to go) and never 'auth' (blames the GM's token).
  *   2. The api-client attaches `status` and `code` to the thrown error, so no
- *      caller has to regex the message prose to find out what happened.
- *   3. The push storm is dead: 20 world-time ticks cost ONE request and ONE
- *      GM notice, not 40 requests and 20 red console errors.
- *   4. The error log coalesces identical repeats, so a failing endpoint cannot
- *      evict every map/actor/item/note error from the one 50-entry ring the
- *      dashboard and the diagnostics bundle share.
+ *      caller has to regex the message prose.
+ *   3. The push storm stays dead: many world-time ticks cost one request and
+ *      one GM notice, not one per tick.
+ *   4. The error log coalesces identical repeats, so a failing endpoint can't
+ *      evict every other error from the shared ring buffer.
  *   5. SAFE-HALF PINS: a calendar 503 must never abort the rest of initial
  *      sync, and must never write a date into the Foundry world.
  */

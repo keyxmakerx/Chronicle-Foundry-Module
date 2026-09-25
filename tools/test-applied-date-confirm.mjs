@@ -1,11 +1,6 @@
 #!/usr/bin/env node
 /**
- * test-applied-date-confirm.mjs — FM-SYNC-CONFIRMED-DATE regression tests.
- *
- * Run: node --test tools/test-applied-date-confirm.mjs
- *
- * Pins the Foundry-side half of the applied-date upgrade (pairs with a
- * parallel Chronicle-side change, C-SYNC-APPLIED-BEACON):
+ * Pins the Foundry-side half of the applied-date confirmation flow:
  *   1. `_applied-date-confirm.mjs`'s pure helpers: 404/405 classification,
  *      the once-per-session debug-log tolerance, and confirmAppliedDate's
  *      request shape + non-throwing swallow behavior.

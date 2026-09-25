@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Regression pins for FM-CAL-DASHBOARD-LINK — the two affordances that
- * surface `SyncCalendarApplication` from outside the settings menu:
+ * Regression pins for the two affordances that surface
+ * `SyncCalendarApplication` from outside the settings menu:
  *
  *   1. Dashboard Calendar tab → "Open Sync Calendar" button.
  *      - `templates/sync-dashboard.hbs` must contain a button with

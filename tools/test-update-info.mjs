@@ -2,14 +2,11 @@
 /**
  * Unit tests for the pure helpers in `scripts/update-info.mjs`.
  *
- * Covers the parsing + classification logic that does NOT touch Foundry
+ * Covers the parsing + classification logic that does not touch Foundry
  * globals (game.modules, game.i18n, fetch). The full `#onCheck` flow is
- * integration-tested manually in the dialog itself — see PR FM-CSU-DIAG-FIX's
- * verification table for the manual-trip matrix.
+ * integration-tested manually in the dialog itself.
  *
  * Run: `node --test tools/test-update-info.mjs`
- *
- * No mocking framework — uses Node's built-in `node:test` (Node ≥ 18).
  */
 
 import test from 'node:test';

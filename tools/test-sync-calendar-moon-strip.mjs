@@ -2,17 +2,11 @@
 /**
  * Unit tests for the moon-strip pure module.
  *
- * Fixtures: the three operator calendars under
- * `cordinator/references/calendars/` (Therin, Tyr, Forbidden Lands). We
- * inline a sub-tree per fixture rather than reading the file so the
- * tests are hermetic — Foundry module CI doesn't pull cordinator.
- *
- * The `getPosition` stub mimics Calendaria's `getMoonPhasePosition`:
- * `position = ((dayDelta + referencePhase * cycleLength) % cycleLength) /
- * cycleLength`, where `dayDelta` is days since `moon.referenceDate`.
- * Real Calendaria adds variance for randomized moons; we don't simulate
- * that — we set Therin's Umbra to always return 0.42 (the "Hidden" tail)
- * and assert the pass-through.
+ * Fixtures (Therin, Tyr, Forbidden Lands) are inlined rather than read from
+ * disk so the tests stay hermetic. The `getPosition` stub mimics Calendaria's
+ * `getMoonPhasePosition`: `position = ((dayDelta + referencePhase *
+ * cycleLength) % cycleLength) / cycleLength`. Real Calendaria adds variance
+ * for randomized moons; we don't simulate that.
  *
  * Run: `node --test tools/test-sync-calendar-moon-strip.mjs`
  */

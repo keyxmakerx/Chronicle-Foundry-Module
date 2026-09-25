@@ -1,19 +1,16 @@
 #!/usr/bin/env node
 /**
- * Tests for per-player permission sync (audit 2026-06-21-permission-sync-audit).
+ * Tests for per-player permission sync.
  *
- * Covers the operator must-haves:
- *   §2 (push) — JournalSync._buildPermissionGrants reverse-maps Foundry per-user
- *               ownership to Chronicle `subject_type:'user'` grants; fails CLOSED
- *               (drops + reports) for users it can't reverse-map; only flips
- *               `visibility:'custom'` when real user grants exist.
- *   §2/§3.1 — SyncManager.memberKey resolves the member id key; the unmatched-
- *               member warning lists every member that didn't auto-match (the
- *               operator's required signal).
- *   §2 (UI)  — buildMemberRows view-model: matched/UNMATCHED badge, dropdown
- *               options, stale-mapping → UNMATCHED.
+ * Covers: JournalSync._buildPermissionGrants reverse-maps Foundry per-user
+ * ownership to Chronicle `subject_type:'user'` grants, fails closed (drops +
+ * reports) for users it can't reverse-map, and only flips
+ * `visibility:'custom'` when real user grants exist; SyncManager.memberKey
+ * resolves the member id key and its unmatched-member warning lists every
+ * member that didn't auto-match; buildMemberRows' view-model shows a
+ * matched/UNMATCHED badge and turns a stale mapping into UNMATCHED.
  *
- * Pure-function tested — no Foundry runtime. Node's built-in `node:test`.
+ * Pure-function tested — no Foundry runtime.
  *
  * Run: `node --test tools/test-permission-sync.mjs`
  */

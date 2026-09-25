@@ -1,9 +1,9 @@
-// test-sync-wire-fix.mjs — FM-SYNC-WIRE-FIX-R1 behavioral pins for the wire fixes
-// that can't be exercised through the pure helpers:
-//   fix 1 — sync.status listener revives initial sync (accepts both emit shapes)
-//   fix 2 — SimpleCalendar structure reader + the guard now covering the SC path
-//   fix 4 — visibility toggle routes to POST /entities/:id/reveal (not a bare PUT)
-//   fix 5 — item relations use the flat /relations/:id routes + snake_case body
+// test-sync-wire-fix.mjs — behavioral pins for wire-contract fixes that can't
+// be exercised through the pure helpers:
+//   - sync.status listener revives initial sync (accepts both emit shapes)
+//   - SimpleCalendar structure reader, and the structure guard covering it
+//   - visibility toggle routes to POST /entities/:id/reveal, not a bare PUT
+//   - item relations use the flat /relations/:id routes + snake_case body
 //
 // Run: node --test tools/test-sync-wire-fix.mjs
 
@@ -32,7 +32,7 @@ const { ItemSync } = await import('../scripts/item-sync.mjs');
 const { SyncDashboard } = await import('../scripts/sync-dashboard.mjs');
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Fix 1 — sync.status listener revives initial sync (FM-SYNC-1)
+// Fix 1 — sync.status listener revives initial sync
 // ═══════════════════════════════════════════════════════════════════════════
 
 function makeManagerSpy() {
