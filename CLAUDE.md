@@ -186,73 +186,82 @@ structure-mismatch pause taken BEFORE the blackout cannot be cleared by its
 documented recovery path (a `calendar.structure.updated` broadcast) until V5 —
 reload the world instead.
 
-## TODO
+## Working with this project
 
-- (none currently) — the Foundry V1→V2 `DialogV2` migration and the
-  `render(true)` → `render({ force: true })` cleanup are complete, centralized in
-  `scripts/_dialogs.mjs` and pinned by `tools/test-dialogs.mjs`.
-- Recommended once on a live **v14** client (can't be unit-tested headlessly):
-  smoke-test the migrated dialogs (resync / pull / push confirms, the "create
-  entity type" prompt, map pin & marker delete confirms, the calendar cleanup
-  confirm) and the dashboard Calendar tab (Foundry local date now renders, the
-  four-state sync badge — in-sync / date-drift with direction /
-  incompatible-structures / paused, FM-SYNC-WIRE-FIX — and Push-date button).
-- **SUSPENDED by the calendar blackout — measured against Chronicle source
-  deleted on 2026-08-21; re-measure against V5 before acting on any of it.**
-  The guard test still runs and should: it stops the *import* advice coming
-  back, which will be just as wrong in V5.
+These rules come from the old coordination repo (Cordinator), which is now a
+frozen archive. The same block is in the CLAUDE.md of Chronicle, the Foundry
+module and the Draw Steel package; change all three together. The binding
+tenets the PR templates name (T-B1 security first, T-B2 plugin isolation, T-B3
+production-grade UI, T-B4 docs for humans and AI alike) are defined in
+Cordinator's `decisions/2026-05-21-core-tenets.md`.
 
-  Blocked on Chronicle (calv4 fix R1, item 6) — THE MODULE CANNOT BE POINTED
-  AT A DIFFERENT CHRONICLE CALENDAR, and until it can, "author the matching
-  calendar in Chronicle" is not advice.** Measured against Chronicle's source:
-  `POST /api/v1/campaigns/:cid/calendar` answers a structured 409
-  `calendar_already_exists` whenever `GetCalendar(campaignID)` returns anything,
-  and that query is `… WHERE campaign_id = ? ORDER BY is_default DESC,
-  sort_order ASC LIMIT 1` — ANY calendar. A campaign showing a structure
-  mismatch has one by construction, so the import door is closed 100% of the
-  time. And `calendarService.CreateCalendar` sets `IsDefault: isFirst`, so a
-  calendar authored in the builder is never the default, while the module is
-  served the default by that same ordering; `SetDefaultCalendar` is on
-  Chronicle's service interface with **no route, no handler and no control on
-  any page**. The mismatch remedy therefore now says the reachable thing — edit
-  either calendar so the two agree — and the unreachable thing is booked here
-  rather than printed. **What Chronicle owes:** a way to mark a calendar as the
-  campaign default (wire `SetDefaultCalendar` to a route and a control), and/or
-  a `?calId=` the syncapi honours so the module can name the calendar it wants.
-  Either one turns "author the matching calendar" back into real advice.
-  Guarded by `tools/test-calendar-mismatch-remedy.mjs`, which fails if any of
-  the three mismatch prints starts recommending an import or a new calendar
-  again.
+**With the operator** (the maintainer, who reviews and deploys):
+- Explain things in plain language, without code. Give each trade-off in one sentence.
+- Give live checks as click-paths: the exact URL, what to click, and what working
+  and broken look like. Docker, OS and network commands are fine; never ask the
+  operator to read code or run a test suite.
+- The operator checks things later, not while you wait. Put checks in an issue
+  labelled `needs-operator`, and when work is blocked on them, name the exact action.
+- Decide and recommend. Don't offer a menu of options for things you can judge;
+  ask only about real product, visual or scheduling choices.
+- Stop at natural stopping points rather than interrupting with status questions.
+- UI work gets a mockup first, and a mockup the operator signed stays the contract
+  until they sign a new one. A decision about motion is shown as playable clips,
+  never stills.
 
-- **`calendar.worldstate.changed` — CLOSED, then moot. Do not re-open.**
-  This entry stood for weeks as "Blocked on Chronicle", claiming the event was
-  published but had no `case` in the publisher adapter and so hit
-  `default: return`. Chronicle fixed all three sub-gaps (adapter case, enriched
-  payload, syncapi read route) in commit `f8d3550` on **2026-07-26** — the day
-  after the claim was last verified — and nobody here re-checked for 26 days.
-  The whole calendar plugin, publisher included, was then deleted on
-  2026-08-21. Re-verify against V5 when it lands; there is nothing to
-  investigate before then.
+**Safety**
+- Chronicle runs in production. Verify, then fix; back up before deploys; put
+  anything risky behind an operator step. Security wins every tie.
+- A merged PR is not a deployed fix. Deploy settings and gates are separate steps
+  with their own checks.
 
-  **The lesson is the process, not the bug:** a claim measured against another
-  repo's source is only true on the day it is measured. Every such claim in
-  these docs now carries a `Re-verify by:` date, and a claim past its date is
-  to be treated as unknown rather than as fact.
+**Verify before you claim**
+- Read the source in the same turn before naming files, lines, identifiers or wire
+  values. Verify a wire contract from the code that consumes it.
+- Check any claim about state (open, merged, shipped, deployed) against git or
+  GitHub first. A claim measured against another repo is true only on the day it
+  was measured.
+- A root cause is a guess until the code confirms it; a bug-fix PR says why the bug
+  existed. When the scope is unclear, start by reading, not changing.
+- CI red with local green on the same commit means an environment difference until
+  proven otherwise.
+- If a rule can't be followed or the task is wrong, stop and say so instead of
+  pressing on.
 
-- **BLOCKED by the calendar blackout — no Chronicle calendar exists to test
-  against.** Recommended once V5 lands (can't be unit-tested): set weather / cross a season or era boundary in Chronicle and
-  confirm the GM whisper lands and the Calendar tab's "Chronicle world state"
-  panel fills; edit the calendar structure in Chronicle and confirm the badge
-  flips to "Structure Changed — Re-check" without the Foundry calendar being
-  modified; confirm a structure-mismatch pause CLEARS when the Chronicle
-  calendar is fixed (no world reload needed); check the diagnostics bundle's
-  `CALENDARIA.api methods available` block for whether the build exposes any of
-  `setWeather` / `setCurrentWeather` / `setWeatherForDate`.
-- **PARTLY BLOCKED by the calendar blackout** (the calendar halves cannot be
-  tested until V5; the entity-visibility and item-relation halves still can).
-  Recommended on a live client (can't be unit-tested):
-  confirm initial sync now fires on a fresh world AND a world with pre-existing
-  synced data (console shows `_performInitialSync` / "Initial sync complete");
-  confirm a SimpleCalendar world with a mismatched structure pauses + badges
-  "incompatible"; confirm the entity visibility toggle round-trips (via
-  `/reveal`) and item add/remove/update relations round-trip.
+**Scope and reporting**
+- The PR description is what gets reviewed: what and why, the load-bearing lines,
+  honest deviations, the exact test commands and their pass counts.
+- Stay inside the task. Open an issue for anything else; ship the smallest useful
+  change and split the follow-ups.
+
+**Sessions**
+- Big agent fleets are welcome for work that splits cleanly, but run them on a
+  lighter model. Never fan a large fleet out on the most expensive model; keep
+  that for the few agents that need it. Usage is a real limit.
+- One session per piece of work, ended when it ships. Don't sit in a loop polling
+  for CI or PR events.
+- Work only on the branch you were given. Never push to another branch without
+  explicit permission.
+- File the issue before handing work on, and never point anyone at something that
+  hasn't landed.
+
+## Open work
+
+Tracked in GitHub issues, not in this file:
+
+- **Live checks on a real Foundry v14 world** (the migrated dialogs, the
+  dashboard, initial sync, visibility, shops, characters): #94, once
+  `TESTING.md` is brought up to date (#88).
+- **Calendar V5.** Everything calendar-shaped waits for Chronicle's rebuild:
+  #95, a sub-issue of keyxmakerx/Chronicle#741. That includes pointing the
+  module at a chosen Chronicle calendar. Until Chronicle allows it, the
+  structure-mismatch message says the reachable thing (edit either calendar so
+  the two agree), and `tools/test-calendar-mismatch-remedy.mjs` fails if any of
+  the three mismatch prints starts recommending an import or a new calendar.
+- Everything else is in this repo's open issues. Ideas nobody has planned: #96.
+
+**A claim measured against another repo's source is only true on the day it
+was measured.** `calendar.worldstate.changed` stayed booked here as "blocked on
+Chronicle" for 26 days after Chronicle fixed it (commit `f8d3550`,
+2026-07-26), because nobody re-checked. Claims like that in these docs carry a
+`Re-verify by:` date; past it, treat the claim as unknown, not as fact.

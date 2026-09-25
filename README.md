@@ -43,10 +43,10 @@ After install, Foundry remembers that URL and re-uses it on every update
 check — so you'll receive whichever module version your campaign owner
 pins, without further configuration.
 
-> **For Chronicle admins:** upload new module `.zip` builds via
-> `/admin/modules/foundry` on your Chronicle instance. Campaign owners
-> can then pin any uploaded version per-campaign from their settings
-> tab.
+> **For Chronicle admins:** Chronicle picks up new versions from this
+> repo's GitHub releases. In Chronicle, open **Admin → Packages**, click
+> **Check for updates** on this module, and install the new version.
+> Campaign owners then pin it per campaign under **Settings → Integrations**.
 
 > **GitHub release distribution is no longer the primary channel.**
 > The repo still produces GitHub releases (Chronicle's package catalog
