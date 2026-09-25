@@ -1,23 +1,23 @@
-# This workflow is NOT the release path.
+name: Release
+
+# Publishes a module release from main in one step: the same tag and GitHub
+# release a maintainer would draft by hand, with generated notes.
 #
-# A release is a GitHub release on this repo: Releases -> Draft a new release,
-# tag it (e.g. 0.1.30), "Generate release notes", Publish. Chronicle's packages
-# plugin imports releases from here ("Check for updates" in Admin -> Packages),
-# falling back to GitHub's source zip when a release has no attached asset.
-# Campaign owners then pin a version per campaign, and Foundry pulls updates
-# from the per-campaign signed manifest URL.
+# Usage: Actions tab -> "Release" -> "Run workflow" -> enter the version
+# (e.g. 0.1.30, no leading "v"). Chronicle's packages plugin picks it up on
+# "Check for updates" in Admin -> Packages.
 #
-# This workflow remains for emergency manual dispatches only; the tag-push
-# trigger is intentionally commented out. It takes the version from the ref it
-# runs on, so dispatch it on a tag ("Use workflow from" -> Tags), never on main,
-# or the version comes out as "main". Fixing or retiring it is tracked in #89.
-name: Release Module
+# Nothing is attached, on purpose: Chronicle installs the release's source zip
+# and writes the tag into module.json at install time, so module.json's
+# version on main is never read.
 
 on:
   workflow_dispatch:
-  # push:
-  #   tags:
-  #     - 'v*'
+    inputs:
+      version:
+        description: 'Release version, no leading "v" (e.g. 0.1.30)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -26,42 +26,20 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-
-      - name: Extract version from tag
-        id: version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-
-      - name: Set version in module.json
+      # The version is read from an env var, never interpolated into the
+      # script, so a crafted input can't inject shell.
+      - name: Validate version (X.Y.Z, no leading v)
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
-          jq --arg v "${{ steps.version.outputs.version }}" '.version = $v' module.json > module.tmp.json
-          mv module.tmp.json module.json
+          echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' \
+            || { echo "::error::version must be X.Y.Z with no leading 'v' (got '$VERSION')"; exit 1; }
 
-      - name: Update download URL in module.json
-        run: |
-          jq --arg tag "${{ github.ref_name }}" \
-            '.download = "https://github.com/${{ github.repository }}/releases/download/" + $tag + "/chronicle-sync.zip"' \
-            module.json > module.tmp.json
-          mv module.tmp.json module.json
-
-      - name: Build release zip
-        run: |
-          zip -r chronicle-sync.zip \
-            module.json \
-            chronicle-package.json \
-            scripts/ \
-            styles/ \
-            templates/ \
-            lang/ \
-            LICENSE \
-            README.md \
-            -x "*.git*" "*.DS_Store" "*.ai.md" "CLAUDE.md" "TESTING.md" \
-                "CONSTANTS.md"
-
-      - name: Create GitHub Release
+      - name: Create tag and GitHub release from main
         uses: softprops/action-gh-release@v3
         with:
-          files: |
-            chronicle-sync.zip
-            module.json
+          tag_name: ${{ inputs.version }}
+          name: ${{ inputs.version }}
+          target_commitish: main
           generate_release_notes: true
+          make_latest: 'true'
