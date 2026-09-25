@@ -1,162 +1,56 @@
 # Chronicle Sync — Foundry VTT Module
 
-This repo contains the **Chronicle Sync** module for Foundry VTT. It provides
-bidirectional real-time sync between a [Chronicle](https://github.com/keyxmakerx/Chronicle)
-worldbuilding instance and a Foundry VTT game world.
-
-## Architecture
-
-See `.ai.md` for full architecture, data flow, file index, and feature details.
-
-Entry point: `scripts/module.mjs` → registers settings on `init`, starts
-`SyncManager` on `ready` (GM only).
+The **Chronicle Sync** module for Foundry VTT: bidirectional real-time sync
+between a [Chronicle](https://github.com/keyxmakerx/Chronicle) worldbuilding
+instance and a Foundry VTT game world. See `.ai.md` for full architecture,
+data flow, file index and feature details. Entry point: `scripts/module.mjs`
+— registers settings on `init`, starts `SyncManager` on `ready` (GM only).
 
 ## File Structure
 
-```
-module.json                       # Foundry module manifest (v12–v14)
-chronicle-package.json            # Chronicle serving descriptor (schema v1)
-scripts/                          # ES modules (.mjs)
-  module.mjs                      # Entry point
-  settings.mjs                    # World settings registration
-  constants.mjs                   # Shared constants (FLAG_SCOPE, MODULE_ID)
-  logger.mjs                      # Shared console logging helper
-  sync-manager.mjs                # Orchestrator, API routing, WS management
-  api-client.mjs                  # REST + WebSocket client
-  journal-sync.mjs                # Entity ↔ JournalEntry sync
-  map-sync.mjs                    # Chronicle map + sub-resources ↔ JournalEntry (image page); markers/drawings/tokens/fog/layers rendered as overlays via MapViewerSheet
-  map-viewer.mjs                  # MapViewerSheet (ApplicationV2): image + SVG overlay
-  calendar-sync.mjs               # Calendar adapter (Calendaria/SimpleCalendar)
-  sync-calendar.mjs               # "Sync Calendar" editor (ApplicationV2, GM-only)
-  sync-calendar-*.mjs             # Pure helpers behind the editor: validation, note-form, moon-strip, condition-builder, diagnostics, Calendaria import
-  actor-sync.mjs                  # Character entity ↔ Actor sync
-  item-sync.mjs                   # Item sync
-  note-sync.mjs                   # Chronicle Notes ↔ JournalEntry sync
-  shop-widget.mjs                 # Shop inventory UI
-  sync-dashboard.mjs              # Dashboard UI: Overview cockpit + grouped vertical rail (Everyday/Library/Setup/Diagnostics)
-  sync-diagnostic-bundle.mjs      # Builds the dashboard's full diagnostics export
-  update-info.mjs                 # "Update Source" diagnostic dialog (install/update flow)
-  character-claim-indicator.mjs   # Per-player character-claim status indicator
-  capability-inspector.mjs        # Probes the local Foundry/system/Calendaria capabilities
-  import-wizard.mjs               # Initial-import wizard UI
-  adapters/
-    generic-adapter.mjs           # API-driven actor field adapter for all systems (incl. actor-embedded items)
-  _*.mjs                          # Pure, Foundry-independent helper modules (guards, validators,
-                                   # view-model builders); each is unit-tested by its own tools/test-*.mjs
-templates/                        # Handlebars templates
-styles/                           # CSS
-lang/                             # Localization (en.json)
-tools/
-  check-package-descriptor.mjs    # CI: validates chronicle-package.json vs module.json
-  test-*.mjs                      # Node's built-in test runner; one file per module/behavior (see TESTING.md)
-.github/workflows/
-  check-descriptor.yml            # Runs the descriptor check on push + PR
-  release.yml                     # Builds release zip (manual workflow_dispatch)
-```
+- `module.json` (Foundry manifest, v12–v14), `chronicle-package.json`
+  (serving descriptor, schema v1) — cross-validated by
+  `tools/check-package-descriptor.mjs`.
+- `scripts/*.mjs`: sync (`journal-sync`, `map-sync`+`map-viewer`,
+  `calendar-sync`+`sync-calendar`+`sync-calendar-*`, `actor-sync`,
+  `item-sync`, `note-sync`), UI (`sync-dashboard`,
+  `sync-diagnostic-bundle`, `update-info`, `character-claim-indicator`,
+  `capability-inspector`, `import-wizard`, `shop-widget`), core (`module`,
+  `settings`, `constants`, `logger`, `sync-manager`, `api-client`),
+  `adapters/generic-adapter.mjs`. `.ai.md` has what each does. `_*.mjs` are
+  pure helpers, each unit-tested by its own `tools/test-*.mjs`.
+- `templates/` Handlebars, `styles/` CSS, `lang/en.json` strings,
+  `tools/test-*.mjs` (Node's test runner, see TESTING.md).
+- `.github/workflows/`: `check-descriptor.yml`, `release.yml` (manual zip).
 
 ## API Contract
 
-See **API-CONTRACT.md** for the full Chronicle REST API and WebSocket contract,
-plus the Chronicle-served module distribution contract (per-campaign manifest +
-download endpoints, serving descriptor, error JSON shape).
-
-For the install/update flow specifically, also see `.ai.md` → "Chronicle
-Integration — Install & Updates".
+**API-CONTRACT.md**: full Chronicle REST/WebSocket contract plus the module
+distribution contract (manifest, downloads, descriptor, error shape).
+Install/update flow: also `.ai.md` → "Chronicle Integration — Install & Updates".
 
 ## Code Conventions
 
-- **ES modules** (`.mjs`) with `export default class` pattern.
-- **Comments say why, briefly.** State the rule the code obeys and why, in a few lines, pointing at a test or issue if more is needed. No incident stories, task IDs (`FM-…`), dates or `file:line` pointers; those go in the PR. Deferred work is `TODO(#issue)`.
-- Sync modules use a `_syncing` guard to prevent infinite loops. Most back it
-  with a boolean; `calendar-sync.mjs` backs it with a reentrant `_syncDepth`
-  counter (read through a `_syncing` getter) because its back-catalog loop and
-  WebSocket handlers can overlap, and a boolean's `finally` would unmask the
-  loop mid-flight.
-- System adapters implement `toChronicleFields()` / `fromChronicleFields()`.
-- All REST calls use Bearer token auth via `api-client.mjs`.
-- **The API key is a CLIENT-scoped setting, never world-scoped.** A world
-  setting is synced to every connected client — `config: false` only hides it
-  from the UI — so a world-scoped key hands the campaign's Bearer token to
-  every player's browser console. `migrateApiKeyToClientScope()` moves a
-  legacy world-scoped value into the GM's browser and deletes the world
-  document. Pinned by `tools/test-api-key-scope.mjs`.
-- **List responses come in two shapes.** Chronicle returns some list endpoints
-  as a bare JSON array and others wrapped in an envelope `{"data":[…],"total":N}`
-  (envelope: `/entities`, `/entity-types`, `/systems`, `/addons`, `/tags`,
-  `/relations/types`, `/calendar/events`; bare: `/maps`, `/maps/:id/*`,
-  `/members`, `/entities/:id/relations`, `/notes`). Every list-consuming caller
-  MUST unwrap defensively — accept a bare array AND `{data:[…]}` — via
-  `result?.data || result || []`, `_normalizeArray()`, `_coerceArray()`, or an
-  `Array.isArray(x) ? x : (x?.data ?? [])` guard, never assuming one shape. A
-  caller that consumes an envelope endpoint as a bare array is a silent no-op.
-  All call sites are pinned at `tools/test-envelope-audit.mjs`.
-- **Real-time calendars are read-only for dates.** `GET /calendar/date` carries
-  `tracks_real_time` (the composed `UsesRealTime()` predicate) — `GET
-  /calendar` never does. When true, the module
-  pauses its own date-**push** only (pull/event sync unaffected). All four push
-  sites (`calendar-sync.mjs`'s three hook-triggered pushes,
-  `sync-dashboard.mjs`'s manual push button) route through the shared
-  `scripts/_realtime-date-guard.mjs`: a fetch-before-push `GET` re-probed on
-  every push (never trust a session-long cached value — pushes are rare, so
-  the extra round trip is cheap and self-heals a mid-session enable), plus a
-  422-from-`PUT`-is-the-same-condition backstop (never a retryable sync
-  error). The GM notice fires once per session, shared across both files via
-  a module-level singleton. See `tools/test-realtime-date-signal.mjs`.
-- **Calendar sub-resources are display-only.** `calendar.weather/season/era/
-  moon/worldstate` land on the dashboard's world-state panel and (per-type world
-  setting) a **GM-whispered** chat line — never public chat, since Chronicle's
-  dm_only gating is server-side and re-broadcasting would launder it into a
-  player-visible decision. `calendar.structure.updated` (+ its `cycle`/`festival`
-  siblings) re-runs the structure comparison and badges the result but **never
-  auto-applies the structure** — that would silently re-date every Calendaria
-  note. It is routed AHEAD of the `_calendarSyncDisabled` guard because it is
-  the only signal that can clear a mismatch pause. Every other `calendar.*` type
-  hits a `default:` that logs once per type per session. See
-  `scripts/_calendar-subresources.mjs`, `tools/test-calendar-subresources.mjs`,
-  `tools/test-calendar-subresource-routing.mjs`.
-- **Chronicle update endpoints are PARTIAL: absent preserves, an explicit
-  `null` clears, a present value replaces** (see API-CONTRACT.md → "The
-  partial-update contract"). Chronicle's request
-  structs bind `patch.Field[T]`, which records presence during decoding, so
-  absent and `null` are genuinely different. **Send only the fields you mean
-  to change**, and do NOT "harden" a narrow body by echoing the untouched
-  fields back: an echo re-arms the endpoint for the next writer and goes
-  stale — that is how `ChronicleMarkerConfigDialog` lost the pairing key. The
-  narrow bodies are pinned by `tools/test-partial-put-contract.mjs`
-  (`actor-sync`'s `{name}` rename push; `calendar-sync`'s three note-edit
-  pushes). Before the contract existed, `{name}` alone bound
-  `is_private=false` and **published a hidden character entity to every
-  player**, and the calendar pushes turned `is_recurring` and `all_day` off.
-  The one surviving echo is the marker dialog's spread, kept deliberately:
-  harmless against a merging server, load-bearing against an older one that
-  predates the partial-update contract.
-- **Never walk a list with a small hard-coded page cap.** The two places that
-  need every entity in the campaign — `JournalSync.resyncAll` and the
-  dashboard's `_buildEntityGroups` — both had `while (hasMore && page <= 5)`
-  inline, a silent 500-entity ceiling: past it entities were never seen, and
-  the GM got a completed resync and a full-looking dashboard anyway. Both now
-  share `scripts/_entity-page-walk.mjs`, whose bound is 200 pages and whose
-  `truncated` flag MUST be surfaced by the caller. A bound is fine; a bound
-  nobody is told about is the defect. See `tools/test-entity-page-walk.mjs`.
-  Chronicle's server-side twin (`POST /sync`, once capped at 1000 with no
-  cursor) now returns `next_cursor`, which this module does not yet consume
-  because it pulls via `GET /entities`, not `POST /sync`.
-- WebSocket messages are routed by type through `SyncManager`.
-- Chronicle-side serving rules live in `chronicle-package.json` at repo root; CI validates it against `module.json` via `tools/check-package-descriptor.mjs`.
+- **ES modules** (`.mjs`), `export default class` pattern.
+- **Comments say why, briefly**, pointing at a test/issue for more — no incident stories, task IDs, dates or `file:line` (those go in the PR). Deferred work is `TODO(#issue)`.
+- `_syncing` guard against infinite loops: boolean, except `calendar-sync.mjs`'s reentrant `_syncDepth` counter (overlapping back-catalog loop and WebSocket handlers).
+- Adapters implement `toChronicleFields()`/`fromChronicleFields()`; REST uses Bearer auth via `api-client.mjs`.
+- **API key is CLIENT-scoped, never world-scoped** (a world setting syncs to every client). `migrateApiKeyToClientScope()` migrates legacy values. `tools/test-api-key-scope.mjs`.
+- **List responses are bare array or `{"data":[…],"total":N}`** — unwrap defensively everywhere. Envelope: `/entities`, `/entity-types`, `/systems`, `/addons`, `/tags`, `/relations/types`, `/calendar/events`. Bare: `/maps`, `/maps/:id/*`, `/members`, `/entities/:id/relations`, `/notes`. `tools/test-envelope-audit.mjs`.
+- **Real-time calendars are read-only for dates**: `tracks_real_time` from `GET /calendar/date` pauses date-push only, via `scripts/_realtime-date-guard.mjs`. `tools/test-realtime-date-signal.mjs`.
+- **Calendar sub-resources are display-only** (dashboard + optional GM-whisper, never public); `structure.updated` badges mismatches, never auto-applies. `scripts/_calendar-subresources.mjs`, `tools/test-calendar-subresources.mjs`, `tools/test-calendar-subresource-routing.mjs`.
+- **Chronicle update endpoints are PARTIAL**: absent preserves, `null` clears, present replaces (API-CONTRACT.md → "partial-update contract"). Send only changed fields; never echo untouched ones back. `tools/test-partial-put-contract.mjs`. One deliberate exception: the marker dialog in `scripts/map-viewer.mjs` spreads the stored marker, harmless on current Chronicle and needed by older servers that replace the whole record.
+- **Never hard-cap a list walk.** `JournalSync.resyncAll` and `_buildEntityGroups` share `scripts/_entity-page-walk.mjs` (200-page bound); its `truncated` flag must be surfaced. `tools/test-entity-page-walk.mjs`.
+- WebSocket messages route by type through `SyncManager`.
 
 ## Calendar blackout
 
-Chronicle deleted its calendar plugin for a ground-up rebuild (V5); the data
-was not preserved. Every syncapi calendar route stays registered and answers
-`HTTP 503 {"error":"calendar_rebuilding", "message":"..."}` — 503 rather than
-404 so the module doesn't mistake it for an old Chronicle without the
-endpoint. No `calendar.*` WebSocket message reaches the wire either.
-
-The module classifies this as its own `'rebuilding'` probe state, shows the
-GM a one-time notice per session instead of erroring on every push, and keeps
-maps, actors, items and notes syncing normally. A structure-mismatch pause
-taken before the blackout can't be cleared by its normal recovery path until
-V5 ships — reload the world instead. Pinned by `tools/test-calendar-blackout.mjs`.
+Chronicle's calendar plugin is mid-rebuild (V5): every calendar route answers
+`HTTP 503 {"error":"calendar_rebuilding", ...}` (503 so the module doesn't
+mistake it for an old Chronicle lacking the endpoint); no `calendar.*`
+WebSocket message fires. The module shows a one-time GM notice per session
+and keeps maps/actors/items/notes syncing. A pre-blackout structure-mismatch
+pause needs a world reload to clear until V5 ships. `tools/test-calendar-blackout.mjs`.
 
 ## Working with this project
 
@@ -219,21 +113,10 @@ Cordinator's `decisions/2026-05-21-core-tenets.md`.
 
 ## Open work
 
-Tracked in GitHub issues, not in this file:
+Tracked in GitHub issues: live checks on a real Foundry v14 world (#94, needs
+`TESTING.md` update #88); calendar V5 (#95, sub-issue of
+keyxmakerx/Chronicle#741); everything else in this repo's open issues; unplanned
+ideas #96.
 
-- **Live checks on a real Foundry v14 world** (the migrated dialogs, the
-  dashboard, initial sync, visibility, shops, characters): #94, once
-  `TESTING.md` is brought up to date (#88).
-- **Calendar V5.** Everything calendar-shaped waits for Chronicle's rebuild:
-  #95, a sub-issue of keyxmakerx/Chronicle#741. That includes pointing the
-  module at a chosen Chronicle calendar. Until Chronicle allows it, the
-  structure-mismatch message says the reachable thing (edit either calendar so
-  the two agree), and `tools/test-calendar-mismatch-remedy.mjs` fails if any of
-  the three mismatch prints starts recommending an import or a new calendar.
-- Everything else is in this repo's open issues. Ideas nobody has planned: #96.
-
-**A claim measured against another repo's source is only true on the day it
-was measured.** `calendar.worldstate.changed` stayed booked here as "blocked on
-Chronicle" for 26 days after Chronicle fixed it (commit `f8d3550`,
-2026-07-26), because nobody re-checked. Claims like that in these docs carry a
-`Re-verify by:` date; past it, treat the claim as unknown, not as fact.
+Cross-repo claims carry a `Re-verify by:` line (API-CONTRACT.md); past that
+date, treat the claim as unknown, not fact.
