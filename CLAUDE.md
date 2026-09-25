@@ -22,7 +22,7 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
 - `templates/` Handlebars, `styles/` CSS, `lang/en.json` strings,
   `tools/test-*.mjs` (Node's test runner, see TESTING.md).
 - `.github/workflows/`: `check-descriptor.yml`, `release.yml` (Actions → Release
-  with a version; tags main and attaches the stamped zip), `snapshot.yml`.
+  with a version; tags main), `snapshot.yml`.
 
 ## API Contract
 
