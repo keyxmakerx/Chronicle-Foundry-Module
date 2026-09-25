@@ -66,6 +66,7 @@ Integration — Install & Updates".
 ## Code Conventions
 
 - **ES modules** (`.mjs`) with `export default class` pattern.
+- **Comments say why, briefly.** State the rule the code obeys and why, in a few lines, pointing at a test or issue if more is needed. No incident stories, task IDs (`FM-…`), dates or `file:line` pointers; those go in the PR. Deferred work is `TODO(#issue)`.
 - Sync modules use a `_syncing` guard to prevent infinite loops. Most back it
   with a boolean; `calendar-sync.mjs` backs it with a reentrant `_syncDepth`
   counter (read through a `_syncing` getter) because its back-catalog loop and
