@@ -1,37 +1,19 @@
 #!/usr/bin/env node
 /**
  * CI guard for ApplicationV2 PARTS templates — each template registered
- * via a `static PARTS = { ..., template: 'modules/.../templates/X.hbs' }`
- * binding must render exactly ONE root HTML element in every possible
- * branch combination.
+ * via `static PARTS = { ..., template: 'modules/.../templates/X.hbs' }`
+ * must render exactly ONE root HTML element in every possible branch
+ * combination. Foundry's `_parsePartHTML` throws otherwise ("Template
+ * part 'X' must render a single HTML element").
  *
- * Foundry's `_parsePartHTML` (foundry.mjs:32135) throws on any rendering
- * that doesn't produce a single root: "Template part 'X' must render a
- * single HTML element." This caps each `PARTS.X.template` to one root
- * regardless of {{#if}}/{{else}} branches taken at runtime.
+ * Pure static analyzer (no Handlebars dep): walks the template source,
+ * tracks Handlebars block depth + HTML element depth, recurses through
+ * every branch of every conditional, and reports the MAX number of root
+ * HTML elements across all branch combinations. Asserts exactly 1 for
+ * every registered PARTS template.
  *
- * Bug context: 2026-05-19, FM-SYNCCAL-ROOT-FIX. Operator's Foundry
- * console threw the above message every time Sync Calendar opened.
- * `templates/sync-calendar.hbs` had a top-level `{{#if degraded}}<section/>{{else}}<header/><main/><footer/>{{/if}}`
- * — the `else` branch had three sibling roots → reject → app dead.
- *
- * Same footgun class as F-LANG-1 (lang expandObject collision):
- * Foundry-runtime contract that Node-only tests can't catch unless we
- * explicitly model it.
- *
- * Approach: pure static analyzer. No Handlebars npm dep (CI is plain
- * Node + node:test). Walks the template source, tracks Handlebars block
- * depth + HTML element depth, recurses through every branch of every
- * conditional, and reports the MAX number of root HTML elements that
- * could emerge across all branch combinations. Asserts ≤1 for every
- * registered PARTS template.
- *
- * Caveat: `{{#each}}` at the outermost HTML depth would amplify a
- * single-root inner body to N roots over N iterations. The analyzer
- * conservatively flags any top-level `{{#each}}` as a potential
- * multi-root, matching Foundry's runtime behavior.
- *
- * Run: `node --test tools/test-template-roots.mjs`
+ * A top-level `{{#each}}` is conservatively flagged as a potential
+ * multi-root, since N iterations of a single-root body emit N roots.
  */
 
 import test from 'node:test';
@@ -47,9 +29,8 @@ const TEMPLATES_DIR = resolve(REPO_ROOT, 'templates');
 
 // ---------------------------------------------------------------------
 // Template discovery: grep every script for `template: 'modules/.../X.hbs'`
-// bindings, since those are the strings ApplicationV2 actually feeds to
-// `_parsePartHTML`. Anything else in templates/ might be an inert
-// fragment that nobody renders as a root part.
+// bindings — those are the only strings ApplicationV2 feeds to
+// `_parsePartHTML`.
 // ---------------------------------------------------------------------
 
 function discoverPartsTemplates() {

@@ -1,19 +1,17 @@
 #!/usr/bin/env node
 /**
- * test-calendar-subresource-routing.mjs — FM-SYNC-SUBRESOURCES-P1.
- *
- * Pins the WIRED half of the sub-resource arc — everything the pure-helper
- * suite (`test-calendar-subresources.mjs`) can't reach because it touches
- * `CalendarSync` state and stubbed Foundry globals:
+ * Pins the wired half of the sub-resource arc (the parts touching
+ * `CalendarSync` state, complementing the pure-helper suite in
+ * `test-calendar-subresources.mjs`):
  *
  *   1. Every handled `calendar.*` type routes to its handler.
  *   2. dm_only weather is NEVER exposed to players — announcements are GM
- *      whispers, and no branch ever posts an unwhispered ChatMessage.
- *   3. `calendar.structure.updated` (and its cycle/festival siblings) triggers
- *      a re-compare, pauses on a new incompatibility, un-pauses on recovery,
- *      and NEVER writes the structure into Foundry.
- *   4. The `default:` branch logs an unhandled `calendar.*` type exactly once
- *      per session and stays silent on non-calendar traffic.
+ *      whispers only.
+ *   3. `calendar.structure.updated` (and its cycle/festival siblings)
+ *      re-compares, pauses on a new mismatch, un-pauses on recovery, and
+ *      NEVER writes the structure into Foundry.
+ *   4. The `default:` branch logs an unhandled `calendar.*` type once per
+ *      session and stays silent on non-calendar traffic.
  *
  * Run: node --test tools/test-calendar-subresource-routing.mjs
  */

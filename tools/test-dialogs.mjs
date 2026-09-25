@@ -2,20 +2,14 @@
 /**
  * Tests for the Foundry V1 → V2 dialog shim (scripts/_dialogs.mjs).
  *
- * Verified against the Foundry DialogV2 API docs:
- *  - DialogV2.confirm resolves true (yes) / false (no), or null when dismissed
- *    with rejectClose:false. The yes/no buttons carry built-in true/false
- *    callbacks, so the shim must NOT override them.
- *  - DialogV2.prompt's ok.callback signature is (event, button, dialog); the
- *    dialog's root element (dialog.element) is what the caller queries for its
- *    <form>.
+ * Per the Foundry DialogV2 API: `confirm` resolves true/false, or null when
+ * dismissed with rejectClose:false, and must not override the yes/no
+ * buttons' built-in callbacks; `prompt`'s ok.callback signature is (event,
+ * button, dialog), and the caller queries `dialog.element` for its `<form>`.
  *
- * Plus a static pin that no module file (besides this shim) still uses the V1
- * Dialog.confirm / Dialog.prompt / new Dialog API, nor the V1 render(true).
- *
- * The rendered dialog itself can only be exercised in a live Foundry client;
- * these tests cover the shim's branching, the option shape passed to DialogV2,
- * the close→cancel coercion, and the V1 fallback.
+ * Also statically pins that no other module file uses the V1 Dialog API or
+ * `render(true)`. The rendered dialog itself needs a live Foundry client;
+ * these tests cover only the shim's branching and fallback.
  *
  * Run: node --test tools/test-dialogs.mjs
  */

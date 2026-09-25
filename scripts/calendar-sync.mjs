@@ -37,11 +37,9 @@ import {
 /**
  * Canonical wire-visibility values per the calendar-sync wire contract
  * (cordinator/decisions/2026-05-17-calendar-sync-wire-contract.md).
- *
- * Chronicle's internal storage uses `'gm_only'` (underscore) for historical
- * reasons; chronicle#316's API handler translates between wire `'gm-only'`
- * (kebab) and storage at the boundary. The module emits + consumes wire
- * values. Don't introduce the storage form on the Foundry side.
+ * Chronicle's internal storage uses `'gm_only'` (underscore); its API
+ * handler translates to/from wire `'gm-only'` (kebab) at the boundary.
+ * This module emits and consumes only the wire (kebab) form.
  */
 export const WIRE_VISIBILITY = Object.freeze({
   EVERYONE: 'everyone',
@@ -95,14 +93,11 @@ export const CALENDARIA_FLAG_SCOPE = 'calendaria';
 
 /**
  * Candidate Calendaria weather-setter method names, probed in order by
- * `_applyWeatherToCalendaria`. Calendaria's published API surface exposes
- * weather READS (`getCurrentWeather`, `getWeatherForDate` — the two the
- * diagnostics bundle already probes) but no documented setter; its weather is
- * generated from zone/preset tables rather than assigned. Probing a short list
- * and degrading to chat beats hard-coding one speculative name that silently
- * no-ops on every build. Mirrored into the diagnostics probe list so an
- * operator whose build DOES expose one shows up in their bug report.
- * FM-SYNC-SUBRESOURCES-P1 Step 0.
+ * `_applyWeatherToCalendaria`. Calendaria's published API exposes weather
+ * reads but no documented setter (weather is generated from zone/preset
+ * tables). Probing a short list and degrading to chat beats hard-coding one
+ * speculative name. Mirrored into the diagnostics probe list so a build
+ * that does expose one shows up in a bug report.
  */
 export const CALENDARIA_WEATHER_SETTERS = Object.freeze([
   'setWeather',
@@ -112,11 +107,9 @@ export const CALENDARIA_WEATHER_SETTERS = Object.freeze([
 
 /**
  * Escape a plain-text line for safe interpolation into a ChatMessage body.
- * Chronicle-authored strings (weather descriptions, season names) are operator
- * content, but they arrive over the wire and land in innerHTML-rendered chat —
- * so they get escaped at the boundary like every other ingress in this module
- * (FM-SEC-CHUNK-3 discipline). Not exported as HTML: the announcements are
- * one-line plain text by design.
+ * Chronicle-authored strings (weather descriptions, season names) arrive
+ * over the wire and land in innerHTML-rendered chat, so they must be
+ * escaped at this boundary like every other ingress in this module.
  * @param {string} s
  * @returns {string}
  */
@@ -142,28 +135,21 @@ export const SIMPLE_CALENDAR_FLAG_SCOPES = Object.freeze([
 /**
  * Pure predicate: is this Foundry JournalEntry a calendar-module note?
  *
- * Both supported calendar modules store their notes as JournalEntry documents:
- *   - **Calendaria** creates one JournalEntry per note in a "Calendar Notes"
- *     folder, flagged `flags.calendaria.isCalendarNote === true`. This includes
- *     *festival/holiday notes it auto-seeds* from a calendar's `festivals`
- *     template (e.g. "Day of Rebirth", "Eve of the Dead") — the exact documents
- *     that triggered this bug. Calendar-structure journals are tagged
- *     `isCalendarJournal`. (Verified against Sayshal/Calendaria
- *     `scripts/notes/note-manager.mjs` + `scripts/festivals/festival-manager.mjs`.)
- *   - **SimpleCalendar** stores each note as a JournalEntry under its own module
- *     flag scope (see SIMPLE_CALENDAR_FLAG_SCOPES).
+ * Both supported calendar modules store their notes as JournalEntry
+ * documents: Calendaria flags `flags.calendaria.isCalendarNote === true`
+ * (including auto-seeded festival/holiday notes; structure journals carry
+ * `isCalendarJournal`); SimpleCalendar stores each note under its own
+ * module flag scope (SIMPLE_CALENDAR_FLAG_SCOPES).
  *
- * Those documents belong to CalendarSync — which mirrors them to Chronicle as
- * *calendar events* — and must NEVER be pushed to Chronicle as worldbuilding
- * entities. JournalSync calls this to skip them: without the guard a calendar
- * note is POSTed to `/entities` with `entity_type_id: 0`, which the server
- * resolves to the campaign's first entity type (typically "Character"), so the
- * holidays wrongly appear in the Characters list.
+ * These documents belong to CalendarSync, which mirrors them to Chronicle
+ * as calendar events, and must never be pushed as worldbuilding entities:
+ * JournalSync calls this to skip them, since an unguarded POST to
+ * `/entities` with `entity_type_id: 0` resolves to the campaign's first
+ * entity type and wrongly surfaces holidays in that list.
  *
- * Detection is by the calendar module's own flag (present the moment the note
- * JournalEntry is created — so it fires on the very first `createJournalEntry`
- * hook) plus our own `calendarEventId` link flag, which a note carries once
- * CalendarSync has mirrored it to a Chronicle event.
+ * Detection is by the calendar module's own flag (present the moment the
+ * note is created) plus our own `calendarEventId` link flag, set once
+ * CalendarSync has mirrored a note to a Chronicle event.
  *
  * Defensive against plain object stubs (tests, partial payloads): reads the
  * nested `flags` object directly when `getFlag` is unavailable.
@@ -204,30 +190,20 @@ export function isCalendarNoteJournal(journal) {
 /**
  * Normalize a Calendaria note startDate to Chronicle's 1-indexed month/day.
  *
- * Calendaria stores dates 0-indexed internally: a raw note startDate carries a
- * 0-indexed `month` and `dayOfMonth`, with an ABSOLUTE `year` (already includes
- * yearZero). Its `toPublic` conversion (returned by CALENDARIA.api.getNote)
- * instead yields a 1-indexed `month` + `day` (dayOfMonth deleted), same
- * absolute year. Verified against Calendaria release-1.1.3 source
- * (scripts/api.mjs `toPublic`: `month = (month ?? 0) + 1`,
- * `day = (dayOfMonth ?? 0) + 1`, year untouched; note* hooks fire the RAW stub).
+ * Calendaria stores dates 0-indexed internally: a raw note startDate carries
+ * a 0-indexed `month`/`dayOfMonth` with an absolute `year`. Its `toPublic`
+ * conversion (CALENDARIA.api.getNote) instead yields a 1-indexed
+ * `month`/`day` (dayOfMonth deleted), same absolute year. The realtime
+ * `calendaria.note*` hooks deliver the raw stub, so the correction is keyed
+ * on the SHAPE, never the code path: a `day` field means already-public (no
+ * correction); a `dayOfMonth` field means raw (0-indexed → +1). The year is
+ * never adjusted.
  *
- * The realtime `calendaria.note*` hooks deliver the RAW (0-indexed) stub, so
- * reading it verbatim mis-dated every pushed event by −1 month / −1 day (a
- * first-of-month or January note became month 0 / day 0 = an INVALID Chronicle
- * date). FM-CAL-SYNC-HOTFIX item 1.
- *
- * The correction is keyed on the SHAPE, never on the code path: a `day` field
- * means already-public (no correction); a `dayOfMonth` field means raw
- * (0-indexed → +1). So both the getNote (public) and raw-hook sources are
- * correct with zero double-correction risk. The YEAR is absolute in both and is
- * never adjusted (an earlier yearZero hypothesis was wrong — audit §2).
- *
- * CAUTION: do NOT pass a raw Foundry `game.time.components` spread (e.g. the
- * `.current` of a Calendaria `dateTimeChange` payload) straight in — it carries
- * BOTH a `dayOfMonth` (day-of-month, 0-indexed) AND a day-of-YEAR `day`, and the
- * `day` would trip the passthrough branch. Extract `{year, month, dayOfMonth}`
- * first (see `_onCalendariaDateTimeChange`). FM-CAL-BACKCATALOG-FIX item 2.
+ * CAUTION: a raw Foundry `game.time.components` spread (e.g. the `.current`
+ * of a Calendaria `dateTimeChange` payload) carries both `dayOfMonth`
+ * (0-indexed) AND a day-of-YEAR `day`, which would wrongly trip the
+ * passthrough branch — extract `{year, month, dayOfMonth}` first (see
+ * `_onCalendariaDateTimeChange`).
  *
  * @param {object} startDate - Calendaria startDate ({year, month, day?|dayOfMonth?}).
  * @returns {{year:number, month:number, day:number}|null} 1-indexed, or null.
@@ -249,11 +225,9 @@ export function chronicleDateFromCalendariaStartDate(startDate) {
 
 /**
  * Build the (year, month) fetch coordinates for the initial event back-catalog
- * sync. Chronicle's GET /calendar/events is MONTH-FILTERED (defaults to the
- * calendar's current year+month), so a bare fetch silently misses every event
- * outside the current month (FM-CAL-SYNC-HOTFIX item 2). We enumerate each
- * month of the calendar across the current year ±`yearSpan` — bounded, never
- * unbounded history.
+ * sync. Chronicle's GET /calendar/events is month-filtered (defaults to the
+ * calendar's current year+month), so enumerate each month across the
+ * current year ±`yearSpan` — bounded, never unbounded history.
  *
  * @param {object} calendar - Chronicle calendar ({current_year, months:[...]}).
  * @param {number} [yearSpan=1] - Years to fetch on each side of current_year.
@@ -276,25 +250,17 @@ export function calendarEventFetchCoordinates(calendar, yearSpan = 1) {
 }
 
 /**
- * Compare Chronicle's calendar structure to the active Foundry calendar's, for
- * the structure-mismatch guard (FM-CAL-SYNC-HOTFIX item 3, ruling B-R2).
- * Compares month count, per-month day counts, and weekday count ONLY — moons,
- * seasons, and eras are cosmetic to date coordinates and excluded (B-R2).
+ * Compare Chronicle's calendar structure to the active Foundry calendar's,
+ * for the structure-mismatch guard (B-R2). Compares month count, per-month
+ * day counts, and weekday count only — moons, seasons, and eras are cosmetic
+ * to date coordinates and excluded.
  *
- * Two ride-along refinements (FM-CAL-BACKCATALOG-FIX, RC-9):
- *   - The weekday comparison is SKIPPED when EITHER side reports 0 weekdays. A
- *     real calendar always has ≥1 weekday, so 0 means the list was unreadable
- *     (e.g. the Foundry reader didn't recognize Calendaria's weekday storage).
- *     Pausing sync on an unreadable weekday list while the month structure
- *     matches is a false positive — degrade to comparing what is readable. The
- *     month structure stays fail-closed (a genuine month divergence still pauses).
- *   - Leap-year month-length variants are a DOCUMENTED EXCLUSION. Chronicle's
- *     wire exposes leap rules (leap_year_every/offset + per-month leap_year_days,
- *     GetCalendar), but the active-Foundry structure reader surfaces only base
- *     per-month `days`, and pinning Calendaria's leap representation for a
- *     symmetric comparison is out of scope (RC-9: do NOT build leap inference).
- *     The base month/day + weekday comparison catches genuine structural
- *     divergence; leap variance is intentionally not compared.
+ * The weekday comparison is skipped when either side reports 0 weekdays,
+ * since a real calendar always has ≥1: that means the list was unreadable,
+ * and pausing sync on an unreadable list while months match would be a
+ * false positive. Leap-year month-length variants are excluded: the active
+ * Foundry structure reader only surfaces base per-month `days`, so leap
+ * representation is not pinned for a symmetric comparison.
  *
  * @param {object} chronicle - Chronicle calendar ({months:[{days}], weekdays:[]}).
  * @param {object} foundry - normalized active Foundry structure
@@ -355,9 +321,8 @@ export class CalendarSync {
     /** @type {import('./api-client.mjs').ChronicleAPI|null} */
     this._api = null;
     /**
-     * Reentrant echo-suppression guard, backed by a DEPTH COUNTER (not a
-     * boolean). Read it through the `_syncing` getter. FM-CAL-BACKCATALOG-FIX
-     * item 3 — see the getter for why a counter is required.
+     * Reentrant echo-suppression guard, backed by a depth counter (not a
+     * boolean — see the `_syncing` getter). Read through `_syncing`.
      * @type {number}
      */
     this._syncDepth = 0;
@@ -372,10 +337,10 @@ export class CalendarSync {
     this._hasModernCalendariaApi = false;
 
     /**
-     * Session-scoped structure-mismatch guard (FM-CAL-SYNC-HOTFIX item 3,
-     * ruling B-R2). When the active Foundry calendar's structure differs from
-     * Chronicle's, calendar sync is paused for the session (both directions) to
-     * avoid guaranteed mis-dating; journals/characters/maps are untouched.
+     * Session-scoped structure-mismatch guard (B-R2). When the active
+     * Foundry calendar's structure differs from Chronicle's, calendar sync
+     * is paused for the session (both directions) to avoid guaranteed
+     * mis-dating; journals/characters/maps are untouched.
      * @type {boolean}
      */
     this._calendarSyncDisabled = false;
@@ -383,10 +348,10 @@ export class CalendarSync {
     this._calendarMismatchDetail = null;
 
     /**
-     * Last-known Chronicle sub-resource snapshot (weather / season / era / moon
-     * phases), folded from the WebSocket stream by `reduceSubresourceState`.
-     * The dashboard's Calendar tab renders it; nothing here drives a write into
-     * Foundry. FM-SYNC-SUBRESOURCES-P1.
+     * Last-known Chronicle sub-resource snapshot (weather / season / era /
+     * moon phases), folded from the WebSocket stream by
+     * `reduceSubresourceState`. The dashboard's Calendar tab renders it;
+     * nothing here writes into Foundry.
      * @type {ReturnType<typeof emptySubresourceState>}
      */
     this._subresourceState = emptySubresourceState();
@@ -402,9 +367,8 @@ export class CalendarSync {
 
     /**
      * Types already logged by the `default:` branch of `onMessage`, so an
-     * unhandled `calendar.*` type produces exactly ONE debug line per session
-     * instead of one per broadcast. The dispatch's "no more silent drops"
-     * requirement, without turning a busy calendar into console spam.
+     * unhandled `calendar.*` type produces one debug line per session, not
+     * one per broadcast.
      * @type {Set<string>}
      */
     this._loggedUnhandledTypes = new Set();
@@ -414,15 +378,13 @@ export class CalendarSync {
   }
 
   /**
-   * Reentrant echo-suppression guard. Reads `true` whenever ANY sync operation
-   * is in flight. Backed by the `_syncDepth` COUNTER rather than a boolean so
-   * that a Chronicle WebSocket handler firing MID back-catalog does not clear
-   * the guard the still-running back-catalog loop depends on. With a boolean,
-   * the WS handler's `finally { _syncing = false }` unmasked the loop, and the
-   * loop's subsequent `_createLocalEvent` calls fired `calendaria.noteCreated`
-   * unsuppressed → `_onCalendariaNoteCreated` re-POSTed just-pulled events as
-   * duplicates. A counter (`_syncDepth++` on enter, `--` in `finally`; active
-   * while `> 0`) nests correctly. FM-CAL-BACKCATALOG-FIX item 3.
+   * Reentrant echo-suppression guard. `true` whenever any sync operation is
+   * in flight. Backed by the `_syncDepth` counter rather than a boolean so a
+   * WebSocket handler firing mid back-catalog doesn't clear the guard the
+   * still-running loop depends on: a boolean's `finally` would unmask the
+   * loop, letting its `_createLocalEvent` calls fire `calendaria.noteCreated`
+   * unsuppressed and re-POST just-pulled events as duplicates. `_syncDepth`
+   * increments on enter, decrements in `finally`; active while `> 0`.
    * @returns {boolean}
    * @private
    */
@@ -465,14 +427,12 @@ export class CalendarSync {
   async onMessage(msg) {
     if (!getSetting('syncCalendar') || !this._calendarModule) return;
 
-    // Structure signals are processed EVEN WHILE PAUSED, ahead of the
-    // mismatch guard. They are the only broadcast that can legitimately CLEAR
-    // a structure-mismatch pause: the operator's remedy for the pause is to fix
-    // the calendar in Chronicle, and fixing it is exactly what emits
-    // `calendar.structure.updated`. Leaving this behind the guard would make
-    // the pause unrecoverable without a world reload — the same
-    // dead-on-arrival shape FM-SYNC-WIRE-FIX just removed from initial sync.
-    // The handler itself performs NO writes into Foundry (see its doc comment).
+    // Structure signals run even while paused, ahead of the mismatch guard:
+    // they're the only broadcast that can clear a structure-mismatch pause
+    // (fixing the calendar in Chronicle is what emits
+    // `calendar.structure.updated`), so gating them behind the guard would
+    // make the pause unrecoverable without a world reload. The handler
+    // itself performs no writes into Foundry (see its doc comment).
     if (STRUCTURE_SIGNAL_TYPES.includes(msg?.type)) {
       await this._onChronicleStructureUpdated(msg.type);
       return;
@@ -494,7 +454,7 @@ export class CalendarSync {
         await this._onChronicleEventDeleted(msg.payload);
         break;
 
-      // --- Sub-resources (FM-SYNC-SUBRESOURCES-P1) ---------------------------
+      // --- Sub-resources ------------------------------------------------
       // Display-level only: every branch below folds the payload into
       // `_subresourceState` for the dashboard and optionally posts a GM-only
       // chat line. None of them writes a Chronicle value into the Foundry
@@ -516,14 +476,10 @@ export class CalendarSync {
   }
 
   /**
-   * Log an unhandled `calendar.*` type ONCE per session.
-   *
-   * Before this dispatch the switch above had no `default:` at all, so seven of
-   * Chronicle's eleven calendar broadcasts fell off the end and vanished with no
-   * trace anywhere — the operator's "celestial events unfindable/unsyncable"
-   * report had no console breadcrumb to follow. Non-calendar types are ignored
-   * silently: `SyncManager._routeMessage` fans EVERY message to EVERY module, so
-   * entity/map/note traffic reaching CalendarSync is normal, not a gap.
+   * Log an unhandled `calendar.*` type once per session, so nothing falls
+   * off the switch silently. Non-calendar types are ignored on purpose:
+   * `SyncManager._routeMessage` fans every message to every module, so
+   * entity/map/note traffic reaching CalendarSync is normal.
    *
    * @param {string|undefined} type
    * @private
@@ -560,14 +516,9 @@ export class CalendarSync {
    * Fetches Chronicle calendar structure and syncs current date.
    */
   async onInitialSync() {
-    // FM-CAL-BLACKOUT: reports whether a date was actually pulled.
-    //
-    // It used to return undefined on every path — success, "no calendar", a
-    // structure-mismatch pause, and a thrown 503 alike — so the dashboard's
-    // "Pull date" button logged "Pulled calendar date from Chronicle" into the
-    // activity feed even when the pull had failed. A feed that records things
-    // that did not happen is worse than no feed.
-    // @returns {Promise<boolean>} true only when a date was applied locally.
+    // @returns {Promise<boolean>} true only when a date was actually applied
+    // locally — the dashboard's activity feed must not log a pull that
+    // didn't happen (no calendar, a mismatch pause, or a thrown error).
     if (!getSetting('syncCalendar') || !this._calendarModule) return false;
     if (this._calendarSyncDisabled) return false;
 
@@ -580,19 +531,13 @@ export class CalendarSync {
 
       // Structure-mismatch guard (B-R2): if the active Foundry calendar's
       // structure differs from Chronicle's, date coordinates are meaningless
-      // across the wire — pause calendar sync for the session (both directions)
-      // and warn loudly, rather than push a Gregorian date into a custom
-      // calendar. Fails OPEN: only a CONFIRMED mismatch pauses; an unreadable
-      // structure does not. Other sync (journals/characters/maps) is untouched.
-      // Require BOTH sides readable before comparing — a degraded /calendar
-      // response (no months) must fail OPEN (don't pause), not report a false
-      // 0-vs-N mismatch.
-      //
-      // FM-SYNC-WIRE-FIX: this guard now covers BOTH module paths (was
-      // Calendaria-only; the SimpleCalendar path fell through to _setLocalDate
-      // unguarded). It MUST stay hot before fix-1 revives initial sync's
-      // date-writes into SimpleCalendar worlds. `_readActiveFoundryStructure`
-      // returns null for an unreadable structure, preserving fail-open.
+      // across the wire — pause calendar sync for the session (both
+      // directions) rather than push a Gregorian date into a custom
+      // calendar. Fails open: only a confirmed mismatch pauses; require both
+      // sides readable before comparing, so a degraded /calendar response
+      // (no months) doesn't report a false 0-vs-N mismatch. Covers both
+      // module paths — `_readActiveFoundryStructure` dispatches per module
+      // and returns null for an unreadable structure.
       if (this._chronicleCalendar.months?.length > 0) {
         const foundryStruct = this._readActiveFoundryStructure();
         if (foundryStruct) {
@@ -605,10 +550,9 @@ export class CalendarSync {
       }
 
       // Sync the current date from Chronicle to the Foundry calendar module.
-      // This is the "poll" apply path (a fetch of GET /calendar on connect/
-      // reconnect, as opposed to the WebSocket-driven _onChronicaleDateAdvanced
-      // below) — confirm back to Chronicle only when _setLocalDate reports a
-      // real apply (FM-SYNC-CONFIRMED-DATE).
+      // This is the "poll" apply path (GET /calendar on connect/reconnect,
+      // vs the WebSocket-driven _onChronicaleDateAdvanced below) — confirm
+      // back to Chronicle only when _setLocalDate reports a real apply.
       const applied = await this._setLocalDate({
         year: this._chronicleCalendar.current_year,
         month: this._chronicleCalendar.current_month,
@@ -669,20 +613,16 @@ export class CalendarSync {
   }
 
   /**
-   * Read the active SimpleCalendar calendar's structure (per-month day counts +
-   * weekday count) for the mismatch guard — the SimpleCalendar sibling of
-   * `_readActiveCalendariaStructure`. Before FM-SYNC-WIRE-FIX the structure guard
-   * was Calendaria-only (`onInitialSync` gated on `_calendarModule === 'calendaria'`),
-   * so a SimpleCalendar world with a mismatched structure fell through unguarded
-   * and `_setLocalDate` wrote Chronicle's coordinates into an incompatible calendar.
+   * Read the active SimpleCalendar calendar's structure (per-month day
+   * counts + weekday count) for the mismatch guard — the SimpleCalendar
+   * sibling of `_readActiveCalendariaStructure`.
    *
-   * SimpleCalendar's public API exposes months via `numberOfDays` (base year; the
-   * `numberOfLeapYearDays` variant is a DOCUMENTED EXCLUSION mirroring the
-   * Calendaria reader — see `compareCalendarStructures`). Prefer the single
-   * `getCurrentCalendar()` read; fall back to the flat `getAllMonths()` /
-   * `getAllWeekdays()` getters for API surfaces that don't expose it. Returns null
-   * when the structure can't be read — the guard then fails OPEN (sync is only
-   * paused on a CONFIRMED mismatch, never on inability to compare).
+   * Exposes months via `numberOfDays` (base year; `numberOfLeapYearDays` is
+   * excluded, mirroring the Calendaria reader — see
+   * `compareCalendarStructures`). Prefers `getCurrentCalendar()`, falling
+   * back to `getAllMonths()`/`getAllWeekdays()`. Returns null when the
+   * structure can't be read — the guard then fails open (sync is only
+   * paused on a confirmed mismatch, never on inability to compare).
    * @returns {{name:string, monthDays:number[], weekdayCount:number}|null}
    * @private
    */
@@ -719,8 +659,8 @@ export class CalendarSync {
 
   /**
    * Read the active Foundry calendar's structure for the mismatch guard,
-   * dispatching to the per-module reader. Returns null for an unknown module or
-   * an unreadable structure (guard fails OPEN). FM-SYNC-WIRE-FIX.
+   * dispatching to the per-module reader. Returns null for an unknown
+   * module or an unreadable structure (guard fails open).
    * @returns {{name:string, monthDays:number[], weekdayCount:number}|null}
    * @private
    */
@@ -747,38 +687,13 @@ export class CalendarSync {
     const foundryShape = `${(foundryStruct?.monthDays || []).length}mo/${foundryStruct?.weekdayCount ?? 0}wd`;
     this._calendarMismatchDetail =
       `Chronicle: ${chronicleName} ${chronicleShape} · Foundry: ${foundryName} ${foundryShape} — ${detail}`;
-    // THE REMEDY IS AN EDIT, NOT AN IMPORT AND NOT A NEW CALENDAR.
-    //
-    // This line used to read "import or author the matching calendar in
-    // Chronicle" and NEITHER HALF WAS REACHABLE, measured against Chronicle's
-    // source:
-    //
-    //   IMPORT — `POST /api/v1/campaigns/:cid/calendar` answers a structured
-    //   409 `calendar_already_exists` whenever the campaign has ANY calendar
-    //   (`… ORDER BY is_default DESC, sort_order ASC LIMIT 1`). When this
-    //   warning fires the campaign HAS one by construction: the mismatch was
-    //   computed by comparing against it. The door is closed 100% of the time
-    //   this advice appears.
-    //
-    //   AUTHOR — Chronicle's `CreateCalendar` sets `IsDefault: isFirst`, so a
-    //   newly authored calendar is not the default; this module is served the
-    //   default (same ordering); and `SetDefaultCalendar` exists on Chronicle's
-    //   service interface with NO route, handler or control anywhere. An
-    //   authored calendar therefore never reaches the wire and the operator has
-    //   nothing to click that would change that.
-    //
-    // What IS reachable is making the two structures agree by editing one of
-    // the calendars that already exist — Chronicle's Calendar Settings owns
-    // months and weekdays, which are exactly the facts compared here, and
-    // Calendaria / Simple Calendar own the Foundry side. Either edit clears it.
-    //
-    // Pointing this module at a DIFFERENT Chronicle calendar remains genuinely
-    // impossible and is BOOKED (CLAUDE.md → Blocked on Chronicle) rather than
-    // printed as an instruction. Advice that cannot be followed is worse than
-    // no advice: the operator spends the session believing the fix is theirs.
-    //
-    // Pinned by tools/test-calendar-mismatch-remedy.mjs, which holds this
-    // string and the dashboard's two banners to the same verdict.
+    // The remedy must be "edit either calendar", never "import" or "author a
+    // new one" — Chronicle rejects importing a second calendar (409) and has
+    // no route to make an authored one the served default, so both would be
+    // unreachable advice. TODO(#95): once Chronicle lets a campaign choose
+    // which calendar is served, offer pointing this module at a different
+    // one. Pinned by tools/test-calendar-mismatch-remedy.mjs against this
+    // string and the dashboard's two banners.
     const msg = `Chronicle Sync: calendar structures differ (${this._calendarMismatchDetail}). `
       + 'Calendar sync is paused for this session — edit either calendar so the two agree '
       + '(Chronicle: Calendar Settings → Months / Weekdays; Foundry: your calendar module), '
@@ -874,8 +789,7 @@ export class CalendarSync {
   /**
    * Update the local Foundry calendar date from Chronicle. This is the
    * WebSocket-driven apply path (`calendar.date.advanced`) — confirm back to
-   * Chronicle only when `_setLocalDate` reports a real apply
-   * (FM-SYNC-CONFIRMED-DATE).
+   * Chronicle only when `_setLocalDate` reports a real apply.
    * @param {object} data - { year, month, day, hour, minute }
    * @private
    */
@@ -887,24 +801,17 @@ export class CalendarSync {
     }
   }
 
-  // --- Chronicle → Foundry: sub-resources (FM-SYNC-SUBRESOURCES-P1) ----------
+  // --- Chronicle → Foundry: sub-resources -----------------------------
 
   /**
-   * Whisper one line to the GMs. Every sub-resource announcement goes through
-   * here, and it is deliberately the ONLY chat surface this arc adds.
-   *
-   * **Why whisper rather than broadcast.** Chronicle's WS hub gates dm_only
-   * traffic server-side via `Message.RequiresDM` (`internal/websocket/hub.go`
-   * :159-167), so a payload that reaches this module is already cleared for the
-   * GM — but "cleared for the GM" is not "cleared for the table". Weather zones
-   * and world state routinely encode information the DM is holding back (an
-   * unnatural darkness, a zone the party hasn't discovered). Re-broadcasting a
-   * DM-gated payload into public chat would launder a server-side permission
-   * decision into a player-visible one, which is exactly the leak class
-   * cordinator#32 hardened against on the Chronicle side. `whisper` to the GM
-   * user ids keeps the audience identical to the one Chronicle authorized.
-   *
-   * The GM decides what to share; the module never decides for them.
+   * Whisper one line to the GMs. This is the only chat surface for
+   * sub-resource announcements — always whisper, never broadcast: Chronicle's
+   * WS hub gates dm_only traffic server-side, so a payload reaching this
+   * module is cleared for the GM but not necessarily for the table (weather
+   * zones and world state can encode information the DM is holding back).
+   * Re-broadcasting to public chat would launder that server-side permission
+   * decision into a player-visible one. The GM decides what to share; the
+   * module never decides for them.
    *
    * @param {string|null} line
    * @private
@@ -948,10 +855,9 @@ export class CalendarSync {
    *
    * Two payload shapes arrive on this type (see `_calendar-subresources.mjs`):
    * the merged `WeatherInput` from `SetWeather`, and `null` from the
-   * weather-zone paths, which publish the type purely as a "refetch me" ping.
-   * A null payload therefore triggers one `GET /calendar/weather` rather than
-   * being discarded — without it, every active-zone change would land as a
-   * no-op, which is the same silent-drop shape this dispatch is closing.
+   * weather-zone paths, which publish the type purely as a "refetch me" ping
+   * — a null payload triggers one `GET /calendar/weather` rather than being
+   * discarded.
    *
    * Apply order, honestly degrading:
    *   1. If the active module is Calendaria AND it exposes a weather SETTER,
@@ -993,19 +899,10 @@ export class CalendarSync {
 
   /**
    * Push a weather reading into Calendaria when — and only when — its API
-   * exposes a setter.
-   *
-   * Step-0 inventory (this dispatch): the module's existing Calendaria probe
-   * list (`sync-dashboard.mjs` `_buildCalendarDiagnosticsInput`) covers
-   * `getWeatherForDate` and `getCurrentWeather` — both READS, used for the
-   * diagnostics bundle. No Calendaria build the module has been pointed at
-   * exposes a documented weather *setter*, and Calendaria's own weather is
-   * generated from its zone/preset tables rather than assigned. So rather than
-   * pin one speculative method name, we probe the plausible names and no-op
-   * when none is present, returning false so the caller falls back to chat.
-   * The probe names are mirrored into the diagnostics bundle, so an operator on
-   * a build that DOES expose one can see it in their report and we can pin the
-   * real name in a follow-up instead of guessing now.
+   * exposes a setter. No known Calendaria build documents a weather setter
+   * (its weather is generated from zone/preset tables), so this probes the
+   * plausible names (`CALENDARIA_WEATHER_SETTERS`) and no-ops when none is
+   * present, returning false so the caller falls back to chat.
    *
    * @param {ReturnType<typeof normalizeWeather>} weather
    * @returns {Promise<boolean>} true when the reading was handed to Calendaria
@@ -1044,16 +941,11 @@ export class CalendarSync {
    * Calendar tab renders) and optionally posts a GM-only chat line, gated by
    * that type's world setting.
    *
-   * **No writes into Foundry.** P1 is display-level by dispatch: nothing here
-   * creates a note, mutates a calendar, or touches a document. In particular
-   * the world-state branch does NOT auto-create a same-day Calendaria note for
-   * celestial events, for two reasons found in Step 0 and recorded in full in
-   * the PR body: the payload carries no celestial detail to put in a note
-   * (`{date, moodTint}` — service side, `worldstate_service.go`:265), and it
-   * carries no stable event id, so a re-broadcast or a reconnect would create
-   * duplicate notes with no way to dedupe them. Announcing what the payload
-   * actually contains is honest; inventing a "Meteor Shower" note from a mood
-   * tint would not be.
+   * **No writes into Foundry.** Nothing here creates a note, mutates a
+   * calendar, or touches a document. The world-state branch never
+   * auto-creates a same-day Calendaria note for celestial events: the
+   * payload carries no celestial detail and no stable event id, so a
+   * re-broadcast could create duplicate, undeduplicable notes.
    *
    * @param {string} type
    * @param {object|null} payload
@@ -1072,29 +964,22 @@ export class CalendarSync {
 
   /**
    * Handle `calendar.structure.updated` and its granular siblings
-   * (`calendar.cycle.changed`, `calendar.festival.changed`, which Chronicle
-   * fires alongside it — `service.go`:1594-1595, :1629-1630).
+   * (`calendar.cycle.changed`, `calendar.festival.changed`).
    *
    * **Deliberately does NOT auto-apply the new structure.** Rewriting the
    * Foundry calendar's months/weekdays from a broadcast would be the most
-   * destructive write in the module: Calendaria stores notes against month/day
-   * coordinates, so re-shaping the calendar underneath them silently re-dates
-   * every note in the world. Non-destructive auto-merge is a later arc
-   * (calendar-remodel requirements §1 item 10). What we do instead:
+   * destructive write in the module: Calendaria stores notes against
+   * month/day coordinates, so re-shaping the calendar underneath them
+   * silently re-dates every note in the world. Instead:
    *
    *   1. Refetch `GET /calendar` so the cached structure isn't stale.
-   *   2. Re-run the SAME comparison `onInitialSync` runs, with the same
-   *      fail-open discipline — an unreadable structure on either side never
-   *      pauses anything.
-   *   3. Now incompatible → pause (the existing B-R2 path, one warning).
-   *      Still compatible → record the advisory `structure-changed` badge
-   *      detail so the dashboard stops claiming a clean "In Sync" the operator
-   *      hasn't eyeballed.
-   *   4. Compatible AND we were previously paused for a mismatch → CLEAR the
-   *      pause. This is the recovery path: the operator's documented remedy for
-   *      a mismatch pause is "fix the calendar in Chronicle", and doing so is
-   *      precisely what emits this broadcast. Without step 4 the pause would
-   *      survive until a world reload even after the cause was removed.
+   *   2. Re-run the same comparison `onInitialSync` runs, fail-open — an
+   *      unreadable structure on either side never pauses anything.
+   *   3. Incompatible → pause (the B-R2 path). Still compatible → record
+   *      the advisory `structure-changed` badge detail.
+   *   4. Compatible AND previously paused for a mismatch → clear the pause;
+   *      fixing the calendar in Chronicle is what emits this broadcast, so
+   *      this is the only way the pause recovers without a world reload.
    *
    * Runs even while paused — it's the one handler that must (see `onMessage`).
    *
@@ -1235,23 +1120,13 @@ export class CalendarSync {
     if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
     if (this._isActiveCalendarExcluded()) return;
 
-    // Calendaria 1.1.3's dateTimeChange payload NESTS the raw date components
-    // under `.current` (verified in Calendaria source: time-tracker.mjs
-    // #fireDateTimeChangeHook spreads game.time.components into hookData.current;
-    // release-1.1.3 @ ee04e44). The old code read data.month / data.dayOfMonth
-    // off the TOP level → every field was undefined → the PUT pushed a garbage
-    // date. The nested components are RAW 0-indexed (month, dayOfMonth), the same
-    // shape the note* hooks deliver; `year` is already yearZero-adjusted.
-    //
-    // We route the correction through chronicleDateFromCalendariaStartDate so the
-    // 0→1 math lives in ONE place (exactly like the note paths after #76). BUT
-    // because `.current` is a spread of game.time.components it ALSO carries a
-    // day-of-YEAR `day` sibling; handing `.current` straight to the shape-keyed
-    // helper would trip its "has `day` → already public" branch and use
-    // day-of-year as day-of-month. So we feed it a CLEAN raw stub
-    // ({year, month, dayOfMonth}) whenever the raw dayOfMonth is present, and
-    // otherwise pass the source through (a genuinely public/flat payload still
-    // takes the helper's passthrough branch). FM-CAL-BACKCATALOG-FIX item 2.
+    // Calendaria's dateTimeChange payload nests the raw date components under
+    // `.current` (a spread of game.time.components), 0-indexed month/dayOfMonth
+    // with an already-adjusted year. `.current` also carries a day-of-YEAR
+    // `day` sibling that would wrongly trip chronicleDateFromCalendariaStartDate's
+    // "has `day` → already public" branch, so build a clean {year, month,
+    // dayOfMonth} stub when dayOfMonth is present and pass the source through
+    // otherwise, keeping the 0→1 correction in that one helper.
     const src = (data && data.current) ? data.current : data;
     if (!src) return;
     const startDate = (src.dayOfMonth !== undefined)
@@ -1260,9 +1135,7 @@ export class CalendarSync {
     const date = chronicleDateFromCalendariaStartDate(startDate);
     if (!date) return;
 
-    // FM-CAL-BLACKOUT: return before the pre-push probe, not after it. Once
-    // the blackout is known this session, a push costs zero requests
-    // instead of two.
+    // Check before the pre-push probe so a known blackout costs zero requests.
     if (calendarBlackoutActive()) return;
 
     try {
@@ -1276,10 +1149,8 @@ export class CalendarSync {
       });
     } catch (err) {
       if (isRealTimeRejection(err)) { notifyRealTimePushPaused(); return; }
-      // FM-CAL-BLACKOUT: a 503 calendar_rebuilding is not a fault to shout
-      // about on every world-time tick — arm the session guard, notify once,
-      // and let the check at the top of this method skip the next one before
-      // it costs a request.
+      // A 503 calendar_rebuilding arms the session guard and notifies once,
+      // rather than logging an error on every world-time tick.
       if (handleIfCalendarRebuilding(err)) return;
       console.error('Chronicle: Failed to push Calendaria date/time to Chronicle', err);
     }
@@ -1372,12 +1243,10 @@ export class CalendarSync {
     if (!noteData) return null;
 
     // Prefer the authoritative note from the modern Calendaria API: getNote()
-    // returns toPublic (1-indexed) dates — the single source of truth, per
-    // CALENDARIA-INTEGRATION.md's "use the API, don't read raw stored dates".
-    // The realtime note* hook payload instead carries RAW 0-indexed dates; both
-    // shapes are normalized by chronicleDateFromCalendariaStartDate below, which
-    // keys the +1 on the date SHAPE (dayOfMonth vs day) so there is no
-    // double-correction (FM-CAL-SYNC-HOTFIX item 1).
+    // returns toPublic (1-indexed) dates, the source of truth. The realtime
+    // note* hook payload instead carries raw 0-indexed dates; both shapes are
+    // normalized by chronicleDateFromCalendariaStartDate, keyed on the date
+    // SHAPE (dayOfMonth vs day) so there is no double-correction.
     let flagData = noteData.flagData || noteData;
     let name = noteData.name || noteData.title;
     if (this._hasModernCalendariaApi && noteData.id && typeof globalThis.CALENDARIA?.api?.getNote === 'function') {
@@ -1394,26 +1263,17 @@ export class CalendarSync {
     const date = chronicleDateFromCalendariaStartDate(startDate);
     if (!date) return null;
 
-    // Six keys, and no more. This payload is used for BOTH create and update;
-    // on the update path Chronicle's PUT /calendar/events/:id is a partial
-    // update — absent preserves, explicit null clears, a value replaces
-    // (API-CONTRACT.md). Before that contract, the keys missing here also
-    // wrote is_recurring=false, all_day=false and a cleared entity_id onto
-    // the event. Do not widen this to echo them back: an echo re-arms the
-    // endpoint for the next writer and goes stale.
+    // Six keys, no more. PUT /calendar/events/:id is a partial update —
+    // absent preserves, explicit null clears, a value replaces (see
+    // API-CONTRACT.md). Do not widen this to echo other fields back: an
+    // echo re-arms the endpoint for the next writer and goes stale.
     return {
       name: name || 'Untitled Note',
       year: date.year,
       month: date.month,
       day: date.day,
       description: noteData.content || noteData.description || flagData.content || '',
-      // Wire visibility is kebab-case per the wire contract
-      // (cordinator/decisions/2026-05-17-calendar-sync-wire-contract.md).
-      // Chronicle's internal storage uses underscore; chronicle#316's
-      // translation layer bridges the two. Foundry MUST emit kebab on
-      // the wire — emitting underscore was masked by the translation
-      // layer in PR 1 but counts as drift. See `chronicleVisibilityFromCalendariaNote`
-      // for the pure helper this delegates to (used by unit tests).
+      // Must emit kebab-case ('gm-only') on the wire, per WIRE_VISIBILITY.
       visibility: chronicleVisibilityFromCalendariaNote(noteData),
     };
   }
@@ -1430,9 +1290,7 @@ export class CalendarSync {
     if (!game.user.isGM) return;
     if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
 
-    // FM-CAL-BLACKOUT: return before the pre-push probe, not after it. Once
-    // the blackout is known this session, a push costs zero requests
-    // instead of two.
+    // Check before the pre-push probe so a known blackout costs zero requests.
     if (calendarBlackoutActive()) return;
 
     try {
@@ -1446,10 +1304,8 @@ export class CalendarSync {
       });
     } catch (err) {
       if (isRealTimeRejection(err)) { notifyRealTimePushPaused(); return; }
-      // FM-CAL-BLACKOUT: a 503 calendar_rebuilding is not a fault to shout
-      // about on every world-time tick — arm the session guard, notify once,
-      // and let the check at the top of this method skip the next one before
-      // it costs a request.
+      // A 503 calendar_rebuilding arms the session guard and notifies once,
+      // rather than logging an error on every world-time tick.
       if (handleIfCalendarRebuilding(err)) return;
       console.error('Chronicle: Failed to push date to Chronicle', err);
     }
@@ -1471,9 +1327,7 @@ export class CalendarSync {
     const date = data?.date || data;
     if (!date) return;
 
-    // FM-CAL-BLACKOUT: return before the pre-push probe, not after it. Once
-    // the blackout is known this session, a push costs zero requests
-    // instead of two.
+    // Check before the pre-push probe so a known blackout costs zero requests.
     if (calendarBlackoutActive()) return;
 
     try {
@@ -1488,10 +1342,8 @@ export class CalendarSync {
       });
     } catch (err) {
       if (isRealTimeRejection(err)) { notifyRealTimePushPaused(); return; }
-      // FM-CAL-BLACKOUT: a 503 calendar_rebuilding is not a fault to shout
-      // about on every world-time tick — arm the session guard, notify once,
-      // and let the check at the top of this method skip the next one before
-      // it costs a request.
+      // A 503 calendar_rebuilding arms the session guard and notifies once,
+      // rather than logging an error on every world-time tick.
       if (handleIfCalendarRebuilding(err)) return;
       console.error('Chronicle: Failed to push SimpleCalendar date to Chronicle', err);
     }
@@ -1544,13 +1396,9 @@ export class CalendarSync {
     }
 
     try {
-      // Narrow body ON PURPOSE: a Foundry note edit means the name, the date
-      // and the body. Chronicle's PUT /calendar/events/:id is a partial
-      // update — absent preserves, explicit null clears, a value replaces
-      // (API-CONTRACT.md). Before that contract, this exact five-key body
-      // also wrote is_recurring=false, all_day=false and a cleared entity_id
-      // onto the event, because those were value-typed / clear-on-nil on the
-      // server. Do not widen this to echo them back.
+      // Narrow body on purpose: PUT /calendar/events/:id is a partial update
+      // (absent preserves, null clears, a value replaces — API-CONTRACT.md).
+      // Do not widen this to echo other fields back.
       await this._api.put(`/calendar/events/${chronicleId}`, {
         name: eventData.name || 'Untitled Event',
         year: eventData.year,
@@ -1723,16 +1571,10 @@ export class CalendarSync {
    * Set the date on the active Foundry calendar module.
    * Uses CALENDARIA.api.setDateTime() when available for full hour/minute support.
    *
-   * "Successfully applied" (FM-SYNC-CONFIRMED-DATE): the code offers no ack
-   * from either calendar module's date setter beyond "the call didn't
-   * throw" — neither Calendaria's `setDateTime`/`setDate` nor
-   * SimpleCalendar's `setDate` returns a result we can inspect for success.
-   * So the return value here is a best-effort signal: `true` means a real
-   * setter for the detected module was found and invoked without throwing;
-   * `false` means either no setter was available (module detected but its
-   * API surface wasn't there — a no-op, nothing was applied) or the setter
-   * threw (already logged below). Flagged per the dispatch's stop-and-flag:
-   * there is no stronger "it actually took effect" hook to key off.
+   * The return value is a best-effort signal, not a real ack: neither
+   * Calendaria's setDateTime/setDate nor SimpleCalendar's setDate reports
+   * success. `true` means a setter for the detected module was invoked
+   * without throwing; `false` means no setter was available or it threw.
    * @param {object} data - { year, month, day, hour, minute }
    * @returns {Promise<boolean>} true if a local setter was invoked and did not throw.
    * @private
@@ -1764,9 +1606,8 @@ export class CalendarSync {
       } else if (this._calendarModule === 'simple-calendar') {
         const sc = SimpleCalendar?.api;
         if (sc?.setDate) {
-          // Awaited (unlike the pre-FM-SYNC-CONFIRMED-DATE code) so a
-          // promise-returning setDate is actually settled before this method
-          // reports success to its callers.
+          // Awaited so a promise-returning setDate is settled before this
+          // method reports success to its callers.
           await sc.setDate({
             year: data.year,
             // SimpleCalendar months are 0-indexed.
@@ -1809,11 +1650,8 @@ export class CalendarSync {
               day: data.day,
             },
             allDay: true,
-            // Wire visibility is kebab `'gm-only'`. The pure helper
-            // `isWireVisibilityGmOnly` accepts either kebab or the legacy
-            // underscore form so this code keeps working if a Chronicle
-            // event lands here with stale storage-side data (e.g. from a
-            // mis-translated WS payload).
+            // isWireVisibilityGmOnly accepts kebab or the legacy underscore
+            // form, so stale storage-side data still resolves correctly.
             gmOnly: isWireVisibilityGmOnly(data.visibility),
             openSheet: false,
           });
@@ -1961,11 +1799,9 @@ export class CalendarSync {
   async _syncChronicleEventsToCalendariaNotes() {
     if (!this._hasModernCalendariaApi && !game.Calendaria?.createEvent) return;
 
-    // GET /calendar/events is MONTH-FILTERED (defaults to the calendar's current
-    // year+month), so the old bare fetch silently mapped only current-month
-    // events and missed the entire back-catalog (FM-CAL-SYNC-HOTFIX item 2).
-    // Enumerate each month across the current year ±1 from the cached Chronicle
-    // structure — bounded, never unbounded history.
+    // GET /calendar/events is month-filtered (defaults to the calendar's
+    // current year+month), so enumerate each month across the current year
+    // ±1 from the cached Chronicle structure — bounded, never unbounded.
     const coords = calendarEventFetchCoordinates(this._chronicleCalendar, 1);
     // No cached structure to enumerate (e.g. /calendar returned no months) →
     // fall back to the single default (current-month) fetch rather than nothing.
@@ -1973,11 +1809,10 @@ export class CalendarSync {
 
     const seen = new Set();
     let created = 0;
-    // Suppress the echo: _createLocalEvent → CALENDARIA.api.createNote fires the
-    // synchronous calendaria.noteCreated hook, which would otherwise re-POST the
-    // just-pulled event back to Chronicle as a DUPLICATE. Hold the _syncing guard
-    // across the create loop, exactly as the WS pull path _onChronicleEventCreated
-    // does around the same call.
+    // _createLocalEvent → CALENDARIA.api.createNote fires the synchronous
+    // calendaria.noteCreated hook synchronously, which would otherwise re-POST
+    // the just-pulled event back to Chronicle as a duplicate; hold _syncing
+    // across the loop, as _onChronicleEventCreated does for the WS pull path.
     this._syncDepth++;
     try {
       for (const coord of fetches) {
@@ -1991,14 +1826,9 @@ export class CalendarSync {
           console.debug('Chronicle: back-catalog fetch failed for', path, err.message);
           continue;
         }
-        // Chronicle's GET /calendar/events returns an ENVELOPE
-        // { "data": [...events], "total": N } (syncapi/calendar_api_handler.go),
-        // NOT a bare array — the same shape getNotes() unwraps (api-client.mjs).
-        // The #76 test masked this by stubbing a bare array, so every window hit
-        // the old `if (!Array.isArray(events)) continue` and the back-catalog
-        // created ZERO events. Accept the envelope (real API) AND a bare array
-        // (tolerance). Kept local to this call site so get()'s contract for the
-        // other 25 callers is unchanged. FM-CAL-BACKCATALOG-FIX item 1 (BLOCKER).
+        // GET /calendar/events returns an envelope { data:[...], total } like
+        // getNotes() unwraps elsewhere — accept that AND a bare array here,
+        // kept local so get()'s contract for other callers is unchanged.
         const events = Array.isArray(payload)
           ? payload
           : (payload && Array.isArray(payload.data) ? payload.data : null);

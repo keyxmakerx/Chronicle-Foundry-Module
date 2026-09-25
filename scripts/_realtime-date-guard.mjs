@@ -1,13 +1,11 @@
 /**
- * Chronicle Sync — real-time calendar date-push guard (RC-4, FM-REALTIME-DATE-SIGNAL).
+ * Real-time calendar date-push guard.
  *
- * When a Chronicle calendar tracks real-world time, `GET /calendar/date` carries
- * `tracks_real_time: true` — the composed `UsesRealTime()` predicate (mode ==
- * reallife AND flag; `syncapi/calendar_api_handler.go:95`) — and Chronicle's W3
- * guard rejects date writes with a 422. This module centralizes the push-side
- * reaction so calendar-sync.mjs's three hook-triggered pushes and
- * sync-dashboard.mjs's manual push button share ONE guard implementation
- * instead of forking the same logic twice (dispatch stop-and-flag).
+ * When a Chronicle calendar tracks real-world time, `GET /calendar/date`
+ * carries `tracks_real_time: true` and Chronicle rejects date writes with a
+ * 422. This module centralizes the push-side reaction so all push sites
+ * (calendar-sync.mjs's hook-triggered pushes, sync-dashboard.mjs's manual
+ * push button) share one guard implementation.
  *
  * Pull/event sync is untouched — this only gates `PUT /calendar/date`.
  * `GET /calendar` (the structure payload) does NOT carry this field; never
@@ -17,11 +15,9 @@
 import { handleIfCalendarRebuilding } from './_calendar-blackout-guard.mjs';
 
 /**
- * Session-scoped notice state. A module-level singleton (not a class field)
- * so calendar-sync.mjs and sync-dashboard.mjs — two independent classes —
- * share one "shown already" flag without either owning the other. Same
- * lifetime as the structure guard's per-instance session state
- * (calendar-sync.mjs's `_calendarSyncDisabled`, set up around line 327).
+ * Session-scoped notice state. A module-level singleton so calendar-sync.mjs
+ * and sync-dashboard.mjs — two independent classes — share one "shown
+ * already" flag without either owning the other.
  */
 const state = {
   noticeShown: false,
@@ -36,10 +32,9 @@ export function _resetRealtimeDateGuardForTests() {
 }
 
 /**
- * Read the `tracks_real_time` field defensively (FM-ENVELOPE-AUDIT
- * convention — never assume a payload shape). `/calendar/date` is a bare
- * single-object endpoint, but a network hiccup or an old Chronicle deploy
- * can still hand back `null`/`undefined`/something unexpected.
+ * Read the `tracks_real_time` field defensively — a network hiccup or an
+ * old Chronicle deploy can hand back `null`/`undefined`/something
+ * unexpected.
  * @param {{tracks_real_time?: boolean}|null|undefined} payload
  * @returns {boolean}
  */
@@ -92,15 +87,10 @@ export async function shouldSkipDatePush(api) {
   try {
     payload = await api.get('/calendar/date');
   } catch (err) {
-    // FM-CAL-BLACKOUT: one probe failure is classified rather than swallowed.
     // A `503 calendar_rebuilding` means the PUT this guard is about to wave
-    // through is certain to fail too, so arming the session guard here and
-    // answering "skip" costs the caller one request instead of two — and every
-    // later push costs none, because the caller returns before probing.
-    //
-    // Every OTHER failure keeps the original fail-open contract below: a probe
-    // that could not be read is not this guard's business, and the push
-    // proceeds to succeed or fail on its own terms.
+    // through is certain to fail too, so skip it here instead of costing a
+    // second request. Every other probe failure fails open: it's not this
+    // guard's business, so the push proceeds to succeed or fail on its own.
     if (handleIfCalendarRebuilding(err)) return true;
     return false;
   }

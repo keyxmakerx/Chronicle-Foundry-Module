@@ -40,9 +40,9 @@ export class ItemSync {
     this._itemTypeId = null;
 
     /**
-     * One-shot guard so the "custom item has no linked Chronicle entity to relate
-     * to — skipping relation push" notice logs once per session, not per item
-     * (FM-SYNC-WIRE-FIX fix 5).
+     * One-shot guard so the "custom item has no linked Chronicle entity to
+     * relate to — skipping relation push" notice logs once per session,
+     * not per item.
      * @type {boolean}
      */
     this._loggedSkipNoTarget = false;
@@ -309,13 +309,12 @@ export class ItemSync {
     const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return; // Actor not synced.
 
-    // FM-SYNC-WIRE-FIX fix 5: Chronicle relations REQUIRE a target entity
-    // (CreateRelation 400s on an empty target_entity_id). A custom Foundry item
-    // has no corresponding Chronicle item entity to point at — the pre-fix code
-    // hard-coded `targetEntityId: null`, so every one of these POSTs 400'd. Only
-    // an item already linked to a Chronicle entity (its own `entityId` flag,
-    // e.g. pulled from Chronicle) can carry a relation; skip the rest. Logged
-    // once per session so bulk-adding custom items doesn't spam the console.
+    // Chronicle relations require a target entity (CreateRelation 400s on
+    // an empty target_entity_id). A custom Foundry item has no
+    // corresponding Chronicle item entity to point at, so only an item
+    // already linked to one (its own `entityId` flag) can carry a
+    // relation. Logged once per session so bulk-adding custom items
+    // doesn't spam the console.
     const targetEntityId = item.getFlag(FLAG_SCOPE, 'entityId');
     if (!targetEntityId) {
       if (!this._loggedSkipNoTarget) {
@@ -376,9 +375,7 @@ export class ItemSync {
     if (!entityId) return;
 
     try {
-      // FM-SYNC-WIRE-FIX fix 5: Chronicle serves a FLAT relation route
-      // (DELETE /relations/:relationId), not the nested
-      // /entities/:id/relations/:relId the module used to call (which 404'd).
+      // Chronicle serves a flat relation route: DELETE /relations/:relationId.
       await this._api.delete(`/relations/${relationId}`);
       console.debug(`Chronicle: Removed item relation for "${item.name}" from Chronicle`);
     } catch (err) {
@@ -413,11 +410,9 @@ export class ItemSync {
         equipped: item.system?.equipped ?? false,
       };
 
-      // FM-SYNC-WIRE-FIX fix 5: flat route PUT /relations/:relationId (was the
-      // nested /entities/:id/relations/:relId/metadata, which 404'd), and the
-      // metadata is a raw object — Chronicle's UpdateRelation binds only
-      // {metadata} as json.RawMessage, so an object stores structured JSON
-      // instead of the old double-encoded JSON string.
+      // Flat route PUT /relations/:relationId. Chronicle's UpdateRelation
+      // binds {metadata} as json.RawMessage, so pass a plain object rather
+      // than a JSON string.
       await this._api.put(`/relations/${relationId}`, {
         metadata: meta,
       });

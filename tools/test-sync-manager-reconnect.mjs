@@ -1,13 +1,10 @@
 #!/usr/bin/env node
 /**
- * Tests for the reconnect re-pull (FM-SYNC-HARDENING §2).
+ * Tests for the reconnect re-pull: a WebSocket reconnect must re-pull
+ * changes made on Chronicle during the disconnect window, not just latch
+ * once on the first sync and lose them until a world reload.
  *
- * Before this fix `_initialSyncDone` was a one-shot latch: once the first
- * sync completed it was never reset, so a WebSocket reconnect did NOT re-pull
- * changes made on Chronicle during the disconnect window — they were lost
- * until a world reload.
- *
- * The fix drives a debounced re-pull off the connection state machine:
+ * A debounced re-pull is driven off the connection state machine:
  *   - a drop ('disconnected' / 'reconnecting') arms `_sawDisconnect`
  *   - a return to 'connected' AFTER initial sync schedules a debounced re-pull
  *   - flapping connections collapse to a single re-pull once the link settles

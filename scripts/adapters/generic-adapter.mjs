@@ -1,36 +1,17 @@
 /**
- * Chronicle Sync - Generic System Adapter
+ * Data-driven adapter that reads field definitions from Chronicle's
+ * `/systems/:id/character-fields` API, so any game system can sync character
+ * fields without a hand-written adapter (via `foundry_path` annotations).
  *
- * A data-driven adapter that reads field definitions from the Chronicle
- * /systems/:id/character-fields API. This allows any game system — including
- * custom-uploaded ones — to sync character fields between Chronicle and Foundry
- * without a hand-written adapter, as long as the system manifest includes
- * foundry_path annotations on its character fields.
+ * A field def is either SCALAR (`foundry_path`: dot-path on actor.system,
+ * `foundry_writable`, `type` for casting) or COLLECTION (`foundry_collection`:
+ * actor collection name, `foundry_item_type` filter, `foundry_item_fields`
+ * projection, `type` "json"/"string" for a serialized string vs raw array).
+ * Collection fields are read-only (pull only); never in the Foundry update path.
  *
- * Field definitions specify either a SCALAR mapping or a COLLECTION mapping:
- *
- *   Scalar (a single value on actor.system):
- *   - key:             Chronicle field key (e.g. "hp_current")
- *   - foundry_path:    dot-notation path on actor.system (e.g. "system.attributes.hp.value")
- *   - foundry_writable: whether Chronicle may write back to this Foundry path (default true)
- *   - type:            field type ("number", "string", etc.) for casting
- *
- *   Collection (embedded documents — abilities, inventory, features — that live in
- *   actor.items[] etc., which a dot-path cannot reach):
- *   - key:               Chronicle field key (e.g. "abilities_json")
- *   - foundry_collection: the actor collection to read ("items", "effects")
- *   - foundry_item_type:  optional Foundry item type(s) to keep (string or string[])
- *   - foundry_item_fields: projection { outKey: "dot.path.on.item" }; omit for a
- *                          default {id,name,type} projection
- *   - type:              "json"/"string" → serialized JSON string; else a raw array
- *   Collection fields are READ-ONLY today (pull only); write-back is a future tier,
- *   so they are never included in the Foundry update path.
- *
- * Every extracted value (scalar or projected) is run through
- * `normalizeFoundryValue` so live Foundry structures that `JSON.stringify`
- * cannot serialize — Sets (keywords, skills, characteristics, actor.statuses)
- * and Collections of pseudo-documents (an ability's `system.power.effects` tier
- * ladder) — become plain arrays/objects instead of `{}`.
+ * Every extracted value passes through `normalizeFoundryValue` so live Foundry
+ * structures `JSON.stringify` can't serialize (Sets, Collections of
+ * pseudo-documents) become plain arrays/objects instead of `{}`.
  */
 
 /**
@@ -152,21 +133,12 @@ export function getNestedValue(obj, path) {
 }
 
 /**
- * Normalize a value read off a live Foundry document into a JSON-safe plain
- * value. Foundry models many fields as data structures that `JSON.stringify`
- * cannot serialize meaningfully:
- *   - a **Set** (keywords, skills, power-roll characteristics, actor.statuses)
- *     serializes to `{}` — must become an array;
- *   - a **Collection / ModelCollection** (a Map subclass — e.g. a CollectionField
- *     of pseudo-documents like an ability's `system.power.effects` tier ladder)
- *     also serializes to `{}` — must become an array of its members;
- *   - a **DataModel / pseudo-document** member exposes its data via `toObject()`,
- *     not own-enumerable properties (the schema fields are getters).
- *
- * This walks such structures recursively and returns arrays / plain objects /
- * primitives only. It is defensive (never throws) and depth-guarded against
- * cycles. Primitives and already-plain values pass straight through, so it is
- * safe to apply to every extracted field.
+ * Recursively normalize a live Foundry value into a JSON-safe plain value.
+ * Foundry Sets and Collections (Map subclasses, incl. pseudo-document
+ * CollectionFields) serialize to `{}` under `JSON.stringify` — this walks
+ * them into arrays instead. DataModel/pseudo-document members expose data via
+ * `toObject()`, not own-enumerable props, so a key-copy would miss it.
+ * Defensive (never throws) and depth-guarded against cycles.
  *
  * @param {*} value
  * @param {number} [depth]

@@ -1,13 +1,8 @@
 /**
- * Chronicle Sync — Sync Calendar note-form pure logic
- *
  * Pure-function translation between the editor's note-form view-model and
  * Calendaria's documented `CALENDARIA.api.createNote` / `updateNote` input
- * shape. No Foundry globals touched — fully unit-testable.
- *
- * Pulled out per PR 1 footgun #4 (and called out in the scoping report
- * §3.1 architecture): the Application class stays a thin integration shell
- * around well-tested pure helpers.
+ * shape. No Foundry globals touched, so it's independently unit-testable;
+ * the Application class stays a thin integration shell around it.
  *
  * Form schema (the editor's interchange shape, all fields explicit):
  *   {
@@ -31,11 +26,9 @@
  *     icon, color, visibility, displayStyle, openSheet: false,
  *   }
  *
- * The pure module deliberately handles only the documented `CALENDARIA.api`
- * options. The legacy `gmOnly` boolean used by `calendar-sync.mjs` for
- * Chronicle wire translation is NOT in scope here — it lives on the sync
- * layer and is fixed separately in `calendar-sync.mjs` per PR 2's
- * carry-in fix A.
+ * This module handles only the documented `CALENDARIA.api` options. The
+ * `gmOnly` boolean used for Chronicle wire translation is out of scope
+ * here — it lives in `calendar-sync.mjs`.
  */
 
 export const VISIBILITY = Object.freeze({
@@ -81,8 +74,8 @@ export function defaultFormForDate(anchor) {
     icon:  '',
     color: '',
     categories: [],
-    // PR 3: recurrence builder. Null means "fires once on startDate";
-    // a populated conditionTree means "fires on every matching date".
+    // Null means "fires once on startDate"; a populated conditionTree
+    // means "fires on every matching date".
     conditionTree: null,
   };
 }
@@ -142,9 +135,8 @@ export function formFromNote(note) {
     icon:  pickString(note.icon,  f.icon,  ''),
     color: pickString(note.color, f.color, ''),
     categories: coerceCategories(note.categories ?? f.categories),
-    // PR 3: surface existing recurrence tree if Calendaria attached one.
-    // The shape passes through verbatim — validation/display happens in
-    // the builder module, not here.
+    // Surfaces an existing recurrence tree verbatim; validation/display
+    // happens in the builder module, not here.
     conditionTree: extractConditionTree(note, f),
   };
 }
@@ -214,9 +206,8 @@ export function noteOptionsFromForm(form) {
   const categories = coerceCategories(form.categories);
   if (categories.length > 0) options.categories = categories;
 
-  // PR 3: recurrence tree passes through verbatim. We don't ship it as
-  // an empty object — null means "no recurrence" and Calendaria's
-  // create/update API treats absence as such.
+  // Passes through verbatim; omitted (not an empty object) means "no
+  // recurrence" per Calendaria's create/update API.
   if (form.conditionTree && typeof form.conditionTree === 'object') {
     options.conditionTree = form.conditionTree;
   }

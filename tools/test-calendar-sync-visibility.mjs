@@ -2,20 +2,9 @@
 /**
  * Unit tests for the wire-visibility helpers in `scripts/calendar-sync.mjs`.
  *
- * Pins the FM-CAL-EDITOR-PR2 carry-in fix A: Foundry must emit kebab
- * `'gm-only'` on the wire, not the storage-side underscore `'gm_only'`
- * that PR 1's calendar-sync was using by mistake.
- *
- * The wire contract lives at:
- *   cordinator/decisions/2026-05-17-calendar-sync-wire-contract.md
- *
- * Chronicle PR #316's translation layer rescued the drift today (since
- * Chronicle stores `gm_only` and translates both ways), but the wire
- * value is the canonical contract and this test pins it.
- *
- * Run: `node --test tools/test-calendar-sync-visibility.mjs`
- *
- * No mocking framework — uses Node's built-in `node:test` (Node ≥ 18).
+ * Foundry must emit kebab `'gm-only'` on the wire, not the storage-side
+ * underscore `'gm_only'` — Chronicle stores `gm_only` and translates both
+ * ways, but the wire value is the canonical contract.
  */
 
 import test from 'node:test';

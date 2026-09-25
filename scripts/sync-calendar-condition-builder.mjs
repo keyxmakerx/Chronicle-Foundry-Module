@@ -1,28 +1,25 @@
 /**
- * Chronicle Sync — visual conditionTree builder (pure logic).
- *
- * Calendaria's `conditionTree` schema lets a note fire on any subset of
- * dates matching a logical expression: every full moon, every 3rd
- * weekday of winter, every Nth of every month, etc. The full schema is
- * 7+ fields × 6+ operators × nested groups — too rich for an inline
- * picker. v1 ships preset compositions that cover the common workflows;
- * advanced trees fall through to Calendaria's existing builder via a
- * "Need more? Open Calendaria's editor" link.
+ * Visual conditionTree builder (pure logic). Calendaria's `conditionTree`
+ * schema lets a note fire on any subset of dates matching a logical
+ * expression (every full moon, every 3rd weekday of winter, every Nth of
+ * every month, etc). The full schema is too rich for an inline picker, so
+ * this ships preset compositions covering common workflows; advanced trees
+ * fall through to Calendaria's own builder via a "Need more?" link.
  *
  * Pure logic: preset → tree, tree validation, tree → human-readable
  * summary. The Application class only orchestrates rendering the preset
  * buttons and persisting the chosen tree.
  *
  * Calendaria root-group rule: a `conditionTree` whose root is not
- * `{type: 'group'}` is silently ignored by Calendaria's matcher (this
- * is documented in their API-Reference and bit us in scoping). Our
- * `validateTree()` flags this; the form's save path blocks on it.
+ * `{type: 'group'}` is silently ignored by Calendaria's matcher (documented
+ * in their API-Reference). `validateTree()` flags this; the form's save
+ * path blocks on it.
  *
  * Tests: `tools/test-sync-calendar-condition-builder.mjs`.
  */
 
 // ---------------------------------------------------------------------
-// Schema enums (v1 scope cap — per dispatch)
+// Schema enums
 // ---------------------------------------------------------------------
 
 /** Field names usable in v1 leaf conditions. */

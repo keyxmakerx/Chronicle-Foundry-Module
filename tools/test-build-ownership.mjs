@@ -1,25 +1,19 @@
 #!/usr/bin/env node
 /**
- * Tests for the visibility → Foundry ownership mapping (FM-SYNC-HARDENING).
+ * Tests for the visibility → Foundry ownership mapping.
  *
  * Covers:
- *   §1 — the shared `_ownership` helper honors the operator's `dmOnlyHidden`
- *        + `defaultOwnership` dashboard settings, and JournalSync._buildOwnership
- *        / NoteSync._buildNoteOwnership consume it (previously the settings were
- *        dead config — registered + dashboard-written but never read).
- *   §3 — JournalSync._buildOwnership fails CLOSED (NONE) when the custom-
- *        visibility permissions API errors. Security-relevant: a transient
- *        error must NEVER widen a GM-restricted entity to player-visible.
- *   §4 — per-user Chronicle grants map to specific Foundry users via the
- *        user-mapping table; unmapped users are dropped (under-share, no leak).
+ *   - The shared `_ownership` helper honors the operator's `dmOnlyHidden` +
+ *     `defaultOwnership` dashboard settings; JournalSync._buildOwnership and
+ *     NoteSync._buildNoteOwnership must both consume it.
+ *   - JournalSync._buildOwnership fails CLOSED (NONE) when the
+ *     custom-visibility permissions API errors — a transient error must
+ *     never widen a GM-restricted entity to player-visible.
+ *   - Per-user Chronicle grants map to specific Foundry users via the
+ *     user-mapping table; unmapped users are dropped (under-share, no leak).
  *
- * Plus static-source regression pins so a future refactor can't silently
- * reintroduce the fail-open behavior or unwire the settings.
- *
- * Run: `node --test tools/test-build-ownership.mjs`
- *
- * No mocking framework — Node's built-in `node:test` + a configurable
- * `game.settings.get` stub.
+ * Plus static-source regression pins so a refactor can't silently
+ * reintroduce fail-open behavior or unwire the settings.
  */
 
 import test from 'node:test';

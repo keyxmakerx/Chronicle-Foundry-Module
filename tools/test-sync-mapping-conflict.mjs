@@ -1,16 +1,13 @@
 #!/usr/bin/env node
 /**
- * Regression tests for sync-mapping conflict detection + benign-error-log
+ * Regression tests for sync-mapping conflict detection and benign-error-log
  * scrubbing.
  *
- * Covers two fixes (see AUDIT-2026-06-21-foundry-errors.md §5):
- *
- *  1. `SyncManager._isMappingConflict` must recognise Chronicle's
- *     mapping-already-exists conflict. The backend returns it as HTTP **409**
- *     (`apperror.NewConflict` → `http.StatusConflict`), which api-client wraps
- *     in a `ConflictError` (`err.status === 409`). The previous matcher only
- *     looked for the string "Chronicle API error 400" and so NEVER absorbed a
- *     real 409 — a concurrent-create conflict would have propagated as an error.
+ *  1. `SyncManager._isMappingConflict` must recognize Chronicle's
+ *     mapping-already-exists conflict, returned as HTTP 409
+ *     (`apperror.NewConflict`) and wrapped by api-client into a
+ *     `ConflictError` (`err.status === 409`), not just a legacy 400 string
+ *     match — otherwise a concurrent-create conflict propagates as an error.
  *
  *  2. `ChronicleAPI.dropLastErrorLogEntry` must accept `status` as a number OR
  *     an array, so `ensureMapping` can scrub a 409 (or legacy 400) conflict and
@@ -19,8 +16,6 @@
  *
  * Both methods are pure w.r.t. their arguments / `this` shape, so we exercise
  * them via prototype-call rather than constructing the full classes.
- *
- * Run: `node --test tools/test-sync-mapping-conflict.mjs`
  */
 
 import test from 'node:test';

@@ -1,35 +1,18 @@
 #!/usr/bin/env node
 /**
  * Source-level pins for the module's half of Chronicle's partial-update
- * contract (Chronicle sweep R4, 2026-08-07).
+ * contract (API-CONTRACT.md → "The partial-update contract"): an ABSENT key
+ * preserves the stored value, an EXPLICIT null clears it, a present value
+ * replaces it. Chronicle's request structs bind `patch.Field[T]`, which
+ * records presence during JSON decoding, so absent and null are genuinely
+ * different.
  *
- * The contract, documented in API-CONTRACT.md → "The partial-update
- * contract": an ABSENT key preserves the stored value, an EXPLICIT null
- * clears it, a present value replaces it. Chronicle's request structs bind
- * `patch.Field[T]`, which records presence during JSON decoding, so absent
- * and null are genuinely different.
- *
- * That contract is what makes this module's narrow bodies SAFE. Before it,
- * they were data loss:
- *
- *   - `actor-sync.mjs` pushes `{name}` alone on a rename. Chronicle's
- *     `apiUpdateEntityRequest.IsPrivate` was a value-typed `bool`, so the
- *     absent key bound `false` and PUBLISHED a hidden character entity to
- *     every player in the campaign. The struct had no `parent_id` member at
- *     all, so the same push also detached the entity from the hierarchy.
- *   - `calendar-sync.mjs` pushes five-key bodies from three paths. Each also
- *     wrote `is_recurring=false`, `all_day=false` and a cleared `entity_id`.
- *
- * Both were fixed on the server. What this file defends is the OTHER
- * direction: that nobody "repairs" these clients by echoing the untouched
- * fields back. An echo re-arms the endpoint for the next writer, and it goes
- * stale — which is exactly how the marker dialog lost the pairing key.
- *
- * These are source-level assertions, not runtime ones, because the thing
- * being pinned is the SHAPE of a request body that a hook builds — the same
- * reason Chronicle pins its own templ clients by reading their source.
- *
- * Run: `node --test tools/test-partial-put-contract.mjs`
+ * Callers must send only the fields they mean to change and must NOT
+ * "harden" a narrow body by echoing untouched fields back — an echo re-arms
+ * the endpoint for the next writer and goes stale. A rename push that widens
+ * beyond `{name}` on the entity endpoint risks flipping visibility or
+ * detaching hierarchy on absent keys; these are source-level assertions on
+ * the request body shape a hook builds, not runtime ones.
  */
 
 import test from 'node:test';

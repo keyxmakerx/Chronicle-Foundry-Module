@@ -1,48 +1,29 @@
 /**
- * Chronicle Sync — HTML sanitization helper (FM-SEC-CHUNK-3)
- *
  * Defense-in-depth sanitization for Chronicle-supplied HTML at journal /
- * note ingress. Closes M-3 as a SECOND layer on top of Chronicle's
- * already-shipped server-side sanitization (bluemonday UGCPolicy at the
- * service layer; see C-SECURITY-AUDIT §1.3 — 8 plugins sanitize
- * `EntryHTML` on write).
+ * note ingress, on top of Chronicle's own server-side sanitization. Catches
+ * a Chronicle ingress path that skips sanitization, pre-existing rows from
+ * before a sanitization rule tightened (Chronicle sanitizes on write, not
+ * read), or a bypass of Chronicle's sanitizer.
  *
- * Why a second layer:
- *   - Catches a future ingress path on Chronicle that forgets to call
- *     `sanitize.HTML` (regression on the server side).
- *   - Catches old database entries that pre-date a sanitization rule
- *     strengthening (Chronicle sanitizes on WRITE, not on read).
- *   - Catches a hypothetical bypass of Chronicle's sanitizer (e.g., a
- *     direct DB write tool that skips the service layer).
+ * Delegates to Foundry's `TextEditor.cleanHTML`, run at ingress so stored
+ * content is pinned to what Foundry considered safe at sync time — a later
+ * loosening of Foundry's render-time sanitizer can't reach already-stored
+ * data.
  *
- * Mechanism: delegate to Foundry's `TextEditor.cleanHTML` — the same
- * sanitizer Foundry runs at render time. Running it at INGRESS pins the
- * on-disk content to whatever Foundry considered safe at the time of
- * sync; future Foundry-renderer changes that loosen sanitization can't
- * reach back into already-stored data.
- *
- * Operator escape: setting `skipIncomingSanitization` (default false —
- * sanitization ON) bypasses this layer for high-trust deployments where
- * Foundry's `cleanHTML` strips legitimate inline styling Chronicle
- * deliberately ships. The world setting is GM-configurable per-world.
- *
- * Per FM-SECURITY-AUDIT §2 M-3, §4 Chunk 3, §0.5 D1=(c); cross-references
- * C-SECURITY-AUDIT §1.3 (Chronicle's primary sanitization).
+ * The `skipIncomingSanitization` world setting (default off) lets an
+ * operator disable this layer for high-trust deployments where cleanHTML
+ * strips legitimate inline styling.
  */
 
 import { MODULE_ID } from './constants.mjs';
 
 /**
- * Look up Foundry's HTML sanitizer across v12 / v13 / v14+ namespaces.
- * The class moved from a global `TextEditor` (v12) into
- * `foundry.applications.ux.TextEditor` (v13), then in v14 the concrete
- * class that carries the static `cleanHTML` moved again onto that
- * namespace's `.implementation` property — the v14 deprecation warning
- * ("now namespaced under foundry.applications.ux.TextEditor.implementation")
- * names this location explicitly. We probe most-specific-modern → namespace
- * → deprecated-global, both so we resolve `cleanHTML` on current Foundry and
- * so we avoid touching the deprecated global (which logs a compatibility
- * warning on every access) unless nothing else resolves.
+ * Look up Foundry's HTML sanitizer across v12 / v13 / v14+ namespaces:
+ * `TextEditor.cleanHTML` moved from a v12 global into
+ * `foundry.applications.ux.TextEditor` in v13, then onto that namespace's
+ * `.implementation` in v14. Probe most-specific-modern first so we don't
+ * touch the deprecated v12 global (which logs a warning on every access)
+ * unless nothing else resolves.
  *
  * @returns {((html: string) => string) | null}
  */
@@ -97,10 +78,8 @@ export function _sanitizeIncomingHTML(html) {
 
   const clean = _resolveCleanHTML();
   if (!clean) {
-    // Fail-open: log once-per-session shape would be nicer but we don't
-    // have a session-cache here; console.warn is fine because in v12-v14
-    // TextEditor.cleanHTML is always available at module-ingest time
-    // (SyncManager.start runs on `ready`, well after Foundry's init).
+    // Fail-open: Foundry's render-time sanitizer still applies, so we warn
+    // rather than block ingest.
     console.warn(
       'Chronicle Sync [html-sanitizer]: TextEditor.cleanHTML not found; ' +
       'storing Chronicle HTML without ingress sanitization. Foundry render-time ' +

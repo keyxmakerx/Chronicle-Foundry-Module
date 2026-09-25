@@ -1,26 +1,19 @@
 #!/usr/bin/env node
 /**
- * check-package-descriptor.mjs
- *
  * CI consistency check for the Chronicle package descriptor.
  *
  * Validates that `chronicle-package.json` is well-formed and that its
  * cross-references into `module.json` resolve correctly. Exits non-zero
  * on any failure so CI fails the PR.
  *
- * The descriptor is Chronicle's source-of-truth for HOW to serve this
+ * The descriptor is Chronicle's source of truth for how to serve this
  * module: where the manifest lives in the zip, what URL shape to emit,
- * whether per-campaign signing is required. Chronicle reads it via a
- * PostInstallHook (see Chronicle C-FMC-5b) with a fallback to hardcoded
- * defaults if the file is absent or malformed.
+ * whether per-campaign signing is required.
  *
- * Per FM-SEC-CHUNK-7 the validation rules live in
- * `scripts/_descriptor-validator.mjs` (shared with the runtime check in
- * `scripts/module.mjs::Hooks.once('ready')`). This script handles only
- * the CI-specific bits: file I/O + the `package.moduleJsonPath` exists-
- * on-disk check (which is meaningless at runtime).
- *
- * Run locally: `node tools/check-package-descriptor.mjs`
+ * Validation rules live in `scripts/_descriptor-validator.mjs`, shared with
+ * the runtime check in `scripts/module.mjs::Hooks.once('ready')`. This
+ * script handles only the CI-specific bits: file I/O and the
+ * `package.moduleJsonPath` exists-on-disk check (meaningless at runtime).
  */
 
 import { readFile } from 'node:fs/promises';

@@ -1,17 +1,15 @@
 @layer chronicle-sync {
 
 /* ====================================================================
- * Sync Calendar — FM-CAL-EDITOR-PR3 additions
- * Moon strip + recurrence builder + empty-state Calendaria import
+ * Sync Calendar: moon strip + recurrence builder + empty-state Calendaria import
  * ==================================================================== */
 
-/* --- FM-SYNCCAL-ROOT-FIX (#26) single-root wrapper -------------------
+/* --- Single-root wrapper -------------------
  * The PARTS body is wrapped in `<div class="sync-calendar-root">` so
  * Foundry's `_parsePartHTML` accepts both the degraded branch and the
- * three-sibling non-degraded branch. Layout migrates from the prior
- * `.sync-calendar .sync-calendar-content` container (which Foundry no
- * longer feeds the children directly) onto this wrapper. See F-PR3-4
- * in `.ai.md` and `tools/test-template-roots.mjs`. */
+ * three-sibling non-degraded branch. Layout lives on this wrapper, not
+ * `.sync-calendar-content`, which Foundry no longer feeds children directly.
+ * Pinned by `tools/test-template-roots.mjs`. */
 
 .sync-calendar .sync-calendar-root {
   display: flex;
@@ -218,10 +216,8 @@
   text-align: left;
 }
 
-/* FM-SYNCCAL-IMPORT-SCROLL (#27): when an import banner is present in
- * the degraded section, top-align (the base rule centers, which clips
- * a tall banner at the top of the modal). Bare degraded state without
- * a banner keeps its centered layout via the base rule. */
+/* With an import banner present, top-align instead of centering (the
+ * base rule) — centering clips a tall banner at the top of the modal. */
 .sync-calendar-degraded:has(.import-banner) {
   justify-content: flex-start;
 }
@@ -259,12 +255,9 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  /* FM-SYNCCAL-IMPORT-SCROLL (#27): Calendaria ships a large library
-   * (8+ calendars routine; more after Calendaria 0.4). The parent
-   * `.sync-calendar-degraded` is height:100% + justify-content:center,
-   * so an oversize list clips top + bottom without a scrollbar. Cap
-   * the list height and let it scroll on its own. Header + hint +
-   * Recheck button stay pinned outside this element. */
+  /* The parent `.sync-calendar-degraded` is height:100% +
+   * justify-content:center, so a long calendar list clips top + bottom
+   * without a scrollbar. Cap the height and let it scroll on its own. */
   max-height: 50vh;
   overflow-y: auto;
 }

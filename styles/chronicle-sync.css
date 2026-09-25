@@ -1,19 +1,13 @@
-/* Chronicle Sync — Foundry VTT Module Styles
- *
- * Cascade layer ordering — per decisions/2026-05-22-ui-modernization-decisions.md Q4 + Q7
- * (cordinator repo). Foundry-host CSS arrives unlayered (effectively in the implicit
- * highest layer). Declaring foundry-host as a NAMED layer forces it BELOW chronicle-sync.
- * Practical effect: any rule inside @layer chronicle-sync { } wins over Foundry's
- * .window-app cascade, without needing specificity hacks.
- *
- * This declaration appears ONCE across the four module CSS files; chronicle-sync.css
- * loads first per module.json#/styles, so this is the right home.
+/* Foundry-host CSS arrives unlayered (effectively the highest-priority layer).
+ * Naming it here forces it BELOW chronicle-sync, so any rule in the
+ * chronicle-sync layer wins over Foundry's .window-app cascade without
+ * specificity hacks. Declare only once — chronicle-sync.css loads first
+ * per module.json#/styles, so this is the right home for it.
  */
 @layer foundry-host, chronicle-sync;
 
-/* Per decisions/2026-05-22-ui-modernization-decisions.md Q6 — total-disable reduced motion.
- * Respects WCAG 2.1 SC 2.3.3 and the OS-level prefers-reduced-motion: reduce setting.
- * Lives outside the chronicle-sync layer so it applies to Foundry-host animation too. */
+/* Respects WCAG 2.1 SC 2.3.3 / prefers-reduced-motion. Outside the
+ * chronicle-sync layer so it also applies to Foundry-host animation. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -1093,9 +1087,8 @@
 /* CALENDAR TAB                                                       */
 /* ================================================================= */
 
-/* FM-CAL-DASHBOARD-LINK: launch row above the date-sync status panel.
- * The primary-action button is sized larger than .dashboard-btn defaults
- * so the operator sees it first when they land on the Calendar tab. */
+/* Launch row above the date-sync status panel; the primary-action button is
+ * sized larger than .dashboard-btn defaults so the operator sees it first. */
 .calendar-tab-actions {
   display: flex;
   flex-direction: column;
@@ -1203,10 +1196,9 @@
   justify-content: center;
 }
 
-/* Chronicle world-state panel (FM-SYNC-SUBRESOURCES-P1): weather / season /
-   era / moon phases folded from the sub-resource WebSocket stream. Read-only
-   display, styled as a quiet block under the date-compare + actions so it
-   never competes with the sync badge above it. */
+/* World-state panel: weather / season / era / moon phases folded from the
+   sub-resource WebSocket stream. Read-only, styled quietly so it never
+   competes with the sync badge above it. */
 .calendar-worldstate {
   margin-top: 16px;
   padding-top: 12px;
@@ -1923,7 +1915,7 @@
 }
 
 /* ============================================================
-   Update Source Info dialog (FM-CSU)
+   Update Source Info dialog
    ============================================================ */
 
 .chronicle-update-info-form {
@@ -2161,8 +2153,7 @@
 }
 
 /* ====================================================================
- * Sync Calendar — FM-CAL-EDITOR-PR1
- * 3-pane editor: left rail | year overview | day inspector
+ * Sync Calendar editor: 3-pane layout — left rail | year overview | day inspector
  * ==================================================================== */
 
 .sync-calendar {
@@ -2183,11 +2174,11 @@
 }
 
 /*
- * The single-root wrapper REQUIRED by ApplicationV2 (see F-PR3-4) sits between
+ * The single-root wrapper ApplicationV2 requires sits between
  * `.sync-calendar-content` and the header/grid/footer. It must itself be a
- * height-constrained flex column, otherwise the grid's `flex: 1 1 auto` and the
- * rails' `overflow-y: auto` have no effect — the left-rail validation findings
- * then overflow and visually collide instead of scrolling. (FM-CAL-RAIL-SCROLL)
+ * height-constrained flex column, or the grid's `flex: 1 1 auto` and the
+ * rails' `overflow-y: auto` have no effect and findings overflow instead of
+ * scrolling.
  */
 .sync-calendar .sync-calendar-root {
   display: flex;
@@ -2713,8 +2704,7 @@
 .sync-calendar-degraded .footer-tool { margin-top: 10px; }
 
 /* ====================================================================
- * Sync Calendar — FM-CAL-EDITOR-PR2 additions
- * Month-view day grid + drag-select + note form
+ * Sync Calendar: month-view day grid + drag-select + note form
  * ==================================================================== */
 
 /* --- Month view: day grid -------------------------------------------- */

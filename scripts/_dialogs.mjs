@@ -1,22 +1,14 @@
 /**
- * Chronicle Sync — dialog helpers (Foundry V1 → V2 shim).
- *
  * Centralizes the module's confirm/prompt dialogs on
  * `foundry.applications.api.DialogV2` (Foundry v13+), falling back to the V1
- * `Dialog` global when DialogV2 is absent (v12 floor) OR if a DialogV2 call
- * throws. This:
- *   - removes the "V1 Application framework is deprecated" warnings on v13/v14,
- *   - keeps the module working when V1 `Dialog` is removed in v16,
- *   - preserves the declared v12 compatibility floor, and
- *   - gives one place to evolve dialog behavior.
+ * `Dialog` global when DialogV2 is absent (v12 floor) or a DialogV2 call
+ * throws — keeps the module working across the v12-v16 range in one place.
  *
- * Both helpers treat dialog dismissal as "cancel" (confirm → false, prompt →
- * null) and never reject, so callers can use `if (!result) return;` uniformly.
+ * Both helpers treat dismissal as "cancel" (confirm → false, prompt → null)
+ * and never reject, so callers can use `if (!result) return;` uniformly.
  *
- * NOTE: the actual rendered dialog can only be exercised inside a live Foundry
- * client; the unit tests (tools/test-dialogs.mjs) pin the branching, the
- * option shape passed to DialogV2, the close→cancel coercion, and the V1
- * fallback. A v14 smoke-test of the real dialogs is still recommended.
+ * The rendered dialog can only be exercised in a live Foundry client;
+ * `tools/test-dialogs.mjs` pins the branching and option shapes only.
  */
 
 /** @returns {any|null} DialogV2 class if available (v13+), else null. */

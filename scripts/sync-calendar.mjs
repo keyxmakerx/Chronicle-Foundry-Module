@@ -1,35 +1,26 @@
 /**
- * Chronicle Sync — Sync Calendar editor (foundation + event CRUD)
+ * Chronicle Sync — Sync Calendar editor
  *
  * GM-only ApplicationV2 that renders a 3-pane view of the active Calendaria
- * calendar with an always-on validation panel. PR 1 shipped the read-only
- * shell; PR 2 (this file's current revision) adds:
+ * calendar with an always-on validation panel: year/month view toggle, a
+ * writable day inspector (create/edit/delete notes via `CALENDARIA.api`),
+ * drag-select multi-day event creation, moon-phase strip, and a recurrence
+ * builder. Still deferred: structure editing and inline category creation.
  *
- *   - Year ↔ month view toggle (year overview + day-grid month view).
- *   - Day inspector becomes writable: create / edit / delete notes via
- *     `CALENDARIA.api.createNote / updateNote / deleteNote`.
- *   - Drag-select in month view → multi-day "Add event" form.
- *   - Note form (name, content, categories, icon, color, visibility,
- *     displayStyle, allDay, start+end date+time) with structural
- *     validation. Pure form ↔ API translation lives in
- *     `scripts/sync-calendar-note-form.mjs` and is unit-tested.
- *
- * Architecture (per scoping § 3.1):
- *   - Writes go through `CALENDARIA.api`. Never reach into Calendaria's
- *     internal settings.
+ * Architecture:
+ *   - Writes go through `CALENDARIA.api`, never Calendaria's internal
+ *     settings directly.
  *   - Reads via `CALENDARIA.api.get*`, wrapped in try/catch with a graceful
  *     degraded-mode render when Calendaria is missing or broken.
  *   - Writes flow to Chronicle automatically via the existing
  *     `scripts/calendar-sync.mjs` hook handlers — no editor-side Chronicle
  *     plumbing required.
  *
- * PRs 3-5 still defer: moon strip, recurrence builder, weather, structure
- * editing, inline category creation. The Application class stays a thin
- * integration shell — pure validation + form translation live in
- * separately-unit-tested modules.
+ * The Application class stays a thin integration shell — pure validation
+ * and form translation live in separately-unit-tested modules.
  *
- * Naming: per scoping § 7, the UI label is "Sync Calendar" — Calendaria
- * already has a "Chronicle" widget. Don't reuse that name.
+ * Naming: the UI label is "Sync Calendar" — Calendaria already has a
+ * "Chronicle" widget, so that name is reserved.
  */
 
 import { MODULE_ID, FLAG_SCOPE } from './constants.mjs';
@@ -98,10 +89,10 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
       'save-event':        SyncCalendarApplication.#onSaveEvent,
       'delete-event':      SyncCalendarApplication.#onDeleteEvent,
       'cancel-form':       SyncCalendarApplication.#onCancelForm,
-      // PR 3: recurrence builder
+      // Recurrence builder
       'apply-recurrence-preset': SyncCalendarApplication.#onApplyRecurrencePreset,
       'clear-recurrence':        SyncCalendarApplication.#onClearRecurrence,
-      // PR 3: empty-state import-from-Calendaria
+      // Empty-state import-from-Calendaria
       'import-calendar':         SyncCalendarApplication.#onImportCalendar,
       'recheck-chronicle':       SyncCalendarApplication.#onRecheckChronicle,
       // Diagnostics & maintenance
@@ -123,7 +114,7 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
     super(options);
     /** Selected date — 1-indexed shape `{year, month, day}`. */
     this._selectedDate = null;
-    /** 'year' or 'month'. PR 2 toggles between year overview + month day-grid. */
+    /** 'year' or 'month' — year overview vs. month day-grid. */
     this._viewMode = 'year';
     /** 'none' | 'add' | 'edit' — controls right-pane form rendering. */
     this._formMode = 'none';
@@ -148,7 +139,7 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
     this._renderPending = false;
 
     /**
-     * PR 3: Chronicle-side calendar presence state. One of:
+     * Chronicle-side calendar presence state. One of:
      *   - 'unknown'        — not yet probed
      *   - 'present'        — Chronicle has a calendar for this campaign
      *   - 'absent'         — Chronicle responded but said no calendar
@@ -270,7 +261,7 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
       ? this.#buildMonthDetail(api, yearOverview, festivals)
       : null;
 
-    // PR 3: moon-phase strip for month view.
+    // Moon-phase strip for month view.
     const moonStrip = (this._viewMode === 'month' && monthDetail)
       ? this.#buildMoonStripView(api, moons, monthDetail.year, monthDetail.monthOrdinal, monthDetail.daysInMonth)
       : null;
@@ -364,7 +355,7 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
       findingCountsBySeverity,
       findingTotal: findings.length,
 
-      // PR 2: writes are enabled for events. PR 5 enables structure-edit.
+      // Writes are enabled for events; structure editing is not yet wired.
       writesEnabled: true,
 
       // Footer toolbar state: per-calendar sync toggle + global switch.
@@ -755,8 +746,7 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
    * Attach click handlers to moon-strip rows. ApplicationV2 actions
    * only delegate `click` events to elements with `data-action`, but
    * strip clicks need pixel-relative math so they live as direct
-   * listeners. Per F-PR2-1 footgun: pointer/non-button-click work
-   * always lives in `_onRender`.
+   * listeners; pointer/non-button-click work always lives in `_onRender`.
    *
    * @private
    */
@@ -1047,7 +1037,7 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
     if (this._formBusy) return;
     if (!this._formData) return;
     const errors = validateForm(this._formData);
-    // PR 3: also block save if recurrence tree is structurally invalid.
+    // Also block save if the recurrence tree is structurally invalid.
     if (this._formData.conditionTree) {
       const recurrenceErrors = validateTree(this._formData.conditionTree);
       // Calendaria's silent-ignore for non-group roots is the only
@@ -1143,7 +1133,7 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
     const focus = target?.dataset?.focus || '';
     if (!focus) return;
     if (game?.user?.isGM === false) return;
-    // Read-only structure focus (PR 5 will wire real navigation).
+    // Structure focus is read-only; no navigation is wired.
   }
 
   /**
@@ -1179,10 +1169,10 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
   }
 
   /**
-   * POST a Calendaria calendar to Chronicle's per-campaign create
-   * endpoint. Graceful degradation: 404/405 means the endpoint isn't
-   * deployed yet (Chronicle's C-CAL-CREATE-ENDPOINT still in flight)
-   * — surface a clear message instead of a generic API error.
+   * POST a Calendaria calendar to Chronicle's per-campaign create endpoint.
+   * Graceful degradation: 404/405 means the endpoint isn't available on this
+   * Chronicle deployment — surface a clear message instead of a generic API
+   * error.
    */
   static async #onImportCalendar(_event, target) {
     const calendarId = target?.dataset?.calendarId || '';
@@ -1250,8 +1240,8 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
 
   /**
    * Re-probe Chronicle's calendar surface. Surfaced as a small refresh
-   * button on the empty-state banner so the operator can confirm a
-   * just-rolled-out C-CAL-CREATE-ENDPOINT without closing the editor.
+   * button on the empty-state banner so the operator can confirm the
+   * endpoint became available without closing the editor.
    */
   static async #onRecheckChronicle(_event, _target) {
     this._chronicleCalendarState = 'unknown';

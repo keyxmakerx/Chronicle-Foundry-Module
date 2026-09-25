@@ -1,12 +1,12 @@
-// test-calendar-sync-hotfix.mjs — FM-CAL-SYNC-HOTFIX: off-DOM tests for the
-// three calendar-sync fixes (off-by-one, back-catalog pagination, structure
-// mismatch guard) plus the _calendariaNoteToChronicleEvent wiring.
+// test-calendar-sync-hotfix.mjs — off-DOM tests for calendar-sync.mjs: date
+// off-by-one, back-catalog pagination, the structure-mismatch guard, and
+// _calendariaNoteToChronicleEvent wiring.
 //
 // Run: node --test tools/test-calendar-sync-hotfix.mjs
 //
-// The date-normalization behavior is verified against Calendaria release-1.1.3
-// source: raw note* hooks carry 0-indexed month/dayOfMonth + absolute year;
-// CALENDARIA.api.getNote returns toPublic (1-indexed) dates.
+// Date normalization: raw Calendaria note* hooks carry 0-indexed
+// month/dayOfMonth + absolute year; CALENDARIA.api.getNote returns toPublic
+// (1-indexed) dates.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -69,9 +69,9 @@ test('missing/invalid startDate returns null', () => {
 // ── Item 1: _calendariaNoteToChronicleEvent wiring (raw vs getNote) ───────────
 
 function makeCalendarSync(overrides) {
-  // _syncDepth: 0 mirrors the constructor's reentrant-guard init (the guard is
-  // now a depth counter read through the _syncing getter — FM-CAL-BACKCATALOG-FIX
-  // item 3). Object.create skips the constructor, so seed it here.
+  // _syncDepth: 0 mirrors the constructor's reentrant-guard init (a depth
+  // counter read through the _syncing getter). Object.create skips the
+  // constructor, so seed it here.
   return Object.assign(
     Object.create(CalendarSync.prototype),
     { _hasModernCalendariaApi: false, _syncDepth: 0 },
@@ -157,8 +157,7 @@ test('back-catalog sync holds _syncing while creating local notes (no echo re-pu
   const cs = makeCalendarSync({
     _hasModernCalendariaApi: true,
     _chronicleCalendar: { current_year: 1492, months: new Array(12).fill({ days: 30 }) },
-    // Stub the REAL Chronicle envelope { data:[...], total:N } — not a bare array
-    // (the #76 stub that masked the BLOCKER). FM-CAL-BACKCATALOG-FIX item 1.
+    // Stub the real Chronicle envelope { data:[...], total:N }, not a bare array.
     _api: { get: async () => ({ data: [{ id: 'e1' }], total: 1 }) },
     _getLocalEventId: () => null, // nothing mapped yet
     _createLocalEvent(event) {

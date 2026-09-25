@@ -1,40 +1,26 @@
 /**
- * Chronicle Sync — calendar sub-resource projection (FM-SYNC-SUBRESOURCES-P1).
+ * Chronicle Sync — calendar sub-resource projection.
  *
- * Chronicle broadcasts eleven `calendar.*` WebSocket types; before this file
- * the module's handler switch (`calendar-sync.mjs` `onMessage`) matched four
- * of them — date + the three event-CRUD types — and every other type fell off
- * the end of the switch with no `default:`, silently dropped. Weather, season,
- * era, moon phase, cycle, festival and structure changes authored in Chronicle
- * never reached the GM's table.
+ * Holds the PURE half of routing Chronicle's `calendar.*` WebSocket types:
+ * payload normalization, the human-readable one-liners the chat/dashboard
+ * surfaces render, and the reducer that maintains the "last known
+ * sub-resource state" snapshot the dashboard's Calendar tab reads.
+ * Everything that touches Foundry globals (ChatMessage, CALENDARIA.api,
+ * ui.notifications) stays in `calendar-sync.mjs` so this file is
+ * unit-testable off-DOM.
  *
- * This module holds the PURE half of the fix: payload normalization, the
- * human-readable one-liners the chat/dashboard surfaces render, and the
- * reducer that maintains the "last known sub-resource state" snapshot the
- * dashboard's Calendar tab reads. Everything that touches Foundry globals
- * (ChatMessage, CALENDARIA.api, ui.notifications) stays in `calendar-sync.mjs`
- * so this file is unit-testable off-DOM (house pattern: `_overview-model.mjs`,
- * `_calendar-sync-state.mjs`).
- *
- * ## Payload shapes (verified against Chronicle main, 2026-07-25)
- *
- * Producers live in `internal/plugins/calendar/service.go` +
- * `worldstate_service.go`; the wire names are assigned by
- * `calendarEventPublisherAdapter.PublishCalendarEvent`
- * (`internal/app/routes.go`).
+ * ## Payload shapes
  *
  * | Type                          | Payload                                              |
  * |-------------------------------|------------------------------------------------------|
- * | `calendar.season.changed`     | `{id, name, color}` — **or `null`** when the date left a season without entering another (service.go:2544) |
+ * | `calendar.season.changed`     | `{id, name, color}` — **or `null`** when the date left a season without entering another |
  * | `calendar.era.changed`        | `{id, name, color}`                                  |
  * | `calendar.moon.phase_changed` | `{moon_id, moon_name, phase_name, phase_position}`   |
- * | `calendar.weather.changed`    | merged `WeatherInput` (FLAT snake_case) — **or `null`** from the weather-zone paths (service.go:1490, :1523) |
+ * | `calendar.weather.changed`    | merged `WeatherInput` (FLAT snake_case) — **or `null`** from the weather-zone paths |
  * | `calendar.structure.updated`  | `null`                                               |
  * | `calendar.cycle.changed`      | `null`                                               |
  * | `calendar.festival.changed`   | `null`                                               |
  * | `calendar.worldstate.changed` | `{date:{year,month,day}, moodTint:{color,intensity}}` |
- *
- * Two consequences drive the defensive shape of the code below:
  *
  * 1. **A null payload is normal, not an error.** Four of the eight types can
  *    arrive with `payload: null` by design. Handlers must treat null as "this
@@ -49,14 +35,13 @@
 /**
  * Every `calendar.*` WebSocket type this module knowingly routes. Used by the
  * `default:` log-once branch to distinguish "a type we deliberately ignore"
- * from "a type Chronicle grew that nobody wired up" — the second is the class
- * of silent drop this whole dispatch exists to end.
+ * from "a type Chronicle grew that nobody wired up".
  *
  * `calendar.cycle.changed` and `calendar.festival.changed` are listed as
  * *routed* because they are handled by the structure re-compare path: both
- * always fire alongside `calendar.structure.updated` from the same service
- * call (service.go:1594-1595, :1629-1630), so treating them as a second
- * structure signal is correct and avoids a duplicate re-compare.
+ * always fire alongside `calendar.structure.updated` from the same event, so
+ * treating them as a second structure signal would cause a duplicate
+ * re-compare.
  */
 export const ROUTED_CALENDAR_TYPES = Object.freeze([
   'calendar.date.advanced',
@@ -74,9 +59,9 @@ export const ROUTED_CALENDAR_TYPES = Object.freeze([
 ]);
 
 /**
- * Types that mean "Chronicle's calendar structure moved — re-compare". All
- * three fire from the same service calls; `structure.updated` is the umbrella
- * and the other two are the granular siblings added by C-CAL-WS-DOTTED.
+ * Types that mean "Chronicle's calendar structure moved — re-compare".
+ * `structure.updated` is the umbrella; the other two are granular siblings
+ * that fire alongside it from the same event.
  */
 export const STRUCTURE_SIGNAL_TYPES = Object.freeze([
   'calendar.structure.updated',
@@ -88,9 +73,9 @@ export const STRUCTURE_SIGNAL_TYPES = Object.freeze([
  * Map a sub-resource WS type to the world setting that gates its chat
  * announcement. Returns null for types that never announce.
  *
- * Defaults (registered in `settings.mjs`) follow the dispatch: season/era ON,
- * moon OFF (a moon phase changes every few in-world days — announcing each one
- * is chat spam), weather ON, worldstate ON.
+ * Defaults (registered in `settings.mjs`): season/era ON, moon OFF (a moon
+ * phase changes every few in-world days — announcing each one is chat spam),
+ * weather ON, worldstate ON.
  *
  * @param {string} type
  * @returns {string|null} setting key, or null when the type never announces
@@ -198,13 +183,9 @@ export function formatWeatherLine(w) {
 }
 
 /**
- * Render `calendar.worldstate.changed` as one GM-facing line.
- *
- * **Known Chronicle-side gap (see this file's header + the PR body):** the
- * payload carries only the date and the ambient mood tint — no meteor/eclipse
- * detail, despite `calendar_celestial_events` being the feature that motivated
- * the dispatch. The line therefore reports what the payload actually contains
- * and never invents a celestial event it cannot see.
+ * Render `calendar.worldstate.changed` as one GM-facing line. The payload
+ * carries only the date and ambient mood tint (no celestial-event detail),
+ * so the line reports what it actually contains and never invents one.
  *
  * @param {object|null|undefined} payload
  * @returns {string|null}
@@ -225,10 +206,9 @@ export function formatWorldstateLine(payload) {
 }
 
 /**
- * Render `calendar.season.changed`. A null payload is the documented "left a
- * season without entering a new one" case (service.go:2544), which is still
- * worth announcing — the seasonal modifiers the table was using no longer
- * apply.
+ * Render `calendar.season.changed`. A null payload means "left a season
+ * without entering a new one" and is still worth announcing — the seasonal
+ * modifiers the table was using no longer apply.
  * @param {object|null|undefined} payload
  * @returns {string|null}
  */
@@ -306,12 +286,12 @@ export function emptySubresourceState() {
  * Fold one sub-resource message into the snapshot the dashboard renders.
  * Pure: returns a new state object, never mutates `prev`.
  *
- * A null payload PRESERVES the prior value for that slot rather than blanking
- * it — the weather-zone paths publish `calendar.weather.changed` with a null
- * payload (service.go:1490, :1523), and treating that as "weather is now
- * unknown" would wipe a perfectly good reading off the dashboard. The one
- * exception is season, where Chronicle uses a null payload to mean the
- * specific, meaningful state "no season in effect".
+ * A null payload PRESERVES the prior value for that slot rather than
+ * blanking it — weather can publish a null payload from the weather-zone
+ * paths, and treating that as "weather is now unknown" would wipe a
+ * perfectly good reading off the dashboard. The one exception is season,
+ * where a null payload means the specific, meaningful state "no season in
+ * effect".
  *
  * @param {ReturnType<typeof emptySubresourceState>|null} prev
  * @param {string} type

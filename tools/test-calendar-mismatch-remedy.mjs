@@ -1,51 +1,13 @@
-// test-calendar-mismatch-remedy.mjs — THE STRUCTURE-MISMATCH ADVICE HAS TO BE
-// SOMETHING THE OPERATOR CAN ACTUALLY DO.
-//
-// Run: node --test tools/test-calendar-mismatch-remedy.mjs
-//
-// WHAT WAS WRONG. All three places the module reports a calendar-structure
-// mismatch — the permanent `ui.notifications.warn` from
-// `_pauseCalendarSyncForMismatch`, and the dashboard's two Calendar-tab banners
-// (paused / incompatible) — printed the same remedy:
-//
-//     "Import or author the matching calendar in Chronicle."
-//
-// NEITHER HALF OF THAT IS REACHABLE, and both were measured against Chronicle's
-// source rather than guessed:
-//
-//   IMPORT. `POST /api/v1/campaigns/:cid/calendar` (api_handler.go's
-//   CreateCalendar) answers a structured 409 `calendar_already_exists` whenever
-//   `GetCalendar(campaignID)` returns anything, and that repo query is
-//   `… WHERE campaign_id = ? ORDER BY is_default DESC, sort_order ASC LIMIT 1`
-//   — i.e. ANY calendar at all. When this banner is on screen the campaign HAS
-//   a calendar, by construction: the mismatch was computed by comparing against
-//   it. So the import door is closed 100% of the time this advice is shown.
-//
-//   AUTHOR. A calendar authored in Chronicle's builder is NOT the default:
-//   `calendarService.CreateCalendar` sets `IsDefault: isFirst` — only the first
-//   calendar in a campaign is ever marked. And the module reads Chronicle's
-//   calendar through the same `is_default DESC, sort_order ASC LIMIT 1`
-//   ordering, so it keeps being served the OLD calendar. `SetDefaultCalendar`
-//   exists on Chronicle's service interface and HAS NO CALLER — no route, no
-//   handler, no control on any page. So the authored calendar is invisible
-//   across the wire and there is nothing the operator can click to change that.
-//
-// WHAT IS REACHABLE, and is what the advice now says: make the two structures
-// match by EDITING one of the calendars that already exist. Chronicle's
-// 10-tab structure editor (Calendar Settings → Months / Weekdays) is exactly
-// the surface for the month-count / month-length / weekday-count facts this
-// guard compares, and the Foundry side is editable in Calendaria / Simple
-// Calendar. Either edit closes the mismatch, and both are one page away.
-//
-// THE BOOKED GAP. "Point the module at a DIFFERENT Chronicle calendar" remains
-// genuinely impossible and is recorded as such (CLAUDE.md → Blocked on
-// Chronicle) rather than printed as an instruction. That is the difference this
-// file is guarding: advice that cannot be followed is worse than no advice,
-// because the operator spends the session believing the fix is theirs to make.
-//
-// THE THREE STRINGS ARE ALSO PINNED TO EACH OTHER. Three prints of one remedy
-// drift; this test reads all three from where they ship and requires the same
-// verdict from each.
+// Pins the calendar-structure-mismatch remedy text (the pause toast plus the
+// dashboard's two Calendar-tab banners) to advice the operator can actually
+// follow: edit either calendar's structure so the two match. "Import" and
+// "author a new calendar" are NOT reachable — the campaign already has a
+// calendar by construction whenever this mismatch fires, so Chronicle's
+// create-calendar endpoint 409s, and a newly authored calendar is never made
+// default (no caller sets it), so it never reaches the wire. Pointing the
+// module at a different Chronicle calendar is a separate, still-open gap
+// (#95) and must not be implied by this text either. All three strings are
+// read from where they ship and held to the same verdict so they can't drift.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';

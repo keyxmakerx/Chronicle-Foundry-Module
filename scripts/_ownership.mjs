@@ -1,23 +1,19 @@
 /**
- * Chronicle Sync - Ownership mapping helper
- *
  * Single source of truth for translating a Chronicle doc's visibility into a
  * Foundry ownership `default` level, honoring the operator's dashboard
  * Permissions controls:
  *
  *   - `defaultOwnership` — the level players get for player-visible synced
- *     docs (None / Limited / Observer / Owner). Registered default is OBSERVER,
- *     which matches the pre-FM-SYNC-HARDENING hardcoded behavior.
+ *     docs (None / Limited / Observer / Owner). Default: OBSERVER.
  *   - `dmOnlyHidden` — when ON (default), a DM-only / private Chronicle doc is
- *     hidden from players (ownership NONE). When OFF, the operator has opted to
- *     surface DM-only content, so it lands at `defaultOwnership` instead.
+ *     hidden from players (ownership NONE). When OFF, it lands at
+ *     `defaultOwnership` instead.
  *
- * Security posture: fail CLOSED. Any ambiguity resolves toward LESS player
- * visibility, never more. See FM-SYNC-HARDENING §1 (wire the settings) + §3
- * (custom-visibility error path fails to NONE, enforced in journal-sync).
- *
- * Both `journal-sync.mjs` (_buildOwnership) and `note-sync.mjs`
- * (_buildNoteOwnership) consume this so the two paths can't drift.
+ * Security: fail CLOSED — any ambiguity resolves toward LESS player
+ * visibility, never more (a custom-visibility error path must fail to NONE,
+ * enforced in journal-sync). Both `journal-sync.mjs` (_buildOwnership) and
+ * `note-sync.mjs` (_buildNoteOwnership) consume this so the two paths can't
+ * drift.
  */
 
 import { getSetting } from './settings.mjs';

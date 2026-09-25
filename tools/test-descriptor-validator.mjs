@@ -1,21 +1,15 @@
 #!/usr/bin/env node
 /**
- * Regression pin for FM-SEC-CHUNK-7 (descriptor schema runtime re-validation).
+ * `validateDescriptor` is the shared descriptor-schema validator, called
+ * from both CI (`tools/check-package-descriptor.mjs`) and runtime
+ * (`scripts/module.mjs::_runtimeValidateDescriptor`) as defense-in-depth.
  *
  * Two-layer test:
  *
- *   1. Behavioral tests for `validateDescriptor` (the shared validator
- *      called from BOTH CI `tools/check-package-descriptor.mjs` AND
- *      runtime `scripts/module.mjs::_runtimeValidateDescriptor`).
- *
- *   2. Static-source integration: confirm both CI script + module.mjs
- *      import from the shared module, so a future refactor that
+ *   1. Behavioral tests for `validateDescriptor` itself.
+ *   2. Static-source integration: confirm both the CI script and
+ *      module.mjs import from the shared module, so a refactor that
  *      forgets to update one path triggers a test failure.
- *
- * The shared validator + runtime hook are defense-in-depth per
- * FM-SECURITY-AUDIT §0.5 D2=(b).
- *
- * Run: `node --test tools/test-descriptor-validator.mjs`
  */
 
 import test from 'node:test';

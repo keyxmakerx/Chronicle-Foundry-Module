@@ -6,15 +6,6 @@
  * Each test exercises a specific rule with the smallest possible fixture
  * that triggers (or doesn't trigger) it. The end-of-file `runValidation`
  * smoke tests confirm the engine glues rules together correctly.
- *
- * Run: `node --test tools/test-sync-calendar-validation.mjs`
- *
- * No mocking framework — uses Node's built-in `node:test` (Node ≥ 18).
- *
- * Cross-reference: cordinator
- * `reports/foundry/2026-05-19-fm-cal-editor-scoping.md` § 6 lists the 10
- * Therin gaps this rule set surfaces. Every entry there maps 1-to-1 to a
- * test below.
  */
 
 import test from 'node:test';
@@ -313,16 +304,11 @@ test('runValidation — clean calendar produces zero findings', () => {
 });
 
 test('runValidation — Therin-shaped calendar fires the 7 dispatch-required advisories', () => {
-  // Reproduce the failing-fixture shape that matches calendar-of-therin.json.
-  // The dispatch's acceptance criteria require AT LEAST these 7 rules to
-  // fire on Calendar of Therin:
-  //   - WEATHER_ACTIVE_ZONE_MISSING
-  //   - FESTIVALS_EMPTY
-  //   - SEASON_INTERSTITIAL (Greylight)
-  //   - MOON_RANDOMIZED_DEFAULT_SEED (Umbra)
-  //   - DATE_FORMAT_LITERAL_ONLY (weekHeader / yearHeader / yearLabel)
-  //   - MOON_REFERENCE_DAY_ZERO (Umbra)
-  //   - CALENDAR_LAST_ADVANCED_NEVER
+  // Reproduces calendar-of-therin.json's shape. Must fire at least:
+  //   WEATHER_ACTIVE_ZONE_MISSING, FESTIVALS_EMPTY, SEASON_INTERSTITIAL
+  //   (Greylight), MOON_RANDOMIZED_DEFAULT_SEED (Umbra), DATE_FORMAT_LITERAL_ONLY
+  //   (weekHeader/yearHeader/yearLabel), MOON_REFERENCE_DAY_ZERO (Umbra),
+  //   CALENDAR_LAST_ADVANCED_NEVER
   const cal = {
     name: 'Calendar of Therin',
     description: 'The common calendar used across the four landmasses...',
@@ -428,28 +414,16 @@ test('runValidation — Forbidden Lands-shaped calendar produces zero or one adv
     // No currentDate field — Forbidden Lands export omits it.
   };
   const findings = runValidation(cal);
-  // Allow up to 1 finding (in case future rule additions catch something
-  // subtle); the dispatch acceptance criterion says "zero or one advisory."
+  // At most 1 finding expected on a Forbidden Lands export.
   assert.ok(findings.length <= 1, `expected <= 1 finding on Forbidden Lands; got ${findings.length}: ${findings.map(f => f.code).join(', ')}`);
 });
 
 test('runValidation — buggy rule never blanks the panel', async () => {
-  // Replace a known rule with a thrower; runValidation should swallow the
-  // exception and still return findings from the surviving rules.
-  // We can't mutate the imported RULES list directly, but we can
-  // simulate via a synthetic ALL_RULES check: pass a calendar that fires
-  // every rule and confirm runValidation returns those findings even
-  // though one rule throws against this fixture. Since the rules are pure
-  // and the engine uses try/catch internally, the only way to actually
-  // test the swallow is to corrupt a rule input.
-  //
-  // We pass an intentionally hostile calendar shape that would throw if
-  // a rule iterated naively, then assert findings still come back.
+  // A rule that throws must not crash runValidation or blank the results;
+  // the engine catches per-rule and keeps surviving findings.
   const hostile = Object.create({
     get name() { throw new Error('forced error from getter'); },
   });
-  // Wrap the shape so most rules see undefined (no fire) but the engine
-  // doesn't crash regardless.
   const findings = runValidation(hostile);
   assert.ok(Array.isArray(findings));
 });

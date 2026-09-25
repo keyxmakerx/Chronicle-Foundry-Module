@@ -1,10 +1,8 @@
 /**
- * Chronicle Sync — Sync Capability Inspector
- *
- * Answers the operator question: "what CAN we pull from Foundry vs what DO we
- * currently sync?" — per source (the character actor today; extensible to items,
- * effects, calendar). Drives the data-pull-completeness work and is the permanent
- * in-UI diagnostic that replaces grepping the manifest.
+ * Answers the operator question: "what CAN we pull from Foundry vs what DO
+ * we currently sync?" — per source (the character actor today; extensible
+ * to items, effects, calendar). The in-UI diagnostic that replaces grepping
+ * the manifest.
  *
  * Two layers (mirrors the calendar diagnostics/validation pattern):
  *   - captureActorSnapshot(actor)  → DEFENSIVE: touches the live Foundry actor,
@@ -81,9 +79,9 @@ export function captureActorSnapshot(actor) {
       system = {};
     }
 
-    // items / effects are Foundry collections (Map-like) — summarize by type, with
-    // a sample item's system schema. The generic dot-path adapter cannot reach
-    // these today; that's the gap the report flags for WS-3.
+    // items / effects are Foundry collections (Map-like) — summarize by type,
+    // with a sample item's system schema. The generic dot-path adapter cannot
+    // reach these today.
     const items = _summarizeCollection(actor.items, true);
     const effects = _summarizeCollection(actor.effects, false);
 

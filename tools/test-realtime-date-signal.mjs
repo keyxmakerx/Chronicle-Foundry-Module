@@ -1,12 +1,7 @@
 #!/usr/bin/env node
 /**
- * test-realtime-date-signal.mjs — FM-REALTIME-DATE-SIGNAL regression tests.
- *
- * Run: node --test tools/test-realtime-date-signal.mjs
- *
- * Pins the RC-4 wire-signal consumption: `GET /calendar/date` now carries
- * `tracks_real_time` (the composed `UsesRealTime()` predicate,
- * syncapi/calendar_api_handler.go:95). This module pauses date-PUSH only
+ * `GET /calendar/date` carries `tracks_real_time` (the composed
+ * `UsesRealTime()` predicate). This module pauses date-PUSH only
  * (pull/event sync untouched) across all four push sites:
  *   - calendar-sync.mjs: _onCalendariaDateTimeChange, _onLocalDateChange,
  *     _onSimpleCalendarDateChange

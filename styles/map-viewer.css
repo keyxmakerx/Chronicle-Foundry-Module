@@ -8,13 +8,10 @@
 /* ---- Layout ---- */
 
 /*
- * Sheet root (class injected by DEFAULT_OPTIONS.classes). In v2,
- * JournalEntryPageSheet renders into a `<section class="journal-entry-page
- * image chronicle-map-viewer-sheet">` element. The parent `.journal-entry-pages`
- * container is scrollable and gives its `<section>` children content-driven
- * height — so `height: 100%` on inner elements resolves to 0. Make the sheet
- * root itself a flex column with a viewport-based min-height so the viewer
- * always has a real area to render into.
+ * The parent `.journal-entry-pages` container gives its `<section>` children
+ * content-driven height, so `height: 100%` on inner elements resolves to 0.
+ * Use a viewport-based min-height instead so the viewer always has a real
+ * area to render into.
  */
 .chronicle-map-viewer-sheet {
   display: flex;

@@ -1,20 +1,16 @@
 /**
- * Chronicle Sync — Diagnostic Bundle builder
- *
  * Assembles a single, copy-paste troubleshooting report from the data the
  * dashboard already gathers: versions, connection/health status, per-resource
- * sync state, field-mapping, the Sync Capability summary, and the recent
- * activity/error logs. This is the manual precursor to the admin AI assist — it
- * is exactly what a human (or an AI) needs to diagnose a sync problem in one
- * paste, instead of the multi-screenshot hunting this project lived through.
+ * sync state, field-mapping, the Sync Capability summary, and recent
+ * activity/error logs.
  *
- * PURE — no Foundry globals, no DOM. The dashboard supplies a plain input object;
- * this returns a Markdown string. Unit-tested in tools/test-sync-diagnostic-bundle.mjs.
+ * Pure — no Foundry globals, no DOM. The dashboard supplies a plain input
+ * object; this returns a Markdown string. Unit-tested in
+ * tools/test-sync-diagnostic-bundle.mjs.
  *
- * Security: callers must pass already-redacted data. This builder never invents
- * values, but it also does not fetch secrets — keep API keys / tokens out of the
- * input. (The dashboard sources from activity/error logs + health metrics, none
- * of which carry secrets.)
+ * Security: callers must pass already-redacted data — this builder never
+ * invents values but also does not fetch secrets, so keep API keys/tokens
+ * out of the input.
  */
 
 /**

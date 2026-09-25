@@ -1,18 +1,12 @@
 /**
- * Chronicle Sync - Member ↔ Foundry-user mapping view-model
+ * Pure builder for the dashboard Members tab: given campaign members, the
+ * `userMappings` table, the available Foundry users, and a member-key
+ * resolver, produces one row per member showing the current mapping and
+ * whether it is matched or UNMATCHED.
  *
- * Pure builder for the dashboard Members tab. Given the Chronicle campaign
- * members, the current `userMappings` table, the available Foundry users, and
- * a member-key resolver, it produces one row per member describing the current
- * mapping and whether it is matched or UNMATCHED.
- *
- * Kept side-effect-free (no Foundry globals) so it can be unit-tested without a
- * Foundry runtime — the same pattern the sync-calendar pure helpers use.
- *
- * Security posture: an UNMATCHED member's per-player permission grants are
- * silently dropped on both push and pull, so the row's `matched=false` /
- * `UNMATCHED` badge is the operator's required signal that a wrong/missing
- * mapping is widening or narrowing access without their knowledge (audit §2).
+ * Security: an UNMATCHED member's per-player permission grants are silently
+ * dropped on both push and pull, so the `matched=false` badge is the
+ * operator's only signal that access is being widened or narrowed unseen.
  */
 
 /**

@@ -1,23 +1,15 @@
 #!/usr/bin/env node
 /**
- * Regression pin for FM-SEC-CHUNK-4 (closes P-8 from FM-SECURITY-AUDIT).
+ * `api-client.mjs::_logError` stores truncated error log entries that
+ * surface on the dashboard's Status tab. If Chronicle's error response
+ * echoes the request — an `Authorization: Bearer <apiKey>` header or a
+ * signed `?token=...` URL — that secret must not land in the log: the
+ * first statement in `_logError` must call `_scrubAuthHeaders(text)`,
+ * which regex-replaces `Bearer <token>` and `?token=<value>` with
+ * `[redacted]` before truncation/storage.
  *
- * `api-client.mjs::_logError` truncates error log entries to 200 chars
- * before storing them in `this._errorLog`. The truncation buffer is
- * surfaced via the dashboard's Status tab. If Chronicle's error
- * response body echoes the request — including `Authorization: Bearer
- * <apiKey>` or a signed `?token=...` URL — that secret lands in the
- * log unscrubbed.
- *
- * The fix: `_scrubAuthHeaders(text)` regex-replaces `Bearer <token>`
- * and `?token=<value>` with `[redacted]` before truncation/storage.
- *
- * This test exercises `_scrubAuthHeaders` directly (pure function,
- * exported). The _logError integration is implicit — the function is
- * called from _logError's first statement (verified by static-source
- * inspection below).
- *
- * Run: `node --test tools/test-api-client-secrets.mjs`
+ * This exercises `_scrubAuthHeaders` directly, plus a static-source check
+ * that `_logError` actually calls it.
  */
 
 import test from 'node:test';

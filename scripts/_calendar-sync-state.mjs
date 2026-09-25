@@ -1,49 +1,14 @@
 /**
- * Chronicle Sync — calendar sync-state classifier (FM-SYNC-WIRE-FIX fix 3).
+ * Chronicle Sync — calendar sync-state classifier.
  *
- * Pure helper mapping the dashboard's calendar inputs to ONE of four explicit,
- * honest states. Extracted from sync-dashboard.mjs so the classification is
- * unit-testable in isolation (house pattern: `_overview-model.mjs`,
- * `_calendar-probe-state.mjs`).
- *
- * The pre-fix badge lied twice: it computed "In Sync" from raw y/m/d equality
- * alone (no structure awareness, no drift direction) and derived its "paused"
- * state from a flag the SimpleCalendar path never set. This classifier replaces
- * that with:
- *
- *   - `paused`                  — the live CalendarSync module has stopped calendar
- *                                 sync for the session (`_calendarSyncDisabled`).
- *                                 Now fed by BOTH module paths (fix 2 makes the
- *                                 SimpleCalendar path set the flag too).
- *   - `incompatible-structures` — the module has NOT paused, but the dashboard can
- *                                 itself read both structures and they differ. This
- *                                 is the fail-open case: the module skips pausing on
- *                                 an unreadable structure, or isn't running, yet the
- *                                 dates on the wire are still meaningless. Carries
- *                                 the month/weekday counts.
- *   - `structure-changed`       — FM-SYNC-SUBRESOURCES-P1. Chronicle broadcast
- *                                 `calendar.structure.updated` (or its granular
- *                                 `cycle`/`festival` siblings) THIS SESSION, the
- *                                 module re-ran the comparison, and it came back
- *                                 compatible. Advisory, not an error: the counts
- *                                 we compare (month count, per-month day counts,
- *                                 weekday count) still match, but month NAMES,
- *                                 cycles, festivals and era boundaries are outside
- *                                 the comparison, so the operator should eyeball
- *                                 the calendar. We deliberately do NOT auto-apply
- *                                 the new structure — auto-merge is a later arc.
- *   - `date-drift`              — structures compatible (or not comparable) but the
- *                                 dates differ. Carries a direction.
- *   - `in-sync`                 — structures compatible and the dates match.
- *
- * `paused` outranks `incompatible-structures` because a paused module is the
- * stronger operational fact (sync is actually off); its detail string already
- * spells out the structural reason. `structure-changed` sits BELOW both — it is
- * an advisory that only makes sense once we've established nothing is actually
- * broken — and ABOVE `date-drift`/`in-sync`, because "the structure moved under
- * you" is more important than a one-day date delta. All four remain
- * independently reachable, so the badge never has to invent a state it can't
- * back with data.
+ * Pure helper mapping the dashboard's calendar inputs to one explicit state:
+ * `unavailable`, `paused`, `incompatible-structures`, `structure-changed`,
+ * `date-drift`, or `in-sync`. States are checked in that order, each ranked
+ * above the ones below it because it is the stronger operational fact (e.g.
+ * a paused module means sync is actually off, so it outranks a date delta).
+ * `structure-changed` is advisory only: counts still match, but month names,
+ * cycles, festivals and era boundaries aren't compared, and the new
+ * structure is never auto-applied.
  */
 
 /**
@@ -79,11 +44,9 @@ function compareDates(a, b) {
  * @param {{year:number, month:number, day:number}|null} [input.chronicleDate]
  * @param {{year:number, month:number, day:number}|null} [input.foundryDate]
  * @param {string|null} [input.structureChangedDetail] - set by CalendarSync when
- *   a `calendar.structure.updated` (or cycle/festival) broadcast arrived this
- *   session and the re-compare found the structures still compatible
- *   (FM-SYNC-SUBRESOURCES-P1). A truthy value raises the advisory
- *   `structure-changed` state; it is deliberately outranked by `paused` and
- *   `incompatible-structures`, which describe actual breakage.
+ *   a structure-updated broadcast arrived this session and the re-compare found
+ *   the structures still compatible; truthy raises the advisory
+ *   `structure-changed` state.
  * @returns {{state:('in-sync'|'date-drift'|'structure-changed'|'incompatible-structures'|'paused'|'unavailable'),
  *   direction:('chronicle-ahead'|'foundry-ahead'|null), detail:string}}
  */
@@ -101,18 +64,11 @@ export function classifyCalendarSyncState(input) {
     unavailableDetail = null,
   } = input || {};
 
-  // 0. Chronicle's calendar endpoint is not answering (FM-CAL-BLACKOUT).
-  //
-  //    Ranked ABOVE `paused` because it is the stronger operational fact: with
-  //    no server-side calendar there is nothing to be paused against, and no
-  //    other verdict below is even computable.
-  //
-  //    This is defence in depth. The dashboard returns before reaching this
-  //    function during the blackout, so today the branch is unreachable — but
-  //    the fall-through at step 4 answers `date-drift` for a missing date,
-  //    which would render an outage as "out of sync with Chronicle" and send
-  //    the GM to check settings that are fine. An invariant that holds only
-  //    because every caller remembers to guard it is not an invariant.
+  // 0. Chronicle's calendar endpoint is not answering. Ranked above `paused`
+  //    because with no server-side calendar nothing below is computable.
+  //    Callers normally return earlier during a blackout; this guard is
+  //    defence in depth so a missing date never falls through to `date-drift`
+  //    and reports an outage as an out-of-sync date.
   if (unavailable) {
     return {
       state: 'unavailable',
@@ -145,9 +101,8 @@ export function classifyCalendarSyncState(input) {
   }
 
   // 3. Chronicle's structure moved this session and the re-compare came back
-  //    compatible (FM-SYNC-SUBRESOURCES-P1). Advisory — sync keeps running, but
-  //    the badge stops claiming a clean "In Sync" the operator hasn't verified.
-  //    Reached only after the two breakage states above have been ruled out.
+  //    compatible. Advisory — sync keeps running, but the badge stops claiming
+  //    a clean "In Sync" the operator hasn't verified.
   if (structureChangedDetail) {
     return { state: 'structure-changed', direction: null, detail: structureChangedDetail };
   }

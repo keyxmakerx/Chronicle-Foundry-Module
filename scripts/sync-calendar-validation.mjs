@@ -21,9 +21,6 @@
  * Schema versioning: the user-flag state persisted by the editor carries a
  * `schemaVersion` integer (see `SCHEMA_VERSION` below). Bump on any rule-
  * output shape change so the editor can ignore stale flag data.
- *
- * Scoping reference: cordinator `reports/foundry/2026-05-19-fm-cal-editor-scoping.md`
- * § 6 — the 10 Therin gaps this rule set surfaces.
  */
 
 export const SCHEMA_VERSION = 1;
@@ -65,9 +62,8 @@ export function runValidation(cal, ctx = {}) {
 /**
  * R1 — Active weather zone references a zone that doesn't exist.
  *
- * Therin case: `weather.activeZone === "temperate"` but `weather.zones === {}`.
- * Calendaria silently falls back to no-weather in this state; operator only
- * sees the gap by running a weather check.
+ * Calendaria silently falls back to no-weather in this state, so the gap is
+ * otherwise invisible short of running a weather check.
  */
 export function ruleActiveZoneExists(cal) {
   const active = cal?.weather?.activeZone;
@@ -87,11 +83,8 @@ export function ruleActiveZoneExists(cal) {
 }
 
 /**
- * R2 — Zero festivals authored.
- *
- * Therin case: `festivals: {}`. Advisory because some calendars genuinely
- * have no festivals; the operator's design probe specifically called this
- * out as a "gap I'd like the editor to surface."
+ * R2 — Zero festivals authored. Advisory only — some calendars genuinely
+ * have none.
  */
 export function ruleFestivalsEmpty(cal) {
   const festivals = cal?.festivals ?? {};
@@ -107,11 +100,9 @@ export function ruleFestivalsEmpty(cal) {
 }
 
 /**
- * R3 — Season with `seasonalType: null`.
- *
- * Therin case: "Greylight" with `seasonalType: null`. Calendaria's
- * astronomical anchors (equinox / solstice) silently skip these seasons.
- * Sometimes intentional (interstitial season); sometimes a forgotten field.
+ * R3 — Season with `seasonalType: null`. Calendaria's astronomical anchors
+ * (equinox / solstice) silently skip these; sometimes intentional
+ * (interstitial season), sometimes a forgotten field.
  */
 export function ruleSeasonInterstitial(cal) {
   const seasons = cal?.seasons?.values ?? {};
@@ -129,11 +120,9 @@ export function ruleSeasonInterstitial(cal) {
 }
 
 /**
- * R4 — Season month range wraps the year boundary.
- *
- * Therin case: "Greylight" `monthStart: 13, monthEnd: 0` (wraps year-end).
- * Not necessarily a bug, but flag for confirmation — operator may have
- * accidentally inverted the range.
+ * R4 — Season month range wraps the year boundary (monthStart > monthEnd).
+ * Not necessarily a bug, but flagged for confirmation since it can also mean
+ * an inverted range.
  */
 export function ruleSeasonWrapsYear(cal) {
   const seasons = cal?.seasons?.values ?? {};
@@ -157,12 +146,9 @@ export function ruleSeasonWrapsYear(cal) {
 }
 
 /**
- * R5 — Randomized moon with default `phaseSeed: 0`.
- *
- * Therin case: Umbra `phaseMode: "randomized"` + `phaseSeed: 0`. Calendaria's
- * editor docs describe the seed as click-to-randomize; `0` is the uninitialized
- * default. The moon will still work but every campaign starts from the same
- * pseudorandom sequence.
+ * R5 — Randomized moon with default `phaseSeed: 0`, the uninitialized value.
+ * The moon still works, but every campaign shares the same pseudorandom
+ * sequence until the seed is rerolled.
  */
 export function ruleRandomizedMoonDefaultSeed(cal) {
   const moons = cal?.moons ?? {};
@@ -180,11 +166,8 @@ export function ruleRandomizedMoonDefaultSeed(cal) {
 }
 
 /**
- * R6 — Multiple moons sharing the stock Calendaria phase icon set.
- *
- * Therin case: Lacrimosa + Sanguin'mor + Umbra all reference
- * `modules/calendaria/assets/moon-phases/0[1-8]_*.svg` for their phases.
- * Visually indistinguishable in the calendar UI. Low-priority advisory.
+ * R6 — Two or more moons sharing Calendaria's stock phase icon set, making
+ * them visually indistinguishable in the calendar UI. Low-priority advisory.
  */
 export function ruleMoonIconsDuplicated(cal) {
   const moons = cal?.moons ?? {};
@@ -210,15 +193,13 @@ export function ruleMoonIconsDuplicated(cal) {
 
 /**
  * R7 — Date format strings consisting entirely of bracket-escaped literals.
- *
- * Therin case: `dateFormats.weekHeader: "[W]"`, `yearHeader: "[YYYY]"`,
- * `yearLabel: "[YYYY] [GGGG]"`. Calendaria treats `[...]` as a literal-text
- * escape, so the format produces the literal string `W` (etc.) at runtime —
- * almost certainly not the intent.
+ * Calendaria treats `[...]` as a literal-text escape, so a format like
+ * `"[W]"` renders the literal string `W` at runtime instead of the computed
+ * token — almost certainly not the intent.
  *
  * Detection: strip every `[...]` segment; if the remainder has no
- * non-whitespace characters, the format is literal-only. Forbidden Lands'
- * `"[Week] W [of] MMMM, Y"` mixes literals with real tokens and passes.
+ * non-whitespace characters, the format is literal-only. A format mixing
+ * literals with real tokens (e.g. `"[Week] W [of] MMMM, Y"`) passes.
  */
 export function ruleDateFormatLiteralString(cal) {
   const formats = cal?.dateFormats ?? {};
@@ -237,13 +218,10 @@ export function ruleDateFormatLiteralString(cal) {
 }
 
 /**
- * R8 — Reference date with `dayOfMonth: 0` on a moon.
- *
- * Therin case: Umbra `referenceDate.dayOfMonth: 0`. Calendaria stores
- * `dayOfMonth` 0-indexed internally; the public API and editor surfaces
- * are 1-indexed. A literal `0` reads as "day 1" in the engine but is
- * suspicious to humans editing raw JSON. Surface so the operator can
- * confirm.
+ * R8 — Reference date with `dayOfMonth: 0` on a moon. Calendaria stores
+ * `dayOfMonth` 0-indexed internally (the public API and editor are
+ * 1-indexed), so a literal `0` means "day 1" to the engine but reads as
+ * suspicious to a human editing raw JSON.
  */
 export function ruleReferenceDateDayZero(cal) {
   const moons = cal?.moons ?? {};
@@ -262,10 +240,7 @@ export function ruleReferenceDateDayZero(cal) {
 
 /**
  * R9 — `description` present at both the top level and under `metadata`,
- * and the two strings disagree.
- *
- * Therin case: top-level `description: "The common calendar used across..."`
- * but `metadata.description: ""`. Cosmetic but signals export inconsistency.
+ * and the two strings disagree. Cosmetic but signals export inconsistency.
  */
 export function ruleDescriptionDoubled(cal) {
   const top  = typeof cal?.description === 'string' ? cal.description.trim() : '';
@@ -283,11 +258,8 @@ export function ruleDescriptionDoubled(cal) {
 
 /**
  * R10 — Calendar has a persisted `currentDate` but it sits at the default
- * (year ≤ yearZero, no time advance recorded). Strong signal the world has
- * never been advanced since creation.
- *
- * Therin case: `currentDate: { year: 0, month: 0, day: 1, dayOfMonth: 0,
- * hour: 0, minute: 0 }` with yearZero: 0. Advisory only.
+ * (year <= yearZero, no time advance recorded). Strong signal the world has
+ * never been advanced since creation. Advisory only.
  */
 export function ruleLastAdvancedNever(cal) {
   const cd = cal?.currentDate;

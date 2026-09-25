@@ -1,16 +1,13 @@
 #!/usr/bin/env node
 /**
- * Tests for PC-CLAIM-4: addon-gated PC sub-type resolution and entity routing.
+ * Tests for addon-gated PC sub-type resolution and entity routing.
  *
- * Covers:
- *   - _findPcSubtypeId(): pure helper that locates the "Player Characters"
- *     child type in the /entity-types response list.
- *   - _pickEntityTypeId(): pure helper that selects the correct entity_type_id
- *     for a new Chronicle entity based on addon state and owner presence.
- *   - ActorSync._isCharacterEntity(): accepts both the parent character type
- *     and the PC sub-type; rejects unrelated types.
- *   - ActorSync.hasPlayerOwnedPcs(): detects player-owned actors for the hint.
- *   - SyncManager.isPcClaimingEnabled() / _fetchAddons(): addon detection.
+ * Covers: _findPcSubtypeId() (locates the "Player Characters" child type in
+ * the /entity-types response), _pickEntityTypeId() (selects entity_type_id
+ * for a new entity based on addon state and owner presence),
+ * ActorSync._isCharacterEntity() (accepts the parent character type and the
+ * PC sub-type, rejects others), ActorSync.hasPlayerOwnedPcs(), and
+ * SyncManager.isPcClaimingEnabled()/_fetchAddons() addon detection.
  *
  * Run: `node --test tools/test-pc-claiming.mjs`
  */

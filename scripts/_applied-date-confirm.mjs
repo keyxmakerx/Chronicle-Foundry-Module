@@ -1,28 +1,21 @@
 /**
- * Chronicle Sync — applied-date confirmation (FM-SYNC-CONFIRMED-DATE).
+ * Applied-date confirmation. Chronicle's sync chip distinguishes what
+ * Foundry SAW (recorded server-side on every `GET /calendar/date`) from
+ * what it actually APPLIED to the active Foundry calendar module. This
+ * module owns the Foundry-side half: `POST /calendar/date/confirm` with
+ * the applied `{year, month, day}`.
  *
- * Pairs with a parallel Chronicle-side change (C-SYNC-APPLIED-BEACON).
- * Chronicle's sync chip distinguishes what Foundry SAW (the #548 beacon,
- * recorded server-side on every `GET /calendar/date`) from what it actually
- * APPLIED to the active Foundry calendar module. This module owns the
- * Foundry-side half: `POST /calendar/date/confirm` with the applied
- * `{year, month, day}`.
- *
- * The endpoint is OPTIONAL — only present on Chronicle deployments that have
- * shipped the applied-beacon release. A 404 (route doesn't exist) or 405
- * (method not allowed — an older router that doesn't recognize the path)
- * means an un-upgraded Chronicle; that is tolerated silently (one debug log
- * per session, no retries) so this module keeps working unchanged against
- * pre-upgrade servers. Any other failure is logged and swallowed by the
- * caller — a missed confirmation only leaves Chronicle's "applied" beacon
- * stale, it never blocks or retries sync.
+ * The endpoint is optional — a 404/405 means an un-upgraded Chronicle
+ * deployment, tolerated silently (one debug log per session, no retries).
+ * Any other failure is logged and swallowed by the caller — a missed
+ * confirmation only leaves Chronicle's "applied" beacon stale, it never
+ * blocks or retries sync.
  */
 
 /**
- * Session-scoped "not supported" log state. A module-level singleton
- * (mirrors `_realtime-date-guard.mjs`'s `state.noticeShown`) so every call
- * site sharing this helper logs the tolerance exactly once per session
- * instead of once per apply.
+ * Session-scoped "not supported" log state, so every call site sharing
+ * this helper logs the tolerance once per session instead of once per
+ * apply.
  */
 const state = {
   notSupportedLogged: false,
@@ -37,11 +30,10 @@ export function _resetAppliedDateConfirmForTests() {
 
 /**
  * Classify a thrown api-client error as "the confirm endpoint isn't present
- * on this Chronicle deployment" (404 route-not-found, or 405 method-not-
- * allowed). Mirrors `_realtime-date-guard.mjs`'s `isRealTimeRejection`:
- * prefer an explicit numeric `err.status`, else parse the api-client's
- * authoritative "Chronicle API error <status>:" prefix — never key on a
- * bare digit run in the message body.
+ * on this Chronicle deployment" (404 route-not-found, or 405
+ * method-not-allowed). Prefers an explicit numeric `err.status`, else
+ * parses the api-client's "Chronicle API error <status>:" prefix — never
+ * keys on a bare digit run in the message body.
  * @param {{status?: number, message?: string}|null|undefined} err
  * @returns {boolean}
  */

@@ -1,15 +1,9 @@
 #!/usr/bin/env node
 /**
- * test-calendar-subresources.mjs — FM-SYNC-SUBRESOURCES-P1.
- *
- * Pins the PURE half of the sub-resource arc: payload normalization, the
+ * Pins the pure half of the sub-resource arc: payload normalization, the
  * GM-facing one-liners, the announce-gating map, and the snapshot reducer the
- * dashboard's world-state panel renders. No Foundry globals needed.
- *
- * The payload shapes asserted here are transcribed from Chronicle main
- * (2026-07-25) — `internal/plugins/calendar/service.go` +
- * `worldstate_service.go`. If Chronicle changes a payload, these tests are the
- * tripwire.
+ * dashboard's world-state panel renders. No Foundry globals needed. If
+ * Chronicle changes a calendar payload shape, these tests are the tripwire.
  *
  * Run: node --test tools/test-calendar-subresources.mjs
  */
@@ -36,7 +30,7 @@ import {
 // ── normalizeWeather: both wire shapes ───────────────────────────────────────
 
 test('normalizeWeather reads the FLAT WeatherInput shape the WS payload carries', () => {
-  // service.go:1333 publishes the merged WeatherInput — flat snake_case.
+  // Chronicle publishes the merged WeatherInput as flat snake_case.
   const w = normalizeWeather({
     preset_id: 'heavy-snow',
     preset_label: 'Heavy snow',
@@ -120,9 +114,8 @@ test('formatWeatherLine returns null for a null record', () => {
 // ── worldstate / season / era / moon ─────────────────────────────────────────
 
 test('formatWorldstateLine renders the date + mood tint the payload actually carries', () => {
-  // worldstate_service.go:265 — {date:{y,m,d}, moodTint:{color,intensity}}.
-  // NOTE: no celestial/meteor detail is present in the payload. The line must
-  // not invent one. See the file header + PR body for the Chronicle-side gap.
+  // Payload is {date:{y,m,d}, moodTint:{color,intensity}} — no celestial or
+  // meteor detail. The line must not invent one.
   const line = formatWorldstateLine({
     date: { year: 1492, month: 3, day: 15 },
     moodTint: { color: '#8844aa', intensity: 0.4 },
@@ -138,8 +131,8 @@ test('formatWorldstateLine returns null for an empty payload', () => {
 });
 
 test('formatSeasonLine handles the documented null payload as a real state', () => {
-  // service.go:2544 publishes season.changed with a NULL payload when the date
-  // leaves a season without entering another. That is information, not noise.
+  // Chronicle publishes season.changed with a null payload when the date
+  // leaves a season without entering another; that is information, not noise.
   assert.equal(formatSeasonLine({ name: 'Deepwinter' }), 'Chronicle season: Deepwinter');
   assert.match(formatSeasonLine(null), /no season currently in effect/);
 });
@@ -244,9 +237,8 @@ test('reducer never mutates the previous state object', () => {
 });
 
 test('a null weather payload PRESERVES the last reading rather than blanking it', () => {
-  // The weather-zone paths (service.go:1490, :1523) publish weather.changed with
-  // a null payload. Treating that as "weather unknown" would wipe a good reading
-  // off the dashboard on every zone edit.
+  // Weather-zone edits publish weather.changed with a null payload. Treating
+  // that as "weather unknown" would wipe a good reading off the dashboard.
   let s = reduceSubresourceState(emptySubresourceState(), 'calendar.weather.changed', { preset_label: 'Clear' });
   s = reduceSubresourceState(s, 'calendar.weather.changed', null);
   assert.equal(s.weather.presetLabel, 'Clear');

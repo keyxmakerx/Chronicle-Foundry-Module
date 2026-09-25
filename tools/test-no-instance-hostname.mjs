@@ -1,22 +1,13 @@
 #!/usr/bin/env node
 /**
- * CI guard: forbid operator's production hostname in tracked source.
+ * CI guard: forbid the operator's production hostname in tracked source.
+ * `chronicle-package.json` ships with every module install, so any tracked
+ * file referencing it would leak the hostname to every consumer.
  *
- * Context: 2026-05-20, FM-SCRUB-SCHEMA-URL. Operator asked we not
- * reference their production hostname anywhere in this repo's tracked
- * artifacts. `chronicle-package.json` ships with every module install;
- * every consumer would see the URL. The scrub PR drops the offending
- * `$schema` field and this test prevents the pattern from coming back.
- *
- * Sibling Chronicle-side dispatch C-SCRUB-INSTANCE-URLS does the same
- * thing on the server source.
- *
- * Approach: deny-list a small set of operator-specific token fragments
- * and walk every tracked source file. Anything containing one of the
- * fragments — except this test file itself, which references them as
- * literals — fails CI with a pointer to the offending line.
- *
- * Run: `node --test tools/test-no-instance-hostname.mjs`
+ * Deny-lists a small set of operator-specific token fragments and walks
+ * every tracked source file. Anything containing one of the fragments —
+ * except this test file itself, which references them as literals — fails
+ * CI with a pointer to the offending line.
  */
 
 import test from 'node:test';

@@ -1,5 +1,5 @@
-// test-calendar-sync-state.mjs — FM-SYNC-WIRE-FIX fix 3: the honest four-state
-// calendar sync-state classifier. Pure helper, no Foundry globals needed.
+// test-calendar-sync-state.mjs — the four-state calendar sync-state
+// classifier. Pure helper, no Foundry globals needed.
 //
 // Run: node --test tools/test-calendar-sync-state.mjs
 
@@ -150,7 +150,7 @@ test('in-sync also holds when structures were simply not comparable but dates ma
   assert.equal(r.state, 'in-sync');
 });
 
-// ── structure-changed (FM-SYNC-SUBRESOURCES-P1) ──────────────────────────────
+// ── structure-changed ─────────────────────────────────────────────────────
 
 test('structure-changed advisory raises even when the dates agree', () => {
   // The whole point: without this state the badge would say a confident

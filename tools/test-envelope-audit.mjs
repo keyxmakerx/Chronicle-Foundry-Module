@@ -1,39 +1,21 @@
 #!/usr/bin/env node
 /**
- * Regression pins for FM-ENVELOPE-AUDIT — the follow-up sweep flagged by
- * PR #77 (FM-CAL-BACKCATALOG-FIX) re-verify item 5.
+ * Regression pins for the list-response envelope contract (see this repo's
+ * CLAUDE.md → "List responses come in two shapes"): Chronicle wraps some
+ * list endpoints in `{"data":[…],"total":N}` and returns others as a bare
+ * array, and every list-consuming caller must unwrap defensively.
  *
- * PR #77 fixed the calendar back-catalog silently importing nothing because
- * Chronicle wraps list responses in `{"data":[…],"total":N}` while the module
- * expected a bare array. This dispatch audited EVERY remaining list-consuming
- * `get()` caller against the real Chronicle handler shape. The verdict: zero
- * remaining mismatches — every list caller already unwraps defensively. See
- * the PR body caller table for the full evidence.
- *
- * These tests are regression PINS, not fixes: they stub the REAL Chronicle
- * response shape (envelope for `/entity-types`, `/systems`, `/addons`; bare
- * array + `.data` envelope for map sub-resources) and assert that the two
- * callers PR #77 explicitly flagged — plus the least-defensive envelope caller
- * — still extract the list correctly. If a future refactor drops the `.data`
- * unwrap at any of these sites, the corresponding test fails (verified by
- * temporary revert during authoring).
- *
- * Consumer-verified handler shapes (Chronicle @ this session's checkout):
- *   /entity-types → ENVELOPE  {data,total}  internal/plugins/syncapi/api_handler.go:249-251 (ListEntityTypes)
- *   /systems      → ENVELOPE  {data,total}  internal/plugins/syncapi/api_handler.go:1067-1069 (ListSystems)
- *   /addons       → ENVELOPE  {data,total}  internal/plugins/syncapi/api_handler.go:1198-1200 (ListAddons)
- *   /maps/:id/*   → BARE array               internal/plugins/syncapi/map_api_handler.go (ListMarkers/… c.JSON of a slice)
- *
- * Run: `node --test tools/test-envelope-audit.mjs`
+ * These tests stub the real Chronicle response shape (envelope for
+ * `/entity-types`, `/systems`, `/addons`; bare array + `.data` envelope for
+ * map sub-resources) and assert each caller still extracts the list
+ * correctly. A future refactor that drops the `.data` unwrap at any of these
+ * sites fails the corresponding test. See #77.
  */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// ---------------------------------------------------------------------------
-// Foundry global stubs (must be set before the first import of module code).
-// Mirrors tools/test-pc-claiming.mjs so the modules import headlessly.
-// ---------------------------------------------------------------------------
+// Foundry global stubs; must be set before the first import of module code.
 
 globalThis.foundry = globalThis.foundry || {
   applications: {
@@ -69,10 +51,8 @@ const { MapSync } = await import('../scripts/map-sync.mjs');
 /** The real Chronicle list envelope: {data:[…], total:N}. */
 const envelope = (arr) => ({ data: arr, total: arr.length });
 
-// ---------------------------------------------------------------------------
-// actor-sync.mjs:631 — GET /entity-types (ENVELOPE)   [PR #77 flagged caller #1]
-// _resolveCharacterTypeId reads `result?.data || result || []`.
-// ---------------------------------------------------------------------------
+// actor-sync's GET /entity-types (ENVELOPE); _resolveCharacterTypeId reads
+// `result?.data || result || []`.
 
 /** Build an ActorSync with a known character slug and a stubbed API. */
 function makeActorSync(getImpl) {
@@ -106,10 +86,8 @@ test('actor-sync /entity-types: empty envelope {data:[],total:0} → no match, n
   assert.ok(!s._characterTypeId, 'an empty list resolves to no character type (not a crash)');
 });
 
-// ---------------------------------------------------------------------------
-// sync-manager.mjs:456 — GET /systems (ENVELOPE)   [least-defensive caller]
-// _detectSystem reads `result.data || []` (envelope-only unwrap).
-// ---------------------------------------------------------------------------
+// sync-manager's GET /systems (ENVELOPE); _detectSystem reads
+// `result.data || []` (envelope-only unwrap, the least-defensive caller).
 
 test('sync-manager /systems: REAL envelope {data,total} → system matched by foundry_system_id', async () => {
   const sm = new SyncManager();
@@ -125,12 +103,8 @@ test('sync-manager /systems: REAL envelope {data,total} → system matched by fo
   assert.equal(sm._matchedSystem, 'dnd5e', 'must unwrap .data and match on foundry_system_id');
 });
 
-// ---------------------------------------------------------------------------
-// sync-manager.mjs:423 — getAddons() → GET /addons (ENVELOPE)
-// _fetchAddons reads `Array.isArray(addons) ? addons : (addons?.data ?? [])`.
-// The existing test-pc-claiming.mjs only stubs the BARE-array shape; this pins
-// the REAL envelope path.
-// ---------------------------------------------------------------------------
+// sync-manager's getAddons() → GET /addons (ENVELOPE); _fetchAddons reads
+// `Array.isArray(addons) ? addons : (addons?.data ?? [])`.
 
 test('sync-manager /addons: REAL envelope {data,total} → PC-claiming addon detected', async () => {
   const sm = new SyncManager();
@@ -143,10 +117,8 @@ test('sync-manager /addons: REAL envelope {data,total} → PC-claiming addon det
   assert.ok(sm.isPcClaimingEnabled(), 'must unwrap .data from the addons envelope to see the addon');
 });
 
-// ---------------------------------------------------------------------------
-// map-sync.mjs:908 / :1052 — GET /maps/:id/{markers,drawings,tokens,layers}
-// Sub-resources are BARE arrays; _coerceArray also tolerates a .data envelope.
-// ---------------------------------------------------------------------------
+// map-sync's GET /maps/:id/{markers,drawings,tokens,layers} sub-resources
+// are BARE arrays; _coerceArray also tolerates a .data envelope.
 
 test('map-sync _coerceArray: bare array (real sub-resource shape) → passthrough', () => {
   const ms = new MapSync();

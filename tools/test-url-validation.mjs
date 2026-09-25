@@ -1,22 +1,16 @@
 #!/usr/bin/env node
 /**
- * Regression pin for FM-SEC-CHUNK-2 (M-2 image-URL host allowlist).
+ * `_isAllowedImageHost` is the host-allowlist gate every Chronicle-supplied
+ * image URL must pass before it reaches `<img src>` or persists on a page
+ * flag, called from map-sync.mjs (`_mapImageSrc`, `_resolveMediaUrl`) and
+ * map-viewer.mjs (`_mapImageSrc`, `_prepareToken`).
  *
  * Two-layer test:
  *
- *   1. Behavioral tests for `_isAllowedImageHost` — the host-allowlist
- *      function called from map-sync.mjs (`_mapImageSrc`,
- *      `_resolveMediaUrl`) and map-viewer.mjs (`_mapImageSrc`,
- *      `_prepareToken`) to gate Chronicle-supplied image URLs before
- *      they hit `<img src>` or persist on a page flag.
- *
- *   2. Static-source integration: confirm map-sync.mjs + map-viewer.mjs
- *      import the helper and reference the validator name, so a future
- *      refactor that forgets one callsite triggers a CI failure.
- *
- * Per FM-SECURITY-AUDIT §2 M-2, §4 Chunk 2, §0.5 D1=(c).
- *
- * Run: `node --test tools/test-url-validation.mjs`
+ *   1. Behavioral tests for `_isAllowedImageHost` itself.
+ *   2. Static-source integration: confirm map-sync.mjs and map-viewer.mjs
+ *      import the helper and reference it, so a refactor that forgets one
+ *      callsite fails CI.
  */
 
 import test from 'node:test';
@@ -192,11 +186,9 @@ test('scripts/map-viewer.mjs: _prepareToken references the host check', () => {
   );
 });
 
-// ---------------------------------------------------------------------
-// F-1 static-source pin: journal-sync entity image-page src (FM-SEC-IMAGE-HOST-ALLOWLIST)
-// A new type:'image' page src added to journal-sync without validation
-// must fail this check, preventing the F-1 class from regressing.
-// ---------------------------------------------------------------------
+// F-1 static-source pin: journal-sync's entity image-page src must flow
+// through the host-allowlist validator; a new type:'image' page src added
+// without validation fails this check.
 
 test('scripts/journal-sync.mjs imports from ./_url-validation.mjs (F-1 pin)', () => {
   const source = readFileSync(resolve(REPO_ROOT, 'scripts/journal-sync.mjs'), 'utf8');
@@ -233,15 +225,9 @@ test('scripts/journal-sync.mjs: _resolveEntityImageSrc validates full URLs via _
   );
 });
 
-// ---------------------------------------------------------------------
-// F-2 unit tests: _setNestedValue prototype-pollution guard
-// ---------------------------------------------------------------------
-
-// Import actor-sync via dynamic import, but _setNestedValue is a module-
-// private function. Test it through a lightweight inline reimplementation
-// that mirrors the guard exactly — keeps the test self-contained and
-// compatible with Foundry's browser-global environment (actor-sync
-// references game.* which doesn't exist in Node).
+// F-2: _setNestedValue prototype-pollution guard. It's module-private, and
+// actor-sync references game.* which doesn't exist in Node, so this tests
+// a lightweight inline reimplementation that mirrors the guard exactly.
 
 const PROTO_BLOCKED_TEST = new Set(['__proto__', 'prototype', 'constructor']);
 function _setNestedValueForTest(obj, path, value) {

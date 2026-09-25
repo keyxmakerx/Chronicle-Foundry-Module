@@ -3,18 +3,13 @@
  * Unit tests for the pure note-form translation module
  * `scripts/sync-calendar-note-form.mjs`.
  *
- * Covers:
- *  - `defaultFormForDate` shape (single-day + multi-day anchors)
- *  - `formFromNote` extraction (full / partial / null inputs, flagData nesting)
- *  - `noteOptionsFromForm` conversion (date+time shape, allDay handling, end omission)
- *  - `validateForm` positives + negatives per field
- *  - `coerceCategories`, `coerceVisibility`, `coerceDisplayStyle` enum pins
- *  - Round-trip: defaultForm → noteOptions → formFromNote (a degraded round-trip;
- *    we lose categories.objects vs ids but pin the shape contract)
+ * Covers `defaultFormForDate`, `formFromNote` extraction, `noteOptionsFromForm`
+ * conversion, `validateForm`, the `coerceCategories`/`coerceVisibility`/
+ * `coerceDisplayStyle` enum pins, and the defaultForm → noteOptions →
+ * formFromNote round-trip (degraded: categories.objects vs ids differ, but
+ * the shape contract holds).
  *
  * Run: `node --test tools/test-sync-calendar-note-form.mjs`
- *
- * No mocking — uses Node's built-in `node:test` (Node ≥ 18).
  */
 
 import test from 'node:test';

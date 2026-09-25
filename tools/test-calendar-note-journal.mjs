@@ -2,15 +2,12 @@
 /**
  * Unit tests for `isCalendarNoteJournal` in `scripts/calendar-sync.mjs`.
  *
- * Pins the FM calendar-journal guard: calendar-module notes (SimpleCalendar /
- * Calendaria) are stored as Foundry JournalEntries and must be recognized so
- * JournalSync skips them instead of POSTing them to /entities (where
- * entity_type_id:0 resolves to the first entity type — typically "Character" —
- * and calendar holidays wrongly appear in the Characters list).
+ * Calendar-module notes (SimpleCalendar / Calendaria) are stored as Foundry
+ * JournalEntries and must be recognized so JournalSync skips them instead of
+ * POSTing them to /entities — entity_type_id:0 there resolves to the first
+ * entity type, so an unrecognized note would appear in the wrong entity list.
  *
  * Run: `node --test tools/test-calendar-note-journal.mjs`
- *
- * No mocking framework — uses Node's built-in `node:test` (Node ≥ 18).
  */
 
 import test from 'node:test';
@@ -62,7 +59,7 @@ function journalStub(flags = {}, { withGetFlag = false, chronicleFlags = null } 
 // ---------------------------------------------------------------------
 
 test('Calendaria note (flags.calendaria.isCalendarNote) → true', () => {
-  // Shape produced by Calendaria note-manager.mjs:379 and festival-manager.mjs.
+  // Shape produced by Calendaria's note-manager.mjs and festival-manager.mjs.
   const j = journalStub({ calendaria: { calendarId: 'therin', isCalendarNote: true } });
   assert.equal(isCalendarNoteJournal(j), true);
 });

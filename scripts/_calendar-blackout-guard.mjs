@@ -1,29 +1,15 @@
 /**
- * Chronicle Sync — calendar-blackout guard.
+ * Session singleton that stops calendar push sites from hammering Chronicle
+ * while its calendar plugin is rebuilding (503 `calendar_rebuilding`). Push
+ * sites check `calendarBlackoutActive()` first and return before spending a
+ * request; without it, every world-time tick fired a doomed request plus a
+ * console error, and the flood evicted real errors from the shared 50-entry
+ * error ring the dashboard and diagnostics bundle read.
  *
- * FM-CAL-BLACKOUT (2026-08-21). Chronicle's calendar plugin was deleted for a
- * ground-up rebuild (V5). Its 34 REST routes stay registered and answer
- * `503 {"error":"calendar_rebuilding", …}` — deliberately 503 rather than 404,
- * so this module does not take its "that Chronicle is too old" path.
- *
- * WHAT THIS FIXES. Without it every Foundry world-time change fired TWO doomed
- * requests (the real-time pre-push probe, then the push itself) plus a red
- * console.error — un-debounced, forever. A GM running the in-game clock, or
- * advancing time per combat round, drove that pair on every tick for the whole
- * outage, and the flood filled the one 50-entry error ring the dashboard and
- * the diagnostics bundle share, evicting real map/actor/item/note errors.
- *
- * The shape is copied deliberately from `_realtime-date-guard.mjs`: a
- * module-level singleton, one notice per session, and a predicate the push
- * sites consult BEFORE spending a request. That guard already solved the same
- * class of problem (a server-side condition that should pause pushes and tell
- * the GM exactly once); this is the same idea for an outage rather than a
- * setting.
- *
- * SESSION-SCOPED ON PURPOSE. Reloading the world clears it, which is the right
- * recovery gesture once V5 lands: nothing has to guess when the calendar came
- * back. Pulls are unaffected — they fail on their own terms and are classified
- * for display by `_calendar-probe-state.mjs`.
+ * Session-scoped on purpose: reloading the world clears it once the rebuild
+ * ships, with nothing needing to guess when the calendar came back. Pulls are
+ * unaffected — see `_calendar-probe-state.mjs`. Same shape as
+ * `_realtime-date-guard.mjs`.
  */
 
 import { isCalendarRebuilding } from './_calendar-probe-state.mjs';

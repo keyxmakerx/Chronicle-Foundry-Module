@@ -70,9 +70,9 @@ Hooks.once('init', () => {
   Handlebars.registerHelper('eq', (a, b) => a === b);
   Handlebars.registerHelper('neq', (a, b) => a !== b);
   Handlebars.registerHelper('lt', (a, b) => a < b);
-  // PR 3 (Sync Calendar): serialize a value as JSON for embedding in a
-  // data-* attribute. The recurrence preset buttons stash their
-  // `paramsTemplate` object here so the click handler can decode it.
+  // Serialize a value as JSON for embedding in a data-* attribute. The
+  // recurrence preset buttons stash their `paramsTemplate` object here so
+  // the click handler can decode it.
   Handlebars.registerHelper('json', (v) => new Handlebars.SafeString(JSON.stringify(v ?? {})));
   Handlebars.registerHelper('timeAgo', (isoString) => {
     if (!isoString) return 'Never';
@@ -114,9 +114,9 @@ Hooks.once('ready', async () => {
   _addStatusIndicator();
   registerCharacterClaimIndicator();
 
-  // FM-SEC-KEY-SCOPE: move a world-scoped API key into this GM's client
-  // scope and delete the world copy BEFORE start() reads the setting. GM
-  // only — players never held a legitimate copy and must not write one.
+  // Move a legacy world-scoped API key into this GM's client scope and
+  // delete the world copy before start() reads the setting. GM only —
+  // players never held a legitimate copy and must not write one.
   if (game.user.isGM) {
     try {
       await migrateApiKeyToClientScope();
@@ -149,18 +149,15 @@ Hooks.once('ready', async () => {
   // `ui.notifications.error` if Foundry's install-time URL no longer
   // authenticates — typically because Chronicle rotated its signing
   // secret or the campaign owner reset the token. Recovery path is
-  // reinstall from a fresh URL; the banner says so. Companion to
-  // cordinator Issue #17.
+  // reinstall from a fresh URL; the banner says so.
   if (game.user.isGM) {
     surfaceManifestRecoveryIfNeeded().catch((err) => {
       console.warn('Chronicle Sync | Manifest recovery probe failed', err);
     });
 
-    // FM-SEC-CHUNK-7: descriptor schema runtime re-validation (D2=b
-    // defense-in-depth per FM-SECURITY-AUDIT §0.5). CI catches drift
-    // at build time; this catches drift when CI is bypassed (hand-
-    // edited release, ad-hoc deployment). GM-only so the surface area
-    // matches the recovery probe's audience.
+    // Runtime re-validation of the descriptor schema: CI catches drift at
+    // build time, this catches drift when CI is bypassed (hand-edited
+    // release, ad-hoc deployment). GM-only, matching the recovery probe.
     _runtimeValidateDescriptor().catch((err) => {
       console.warn('Chronicle Sync | Descriptor runtime check failed', err);
     });
@@ -169,8 +166,7 @@ Hooks.once('ready', async () => {
 
 /**
  * Runtime re-validation of `chronicle-package.json` against the same
- * rules `tools/check-package-descriptor.mjs` enforces at CI. Defense-
- * in-depth per FM-SEC-CHUNK-7 / FM-SECURITY-AUDIT §0.5 D2=(b).
+ * rules `tools/check-package-descriptor.mjs` enforces at CI.
  *
  * Fetches the deployed descriptor from the module's static-asset path
  * (`modules/chronicle-sync/chronicle-package.json`), runs
@@ -193,12 +189,11 @@ async function _runtimeValidateDescriptor() {
       fetch('modules/chronicle-sync/module.json', { cache: 'no-store' }),
     ]);
     // Chronicle deliberately strips chronicle-package.json from the module
-    // zips it serves (Chronicle foundry_vtt/handler.go) — the descriptor is
-    // Chronicle-side metadata, not part of the installed module. A 404 here
-    // is therefore the NORMAL served-install case, not schema drift: skip the
-    // check silently. (It still fires for a genuinely malformed descriptor
-    // that WAS shipped — a hand-edited / ad-hoc release — which is the
-    // FM-SEC-CHUNK-7 purpose.)
+    // zips it serves — the descriptor is Chronicle-side metadata, not part
+    // of the installed module. A 404 here is the normal served-install
+    // case, not schema drift, so it's skipped silently. This still fires
+    // for a genuinely malformed descriptor that WAS shipped (a hand-edited
+    // or ad-hoc release).
     if (!descResp.ok) {
       console.debug(
         `Chronicle Sync | chronicle-package.json not served (HTTP ${descResp.status}) — `
@@ -239,12 +234,9 @@ async function _runtimeValidateDescriptor() {
 Hooks.on('getSceneControlButtons', (controls) => {
   if (!game.user.isGM) return;
 
-  // openDashboard() is the module-level helper above: it recreates the
-  // dashboard when a prior close left the instance non-re-renderable, fixing
-  // the intermittent "can't reopen the dashboard" bug.
-  // FM-CAL-DASHBOARD-LINK: surface SyncCalendarApplication as a second
-  // tool in the Chronicle Sync scene-control group. The singleton helper
-  // is GM-only by contract; the outer GM guard above is also enforced.
+  // openDashboard() recreates the dashboard when a prior close left the
+  // instance non-re-renderable. Surfaces SyncCalendarApplication as a
+  // second tool in the Chronicle Sync scene-control group.
   const launchSyncCalendar = () => { openSyncCalendar(); };
   const syncCalendarTitle = game.i18n.localize('CHRONICLE.SceneControl.SyncCalendar');
 
@@ -414,16 +406,13 @@ function _addStatusIndicator() {
 /**
  * Re-attach the sidebar status indicator after the sidebar re-renders.
  *
- * Foundry v13+ rebuilt the sidebar as an ApplicationV2 that re-renders (and
- * wipes injected nodes) on tab changes, so the one-shot injection in
- * `_addStatusIndicator` does not persist — the indicator (a primary entry
- * point to the dashboard and its diagnostics) silently vanishes, which reads
- * to the operator as "the debug button is gone." This handler is purely
- * additive and fully guarded: if the hook never fires or the DOM shape differs
- * on a future Foundry version, behavior degrades to "no indicator" rather than
- * throwing. A version-independent path to diagnostics is also exposed on the
- * module API (`game.modules.get('chronicle-sync').api.copyDebug()` /
- * `.openDashboard()`).
+ * Foundry v13+'s sidebar is an ApplicationV2 that re-renders (and wipes
+ * injected nodes) on tab changes, so the one-shot injection in
+ * `_addStatusIndicator` doesn't persist on its own. Purely additive and
+ * fully guarded: if the DOM shape differs on a future Foundry version this
+ * degrades to "no indicator" rather than throwing. A version-independent
+ * diagnostics path also exists on the module API
+ * (`game.modules.get('chronicle-sync').api.copyDebug()` / `.openDashboard()`).
  */
 Hooks.on('renderSidebar', () => {
   try {
