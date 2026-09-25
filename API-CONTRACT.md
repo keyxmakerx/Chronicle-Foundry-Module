@@ -682,9 +682,65 @@ Generic sync endpoint for batch operations.
 #### GET /maps
 Lists all maps in the campaign.
 
-> **Note:** Drawing, token, fog, and layer endpoints exist on the Chronicle API
-> but are consumed by Chronicle's web map editor only — they are not synced to
-> Foundry. Only markers are synced as Foundry Scene Map Notes.
+> **Note:** The Foundry module renders a Chronicle map as a JournalEntry image
+> page with an SVG overlay (`MapViewerSheet`), not as a Foundry Scene. Drawing,
+> token, fog, and layer endpoints (below) are pulled read-only for that
+> overlay; only markers are editable from Foundry and pushed back.
+
+#### GET /maps/:mapId/drawings
+All coordinates are percentage-based (0–100), not pixels. `drawing_type` is
+one of `freehand`, `rectangle`, `ellipse`, `polygon`, `text`.
+
+```json
+{
+  "id": "drw_001", "map_id": "map_001", "layer_id": null,
+  "drawing_type": "rectangle", "points": [],
+  "stroke_color": "#ff0000", "stroke_width": 2,
+  "fill_color": "#00ff00", "fill_alpha": 0.5,
+  "text_content": null, "font_size": null, "rotation": 0,
+  "visibility": "everyone", "visibility_rules": null,
+  "created_by": "user_001", "foundry_id": null
+}
+```
+
+#### GET /maps/:mapId/tokens
+Coordinates are percentage-based (0–100); `width`/`height` are grid units.
+
+```json
+{
+  "id": "tok_001", "map_id": "map_001", "layer_id": null,
+  "entity_id": "ent_goblin01", "name": "Goblin Archer",
+  "image_path": "/uploads/tokens/goblin.png",
+  "x": 45.2, "y": 67.8, "width": 5.0, "height": 5.0,
+  "rotation": 0, "scale": 1.0, "is_hidden": false, "is_locked": false,
+  "bar1_value": 15, "bar1_max": 15, "bar2_value": null, "bar2_max": null,
+  "aura_radius": null, "aura_color": null,
+  "light_radius": null, "light_dim_radius": null, "light_color": null,
+  "vision_enabled": false, "vision_range": null,
+  "elevation": 0, "sort_order": 0,
+  "status_effects": null, "flags": null, "foundry_id": null
+}
+```
+
+#### GET /maps/:mapId/fog
+Fog regions use percentage coordinates; `points` is a JSON string of
+`[{x, y}, ...]`. `is_explored: true` renders semi-transparent, `false` fully
+opaque.
+
+```json
+{ "id": "fog_001", "map_id": "map_001",
+  "points": "[{\"x\":10,\"y\":10},{\"x\":30,\"y\":10},{\"x\":30,\"y\":30}]",
+  "is_explored": false }
+```
+
+#### GET /maps/:mapId/layers
+`layer_type` is one of `background`, `drawing`, `token`, `gm`, `fog`.
+
+```json
+{ "id": "lyr_001", "map_id": "map_001", "name": "Tokens",
+  "layer_type": "token", "sort_order": 1,
+  "is_visible": true, "opacity": 1.0, "is_locked": false }
+```
 
 #### GET /maps/:mapId/markers
 Lists map markers (pins/notes on the map).
@@ -1344,22 +1400,19 @@ If the token is invalid, the server rejects the upgrade.
 | `calendar.cycle.changed` | `null` | Cycle edited (always fires alongside `structure.updated`) |
 | `calendar.festival.changed` | `null` | Festival edited (always fires alongside `structure.updated`) |
 | `calendar.era.changed` | `{ id, name, color }` | Era boundary crossed |
-| `calendar.worldstate.changed` | `{ date: {year, month, day}, moodTint: {color, intensity} }` | World state changed — **see the gap note below; does not currently reach the wire** |
+| `calendar.worldstate.changed` | `{ date: {year, month, day}, moodTint: {color, intensity} }` | World state changed — dormant along with every other `calendar.*` type during the blackout |
 | `sync.status` | `{ connected: bool }` | Connection state change |
 | `sync.error` | `{ message }` | Synchronization error |
 | `sync.conflict` | Conflict details | Data conflict detected |
 
 ### What the module does with each `calendar.*` type
 
-Wired by FM-SYNC-SUBRESOURCES-P1 (`scripts/calendar-sync.mjs` `onMessage` +
-`scripts/_calendar-subresources.mjs`). Before that dispatch only the first four
-rows were handled and the switch had no `default:`, so every other type was
-dropped with no trace.
-
-P1 is **display-level and non-destructive**: no branch below writes a Chronicle
-value into the Foundry calendar's stored structure, and none creates a note.
-Chat announcements are **GM whispers only** — never public chat, so a payload
-Chronicle gated to the DM is not laundered into a player-visible one.
+Handled in `scripts/calendar-sync.mjs` `onMessage` + `scripts/_calendar-subresources.mjs`.
+The handling is **display-level and non-destructive**: no branch below writes
+a Chronicle value into the Foundry calendar's stored structure, and none
+creates a note. Chat announcements are **GM whispers only** — never public
+chat, so a payload Chronicle gated to the DM is not laundered into a
+player-visible one.
 
 | Type | Module behavior | Calendaria | Simple Calendar |
 |------|-----------------|-----------|-----------------|
@@ -1369,25 +1422,13 @@ Chronicle gated to the DM is not laundered into a player-visible one.
 | `calendar.season.changed` | Panel + GM chat line (`calendarAnnounceSeasonEra`, default **on**) | Display only | Display only |
 | `calendar.era.changed` | Panel + GM chat line (`calendarAnnounceSeasonEra`, default **on**) | Display only | Display only |
 | `calendar.moon.phase_changed` | Panel + GM chat line (`calendarAnnounceMoon`, default **off** — moons change phase every few in-world days) | Display only | Display only |
-| `calendar.worldstate.changed` | Panel + GM chat line (`calendarAnnounceWorldstate`, default **on**). Handler is wired and tested but **currently unreachable** — see the gap note. | Display only | Display only |
+| `calendar.worldstate.changed` | Panel + GM chat line (`calendarAnnounceWorldstate`, default **on**). Handler is wired and tested but currently unreachable (blackout). | Display only | Display only |
 | `calendar.structure.updated`, `calendar.cycle.changed`, `calendar.festival.changed` | Refetches `GET /calendar`, re-runs the structure comparison, and sets the badge: pause if now incompatible, clear a prior mismatch pause if now compatible, otherwise raise the advisory `structure-changed` state. **Never auto-applies the structure** — rewriting months/weekdays would silently re-date every existing note. Processed even while sync is paused (the only recovery path). | Both | Both |
-| any other `calendar.*` | `default:` branch logs one `console.debug` line **per type per session** — no more silent drops | — | — |
+| any other `calendar.*` | `default:` branch logs one `console.debug` line **per type per session** — no silent drops | — | — |
 
-
-#### History: worldstate wire (closed 2026-07-26, moot 2026-08-21)
-
-This section documented `calendar.worldstate.changed` as a live gap — published
-but with no `case` in Chronicle's publisher adapter, so it dead-lettered. It was
-stamped "verified against Chronicle `main` on 2026-07-25".
-
-Chronicle closed all three sub-gaps the very next day (`f8d3550`, 2026-07-26):
-the adapter case, the enriched payload and the syncapi read route. Nobody here
-re-checked for 26 days, and the module's docs advertised a blocker that no
-longer existed. The plugin — publisher included — was then deleted on
-2026-08-21.
-
-Kept as a record so nobody re-opens the investigation, and as the reason every
-cross-repo claim in this document now carries a `Re-verify by:` line.
+Every cross-repo claim in this document carries a `Re-verify by:` line: a
+calendar wire gap here was once reported fixed, then the whole plugin was
+deleted before anyone re-checked, and the stale claim stood for weeks.
 
 ### Reconnection
 

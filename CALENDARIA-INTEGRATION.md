@@ -129,11 +129,19 @@ with Calendaria** — hence the need for strict domain ownership checks.
 
 From `scripts/api.mjs`. Notes API is used by `calendar-sync.mjs`:
 
-- Notes: `createNote(...)`, `updateNote(id, ...)`, `deleteNote(id)`, `getNote(id)`
-- Date/time: `getCurrentDateTime()`, `setDateTime(components)`, `advanceTime(delta)`, `jumpToDate({year,month,day})`
+- Notes: `createNote(options)`, `updateNote(pageId, updates)`, `deleteNote(pageId)`, `getNote(id)`, `getNotesForDate(y, m, d)`
+- Date/time: `getCurrentDateTime()`, `setDateTime(components)`, `advanceTime(delta)`, `jumpToDate({year,month,day})`, `formatDate(components, format)`
 - Calendars: `getActiveCalendar()`, `getCalendar(id)`, `getAllCalendars()`, `switchCalendar(id)`, `setActiveCalendar(id)`, `addCalendar(id, def)`
+- Seasons: `getCurrentSeason()`
 - Moons: `getMoonPhase(i)`, `getAllMoonPhases()`, `isMoonFull(...)`, `getNextFullMoon(...)`, `getNextConvergence(...)`, `getEclipse(...)`
+- Weather: `getCurrentWeather(zoneId)`, `setWeather(presetId, options)` (GM only), `getWeatherForecast(options)`
 - Conversion: `convertDate(...)`, `getEquivalentDates(...)`, `getCurrentDateOn(id)`
+
+Hooks beyond the four this module consumes: `calendaria.dayChange` (day boundary
+crossed), `calendaria.seasonChange`, `calendaria.moonPhaseChange`,
+`calendaria.weatherChange`, `calendaria.calendarAdded/Removed/Switched/Updated`,
+`calendaria.clockUpdate`, `calendaria.conditionEvaluated`, plus cinematic hooks —
+see upstream `constants.mjs` `HOOKS`.
 
 > Calendaria uses a `yearZero` offset internally; the API exposes "public" dates
 > (`toPublic`) — keep using the API, don't read raw stored dates.

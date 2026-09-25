@@ -4,18 +4,18 @@ Bidirectional real-time sync between [Chronicle](https://github.com/keyxmakerx/C
 
 ## Features
 
-> **Calendar sync is paused (since 2026-08-21).** Chronicle's calendar is being
-> rebuilt from scratch, and its API answers `503` while that work is under way.
+> **Calendar sync is paused.** Chronicle's calendar is being rebuilt from
+> scratch, and its API answers `503` while that work is under way.
 > Journals, maps, characters, items and notes are unaffected and sync normally.
 > The module detects this and pauses calendar sync for the session rather than
 > reporting an error — nothing is wrong on your side and there is nothing to fix.
 
 - **Journal Sync** — Chronicle entities ↔ Foundry journal entries (with multi-page splitting)
-- **Map Sync** — Chronicle map markers ↔ Foundry scene pins (with "View in Chronicle" for full map editor)
+- **Map Sync** — Chronicle maps render as Foundry journal pages with an editable-marker overlay ("Open in Chronicle web editor" for the full map editor)
 - **Calendar Sync** — Calendaria and Simple Calendar integration
 - **Character Sync** — Actor ↔ character entity with system-aware field mapping (D&D 5e, Pathfinder 2e, or any system with annotated fields)
 - **Shop Widget** — Browse and purchase from Chronicle shop entities in Foundry
-- **Sync Dashboard** — 8-tab management UI with diagnostics, error logs, and health metrics
+- **Sync Dashboard** — management UI with diagnostics, error logs, and health metrics
 - **Permission Mapping** — Chronicle visibility ↔ Foundry ownership levels
 
 ## Compatibility
@@ -43,20 +43,17 @@ After install, Foundry remembers that URL and re-uses it on every update
 check — so you'll receive whichever module version your campaign owner
 pins, without further configuration.
 
-> **For Chronicle admins:** Chronicle picks up new versions from this
-> repo's GitHub releases. In Chronicle, open **Admin → Packages**, click
-> **Check for updates** on this module, and install the new version.
-> Campaign owners then pin it per campaign under **Settings → Integrations**.
-
-> **GitHub release distribution is no longer the primary channel.**
-> The repo still produces GitHub releases (Chronicle's package catalog
-> uses them as its upstream source), but the install URL Foundry users
-> should consume is the per-campaign Chronicle URL above — that's how
-> per-campaign version pinning works. Existing installs pointing at
-> GitHub continue to run but won't receive the campaign's pinned
-> version. Open the **Update Source** panel (Game Settings → Module
-> Settings → Chronicle Sync → Update Source) to check whether your
-> install needs to be re-pointed at Chronicle.
+> **For Chronicle admins:** Chronicle picks up new versions from this repo's
+> GitHub releases. In Chronicle, open **Admin → Packages**, click **Check for
+> updates** on this module, and install the new version. Campaign owners then
+> pin it per campaign under **Settings → Integrations**.
+>
+> GitHub releases are Chronicle's upstream source, not the install channel for
+> Foundry users — the install URL to hand out is the per-campaign Chronicle
+> URL above, since that's what makes per-campaign version pinning work. An
+> install still pointed at GitHub keeps running but won't receive the
+> campaign's pinned version; check **Game Settings → Module Settings →
+> Chronicle Sync → Update Source** to see whether an install needs re-pointing.
 
 ## Updating in Foundry
 

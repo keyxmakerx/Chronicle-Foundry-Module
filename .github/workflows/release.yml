@@ -56,7 +56,7 @@ jobs:
             LICENSE \
             README.md \
             -x "*.git*" "*.DS_Store" "*.ai.md" "CLAUDE.md" "TESTING.md" \
-                "API.md" "CONSTANTS.md"
+                "CONSTANTS.md"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
