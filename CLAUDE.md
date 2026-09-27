@@ -21,7 +21,8 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
   pure helpers, each unit-tested by its own `tools/test-*.mjs`.
 - `templates/` Handlebars, `styles/` CSS, `lang/en.json` strings,
   `tools/test-*.mjs` (Node's test runner, see TESTING.md).
-- `.github/workflows/`: `check-descriptor.yml`, `release.yml` (manual zip).
+- `.github/workflows/`: `check-descriptor.yml`, `release.yml` (Actions → Release
+  with a version; tags main), `snapshot.yml`.
 
 ## API Contract
 
