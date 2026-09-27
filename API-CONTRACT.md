@@ -1115,9 +1115,9 @@ If the token is invalid, the server rejects the upgrade.
 | `marker.created` | Full marker object | Map marker created |
 | `marker.updated` | Full marker object | Map marker modified |
 | `marker.deleted` | `{ id }` | Map marker deleted |
-| `note.created` | Full note object | Note created |
-| `note.updated` | Full note object | Note modified |
-| `note.deleted` | `{ id }` | Note deleted |
+| `note.created` | `{ noteId, entityId }` — ids only; the module fetches the note. An older Chronicle sends the full note object instead | Note created |
+| `note.updated` | `{ noteId, entityId }` — ids only; the module fetches the note. An older Chronicle sends the full note object instead | Note modified |
+| `note.deleted` | `{ noteId, entityId }` (an older Chronicle sends the full note object; only the id is read) | Note deleted |
 | `calendar.event.created` | Full event object | Calendar event created |
 | `calendar.event.updated` | Full event object | Calendar event modified |
 | `calendar.event.deleted` | `{ id }` | Calendar event deleted |
@@ -1133,6 +1133,22 @@ If the token is invalid, the server rejects the upgrade.
 | `sync.status` | `{ connected: bool }` | Connection state change |
 | `sync.error` | `{ message }` | Synchronization error |
 | `sync.conflict` | Conflict details | Data conflict detected |
+
+### What the module does with `note.*`
+
+`note.created`/`note.updated` carry no content — `scripts/note-sync.mjs`
+fetches the note by id (`GET /notes/:noteId`, Bearer auth, same shape as an
+item in `GET /notes`) and applies it exactly like a note from the initial
+sync. A message that still carries the full note (an older Chronicle) is
+applied directly, unchanged from before. A 404 or 403 on that fetch means
+the note is gone or no longer visible to this key: the module deletes its
+local copy — the same outcome `note.deleted` produces — and never logs the
+note's title. The message-shape and fetch-outcome decisions live in
+`scripts/_note-event.mjs` (`tools/test-note-event.mjs`).
+
+**Re-verify by: when keyxmakerx/Chronicle#787 merges and deploys.** The
+module's dual-shape handling holds either way; the ids-only wire shape it
+targets is unmerged as of 2026-09-27.
 
 ### What the module does with each `calendar.*` type
 

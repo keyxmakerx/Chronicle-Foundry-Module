@@ -10,6 +10,7 @@ import { getSetting } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
 import { defaultLevelForVisibility } from './_ownership.mjs';
+import { noteEventId, noteEventHasContent, noteFetchFailureAction } from './_note-event.mjs';
 
 /** Name of the root Foundry folder for Chronicle notes. */
 const NOTES_FOLDER_NAME = 'Chronicle Notes';
@@ -124,14 +125,14 @@ export class NoteSync {
 
   /**
    * Handle a new note from Chronicle.
-   * @param {object} payload - Raw WS payload (camelCase keys).
+   * @param {object} payload - Raw WS payload: ids-only `{ noteId, entityId }`
+   *   since Chronicle#787, or, from an older Chronicle, the full note
+   *   (camelCase keys).
    * @private
    */
   async _onNoteCreated(payload) {
-    if (!payload?.id) return;
-
-    // Normalize camelCase payload to snake_case.
-    const note = this._normalizeNote(payload);
+    const note = await this._resolveNoteEvent(payload);
+    if (!note) return;
 
     // Skip folder-type notes (handle separately if needed).
     if (note.is_folder) return;
@@ -146,13 +147,13 @@ export class NoteSync {
 
   /**
    * Handle an updated note from Chronicle.
-   * @param {object} payload
+   * @param {object} payload - Raw WS payload: ids-only `{ noteId, entityId }`
+   *   since Chronicle#787, or, from an older Chronicle, the full note.
    * @private
    */
   async _onNoteUpdated(payload) {
-    if (!payload?.id) return;
-
-    const note = this._normalizeNote(payload);
+    const note = await this._resolveNoteEvent(payload);
+    if (!note) return;
 
     const journal = game.journal.find(
       (j) => j.getFlag(FLAG_SCOPE, 'noteId') === note.id
@@ -166,14 +167,59 @@ export class NoteSync {
   }
 
   /**
+   * Resolve a note.created/note.updated payload to a normalized note,
+   * fetching it over the API when the payload carries no content
+   * (Chronicle#787's ids-only shape). Returns null when there is nothing to
+   * apply: no id on the payload, or a fetch failure that isn't a 404/403 —
+   * left for the next event or the initial sync to reconcile rather than
+   * guessed at. A 404/403 (the note is gone, or no longer visible to this
+   * key) is applied here as a delete of the Foundry copy — the same outcome
+   * a note.deleted event produces — and never logs a title, since the
+   * failed fetch never returned one.
+   * @param {object} payload
+   * @returns {Promise<object|null>} Normalized (snake_case) note, or null.
+   * @private
+   */
+  async _resolveNoteEvent(payload) {
+    const noteId = noteEventId(payload);
+    if (!noteId) return null;
+
+    if (noteEventHasContent(payload)) {
+      return this._normalizeNote(payload);
+    }
+
+    try {
+      const fetched = await this._api.getNotes(`/notes/${noteId}`);
+      return fetched ? this._normalizeNote(fetched) : null;
+    } catch (err) {
+      if (noteFetchFailureAction(err?.status) === 'delete') {
+        await this._deleteJournalForNote(noteId);
+      } else {
+        console.warn(`Chronicle: Failed to fetch note ${noteId} for sync`, err);
+      }
+      return null;
+    }
+  }
+
+  /**
    * Handle a deleted note from Chronicle.
    * @param {object} payload
    * @private
    */
   async _onNoteDeleted(payload) {
-    const noteId = payload?.id || payload?.noteId;
+    const noteId = noteEventId(payload);
     if (!noteId) return;
+    await this._deleteJournalForNote(noteId);
+  }
 
+  /**
+   * Delete the Foundry journal mapped to a Chronicle note id, if one exists.
+   * Shared by note.deleted events and by _resolveNoteEvent's 404/403 fetch
+   * outcome — the same "gone from here" case reached by a different path.
+   * @param {string} noteId
+   * @private
+   */
+  async _deleteJournalForNote(noteId) {
     const journal = game.journal.find(
       (j) => j.getFlag(FLAG_SCOPE, 'noteId') === noteId
     );
