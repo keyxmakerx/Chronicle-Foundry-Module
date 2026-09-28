@@ -2,43 +2,33 @@
 /**
  * CI guard: forbid the operator's production hostname in tracked source.
  * `chronicle-package.json` ships with every module install, so any tracked
- * file referencing it would leak the hostname to every consumer.
+ * file naming it would hand it to every consumer.
  *
- * Deny-lists a small set of operator-specific token fragments and walks
- * every tracked source file. Anything containing one of the fragments —
- * except this test file itself, which references them as literals — fails
- * CI with a pointer to the offending line.
+ * The guard holds only a SHA-256 fingerprint of the hostname's distinctive
+ * label, never the label itself: a guard that spells out what it guards
+ * publishes it. Every word of every walked file is hashed and compared, and
+ * a hit is reported as file:line only, so the CI log doesn't repeat it.
  */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join, relative } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
 
-/**
- * Token fragments that must not appear anywhere in tracked source. Kept
- * narrow (single-token substring) so we don't accidentally false-positive
- * on words that happen to contain a substring. Operator may extend if
- * future production hostnames need scrubbing.
- */
-const FORBIDDEN_FRAGMENTS = ['bnuuy'];
+/** SHA-256 of each forbidden word, lowercased. */
+const FORBIDDEN_SHA256 = new Set([
+  'ac1714a0d116e09a0a7a89b76e7c51e8d88ce8fa7678d63ec3c5dec301f32868',
+]);
 
-/**
- * Directories never walked. `.git` and `node_modules` are obvious; we
- * also skip Foundry's bundled `assets/` if it ever lands here (binary
- * content). Add more as needed.
- */
+/** Directories never walked. */
 const SKIP_DIRS = new Set(['.git', 'node_modules']);
 
-/**
- * File extensions we walk. Anything else (binary, lockfiles, etc.) is
- * skipped — the operator's hostname appearing in a PNG would be a much
- * weirder bug than this guard is built to catch.
- */
+/** File extensions walked: text the module ships or documents itself with. */
 const WALK_EXTENSIONS = new Set([
   '.mjs', '.js', '.cjs', '.ts',
   '.json', '.jsonc',
@@ -46,14 +36,6 @@ const WALK_EXTENSIONS = new Set([
   '.hbs', '.html', '.css',
   '.yml', '.yaml',
   '.sh',
-]);
-
-/**
- * Files allowed to mention the forbidden fragments because their job is
- * to detect them. Relative-to-repo-root paths.
- */
-const SELF_REFERENCES = new Set([
-  'tools/test-no-instance-hostname.mjs',
 ]);
 
 function walk(dir, acc) {
@@ -71,67 +53,56 @@ function walk(dir, acc) {
   }
 }
 
-function scanFile(absPath) {
-  const rel = relative(REPO_ROOT, absPath);
-  if (SELF_REFERENCES.has(rel)) return [];
-  let text;
-  try { text = readFileSync(absPath, 'utf8'); }
-  catch { return []; }
+const sha256 = (word) => createHash('sha256').update(word).digest('hex');
+
+/** Lines of text holding a word whose fingerprint is in `forbidden`. */
+function scanText(text, forbidden) {
+  const seen = new Map();
   const hits = [];
-  const lines = text.split(/\r?\n/);
-  lines.forEach((line, idx) => {
-    for (const frag of FORBIDDEN_FRAGMENTS) {
-      if (line.includes(frag)) {
-        hits.push({ file: rel, line: idx + 1, fragment: frag, content: line.trim().slice(0, 200) });
-      }
+  text.split(/\r?\n/).forEach((line, idx) => {
+    for (const word of line.toLowerCase().match(/[a-z0-9]+/g) || []) {
+      if (!seen.has(word)) seen.set(word, forbidden.has(sha256(word)));
+      if (seen.get(word)) { hits.push(idx + 1); break; }
     }
   });
   return hits;
+}
+
+function scanFile(absPath) {
+  let text;
+  try { text = readFileSync(absPath, 'utf8'); }
+  catch { return []; }
+  const rel = relative(REPO_ROOT, absPath);
+  return scanText(text, FORBIDDEN_SHA256).map((line) => `${rel}:${line}`);
 }
 
 // ---------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------
 
-test('FORBIDDEN_FRAGMENTS is non-empty and tightly scoped', () => {
-  assert.ok(FORBIDDEN_FRAGMENTS.length >= 1);
-  for (const f of FORBIDDEN_FRAGMENTS) {
-    assert.ok(typeof f === 'string' && f.length >= 4,
-      'fragment must be at least 4 chars to avoid false positives');
-  }
+test('every fingerprint is a SHA-256 hex digest', () => {
+  assert.ok(FORBIDDEN_SHA256.size >= 1);
+  for (const h of FORBIDDEN_SHA256) assert.match(h, /^[0-9a-f]{64}$/);
+});
+
+test('the scanner finds a fingerprinted word in any case, as a whole word', () => {
+  const forbidden = new Set([sha256('example')]);
+  assert.deepEqual(scanText('a\nhttps://chronicle.EXAMPLE.org/x\n', forbidden), [2]);
+  assert.deepEqual(scanText('counterexamples only', forbidden), []);
 });
 
 test('no tracked source references the operator\'s production hostname', () => {
   const files = [];
   walk(REPO_ROOT, files);
   const hits = files.flatMap(scanFile);
-  if (hits.length > 0) {
-    const lines = hits.map((h) =>
-      `  - ${h.file}:${h.line}  (fragment "${h.fragment}")\n      ${h.content}`,
-    );
-    assert.fail(
-      `Found ${hits.length} reference(s) to operator's production hostname in tracked source.\n` +
-      `Operator's security policy: no instance-specific hostnames in shipped artifacts.\n\n` +
-      `Hits:\n${lines.join('\n')}\n\n` +
-      `Fix: replace with a non-leaky placeholder or drop the field entirely. ` +
-      `See FM-SCRUB-SCHEMA-URL for the precedent.`,
-    );
-  }
+  assert.equal(hits.length, 0,
+    `The operator's production hostname appears in tracked source:\n  ${hits.join('\n  ')}\n` +
+    'Replace it with a non-leaky placeholder or drop the field.');
 });
 
-test('regression: chronicle-package.json no longer carries $schema with the operator hostname', () => {
-  const path = resolve(REPO_ROOT, 'chronicle-package.json');
-  const text = readFileSync(path, 'utf8');
-  const parsed = JSON.parse(text);
-  // The fix is Option A from the dispatch: drop the field entirely.
-  assert.equal(parsed.$schema, undefined,
-    'chronicle-package.json must not carry a $schema field that leaks the operator hostname. ' +
-    'Option A (drop the field) was chosen in FM-SCRUB-SCHEMA-URL because the schema is server-enforced.');
-});
-
-test('self-reference allowance is intact — this test file is permitted to mention the fragments', () => {
-  // This test exists to make the SELF_REFERENCES allowance explicit.
-  // If somebody removes the allowance, this file's grep would fail
-  // the main test and crash the suite circularly.
-  assert.ok(SELF_REFERENCES.has('tools/test-no-instance-hostname.mjs'));
+test('chronicle-package.json carries no $schema URL', () => {
+  // The schema is enforced by the server, so the descriptor needs no URL
+  // pointing at any instance.
+  const parsed = JSON.parse(readFileSync(resolve(REPO_ROOT, 'chronicle-package.json'), 'utf8'));
+  assert.equal(parsed.$schema, undefined);
 });
