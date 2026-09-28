@@ -25,13 +25,14 @@ Requires a running Chronicle instance and Foundry VTT with the chronicle-sync mo
 - [ ] Update entity name -> JournalEntry name updates
 - [ ] Update entity entry (rich text) -> JournalEntry pages update
 - [ ] Toggle entity privacy -> JournalEntry ownership changes
-- [ ] Delete entity -> JournalEntry removed
+- [ ] Delete entity -> JournalEntry set aside (unlinked, in the "Chronicle: removed" folder), never deleted
 
 ### Foundry -> Chronicle
 - [ ] Create JournalEntry -> Entity appears in Chronicle
 - [ ] Update JournalEntry name -> Entity name updates
 - [ ] Edit JournalEntry page content -> Entity entry updates
-- [ ] Delete JournalEntry -> Entity deleted in Chronicle
+- [ ] Delete JournalEntry -> asked "Delete in Chronicle too?": No keeps the entity, Yes deletes it
+- [ ] Delete several linked JournalEntries at once -> asked once, with all of them listed
 
 ### Multi-Page Sync
 - [ ] Entity with h1/h2 headings creates multiple Foundry journal pages
@@ -180,7 +181,7 @@ map editor. Only markers/pins sync to Foundry as Scene Map Notes.
 - [ ] Update Actor ability scores -> Chronicle entity fields_data updates
 - [ ] Update Actor HP -> Chronicle entity hp_current/hp_max update
 - [ ] Update Actor name -> Chronicle entity name updates
-- [ ] Delete Actor -> Chronicle entity deleted
+- [ ] Delete Actor -> asked "Delete in Chronicle too?": No keeps the entity, Yes deletes it
 
 ### Dashboard - Characters Tab
 - [ ] Characters tab visible in sync dashboard

@@ -18,6 +18,7 @@ import { getSetting } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
 import { createGenericAdapter } from './adapters/generic-adapter.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
+import { queueRemoteDelete } from './_remote-deletes.mjs';
 
 /**
  * ActorSync handles character entity ↔ Actor synchronization.
@@ -573,8 +574,8 @@ export class ActorSync {
   }
 
   /**
-   * Handle Foundry deleteActor hook.
-   * Deletes the linked Chronicle entity if one exists.
+   * Handle Foundry deleteActor hook: the GM is asked before the linked
+   * Chronicle entity, if any, is deleted too.
    * @param {Actor} actor
    * @param {object} options
    * @param {string} userId
@@ -587,12 +588,8 @@ export class ActorSync {
     const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
 
-    try {
-      await this._api.delete(`/entities/${entityId}`);
-      console.debug(`Chronicle: Deleted entity for actor "${actor.name}"`);
-    } catch (err) {
-      console.error('Chronicle: Failed to delete entity for deleted actor', err);
-    }
+    // The GM is asked before the Chronicle page goes too (_remote-deletes.mjs).
+    queueRemoteDelete({ label: actor.name, run: () => this._api.delete(`/entities/${entityId}`) });
   }
 
   // ---------------------------------------------------------------------------

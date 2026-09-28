@@ -11,6 +11,8 @@ import { FLAG_SCOPE } from './constants.mjs';
 import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
 import { defaultLevelForVisibility } from './_ownership.mjs';
 import { noteEventId, noteEventHasContent, noteFetchFailureAction } from './_note-event.mjs';
+import { setAside } from './_set-aside.mjs';
+import { queueRemoteDelete } from './_remote-deletes.mjs';
 
 /** Name of the root Foundry folder for Chronicle notes. */
 const NOTES_FOLDER_NAME = 'Chronicle Notes';
@@ -173,7 +175,7 @@ export class NoteSync {
    * apply: no id on the payload, or a fetch failure that isn't a 404/403 —
    * left for the next event or the initial sync to reconcile rather than
    * guessed at. A 404/403 (the note is gone, or no longer visible to this
-   * key) is applied here as a delete of the Foundry copy — the same outcome
+   * key) is applied here by setting the Foundry copy aside — the same outcome
    * a note.deleted event produces — and never logs a title, since the
    * failed fetch never returned one.
    * @param {object} payload
@@ -193,7 +195,7 @@ export class NoteSync {
       return fetched ? this._normalizeNote(fetched) : null;
     } catch (err) {
       if (noteFetchFailureAction(err?.status) === 'delete') {
-        await this._deleteJournalForNote(noteId);
+        await this._setAsideJournalForNote(noteId);
       } else {
         console.warn(`Chronicle: Failed to fetch note ${noteId} for sync`, err);
       }
@@ -209,17 +211,19 @@ export class NoteSync {
   async _onNoteDeleted(payload) {
     const noteId = noteEventId(payload);
     if (!noteId) return;
-    await this._deleteJournalForNote(noteId);
+    await this._setAsideJournalForNote(noteId);
   }
 
   /**
-   * Delete the Foundry journal mapped to a Chronicle note id, if one exists.
-   * Shared by note.deleted events and by _resolveNoteEvent's 404/403 fetch
-   * outcome — the same "gone from here" case reached by a different path.
+   * Set aside the Foundry journal mapped to a Chronicle note id, if one
+   * exists: unlinked, in the "Chronicle: removed" folder, never deleted
+   * (_set-aside.mjs). Shared by note.deleted events and by
+   * _resolveNoteEvent's 404/403 fetch outcome — the same "gone from here"
+   * case reached by a different path.
    * @param {string} noteId
    * @private
    */
-  async _deleteJournalForNote(noteId) {
+  async _setAsideJournalForNote(noteId) {
     const journal = game.journal.find(
       (j) => j.getFlag(FLAG_SCOPE, 'noteId') === noteId
     );
@@ -227,8 +231,9 @@ export class NoteSync {
 
     this._syncing = true;
     try {
-      await journal.delete();
-      console.debug(`Chronicle: Deleted journal for note ${noteId}`);
+      await setAside(journal, FLAG_SCOPE);
+      ui.notifications?.info?.(game.i18n.format('CHRONICLE.Removed.Note', { name: journal.name }));
+      console.debug(`Chronicle: Set aside journal for note ${noteId}`);
     } finally {
       this._syncing = false;
     }
@@ -412,7 +417,8 @@ export class NoteSync {
   }
 
   /**
-   * Handle Foundry JournalEntry deletion — delete Chronicle note.
+   * Handle Foundry JournalEntry deletion: the GM is asked before its
+   * Chronicle note is deleted too (_remote-deletes.mjs).
    * @param {JournalEntry} journal
    * @param {object} options
    * @param {string} userId
@@ -425,12 +431,7 @@ export class NoteSync {
     const noteId = journal.getFlag(FLAG_SCOPE, 'noteId');
     if (!noteId) return;
 
-    try {
-      await this._api.deleteNote(`/notes/${noteId}`);
-      console.debug(`Chronicle: Deleted note ${noteId} from journal deletion`);
-    } catch (err) {
-      console.warn('Chronicle: Failed to delete note on Chronicle', err);
-    }
+    queueRemoteDelete({ label: journal.name, run: () => this._api.deleteNote(`/notes/${noteId}`) });
   }
 
   // ---------------------------------------------------------------------------

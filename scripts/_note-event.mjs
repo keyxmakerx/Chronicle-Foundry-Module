@@ -53,9 +53,10 @@ export function noteEventHasContent(payload) {
  * being able to log) its title.
  * @param {number|null|undefined} status - `err.status` from the failed fetch.
  * @returns {'delete'|'error'} 'delete' when the fetch outcome means the
- *   local copy should be removed like a `note.deleted` event; 'error' for
- *   anything else (network failure, 5xx, …), which the caller surfaces
- *   normally instead of deleting on a guess.
+ *   note is gone from this key's view, handled like a `note.deleted` event
+ *   (the caller sets the local copy aside); 'error' for anything else
+ *   (network failure, 5xx, …), which the caller surfaces normally instead
+ *   of acting on a guess.
  */
 export function noteFetchFailureAction(status) {
   return status === 404 || status === 403 ? 'delete' : 'error';
