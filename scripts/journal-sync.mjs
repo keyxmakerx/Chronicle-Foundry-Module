@@ -18,6 +18,8 @@ import { isCalendarNoteJournal } from './calendar-sync.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
 import { walkEntityPages } from './_entity-page-walk.mjs';
 import { JournalPushDebouncer } from './_journal-push-debounce.mjs';
+import { setAside } from './_set-aside.mjs';
+import { queueRemoteDelete } from './_remote-deletes.mjs';
 
 /**
  * Validate and resolve a Chronicle entity's `image_path` to a safe src
@@ -402,7 +404,8 @@ export class JournalSync {
   }
 
   /**
-   * Delete a JournalEntry when its Chronicle entity is deleted.
+   * Set aside the JournalEntry of an entity deleted in Chronicle: unlinked,
+   * in the "Chronicle: removed" folder, never deleted (_set-aside.mjs).
    * @param {object} data - { id: entityId }
    * @private
    */
@@ -416,8 +419,9 @@ export class JournalSync {
 
     this._syncing = true;
     try {
-      await journal.delete();
-      console.debug(`Chronicle: Deleted journal for entity ${data.id}`);
+      await setAside(journal, FLAG_SCOPE);
+      ui.notifications?.info?.(game.i18n.format('CHRONICLE.Removed.Entity', { name: journal.name }));
+      console.debug(`Chronicle: Set aside journal for deleted entity ${data.id}`);
     } finally {
       this._syncing = false;
     }
@@ -801,7 +805,8 @@ export class JournalSync {
   }
 
   /**
-   * Handle Foundry JournalEntry deletion — notify Chronicle.
+   * Handle Foundry JournalEntry deletion: the GM is asked before its
+   * Chronicle page is deleted too (_remote-deletes.mjs).
    * @param {JournalEntry} journal
    * @param {object} options
    * @param {string} userId
@@ -819,13 +824,7 @@ export class JournalSync {
     const entityId = journal.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
 
-    try {
-      await this._api.delete(`/entities/${entityId}`);
-      console.debug(`Chronicle: Deleted entity ${entityId} from journal deletion`);
-    } catch (err) {
-      // Entity may already be deleted on Chronicle side — that's fine.
-      console.warn('Chronicle: Failed to delete entity on Chronicle', err);
-    }
+    queueRemoteDelete({ label: journal.name, run: () => this._api.delete(`/entities/${entityId}`) });
   }
 
   /**
@@ -882,11 +881,11 @@ export class JournalSync {
   }
 
   /**
-   * Remove any JournalEntries that duplicate a synced Foundry Actor
+   * Set aside any JournalEntries that duplicate a synced Foundry Actor
    * (same `entityId` flag on both). Called after the initial sync pass
-   * completes — by that point ActorSync has materialized its actors,
-   * so this overlaps cleanly. Conservative: only deletes entries whose
-   * single page is the auto-generated content (no user pages added).
+   * completes — by that point ActorSync has materialized its actors, so
+   * this overlaps cleanly. They are unlinked and moved to the removed
+   * folder, never deleted: a GM may have written in them.
    */
   async cleanupActorJournalDuplicates() {
     if (!getSetting('syncJournals')) return;
@@ -899,28 +898,26 @@ export class JournalSync {
     }
     if (actorEntityIds.size === 0) return;
 
-    let deleted = 0;
+    let moved = 0;
     this._syncing = true;
     try {
       for (const journal of [...game.journal.contents]) {
         const eid = journal.getFlag(FLAG_SCOPE, 'entityId');
         if (!eid || !actorEntityIds.has(eid)) continue;
         try {
-          await journal.delete();
-          deleted++;
+          await setAside(journal, FLAG_SCOPE);
+          moved++;
         } catch (err) {
-          console.warn(`Chronicle: Failed to delete duplicate journal ${journal.id}`, err);
+          console.warn(`Chronicle: Failed to set aside duplicate journal ${journal.id}`, err);
         }
       }
     } finally {
       this._syncing = false;
     }
 
-    if (deleted > 0) {
-      console.debug(`Chronicle: Cleaned up ${deleted} duplicate character journal(s)`);
-      ui.notifications.info(
-        `Chronicle: Removed ${deleted} duplicate character journal entr${deleted === 1 ? 'y' : 'ies'} (handled by Actor sheets).`
-      );
+    if (moved > 0) {
+      console.debug(`Chronicle: Set aside ${moved} duplicate character journal(s)`);
+      ui.notifications.info(game.i18n.format('CHRONICLE.Removed.Duplicates', { count: moved }));
     }
   }
 

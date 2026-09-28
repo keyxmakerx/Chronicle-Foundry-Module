@@ -638,6 +638,19 @@
         "IncompatibleApi": "Calendaria is installed but its API is not exposed. This editor needs CALENDARIA.api to function; check your Calendaria version.",
         "NoActiveCalendar": "Calendaria is loaded but no active calendar is selected. Open Calendaria's Calendar Editor to set one."
       }
+    },
+    "Removed": {
+      "FolderName": "Chronicle: removed",
+      "Entity": "\"{name}\" was deleted in Chronicle. Its journal is kept, unlinked, in the \"Chronicle: removed\" folder.",
+      "Note": "The note \"{name}\" was deleted in Chronicle, or is no longer shared with this world. Its journal is kept, unlinked, in the \"Chronicle: removed\" folder.",
+      "Duplicates": "{count} journal entries repeated characters that now sync as actors. They were moved, unlinked, to the \"Chronicle: removed\" folder."
+    },
+    "RemoteDelete": {
+      "Title": "Delete in Chronicle too?",
+      "Body": "<p>You deleted {count} item(s) in Foundry that are linked to Chronicle:</p>{list}<p>Delete them in Chronicle too? Chronicle deletes them for good.</p><p>Choose No to keep them in Chronicle. A kept journal comes back into Foundry at the next full sync; a kept actor does not.</p>",
+      "More": "and {count} more",
+      "Deleted": "Deleted {count} item(s) in Chronicle.",
+      "Kept": "Kept {count} item(s) in Chronicle."
     }
   }
 }
