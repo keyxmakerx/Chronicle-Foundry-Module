@@ -64,3 +64,15 @@ export async function walkEntityPages(fetchPage, normalize, opts = {}) {
 
   return { entities: all, truncated, pages: page };
 }
+
+/**
+ * Unwrap an entity list response: a bare array or `{data|entities: [...]}`.
+ * @param {unknown} raw
+ * @returns {Array<object>}
+ */
+export function unwrapEntityList(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.data)) return raw.data;
+  if (Array.isArray(raw?.entities)) return raw.entities;
+  return [];
+}

@@ -128,3 +128,14 @@ test('a fresh schedule() after a flush starts a new, independent window', (t) =>
   t.mock.timers.tick(JOURNAL_PUSH_DEBOUNCE_MS);
   assert.deepEqual(calls, [['first'], ['second']]);
 });
+
+test('has(key) is true only while a push is pending for that key', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const d = new JournalPushDebouncer(() => {}, 1000);
+  assert.equal(d.has('a'), false);
+  d.schedule('a', 1);
+  assert.equal(d.has('a'), true);
+  assert.equal(d.has('b'), false);
+  t.mock.timers.tick(1000);
+  assert.equal(d.has('a'), false);
+});

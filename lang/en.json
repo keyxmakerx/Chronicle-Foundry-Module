@@ -651,6 +651,14 @@
       "More": "and {count} more",
       "Deleted": "Deleted {count} item(s) in Chronicle.",
       "Kept": "Kept {count} item(s) in Chronicle."
+    },
+    "JournalPush": {
+      "TypeLabel": "Page type for journals made in Foundry",
+      "TypeHint": "A journal you create in Foundry becomes a Chronicle page of this type."
+    },
+    "CalendarDatePush": {
+      "Rejected": "Chronicle won't accept this date: its calendar has different months or leap days. Date sync is paused.",
+      "Forbidden": "Only the campaign owner's key can change Chronicle's date. Date sync is paused."
     }
   }
 }

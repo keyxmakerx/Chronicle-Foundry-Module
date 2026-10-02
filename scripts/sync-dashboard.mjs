@@ -27,6 +27,7 @@ import { buildOverviewModel } from './_overview-model.mjs';
 import { log, getLogBuffer } from './logger.mjs';
 import { shouldSkipDatePush, isRealTimeRejection, notifyRealTimePushPaused } from './_realtime-date-guard.mjs';
 import { walkEntityPages } from './_entity-page-walk.mjs';
+import { pickJournalCreateType } from './_journal-create.mjs';
 import { compareCalendarStructures } from './calendar-sync.mjs';
 import { classifyCalendarSyncState } from './_calendar-sync-state.mjs';
 import { projectSubresourcePanel } from './_calendar-subresources.mjs';
@@ -983,6 +984,14 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       { key: 'notes', label: 'Notes', icon: 'fa-sticky-note', direction: directions.notes || 'both', count: null },
     ];
 
+    // Page types for the "journals made in Foundry" dropdown; the selected one
+    // is what a new journal would be filed under right now.
+    const typeList = this._cache.entityTypes || [];
+    const selectedTypeId = pickJournalCreateType(typeList, getSetting('journalCreateTypeId'));
+    const journalCreateTypes = typeList
+      .filter((t) => t && t.enabled !== false)
+      .map((t) => ({ id: t.id, name: t.name_plural || t.name, selected: Number(t.id) === selectedTypeId }));
+
     return {
       apiUrl: getSetting('apiUrl'),
       apiKey: getSetting('apiKey'),
@@ -991,6 +1000,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       defaultOwnership: getSetting('defaultOwnership'),
       dmOnlyHidden: getSetting('dmOnlyHidden'),
       conflictResolution: getSetting('conflictResolution'),
+      journalCreateTypes,
       autoSync: getSetting('autoSync'),
       excludedTagsText: excludedTags.join(', '),
       excludedNamePattern: getSetting('excludedNamePattern'),
@@ -2570,6 +2580,13 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       // Behavior settings.
       const conflictRes = el.querySelector('[data-config-key="conflictResolution"]')?.value ?? 'chronicle';
       await setSetting('conflictResolution', conflictRes);
+
+      // Only when the dropdown was shown (it is absent if types failed to load),
+      // so a failed load never resets the chosen type.
+      const journalTypeSelect = el.querySelector('[data-config-key="journalCreateTypeId"]');
+      if (journalTypeSelect?.value) {
+        await setSetting('journalCreateTypeId', Number(journalTypeSelect.value));
+      }
 
       const autoSync = el.querySelector('[data-config-key="autoSync"]')?.checked ?? true;
       await setSetting('autoSync', autoSync);

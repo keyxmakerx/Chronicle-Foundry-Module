@@ -50,6 +50,16 @@ export class JournalPushDebouncer {
   }
 
   /**
+   * Whether a push is waiting for `key`. An incoming Chronicle change checks
+   * this so it never silently overwrites an edit that has not been sent yet.
+   * @param {string} key
+   * @returns {boolean}
+   */
+  has(key) {
+    return this._timers.has(key);
+  }
+
+  /**
    * Cancel a pending push for `key` without running it. No-op if nothing
    * is pending.
    * @param {string} key

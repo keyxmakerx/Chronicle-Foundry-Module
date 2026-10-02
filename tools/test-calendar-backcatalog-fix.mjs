@@ -169,28 +169,29 @@ test('MEDIUM: _syncDepth nests — the guard stays active until the OUTERMOST sc
   assert.equal(cs._syncing, false);
 });
 
-test('MEDIUM: a WS _onChronicleEventCreated resolving mid-back-catalog does not unmask the loop', async () => {
-  const syncingSeen = [];
+test('MEDIUM: a WS _onChronicleEventCreated mid-back-catalog neither unmasks nor over-holds the guard', async () => {
+  const seen = [];
   let injected = false;
   const cs = makeCalendarSync({
     _chronicleCalendar: { current_year: 1492, months: [{ days: 30 }] },
-    _api: { get: async () => ({ data: [{ id: 'e1' }, { id: 'e2' }], total: 2 }) },
+    _api: { get: async () => ({ data: [{ id: 'e1', name: 'A', year: 1, month: 1, day: 1 }, { id: 'e2', name: 'B', year: 1, month: 1, day: 2 }], total: 2 }) },
     _getLocalEventId: () => null,
-    async _createLocalEvent() {
-      syncingSeen.push(this._syncing);
+    async _createLocalEventUnguarded(data) {
+      seen.push(this._echoGuard.isEcho({ key: this._eventEchoKeys(data)[0] }));
       if (!injected) {
         injected = true;
-        // A Chronicle WS event lands mid-loop: run the REAL handler, whose
-        // finally does _syncDepth-- . With the old boolean this cleared the
-        // guard for the remaining creates → duplicate re-POST.
-        await CalendarSync.prototype._onChronicleEventCreated.call(this, { id: 'ws-1' });
+        // A Chronicle WS event lands mid-loop and finishes: its release must
+        // not clear the loop's still-held scope for the current event.
+        await CalendarSync.prototype._onChronicleEventCreated.call(this, { id: 'ws-1', name: 'A', year: 1, month: 1, day: 1 });
+        seen.push(this._echoGuard.isEcho({ key: this._eventEchoKeys(data)[0] }));
       }
     },
   });
   await cs._syncChronicleEventsToCalendariaNotes();
-  assert.ok(syncingSeen.length >= 2, 'multiple creates happened');
-  assert.ok(syncingSeen.every((v) => v === true), 'guard stays held across the interleaved WS event');
-  assert.equal(cs._syncing, false, 'guard fully released after the loop');
+  assert.ok(seen.length >= 3);
+  assert.ok(seen.every((v) => v === true), 'each create stays guarded across the interleaved WS event');
+  assert.equal(cs._echoGuard.isEcho({ key: cs._eventEchoKeys({ name: 'A', year: 1, month: 1, day: 1 })[0] }), false,
+    'guard fully released after the loop');
 });
 
 // ── Ride-alongs: compareCalendarStructures (RC-9) ────────────────────────────

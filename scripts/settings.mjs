@@ -258,6 +258,15 @@ export function registerSettings() {
     default: 'chronicle',
   });
 
+  // Chronicle page type for journals created in Foundry. 0 = not chosen yet:
+  // the first page type of the campaign is used (see _journal-create.mjs).
+  game.settings.register(MODULE_ID, 'journalCreateTypeId', {
+    scope: 'world',
+    config: false,
+    type: Number,
+    default: 0,
+  });
+
   // Auto-sync on change (true) vs manual-only (false).
   game.settings.register(MODULE_ID, 'autoSync', {
     scope: 'world',

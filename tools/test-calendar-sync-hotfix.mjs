@@ -152,25 +152,30 @@ test('no calendar / no months yields no coordinates (caller falls back to a bare
 
 // ── Item 2: the back-catalog must NOT echo (holds _syncing during create) ────
 
-test('back-catalog sync holds _syncing while creating local notes (no echo re-push)', async () => {
-  const syncingAtCreate = [];
+test('back-catalog sync suppresses the echo of each note it creates, and only that note', async () => {
+  const echoed = [];
+  const unrelatedEcho = [];
+  globalThis.CALENDARIA = { api: { createNote: async (n) => {
+    // The noteCreated hook fires synchronously inside createNote.
+    echoed.push(cs._isCalendariaNoteEcho({ name: n.name, startDate: n.startDate }));
+    unrelatedEcho.push(cs._isCalendariaNoteEcho({ name: 'GM note', startDate: { year: 1492, month: 5, day: 5 } }));
+    return { id: 'local-1' };
+  } } };
   const cs = makeCalendarSync({
+    _calendarModule: 'calendaria',
     _hasModernCalendariaApi: true,
     _chronicleCalendar: { current_year: 1492, months: new Array(12).fill({ days: 30 }) },
-    // Stub the real Chronicle envelope { data:[...], total:N }, not a bare array.
-    _api: { get: async () => ({ data: [{ id: 'e1' }], total: 1 }) },
-    _getLocalEventId: () => null, // nothing mapped yet
-    _createLocalEvent(event) {
-      // _createLocalEvent → CALENDARIA.api.createNote fires the noteCreated hook
-      // synchronously; _syncing MUST be true here to suppress the echo re-push.
-      syncingAtCreate.push(this._syncing);
-      return Promise.resolve();
-    },
+    _api: { get: async () => ({ data: [{ id: 'e1', name: 'Fair', year: 1492, month: 2, day: 3 }], total: 1 }) },
+    _getLocalEventId: () => null,
+    _storeEventMapping: async () => {},
   });
   await cs._syncChronicleEventsToCalendariaNotes();
-  assert.ok(syncingAtCreate.length > 0, 'at least one event was created (envelope was unwrapped)');
-  assert.ok(syncingAtCreate.every((v) => v === true), '_syncing must be held true during every create');
-  assert.equal(cs._syncing, false, '_syncing is reset after the loop');
+  assert.ok(echoed.length > 0, 'at least one event was created (envelope was unwrapped)');
+  assert.ok(echoed.every((v) => v === true), 'the created note\'s own hook echo is suppressed');
+  assert.ok(unrelatedEcho.every((v) => v === false), 'an unrelated GM note is NOT suppressed');
+  assert.equal(cs._isCalendariaNoteEcho({ name: 'Fair', startDate: { year: 1492, month: 2, day: 3 } }), false,
+    'guard fully released after the loop');
+  delete globalThis.CALENDARIA;
 });
 
 // ── Item 3: structure comparison (B-R2) ──────────────────────────────────────
