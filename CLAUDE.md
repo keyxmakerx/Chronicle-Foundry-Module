@@ -60,7 +60,7 @@ A structure-mismatch pause is re-checked on every pull (`onInitialSync`:
 reconnect and the dashboard's manual pull) and lifts when the calendars match;
 no world reload. A 400 (or non-real-time 422) on a date push means Chronicle's
 calendar cannot hold the date; a 403 means the key is not the campaign owner's.
-Either pauses date push for the session with one GM notice
+Either pauses date push, with one GM notice per session, until the next pull (reconnect or manual) or a lifted mismatch pause
 (`scripts/_date-push-rejection.mjs`). Note hooks (Calendaria and Simple
 Calendar) share the mismatch guard and per-calendar exclusions. Echo
 suppression for notes is per note id or name+date (`scripts/_apply-guard.mjs`),
