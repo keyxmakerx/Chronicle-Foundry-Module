@@ -35,6 +35,7 @@ const {
   WIRE_VISIBILITY,
   chronicleVisibilityFromCalendariaNote,
   isWireVisibilityGmOnly,
+  isChronicleEventPublic,
 } = await import('../scripts/calendar-sync.mjs');
 
 // ---------------------------------------------------------------------
@@ -164,4 +165,46 @@ test('regression: a GM-only note round-trips through wire helpers without unders
     `expected kebab "gm-only" in wire payload; got ${serialized}`);
   assert.ok(!serialized.includes('"gm_only"'),
     `wire payload must never contain underscore "gm_only"; got ${serialized}`);
+});
+
+// ---------------------------------------------------------------------
+// isChronicleEventPublic — Chronicle → Foundry, fail closed
+// ---------------------------------------------------------------------
+
+test('isChronicleEventPublic: everyone with no rules is public', () => {
+  assert.equal(isChronicleEventPublic({ visibility: 'everyone' }), true);
+  assert.equal(isChronicleEventPublic({ visibility: 'everyone', visibility_rules: null }), true);
+  assert.equal(isChronicleEventPublic({ visibility: 'everyone', visibility_rules: '' }), true);
+  assert.equal(isChronicleEventPublic({ visibility: 'everyone', visibility_rules: '{}' }), true);
+  assert.equal(isChronicleEventPublic({ visibility: 'everyone', visibility_rules: '{"allowed_users":[]}' }), true);
+  // Pre-contract servers sent no visibility and only public events.
+  assert.equal(isChronicleEventPublic({ name: 'Old' }), true);
+});
+
+test('isChronicleEventPublic: GM-only in either form is not public', () => {
+  assert.equal(isChronicleEventPublic({ visibility: 'gm-only' }), false);
+  assert.equal(isChronicleEventPublic({ visibility: 'gm_only' }), false);
+  assert.equal(isChronicleEventPublic({ visibility: 'dm_only' }), false);
+});
+
+test('isChronicleEventPublic: an everyone event restricted to some players is not public', () => {
+  assert.equal(isChronicleEventPublic({
+    visibility: 'everyone',
+    visibility_rules: '{"allowed_users":["u-1"]}',
+  }), false);
+  assert.equal(isChronicleEventPublic({
+    visibility: 'everyone',
+    visibility_rules: '{"denied_users":["u-2"]}',
+  }), false);
+  assert.equal(isChronicleEventPublic({
+    visibility: 'everyone',
+    visibility_rules: { allowed_users: ['u-1'] },
+  }), false);
+});
+
+test('isChronicleEventPublic: unknown or unreadable values fail closed', () => {
+  assert.equal(isChronicleEventPublic(null), false);
+  assert.equal(isChronicleEventPublic({ visibility: 'specific' }), false);
+  assert.equal(isChronicleEventPublic({ visibility: 'everyone', visibility_rules: 'not json' }), false);
+  assert.equal(isChronicleEventPublic({ visibility: 'everyone', visibility_rules: '[1]' }), false);
 });

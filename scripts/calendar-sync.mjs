@@ -78,6 +78,50 @@ export function isWireVisibilityGmOnly(wireValue) {
 }
 
 /**
+ * Pure helper: may this Chronicle event be shown to every player in Foundry?
+ * False for a GM-only event, and also for an `everyone` event that carries
+ * `visibility_rules` (an allow- or deny-list of players): Foundry notes can't
+ * express "only these players", so those stay GM-only. Fails closed: an
+ * unknown visibility value or unreadable rules count as restricted.
+ *
+ * Exported for unit testing.
+ *
+ * @param {object|null} event - Chronicle event as served by the sync API.
+ * @returns {boolean}
+ */
+export function isChronicleEventPublic(event) {
+  if (!event || typeof event !== 'object') return false;
+  const v = event.visibility;
+  // Absent visibility: servers older than the wire contract only sent public events.
+  if (v !== undefined && v !== null && v !== WIRE_VISIBILITY.EVERYONE) return false;
+  return !hasVisibilityRules(event.visibility_rules);
+}
+
+/**
+ * Does a raw `visibility_rules` value (a JSON string on the wire, or an
+ * already-parsed object) name any allowed or denied users? Unparseable →
+ * true, so a malformed rule never widens visibility.
+ *
+ * @param {string|object|null|undefined} raw
+ * @returns {boolean}
+ */
+function hasVisibilityRules(raw) {
+  if (raw === undefined || raw === null || raw === '') return false;
+  let rules = raw;
+  if (typeof raw === 'string') {
+    try {
+      rules = JSON.parse(raw);
+    } catch {
+      return true;
+    }
+  }
+  if (rules === null) return false;
+  if (typeof rules !== 'object' || Array.isArray(rules)) return true;
+  const named = (list) => Array.isArray(list) && list.length > 0;
+  return named(rules.allowed_users) || named(rules.denied_users);
+}
+
+/**
  * Calendaria's Foundry module id. It tags every note JournalEntry it creates
  * with flags under this scope. (Verified against Sayshal/Calendaria
  * `scripts/constants.mjs` → `MODULE.ID = 'calendaria'`.)
@@ -1608,6 +1652,7 @@ export class CalendarSync {
    * @private
    */
   async _createLocalEvent(data) {
+    const isPublic = isChronicleEventPublic(data);
     if (this._calendarModule === 'calendaria') {
       if (this._hasModernCalendariaApi) {
         // Modern Calendaria: create a note (notes are the primary event type).
@@ -1621,9 +1666,8 @@ export class CalendarSync {
               day: data.day,
             },
             allDay: true,
-            // isWireVisibilityGmOnly accepts kebab or the legacy underscore
-            // form, so stale storage-side data still resolves correctly.
-            gmOnly: isWireVisibilityGmOnly(data.visibility),
+            gmOnly: !isPublic,
+            visibility: isPublic ? 'visible' : 'hidden',
             openSheet: false,
           });
           if (note?.id) {
@@ -1633,7 +1677,9 @@ export class CalendarSync {
           console.error('Chronicle: Failed to create Calendaria note from Chronicle event', err);
         }
       } else if (game.Calendaria?.createEvent) {
-        // Legacy Calendaria.
+        // Legacy Calendaria has no hidden events, so a restricted one is
+        // not copied at all rather than shown to every player.
+        if (!isPublic) return;
         const localEvent = await game.Calendaria.createEvent({
           name: data.name,
           year: data.year,
@@ -1648,7 +1694,9 @@ export class CalendarSync {
         console.debug('Chronicle: Calendaria createEvent/createNote API not available');
       }
     } else if (this._calendarModule === 'simple-calendar') {
-      // SimpleCalendar events are journal entries with note flags.
+      // SimpleCalendar events are journal entries with note flags. This path
+      // sets no player visibility, so a restricted event is not copied.
+      if (!isPublic) return;
       const sc = SimpleCalendar?.api;
       if (sc?.addNote) {
         const note = await sc.addNote(
@@ -1691,6 +1739,7 @@ export class CalendarSync {
    * @private
    */
   async _updateLocalEvent(data) {
+    const isPublic = isChronicleEventPublic(data);
     if (this._calendarModule === 'calendaria') {
       const localId = this._getLocalEventId(data.id);
       if (!localId) return;
@@ -1705,11 +1754,20 @@ export class CalendarSync {
               month: data.month,
               day: data.day,
             },
+            // Re-applied on every update so an event Chronicle narrows to
+            // the GM or to some players stops being visible to everyone.
+            visibility: isPublic ? 'visible' : 'hidden',
           });
         } catch (err) {
           console.error('Chronicle: Failed to update Calendaria note', err);
         }
       } else if (game.Calendaria?.updateEvent) {
+        // No hidden events here (see _createLocalEvent): a now-restricted
+        // event is removed from Foundry instead of staying visible.
+        if (!isPublic) {
+          await this._deleteLocalEvent(data);
+          return;
+        }
         await game.Calendaria.updateEvent(localId, {
           name: data.name,
           year: data.year,
@@ -1719,7 +1777,12 @@ export class CalendarSync {
         });
       }
     } else if (this._calendarModule === 'simple-calendar') {
-      // SimpleCalendar notes are journal entries — update name/content.
+      // SimpleCalendar notes are journal entries — update name/content. A
+      // now-restricted event is removed, as for legacy Calendaria above.
+      if (!isPublic) {
+        await this._deleteLocalEvent(data);
+        return;
+      }
       const localId = this._getLocalEventId(data.id);
       if (localId) {
         const journal = game.journal.get(localId);
