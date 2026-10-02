@@ -564,7 +564,7 @@ export class ActorSync {
         : (change.system ? this._adapter.toChronicleFields(actor) : null);
 
       if (fields && Object.keys(fields).length > 0) {
-        await this._api.put(`/entities/${entityId}/fields`, { fields_data: fields });
+        await this._putFieldsMerged(entityId, fields);
         await this._refreshChronicleVersion(actor, entityId);
       }
 
@@ -574,6 +574,24 @@ export class ActorSync {
     } catch (err) {
       console.error('Chronicle: Failed to push actor update to Chronicle', err);
     }
+  }
+
+  /**
+   * Write some fields without losing the rest. Older Chronicle servers
+   * replace the whole field set on this PUT, so the current set is read and
+   * the changes laid over it; newer ones merge, and sending the merged set
+   * is the same result there. A failed read throws rather than risk a
+   * partial set wiping the rest on an older server.
+   * @param {string} entityId
+   * @param {object} fields
+   * @private
+   */
+  async _putFieldsMerged(entityId, fields) {
+    const current = (await this._api.get(`/entities/${entityId}`))?.fields_data;
+    const merged = current && typeof current === 'object' && !Array.isArray(current)
+      ? { ...current, ...fields }
+      : fields;
+    await this._api.put(`/entities/${entityId}/fields`, { fields_data: merged });
   }
 
   /**
@@ -991,7 +1009,7 @@ export class ActorSync {
     const actor = game.actors.get(actorId);
     const entityId = actor?.getFlag(FLAG_SCOPE, 'entityId');
     if (!actor || !entityId || !this._adapter) return false;
-    await this._api.put(`/entities/${entityId}/fields`, { fields_data: this._adapter.toChronicleFields(actor) });
+    await this._putFieldsMerged(entityId, this._adapter.toChronicleFields(actor));
     this._syncing = true;
     try { await actor.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString()); }
     finally { this._syncing = false; }

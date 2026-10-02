@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Actor edits push only the mapped fields they changed (Chronicle merges
- * them, so Chronicle-only fields survive), renames carry the entity's new
+ * Actor edits push only the mapped fields they changed, laid over the
+ * entity's current field set so Chronicle-only fields survive on any server, renames carry the entity's new
  * version forward instead of 409ing, and bursts collapse per actor.
  */
 import test from 'node:test';
@@ -83,6 +83,30 @@ test('a field edit PUTs only that field to /fields and re-reads the version', as
   assert.deepEqual(Object.keys(put[2].fields_data).sort(), ['hp', 'inventory']);
   assert.ok(!('ac' in put[2].fields_data) && !('bio' in put[2].fields_data));
   assert.equal(actor.flags.chronicleUpdatedAt, 'V2', 'new version carried forward');
+});
+
+test('a field edit keeps Chronicle-only fields even on a server that replaces the whole set', async () => {
+  const { sync, calls } = await harness();
+  sync._api.get = async (p) => { calls.push(['GET', p]); return { id: 'ent-1', updated_at: 'V1', fields_data: { hp: 5, notes: 'keep me' } }; };
+  await sync._handleUpdateActor(actorDoc(), { system: { attributes: { hp: { value: 9 } } } }, {}, 'gm');
+  sync._actorPushDebouncer.flush('a1');
+  await new Promise((r) => setImmediate(r));
+  const put = calls.find((c) => c[0] === 'PUT');
+  assert.equal(put[2].fields_data.notes, 'keep me');
+  assert.equal(put[2].fields_data.hp, 12, 'the actor value wins over the stored one');
+});
+
+test('when the current fields cannot be read, nothing is pushed', async () => {
+  const { sync, calls } = await harness();
+  sync._api.get = async () => { throw Object.assign(new Error('down'), { status: 503 }); };
+  const errs = []; const orig = console.error; console.error = (...a) => errs.push(a);
+  try {
+    await sync._handleUpdateActor(actorDoc(), { system: { attributes: { hp: { value: 9 } } } }, {}, 'gm');
+    sync._actorPushDebouncer.flush('a1');
+    await new Promise((r) => setImmediate(r));
+  } finally { console.error = orig; }
+  assert.equal(calls.filter((c) => c[0] === 'PUT').length, 0);
+  assert.equal(errs.length, 1);
 });
 
 test('rename then field edit: name PUT uses the stored version, and the next rename does not conflict', async () => {
