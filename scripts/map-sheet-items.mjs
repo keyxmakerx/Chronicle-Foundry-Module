@@ -1,8 +1,9 @@
 /**
  * Chronicle Sync - Maps on character sheets
  *
- * The GM gives a Chronicle map to a character ("Give this map to a
- * character" on a map's journal entry). It becomes an item in the
+ * The GM gives a Chronicle map to a character by dragging the map onto
+ * the sheet, or with "Give this map to a character" on the map's journal
+ * entry. It becomes an item in the
  * character's inventory; its Open button unfolds the live map in its own
  * window while the sheet stays open. Giving the map also lets the players
  * who own that character open its journal.
@@ -28,6 +29,29 @@ export function registerMapSheetItems() {
   Hooks.on('renderActorSheetV2', _onRenderActorSheet);
   Hooks.on('renderItemSheet', _onRenderItemSheet);
   Hooks.on('renderItemSheetV2', _onRenderItemSheet);
+  Hooks.on('dropActorSheetData', _onDropActorSheetData);
+}
+
+/**
+ * The GM drags a Chronicle map (its journal entry or page) onto a sheet.
+ * Returning false stops the sheet's own drop handling for that drop only.
+ */
+function _onDropActorSheetData(actor, _sheet, data) {
+  if (!game.user.isGM || !actor) return;
+  if (data?.type !== 'JournalEntry' && data?.type !== 'JournalEntryPage') return;
+  const uuid = typeof data.uuid === 'string' ? data.uuid : null;
+  if (!uuid) return;
+  // fromUuidSync keeps the decision synchronous, so `return false` counts.
+  const doc = fromUuidSync(uuid);
+  const page = data.type === 'JournalEntryPage'
+    ? (doc?.getFlag?.(FLAG_SCOPE, 'mapId') ? doc : null)
+    : _mapPageOf(doc);
+  if (!page) return;
+  giveMapToActor(page, actor).catch((err) => {
+    console.error('Chronicle: give map failed', err);
+    ui.notifications.error(game.i18n.localize('CHRONICLE.MapItems.GiveFailed'));
+  });
+  return false;
 }
 
 /** The Chronicle map page of a journal entry, if it is one. */
