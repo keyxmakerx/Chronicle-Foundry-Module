@@ -704,17 +704,6 @@ export class SyncManager {
   }
 
   /**
-   * Create or update a sync mapping on the server. Delegates to
-   * `ensureMapping` so legacy callers (wizard `link-map`, dashboard
-   * manual-sync) inherit conflict-tolerant idempotency.
-   * @param {object} mapping
-   * @returns {Promise<object>}
-   */
-  async createMapping(mapping) {
-    return this.ensureMapping(mapping);
-  }
-
-  /**
    * Idempotent sync-mapping POST.
    *
    * 1. Look up an existing mapping for `(chronicle_type, chronicle_id)`; if
@@ -863,20 +852,6 @@ export class SyncManager {
         const actorSync = this._modules.find((m) => m.constructor.name === 'ActorSync');
         if (!actorSync) throw new Error('ActorSync module not loaded');
         await actorSync._handleCreateActor(actor, {}, game.user.id);
-        break;
-      }
-      case 'link-map': {
-        const scene = game.scenes.get(item.data.sceneId);
-        if (!scene) throw new Error(`Scene ${item.data.sceneId} not found`);
-        await scene.setFlag('chronicle-sync', 'mapId', item.data.mapId);
-        await this.createMapping({
-          chronicle_type: 'map',
-          chronicle_id: item.data.mapId,
-          external_system: 'foundry',
-          external_id: item.data.sceneId,
-          sync_direction: 'both',
-          sync_metadata: { foundry_type: 'Scene' },
-        });
         break;
       }
       case 'assign-tags': {
