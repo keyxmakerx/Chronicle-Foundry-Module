@@ -1103,6 +1103,15 @@ export class MapSync {
   }
 
   /**
+   * Chronicle's marker icon catalog from the last `GET /maps/look`, for the
+   * marker window's picker. Empty on an older Chronicle without the route.
+   * @returns {{id: string, label: string, category: string}[]}
+   */
+  getIconCatalog() {
+    return this._look?.iconCatalog || [];
+  }
+
+  /**
    * Fetch the campaign map look. Cosmetic: a failure (or an older Chronicle
    * without the route) keeps the last answer and is only logged.
    * @private

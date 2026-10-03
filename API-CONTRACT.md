@@ -393,7 +393,7 @@ Lists all tags in the campaign.
 #### POST /tags
 Create a new tag.
 
-**Used by:** `import-wizard.mjs` → Step 8 tag creation during import
+**Used by:** `import-wizard.mjs` → Step 7 (Review) tag creation during import
 
 **Request:**
 ```json
@@ -670,6 +670,9 @@ icons[{id,label,category}], default_icon}`. `campaign_frame` is one of
 own frame wears. Fetched once per full sync; a 404 (older Chronicle) keeps
 the Atlas default. Marker `icon` is a Font Awesome class from `icons`; the
 viewer draws any well-formed `fa-` class and falls back to `default_icon`.
+The marker dialog's icon picker offers `icons` grouped by `category` and
+sends only an `id` from that list; without the list (older Chronicle) the
+picker is hidden and a marker keeps its icon.
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/map_api_look.go`, keyxmakerx/Chronicle#1017)
 
 #### GET /maps/:mapId/drawings
@@ -1021,6 +1024,50 @@ Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/shop_api_handler.g
 
 ---
 
+### DM Screen
+
+The GM's DM Screen window (`dm-screen.mjs`, parsed by `_dm-screen-view.mjs`).
+The body is Chronicle's `dmscreen.View`, the same data its own panel draws.
+A Chronicle without these routes answers 404; the window then says to update
+Chronicle. Players are refused (403) and the downtime switch is owner-only;
+the GM's sync key counts as the owner.
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/dm_screen_api.go`, `internal/plugins/dmscreen/model.go`; added in Chronicle PR #1021)
+
+#### GET /dm-screen
+Used by: `dm-screen.mjs`. Scope: read.
+
+**Response:** sections Chronicle can't fill are left out (`downtime`, `world`, `night`) or empty.
+```json
+{
+  "campaign_id": "uuid",
+  "downtime": { "open": false, "can_toggle": true, "pending": 2 },
+  "world": { "calendar_id": "uuid", "date_label": "3 Frostfall 1204", "time_label": "14:00", "weather": "Light snow" },
+  "night": { "name": "Session 12", "when": "Fri 3 Oct, 7pm", "going": 3, "maybe": 1, "cant": 0, "no_answer": 2 },
+  "foundry": { "connected": true, "never_seen": false, "last_seen": "2026-10-03T15:00:00Z" },
+  "system_name": "Draw Steel",
+  "party_filled": true,
+  "party": [
+    { "id": "uuid", "name": "Vex", "player_name": "Sam", "subtitle": "Shadow", "conditions": ["Bleeding"],
+      "meters": [ { "label": "Stamina", "current": "12", "max": "30", "has_max": true, "percent": 40, "low": true } ] }
+  ],
+  "hidden": [ { "id": "uuid", "name": "The Baron", "type_name": "Character", "revealed": false } ],
+  "conditions": [ { "name": "Bleeding", "text": "Plain rule text." } ]
+}
+```
+
+#### POST /dm-screen/reveal/:entityId
+Used by: `dm-screen.mjs`. Scope: write. Body `{}`. Makes one hidden character visible to players.
+
+**Response:** `{ "id": "uuid", "name": "The Baron", "revealed": true }`
+
+#### POST /dm-screen/downtime
+Used by: `dm-screen.mjs`. Scope: write. Body `{ "open": true }` or `{ "open": false }`; a missing `open` is a 400.
+404 when the campaign has no Armory.
+
+**Response:** `{ "open": true, "applied": 2, "failed": 0 }` (waiting requests that went through or failed on opening)
+
+---
+
 ## Chronicle-served Module Distribution
 
 The install/update contract: the URLs Foundry hits to fetch the module's
@@ -1328,6 +1375,7 @@ If the token is invalid, the server rejects the upgrade.
 | `stash.moved` | `{ moveId, status, characterIds, stashIds }` | A move ran; the touched linked actors are re-pulled |
 | `stash.money_changed` | `{ characterId, moveId }` | A character's money changed (including a sheet edit); the actor is re-pulled |
 | `downtime.changed` | `{ open }` | Downtime was opened or closed; relayed to players' open windows |
+| `npc.spotlight` | none; `resourceId` is the NPC's entity id | "Show in Foundry" pressed on a Chronicle NPC page |
 | `sync.status` | `{ connected: bool }` | Connection state change |
 | `sync.error` | `{ message }` | Synchronization error |
 | `sync.conflict` | Conflict details | Data conflict detected |
@@ -1370,21 +1418,25 @@ stored, refreshing every map once when it cannot. Re-verify by: 2026-11-03
 (Chronicle `internal/app/routes.go` `mapEventPublisherAdapter`,
 `internal/plugins/syncapi/map_api_handler.go`).
 
+### What the module does with `npc.spotlight`
+
+Sent to DM-equivalent sockets only, with the page id and nothing else, when
+the owner or a member given DM access presses "Show in Foundry" on an NPC
+page. It is not in the change feed, so a missed one is simply gone. The
+module's allowlist includes the `npc.` prefix; `scripts/npc-presence.mjs`
+`npcSpotlightRelay` acts on the **active GM client only**: it finds a token
+on the GM's current scene linked to that page (shown before hidden) and runs
+the same spotlight as the token HUD star. No such token, or a hidden one,
+only tells the GM. `tools/test-npc-presence.mjs`.
+
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/foundry_vtt/npc_spotlight.go`, `internal/app/npc_spotlight_adapters.go`; keyxmakerx/Chronicle#1039)
+
 ### What the module does with `note.*`
 
-`note.created`/`note.updated` carry no content — `scripts/note-sync.mjs`
-fetches the note by id (`GET /notes/:noteId`, Bearer auth, same shape as an
-item in `GET /notes`) and applies it exactly like a note from the initial
-sync. A message that still carries the full note (an older Chronicle) is
-applied directly, unchanged from before. A 404 or 403 on that fetch means
-the note is gone or no longer visible to this key: the module deletes its
-local copy — the same outcome `note.deleted` produces — and never logs the
-note's title. The message-shape and fetch-outcome decisions live in
-`scripts/_note-event.mjs` (`tools/test-note-event.mjs`).
-
-**Re-verify by: when keyxmakerx/Chronicle#787 merges and deploys.** The
-module's dual-shape handling holds either way; the ids-only wire shape it
-targets is unmerged as of 2026-09-27.
+Nothing. The player notebook shows Chronicle's own Journal and Jot pages in
+frames, so notes never become Foundry journals and no sync module reads
+`note.*`. The old "Chronicle Notes" folder from the retired note sync is set
+aside on the GM's world load (`scripts/_notes-folder.mjs`).
 
 ### What the module does with each `calendar.*` type
 

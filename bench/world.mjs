@@ -95,7 +95,6 @@ export function newWorld(seed, { settings = {} } = {}) {
       syncCharacters: false,
       syncMaps: false,
       syncCalendar: false,
-      syncNotes: false,
       ...settings,
     },
   });

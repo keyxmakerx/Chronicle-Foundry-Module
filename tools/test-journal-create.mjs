@@ -2,7 +2,8 @@
 /**
  * Journal made in Foundry -> Chronicle page: the create payload is pinned to
  * Chronicle's create request keys, the text goes in a follow-up PUT, and
- * journals owned by MapSync / NoteSync / CalendarSync are never pushed.
+ * journals owned by MapSync / CalendarSync, or set aside in the old
+ * Chronicle Notes folder, are never pushed.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -91,10 +92,11 @@ test('map journals (page flag or Maps folder), sync-made and already-linked jour
   assert.deepEqual(calls, [], 'no request of any kind');
 });
 
-test('Chronicle Notes journals are skipped', async () => {
+test('journals in the old Chronicle Notes folder are skipped', async () => {
   const { js, calls } = harness();
-  js._syncManager._modules = [{ constructor: { name: 'NoteSync' }, _isNoteJournal: () => true }];
-  await js._handleCreateJournal(makeJournal(), {}, 'gm');
+  const notesRoot = { getFlag: (_s, k) => k === 'isNotesRoot', folder: null };
+  await js._handleCreateJournal(makeJournal({ folder: { getFlag: () => undefined, folder: notesRoot } }), {}, 'gm');
+  await js._handleCreateJournal(makeJournal({ flags: { oldNote: true } }), {}, 'gm');
   assert.deepEqual(calls, []);
 });
 

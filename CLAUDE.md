@@ -13,7 +13,7 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
   `tools/check-package-descriptor.mjs`.
 - `scripts/*.mjs`: sync (`journal-sync`, `map-sync`+`map-viewer`,
   `calendar-sync`+`sync-calendar`+`sync-calendar-*`, `actor-sync`,
-  `item-sync`, `note-sync`, `stash-sync`+`stash-client`), UI (`sync-dashboard`, `npc-presence`,
+  `item-sync`, `stash-sync`+`stash-client`), UI (`sync-dashboard`, `npc-presence`,
   `sync-diagnostic-bundle`, `update-info`, `character-claim-indicator`,
   `capability-inspector`, `import-wizard`, `shop-widget`+`shop-room-window`, `player-notebook`, `stash-window`+`stash-chat`), core (`module`,
   `settings`, `constants`, `logger`, `sync-manager`, `api-client`),
@@ -21,6 +21,8 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
   pure helpers, each unit-tested by its own `tools/test-*.mjs`.
 - `vendor/chronicle/`: Chronicle's shop room widget, copied unchanged; a
   Chronicle change to it means copying it again (`tools/test-shop-room.mjs`).
+- `scripts/dm-screen.mjs` (UI): the GM's DM Screen window, drawn from
+  Chronicle's `GET /dm-screen`.
 - `templates/` Handlebars, `styles/` CSS, `lang/en.json` strings,
   `tools/test-*.mjs` (Node's test runner, see TESTING.md).
 - `bench/`: the two-sided sync bench (real Chronicle + the real sync code in

@@ -27,7 +27,8 @@
     "styles/map-viewer.css",
     "styles/map-frames.css",
     "styles/stashes.css",
-    "styles/sync-calendar-pr3.css"
+    "styles/sync-calendar-pr3.css",
+    "styles/dm-screen.css"
   ],
   "languages": [
     {

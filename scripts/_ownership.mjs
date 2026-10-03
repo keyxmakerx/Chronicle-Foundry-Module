@@ -11,9 +11,8 @@
  *
  * Security: fail CLOSED — any ambiguity resolves toward LESS player
  * visibility, never more (a custom-visibility error path must fail to NONE,
- * enforced in journal-sync). Both `journal-sync.mjs` (_buildOwnership) and
- * `note-sync.mjs` (_buildNoteOwnership) consume this so the two paths can't
- * drift.
+ * enforced in journal-sync). `journal-sync.mjs` (_buildOwnership) consumes
+ * this.
  */
 
 import { getSetting } from './settings.mjs';
