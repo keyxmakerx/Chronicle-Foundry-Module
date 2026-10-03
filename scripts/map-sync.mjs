@@ -28,8 +28,7 @@ import { getSetting } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
 import {
-  isMarkerSafeForPlayerFlags,
-  isDrawingSafeForPlayerFlags,
+  playerSafeMapItems,
   isTokenSafeForPlayerFlags,
 } from './_map-flag-filter.mjs';
 
@@ -844,16 +843,17 @@ export class MapSync {
       // re-checks the stored flags, not just new writes, so restricted
       // data already on a player's client is removed instead of waiting
       // for a viewer-open or a live event to clean it up.
+      // Shadows come from the stored drawings: an older module wrote visible
+      // shadow drawings into flags alongside the pins they cover. Pins under
+      // a GM-only shadow are caught by the full refresh that follows.
       const storedMarkers = page.getFlag(FLAG_SCOPE, 'chronicleMarkers') || [];
-      const safeStoredMarkers = storedMarkers.filter(isMarkerSafeForPlayerFlags);
-      if (safeStoredMarkers.length !== storedMarkers.length) {
-        updates[`flags.${FLAG_SCOPE}.chronicleMarkers`] = safeStoredMarkers;
-      }
-
       const storedDrawings = page.getFlag(FLAG_SCOPE, 'chronicleDrawings') || [];
-      const safeStoredDrawings = storedDrawings.filter(isDrawingSafeForPlayerFlags);
-      if (safeStoredDrawings.length !== storedDrawings.length) {
-        updates[`flags.${FLAG_SCOPE}.chronicleDrawings`] = safeStoredDrawings;
+      const stored = playerSafeMapItems(storedMarkers, storedDrawings);
+      if (stored.markers.length !== storedMarkers.length) {
+        updates[`flags.${FLAG_SCOPE}.chronicleMarkers`] = stored.markers;
+      }
+      if (stored.drawings.length !== storedDrawings.length) {
+        updates[`flags.${FLAG_SCOPE}.chronicleDrawings`] = stored.drawings;
       }
 
       const storedTokens = page.getFlag(FLAG_SCOPE, 'chronicleTokens') || [];
@@ -956,36 +956,44 @@ export class MapSync {
       tokens,
       layers,
       fog,
+      drawingsKnown: drawingsR != null,
       lastFetched: Date.now(),
     });
 
-    await this._refreshPageFlags(mapId, { markers, drawings, tokens, layers });
+    // Without the drawing list the shadow areas are unknown, so markers and
+    // drawings in the player copy are left as they were rather than
+    // rewritten from data that might sit under a shadow.
+    await this._refreshPageFlags(mapId, {
+      markers, drawings, tokens, layers, drawingsKnown: drawingsR != null,
+    });
   }
 
   /**
    * Write the player-safe subset of sub-resource data to the JournalEntry
-   * page flags. DM-only, per-user-restricted, and hidden data is filtered
-   * out (`_map-flag-filter.mjs`) and stays only in GM memory. Layers carry
-   * no restricted content (names and display settings only) and are
-   * written through unfiltered.
+   * page flags. DM-only, per-user-restricted, hidden and shadowed data is
+   * filtered out (`_map-flag-filter.mjs`) and stays only in GM memory.
+   * Layers carry no restricted content (names and display settings only)
+   * and are written through unfiltered.
    * @param {string} mapId
-   * @param {{ markers: object[], drawings: object[], tokens: object[], layers: object[] }} data
+   * @param {{ markers: object[], drawings: object[], tokens: object[], layers: object[], drawingsKnown?: boolean }} data
+   *   `drawingsKnown: false` (the drawing fetch failed) leaves the stored
+   *   markers and drawings untouched, since shadows can't be applied.
    * @private
    */
-  async _refreshPageFlags(mapId, { markers, drawings, tokens, layers }) {
+  async _refreshPageFlags(mapId, { markers, drawings, tokens, layers, drawingsKnown = true }) {
     const page = this.findPageByMapId(mapId);
     if (!page) return;
 
-    const safeMarkers = (markers || []).filter(isMarkerSafeForPlayerFlags);
-    const safeDrawings = (drawings || []).filter(isDrawingSafeForPlayerFlags);
-    const safeTokens = (tokens || []).filter(isTokenSafeForPlayerFlags);
-
-    await page.update({
-      [`flags.${FLAG_SCOPE}.chronicleMarkers`]: safeMarkers,
-      [`flags.${FLAG_SCOPE}.chronicleDrawings`]: safeDrawings,
-      [`flags.${FLAG_SCOPE}.chronicleTokens`]: safeTokens,
+    const updates = {
+      [`flags.${FLAG_SCOPE}.chronicleTokens`]: (tokens || []).filter(isTokenSafeForPlayerFlags),
       [`flags.${FLAG_SCOPE}.chronicleLayers`]: layers || [],
-    });
+    };
+    if (drawingsKnown) {
+      const safe = playerSafeMapItems(markers, drawings);
+      updates[`flags.${FLAG_SCOPE}.chronicleMarkers`] = safe.markers;
+      updates[`flags.${FLAG_SCOPE}.chronicleDrawings`] = safe.drawings;
+    }
+    await page.update(updates);
   }
 
   /**
@@ -1080,10 +1088,15 @@ export class MapSync {
         updates[kind] = this._coerceArray(resp);
       }
     });
+    // A failed drawing poll keeps the cached list, which only counts if it
+    // came from a successful fetch (see _refreshSubResources).
+    const drawingsResp = fetches[POLLED_SUBRESOURCES.indexOf('drawings')];
+    updates.drawingsKnown = drawingsResp != null || cached.drawingsKnown === true;
     updates.lastFetched = Date.now();
     this._cache.set(mapId, updates);
 
     await this._refreshPageFlags(mapId, {
+      drawingsKnown: updates.drawingsKnown,
       markers: cached.markers || [],
       drawings: updates.drawings || [],
       tokens: updates.tokens || [],
