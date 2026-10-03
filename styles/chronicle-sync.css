@@ -3002,3 +3002,72 @@
 .ce-img--w95 { width: 95%; }
 .ce-img--w100 { width: 100%; }
 .ce-img--w100 { float: none; margin-inline: 0; }
+/* Player notebook and jot notes: frames of Chronicle's own notes pages. */
+.chronicle-notebook .window-content {
+  padding: 0;
+  overflow: hidden;
+}
+
+.chronicle-notes-host {
+  width: 100%;
+  height: 100%;
+}
+
+.chronicle-notes-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #1c1b19;
+}
+
+.chronicle-notes-message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1.25rem;
+}
+
+.chronicle-notes-message button {
+  width: auto;
+}
+
+.chronicle-jot-tab {
+  position: fixed;
+  right: var(--chronicle-jot-right, 8px);
+  bottom: 0;
+  z-index: 60;
+  width: auto;
+  margin: 0;
+  padding: 4px 12px;
+  border: 1px solid var(--color-border-dark, #3a3833);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: rgba(28, 27, 25, 0.92);
+  color: var(--color-text-light-highlight, #f0e9d8);
+  font-size: var(--font-size-13, 13px);
+  line-height: 1.4;
+}
+
+.chronicle-jot-tab[aria-expanded="true"] {
+  color: #e2b24c;
+}
+
+.chronicle-jot-panel {
+  position: fixed;
+  right: var(--chronicle-jot-right, 8px);
+  bottom: 28px;
+  z-index: 60;
+  width: 360px;
+  height: min(520px, calc(100vh - 120px));
+  border: 1px solid var(--color-border-dark, #3a3833);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #1c1b19;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+
+.chronicle-jot-panel[hidden] {
+  display: none;
+}

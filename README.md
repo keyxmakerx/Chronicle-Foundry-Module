@@ -11,7 +11,7 @@ Bidirectional real-time sync between [Chronicle](https://github.com/keyxmakerx/C
 > reporting an error — nothing is wrong on your side and there is nothing to fix.
 
 - **Journal Sync** — Chronicle entities ↔ Foundry journal entries (with multi-page splitting)
-- **Map Sync** — Chronicle maps render as Foundry journal pages with an editable-marker overlay ("Open in Chronicle web editor" for the full map editor)
+- **Map Sync** — Chronicle maps render as Foundry journal pages (not Scenes), with markers, drawings, tokens, layers and fog drawn as overlays; markers are editable ("Open in Chronicle web editor" for the full map editor)
 - **Calendar Sync** — Calendaria and Simple Calendar integration
 - **Character Sync** — Actor ↔ character entity with system-aware field mapping (D&D 5e, Pathfinder 2e, or any system with annotated fields)
 - **Shop Widget** — Browse and purchase from Chronicle shop entities in Foundry

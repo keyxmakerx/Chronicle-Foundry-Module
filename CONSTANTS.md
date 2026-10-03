@@ -10,7 +10,7 @@ module. Useful when debugging sync behavior or tuning performance.
 | Constant | Value | Location | Purpose |
 |----------|-------|----------|---------|
 | Map-viewer notify debounce | 200ms | `map-sync.mjs` `NOTIFY_DEBOUNCE_MS` | Collapses a burst of WS updates for a map into one viewer re-render |
-| Status dot activity flash | 300ms | `module.mjs:150` | Brief white flash on WS message |
+| Status dot activity flash | 300ms | `module.mjs` `activityThrottled` timeout | Brief white flash on WS message |
 | WS initial reconnect delay | 1000ms | `api-client.mjs` `_reconnectDelay` | First reconnect attempt delay |
 | WS max reconnect delay | 30000ms | `api-client.mjs` `_scheduleReconnect` | Cap on exponential backoff |
 | WS backoff multiplier | 2x | `api-client.mjs` `_scheduleReconnect` | Delay doubles each attempt |
@@ -19,7 +19,7 @@ module. Useful when debugging sync behavior or tuning performance.
 
 | Constant | Value | Location | Purpose |
 |----------|-------|----------|---------|
-| Message queue cap | 100 | `api-client.mjs` `_messageQueue` | Max buffered WS messages while disconnected |
+| Message queue cap | 100 | `api-client.mjs` `send` | Max buffered WS messages while disconnected |
 | Retry queue cap | 50 | `api-client.mjs` `queueForRetry` | Max failed REST operations to retry on reconnect |
 | Retry max attempts | 3 | `api-client.mjs` `queueForRetry` | Per-operation retry limit |
 | Activity log max | 100 | `sync-manager.mjs` `_maxLogEntries` | Dashboard activity log entries |
@@ -29,16 +29,9 @@ module. Useful when debugging sync behavior or tuning performance.
 
 ## Coordinate Systems
 
-The module converts between two coordinate systems:
-
-| System | Range | Used by |
-|--------|-------|---------|
-| **Pixel** | 0 to canvas width/height | Foundry scenes |
-| **Percentage** | 0–100 | Chronicle API |
-
-Conversion: `percentage = (pixel / sceneDimension) * 100`
-
-Applies to: drawings, tokens, fog regions, polygon points.
+Map markers, drawings, tokens and fog regions use percentages (0–100) of the
+map image on both sides. `MapViewerSheet` draws them as SVG overlays on the
+image page, so no pixel conversion happens.
 
 ## Permission Mapping
 
@@ -46,8 +39,8 @@ Applies to: drawings, tokens, fog regions, polygon points.
 
 | Chronicle `visibility` | Chronicle `is_private` | Foundry default ownership |
 |------------------------|----------------------|---------------------------|
-| any | `true` | `NONE` (0) |
-| `"default"` | `false` | `OBSERVER` (2) |
+| any | `true` | `NONE` (0), or the default level when the `dmOnlyHidden` setting is off |
+| `"default"` | `false` | `defaultOwnership` setting (default `OBSERVER`, 2) |
 | `"custom"` | `false` | Per-role grants |
 
 ### Role Grants → Foundry Ownership

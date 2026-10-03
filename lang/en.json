@@ -444,7 +444,22 @@
       }
     },
     "SceneControl": {
-      "SyncCalendar": "Open Sync Calendar"
+      "SyncCalendar": "Open Sync Calendar",
+      "Notebook": "Open my Chronicle notebook"
+    },
+    "Notebook": {
+      "Title": "Notebook",
+      "JotsTitle": "Jot notes",
+      "Connect": "Connect to Chronicle",
+      "NotConnected": "Your Chronicle notes aren't connected to Foundry yet. Connect once and Chronicle will ask you to press Allow.",
+      "Rejected": "Chronicle no longer accepts this connection (it was disconnected, or your sign-in changed). Connect again to keep going.",
+      "NotSetUp": "This world isn't connected to a Chronicle campaign yet. Ask your GM to set it up.",
+      "PopupBlocked": "Your browser blocked the Chronicle window. Allow pop-ups for this Foundry and try again.",
+      "Refused": {
+        "unmapped": "Chronicle said yes, but your GM hasn't matched your Foundry login to a Chronicle player yet. Ask them to match you in Chronicle Sync > Members, then try again.",
+        "mismatch": "The Chronicle account that pressed Allow isn't the one your GM matched to your Foundry login. Sign in to Chronicle as yourself and try again.",
+        "campaign": "That Chronicle window was for a different campaign. Try again from the notebook button."
+      }
     },
     "SyncCalendar": {
       "Title": "Sync Calendar",

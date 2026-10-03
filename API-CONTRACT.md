@@ -522,13 +522,21 @@ Lists all sync mappings for the campaign.
 
 **Used by:** `sync-manager.mjs` → initial sync setup
 
-**Response:**
+**Query:** `?limit=` (max 1000) and `?offset=`.
+
+**Response:** full `SyncMapping` objects (same shape as `/sync/lookup` below)
+plus paging fields.
 ```json
 {
   "data": [
-    { "id": "uuid", "chronicle_id": "entity-uuid", "foundry_id": "foundry-doc-id",
-      "type": "entity", "last_synced": "2026-01-15T12:00:00Z" }
-  ]
+    { "id": "mapping-uuid", "campaign_id": "campaign-uuid",
+      "chronicle_type": "entity", "chronicle_id": "entity-uuid",
+      "external_system": "foundry", "external_id": "foundry-doc-id",
+      "sync_version": 1, "last_synced_at": "2026-01-15T12:00:00Z",
+      "sync_direction": "both", "sync_metadata": {},
+      "created_at": "2026-01-15T12:00:00Z", "updated_at": "2026-01-15T12:00:00Z" }
+  ],
+  "total": 1, "limit": 50, "offset": 0
 }
 ```
 
@@ -1033,8 +1041,10 @@ by the wire-contract decision above:
 https://raw.githubusercontent.com/keyxmakerx/Chronicle/main/internal/plugins/foundry_vtt/error-catalog.json
 ```
 
-The artifact is treated as **implicit schema v1** — it carries no explicit
-`schema_version` field.
+The catalog carries `"schemaVersion": 1`. CI (`tools/check-error-catalog.mjs`,
+`.github/workflows/check-error-catalog.yml`) fetches it on every PR, push to
+`main` and weekly, and fails when the table below or `update-info.mjs`'s
+`CHRONICLE_CATEGORIES` no longer match it, or when `schemaVersion` changes.
 
 | `error` code | `category` | Description | HTTP |
 |---|---|---|---|
