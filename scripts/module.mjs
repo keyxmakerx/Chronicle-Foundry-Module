@@ -18,6 +18,7 @@ import { NoteSync } from './note-sync.mjs';
 import { SyncDashboard } from './sync-dashboard.mjs';
 import { MapViewerSheet } from './map-viewer.mjs';
 import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs';
+import { registerNpcPresence } from './npc-presence.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { openSyncCalendar } from './sync-calendar.mjs';
 
@@ -113,6 +114,7 @@ Hooks.once('ready', async () => {
   dashboard.bind(syncManager);
   _addStatusIndicator();
   registerCharacterClaimIndicator();
+  registerNpcPresence(() => syncManager?.api ?? null);
 
   // Move a legacy world-scoped API key into this GM's client scope and
   // delete the world copy before start() reads the setting. GM only —

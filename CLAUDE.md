@@ -15,8 +15,9 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
   `calendar-sync`+`sync-calendar`+`sync-calendar-*`, `actor-sync`,
   `item-sync`, `note-sync`), UI (`sync-dashboard`,
   `sync-diagnostic-bundle`, `update-info`, `character-claim-indicator`,
-  `capability-inspector`, `import-wizard`, `shop-widget`), core (`module`,
-  `settings`, `constants`, `logger`, `sync-manager`, `api-client`),
+  `npc-presence`, `capability-inspector`, `import-wizard`, `shop-widget`),
+  core (`module`, `settings`, `constants`, `logger`, `sync-manager`,
+  `api-client`),
   `adapters/generic-adapter.mjs`. `.ai.md` has what each does. `_*.mjs` are
   pure helpers, each unit-tested by its own `tools/test-*.mjs`.
 - `templates/` Handlebars, `styles/` CSS, `lang/en.json` strings,
