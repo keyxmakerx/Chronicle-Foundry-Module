@@ -177,7 +177,7 @@ GM notice. See API-CONTRACT.md.
 - [ ] Multiple shop rooms can be open simultaneously; closing one cleans up its tooltip
 - [ ] GM: open the wares, Add an item, pick who pays, Buy -> "Bought … left." in the room; the coins drop on that character's sheet and the item appears in its inventory; a whispered chat line names the character, goods and cost
 - [ ] Player (matched to a Chronicle member, downtime open, shop shown): the basket lists only their own characters; Buy works the same; the GM gets the chat line naming the player
-- [ ] Player while downtime is closed: Buy reads "Buying opens in downtime" and nothing is charged
+- [ ] Player while downtime is closed: the button reads "Ask to buy"; pressing it says "Asked the GM for …", nothing is charged and no chat line appears; the request waits on Chronicle's Stashes page
 - [ ] Player whose Foundry user is not matched: no basket appears; GM stops showing the shop mid-basket -> Buy says the GM isn't showing it any more
 
 ## Initial Sync

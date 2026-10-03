@@ -1016,9 +1016,12 @@ the armory addon.
 (at most 50 lines, quantity 1–99; prices come from the listing, never the body)
 
 **Buy response:** `{"status": "bought", "spent": 6, "currency": "gp", "moneyLeft": 44}`.
-Refusals are `{"message": "..."}`: 400 (empty basket, no coin field, not
-enough coin, mixed currencies), 403 (not their character), 404 (shop or good
-hidden), 409 (a player while downtime is closed).
+A player while downtime is closed gets `{"status": "requested"}` instead: the
+basket is stored as a request the GM approves on Chronicle's Stashes page, and
+nothing is charged yet (`canBuyNow` is false in the buyers response then).
+Refusals are `{"message": "..."}`: 400 (empty basket, no coin field, a Wealth
+sheet, not enough coin, mixed currencies), 403 (not their character), 404
+(shop or good hidden), 409 (prices changed, or the item could not be added).
 
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/shop_api_handler.go`)
 

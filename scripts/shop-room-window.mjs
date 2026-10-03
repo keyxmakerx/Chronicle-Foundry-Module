@@ -300,7 +300,9 @@ export class ShopRoomWindow extends ApplicationV2 {
       } catch (err) {
         console.warn('Chronicle: could not re-read the shop after a sale', err);
       }
-      this._announceSale(describeSale({
+      // A request outside downtime is not a sale yet; the GM approves it on
+      // Chronicle's Stashes page.
+      if (result?.status === 'bought') this._announceSale(describeSale({
         who, character: this._buyerNames.get(body?.buyerEntityId) || t('SomeCharacter'),
         shop: this._name, items: body?.items, goods: goodsBefore, result,
       }));
