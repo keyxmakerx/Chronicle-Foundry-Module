@@ -46,7 +46,7 @@ test('handleRequest never reads a user id out of the message', () => {
 });
 
 test('the window request carries no user id', () => {
-  const src = body(client, 'export async function stashRequest(msg)');
+  const src = body(client, 'export async function stashRequest(msg, owner = null)');
   assert.equal(/userId/i.test(src.replace(/toUserId/g, '')), false);
 });
 
@@ -59,7 +59,7 @@ test('request cards are whispered to GM users', () => {
 test('only the active GM answers, posts cards and refreshes', () => {
   assert.match(body(sync, 'async handleRequest(msg, senderId)'), /_isActive\(\)/);
   assert.match(body(sync, 'async _syncCards()'), /_isActive\(\)/);
-  assert.match(body(sync, 'refreshCharacters(entityIds)'), /_isActive\(\)/);
+  assert.match(body(sync, 'refreshCharacters(entityIds, removal = null)'), /_isActive\(\)/);
   assert.match(client, /isAnsweringGM\(game\.user,\s*game\.users\.activeGM\)/);
 });
 

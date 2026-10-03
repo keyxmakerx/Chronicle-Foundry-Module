@@ -1170,6 +1170,12 @@ request body.
 | GET | `/stashes/downtime` | `{open}`. |
 | PUT | `/stashes/downtime` | `{open, actingUserId}`; approver only. The module does not call it. |
 
+Known limits: only the active GM client answers players, posts request cards and
+refreshes actors; the Stashes button treats any Chronicle-linked actor as a
+character. Replies to players travel encrypted on the module socket; a refresh
+never deletes a Foundry item except the one an applied move took from a
+character.
+
 Lists are unwrapped defensively (`{history}`/`{requests}`/`{data}` or a bare
 array): `scripts/_stash-model.mjs`.
 

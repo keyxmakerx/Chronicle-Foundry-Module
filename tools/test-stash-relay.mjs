@@ -231,3 +231,16 @@ test('planDirect: bad requests are refused', () => {
   assert.equal(planDirect({ action: 'move', characterId: 'c1', move: { kind: 'item' } }, ctx).error.code, 'bad_request');
   assert.equal(planDirect({ action: 'nope', characterId: 'c1' }, ctx).error.code, 'bad_request');
 });
+
+test('PendingRequests: cancelling one owner leaves other windows\' requests waiting', async () => {
+  const p = new PendingRequests();
+  const winA = {};
+  const winB = {};
+  const a = p.create(winA);
+  const b = p.create(winB);
+  p.cancelAll(winA);
+  assert.equal((await a.promise).error.code, 'cancelled');
+  assert.equal(p.size, 1);
+  assert.equal(p.settle(b.id, { ok: true }), true);
+  assert.deepEqual(await b.promise, { ok: true });
+});

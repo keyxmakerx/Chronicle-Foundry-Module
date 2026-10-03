@@ -194,16 +194,17 @@ export class PendingRequests {
 
   /**
    * Register a request.
+   * @param {any} [owner] - who is waiting, for scoped cancellation.
    * @returns {{id: string, promise: Promise<any>}} The promise resolves with
    *   the reply, or with `{ok:false,error:{code:'timeout'}}` if none comes.
    */
-  create() {
+  create(owner = null) {
     const id = this._makeId();
     const promise = new Promise((resolve) => {
       const timer = this._set(() => {
         if (this._map.delete(id)) resolve({ ok: false, error: { code: 'timeout', message: 'No answer from the GM.' } });
       }, this._timeoutMs);
-      this._map.set(id, { resolve, timer });
+      this._map.set(id, { resolve, timer, owner });
     });
     return { id, promise };
   }
@@ -224,9 +225,14 @@ export class PendingRequests {
     return true;
   }
 
-  /** Fail everything waiting, e.g. when the window closes. */
-  cancelAll() {
+  /**
+   * Fail what is waiting: everything, or only the requests made for `owner`
+   * (a closing window must not cancel another window's requests).
+   * @param {any} [owner]
+   */
+  cancelAll(owner) {
     for (const [id, entry] of this._map) {
+      if (owner !== undefined && entry.owner !== owner) continue;
       this._clear(entry.timer);
       entry.resolve({ ok: false, error: { code: 'cancelled', message: 'Cancelled.' } });
       this._map.delete(id);

@@ -76,7 +76,7 @@ export class StashesWindow extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Fetch the view (character, stashes, destinations, downtime). */
   async load() {
     this.loading = true;
-    const res = await stashRequest({ action: 'view', characterId: this.characterId });
+    const res = await stashRequest({ action: 'view', characterId: this.characterId }, this);
     this.loading = false;
     if (!res.ok) {
       this.error = describeError(res.error);
@@ -114,7 +114,7 @@ export class StashesWindow extends HandlebarsApplicationMixin(ApplicationV2) {
       if (render) this.render();
       // Another character's contents come back redacted for this member; a
       // refusal just means there is nothing to show.
-      const res = await stashRequest({ action: 'view', characterId: dest.id, contextCharacterId: this.characterId });
+      const res = await stashRequest({ action: 'view', characterId: dest.id, contextCharacterId: this.characterId }, this);
       const v = res.ok ? normalizeView(res.data) : null;
       if (this.dest !== dest) return;
       this.destContents = v
@@ -130,7 +130,7 @@ export class StashesWindow extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** Fetch the move history of this character. */
   async loadHistory({ render = true } = {}) {
-    const res = await stashRequest({ action: 'history', characterId: this.characterId });
+    const res = await stashRequest({ action: 'history', characterId: this.characterId }, this);
     if (res.ok) {
       this.history = unwrapHistory(res.data);
       this.error = '';
@@ -319,7 +319,7 @@ export class StashesWindow extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @override */
   _onClose(options) {
     Hooks.off('chronicleStashChanged', this._onChanged);
-    cancelStashRequests();
+    cancelStashRequests(this);
     open.delete(this.actor.id);
     super._onClose?.(options);
   }
@@ -384,7 +384,7 @@ export class StashesWindow extends HandlebarsApplicationMixin(ApplicationV2) {
     this._busy = true;
     this.error = '';
     this.render();
-    const res = await stashRequest({ action: 'move', characterId: this.characterId, move });
+    const res = await stashRequest({ action: 'move', characterId: this.characterId, move }, this);
     this._busy = false;
     if (!res.ok) {
       this.error = describeError(res.error);
@@ -419,8 +419,9 @@ export async function openStashes(actor) {
 /**
  * Add the Stashes button to actor sheet title bars. Hooks both the V1 and V2
  * sheet render events, as the claim indicator does, so any system's sheet gets
- * it. The button is rebuilt on every render, so a permission or availability
- * change shows up the next time the sheet draws.
+ * it. The button is rebuilt whenever the sheet's header is drawn (always on
+ * V2 sheets; on V1 sheets the header is not redrawn by a re-render, so a
+ * permission or availability change shows after the sheet is reopened).
  */
 export function registerStashButton() {
   Hooks.on('renderActorSheet', onRenderActorSheet);

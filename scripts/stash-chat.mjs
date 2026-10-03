@@ -8,7 +8,8 @@
  * of listeners.
  */
 
-import { getStashSync } from './stash-sync.mjs';
+import { cardFlagOf, getStashSync } from './stash-sync.mjs';
+import { trustedCardMoveId } from './_stash-cards.mjs';
 
 /**
  * Wire the buttons of a rendered request card.
@@ -21,8 +22,11 @@ function onRenderChatMessage(message, html) {
   if (!card) return;
 
   const buttons = card.querySelectorAll('button[data-stash-action]');
-  // A whisper reaches only GMs, but the buttons still refuse anyone else.
-  if (!game.user.isGM) {
+  // Any player can create a message with card markup, so only a GM-authored
+  // message is a request card, and its move id comes from its flag, never
+  // from the markup. Anything else gets no working buttons.
+  const moveId = trustedCardMoveId(message, cardFlagOf);
+  if (!game.user.isGM || !moveId) {
     buttons.forEach((b) => b.remove());
     return;
   }
@@ -30,8 +34,7 @@ function onRenderChatMessage(message, html) {
     button.addEventListener('click', async (event) => {
       event.preventDefault();
       const action = button.dataset.stashAction;
-      const moveId = button.dataset.moveId;
-      if (!moveId || (action !== 'approve' && action !== 'decline')) return;
+      if ((action !== 'approve' && action !== 'decline')) return;
       // One press only: the card is rewritten when the answer lands.
       buttons.forEach((b) => { b.disabled = true; });
       const stash = getStashSync();

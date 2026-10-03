@@ -171,3 +171,54 @@ export function modelFromFlag(flag) {
     by: String(flag.by ?? ''),
   };
 }
+
+/**
+ * Was this chat message written by a GM? Any player can create a message with
+ * card markup and flags, so only a GM-authored message counts as a request
+ * card. Foundry 13 calls the field `author`, 12 `user`.
+ * @param {any} message
+ * @returns {boolean}
+ */
+export function isGmAuthored(message) {
+  return (message?.author ?? message?.user)?.isGM === true;
+}
+
+/**
+ * The move id of a trusted request card, read from the message flag (never
+ * from the rendered markup). Null for anything not GM-authored.
+ * @param {any} message
+ * @param {(m: any) => any} getFlag - reads the stash-request flag.
+ * @returns {string|null}
+ */
+export function trustedCardMoveId(message, getFlag) {
+  if (!isGmAuthored(message)) return null;
+  const id = getFlag(message)?.moveId;
+  return id === undefined || id === null || id === '' ? null : String(id);
+}
+
+/**
+ * Move ids that already have a trusted card.
+ * @param {any[]} messages
+ * @param {(m: any) => any} getFlag
+ * @returns {string[]}
+ */
+export function collectCardMoveIds(messages, getFlag) {
+  const out = [];
+  for (const m of messages ?? []) {
+    const id = trustedCardMoveId(m, getFlag);
+    if (id) out.push(id);
+  }
+  return out;
+}
+
+/**
+ * The trusted card message for a move id, or null.
+ * @param {any[]} messages
+ * @param {string|number} moveId
+ * @param {(m: any) => any} getFlag
+ * @returns {any|null}
+ */
+export function findCardMessage(messages, moveId, getFlag) {
+  const want = String(moveId);
+  return (messages ?? []).find((m) => trustedCardMoveId(m, getFlag) === want) ?? null;
+}

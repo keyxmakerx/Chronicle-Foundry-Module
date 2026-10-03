@@ -14,6 +14,10 @@ import {
   cardFlag,
   cardHtml,
   cardsToPost,
+  collectCardMoveIds,
+  findCardMessage,
+  isGmAuthored,
+  trustedCardMoveId,
   escapeHtml,
   modelFromFlag,
   requestCardModel,
@@ -137,4 +141,39 @@ test('card flag round-trips; a foreign flag reads as not a card', () => {
   assert.equal(modelFromFlag({}), null);
   assert.equal(modelFromFlag({ model: {} }), null);
   assert.equal(modelFromFlag({ model: { moveId: '1' }, state: 'bogus' }).state, 'pending');
+});
+
+const flagOf = (m) => m.flag;
+const gmCard = (id) => ({ author: { isGM: true }, flag: { moveId: id } });
+const playerCard = (id) => ({ author: { isGM: false }, flag: { moveId: id } });
+
+test('isGmAuthored: v13 author, v12 user, and nothing else', () => {
+  assert.equal(isGmAuthored({ author: { isGM: true } }), true);
+  assert.equal(isGmAuthored({ user: { isGM: true } }), true);
+  assert.equal(isGmAuthored({ author: { isGM: false } }), false);
+  assert.equal(isGmAuthored({ user: { isGM: false } }), false);
+  assert.equal(isGmAuthored({}), false);
+  assert.equal(isGmAuthored(null), false);
+});
+
+test('a player-authored card is ignored for wiring', () => {
+  assert.equal(trustedCardMoveId(playerCard('12'), flagOf), null);
+  assert.equal(trustedCardMoveId(gmCard('12'), flagOf), '12');
+  assert.equal(trustedCardMoveId(gmCard(12), flagOf), '12');
+  assert.equal(trustedCardMoveId({ author: { isGM: true }, flag: {} }, flagOf), null);
+});
+
+test('a player-authored card neither counts as existing nor hides the real one', () => {
+  const messages = [playerCard('12'), gmCard('13')];
+  assert.deepEqual(collectCardMoveIds(messages, flagOf), ['13']);
+  // The forged card does not stop the real request 12 from getting its card.
+  assert.deepEqual(cardsToPost([ITEM_LINE], collectCardMoveIds(messages, flagOf)).map((l) => l.id), ['12']);
+  assert.equal(findCardMessage(messages, '12', flagOf), null);
+  assert.equal(findCardMessage(messages, 13, flagOf), messages[1]);
+});
+
+test('when both a forged and a real card exist, the real one is found', () => {
+  const forged = playerCard('12');
+  const real = gmCard('12');
+  assert.equal(findCardMessage([forged, real], '12', flagOf), real);
 });

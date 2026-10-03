@@ -30,8 +30,12 @@ import {
   planRelay,
   relayErrorFrom,
 } from './_stash-relay.mjs';
+import { encryptReply, isPublicJwk } from './_stash-crypto.mjs';
+import { removalFromMove } from './_stash-reconcile.mjs';
 import {
   CARD_STATE,
+  collectCardMoveIds,
+  findCardMessage,
   cardFlag,
   cardHtml,
   cardsToPost,
@@ -57,6 +61,11 @@ const t = (key, data) => (data
   ? game.i18n.format(`CHRONICLE.Stashes.${key}`, data)
   : game.i18n.localize(`CHRONICLE.Stashes.${key}`));
 
+/** The stash-request flag of a chat message. */
+export function cardFlagOf(message) {
+  return message?.getFlag?.(FLAG_SCOPE, 'stashRequest');
+}
+
 export class StashSync {
   constructor() {
     /** @type {import('./api-client.mjs').ChronicleAPI|null} */
@@ -73,6 +82,8 @@ export class StashSync {
     this._refreshQueue = new Set();
     /** @type {ReturnType<typeof setTimeout>|null} */
     this._refreshTimer = null;
+    /** @type {Map<string, Set<string>>} Items to remove per character at the next refresh. */
+    this._removals = new Map();
     instance = this;
   }
 
@@ -194,7 +205,9 @@ export class StashSync {
    */
   async handleRequest(msg, senderId) {
     if (!this._isActive() || typeof msg?.requestId !== 'string') return;
-    const reply = (body) => this._reply(senderId, msg.requestId, body);
+    // No usable key to encrypt the answer to: nothing is sent.
+    if (!isPublicJwk(msg.publicKey)) return;
+    const reply = (body) => this._reply(senderId, msg.requestId, msg.publicKey, body);
 
     if (!this._api || this._verdict !== true) {
       return reply({ ok: false, error: { code: 'gm_not_ready', message: t('Error.GMNotReady') } });
@@ -250,9 +263,18 @@ export class StashSync {
     return actor.testUserPermission(user, 'OWNER');
   }
 
-  /** Send a reply to exactly one user. */
-  _reply(userId, requestId, body) {
-    game.socket.emit(SOCKET_CHANNEL, { type: STASH_MSG.REPLY, requestId, toUserId: userId, ...body }, { recipients: [userId] });
+  /**
+   * Send a reply to one user. The module channel may reach every client, so
+   * the body is encrypted to the key the asking window sent; `recipients` is
+   * passed only as a best-effort narrowing, never relied on.
+   */
+  async _reply(userId, requestId, publicKey, body) {
+    try {
+      const envelope = await encryptReply(publicKey, body);
+      game.socket.emit(SOCKET_CHANNEL, { type: STASH_MSG.REPLY, requestId, toUserId: userId, envelope }, { recipients: [userId] });
+    } catch (err) {
+      console.warn('Chronicle: could not encrypt a stash reply', err?.message);
+    }
   }
 
   /** Send a non-secret notice (ids, the downtime switch) to every client. */
@@ -261,11 +283,12 @@ export class StashSync {
   }
 
   /**
-   * Tell open windows (here and on players' clients) to reload. Empty ids
-   * means "everything may have changed".
+   * Tell open windows to reload. Players' clients get a bare hint with no
+   * ids (a hidden character's id must not reach them); this GM client's own
+   * windows get the ids so they can skip unrelated reloads.
    */
   _tellWindows({ ids }) {
-    this._broadcast({ type: STASH_MSG.REFRESH, characterIds: ids });
+    this._broadcast({ type: STASH_MSG.REFRESH });
     Hooks.callAll('chronicleStashChanged', { kind: 'refresh', characterIds: ids });
   }
 
@@ -276,7 +299,7 @@ export class StashSync {
     const ids = [move.from, move.to]
       .filter((e) => e?.kind === 'character' && e.id)
       .map((e) => String(e.id));
-    this.refreshCharacters(ids);
+    this.refreshCharacters(ids, removalFromMove(result));
   }
 
   // --- Chat cards --------------------------------------------------------
@@ -318,18 +341,11 @@ export class StashSync {
 
   /** Move ids that already have a card in chat. */
   _cardMoveIds() {
-    const ids = [];
-    for (const m of game.messages?.contents ?? []) {
-      const flag = m.getFlag?.(FLAG_SCOPE, 'stashRequest');
-      if (flag?.moveId) ids.push(String(flag.moveId));
-    }
-    return ids;
+    return collectCardMoveIds(game.messages?.contents ?? [], cardFlagOf);
   }
 
   _findCard(moveId) {
-    return (game.messages?.contents ?? []).find(
-      (m) => String(m.getFlag?.(FLAG_SCOPE, 'stashRequest')?.moveId ?? '') === String(moveId),
-    ) ?? null;
+    return findCardMessage(game.messages?.contents ?? [], moveId, cardFlagOf);
   }
 
   /** The card's localized strings. */
@@ -426,20 +442,30 @@ export class StashSync {
    * Re-pull linked actors from Chronicle through the existing actor and item
    * sync paths, coalescing a burst for the same character into one pass.
    * @param {string[]} entityIds
+   * @param {{characterId: string, itemId: string}|null} [removal] - an item a
+   *   just-applied move took from a character; the only thing a refresh may
+   *   delete.
    */
-  refreshCharacters(entityIds) {
+  refreshCharacters(entityIds, removal = null) {
     if (!this._isActive()) return;
     for (const id of entityIds ?? []) if (id) this._refreshQueue.add(String(id));
+    if (removal) {
+      const set = this._removals.get(removal.characterId) ?? new Set();
+      set.add(removal.itemId);
+      this._removals.set(removal.characterId, set);
+    }
     if (this._refreshTimer || this._refreshQueue.size === 0) return;
     this._refreshTimer = setTimeout(() => {
       this._refreshTimer = null;
       const ids = [...this._refreshQueue];
       this._refreshQueue.clear();
-      this._refreshNow(ids).catch((err) => console.warn('Chronicle: stash refresh failed', err));
+      const removals = this._removals;
+      this._removals = new Map();
+      this._refreshNow(ids, removals).catch((err) => console.warn('Chronicle: stash refresh failed', err));
     }, REFRESH_DEBOUNCE_MS);
   }
 
-  async _refreshNow(entityIds) {
+  async _refreshNow(entityIds, removals = new Map()) {
     const mods = this._syncManager?._modules ?? [];
     const actorSync = mods.find((m) => typeof m.refreshFromChronicle === 'function');
     const itemSync = mods.find((m) => typeof m.refreshInventory === 'function');
@@ -448,7 +474,7 @@ export class StashSync {
       if (!actor) continue;
       try {
         await actorSync?.refreshFromChronicle(entityId);
-        await itemSync?.refreshInventory(actor);
+        await itemSync?.refreshInventory(actor, { removeItemIds: [...(removals.get(entityId) ?? [])] });
       } catch (err) {
         console.warn(`Chronicle: could not refresh "${actor.name}" after a stash move`, err);
       }

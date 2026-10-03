@@ -18,9 +18,13 @@ import {
   isAnsweringGM,
   isStashMessage,
 } from './_stash-relay.mjs';
+import { decryptReply, generateRequestKeys } from './_stash-crypto.mjs';
 import { showStashButton } from './_stash-probe.mjs';
 
 const pending = new PendingRequests();
+
+/** Private keys of requests still waiting, by request id. */
+const keys = new Map();
 
 /** Whether Chronicle offers Stashes in this world (shared by the GM client). */
 export function stashesAvailable() {
@@ -51,9 +55,10 @@ export function canOpenStashes(actor) {
 /**
  * Ask for a view, a history or a move.
  * @param {object} msg - `{action, characterId, move?, contextCharacterId?}`
+ * @param {any} [owner] - the window asking, so closing it cancels only its own requests
  * @returns {Promise<{ok: boolean, data?: any, error?: {code: string, message: string}}>}
  */
-export async function stashRequest(msg) {
+export async function stashRequest(msg, owner = null) {
   if (game.user.isGM) {
     const gm = getStashSync();
     if (!gm) return { ok: false, error: { code: 'gm_not_ready', message: game.i18n.localize('CHRONICLE.Stashes.Error.GMNotReady') } };
@@ -62,10 +67,19 @@ export async function stashRequest(msg) {
   if (!game.users.activeGM) {
     return { ok: false, error: { code: 'no_gm', message: game.i18n.localize('CHRONICLE.Stashes.Error.NoGM') } };
   }
-  const { id, promise } = pending.create();
+  let pair;
+  try {
+    pair = await generateRequestKeys();
+  } catch {
+    return { ok: false, error: { code: 'api_error', message: '' } };
+  }
+  const { id, promise } = pending.create(owner);
+  keys.set(id, pair.privateKey);
+  promise.then(() => keys.delete(id));
   // No user id goes in the payload: the GM client takes the sender from the
-  // socket layer.
-  game.socket.emit(SOCKET_CHANNEL, { type: STASH_MSG.REQUEST, requestId: id, ...msg });
+  // socket layer. The public key lets the GM encrypt the answer to this
+  // request alone.
+  game.socket.emit(SOCKET_CHANNEL, { type: STASH_MSG.REQUEST, requestId: id, publicKey: pair.publicJwk, ...msg });
   return promise;
 }
 
@@ -89,9 +103,10 @@ export function describeError(error) {
   }
 }
 
-/** Cancel everything this client is waiting on (a window closing). */
-export function cancelStashRequests() {
-  pending.cancelAll();
+/** Cancel what one window is waiting on (it is closing). */
+export function cancelStashRequests(owner) {
+  if (owner === undefined || owner === null) return;
+  pending.cancelAll(owner);
 }
 
 /**
@@ -111,10 +126,15 @@ export function registerStashSocket() {
         }
         break;
       case STASH_MSG.REPLY:
-        // Replies are addressed with `recipients`; the id check is a second
-        // filter for a client that still sees one.
+        // Every client may see a reply, so the body is encrypted to the
+        // asking window's key; only that window can open it.
         if (fromGM && data.toUserId === game.user.id && typeof data.requestId === 'string') {
-          pending.settle(data.requestId, { ok: data.ok === true, data: data.data, error: data.error });
+          const key = keys.get(data.requestId);
+          if (!key) break;
+          decryptReply(key, data.envelope).then(
+            (body) => pending.settle(data.requestId, { ok: body?.ok === true, data: body?.data, error: body?.error }),
+            () => pending.settle(data.requestId, { ok: false, error: { code: 'api_error', message: '' } }),
+          );
         }
         break;
       case STASH_MSG.DOWNTIME:
