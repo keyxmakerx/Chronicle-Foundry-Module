@@ -16,7 +16,14 @@ const row = (n) => ({ chronicle_type: 'entity', chronicle_id: `e${n}`, updated_a
 function make(pull) {
   const sm = new SyncManager();
   const routed = [];
-  sm.api = { get: async (p) => pull(p) };
+  // The change feed is covered by test-change-feed.mjs; here it is absent,
+  // as on a Chronicle without it.
+  sm.api = {
+    get: async (p) => {
+      if (p.startsWith('/sync/changes')) throw Object.assign(new Error('not found'), { status: 404 });
+      return pull(p);
+    },
+  };
   sm.fetchAndCacheMembers = async () => {};
   sm.logActivity = () => {};
   sm._modules = [{ onSyncMapping: async (m) => { routed.push(m.chronicle_id); } }];

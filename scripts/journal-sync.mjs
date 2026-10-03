@@ -23,6 +23,7 @@ import { pickJournalCreateType, buildEntityCreateBody } from './_journal-create.
 import { JournalPushDebouncer } from './_journal-push-debounce.mjs';
 import { setAside } from './_set-aside.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
+import { collapseChanges } from './_change-feed.mjs';
 
 /**
  * Validate and resolve a Chronicle entity's `image_path` to a safe src
@@ -189,16 +190,86 @@ export class JournalSync {
    * logic (update changed pages, create missing ones), then sets aside
    * journals whose page is gone. Runs on every connect and reconnect.
    */
-  async onInitialSync() {
+  /** Change-feed area this module reads at connect (see SyncManager). */
+  get feedArea() { return 'journals'; }
+
+  /** Journals use the feed only while journal sync is on. */
+  feedActive() { return !!getSetting('syncJournals'); }
+
+  /**
+   * Connect-time catch-up. With the change feed, only the pages Chronicle
+   * says changed are refetched; without it (first connect, an older server,
+   * a feed gap) every page is walked.
+   *
+   * @param {{feed?: {mode: 'delta', changes: object[]}|{mode: 'full'}}} [opts]
+   */
+  async onInitialSync({ feed } = {}) {
     if (!game.user.isGM || !this._api || !getSetting('syncJournals')) return;
     // lastSyncTime is still the previous sync's here (SyncManager writes the
     // new one after every module's onInitialSync). None yet → no creates:
     // a first connect leaves importing to the import wizard.
     const createdAfter = getSetting('lastSyncTime') || null;
+    if (feed?.mode === 'delta') {
+      await this._catchUpFromFeed(feed.changes, feed.createdAfter ?? createdAfter);
+      return;
+    }
     const summary = await this.resyncAll({ verbose: false, onlyChanged: true, createdAfter });
     // A failed or partial walk proves nothing about deletions.
     if (summary.errors > 0 && !this._lastWalk) throw new Error('journal reconcile: entity list failed');
     await this._setAsideMissing();
+  }
+
+  /**
+   * Apply the pages the change feed lists. Same rules as the full walk: a
+   * journal already at the page's version is left alone, a new journal is
+   * made only for a page created since the cursor (an older page with no
+   * journal is one the GM deleted here), and a removed page sets its journal
+   * aside only on a definite 404. "Created since" is the page's own
+   * `created_at` against the cursor's `createdAfter`, not the feed's
+   * `created` entry: the feed replays entries a previous connect already
+   * applied. Throws when any page failed, so the cursor is not advanced past
+   * it.
+   *
+   * @param {object[]} changes
+   * @param {string|null} createdAfter - Saved with the cursor.
+   * @private
+   */
+  async _catchUpFromFeed(changes, createdAfter) {
+    const outcomes = collapseChanges(changes, 'entity');
+    let errors = 0;
+    for (const [entityId, op] of outcomes) {
+      const journal = this._findJournal(entityId);
+      try {
+        if (op === 'deleted') {
+          if (journal) await this._setAsideIfGone(journal, entityId);
+          continue;
+        }
+        let entity;
+        try {
+          entity = await this._api.get(`/entities/${entityId}`);
+        } catch (err) {
+          // Removed after this change was recorded: its own delete entry may
+          // be later in the feed, but check rather than rely on it.
+          if ((err?.status ?? err?.statusCode) === 404) {
+            if (journal) await this._setAsideIfGone(journal, entityId, { knownGone: true });
+            continue;
+          }
+          throw err;
+        }
+        if (!entity?.id || this._isExcluded(entity) || this._isHandledByActorSync(entity)) continue;
+        if (journal) {
+          if (entity.updated_at && journal.getFlag(FLAG_SCOPE, 'chronicleUpdatedAt') === entity.updated_at) continue;
+          await this._onEntityUpdated(entity);
+        } else if (op === 'created' && createdAfter && entity.created_at
+            && Date.parse(entity.created_at) > Date.parse(createdAfter)) {
+          await this._createJournalFromEntity(entity);
+        }
+      } catch (err) {
+        errors++;
+        console.warn(`Chronicle: catch-up failed for entity ${entityId}:`, err);
+      }
+    }
+    if (errors > 0) throw new Error(`journal catch-up: ${errors} page(s) failed`);
   }
 
   /**
@@ -213,21 +284,33 @@ export class JournalSync {
     for (const journal of [...game.journal.contents]) {
       const eid = journal.getFlag(FLAG_SCOPE, 'entityId');
       if (!eid || walk.ids.has(eid)) continue;
-      if (isCalendarNoteJournal(journal) || this._isHandledByNoteSync(journal) || isMapJournal(journal, FLAG_SCOPE)) continue;
-      if (this._isActorLinked(eid)) continue;
-      let gone = false;
+      await this._setAsideIfGone(journal, eid);
+    }
+  }
+
+  /**
+   * Set a linked journal aside when its Chronicle page is definitely gone
+   * (a 404, or `knownGone` from a 404 the caller just saw). Journals owned by
+   * another area (calendar notes, notes, maps, actor-linked) are left alone.
+   * @private
+   */
+  async _setAsideIfGone(journal, eid, { knownGone = false } = {}) {
+    if (isCalendarNoteJournal(journal) || this._isHandledByNoteSync(journal) || isMapJournal(journal, FLAG_SCOPE)) return;
+    if (this._isActorLinked(eid)) return;
+    let gone = knownGone;
+    if (!gone) {
       try {
         await this._api.get(`/entities/${eid}`);
       } catch (err) {
         gone = (err?.status ?? err?.statusCode) === 404;
       }
-      if (!gone) continue;
-      await this._queue.run(eid, async () => {
-        this._journalPushDebouncer.cancel(journal.id);
-        await setAside(journal, FLAG_SCOPE, SYNC_OPTIONS);
-        ui.notifications?.info?.(game.i18n.format('CHRONICLE.Removed.Entity', { name: journal.name }));
-      });
     }
+    if (!gone) return;
+    await this._queue.run(eid, async () => {
+      this._journalPushDebouncer.cancel(journal.id);
+      await setAside(journal, FLAG_SCOPE, SYNC_OPTIONS);
+      ui.notifications?.info?.(game.i18n.format('CHRONICLE.Removed.Entity', { name: journal.name }));
+    });
   }
 
   /** True when a synced actor already carries this entity id. @private */
@@ -495,13 +578,22 @@ export class JournalSync {
       return;
     }
 
+    // A copy older than the version this journal already has is stale (an
+    // echo built before a later save), and applying it would roll the
+    // journal and its recorded version back. Equal versions still apply:
+    // versions have one-second precision, so equal is not proof of same.
+    if (this._olderThanRecorded(journal, entity.updated_at)) {
+      console.debug(`Chronicle: ignored a stale copy of "${journal.name}"`);
+      return;
+    }
+
     // A local edit still waiting to be sent wins over this incoming change:
     // applying it would silently erase what the GM just typed. The edit is
     // pushed shortly (Chronicle updates are partial), so move the expected
     // version forward to this change's, otherwise that push would be
     // rejected as a conflict, and tell the GM.
     if (this._journalPushDebouncer.has(journal.id)) {
-      if (entity.updated_at) {
+      if (entity.updated_at && !this._olderThanRecorded(journal, entity.updated_at)) {
         await journal.update(
           { [`flags.${FLAG_SCOPE}.chronicleUpdatedAt`]: entity.updated_at },
           SYNC_OPTIONS,
@@ -831,7 +923,7 @@ export class JournalSync {
         });
 
         // Push initial permissions from Foundry ownership.
-        await this._pushPermissions(entity.id, journal.ownership, isPrivate, journal.name);
+        await this._pushPermissions(entity.id, journal.ownership, isPrivate, journal.name, journal);
 
         console.debug(`Chronicle: Pushed new journal "${journal.name}" to Chronicle`);
       }
@@ -958,7 +1050,7 @@ export class JournalSync {
       }
 
       // Push ownership changes as Chronicle permission updates.
-      await this._pushPermissions(entityId, journal.ownership, isPrivate, journal.name);
+      await this._pushPermissions(entityId, journal.ownership, isPrivate, journal.name, journal);
 
       await this._recordPush(journal, result);
 
@@ -978,6 +1070,17 @@ export class JournalSync {
   }
 
   /**
+   * True when `ts` is older than the Chronicle version this journal has
+   * recorded. A journal's recorded version only ever moves forward.
+   * @private
+   */
+  _olderThanRecorded(journal, ts) {
+    const seen = Date.parse(journal?.getFlag?.(FLAG_SCOPE, 'chronicleUpdatedAt') || '');
+    const t = Date.parse(ts || '');
+    return Number.isFinite(seen) && Number.isFinite(t) && t < seen;
+  }
+
+  /**
    * Record a successful push on the journal: when it synced and the version
    * the next push must expect. One marked write, so no hook echo.
    * @param {JournalEntry} journal
@@ -986,7 +1089,9 @@ export class JournalSync {
    */
   async _recordPush(journal, result) {
     const update = { [`flags.${FLAG_SCOPE}.lastSync`]: new Date().toISOString() };
-    if (result?.updated_at) update[`flags.${FLAG_SCOPE}.chronicleUpdatedAt`] = result.updated_at;
+    if (result?.updated_at && !this._olderThanRecorded(journal, result.updated_at)) {
+      update[`flags.${FLAG_SCOPE}.chronicleUpdatedAt`] = result.updated_at;
+    }
     await journal.update(update, SYNC_OPTIONS);
   }
 
@@ -1278,13 +1383,19 @@ export class JournalSync {
    * Best-effort: a transport error is surfaced but never fails the journal
    * sync, mirroring the journal-content push posture.
    *
+   * With `journal`, a push identical to the last one sent for it is skipped:
+   * Chronicle stamps a new version on every permissions save, so a repeat
+   * would leave the journal's recorded version stale and make the next
+   * catch-up re-apply the module's own push.
+   *
    * @param {string} entityId - Chronicle entity ID.
    * @param {object} ownership - Foundry ownership object.
    * @param {boolean} isPrivate - Derived privacy flag from default ownership.
    * @param {string} [label] - Human-readable entity name for notifications.
+   * @param {JournalEntry} [journal] - Remembers what was last pushed.
    * @private
    */
-  async _pushPermissions(entityId, ownership, isPrivate, label) {
+  async _pushPermissions(entityId, ownership, isPrivate, label, journal) {
     const { permissions, unmapped, hasUserGrants } = this._buildPermissionGrants(
       ownership,
       isPrivate,
@@ -1311,11 +1422,20 @@ export class JournalSync {
     try {
       // Only push when there is something meaningful to say.
       if (hasUserGrants || permissions.length > 0) {
-        await this._api.put(`/entities/${entityId}/permissions`, {
-          visibility: hasUserGrants ? 'custom' : 'default',
-          is_private: isPrivate,
-          permissions,
-        });
+        const body = { visibility: hasUserGrants ? 'custom' : 'default', is_private: isPrivate, permissions };
+        const key = JSON.stringify(body);
+        if (journal && journal.getFlag(FLAG_SCOPE, 'pushedPermissions') === key) return;
+        await this._api.put(`/entities/${entityId}/permissions`, body);
+        if (journal) {
+          // The save stamps a new page version but does not return it (and
+          // its broadcast can carry an older one), so read it back.
+          const update = { [`flags.${FLAG_SCOPE}.pushedPermissions`]: key };
+          const fresh = await this._api.get(`/entities/${entityId}`).catch(() => null);
+          if (fresh?.updated_at && !this._olderThanRecorded(journal, fresh.updated_at)) {
+            update[`flags.${FLAG_SCOPE}.chronicleUpdatedAt`] = fresh.updated_at;
+          }
+          await journal.update(update, SYNC_OPTIONS);
+        }
       }
     } catch (err) {
       // Best-effort — don't fail the sync, but don't fail silently either.

@@ -8,6 +8,7 @@
 
 import { ChronicleAPI } from './api-client.mjs';
 import { walkSyncPull, PULL_PAGE_SIZE } from './_sync-pull-walk.mjs';
+import { walkChangeFeed, cursorFor, feedForArea, FEED_PAGE_SIZE, FEED_SETTLE_MS } from './_change-feed.mjs';
 import { getSetting, setSetting, isConfigured, getSyncDirections, getExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
 
 /**
@@ -180,6 +181,7 @@ export class SyncManager {
    */
   async _onSyncStatus(msg) {
     const status = msg?.status ?? msg?.payload?.status;
+    if (status === 'connected') this._connectedAt ??= Date.now();
     if (status === 'connected' && !this._initialSyncDone) {
       // Latched only on success: a failed first sync is retried on the next
       // 'connected', not skipped until the connection drops.
@@ -206,8 +208,10 @@ export class SyncManager {
   _onConnectionStateChange(state) {
     if (state === 'disconnected' || state === 'reconnecting') {
       this._sawDisconnect = true;
+      this._connectedAt = null;
       return;
     }
+    if (state === 'connected') this._connectedAt ??= Date.now();
     if (state === 'connected' && this._initialSyncDone && this._sawDisconnect) {
       this._scheduleReconnectResync();
     }
@@ -512,6 +516,38 @@ export class SyncManager {
   }
 
   /**
+   * Read Chronicle's change feed for this connect.
+   *
+   * With a saved cursor: the changes after it (`delta`), or `full` when the
+   * feed no longer reaches back that far. With none: walk to the head first
+   * (`full`), so the rescan that follows is covered from there on. Null when
+   * the server has no feed or this key may not read it (older Chronicle, a
+   * player's key): areas then rescan and no cursor is saved.
+   *
+   * @param {{seq: number}|null} cursor
+   * @returns {Promise<{mode: 'delta'|'full', changes: object[], next: number, complete: boolean}|null>}
+   * @private
+   */
+  async _readChangeFeed(cursor) {
+    // The feed holds back its newest rows for a moment (see FEED_SETTLE_MS).
+    // Edits from just before the socket opened would be missing from a read
+    // made right away, and live delivery never saw them; wait them out.
+    const wait = FEED_SETTLE_MS - (Date.now() - (this._connectedAt ?? 0));
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    try {
+      const walked = await walkChangeFeed(
+        (since) => this.api.get(`/sync/changes?since=${since}&limit=${FEED_PAGE_SIZE}`),
+        cursor ? cursor.seq : 0,
+      );
+      const mode = cursor && !walked.resetRequired ? 'delta' : 'full';
+      return { mode, changes: mode === 'delta' ? walked.changes : [], next: walked.next, complete: walked.complete };
+    } catch (err) {
+      console.debug('Chronicle: change feed unavailable; areas will rescan', err?.status ?? err);
+      return null;
+    }
+  }
+
+  /**
    * Perform initial sync: pull all changes since last sync time.
    * @returns {Promise<boolean>} true when the whole pull was applied and the
    *   sync time saved; false when it failed or was cut short.
@@ -547,19 +583,40 @@ export class SyncManager {
         }
       }
 
+      // Read the change feed before any module applies, so whatever changes
+      // during this pass is after the cursor and replays next time.
+      const campaignId = getSetting('campaignId');
+      const cursor = cursorFor(getSetting('changeFeedCursor'), campaignId);
+      const feed = await this._readChangeFeed(cursor);
+
       // Let each module perform its own initial sync (e.g., calendar structure).
       // Isolated per module, mirroring the onPostInitialSync loop below: one
       // module throwing here must not abort the pass for the rest, or skip
       // the `lastSyncTime` write and re-pull from the same point forever.
+      // A module that uses the feed (`feedArea`) gets its changes or a full
+      // rescan; the cursor records only the areas that applied cleanly.
+      const feedAreas = [];
+      let feedFailed = false;
       for (const mod of this._modules) {
         if (typeof mod.onInitialSync === 'function') {
+          const area = mod.feedArea && mod.feedActive?.() ? mod.feedArea : null;
           try {
-            await mod.onInitialSync();
+            await mod.onInitialSync(area ? { feed: feedForArea(feed, cursor, area) } : undefined);
+            if (area) feedAreas.push(area);
           } catch (err) {
+            if (area) feedFailed = true;
             console.warn(`Chronicle: ${mod.constructor.name}.onInitialSync failed`, err);
             this.logActivity('error', `${mod.constructor.name} initial sync failed`);
           }
         }
+      }
+      if (feed && !feedFailed) {
+        // A walk cut short keeps the old "created after": pages created in
+        // the unread part are still new when the next connect reads them.
+        const createdAfter = feed.complete
+          ? (result.serverTime || new Date().toISOString())
+          : (cursor?.createdAfter ?? null);
+        await setSetting('changeFeedCursor', { campaignId, seq: feed.next, areas: feedAreas, createdAfter });
       }
 
       // Post-pass: modules that need to coordinate with each other after

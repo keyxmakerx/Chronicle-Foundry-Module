@@ -48,6 +48,7 @@ Install/update flow: also `.ai.md` → "Chronicle Integration — Install & Upda
 - **Sync never deletes without asking.** A Chronicle-side removal sets the Foundry journal aside (unlinked, in a "Chronicle: removed" folder, `scripts/_set-aside.mjs`); a Foundry-side delete of a linked actor or journal asks before deleting the Chronicle copy (`scripts/_remote-deletes.mjs`). `tools/test-set-aside.mjs`, `tools/test-remote-deletes.mjs`.
 - **Never hard-cap a list walk.** `JournalSync.resyncAll` and `_buildEntityGroups` share `scripts/_entity-page-walk.mjs` (200-page bound); its `truncated` flag must be surfaced. `tools/test-entity-page-walk.mjs`.
 - WebSocket messages route by type through `SyncManager`.
+- **Connect catch-up reads Chronicle's change feed** (`GET /sync/changes`, `scripts/_change-feed.mjs`); journals use it so far. The cursor is saved only after its changes applied, so replays must be harmless: skip what is already at its version, decide "new" by the page's own `created_at` against the cursor's `createdAfter`, which moves only with the cursor. A journal's recorded version never moves backwards. `tools/test-change-feed.mjs`, `tools/test-journal-versions.mjs`.
 
 ## Calendar blackout and date-push pauses
 

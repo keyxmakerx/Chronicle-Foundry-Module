@@ -197,6 +197,15 @@ export function registerSettings() {
     default: '',
   });
 
+  // Internal: change-feed position `{campaignId, seq, areas}` (not shown in
+  // UI). Saved only after a connect's changes applied; see _change-feed.mjs.
+  game.settings.register(MODULE_ID, 'changeFeedCursor', {
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: null,
+  });
+
   // Internal: Chronicle user → Foundry user ID mapping (not shown in settings UI).
   // Stored as JSON: { "chronicle-user-uuid": "foundry-user-id", ... }
   game.settings.register(MODULE_ID, 'userMappings', {

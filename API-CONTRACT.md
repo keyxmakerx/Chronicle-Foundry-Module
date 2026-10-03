@@ -293,12 +293,20 @@ Updates only the `fields_data` on an entity. Chronicle with keyxmakerx/Chronicle
 Returns entity permission/visibility settings.
 
 #### PUT /entities/:entityId/permissions
-Updates entity permissions.
+Updates entity permissions. Owner only.
 
 **Request:**
 ```json
-{ "visibility": "public" }
+{ "visibility": "default", "is_private": false, "permissions": [ { "subject_type": "role", "subject_id": "1", "permission": "view" } ] }
 ```
+
+Answers `{"status":"ok"}`. The save stamps a new `updated_at` it does not
+return, and its `entity.updated` broadcast can carry the previous one. So the
+module pushes only when the body differs from the last one sent for that
+journal, reads the page back afterwards, and never lets a journal's recorded
+version move backwards.
+
+Re-verify by: 2026-11-03 (Chronicle `entities/service.go` `SetEntityPermissions`)
 
 #### POST /entities/:entityId/reveal
 Toggles entity reveal state (NPC reveal to players). Body is exactly
@@ -583,6 +591,28 @@ Pulls all changes since a timestamp.
 ```json
 { "entities": [ ], "deleted_entities": [ "uuid1", "uuid2" ], "drawings": [ ], "tokens": [ ], "calendar_events": [ ] }
 ```
+
+#### GET /sync/changes
+Change feed: ids of what changed after a cursor. Owner or co-DM keys only
+(403 otherwise); absent on older Chronicle (404).
+
+**Used by:** `sync-manager.mjs` → initial sync (`_readChangeFeed`), journals first
+
+**Query:** `?since=<seq>&limit=1000` (default 500, max 1000)
+
+**Response:**
+```json
+{ "changes": [ { "seq": 12, "type": "entity", "resourceId": "uuid", "op": "created" } ], "next": 12, "hasMore": false, "resetRequired": false }
+```
+
+- `op` is `created`, `updated` or `deleted`; content is refetched through the
+  normal reads, so visibility filtering still applies.
+- `resetRequired: true` means `since` is older than the feed keeps (30 days):
+  do a full rescan and resume from `next`.
+- Rows younger than 2 s are held back, so a cursor never passes a change
+  still committing; the module reads at least 2.5 s after its socket opened.
+
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/sync_changes_handler.go`, `sync_change_repository.go`)
 
 #### POST /sync
 Generic sync endpoint for batch operations.
