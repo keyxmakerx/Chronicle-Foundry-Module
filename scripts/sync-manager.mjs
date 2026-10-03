@@ -525,7 +525,7 @@ export class SyncManager {
    * player's key): areas then rescan and no cursor is saved.
    *
    * @param {{seq: number}|null} cursor
-   * @returns {Promise<{mode: 'delta'|'full', changes: object[], next: number, complete: boolean}|null>}
+   * @returns {Promise<{mode: 'delta'|'full', changes: object[], next: number, complete: boolean, types: string[]|null}|null>}
    * @private
    */
   async _readChangeFeed(cursor) {
@@ -540,7 +540,7 @@ export class SyncManager {
         cursor ? cursor.seq : 0,
       );
       const mode = cursor && !walked.resetRequired ? 'delta' : 'full';
-      return { mode, changes: mode === 'delta' ? walked.changes : [], next: walked.next, complete: walked.complete };
+      return { mode, changes: mode === 'delta' ? walked.changes : [], next: walked.next, complete: walked.complete, types: walked.types };
     } catch (err) {
       console.debug('Chronicle: change feed unavailable; areas will rescan', err?.status ?? err);
       return null;
@@ -601,7 +601,7 @@ export class SyncManager {
         if (typeof mod.onInitialSync === 'function') {
           const area = mod.feedArea && mod.feedActive?.() ? mod.feedArea : null;
           try {
-            await mod.onInitialSync(area ? { feed: feedForArea(feed, cursor, area) } : undefined);
+            await mod.onInitialSync(area ? { feed: feedForArea(feed, cursor, area, mod.feedType) } : undefined);
             if (area) feedAreas.push(area);
           } catch (err) {
             if (area) feedFailed = true;
@@ -616,7 +616,7 @@ export class SyncManager {
         const createdAfter = feed.complete
           ? (result.serverTime || new Date().toISOString())
           : (cursor?.createdAfter ?? null);
-        await setSetting('changeFeedCursor', { campaignId, seq: feed.next, areas: feedAreas, createdAfter });
+        await setSetting('changeFeedCursor', { campaignId, seq: feed.next, areas: feedAreas, createdAfter, types: feed.types || [] });
       }
 
       // Post-pass: modules that need to coordinate with each other after

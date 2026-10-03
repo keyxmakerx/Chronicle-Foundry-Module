@@ -176,6 +176,32 @@ test('editing page text in Foundry reaches Chronicle', () => scenario('fvtt-page
   assert.match(full.entry_html || '', /second/);
 }));
 
+test('GM-only text reaches Foundry only inside a secret block, and a GM edit keeps it GM-only', () => scenario('gm-secrets', async ({ seed, world }) => {
+  const e = await chroniclePage(seed, 'Duke Varn');
+  await seed.chronicle.put(`/entities/${e.id}`, { entry: '<p>The duke is <span data-secret="true">a vampire</span> and kind.</p>' });
+  await openWorld(world);
+  await JournalSync_resync(world);
+  const j = byEntity(world, e.id);
+  assert.ok(j, 'journal exists');
+  const page = j.pages.contents.find((p) => p.type === 'text');
+  const html = page.text.content;
+  assert.doesNotMatch(html, /data-secret/);
+  assert.match(html, /<section class="secret"[^>]*><p[^>]*>a vampire<\/p><\/section>/);
+  assert.doesNotMatch(html.replace(/<section class="secret"[\s\S]*?<\/section>/g, ''), /vampire/, 'not in what players see');
+
+  await page.update({ 'text.content': html.replace('and kind.', 'and cruel.') });
+  await settle();
+  const full = await seed.chronicle.get(`/entities/${e.id}`);
+  assert.match(full.entry_html || '', /<span data-secret="true">a vampire<\/span>/);
+  assert.match(full.entry_html || '', /cruel/);
+  assert.doesNotMatch(full.entry_html || '', /<section/);
+  await seed.chronicle.put(`/entities/${e.id}`, { entry: '<p>Now <span data-secret="true">a lich</span>.</p>' });
+  await waitFor(() => /a lich/.test(pageText(j)), 15000, 'Chronicle edit to arrive');
+  await settle();
+  assert.doesNotMatch(pageText(j), /data-secret/);
+  assert.equal(j.getFlag(FLAG, 'fields'), undefined, 'field values (GM-only ones included) are not stored on the journal');
+}));
+
 test('changes made while the connection was down arrive when it comes back', () => scenario('ws-drop', async ({ seed, world }) => {
   const e = await chroniclePage(seed, 'Watchtower');
   await openWorld(world);

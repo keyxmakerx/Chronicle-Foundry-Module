@@ -604,13 +604,13 @@ Pulls all changes since a timestamp.
 Change feed: ids of what changed after a cursor. Owner or co-DM keys only
 (403 otherwise); absent on older Chronicle (404).
 
-**Used by:** `sync-manager.mjs` → initial sync (`_readChangeFeed`), journals first
+**Used by:** `sync-manager.mjs` → initial sync (`_readChangeFeed`): journals, characters and inventories
 
 **Query:** `?since=<seq>&limit=1000` (default 500, max 1000)
 
 **Response:**
 ```json
-{ "changes": [ { "seq": 12, "type": "entity", "resourceId": "uuid", "op": "created" } ], "next": 12, "hasMore": false, "resetRequired": false }
+{ "changes": [ { "seq": 12, "type": "entity", "resourceId": "uuid", "op": "created" } ], "next": 12, "hasMore": false, "resetRequired": false, "types": ["entity", "relation", "..."] }
 ```
 
 - `op` is `created`, `updated` or `deleted`; content is refetched through the
@@ -619,6 +619,12 @@ Change feed: ids of what changed after a cursor. Owner or co-DM keys only
   do a full rescan and resume from `next`.
 - Rows younger than 2 s are held back, so a cursor never passes a change
   still committing; the module reads at least 2.5 s after its socket opened.
+- A `relation` change's `resourceId` is the relation's **source entity**: "this
+  entity's relations changed". Item sync refetches `GET /entities/:id/relations`.
+- `types` lists the resource types the server records (absent on an older
+  Chronicle). The module saves it with the cursor; inventories use the delta
+  only when the cursor was saved while `relation` was recorded, else every
+  linked character is reconciled.
 
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/sync_changes_handler.go`, `sync_change_repository.go`)
 
@@ -636,6 +642,35 @@ Lists all maps in the campaign.
 > with an SVG overlay (`MapViewerSheet`), not a Foundry Scene. Drawing, token,
 > fog and layer endpoints below are read-only for that overlay; only markers
 > are editable and pushed back.
+
+`player_image_url` is set on every map row (list and single) whose map has a
+picture and at least one shadow area, whatever the key's role:
+`/api/v1/campaigns/:id/maps/:mapId/player-image?v=<version>`. That route
+returns the picture as JPEG with the shadowed areas smudged in; the version
+changes whenever the picture or a shadow does. The owner's key still gets the
+original in `image_id`/`image_url`, so the module fetches the player copy,
+stores it in Foundry, and points the page every player reads at that file
+only (`scripts/_map-player-image.mjs`). A missing field means no shadows
+(also what an older Chronicle sends). `drawing_type` also includes `shadow`
+(exactly two corner points).
+
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/map_api_handler.go` `PlayerImage`, `playerImageAPIURL`)
+
+Each map row carries `display_settings` (nullable object): the map's own
+look. The module reads `frame.style`/`frame.tint` and `pins.style`
+(`drop|seal|flag|dot`), `pins.size` (`s|m|l`), `pins.labels`
+(`always|hover|never`); absent means "follow the campaign" / the default.
+Resolved by `scripts/_map-look.mjs` `resolveMapLook` into the page meta
+(`chronicleMapMeta.look`) so players never need campaign settings.
+
+#### GET /maps/look
+The campaign map look: `{campaign_frame, frames[], kinds[{id,label,color}],
+icons[{id,label,category}], default_icon}`. `campaign_frame` is one of
+`atlas|arcane|old|modern|futuristic|gilded` and is what a map without its
+own frame wears. Fetched once per full sync; a 404 (older Chronicle) keeps
+the Atlas default. Marker `icon` is a Font Awesome class from `icons`; the
+viewer draws any well-formed `fa-` class and falls back to `default_icon`.
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/map_api_look.go`, keyxmakerx/Chronicle#1017)
 
 #### GET /maps/:mapId/drawings
 All coordinates are percentage-based (0–100), not pixels. `drawing_type` is
@@ -950,6 +985,40 @@ Lists relations for an entity (used for shop inventory).
 }
 ```
 
+#### GET /armory/shops/:entityId/room
+The shop room window's read (`scripts/shop-room-window.mjs`). Needs the armory
+addon. 404 when the shop is missing, not a shop, or hidden from the key.
+
+**Response:**
+```json
+{ "layout": { "...": "saved room, or null to generate one" },
+  "goods": [ { "id": 7, "relationType": "sells", "targetEntityId": "item-uuid",
+               "targetEntityName": "Rope", "metadata": { "price": 1, "currency": "gp", "quantity": 3 } } ] }
+```
+`goods` are the shop's `sells` relations a plain player can see (no `dmOnly`
+rows, no items hidden from players), so the room can be shown to every player.
+
+#### GET /armory/shops/:entityId/buyers?actingUserId=
+#### POST /armory/shops/:entityId/buy
+The shop room's buying calls (`scripts/shop-room-window.mjs`), made by the
+GM's client: for the GM, or for a player as the Chronicle member the player
+is matched to (`actingUserId`, a query parameter on GET and a body field on
+POST). Only an Owner or co-DM key may name someone else (403); the name must
+be a current member (404); the call then has that member's rights only. Needs
+the armory addon.
+
+**Buyers response:** `{"downtimeOpen": true, "canBuyNow": true, "buyers": [{"id": "char-uuid", "name": "Brin", "moneyKey": "gp", "money": 50}]}`
+
+**Buy body:** `{"actingUserId": "member-uuid", "buyerEntityId": "char-uuid", "items": [{"relationId": 7, "quantity": 2}]}`
+(at most 50 lines, quantity 1–99; prices come from the listing, never the body)
+
+**Buy response:** `{"status": "bought", "spent": 6, "currency": "gp", "moneyLeft": 44}`.
+Refusals are `{"message": "..."}`: 400 (empty basket, no coin field, not
+enough coin, mixed currencies), 403 (not their character), 404 (shop or good
+hidden), 409 (a player while downtime is closed).
+
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/shop_api_handler.go`)
+
 ---
 
 ## Chronicle-served Module Distribution
@@ -1150,6 +1219,49 @@ If Chronicle's URL shape changes, update all three together:
 
 ---
 
+### Stashes
+
+Move items and money between characters and stashes. All routes need the
+Armory addon; an older Chronicle, or a campaign with the addon off, answers
+**404** and the module simply does not offer Stashes (it probes
+`GET /stashes/downtime` once per session, caches a definitive answer, and keeps
+that 404 out of the error log). JSON is camelCase, money is a number in whole
+currency units, ids are strings (a stash id may arrive as a number).
+
+**Used by:** `scripts/stash-sync.mjs` (GM client only), reached by players
+through the module socket (`scripts/stash-client.mjs`).
+
+**Acting member.** Every call may carry `actingUserId` (query on GET, body on
+POST/PUT): the Chronicle user id of a current member. The call then runs under
+THAT member's role and rules. Only an Owner or co-DM key may name someone
+else (403 otherwise), so naming a player only narrows what the call may do.
+The module sends it only when relaying for a player, and takes the member from
+the Foundry user id the socket layer attached to the request, never from the
+request body.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/stashes/view?characterId=&actingUserId=` | `{downtimeOpen, canApprove, character:{id,name,moneyKey,money,items:[{itemId,name,quantity}]}, stashes:[{id,name,money,items}], destinations:[{kind,id,name}]}`. `characterId` is the Chronicle entity id (the actor's `entityId` flag). `moneyKey` is empty when the system has no money field. |
+| POST | `/stashes/moves` | Body `{actingUserId, kind:"item"\|"money", itemId, quantity, amount, from:{kind,id}, to:{kind,id}}`, endpoint kinds `character`\|`stash`. Items send `itemId`+integer `quantity`; money sends a number `amount` (at most two decimals). Answer `{status:"applied"\|"pending", move}`. 403 not your character, 404 unseen stash, 409 not enough / not applicable. |
+| GET | `/stashes/history?characterId=&actingUserId=` | `{history:[line]}`, newest first, at most 50. A line has `id, kind, status, quantity, amount, itemName, fromName, toName, requesterName, summary, createdAt`; a sheet money edit has both ends the same character and reads e.g. "Wealth changed 2 → 3 · in Foundry". |
+| GET | `/stashes/requests` | `{requests:[line]}`, pending only; the actor must be able to approve. |
+| POST | `/stashes/requests/:moveId/approve`, `/decline` | Body `{actingUserId}` optional; the actor must be able to approve. Answer `{status, move}` (`applied`, `declined` or `failed`). |
+| GET | `/stashes/downtime` | `{open}`. |
+| PUT | `/stashes/downtime` | `{open, actingUserId}`; approver only. The module does not call it. |
+
+Known limits: only the active GM client answers players, posts request cards and
+refreshes actors; the Stashes button treats any Chronicle-linked actor as a
+character. Replies to players travel encrypted on the module socket; a refresh
+never deletes a Foundry item except the one an applied move took from a
+character.
+
+Lists are unwrapped defensively (`{history}`/`{requests}`/`{data}` or a bare
+array): `scripts/_stash-model.mjs`.
+
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/stash_api_handler.go`, `internal/plugins/armory/stash_api.go`, `docs/api/openapi.yaml` Stashes tag; the routes are on Chronicle PR #1022 and unreleased as of 2026-10-03)
+
+---
+
 ## WebSocket Protocol
 
 > **Every `calendar.*` message type below is DORMANT.** Chronicle's calendar
@@ -1191,6 +1303,9 @@ If the token is invalid, the server rejects the upgrade.
 | `note.created` | `{ noteId, entityId }` — ids only; the module fetches the note. An older Chronicle sends the full note object instead | Note created |
 | `note.updated` | `{ noteId, entityId }` — ids only; the module fetches the note. An older Chronicle sends the full note object instead | Note modified |
 | `note.deleted` | `{ noteId, entityId }` (an older Chronicle sends the full note object; only the id is read) | Note deleted |
+| `relation.created` | Full relation row (`id`, `sourceEntityId`, `targetEntityId`, `relationType`, `metadata`, …); `resourceId` is the source entity | Relation row created (one message per direction) |
+| `relation.deleted` | Same | Relation row deleted |
+| `relation.metadata_updated` | Same | Relation metadata changed (quantity, equipped, stash moves) |
 | `calendar.event.created` | Full event object | Calendar event created |
 | `calendar.event.updated` | Full event object | Calendar event modified |
 | `calendar.event.deleted` | `{ id }` | Calendar event deleted |
@@ -1203,9 +1318,33 @@ If the token is invalid, the server rejects the upgrade.
 | `calendar.festival.changed` | `null` | Festival edited (always fires alongside `structure.updated`) |
 | `calendar.era.changed` | `{ id, name, color }` | Era boundary crossed |
 | `calendar.worldstate.changed` | `{ date: {year, month, day}, moodTint: {color, intensity} }` | World state changed — dormant along with every other `calendar.*` type during the blackout |
+| `stash.requested` | `{ moveId, requestedBy, summary }` — ids and a size summary only | A player asked to move something; the GM client fetches `GET /stashes/requests` and posts a card |
+| `stash.settled` | `{ moveId, status, decidedBy }` | A request was answered (here or on the website); the card is rewritten |
+| `stash.moved` | `{ moveId, status, characterIds, stashIds }` | A move ran; the touched linked actors are re-pulled |
+| `stash.money_changed` | `{ characterId, moveId }` | A character's money changed (including a sheet edit); the actor is re-pulled |
+| `downtime.changed` | `{ open }` | Downtime was opened or closed; relayed to players' open windows |
 | `sync.status` | `{ connected: bool }` | Connection state change |
 | `sync.error` | `{ message }` | Synchronization error |
 | `sync.conflict` | Conflict details | Data conflict detected |
+
+`relation.*` messages go to owner and co-DM sockets only (a relation can
+name a private entity). Item sync treats any of them for a linked character
+as "reconcile this character's inventory" (`scripts/_inventory-plan.mjs`),
+so a missed or repeated message cannot leave it wrong. A removed relation
+only unlinks its Foundry item; the module deletes it only when a stash
+move the GM just applied took it off that character. Re-verify by:
+2026-11-03 (Chronicle `internal/widgets/relations/service.go`,
+`internal/app/routes.go` `relationEventPublisherAdapter`; sent since
+keyxmakerx/Chronicle#1025).
+
+### What the module does with `stash.*` and `downtime.changed`
+
+These reach DM-equivalent sockets only, with ids and statuses, never names.
+Handled in `scripts/stash-sync.mjs` `onMessage`, by the **active GM client
+only** (`game.users.activeGM`), and only once the Stashes probe said yes. The
+module's WebSocket allowlist includes the `stash.` and `downtime.` prefixes.
+
+Re-verify by: 2026-11-03 (Chronicle `internal/websocket/.ai.md`, `internal/plugins/armory/stash_events.go`)
 
 ### What the module does with `note.*`
 

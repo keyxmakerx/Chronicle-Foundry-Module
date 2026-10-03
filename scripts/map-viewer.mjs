@@ -10,9 +10,8 @@
  *
  * Security: `visibility=dm_only` markers and the whole fog overlay never
  * render for non-GMs — they're absent from the flag data, and GM-only
- * memory supplies them only on the GM client. `visibility_rules.
- * allowed_users`/`denied_users` are honored against the mapped Chronicle
- * user id.
+ * memory supplies them only on the GM client. Per-user `visibility_rules`
+ * are honored against the mapped Chronicle user id (`userCanSeeMarker`).
  *
  * Drawings, tokens, fog, and layers are read-only; markers stay editable
  * (with a visibility=dm_only checkbox) for GMs.
@@ -27,6 +26,11 @@ import { PIN_ICONS } from './map-sync.mjs';
 import { getUserMappings } from './settings.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
 import { confirmDialog } from './_dialogs.mjs';
+import { userCanSeeMarker } from './_map-flag-filter.mjs';
+import {
+  sanitizeLook, markerIconClass, pinMetrics, pinShapeSvg, frameInitial,
+} from './_map-look.mjs';
+import { startMotionRest } from './_map-motion-rest.mjs';
 
 /* ============================================================
    Constants
@@ -84,33 +88,6 @@ function _currentChronicleUserId() {
   return null;
 }
 
-/**
- * Visibility filter for a Chronicle marker. Honors `visibility=dm_only`
- * AND the per-user `visibility_rules.allowed_users` / `denied_users`.
- * @param {object} marker
- * @param {boolean} isGM
- * @param {string|null} chronicleUserId
- * @returns {boolean}
- */
-function _userCanSeeMarker(marker, isGM, chronicleUserId) {
-  if (!marker) return false;
-  if (marker.visibility === 'dm_only') return isGM;
-
-  const rules = marker.visibility_rules;
-  if (!rules || typeof rules !== 'object') return true;
-  // GM always sees regardless of rules (defense-in-depth on top of dm_only check).
-  if (isGM) return true;
-
-  const denied = Array.isArray(rules.denied_users) ? rules.denied_users : null;
-  if (denied && chronicleUserId && denied.includes(chronicleUserId)) return false;
-
-  const allowed = Array.isArray(rules.allowed_users) ? rules.allowed_users : null;
-  if (allowed && allowed.length > 0) {
-    return chronicleUserId ? allowed.includes(chronicleUserId) : false;
-  }
-  return true;
-}
-
 /** Cap a hex color to the standard `#RRGGBB[AA]` shape; strips dangerous chars. */
 function _safeColor(value, fallback = '#888888') {
   if (typeof value !== 'string') return fallback;
@@ -163,6 +140,7 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
   static PARTS = {
     content: {
       template: 'modules/chronicle-sync/templates/map-viewer.hbs',
+      templates: ['modules/chronicle-sync/templates/map-frame-ornaments.hbs'],
     },
   };
 
@@ -173,7 +151,12 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
     this._zoom = 1;
     this._panX = 0;
     this._panY = 0;
-    this._showLabels = true;
+    /**
+     * Name display chosen with the viewer's label button, overriding the
+     * map's own setting (`look.pinLabels`) for this view; null follows it.
+     * @type {'always'|'never'|null}
+     */
+    this._labelMode = null;
     /** @type {string|null} Active placement tool: a pin-type key or 'chronicle-marker'. */
     this._activeTool = null;
     this._isPanning = false;
@@ -244,13 +227,20 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
 
     // Visibility-filter markers; render-time enforcement of dm_only and rules.
     const filteredMarkers = (mapData?.markers || []).filter(
-      (m) => _userCanSeeMarker(m, isGM, userChronicleId)
+      (m) => userCanSeeMarker(m, isGM, userChronicleId)
     );
+
+    // The map's look as Chronicle draws it; the GM's sync resolves it into
+    // the page meta so players never need the campaign settings.
+    const look = sanitizeLook(meta?.look);
+    const labelMode = this._labelMode ?? look.pinLabels;
+    const pin = pinMetrics(look.pinStyle, look.pinSize);
 
     const chronicleMarkers = filteredMarkers.map((m) => {
       const category = CHRONICLE_MARKER_CATEGORIES.includes(m.pin_category)
         ? m.pin_category : 'note';
       const style = PIN_ICONS[category];
+      const color = _safeColor(m.color, style.color);
       const audience = m.visibility === 'dm_only'
         ? game.i18n.localize('CHRONICLE.MapViewer.MarkerAudienceDm')
         : game.i18n.localize('CHRONICLE.MapViewer.MarkerAudienceEveryone');
@@ -261,8 +251,11 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
         label: m.name || '',
         description: m.description || '',
         category,
-        faIcon: style.faIcon,
-        color: _safeColor(m.color, style.color),
+        faIcon: markerIconClass(m.icon),
+        color,
+        // Markup built only from closed sets and a validated colour.
+        shapeSvg: new Handlebars.SafeString(pinShapeSvg(look.pinStyle, color, m.visibility === 'dm_only')),
+        pin,
         visibility: m.visibility || 'everyone',
         isDmOnly: m.visibility === 'dm_only',
         audienceLabel: audience,
@@ -308,8 +301,15 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
       tokens,
       fog,
       hasFog: !!fog,
-      showLabels: this._showLabels,
+      labelMode,
+      showLabels: labelMode === 'always',
+      showLocalLabels: labelMode !== 'never',
       zoomPercent: Math.round(this._zoom * 100),
+      look,
+      mapTitle: meta?.name || this.document.name || '',
+      mapTitleUpper: String(meta?.name || this.document.name || '').toUpperCase(),
+      mapInitial: frameInitial(meta?.name || this.document.name),
+      frameCorners: ['tl', 'tr', 'br', 'bl'],
     };
   }
 
@@ -458,6 +458,9 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
     if (!viewer) return;
 
     this._viewer = viewer;
+    // Each render replaces the viewer element, so rest-tracking restarts on it.
+    this._stopMotionRest?.();
+    this._stopMotionRest = startMotionRest(viewer);
     this._viewport = viewer.querySelector('.map-viewport');
     this._container = viewer.querySelector('.map-container');
     this._pinLayer = viewer.querySelector('.pin-layer');
@@ -563,6 +566,8 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
   async _preClose(options) {
     await super._preClose?.(options);
     this._teardownGlobalListeners();
+    this._stopMotionRest?.();
+    this._stopMotionRest = null;
 
     const mapId = this.document.getFlag(FLAG_SCOPE, 'mapId');
     if (mapId) {
@@ -660,8 +665,14 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
     if (!this._container) return;
     this._container.style.transform = `translate(${this._panX}px, ${this._panY}px) scale(${this._zoom})`;
 
+    // Chronicle's pins keep their screen size at any zoom.
+    this._container.style.setProperty('--cs-inv-zoom', String(1 / this._zoom));
+
+    const pct = `${Math.round(this._zoom * 100)}%`;
     const indicator = this._viewer?.querySelector('.zoom-indicator');
-    if (indicator) indicator.textContent = `${Math.round(this._zoom * 100)}%`;
+    if (indicator) indicator.textContent = pct;
+    const hud = this._viewer?.querySelector('.cs-mp-hudzoom');
+    if (hud) hud.textContent = `ZOOM ${pct}`;
   }
 
   _zoomBy(delta) {
@@ -709,12 +720,24 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
     this._applyTransform();
   }
 
+  /**
+   * The label button shows every name, or, when they all show, hides them.
+   * It swaps the marker layer's mode class, since the map's hover and never
+   * settings hide names in CSS that an inline style can't undo.
+   */
   _toggleLabels() {
-    this._showLabels = !this._showLabels;
+    const layer = this._viewer?.querySelector('.chronicle-marker-layer');
+    const current = this._labelMode ?? layer?.dataset.labels ?? 'always';
+    this._labelMode = current === 'always' ? 'never' : 'always';
+    if (layer) {
+      layer.classList.remove('cs-labels-always', 'cs-labels-hover', 'cs-labels-never');
+      layer.classList.add(`cs-labels-${this._labelMode}`);
+    }
     const btn = this._viewer?.querySelector('.toggle-labels');
-    if (btn) btn.classList.toggle('active', this._showLabels);
-    this._viewer?.querySelectorAll('.pin-label').forEach((el) => {
-      el.style.display = this._showLabels ? '' : 'none';
+    if (btn) btn.classList.toggle('active', this._labelMode === 'always');
+    this._viewer?.querySelectorAll('.pin-label, .token-label').forEach((el) => {
+      if (el.closest('.cs-pin')) return;
+      el.style.display = this._labelMode === 'never' ? 'none' : '';
     });
   }
 
