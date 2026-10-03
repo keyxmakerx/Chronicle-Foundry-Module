@@ -24,7 +24,8 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
 - `bench/`: the two-sided sync bench (real Chronicle + the real sync code in
   a fake Foundry world); `CHRONICLE_DIR=../Chronicle bench/run.sh`. A sync
   change is not ready until its bench scenarios pass. `bench/README.md`.
-- `.github/workflows/`: `check-descriptor.yml`, `release.yml` (Actions → Release
+- `.github/workflows/`: `check-descriptor.yml`, `check-error-catalog.yml`
+  (API-CONTRACT.md's error table vs Chronicle's catalog), `release.yml` (Actions → Release
   with a version; tags main), `snapshot.yml`, `sync-bench.yml` (the bench,
   against the same-named Chronicle branch or main).
 
