@@ -22,6 +22,8 @@ function webSession() {
   const cookie = () => [...jar].map(([k, v]) => `${k}=${v}`).join('; ');
   const csrf = () => jar.get('chronicle_csrf') || '';
   return {
+    cookie,
+    csrf,
     async get(path) {
       const res = await fetch(CHRONICLE_URL + path, { headers: { cookie: cookie() }, redirect: 'manual' });
       store(res);
@@ -37,6 +39,16 @@ function webSession() {
           'x-csrf-token': csrf(),
         },
         body: new URLSearchParams(form).toString(),
+      });
+      store(res);
+      return res;
+    },
+    async postJSON(path, body) {
+      const res = await fetch(CHRONICLE_URL + path, {
+        method: 'POST',
+        redirect: 'manual',
+        headers: { cookie: cookie(), 'content-type': 'application/json', 'x-csrf-token': csrf() },
+        body: JSON.stringify(body),
       });
       store(res);
       return res;
@@ -92,7 +104,30 @@ export async function seedCampaign(label = 'bench') {
   };
   const moduleKey = await makeKey('bench foundry module');
   const otherKey = await makeKey('bench chronicle editor');
-  return { campaignId, moduleKey, displayName, chronicle: apiClient(campaignId, otherKey), module: apiClient(campaignId, moduleKey) };
+  // Maps are made only through the owner's web routes, with the campaign's
+  // maps add-on switched on first; the sync API reads them.
+  let mapsOn = false;
+  const createMap = async (name) => {
+    if (!mapsOn) {
+      const list = await (await web.get(`/campaigns/${campaignId}/addons`)).json();
+      const maps = list.find((a) => a.addon_slug === 'maps');
+      if (!maps) throw new Error('no maps add-on');
+      if (!maps.enabled) {
+        const r = await fetch(`${CHRONICLE_URL}/campaigns/${campaignId}/addons/${maps.addon_id}/toggle`, {
+          method: 'PUT', redirect: 'manual',
+          headers: { cookie: web.cookie(), 'content-type': 'application/x-www-form-urlencoded', 'x-csrf-token': web.csrf() },
+          body: 'action=enable',
+        });
+        if (r.status >= 400) throw new Error(`maps add-on not enabled: HTTP ${r.status}`);
+      }
+      mapsOn = true;
+    }
+    const r = await web.postJSON(`/campaigns/${campaignId}/maps`, { name });
+    const text = await r.text();
+    if (r.status >= 300) throw new Error(`map create failed: HTTP ${r.status} ${text.slice(0, 200)}`);
+    return JSON.parse(text);
+  };
+  return { campaignId, moduleKey, displayName, createMap, chronicle: apiClient(campaignId, otherKey), module: apiClient(campaignId, moduleKey) };
 }
 
 /** A REST client scoped to one campaign, for scenario setup and assertions. */
@@ -118,6 +153,7 @@ export function apiClient(campaignId, key) {
     get: (p) => call('GET', p),
     post: (p, b) => call('POST', p, b || {}),
     put: (p, b) => call('PUT', p, b || {}),
+    patch: (p, b) => call('PATCH', p, b || {}),
     del: (p) => call('DELETE', p),
     /** Every entity in the campaign, all pages. */
     async allEntities() {

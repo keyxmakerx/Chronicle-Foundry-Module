@@ -48,12 +48,14 @@ async function loadModule() {
     import('../scripts/journal-sync.mjs'),
     import('../scripts/actor-sync.mjs'),
     import('../scripts/item-sync.mjs'),
-  ]).then(([settings, sm, js, as, is]) => ({
+    import('../scripts/map-sync.mjs'),
+  ]).then(([settings, sm, js, as, is, ms]) => ({
     registerSettings: settings.registerSettings,
     SyncManager: sm.SyncManager,
     JournalSync: js.JournalSync,
     ActorSync: as.ActorSync,
     ItemSync: is.ItemSync,
+    MapSync: ms.MapSync,
   }));
   return modulesLoaded;
 }
@@ -129,6 +131,7 @@ export async function openWorld(world, { modules = ['journals'] } = {}) {
     sm.registerModule(actors);
   }
   if (modules.includes('items')) sm.registerModule(new m.ItemSync());
+  if (modules.includes('maps')) sm.registerModule(new m.MapSync());
   world.syncManager = sm;
   await sm.start();
   await waitFor(() => sm._initialSyncDone, 20000, 'initial sync');
