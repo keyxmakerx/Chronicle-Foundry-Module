@@ -72,6 +72,6 @@ test('the sync files set journals aside rather than deleting them', () => {
   const journal = src('journal-sync.mjs'), note = src('note-sync.mjs');
   assert.doesNotMatch(journal, /journal\.delete\(\)/, 'journal-sync must not delete journals');
   assert.doesNotMatch(note, /journal\.delete\(\)/, 'note-sync must not delete journals');
-  assert.match(journal, /setAside\(journal, FLAG_SCOPE\)/);
+  assert.match(journal, /setAside\(journal, FLAG_SCOPE(, SYNC_OPTIONS)?\)/);
   assert.match(note, /setAside\(journal, FLAG_SCOPE\)/);
 });

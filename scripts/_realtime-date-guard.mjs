@@ -12,7 +12,7 @@
  * read it from there.
  */
 
-import { handleIfCalendarRebuilding } from './_calendar-blackout-guard.mjs';
+import { handleIfCalendarRebuilding, noteCalendarAnswerOk } from './_calendar-blackout-guard.mjs';
 
 /**
  * Session-scoped notice state. A module-level singleton so calendar-sync.mjs
@@ -94,6 +94,7 @@ export async function shouldSkipDatePush(api) {
     if (handleIfCalendarRebuilding(err)) return true;
     return false;
   }
+  noteCalendarAnswerOk();
   if (!tracksRealTime(payload)) return false;
   notifyRealTimePushPaused();
   return true;

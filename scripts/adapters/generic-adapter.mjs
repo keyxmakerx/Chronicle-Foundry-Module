@@ -14,6 +14,8 @@
  * pseudo-documents) become plain arrays/objects instead of `{}`.
  */
 
+import { touchedScalarKeys } from '../_actor-field-diff.mjs';
+
 /**
  * Create a generic adapter instance by fetching field definitions from the API.
  *
@@ -76,6 +78,26 @@ export async function createGenericAdapter(api, chronicleSystemId) {
      */
     toChronicleFields(actor) {
       return buildChronicleFields(actor, mappedFields);
+    },
+
+    /**
+     * Like toChronicleFields, but only the scalar fields the update `change`
+     * touched, plus the Foundry-derived collection fields (items) when at
+     * least one scalar changed. Returns null when no mapped field changed, so
+     * the caller skips the push. Chronicle merges the result into the stored
+     * fields, so Chronicle-only fields are never overwritten.
+     *
+     * @param {Actor} actor
+     * @param {object} change - Foundry's nested update diff.
+     * @returns {object|null}
+     */
+    toChronicleFieldsChanged(actor, change) {
+      const touched = new Set(touchedScalarKeys(change || {}, mappedFields));
+      if (touched.size === 0) return null;
+      return buildChronicleFields(
+        actor,
+        mappedFields.filter((f) => f.foundry_collection || touched.has(f.key)),
+      );
     },
 
     /**

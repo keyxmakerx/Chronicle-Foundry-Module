@@ -40,19 +40,31 @@ Install/update flow: also `.ai.md` → "Chronicle Integration — Install & Upda
 - **List responses are bare array or `{"data":[…],"total":N}`** — unwrap defensively everywhere. Envelope: `/entities`, `/entity-types`, `/systems`, `/addons`, `/tags`, `/relations/types`, `/calendar/events`. Bare: `/maps`, `/maps/:id/*`, `/members`, `/entities/:id/relations`, `/notes`. `tools/test-envelope-audit.mjs`.
 - **Real-time calendars are read-only for dates**: `tracks_real_time` from `GET /calendar/date` pauses date-push only, via `scripts/_realtime-date-guard.mjs`. `tools/test-realtime-date-signal.mjs`.
 - **Calendar sub-resources are display-only** (dashboard + optional GM-whisper, never public); `structure.updated` badges mismatches, never auto-applies. `scripts/_calendar-subresources.mjs`, `tools/test-calendar-subresources.mjs`, `tools/test-calendar-subresource-routing.mjs`.
-- **Chronicle update endpoints are PARTIAL**: absent preserves, `null` clears, present replaces (API-CONTRACT.md → "partial-update contract"). Send only changed fields; never echo untouched ones back. `tools/test-partial-put-contract.mjs`. One deliberate exception: the marker dialog in `scripts/map-viewer.mjs` spreads the stored marker, harmless on current Chronicle and needed by older servers that replace the whole record.
+- **Chronicle update endpoints are PARTIAL**: absent preserves, `null` clears, present replaces (API-CONTRACT.md → "partial-update contract"). Send only changed fields; never echo untouched ones back. `tools/test-partial-put-contract.mjs`. One deliberate exception: the marker dialog in `scripts/map-viewer.mjs` spreads the stored marker, harmless on current Chronicle and needed by older servers that replace the whole record. Actor field pushes do the same for `fields_data` (`ActorSync._putFieldsMerged`).
 - **Sync never deletes without asking.** A Chronicle-side removal sets the Foundry journal aside (unlinked, in a "Chronicle: removed" folder, `scripts/_set-aside.mjs`); a Foundry-side delete of a linked actor or journal asks before deleting the Chronicle copy (`scripts/_remote-deletes.mjs`). `tools/test-set-aside.mjs`, `tools/test-remote-deletes.mjs`.
 - **Never hard-cap a list walk.** `JournalSync.resyncAll` and `_buildEntityGroups` share `scripts/_entity-page-walk.mjs` (200-page bound); its `truncated` flag must be surfaced. `tools/test-entity-page-walk.mjs`.
 - WebSocket messages route by type through `SyncManager`.
 
-## Calendar blackout
+## Calendar blackout and date-push pauses
 
-Chronicle's calendar plugin is mid-rebuild (V5): every calendar route answers
-`HTTP 503 {"error":"calendar_rebuilding", ...}` (503 so the module doesn't
-mistake it for an old Chronicle lacking the endpoint); no `calendar.*`
-WebSocket message fires. The module shows a one-time GM notice per session
-and keeps maps/actors/items/notes syncing. A pre-blackout structure-mismatch
-pause needs a world reload to clear until V5 ships. `tools/test-calendar-blackout.mjs`.
+Chronicle's date and event routes are live; some calendar routes (structure
+and settings writes, import, export, advance) still answer
+`HTTP 503 {"error":"calendar_rebuilding", ...}`. Only a 503 whose body says
+`calendar_rebuilding` arms the blackout (`scripts/_calendar-blackout-guard.mjs`,
+`_calendar-probe-state.mjs`); a bare 503 from a proxy or restart is an ordinary
+failed request retried next tick. The GM gets one notice when it arms; pushes
+pause for 30 s, then one is let through, and any good calendar answer clears it
+silently. `tools/test-calendar-blackout.mjs`.
+
+A structure-mismatch pause is re-checked on every pull (`onInitialSync`:
+reconnect and the dashboard's manual pull) and lifts when the calendars match;
+no world reload. A 400 (or non-real-time 422) on a date push means Chronicle's
+calendar cannot hold the date; a 403 means the key is not the campaign owner's.
+Either pauses date push, with one GM notice per session, until the next pull (reconnect or manual) or a lifted mismatch pause
+(`scripts/_date-push-rejection.mjs`). Note hooks (Calendaria and Simple
+Calendar) share the mismatch guard and per-calendar exclusions. Echo
+suppression for notes is per note id or name+date (`scripts/_apply-guard.mjs`),
+so GM edits during a pull still push. `tools/test-calendar-resilience.mjs`.
 
 ## Working with this project
 

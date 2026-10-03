@@ -15,7 +15,9 @@
 import { getSetting, getCalendarSyncExclusions } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import { shouldSkipDatePush, isRealTimeRejection, notifyRealTimePushPaused } from './_realtime-date-guard.mjs';
-import { calendarBlackoutActive, handleIfCalendarRebuilding } from './_calendar-blackout-guard.mjs';
+import { calendarBlackoutActive, handleIfCalendarRebuilding, noteCalendarAnswerOk } from './_calendar-blackout-guard.mjs';
+import { datePushPaused, handleDatePushRefusal, resumeDatePush } from './_date-push-rejection.mjs';
+import { ApplyGuard, echoKey } from './_apply-guard.mjs';
 import { confirmAppliedDate } from './_applied-date-confirm.mjs';
 import {
   ROUTED_CALENDAR_TYPES,
@@ -346,8 +348,9 @@ export class CalendarSync {
     /** @type {import('./api-client.mjs').ChronicleAPI|null} */
     this._api = null;
     /**
-     * Reentrant echo-suppression guard, backed by a depth counter (not a
-     * boolean — see the `_syncing` getter). Read through `_syncing`.
+     * Reentrant echo guard for the DATE write only (`_setLocalDate`), backed
+     * by a depth counter. Notes use the per-note `_echoGuard` instead, so a
+     * GM's unrelated edits during a pull still push. Read through `_syncing`.
      * @type {number}
      */
     this._syncDepth = 0;
@@ -403,18 +406,55 @@ export class CalendarSync {
   }
 
   /**
-   * Reentrant echo-suppression guard. `true` whenever any sync operation is
-   * in flight. Backed by the `_syncDepth` counter rather than a boolean so a
-   * WebSocket handler firing mid back-catalog doesn't clear the guard the
-   * still-running loop depends on: a boolean's `finally` would unmask the
-   * loop, letting its `_createLocalEvent` calls fire `calendaria.noteCreated`
-   * unsuppressed and re-POST just-pulled events as duplicates. `_syncDepth`
-   * increments on enter, decrements in `finally`; active while `> 0`.
+   * Reentrant echo guard for the date write: `true` while `_setLocalDate` is
+   * applying Chronicle's date, so the date hook it triggers isn't pushed back.
+   * A counter, not a boolean, so overlapping applies don't unmask each other.
    * @returns {boolean}
    * @private
    */
   get _syncing() {
     return this._syncDepth > 0;
+  }
+
+  /**
+   * Per-note echo guard: names the notes being applied from Chronicle so only
+   * their own hook echoes are ignored (see `_apply-guard.mjs`). Created lazily.
+   * @returns {ApplyGuard}
+   * @private
+   */
+  get _echoGuard() {
+    if (!this.__echoGuard) this.__echoGuard = new ApplyGuard();
+    return this.__echoGuard;
+  }
+
+  /**
+   * Is this Calendaria note hook the echo of a note Chronicle is applying?
+   * @param {object} noteData
+   * @returns {boolean}
+   * @private
+   */
+  _isCalendariaNoteEcho(noteData) {
+    if (!noteData) return false;
+    const fd = noteData.flagData || noteData;
+    const date = chronicleDateFromCalendariaStartDate(fd.startDate || fd);
+    const name = noteData.name || noteData.title || '';
+    return this._echoGuard.isEcho({
+      id: noteData.id ?? noteData.pageId,
+      key: date ? echoKey({ name, ...date }) : null,
+    });
+  }
+
+  /**
+   * Echo keys for a Chronicle event about to be written locally. An empty
+   * name also registers the placeholders the module substitutes for it.
+   * @param {object} data Chronicle event.
+   * @returns {string[]}
+   * @private
+   */
+  _eventEchoKeys(data) {
+    const names = new Set([data.name || '']);
+    if (!data.name) { names.add('Event'); names.add('Untitled Note'); names.add('Untitled Event'); }
+    return [...names].map((name) => echoKey({ name, year: data.year, month: data.month, day: data.day }));
   }
 
   /**
@@ -545,14 +585,20 @@ export class CalendarSync {
     // locally — the dashboard's activity feed must not log a pull that
     // didn't happen (no calendar, a mismatch pause, or a thrown error).
     if (!getSetting('syncCalendar') || !this._calendarModule) return false;
-    if (this._calendarSyncDisabled) return false;
+    // A reconnect or manual pull gives a refused date push another chance:
+    // the GM may have fixed the calendar or the key in between.
+    resumeDatePush();
 
     try {
+      // A mismatch pause does not return early: the structure is re-checked
+      // on every pull so fixing either calendar resumes sync without a
+      // world reload.
       this._chronicleCalendar = await this._api.get('/calendar');
       if (!this._chronicleCalendar) {
         console.debug('Chronicle: No calendar configured for this campaign');
         return false;
       }
+      noteCalendarAnswerOk();
 
       // Structure-mismatch guard (B-R2): if the active Foundry calendar's
       // structure differs from Chronicle's, date coordinates are meaningless
@@ -568,11 +614,15 @@ export class CalendarSync {
         if (foundryStruct) {
           const cmp = compareCalendarStructures(this._chronicleCalendar, foundryStruct);
           if (!cmp.match) {
-            this._pauseCalendarSyncForMismatch(this._chronicleCalendar, foundryStruct, cmp.detail);
+            if (!this._calendarSyncDisabled) {
+              this._pauseCalendarSyncForMismatch(this._chronicleCalendar, foundryStruct, cmp.detail);
+            }
             return false;
           }
+          this._clearMismatchPause();
         }
       }
+      if (this._calendarSyncDisabled) return false;
 
       // Sync the current date from Chronicle to the Foundry calendar module.
       // This is the "poll" apply path (GET /calendar on connect/reconnect,
@@ -722,10 +772,27 @@ export class CalendarSync {
     const msg = `Chronicle Sync: calendar structures differ (${this._calendarMismatchDetail}). `
       + 'Calendar sync is paused for this session — edit either calendar so the two agree '
       + '(Chronicle: Calendar Settings → Months / Weekdays; Foundry: your calendar module), '
-      + 'then reload the world. '
+      + 'then reconnect or pull the calendar again; sync resumes by itself once they match. '
       + '(Journals, characters, and maps still sync.)';
     console.warn(msg);
     try { globalThis.ui?.notifications?.warn(msg, { permanent: true }); } catch { /* headless */ }
+  }
+
+  /**
+   * Lift a structure-mismatch pause once a re-check finds the calendars
+   * matching. No-op when not paused.
+   * @private
+   */
+  _clearMismatchPause() {
+    // A refused date push may have been the same mismatch; let it try again.
+    resumeDatePush();
+    if (!this._calendarSyncDisabled) return;
+    this._calendarSyncDisabled = false;
+    this._calendarMismatchDetail = null;
+    const msg = 'Chronicle Sync: the Chronicle calendar structure now matches the active '
+      + 'Foundry calendar — calendar sync resumed for this session.';
+    console.warn(msg);
+    try { globalThis.ui?.notifications?.info(msg); } catch { /* headless */ }
   }
 
   /**
@@ -890,30 +957,25 @@ export class CalendarSync {
    * @private
    */
   async _onChronicleWeatherChanged(payload) {
-    this._syncDepth++;
-    try {
-      let raw = payload;
-      if (!raw) {
-        // Zone-change ping: the type fired with no body. Refetch the reading.
-        try {
-          raw = await this._api.get('/calendar/weather');
-        } catch (err) {
-          console.debug('Chronicle: weather refetch after zone change failed', err?.message);
-        }
+    let raw = payload;
+    if (!raw) {
+      // Zone-change ping: the type fired with no body. Refetch the reading.
+      try {
+        raw = await this._api.get('/calendar/weather');
+      } catch (err) {
+        console.debug('Chronicle: weather refetch after zone change failed', err?.message);
       }
-      const weather = normalizeWeather(raw);
-      if (!weather) return;
+    }
+    const weather = normalizeWeather(raw);
+    if (!weather) return;
 
-      this._subresourceState = reduceSubresourceState(
-        this._subresourceState, 'calendar.weather.changed', raw,
-      );
+    this._subresourceState = reduceSubresourceState(
+      this._subresourceState, 'calendar.weather.changed', raw,
+    );
 
-      const appliedToModule = await this._applyWeatherToCalendaria(weather);
-      if (!appliedToModule && this._shouldAnnounce('calendar.weather.changed')) {
-        this._announceToGM(this._subresourceState.weatherLine);
-      }
-    } finally {
-      this._syncDepth--;
+    const appliedToModule = await this._applyWeatherToCalendaria(weather);
+    if (!appliedToModule && this._shouldAnnounce('calendar.weather.changed')) {
+      this._announceToGM(this._subresourceState.weatherLine);
     }
   }
 
@@ -972,14 +1034,9 @@ export class CalendarSync {
    * @private
    */
   async _onChronicleSubresourceChanged(type, payload) {
-    this._syncDepth++;
-    try {
-      this._subresourceState = reduceSubresourceState(this._subresourceState, type, payload);
-      if (!this._shouldAnnounce(type)) return;
-      this._announceToGM(formatSubresourceLine(type, payload));
-    } finally {
-      this._syncDepth--;
-    }
+    this._subresourceState = reduceSubresourceState(this._subresourceState, type, payload);
+    if (!this._shouldAnnounce(type)) return;
+    this._announceToGM(formatSubresourceLine(type, payload));
   }
 
   /**
@@ -1002,59 +1059,47 @@ export class CalendarSync {
    * @private
    */
   async _onChronicleStructureUpdated(type = 'calendar.structure.updated') {
-    this._syncDepth++;
+    let cal = null;
     try {
-      let cal = null;
-      try {
-        cal = await this._api.get('/calendar');
-      } catch (err) {
-        console.debug('Chronicle: structure re-compare could not refetch /calendar', err?.message);
-      }
-      if (cal) this._chronicleCalendar = cal;
-
-      const chronicleCal = this._chronicleCalendar;
-      // Fail open, exactly as onInitialSync does: no readable structure on
-      // either side means no verdict, so we neither pause nor un-pause.
-      if (!(chronicleCal?.months?.length > 0)) {
-        console.debug(`Chronicle: ${type} received; Chronicle structure unreadable — no re-compare.`);
-        return;
-      }
-      const foundryStruct = this._readActiveFoundryStructure();
-      if (!foundryStruct) {
-        console.debug(`Chronicle: ${type} received; Foundry structure unreadable — no re-compare.`);
-        return;
-      }
-
-      const cmp = compareCalendarStructures(chronicleCal, foundryStruct);
-      if (!cmp.match) {
-        this._structureChangedDetail = null;
-        if (!this._calendarSyncDisabled) {
-          this._pauseCalendarSyncForMismatch(chronicleCal, foundryStruct, cmp.detail);
-        }
-        return;
-      }
-
-      // Compatible. Recover from a prior mismatch pause if there was one.
-      if (this._calendarSyncDisabled) {
-        this._calendarSyncDisabled = false;
-        this._calendarMismatchDetail = null;
-        const msg = 'Chronicle Sync: the Chronicle calendar structure now matches the active '
-          + 'Foundry calendar — calendar sync resumed for this session.';
-        console.warn(msg);
-        try { globalThis.ui?.notifications?.info(msg); } catch { /* headless */ }
-      }
-
-      const chronicleShape = `${(chronicleCal.months || []).length}mo/${(chronicleCal.weekdays || []).length}wd`;
-      const foundryShape = `${(foundryStruct.monthDays || []).length}mo/${foundryStruct.weekdayCount ?? 0}wd`;
-      this._structureChangedDetail =
-        `Chronicle's calendar structure changed (${type}). Re-compared: still compatible `
-        + `(Chronicle ${chronicleShape} vs Foundry ${foundryShape}). Month names, cycles, festivals `
-        + 'and era boundaries are outside this comparison — re-check the calendar. '
-        + 'The Foundry calendar was NOT modified.';
-      console.debug(`Chronicle: ${this._structureChangedDetail}`);
-    } finally {
-      this._syncDepth--;
+      cal = await this._api.get('/calendar');
+    } catch (err) {
+      console.debug('Chronicle: structure re-compare could not refetch /calendar', err?.message);
     }
+    if (cal) this._chronicleCalendar = cal;
+
+    const chronicleCal = this._chronicleCalendar;
+    // Fail open, exactly as onInitialSync does: no readable structure on
+    // either side means no verdict, so we neither pause nor un-pause.
+    if (!(chronicleCal?.months?.length > 0)) {
+      console.debug(`Chronicle: ${type} received; Chronicle structure unreadable — no re-compare.`);
+      return;
+    }
+    const foundryStruct = this._readActiveFoundryStructure();
+    if (!foundryStruct) {
+      console.debug(`Chronicle: ${type} received; Foundry structure unreadable — no re-compare.`);
+      return;
+    }
+
+    const cmp = compareCalendarStructures(chronicleCal, foundryStruct);
+    if (!cmp.match) {
+      this._structureChangedDetail = null;
+      if (!this._calendarSyncDisabled) {
+        this._pauseCalendarSyncForMismatch(chronicleCal, foundryStruct, cmp.detail);
+      }
+      return;
+    }
+
+    // Compatible. Recover from a prior mismatch pause if there was one.
+    this._clearMismatchPause();
+
+    const chronicleShape = `${(chronicleCal.months || []).length}mo/${(chronicleCal.weekdays || []).length}wd`;
+    const foundryShape = `${(foundryStruct.monthDays || []).length}mo/${foundryStruct.weekdayCount ?? 0}wd`;
+    this._structureChangedDetail =
+      `Chronicle's calendar structure changed (${type}). Re-compared: still compatible `
+      + `(Chronicle ${chronicleShape} vs Foundry ${foundryShape}). Month names, cycles, festivals `
+      + 'and era boundaries are outside this comparison — re-check the calendar. '
+      + 'The Foundry calendar was NOT modified.';
+    console.debug(`Chronicle: ${this._structureChangedDetail}`);
   }
 
   /**
@@ -1064,12 +1109,7 @@ export class CalendarSync {
    */
   async _onChronicleEventCreated(data) {
     if (!data) return;
-    this._syncDepth++;
-    try {
-      await this._createLocalEvent(data);
-    } finally {
-      this._syncDepth--;
-    }
+    await this._createLocalEvent(data);
   }
 
   /**
@@ -1079,12 +1119,7 @@ export class CalendarSync {
    */
   async _onChronicleEventUpdated(data) {
     if (!data) return;
-    this._syncDepth++;
-    try {
-      await this._updateLocalEvent(data);
-    } finally {
-      this._syncDepth--;
-    }
+    await this._updateLocalEvent(data);
   }
 
   /**
@@ -1094,16 +1129,11 @@ export class CalendarSync {
    */
   async _onChronicleEventDeleted(data) {
     if (!data) return;
-    this._syncDepth++;
-    try {
-      await this._deleteLocalEvent(data);
-    } finally {
-      this._syncDepth--;
-    }
+    await this._deleteLocalEvent(data);
   }
 
   /**
-   * Whether the operator has opted the currently-active Calendaria calendar out
+   * Whether the operator has opted the currently-active calendar (Calendaria or Simple Calendar) out
    * of Chronicle sync (toggled from the Sync Calendar editor). Push handlers
    * check this so a local-only calendar stops pushing date/note changes without
    * disabling calendar sync globally. Defensive: any lookup failure → not
@@ -1113,7 +1143,9 @@ export class CalendarSync {
     try {
       const exclusions = getCalendarSyncExclusions();
       if (!exclusions.length) return false;
-      const cal = globalThis.CALENDARIA?.api?.getActiveCalendar?.();
+      const cal = this._calendarModule === 'simple-calendar'
+        ? globalThis.SimpleCalendar?.api?.getCurrentCalendar?.()
+        : globalThis.CALENDARIA?.api?.getActiveCalendar?.();
       const id = cal?.metadata?.id || cal?.id || '';
       return !!id && exclusions.includes(id);
     } catch {
@@ -1151,7 +1183,7 @@ export class CalendarSync {
     if (!date) return;
 
     // Check before the pre-push probe so a known blackout costs zero requests.
-    if (calendarBlackoutActive()) return;
+    if (calendarBlackoutActive() || datePushPaused()) return;
 
     try {
       if (await shouldSkipDatePush(this._api)) return;
@@ -1162,7 +1194,10 @@ export class CalendarSync {
         hour: src.hour ?? 0,
         minute: src.minute ?? 0,
       });
+      noteCalendarAnswerOk();
     } catch (err) {
+      // 400/403/422 refusals pause date push with one notice, not one error per tick.
+      if (handleDatePushRefusal(err)) return;
       if (isRealTimeRejection(err)) { notifyRealTimePushPaused(); return; }
       // A 503 calendar_rebuilding arms the session guard and notifies once,
       // rather than logging an error on every world-time tick.
@@ -1177,7 +1212,7 @@ export class CalendarSync {
    * @private
    */
   async _onCalendariaNoteCreated(noteData) {
-    if (this._syncing) return;
+    if (this._isCalendariaNoteEcho(noteData)) return;
     if (!game.user.isGM) return;
     if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
     if (this._isActiveCalendarExcluded()) return;
@@ -1201,7 +1236,7 @@ export class CalendarSync {
    * @private
    */
   async _onCalendariaNoteUpdated(noteData) {
-    if (this._syncing) return;
+    if (this._isCalendariaNoteEcho(noteData)) return;
     if (!game.user.isGM) return;
     if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
     if (this._isActiveCalendarExcluded()) return;
@@ -1229,7 +1264,7 @@ export class CalendarSync {
    * @private
    */
   async _onCalendariaNoteDeleted(noteData) {
-    if (this._syncing) return;
+    if (this._isCalendariaNoteEcho(noteData)) return;
     if (!game.user.isGM) return;
     if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
     if (this._isActiveCalendarExcluded()) return;
@@ -1306,7 +1341,7 @@ export class CalendarSync {
     if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
 
     // Check before the pre-push probe so a known blackout costs zero requests.
-    if (calendarBlackoutActive()) return;
+    if (calendarBlackoutActive() || datePushPaused()) return;
 
     try {
       if (await shouldSkipDatePush(this._api)) return;
@@ -1317,7 +1352,10 @@ export class CalendarSync {
         hour: dateData.hour || 0,
         minute: dateData.minute || 0,
       });
+      noteCalendarAnswerOk();
     } catch (err) {
+      // 400/403/422 refusals pause date push with one notice, not one error per tick.
+      if (handleDatePushRefusal(err)) return;
       if (isRealTimeRejection(err)) { notifyRealTimePushPaused(); return; }
       // A 503 calendar_rebuilding arms the session guard and notifies once,
       // rather than logging an error on every world-time tick.
@@ -1343,7 +1381,7 @@ export class CalendarSync {
     if (!date) return;
 
     // Check before the pre-push probe so a known blackout costs zero requests.
-    if (calendarBlackoutActive()) return;
+    if (calendarBlackoutActive() || datePushPaused()) return;
 
     try {
       if (await shouldSkipDatePush(this._api)) return;
@@ -1355,7 +1393,10 @@ export class CalendarSync {
         hour: date.hour || 0,
         minute: date.minute || 0,
       });
+      noteCalendarAnswerOk();
     } catch (err) {
+      // 400/403/422 refusals pause date push with one notice, not one error per tick.
+      if (handleDatePushRefusal(err)) return;
       if (isRealTimeRejection(err)) { notifyRealTimePushPaused(); return; }
       // A 503 calendar_rebuilding arms the session guard and notifies once,
       // rather than logging an error on every world-time tick.
@@ -1370,7 +1411,7 @@ export class CalendarSync {
    * @private
    */
   async _onLocalEventCreate(eventData) {
-    if (this._syncing) return;
+    if (this._echoGuard.isEcho({ id: eventData?.id, key: echoKey(eventData) })) return;
     if (!game.user.isGM) return;
     if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
 
@@ -1399,7 +1440,7 @@ export class CalendarSync {
    * @private
    */
   async _onLocalEventUpdate(eventData) {
-    if (this._syncing) return;
+    if (this._echoGuard.isEcho({ id: eventData?.id, key: echoKey(eventData) })) return;
     if (!game.user.isGM) return;
     if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
 
@@ -1432,7 +1473,7 @@ export class CalendarSync {
    * @private
    */
   async _onLocalEventDelete(eventData) {
-    if (this._syncing) return;
+    if (this._echoGuard.isEcho({ id: eventData?.id })) return;
     if (!game.user.isGM) return;
     if (this._calendarSyncDisabled) return; // structure-mismatch guard (B-R2): pause push both dirs
 
@@ -1460,8 +1501,11 @@ export class CalendarSync {
    * @private
    */
   async _onSimpleCalendarNoteCreate(journal, options, userId) {
-    if (this._syncing || !game.user.isGM) return;
+    if (!game.user.isGM) return;
     if (userId !== game.user.id) return;
+    if (this._calendarSyncDisabled) return; // same mismatch guard as Calendaria
+    if (this._isActiveCalendarExcluded()) return;
+    if (this._isSimpleCalendarNoteEcho(journal)) return;
 
     const scData = this._extractSimpleCalendarData(journal);
     if (!scData) return;
@@ -1495,8 +1539,11 @@ export class CalendarSync {
    * @private
    */
   async _onSimpleCalendarNoteUpdate(journal, change, options, userId) {
-    if (this._syncing || !game.user.isGM) return;
+    if (!game.user.isGM) return;
     if (userId !== game.user.id) return;
+    if (this._calendarSyncDisabled) return; // same mismatch guard as Calendaria
+    if (this._isActiveCalendarExcluded()) return;
+    if (this._isSimpleCalendarNoteEcho(journal)) return;
 
     const scData = this._extractSimpleCalendarData(journal);
     if (!scData) return;
@@ -1534,8 +1581,11 @@ export class CalendarSync {
    * @private
    */
   async _onSimpleCalendarNoteDelete(journal, options, userId) {
-    if (this._syncing || !game.user.isGM) return;
+    if (!game.user.isGM) return;
     if (userId !== game.user.id) return;
+    if (this._echoGuard.isEcho({ id: journal?.id })) return;
+    if (this._calendarSyncDisabled) return; // same mismatch guard as Calendaria
+    if (this._isActiveCalendarExcluded()) return;
 
     // Check if this was a SC note we know about.
     const chronicleId = this._getChronicleEventId(journal.id)
@@ -1548,6 +1598,19 @@ export class CalendarSync {
     } catch (err) {
       console.warn('Chronicle: Failed to delete SimpleCalendar note from Chronicle', err);
     }
+  }
+
+  /**
+   * Is this journal hook the echo of a SimpleCalendar note Chronicle is
+   * applying? Matches by journal id, or by name+date for a create whose id
+   * did not exist yet.
+   * @param {JournalEntry} journal
+   * @returns {boolean}
+   * @private
+   */
+  _isSimpleCalendarNoteEcho(journal) {
+    const scData = this._extractSimpleCalendarData(journal);
+    return this._echoGuard.isEcho({ id: journal?.id, key: scData ? echoKey(scData) : null });
   }
 
   /**
@@ -1652,6 +1715,16 @@ export class CalendarSync {
    * @private
    */
   async _createLocalEvent(data) {
+    // Held only for this event's own write so a GM's unrelated edits during a
+    // pull still push; the new note's id joins the scope once it exists.
+    return this._echoGuard.run(
+      { keys: this._eventEchoKeys(data) },
+      (token) => this._createLocalEventUnguarded(data, token),
+    );
+  }
+
+  /** @private */
+  async _createLocalEventUnguarded(data, token) {
     const isPublic = isChronicleEventPublic(data);
     if (this._calendarModule === 'calendaria') {
       if (this._hasModernCalendariaApi) {
@@ -1671,6 +1744,7 @@ export class CalendarSync {
             openSheet: false,
           });
           if (note?.id) {
+            this._echoGuard.addId(token, note.id);
             await this._storeEventMapping(note.id, data.id);
           }
         } catch (err) {
@@ -1688,6 +1762,7 @@ export class CalendarSync {
           description: data.description || '',
         });
         if (localEvent?.id) {
+          this._echoGuard.addId(token, localEvent.id);
           await this._storeEventMapping(localEvent.id, data.id);
         }
       } else {
@@ -1722,6 +1797,7 @@ export class CalendarSync {
           0,    // repeats (none)
         );
         if (note?.id) {
+          this._echoGuard.addId(token, note.id);
           await this._storeEventMapping(note.id, data.id);
           // Store Chronicle event ID on the journal entry.
           const journal = game.journal.get(note.id);
@@ -1739,6 +1815,14 @@ export class CalendarSync {
    * @private
    */
   async _updateLocalEvent(data) {
+    return this._echoGuard.run(
+      { ids: [this._getLocalEventId(data.id)] },
+      () => this._updateLocalEventUnguarded(data),
+    );
+  }
+
+  /** @private */
+  async _updateLocalEventUnguarded(data) {
     const isPublic = isChronicleEventPublic(data);
     if (this._calendarModule === 'calendaria') {
       const localId = this._getLocalEventId(data.id);
@@ -1801,6 +1885,11 @@ export class CalendarSync {
   async _deleteLocalEvent(data) {
     const localId = this._getLocalEventId(data.id);
     if (!localId) return;
+    return this._echoGuard.run({ ids: [localId] }, () => this._deleteLocalEventUnguarded(data, localId));
+  }
+
+  /** @private */
+  async _deleteLocalEventUnguarded(data, localId) {
 
     if (this._calendarModule === 'calendaria') {
       if (this._hasModernCalendariaApi) {
@@ -1843,11 +1932,8 @@ export class CalendarSync {
 
     const seen = new Set();
     let created = 0;
-    // _createLocalEvent → CALENDARIA.api.createNote fires the synchronous
-    // calendaria.noteCreated hook synchronously, which would otherwise re-POST
-    // the just-pulled event back to Chronicle as a duplicate; hold _syncing
-    // across the loop, as _onChronicleEventCreated does for the WS pull path.
-    this._syncDepth++;
+    // Each _createLocalEvent holds its own per-note echo scope, so a GM edit
+    // made between requests of this ~36-request walk is not dropped.
     try {
       for (const coord of fetches) {
         const path = coord
@@ -1884,8 +1970,6 @@ export class CalendarSync {
     } catch (err) {
       // Calendar events endpoint may not exist yet; not critical.
       console.debug('Chronicle: Could not sync calendar events back-catalog', err.message);
-    } finally {
-      this._syncDepth--;
     }
   }
 

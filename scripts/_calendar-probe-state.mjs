@@ -16,12 +16,13 @@
  *     calendar for this campaign (import one).
  *   - `'auth'`        — 401 / 403 / `invalid_token`: token/auth problem
  *     (re-check the API key, or reinstall from a fresh campaign URL).
- *   - `'rebuilding'`  — 503 / `calendar_rebuilding`: Chronicle's calendar is
- *     deliberately unavailable during its V5 rebuild; every other subsystem
- *     still syncs. Kept distinct from 'absent' (which would wrongly suggest
- *     importing a calendar) and 'unreachable' (which would wrongly blame
- *     connection/settings) — nothing the GM can do fixes it.
- *   - `'unreachable'` — anything else (network error, other 5xx, unknown).
+ *   - `'rebuilding'`  — a 503 whose body says `calendar_rebuilding`: that
+ *     calendar route is deliberately unavailable while Chronicle rebuilds it;
+ *     every other subsystem still syncs. Kept distinct from 'absent' (which
+ *     would wrongly suggest importing a calendar) and 'unreachable' (which
+ *     would wrongly blame connection/settings).
+ *   - `'unreachable'` — anything else (network error, a bare 503 from a proxy
+ *     or restart, other 5xx, unknown): a failed request, retried next time.
  */
 export function calendarStateFromError(err) {
   const msg = String(err?.message || '');
@@ -31,12 +32,12 @@ export function calendarStateFromError(err) {
   const status = (typeof err?.status === 'number' && err.status)
     || Number(msg.match(/Chronicle API error (\d{3})\b/)?.[1])
     || 0;
-  // Ordered before 'absent' deliberately: Chronicle answers the blackout with
-  // 503 rather than 404 precisely so the module does not take its "this server
-  // is too old to have the endpoint" path, and misreading it as 'absent' would
-  // reintroduce that confusion one layer up.
-  if (status === 503 || err?.code === 'calendar_rebuilding'
-    || /calendar_rebuilding/i.test(msg)) return 'rebuilding';
+  // Only Chronicle's own `calendar_rebuilding` body counts. A bare 503 is a
+  // proxy or a restart, and treating it as the rebuild would silence date
+  // sync for no reason. Ordered before 'absent' because Chronicle answers it
+  // with 503 rather than 404 so the module doesn't take its "server too old"
+  // path.
+  if (err?.code === 'calendar_rebuilding' || /calendar_rebuilding/i.test(msg)) return 'rebuilding';
   if (status === 404 || /calendar_not_configured/i.test(msg)) return 'absent';
   if (status === 401 || status === 403 || /invalid_token|unauthor/i.test(msg)) return 'auth';
   return 'unreachable';

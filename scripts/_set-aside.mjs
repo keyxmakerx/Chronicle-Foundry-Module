@@ -51,8 +51,9 @@ export async function removedFolder(scope) {
  * Unlinks a journal and moves it into the removed folder.
  * @param {JournalEntry} journal
  * @param {string} scope
+ * @param {object} [options] - Passed to `journal.update` (the sync marker, so the update hooks ignore it).
  */
-export async function setAside(journal, scope) {
+export async function setAside(journal, scope, options) {
   const folder = await removedFolder(scope);
-  await journal.update(setAsideUpdate(scope, folder?.id ?? null));
+  await journal.update(setAsideUpdate(scope, folder?.id ?? null), options);
 }

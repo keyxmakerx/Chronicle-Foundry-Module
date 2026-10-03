@@ -10,3 +10,10 @@ export const FLAG_SCOPE = 'chronicle-sync';
 
 /** Module ID used for Foundry settings registration. */
 export const MODULE_ID = 'chronicle-sync';
+
+/**
+ * Option marker on every document write sync itself makes. The Foundry hooks
+ * ignore a write that carries it, so only sync's own echoes are dropped and a
+ * GM edit made while sync is writing something else still pushes.
+ */
+export const SYNC_OPTIONS = Object.freeze({ chronicleSync: true });

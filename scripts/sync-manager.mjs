@@ -7,6 +7,7 @@
  */
 
 import { ChronicleAPI } from './api-client.mjs';
+import { walkSyncPull, PULL_PAGE_SIZE } from './_sync-pull-walk.mjs';
 import { getSetting, setSetting, isConfigured, getSyncDirections, getExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
 
 /**
@@ -180,8 +181,10 @@ export class SyncManager {
   async _onSyncStatus(msg) {
     const status = msg?.status ?? msg?.payload?.status;
     if (status === 'connected' && !this._initialSyncDone) {
-      await this._performInitialSync();
-      this._initialSyncDone = true;
+      // Latched only on success: a failed first sync is retried on the next
+      // 'connected', not skipped until the connection drops.
+      const ok = await this._performInitialSync();
+      if (ok !== false) this._initialSyncDone = true;
     }
   }
 
@@ -236,8 +239,10 @@ export class SyncManager {
   async _resyncAfterReconnect() {
     this._sawDisconnect = false;
     try {
-      await this._performInitialSync();
-      this.logActivity('connect', 'Reconnected — re-pulled changes made during the disconnect');
+      const ok = await this._performInitialSync();
+      if (ok !== false) {
+        this.logActivity('connect', 'Reconnected — re-pulled changes made during the disconnect');
+      }
     } catch (err) {
       console.warn('Chronicle: Reconnect re-pull failed', err);
     }
@@ -508,6 +513,8 @@ export class SyncManager {
 
   /**
    * Perform initial sync: pull all changes since last sync time.
+   * @returns {Promise<boolean>} true when the whole pull was applied and the
+   *   sync time saved; false when it failed or was cut short.
    * @private
    */
   async _performInitialSync() {
@@ -520,10 +527,14 @@ export class SyncManager {
       // Fetch campaign members for user ID mapping.
       await this.fetchAndCacheMembers();
 
-      // Pull sync mappings modified since last sync.
-      const result = await this.api.get(`/sync/pull?since=${encodeURIComponent(lastSync)}`);
+      // Pull sync mappings modified since last sync, following has_more
+      // (the endpoint returns 100 rows per call).
+      const result = await walkSyncPull(
+        (since) => this.api.get(`/sync/pull?since=${encodeURIComponent(since)}&limit=${PULL_PAGE_SIZE}`),
+        lastSync,
+      );
 
-      if (result.mappings && result.mappings.length > 0) {
+      if (result.mappings.length > 0) {
         console.debug(`Chronicle: Received ${result.mappings.length} mapping updates`);
 
         // Route each mapping to the appropriate module.
@@ -564,15 +575,25 @@ export class SyncManager {
         }
       }
 
-      // Update last sync timestamp.
-      await setSetting('lastSyncTime', result.server_time || new Date().toISOString());
+      if (!result.complete) {
+        // Keep the old starting point: the next pull re-reads from it rather
+        // than skipping what this one never reached.
+        console.warn('Chronicle: Initial sync pull stopped early; sync time not advanced');
+        this.logActivity('error', 'Initial sync incomplete — will retry');
+        return false;
+      }
 
-      this.logActivity('connect', `Initial sync complete (${result.mappings?.length || 0} mappings)`);
+      // The first page's server_time, so changes made mid-walk are re-read.
+      await setSetting('lastSyncTime', result.serverTime || new Date().toISOString());
+
+      this.logActivity('connect', `Initial sync complete (${result.mappings.length} mappings)`);
       ui.notifications.info('Chronicle: Initial sync complete');
+      return true;
     } catch (err) {
       console.error('Chronicle: Initial sync failed', err);
       this.logActivity('error', `Initial sync failed: ${err.message || 'Unknown error'}`);
       ui.notifications.error('Chronicle: Initial sync failed. Check console for details.');
+      return false;
     }
   }
 

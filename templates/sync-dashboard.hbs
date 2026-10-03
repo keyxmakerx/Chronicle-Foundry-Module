@@ -259,6 +259,17 @@
               <option value="newest" {{#if (eq config.conflictResolution "newest")}}selected{{/if}}>Newest wins</option>
             </select>
           </div>
+          {{#if config.journalCreateTypes.length}}
+          <div class="config-field">
+            <label class="config-label">{{localize "CHRONICLE.JournalPush.TypeLabel"}}</label>
+            <select class="config-select" data-config-key="journalCreateTypeId">
+              {{#each config.journalCreateTypes}}
+              <option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.name}}</option>
+              {{/each}}
+            </select>
+            <span class="config-hint-inline">{{localize "CHRONICLE.JournalPush.TypeHint"}}</span>
+          </div>
+          {{/if}}
           <div class="config-toggle-row">
             <label class="config-toggle-label">
               <input type="checkbox" class="config-checkbox" data-config-key="autoSync" {{#if config.autoSync}}checked{{/if}} />

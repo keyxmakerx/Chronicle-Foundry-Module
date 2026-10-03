@@ -11,12 +11,15 @@
 
 import { getSetting, getSyncExclusions } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
-import { FLAG_SCOPE } from './constants.mjs';
+import { FLAG_SCOPE, SYNC_OPTIONS } from './constants.mjs';
 import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
 import { defaultLevelForVisibility } from './_ownership.mjs';
 import { isCalendarNoteJournal } from './calendar-sync.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
-import { walkEntityPages } from './_entity-page-walk.mjs';
+import { walkEntityPages, unwrapEntityList } from './_entity-page-walk.mjs';
+import { KeyedQueue } from './_keyed-queue.mjs';
+import { isMapJournal } from './_journal-ownership.mjs';
+import { pickJournalCreateType, buildEntityCreateBody } from './_journal-create.mjs';
 import { JournalPushDebouncer } from './_journal-push-debounce.mjs';
 import { setAside } from './_set-aside.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
@@ -56,8 +59,22 @@ export class JournalSync {
     /** @type {import('./sync-manager.mjs').SyncManager|null} */
     this._syncManager = null;
 
-    /** @type {boolean} Suppress hook processing during sync-initiated changes. */
-    this._syncing = false;
+    // Incoming Chronicle changes apply per entity, in arrival order. Writes
+    // sync makes carry SYNC_OPTIONS, which the Foundry hooks use to ignore
+    // only sync's own echoes (a GM edit made meanwhile still pushes).
+    /** @type {KeyedQueue} */
+    this._queue = new KeyedQueue();
+
+    /**
+     * Journals whose create POST is in flight (journal id -> name). The
+     * `entity.created` broadcast can arrive before the POST returns and the
+     * journal is flagged; without this it would spawn a second journal.
+     * @type {Map<string, string>}
+     */
+    this._inFlightCreates = new Map();
+
+    /** Entity ids seen / completeness of the last full walk, for reconcile. */
+    this._lastWalk = null;
 
     // Bound hook handlers for cleanup.
     this._onCreateJournal = this._handleCreateJournal.bind(this);
@@ -162,6 +179,60 @@ export class JournalSync {
   }
 
   /**
+   * Catch up on connect: apply what changed in Chronicle while Foundry was
+   * closed or disconnected. Chronicle does not touch a sync mapping when a
+   * page changes, so the mapping pull misses page edits, deletions and new
+   * pages; this walks the entity list instead, with the dashboard Resync's
+   * logic (update changed pages, create missing ones), then sets aside
+   * journals whose page is gone. Runs on every connect and reconnect.
+   */
+  async onInitialSync() {
+    if (!game.user.isGM || !this._api || !getSetting('syncJournals')) return;
+    // lastSyncTime is still the previous sync's here (SyncManager writes the
+    // new one after every module's onInitialSync). None yet → no creates:
+    // a first connect leaves importing to the import wizard.
+    const createdAfter = getSetting('lastSyncTime') || null;
+    const summary = await this.resyncAll({ verbose: false, onlyChanged: true, createdAfter });
+    // A failed or partial walk proves nothing about deletions.
+    if (summary.errors > 0 && !this._lastWalk) throw new Error('journal reconcile: entity list failed');
+    await this._setAsideMissing();
+  }
+
+  /**
+   * Set aside journals linked to a page Chronicle no longer has. Only after
+   * a complete walk, and only on a definite 404 for that page, so a flaky
+   * request or a page the key cannot see never unlinks a healthy journal.
+   * @private
+   */
+  async _setAsideMissing() {
+    const walk = this._lastWalk;
+    if (!walk || walk.truncated) return;
+    for (const journal of [...game.journal.contents]) {
+      const eid = journal.getFlag(FLAG_SCOPE, 'entityId');
+      if (!eid || walk.ids.has(eid)) continue;
+      if (isCalendarNoteJournal(journal) || this._isHandledByNoteSync(journal) || isMapJournal(journal, FLAG_SCOPE)) continue;
+      if (this._isActorLinked(eid)) continue;
+      let gone = false;
+      try {
+        await this._api.get(`/entities/${eid}`);
+      } catch (err) {
+        gone = (err?.status ?? err?.statusCode) === 404;
+      }
+      if (!gone) continue;
+      await this._queue.run(eid, async () => {
+        this._journalPushDebouncer.cancel(journal.id);
+        await setAside(journal, FLAG_SCOPE, SYNC_OPTIONS);
+        ui.notifications?.info?.(game.i18n.format('CHRONICLE.Removed.Entity', { name: journal.name }));
+      });
+    }
+  }
+
+  /** True when a synced actor already carries this entity id. @private */
+  _isActorLinked(entityId) {
+    return game.actors?.contents?.some((a) => a.getFlag(FLAG_SCOPE, 'entityId') === entityId) ?? false;
+  }
+
+  /**
    * Run after all modules complete `onInitialSync`. Cleans up character
    * JournalEntries left behind by earlier sync runs (before ActorSync was
    * the canonical handler).
@@ -180,10 +251,13 @@ export class JournalSync {
    * (re-running `_buildOwnership`) or create it otherwise. Sequential, not
    * parallelized, so a large campaign doesn't hammer the API.
    *
-   * @param {{verbose?: boolean}} [opts]
+   * `onlyChanged` skips journals already at the entity's `updated_at` (the
+   * connect-time catch-up); the dashboard button refreshes everything.
+   *
+   * @param {{verbose?: boolean, onlyChanged?: boolean}} [opts]
    * @returns {Promise<{updated: number, created: number, skipped: number, errors: number}>}
    */
-  async resyncAll({ verbose = true } = {}) {
+  async resyncAll({ verbose = true, onlyChanged = false, createdAfter } = {}) {
     if (!game.user.isGM || !this._api) {
       return { updated: 0, created: 0, skipped: 0, errors: 0 };
     }
@@ -199,15 +273,15 @@ export class JournalSync {
     // first 500 and reported a clean finish.
     let allEntities = [];
     let truncated = false;
+    this._lastWalk = null;
     try {
       const walked = await walkEntityPages(
         (page, perPage) => this._api.get(`/entities?per_page=${perPage}&page=${page}`),
-        (result) => (Array.isArray(result) ? result
-          : (Array.isArray(result?.entities) ? result.entities
-          : (Array.isArray(result?.data) ? result.data : []))),
+        unwrapEntityList,
       );
       allEntities = walked.entities;
       truncated = walked.truncated;
+      this._lastWalk = { ids: new Set(walked.entities.map((e) => e?.id).filter(Boolean)), truncated };
     } catch (err) {
       const status = err?.status || null;
       console.warn(`Chronicle JournalSync.resyncAll: GET /entities failed (${status || 'network'})`, err);
@@ -253,6 +327,11 @@ export class JournalSync {
       const journal = journalByEntityId.get(entity.id);
 
       try {
+        if (journal && onlyChanged && entity.updated_at
+            && journal.getFlag(FLAG_SCOPE, 'chronicleUpdatedAt') === entity.updated_at) {
+          skipped++;
+          continue;
+        }
         if (journal) {
           // Journal exists → fetch full entity data and update (refreshes
           // content + re-runs _buildOwnership so permissions are current).
@@ -268,6 +347,15 @@ export class JournalSync {
           await this._onEntityUpdated(fullEntity);
           updated++;
         } else {
+          // Connect-time pass: only pages made in Chronicle since the last
+          // sync get a new journal. An older page with no journal is one the
+          // GM deleted here (and chose to keep in Chronicle) or never
+          // imported, and must not keep coming back on every reconnect.
+          if (createdAfter !== undefined
+              && !(createdAfter && entity.created_at && Date.parse(entity.created_at) > Date.parse(createdAfter))) {
+            skipped++;
+            continue;
+          }
           // No journal yet → fetch full entity and create.
           let fullEntity = entity;
           try {
@@ -322,21 +410,22 @@ export class JournalSync {
   /**
    * Create a new JournalEntry from a Chronicle entity.
    * Fetches full entity data from the API since WebSocket payloads may
-   * not include content fields (entry_html, fields_data, tags).
+   * not include content fields (entry_html, fields_data, tags). Queued per
+   * entity so it cannot interleave with an update for the same entity.
    * @param {object} entity - Chronicle entity data (possibly partial).
    * @private
    */
-  async _onEntityCreated(entity) {
-    if (!entity?.id) return;
+  _onEntityCreated(entity) {
+    if (!entity?.id) return Promise.resolve();
+    return this._queue.run(entity.id, () => this._applyEntityCreated(entity));
+  }
 
+  /** @private */
+  async _applyEntityCreated(entity) {
     // Skip if entity or its type is excluded from sync.
     if (this._isExcluded(entity)) return;
-
-    // Check if we already have a journal for this entity.
-    const existing = game.journal.find(
-      (j) => j.getFlag(FLAG_SCOPE, 'entityId') === entity.id
-    );
-    if (existing) return;
+    if (this._findJournal(entity.id)) return;
+    if (this._isOwnCreateInFlight(entity)) return;
 
     // Fetch full entity data (WS payload may be partial).
     let fullEntity = entity;
@@ -353,7 +442,26 @@ export class JournalSync {
       return;
     }
 
-    await this._createJournalFromEntity(fullEntity);
+    // Re-checked inside _createJournalLocked: nothing else can have created
+    // it, because every creator for this entity runs through the same queue.
+    await this._createJournalLocked(fullEntity);
+  }
+
+  /** @private */
+  _findJournal(entityId) {
+    return game.journal.find((j) => j.getFlag(FLAG_SCOPE, 'entityId') === entityId) || null;
+  }
+
+  /**
+   * True when this entity is the page our own in-flight journal POST is
+   * creating (same name), so the broadcast must not create a second journal.
+   * @private
+   */
+  _isOwnCreateInFlight(entity) {
+    for (const name of this._inFlightCreates.values()) {
+      if (name === entity.name) return true;
+    }
+    return false;
   }
 
   /**
@@ -361,46 +469,62 @@ export class JournalSync {
    * @param {object} entity
    * @private
    */
-  async _onEntityUpdated(entity) {
-    if (!entity?.id) return;
+  _onEntityUpdated(entity) {
+    if (!entity?.id) return Promise.resolve();
+    return this._queue.run(entity.id, () => this._applyEntityUpdated(entity));
+  }
 
+  /** @private */
+  async _applyEntityUpdated(entity) {
     // Skip if entity or its type is excluded from sync.
     if (this._isExcluded(entity)) return;
 
-    const journal = game.journal.find(
-      (j) => j.getFlag(FLAG_SCOPE, 'entityId') === entity.id
-    );
+    const journal = this._findJournal(entity.id);
     if (!journal) {
       // Entity was updated but we don't have a journal for it yet — create
-      // one, unless it's a character handled by ActorSync.
+      // one, unless it's a character handled by ActorSync or our own POST.
       if (this._isHandledByActorSync(entity)) return;
-      await this._createJournalFromEntity(entity);
+      if (this._isOwnCreateInFlight(entity)) return;
+      await this._createJournalLocked(entity);
       return;
     }
 
-    this._syncing = true;
-    try {
-      // Update the journal name and ownership from Chronicle permissions.
-      const ownership = await this._buildOwnership(entity);
-      await journal.update({ name: entity.name, ownership });
-
-      // Split entity content into pages and sync them.
-      await this._syncPagesToJournal(journal, _sanitizeIncomingHTML(entity.entry_html || ''));
-
-      // Sync player notes page.
-      await this._syncPlayerNotesPage(journal, _sanitizeIncomingHTML(entity.player_notes_html || ''));
-
-      // Update flags with latest entity data.
-      await journal.setFlag(FLAG_SCOPE, 'entityType', entity.type_name || '');
-      await journal.setFlag(FLAG_SCOPE, 'fields', entity.fields_data || {});
-      await journal.setFlag(FLAG_SCOPE, 'tags', entity.tags || []);
-      await journal.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
-      await journal.setFlag(FLAG_SCOPE, 'chronicleUpdatedAt', entity.updated_at || '');
-
-      console.debug(`Chronicle: Updated journal "${journal.name}" from entity`);
-    } finally {
-      this._syncing = false;
+    // A local edit still waiting to be sent wins over this incoming change:
+    // applying it would silently erase what the GM just typed. The edit is
+    // pushed shortly (Chronicle updates are partial), so move the expected
+    // version forward to this change's, otherwise that push would be
+    // rejected as a conflict, and tell the GM.
+    if (this._journalPushDebouncer.has(journal.id)) {
+      if (entity.updated_at) {
+        await journal.update(
+          { [`flags.${FLAG_SCOPE}.chronicleUpdatedAt`]: entity.updated_at },
+          SYNC_OPTIONS,
+        );
+      }
+      console.warn(`Chronicle: kept unsent Foundry edit of "${journal.name}" over an incoming Chronicle change`);
+      this._syncManager?.logActivity?.('update', `Kept your Foundry edit of "${journal.name}" over a Chronicle change`);
+      return;
     }
+
+    // One write for name, ownership and link flags; pages follow.
+    const ownership = await this._buildOwnership(entity);
+    await journal.update({
+      name: entity.name,
+      ownership,
+      [`flags.${FLAG_SCOPE}.entityType`]: entity.type_name || '',
+      [`flags.${FLAG_SCOPE}.fields`]: entity.fields_data || {},
+      [`flags.${FLAG_SCOPE}.tags`]: entity.tags || [],
+      [`flags.${FLAG_SCOPE}.lastSync`]: new Date().toISOString(),
+      [`flags.${FLAG_SCOPE}.chronicleUpdatedAt`]: entity.updated_at || '',
+    }, SYNC_OPTIONS);
+
+    // Split entity content into pages and sync them.
+    await this._syncPagesToJournal(journal, _sanitizeIncomingHTML(entity.entry_html || ''));
+
+    // Sync player notes page.
+    await this._syncPlayerNotesPage(journal, _sanitizeIncomingHTML(entity.player_notes_html || ''));
+
+    console.debug(`Chronicle: Updated journal "${journal.name}" from entity`);
   }
 
   /**
@@ -409,22 +533,22 @@ export class JournalSync {
    * @param {object} data - { id: entityId }
    * @private
    */
-  async _onEntityDeleted(data) {
-    if (!data?.id) return;
+  _onEntityDeleted(data) {
+    if (!data?.id) return Promise.resolve();
+    return this._queue.run(data.id, () => this._applyEntityDeleted(data));
+  }
 
-    const journal = game.journal.find(
-      (j) => j.getFlag(FLAG_SCOPE, 'entityId') === data.id
-    );
+  /** @private */
+  async _applyEntityDeleted(data) {
+    const journal = this._findJournal(data.id);
     if (!journal) return;
 
-    this._syncing = true;
-    try {
-      await setAside(journal, FLAG_SCOPE);
-      ui.notifications?.info?.(game.i18n.format('CHRONICLE.Removed.Entity', { name: journal.name }));
-      console.debug(`Chronicle: Set aside journal for deleted entity ${data.id}`);
-    } finally {
-      this._syncing = false;
-    }
+    // The journal is going away from sync; an edit still pending for it
+    // would only push at a page that no longer exists.
+    this._journalPushDebouncer.cancel(journal.id);
+    await setAside(journal, FLAG_SCOPE, SYNC_OPTIONS);
+    ui.notifications?.info?.(game.i18n.format('CHRONICLE.Removed.Entity', { name: journal.name }));
+    console.debug(`Chronicle: Set aside journal for deleted entity ${data.id}`);
   }
 
   /**
@@ -442,17 +566,12 @@ export class JournalSync {
     );
     if (!folder) return;
 
-    this._syncing = true;
-    try {
-      const updates = {};
-      if (folder.name !== entityType.name) updates.name = entityType.name;
-      if (entityType.color && folder.color !== entityType.color) updates.color = entityType.color;
-      if (Object.keys(updates).length > 0) {
-        await folder.update(updates);
-        console.debug(`Chronicle: Updated folder "${entityType.name}" from entity type`);
-      }
-    } finally {
-      this._syncing = false;
+    const updates = {};
+    if (folder.name !== entityType.name) updates.name = entityType.name;
+    if (entityType.color && folder.color !== entityType.color) updates.color = entityType.color;
+    if (Object.keys(updates).length > 0) {
+      await folder.update(updates, SYNC_OPTIONS);
+      console.debug(`Chronicle: Updated folder "${entityType.name}" from entity type`);
     }
   }
 
@@ -494,7 +613,7 @@ export class JournalSync {
     };
     if (entity.type_color) folderData.color = entity.type_color;
 
-    return Folder.create(folderData);
+    return Folder.create(folderData, { ...SYNC_OPTIONS });
   }
 
   /**
@@ -503,117 +622,125 @@ export class JournalSync {
    * @param {string} [forceId] - Optionally use a specific Foundry document ID.
    * @private
    */
-  async _createJournalFromEntity(entity, forceId) {
-    this._syncing = true;
-    try {
-      const isMonksActive = game.modules.get('monks-enhanced-journal')?.active;
+  _createJournalFromEntity(entity, forceId) {
+    if (!entity?.id) return Promise.resolve(null);
+    return this._queue.run(entity.id, () => this._createJournalLocked(entity, forceId));
+  }
 
-      // Build journal pages.
-      const pages = [];
+  /**
+   * The create itself. Callers already hold this entity's queue slot, and it
+   * re-checks for an existing journal, so two creators for one entity (a
+   * created and an updated event, the dashboard, a resync) make one journal.
+   * @private
+   */
+  async _createJournalLocked(entity, forceId) {
+    const existing = this._findJournal(entity.id);
+    if (existing) return existing;
+    const isMonksActive = game.modules.get('monks-enhanced-journal')?.active;
 
-      // Image page (if entity has an image). Route through the same
-      // host-allowlist map-sync uses (_mapImageSrc); a rejected host
-      // drops to empty src + warn.
-      const resolvedImageSrc = _resolveEntityImageSrc(entity.image_path);
-      if (resolvedImageSrc) {
-        pages.push({
-          name: 'Image',
-          type: 'image',
-          src: resolvedImageSrc,
-          sort: 0,
-        });
-      }
+    // Build journal pages.
+    const pages = [];
 
-      // Split entity content into pages by top-level headings.
-      // Sanitize at ingress before splitting (defense-in-depth).
-      const sections = this._splitByHeadings(_sanitizeIncomingHTML(entity.entry_html || ''));
+    // Image page (if entity has an image). Route through the same
+    // host-allowlist map-sync uses (_mapImageSrc); a rejected host
+    // drops to empty src + warn.
+    const resolvedImageSrc = _resolveEntityImageSrc(entity.image_path);
+    if (resolvedImageSrc) {
+      pages.push({
+        name: 'Image',
+        type: 'image',
+        src: resolvedImageSrc,
+        sort: 0,
+      });
+    }
 
-      let sortIndex = 1;
-      for (const section of sections) {
-        const pageData = {
-          name: section.title,
-          type: 'text',
-          text: { content: section.content },
-          sort: sortIndex++,
-        };
+    // Split entity content into pages by top-level headings.
+    // Sanitize at ingress before splitting (defense-in-depth).
+    const sections = this._splitByHeadings(_sanitizeIncomingHTML(entity.entry_html || ''));
 
-        // Monk's Enhanced Journal uses enhanced page flags.
-        if (isMonksActive) {
-          pageData.flags = {
-            'monks-enhanced-journal': { type: 'base' },
-          };
-        }
-
-        pages.push(pageData);
-      }
-
-      // Add a player notes page if the entity has player-visible content.
-      if (entity.player_notes_html) {
-        pages.push({
-          name: 'Player Notes',
-          type: 'text',
-          text: { content: _sanitizeIncomingHTML(entity.player_notes_html) },
-          sort: sortIndex++,
-          ownership: { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER },
-          flags: { [FLAG_SCOPE]: { isPlayerNotes: true } },
-        });
-      }
-
-      // Determine ownership from Chronicle permissions.
-      const ownership = await this._buildOwnership(entity);
-
-      // Find or create a folder for this entity type.
-      const folder = await this._getOrCreateEntityFolder(entity);
-
-      const journalData = {
-        name: entity.name,
-        pages,
-        ownership,
-        folder: folder?.id || null,
-        flags: {
-          [FLAG_SCOPE]: {
-            entityId: entity.id,
-            entityType: entity.type_name || '',
-            fields: entity.fields_data || {},
-            tags: entity.tags || [],
-            lastSync: new Date().toISOString(),
-            chronicleUpdatedAt: entity.updated_at || '',
-          },
-        },
+    let sortIndex = 1;
+    for (const section of sections) {
+      const pageData = {
+        name: section.title,
+        type: 'text',
+        text: { content: section.content },
+        sort: sortIndex++,
       };
 
-      if (forceId) {
-        journalData._id = forceId;
+      // Monk's Enhanced Journal uses enhanced page flags.
+      if (isMonksActive) {
+        pageData.flags = {
+          'monks-enhanced-journal': { type: 'base' },
+        };
       }
 
-      const journal = await JournalEntry.create(journalData);
-
-      // Create sync mapping on Chronicle server (idempotent — tolerates
-      // a pre-existing Chronicle mapping pointing at a stale Foundry id,
-      // which is common when the user has re-imported a world).
-      if (journal) {
-        try {
-          await this._syncManager?.ensureMapping({
-            chronicle_type: 'entity',
-            chronicle_id: entity.id,
-            external_system: 'foundry',
-            external_id: journal.id,
-            sync_direction: 'both',
-            sync_metadata: { foundry_type: 'JournalEntry' },
-          });
-        } catch (err) {
-          // Real (non-conflict) errors still surface as a warn — the
-          // helper only absorbs the "already exists" conflict and
-          // propagates everything else.
-          console.warn('Chronicle: Failed to create sync mapping', err);
-        }
-      }
-
-      console.debug(`Chronicle: Created journal "${entity.name}" from entity`);
-      return journal;
-    } finally {
-      this._syncing = false;
+      pages.push(pageData);
     }
+
+    // Add a player notes page if the entity has player-visible content.
+    if (entity.player_notes_html) {
+      pages.push({
+        name: 'Player Notes',
+        type: 'text',
+        text: { content: _sanitizeIncomingHTML(entity.player_notes_html) },
+        sort: sortIndex++,
+        ownership: { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER },
+        flags: { [FLAG_SCOPE]: { isPlayerNotes: true } },
+      });
+    }
+
+    // Determine ownership from Chronicle permissions.
+    const ownership = await this._buildOwnership(entity);
+
+    // Find or create a folder for this entity type.
+    const folder = await this._getOrCreateEntityFolder(entity);
+
+    const journalData = {
+      name: entity.name,
+      pages,
+      ownership,
+      folder: folder?.id || null,
+      flags: {
+        [FLAG_SCOPE]: {
+          entityId: entity.id,
+          entityType: entity.type_name || '',
+          fields: entity.fields_data || {},
+          tags: entity.tags || [],
+          lastSync: new Date().toISOString(),
+          chronicleUpdatedAt: entity.updated_at || '',
+        },
+      },
+    };
+
+    if (forceId) {
+      journalData._id = forceId;
+    }
+
+    const journal = await JournalEntry.create(journalData, { ...SYNC_OPTIONS });
+
+    // Create sync mapping on Chronicle server (idempotent — tolerates
+    // a pre-existing Chronicle mapping pointing at a stale Foundry id,
+    // which is common when the user has re-imported a world).
+    if (journal) {
+      try {
+        await this._syncManager?.ensureMapping({
+          chronicle_type: 'entity',
+          chronicle_id: entity.id,
+          external_system: 'foundry',
+          external_id: journal.id,
+          sync_direction: 'both',
+          sync_metadata: { foundry_type: 'JournalEntry' },
+        });
+      } catch (err) {
+        // Real (non-conflict) errors still surface as a warn — the
+        // helper only absorbs the "already exists" conflict and
+        // propagates everything else.
+        console.warn('Chronicle: Failed to create sync mapping', err);
+      }
+    }
+
+    console.debug(`Chronicle: Created journal "${entity.name}" from entity`);
+    return journal;
   }
 
   // --- Foundry → Chronicle ---
@@ -626,17 +753,17 @@ export class JournalSync {
    * @private
    */
   async _handleCreateJournal(journal, options, userId) {
-    if (this._syncing) return;
+    if (options?.chronicleSync) return;
     if (userId !== game.user.id) return;
 
     // Skip if this journal was created by Chronicle sync.
     if (journal.getFlag(FLAG_SCOPE, 'entityId')) return;
 
-    // Skip journals owned by another sync domain: calendar modules and
+    // Skip journals owned by another sync domain: calendar modules, maps and
     // Chronicle Notes also persist as JournalEntries, and CalendarSync /
-    // NoteSync mirror them to their own Chronicle resource. Without this
-    // guard they'd be POSTed to /entities with entity_type_id:0 and filed
-    // under the campaign's first entity type. Mirrors _isHandledByActorSync.
+    // MapSync / NoteSync mirror them to their own Chronicle resource. Pushed
+    // as pages they would fail (maps) or be filed under an arbitrary type.
+    // Mirrors _isHandledByActorSync.
     if (isCalendarNoteJournal(journal)) {
       console.debug(`Chronicle: Skipping journal "${journal.name}" — calendar note (owned by CalendarSync).`);
       return;
@@ -645,26 +772,46 @@ export class JournalSync {
       console.debug(`Chronicle: Skipping journal "${journal.name}" — Chronicle Note (owned by NoteSync).`);
       return;
     }
+    if (isMapJournal(journal, FLAG_SCOPE)) {
+      console.debug(`Chronicle: Skipping journal "${journal.name}" — Chronicle map (owned by MapSync).`);
+      return;
+    }
 
-    // Create entity in Chronicle from this new journal.
+    // Marked before the first await so the entity.created broadcast, which
+    // can beat our POST response, finds it and does not make a second journal.
+    this._inFlightCreates.set(journal.id, journal.name);
     try {
-      // Concatenate all text pages into a single entry for Chronicle.
-      const entryHtml = this._collectTextPages(journal);
+      const entityTypeId = await this._resolveCreateTypeId();
+      if (!entityTypeId) {
+        console.warn(`Chronicle: "${journal.name}" not sent; the campaign has no page types`);
+        this._syncManager?.logActivity?.('error', `"${journal.name}" not sent: the campaign has no page types`);
+        return;
+      }
 
-      const entity = await this._api.post('/entities', {
+      const isPrivate =
+        (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER;
+
+      // Chronicle's create request has no text field, so the text follows in
+      // an update (see _journal-create.mjs).
+      const entity = await this._api.post('/entities', buildEntityCreateBody({
         name: journal.name,
-        entity_type_id: 0, // Default type — will use first available.
-        is_private: (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER,
-        entry: entryHtml,
-      });
+        entityTypeId,
+        isPrivate,
+      }));
 
       if (entity) {
-        this._syncing = true;
-        try {
-          await journal.setFlag(FLAG_SCOPE, 'entityId', entity.id);
-          await journal.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
-        } finally {
-          this._syncing = false;
+        // Linked before the text goes up, so a failed text push leaves a
+        // linked journal whose next edit retries it, not an orphan page.
+        await journal.update({
+          [`flags.${FLAG_SCOPE}.entityId`]: entity.id,
+          [`flags.${FLAG_SCOPE}.lastSync`]: new Date().toISOString(),
+          [`flags.${FLAG_SCOPE}.chronicleUpdatedAt`]: entity.updated_at || '',
+        }, SYNC_OPTIONS);
+
+        const entryHtml = this._collectTextPages(journal);
+        if (entryHtml) {
+          const updated = await this._api.put(`/entities/${entity.id}`, { entry: entryHtml });
+          await this._recordPush(journal, updated);
         }
 
         // Create sync mapping (idempotent — tolerates server-side
@@ -678,8 +825,6 @@ export class JournalSync {
         });
 
         // Push initial permissions from Foundry ownership.
-        const isPrivate =
-          (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER;
         await this._pushPermissions(entity.id, journal.ownership, isPrivate, journal.name);
 
         console.debug(`Chronicle: Pushed new journal "${journal.name}" to Chronicle`);
@@ -689,7 +834,21 @@ export class JournalSync {
       // REST error itself is already in the dashboard's error log.
       console.error('Chronicle: Failed to push journal to Chronicle', err);
       ui.notifications?.warn?.(`Chronicle: Failed to push journal "${journal.name}". Check the sync dashboard for details.`);
+    } finally {
+      this._inFlightCreates.delete(journal.id);
     }
+  }
+
+  /**
+   * Page type for a journal made in Foundry: the dashboard's setting, else
+   * the campaign's first page type from GET /entity-types.
+   * @returns {Promise<number|null>}
+   * @private
+   */
+  async _resolveCreateTypeId() {
+    const configured = Number(getSetting('journalCreateTypeId')) || 0;
+    const types = await this._api.get('/entity-types');
+    return pickJournalCreateType(types, configured);
   }
 
   /**
@@ -702,7 +861,7 @@ export class JournalSync {
    * @private
    */
   async _handleUpdateJournal(journal, change, options, userId) {
-    if (this._syncing) return;
+    if (options?.chronicleSync) return;
     if (userId !== game.user.id) return;
 
     const entityId = journal.getFlag(FLAG_SCOPE, 'entityId');
@@ -711,7 +870,8 @@ export class JournalSync {
     // Defensive: a calendar note / Chronicle Note may carry a stale entityId
     // from before the create-time guard existed. Don't keep pushing edits to
     // that bogus entity — the cleanup pass unlinks it.
-    if (isCalendarNoteJournal(journal) || this._isHandledByNoteSync(journal)) return;
+    if (isCalendarNoteJournal(journal) || this._isHandledByNoteSync(journal)
+        || isMapJournal(journal, FLAG_SCOPE)) return;
 
     // Debounced: collapse a typing burst into one push, ~2s after
     // the last edit. `journal` reflects the live document state by the
@@ -779,15 +939,7 @@ export class JournalSync {
       // Push ownership changes as Chronicle permission updates.
       await this._pushPermissions(entityId, journal.ownership, isPrivate, journal.name);
 
-      this._syncing = true;
-      try {
-        await journal.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
-        if (result?.updated_at) {
-          await journal.setFlag(FLAG_SCOPE, 'chronicleUpdatedAt', result.updated_at);
-        }
-      } finally {
-        this._syncing = false;
-      }
+      await this._recordPush(journal, result);
 
       console.debug(`Chronicle: Pushed journal update "${journal.name}" to Chronicle`);
     } catch (err) {
@@ -805,6 +957,19 @@ export class JournalSync {
   }
 
   /**
+   * Record a successful push on the journal: when it synced and the version
+   * the next push must expect. One marked write, so no hook echo.
+   * @param {JournalEntry} journal
+   * @param {{updated_at?: string}|null} result - The PUT response.
+   * @private
+   */
+  async _recordPush(journal, result) {
+    const update = { [`flags.${FLAG_SCOPE}.lastSync`]: new Date().toISOString() };
+    if (result?.updated_at) update[`flags.${FLAG_SCOPE}.chronicleUpdatedAt`] = result.updated_at;
+    await journal.update(update, SYNC_OPTIONS);
+  }
+
+  /**
    * Handle Foundry JournalEntry deletion: the GM is asked before its
    * Chronicle page is deleted too (_remote-deletes.mjs).
    * @param {JournalEntry} journal
@@ -813,7 +978,7 @@ export class JournalSync {
    * @private
    */
   async _handleDeleteJournal(journal, options, userId) {
-    if (this._syncing) return;
+    if (options?.chronicleSync) return;
     if (userId !== game.user.id) return;
 
     // Drop any push still pending for this journal before deleting.
@@ -899,20 +1064,15 @@ export class JournalSync {
     if (actorEntityIds.size === 0) return;
 
     let moved = 0;
-    this._syncing = true;
-    try {
-      for (const journal of [...game.journal.contents]) {
-        const eid = journal.getFlag(FLAG_SCOPE, 'entityId');
-        if (!eid || !actorEntityIds.has(eid)) continue;
-        try {
-          await setAside(journal, FLAG_SCOPE);
-          moved++;
-        } catch (err) {
-          console.warn(`Chronicle: Failed to set aside duplicate journal ${journal.id}`, err);
-        }
+    for (const journal of [...game.journal.contents]) {
+      const eid = journal.getFlag(FLAG_SCOPE, 'entityId');
+      if (!eid || !actorEntityIds.has(eid)) continue;
+      try {
+        await setAside(journal, FLAG_SCOPE, SYNC_OPTIONS);
+        moved++;
+      } catch (err) {
+        console.warn(`Chronicle: Failed to set aside duplicate journal ${journal.id}`, err);
       }
-    } finally {
-      this._syncing = false;
     }
 
     if (moved > 0) {
@@ -1256,7 +1416,7 @@ export class JournalSync {
     if (playerNotesHtml) {
       if (existingPage) {
         // Update existing player notes page.
-        await existingPage.update({ 'text.content': playerNotesHtml });
+        await existingPage.update({ 'text.content': playerNotesHtml }, SYNC_OPTIONS);
       } else {
         // Create new player notes page.
         const maxSort = Math.max(0, ...journal.pages.map((p) => p.sort || 0));
@@ -1269,11 +1429,11 @@ export class JournalSync {
             ownership: { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER },
             flags: { [FLAG_SCOPE]: { isPlayerNotes: true } },
           },
-        ]);
+        ], SYNC_OPTIONS);
       }
     } else if (existingPage) {
       // Remove player notes page if entity no longer has player notes.
-      await journal.deleteEmbeddedDocuments('JournalEntryPage', [existingPage.id]);
+      await journal.deleteEmbeddedDocuments('JournalEntryPage', [existingPage.id], SYNC_OPTIONS);
     }
   }
 
@@ -1303,15 +1463,7 @@ export class JournalSync {
         // Force push without expected_updated_at.
         delete body.expected_updated_at;
         const result = await this._api.put(`/entities/${entityId}`, body);
-        this._syncing = true;
-        try {
-          if (result?.updated_at) {
-            await journal.setFlag(FLAG_SCOPE, 'chronicleUpdatedAt', result.updated_at);
-          }
-          await journal.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
-        } finally {
-          this._syncing = false;
-        }
+        await this._recordPush(journal, result);
         ui.notifications.warn(`Chronicle: Conflict on "${journal.name}" — kept Foundry version.`);
         break;
       }
@@ -1324,15 +1476,7 @@ export class JournalSync {
           // Local is newer — force push.
           delete body.expected_updated_at;
           const result = await this._api.put(`/entities/${entityId}`, body);
-          this._syncing = true;
-          try {
-            if (result?.updated_at) {
-              await journal.setFlag(FLAG_SCOPE, 'chronicleUpdatedAt', result.updated_at);
-            }
-            await journal.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
-          } finally {
-            this._syncing = false;
-          }
+          await this._recordPush(journal, result);
           ui.notifications.info(`Chronicle: Conflict on "${journal.name}" — Foundry version was newer.`);
         } else if (remote) {
           // Remote is newer — re-pull.
@@ -1368,7 +1512,7 @@ export class JournalSync {
         if (page.name !== section.title) {
           updates.name = section.title;
         }
-        await page.update(updates);
+        await page.update(updates, SYNC_OPTIONS);
       } else {
         // Create new page.
         await journal.createEmbeddedDocuments('JournalEntryPage', [
@@ -1378,7 +1522,7 @@ export class JournalSync {
             text: { content: section.content },
             sort: (existingTextPages.length + i) * 100,
           },
-        ]);
+        ], SYNC_OPTIONS);
       }
     }
 
@@ -1388,7 +1532,7 @@ export class JournalSync {
         .slice(sections.length)
         .map((p) => p.id);
       if (pagesToDelete.length > 0) {
-        await journal.deleteEmbeddedDocuments('JournalEntryPage', pagesToDelete);
+        await journal.deleteEmbeddedDocuments('JournalEntryPage', pagesToDelete, SYNC_OPTIONS);
       }
     }
   }

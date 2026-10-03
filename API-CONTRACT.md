@@ -247,7 +247,7 @@ Send only the fields you mean to change.
 Deletes an entity.
 
 #### PUT /entities/:entityId/fields
-Updates only the `fields_data` on an entity.
+Updates only the `fields_data` on an entity. Chronicle with keyxmakerx/Chronicle#927 merges the sent keys into the stored set (`null` removes a key); older Chronicle replaces the whole set, so the module always sends the stored set with its changes laid over it.
 
 **Used by:** `actor-sync.mjs` → push character stats to Chronicle
 

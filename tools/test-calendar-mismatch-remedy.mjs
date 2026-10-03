@@ -123,6 +123,7 @@ test('the pause toast still says sync is paused and what keeps working', () => {
   assert.match(text, /journals/i,
     'the toast must still say journals, characters and maps keep syncing — that '
     + 'sentence is what stops a structure mismatch reading as a dead integration');
-  assert.match(text, /reload the world/i,
-    'the pause is for the session, so the toast must still say a reload is what clears it');
+  assert.match(text, /reconnect or pull/i,
+    'a re-check on the next pull clears the pause, so the toast must say that and not ask for a reload');
+  assert.doesNotMatch(text, /reload the world/i);
 });

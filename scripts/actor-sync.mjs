@@ -19,6 +19,9 @@ import { ConflictError } from './api-client.mjs';
 import { createGenericAdapter } from './adapters/generic-adapter.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
+import { walkEntityPages, unwrapEntityList } from './_entity-page-walk.mjs';
+import { JournalPushDebouncer } from './_journal-push-debounce.mjs';
+import { mergeChanges } from './_actor-field-diff.mjs';
 
 /**
  * ActorSync handles character entity ↔ Actor synchronization.
@@ -51,6 +54,17 @@ export class ActorSync {
 
     /** @type {number|null} Cached "Player Characters" sub-type ID (child of character type). Null when addon off or sub-type not found. */
     this._pcSubtypeId = null;
+
+    // Foundry -> Chronicle actor pushes are debounced per actor: a burst of
+    // edits (a slider drag, an HP tick) is one request, not one per update,
+    // against the API key's per-minute limit. The changes of the burst are
+    // merged so the push knows every field it touched.
+    /** @type {Map<string, object>} Merged update diffs awaiting a push. */
+    this._pendingChanges = new Map();
+    this._actorPushDebouncer = new JournalPushDebouncer(
+      (actor, entityId) => { this._pushActorUpdate(actor, entityId); }
+    );
+    this._onBeforeUnload = () => this._actorPushDebouncer.flushAll();
 
     // Bound hook handlers for cleanup.
     this._onCreateActor = this._handleCreateActor.bind(this);
@@ -94,6 +108,7 @@ export class ActorSync {
     Hooks.on('createActor', this._onCreateActor);
     Hooks.on('updateActor', this._onUpdateActor);
     Hooks.on('deleteActor', this._onDeleteActor);
+    globalThis.window?.addEventListener?.('beforeunload', this._onBeforeUnload);
 
     console.debug(`Chronicle: Actor sync initialized (adapter: ${this._adapter.systemId}, actorType: ${this._actorType})`);
   }
@@ -180,8 +195,7 @@ export class ActorSync {
 
       const allEntities = [];
       for (const typeId of typeIds) {
-        const result = await this._api.get(`/entities?type_id=${typeId}&per_page=100`);
-        allEntities.push(...(result?.data || []));
+        allEntities.push(...(await this._walkTypeEntities(typeId)));
       }
 
       for (const entity of allEntities) {
@@ -212,6 +226,8 @@ export class ActorSync {
     Hooks.off('createActor', this._onCreateActor);
     Hooks.off('updateActor', this._onUpdateActor);
     Hooks.off('deleteActor', this._onDeleteActor);
+    globalThis.window?.removeEventListener?.('beforeunload', this._onBeforeUnload);
+    this._actorPushDebouncer.flushAll();
   }
 
   // ---------------------------------------------------------------------------
@@ -508,68 +524,146 @@ export class ActorSync {
       }
     }
 
-    // Only push field/name changes if system data or name changed.
+    // Only push field/name changes if system data or name changed. The diff
+    // is kept (merged with the burst's earlier ones) so the push can send
+    // just the mapped fields that changed.
     if (!change.system && !change.name) return;
+    this._pendingChanges.set(actor.id, mergeChanges(this._pendingChanges.get(actor.id), change));
+    this._actorPushDebouncer.schedule(actor.id, actor, entityId);
+  }
+
+  /**
+   * Push an actor's pending name and field changes to Chronicle, after the
+   * debounce window.
+   *
+   * Name goes first, with the stored `updated_at` as the conflict check, so a
+   * rename is still compared against what Chronicle really had. The fields
+   * PUT is a partial merge that bumps the entity's `updated_at` without
+   * returning it, so the new value is re-read afterwards and carried forward;
+   * otherwise the next rename would send a stale version and always 409.
+   * (Name and fields cannot share one PUT: the entity PUT replaces
+   * `fields_data` instead of merging it.)
+   * @param {Actor} actor
+   * @param {string} entityId
+   * @private
+   */
+  async _pushActorUpdate(actor, entityId) {
+    const change = this._pendingChanges.get(actor.id) || {};
+    this._pendingChanges.delete(actor.id);
 
     try {
-      const fields = this._adapter.toChronicleFields(actor);
-
-      await this._api.put(`/entities/${entityId}/fields`, { fields_data: fields });
-
-      // Update name separately if changed, with conflict detection.
-      if (change.name) {
-        // Chronicle's PUT /entities/:id is a partial update: absent preserves,
-        // explicit null clears, present replaces (API-CONTRACT.md → "The
-        // partial-update contract"). Send only {name} — do NOT echo
-        // is_private/type_label/parent_id back, which would re-arm the
-        // endpoint for the next writer with a stale value. Visibility has
-        // its own route: POST /entities/:id/reveal.
-        const nameBody = { name: change.name };
-        const chronicleUpdatedAt = actor.getFlag(FLAG_SCOPE, 'chronicleUpdatedAt');
-        if (chronicleUpdatedAt) {
-          nameBody.expected_updated_at = chronicleUpdatedAt;
-        }
-
-        try {
-          const result = await this._api.put(`/entities/${entityId}`, nameBody);
-          if (result?.updated_at) {
-            this._syncing = true;
-            try {
-              await actor.setFlag(FLAG_SCOPE, 'chronicleUpdatedAt', result.updated_at);
-            } finally {
-              this._syncing = false;
-            }
-          }
-        } catch (err) {
-          if (err instanceof ConflictError) {
-            const strategy = getSetting('conflictResolution');
-            if (strategy === 'chronicle') {
-              // Re-pull from Chronicle.
-              const entity = await this._api.get(`/entities/${entityId}`);
-              if (entity) await this._updateActorFromEntity(actor, entity);
-              ui.notifications.warn(`Chronicle: Conflict on "${actor.name}" — kept Chronicle version.`);
-            } else {
-              // Force push.
-              delete nameBody.expected_updated_at;
-              await this._api.put(`/entities/${entityId}`, nameBody);
-              ui.notifications.warn(`Chronicle: Conflict on "${actor.name}" — kept Foundry version.`);
-            }
-            return;
-          }
-          throw err;
-        }
+      if (change.name !== undefined) {
+        const kept = await this._pushActorName(actor, entityId);
+        if (!kept) return;
       }
 
-      try {
-        this._syncing = true;
-        await actor.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
-      } finally {
-        this._syncing = false;
+      // Only the mapped fields this burst touched. Without an adapter helper
+      // fall back to the full set, but only when system data changed.
+      const fields = typeof this._adapter.toChronicleFieldsChanged === 'function'
+        ? this._adapter.toChronicleFieldsChanged(actor, change)
+        : (change.system ? this._adapter.toChronicleFields(actor) : null);
+
+      if (fields && Object.keys(fields).length > 0) {
+        await this._putFieldsMerged(entityId, fields);
+        await this._refreshChronicleVersion(actor, entityId);
       }
+
+      await this._setActorFlag(actor, 'lastSync', new Date().toISOString());
 
       console.debug(`Chronicle: Pushed actor "${actor.name}" changes to Chronicle`);
     } catch (err) {
       console.error('Chronicle: Failed to push actor update to Chronicle', err);
+    }
+  }
+
+  /**
+   * Write some fields without losing the rest. Older Chronicle servers
+   * replace the whole field set on this PUT, so the current set is read and
+   * the changes laid over it; newer ones merge, and sending the merged set
+   * is the same result there. A failed read throws rather than risk a
+   * partial set wiping the rest on an older server.
+   * @param {string} entityId
+   * @param {object} fields
+   * @private
+   */
+  async _putFieldsMerged(entityId, fields) {
+    const current = (await this._api.get(`/entities/${entityId}`))?.fields_data;
+    const merged = current && typeof current === 'object' && !Array.isArray(current)
+      ? { ...current, ...fields }
+      : fields;
+    await this._api.put(`/entities/${entityId}/fields`, { fields_data: merged });
+  }
+
+  /**
+   * Rename the Chronicle entity. Chronicle's PUT /entities/:id is a partial
+   * update (API-CONTRACT.md → "The partial-update contract"): send only
+   * {name}, never echo is_private/type_label/parent_id back. Visibility has
+   * its own route: POST /entities/:id/reveal.
+   * @returns {Promise<boolean>} false when Chronicle's version was kept
+   *   instead, so the caller must not push this burst's fields over it.
+   * @private
+   */
+  async _pushActorName(actor, entityId) {
+    const nameBody = { name: actor.name };
+    const chronicleUpdatedAt = actor.getFlag(FLAG_SCOPE, 'chronicleUpdatedAt');
+    if (chronicleUpdatedAt) {
+      nameBody.expected_updated_at = chronicleUpdatedAt;
+    }
+
+    try {
+      const result = await this._api.put(`/entities/${entityId}`, nameBody);
+      if (result?.updated_at) {
+        await this._setActorFlag(actor, 'chronicleUpdatedAt', result.updated_at);
+      }
+      return true;
+    } catch (err) {
+      if (!(err instanceof ConflictError)) throw err;
+      const strategy = getSetting('conflictResolution');
+      if (strategy === 'chronicle') {
+        // Re-pull from Chronicle.
+        const entity = await this._api.get(`/entities/${entityId}`);
+        if (entity) await this._updateActorFromEntity(actor, entity);
+        ui.notifications.warn(`Chronicle: Conflict on "${actor.name}" — kept Chronicle version.`);
+        return false;
+      }
+      // Force push.
+      delete nameBody.expected_updated_at;
+      const forced = await this._api.put(`/entities/${entityId}`, nameBody);
+      if (forced?.updated_at) {
+        await this._setActorFlag(actor, 'chronicleUpdatedAt', forced.updated_at);
+      }
+      ui.notifications.warn(`Chronicle: Conflict on "${actor.name}" — kept Foundry version.`);
+      return true;
+    }
+  }
+
+  /**
+   * Re-read the entity's `updated_at` after a fields push and store it. If the
+   * read fails the stored version is dropped, so the next rename sends no
+   * version check rather than a stale one that would always conflict.
+   * @private
+   */
+  async _refreshChronicleVersion(actor, entityId) {
+    try {
+      const entity = await this._api.get(`/entities/${entityId}`);
+      if (entity?.updated_at) {
+        await this._setActorFlag(actor, 'chronicleUpdatedAt', entity.updated_at);
+        return;
+      }
+    } catch (err) {
+      console.warn('Chronicle: Could not re-read the entity version after a fields push', err);
+    }
+    await this._setActorFlag(actor, 'chronicleUpdatedAt', null);
+  }
+
+  /** Set a sync flag without the update hook treating it as a user edit. @private */
+  async _setActorFlag(actor, key, value) {
+    this._syncing = true;
+    try {
+      if (value === null) await actor.unsetFlag(FLAG_SCOPE, key);
+      else await actor.setFlag(FLAG_SCOPE, key, value);
+    } finally {
+      this._syncing = false;
     }
   }
 
@@ -584,6 +678,10 @@ export class ActorSync {
   async _handleDeleteActor(actor, options, userId) {
     if (this._syncing) return;
     if (userId !== game.user.id) return;
+
+    // A push still pending would aim at an actor that is gone.
+    this._actorPushDebouncer.cancel(actor.id);
+    this._pendingChanges.delete(actor.id);
 
     const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
@@ -780,13 +878,30 @@ export class ActorSync {
     const out = [];
     for (const typeId of typeIds) {
       try {
-        const result = await this._api.get(`/entities?type_id=${typeId}&per_page=100`);
-        out.push(...(result?.data || []));
+        out.push(...(await this._walkTypeEntities(typeId)));
       } catch (err) {
         console.warn('Chronicle: failed to list character entities', err);
       }
     }
     return out;
+  }
+
+  /**
+   * Every entity of one type, paged to the end (a campaign with more than
+   * one page of characters used to be cut off at the first).
+   * @param {number} typeId
+   * @returns {Promise<Array<object>>}
+   * @private
+   */
+  async _walkTypeEntities(typeId) {
+    const walked = await walkEntityPages(
+      (page, perPage) => this._api.get(`/entities?type_id=${typeId}&per_page=${perPage}&page=${page}`),
+      unwrapEntityList,
+    );
+    if (walked.truncated) {
+      console.warn(`Chronicle: character list for type ${typeId} stopped at ${walked.entities.length}; there are more.`);
+    }
+    return walked.entities;
   }
 
   /**
@@ -894,7 +1009,7 @@ export class ActorSync {
     const actor = game.actors.get(actorId);
     const entityId = actor?.getFlag(FLAG_SCOPE, 'entityId');
     if (!actor || !entityId || !this._adapter) return false;
-    await this._api.put(`/entities/${entityId}/fields`, { fields_data: this._adapter.toChronicleFields(actor) });
+    await this._putFieldsMerged(entityId, this._adapter.toChronicleFields(actor));
     this._syncing = true;
     try { await actor.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString()); }
     finally { this._syncing = false; }
