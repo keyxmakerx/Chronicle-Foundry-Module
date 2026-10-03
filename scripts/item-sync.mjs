@@ -21,6 +21,9 @@ import { FLAG_SCOPE } from './constants.mjs';
 import { collapseChanges } from './_change-feed.mjs';
 import { HAS_ITEM, planInventory, itemDataFor } from './_inventory-plan.mjs';
 
+/** Write option marking an item change as applied from Chronicle, so its hook does not push it back. */
+const APPLY_OPTION = 'chronicleSyncApply';
+
 /** The actor linked to a Chronicle character, or null. */
 function linkedActor(entityId) {
   if (!entityId) return null;
@@ -39,7 +42,11 @@ export class ItemSync {
     /** @type {import('./sync-manager.mjs').SyncManager|null} */
     this._syncManager = null;
 
-    /** @type {boolean} Suppress hook processing during sync-initiated changes. */
+    /**
+     * Kept for callers that pause pushes wholesale; this module's own
+     * writes are marked per write with APPLY_OPTION instead.
+     * @type {boolean}
+     */
     this._syncing = false;
 
     /** @type {object|null} Item field definitions from API. */
@@ -194,22 +201,21 @@ export class ItemSync {
     })));
     if (!plan.create.length && !plan.update.length && !plan.adopt.length && !plan.remove.length) return;
 
-    this._syncing = true;
-    try {
-      for (const { id, relationId } of plan.adopt) {
-        await actor.items.get(id)?.setFlag(FLAG_SCOPE, 'relationId', relationId);
-      }
-      for (const { id, change } of plan.update) {
-        await actor.items.get(id)?.update(change);
-      }
-      if (plan.create.length) {
-        await actor.createEmbeddedDocuments('Item', plan.create.map((r) => itemDataFor(r)));
-      }
-      if (plan.remove.length) {
-        await actor.deleteEmbeddedDocuments('Item', plan.remove);
-      }
-    } finally {
-      this._syncing = false;
+    // Tagged per write rather than behind `_syncing`: a GM edit to another
+    // item while this runs must still push, and a reconcile on another
+    // actor must not lift this one's guard.
+    const opts = { [APPLY_OPTION]: true };
+    for (const { id, relationId } of plan.adopt) {
+      await actor.items.get(id)?.update({ [`flags.${FLAG_SCOPE}.relationId`]: relationId }, opts);
+    }
+    for (const { id, change } of plan.update) {
+      await actor.items.get(id)?.update(change, opts);
+    }
+    if (plan.create.length) {
+      await actor.createEmbeddedDocuments('Item', plan.create.map((r) => itemDataFor(r)), opts);
+    }
+    if (plan.remove.length) {
+      await actor.deleteEmbeddedDocuments('Item', plan.remove, opts);
     }
   }
 
@@ -235,7 +241,7 @@ export class ItemSync {
    * @private
    */
   async _handleCreateItem(item, options, userId) {
-    if (this._syncing) return;
+    if (this._syncing || options?.[APPLY_OPTION]) return;
     if (userId !== game.user.id) return;
     if (!item.parent || !(item.parent instanceof Actor)) return;
 
@@ -279,12 +285,7 @@ export class ItemSync {
       });
 
       if (relation) {
-        this._syncing = true;
-        try {
-          await item.setFlag(FLAG_SCOPE, 'relationId', relation.id);
-        } finally {
-          this._syncing = false;
-        }
+        await item.update({ [`flags.${FLAG_SCOPE}.relationId`]: relation.id }, { [APPLY_OPTION]: true });
         console.debug(`Chronicle: Pushed new item "${item.name}" from "${actor.name}" to Chronicle`);
       }
     } catch (err) {
@@ -301,7 +302,7 @@ export class ItemSync {
    * @private
    */
   async _handleDeleteItem(item, options, userId) {
-    if (this._syncing) return;
+    if (this._syncing || options?.[APPLY_OPTION]) return;
     if (userId !== game.user.id) return;
 
     const relationId = item.getFlag(FLAG_SCOPE, 'relationId');
@@ -330,7 +331,7 @@ export class ItemSync {
    * @private
    */
   async _handleUpdateItem(item, change, options, userId) {
-    if (this._syncing) return;
+    if (this._syncing || options?.[APPLY_OPTION]) return;
     if (userId !== game.user.id) return;
     if (!change.system) return; // Only system data changes matter.
 

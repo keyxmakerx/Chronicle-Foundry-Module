@@ -20,7 +20,8 @@ function makeActor(id, entityId) {
     id, name: id, writes: [],
     getFlag: (_s, k) => (k === 'entityId' ? entityId : undefined),
     items: { contents: [], get: (iid) => items.get(iid) || null },
-    async createEmbeddedDocuments(_t, list) {
+    async createEmbeddedDocuments(_t, list, opts) {
+      assert.ok(opts?.chronicleSyncApply);
       // A real create yields to the event loop before the item exists.
       await new Promise((r) => setTimeout(r, 5));
       for (const d of list) {
@@ -30,14 +31,22 @@ function makeActor(id, entityId) {
           id: iid, name: d.name, system: { ...d.system }, flags,
           getFlag: (_s, k) => flags[k],
           setFlag: async (_s, k, v) => { flags[k] = v; a.writes.push(`flag ${iid}`); },
-          update: async (c) => { a.writes.push(`update ${iid} ${JSON.stringify(c)}`); for (const [k, v] of Object.entries(c)) it.system[k.split('.')[1]] = v; },
+          update: async (c, opts) => {
+            assert.ok(opts?.chronicleSyncApply, 'applied writes are marked so their hooks do not push');
+            a.writes.push(`update ${iid} ${JSON.stringify(c)}`);
+            for (const [k, v] of Object.entries(c)) {
+              const [root, ...rest] = k.split('.');
+              if (root === 'flags') flags[rest.at(-1)] = v; else it.system[rest[0]] = v;
+            }
+          },
         };
         items.set(iid, it);
         a.writes.push(`create ${d.name}`);
       }
       a.items.contents = [...items.values()];
     },
-    async deleteEmbeddedDocuments(_t, ids) {
+    async deleteEmbeddedDocuments(_t, ids, opts) {
+      assert.ok(opts?.chronicleSyncApply);
       for (const iid of ids) { items.delete(iid); a.writes.push(`delete ${iid}`); }
       a.items.contents = [...items.values()];
     },
@@ -104,6 +113,27 @@ test('a quantity change and a removal arrive; nothing else is written', async ()
   rels.hero = [hasItem(1, 'sword', { quantity: 4 })];
   await is.onMessage({ type: 'relation.metadata_updated', resourceId: 'hero', payload: hasItem(1, 'sword') });
   assert.deepEqual(hero.writes, ['update i1 {"system.quantity":4}', 'delete i2']);
+});
+
+test('a Foundry item whose push is in flight is linked, not copied', async () => {
+  const hero = makeActor('hero-actor', 'hero');
+  await hero.createEmbeddedDocuments('Item', [{ name: 'rope', system: { quantity: 1 }, flags: { 'chronicle-sync': { entityId: 'rope' } } }], { chronicleSyncApply: true });
+  hero.writes.length = 0;
+  const { is } = make([hero], { hero: [hasItem(9, 'rope', { quantity: 1 })] });
+  await is.onMessage({ type: 'relation.created', resourceId: 'hero', payload: hasItem(9, 'rope') });
+  assert.deepEqual(hero.writes, ['update i1 {"flags.chronicle-sync.relationId":9}']);
+  assert.equal(hero.items.contents.length, 1);
+});
+
+test('hooks for writes marked as applied from Chronicle push nothing', async () => {
+  const hero = makeActor('hero-actor', 'hero');
+  const { is } = make([hero], {});
+  const calls = [];
+  is._api = { post: async (...a) => calls.push(a), put: async (...a) => calls.push(a), delete: async (...a) => calls.push(a) };
+  const it = { name: 'x', parent: hero, system: { quantity: 2 }, getFlag: (_s, k) => ({ relationId: 3, entityId: 'x' })[k] };
+  await is._handleUpdateItem(it, { system: { quantity: 2 } }, { chronicleSyncApply: true }, 'gm');
+  await is._handleDeleteItem(it, { chronicleSyncApply: true }, 'gm');
+  assert.deepEqual(calls, []);
 });
 
 test('a failed fetch throws so the cursor stays', async () => {
