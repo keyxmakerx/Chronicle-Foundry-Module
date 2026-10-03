@@ -9,6 +9,7 @@
  */
 
 import { getSetting, setSetting, getSyncDirections, setSyncDirections, getExcludedTags, setExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
+import { SyncHistoryTab } from './sync-history-tab.mjs';
 import { FLAG_SCOPE, REPORT_STORE_FLAG } from './constants.mjs';
 import { confirmDialog, promptDialog } from './_dialogs.mjs';
 import { openSyncCalendar } from './sync-calendar.mjs';
@@ -27,6 +28,8 @@ import { buildOverviewModel } from './_overview-model.mjs';
 import { log, getLogBuffer } from './logger.mjs';
 import { shouldSkipDatePush, isRealTimeRejection, notifyRealTimePushPaused } from './_realtime-date-guard.mjs';
 import { walkEntityPages } from './_entity-page-walk.mjs';
+import { mapThumbSrc } from './_map-look.mjs';
+import { _isAllowedImageHost } from './_url-validation.mjs';
 import { pickJournalCreateType } from './_journal-create.mjs';
 import { compareCalendarStructures } from './calendar-sync.mjs';
 import { classifyCalendarSyncState } from './_calendar-sync-state.mjs';
@@ -156,6 +159,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
      * the Overview cockpit so the GM lands on a calm summary, not a dense list. */
     this._activeTab = getSetting('dashboardActiveTab') || 'overview';
 
+    /** The History tab's rows and filters, kept across re-renders. */
+    this._historyTab = new SyncHistoryTab(() => this.api);
+
     /** @type {Set<string>} Currently selected entity IDs for bulk operations. */
     this._selectedEntities = new Set();
 
@@ -270,15 +276,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       loadErrors.push({ tab: 'calendar', message: err.message || 'Failed to load calendar' });
     }
 
-    // Build notes tab data.
-    let notesData = [];
-    try {
-      notesData = await this._buildNotesData();
-    } catch (err) {
-      console.error('Chronicle Dashboard: Failed to load notes', err);
-      loadErrors.push({ tab: 'notes', message: err.message || 'Failed to load notes' });
-    }
-
     // Build status tab data.
     const statusData = this._buildStatusData();
 
@@ -375,9 +372,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
       // Members (permission mapping) tab.
       members: membersData,
-
-      // Notes tab.
-      notes: notesData,
 
       // Calendar tab.
       calendar: calendarData,
@@ -578,6 +572,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         drawingCount,
         tokenCount,
         chronicleUrl,
+        // The page's own picture: for a shadowed map, the stored player copy.
+        thumbSrc: mapThumbSrc(page?.src, (url) => _isAllowedImageHost(url, getSetting('apiUrl'))),
       };
     });
 
@@ -1022,7 +1018,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       { key: 'calendar', label: 'Calendar', icon: 'fa-calendar', direction: directions.calendar || 'both', count: null },
       { key: 'characters', label: 'Characters / Actors', icon: 'fa-users', direction: directions.characters || 'both', count: null },
       { key: 'shops', label: 'Shops', icon: 'fa-store', direction: directions.shops || 'both', count: null },
-      { key: 'notes', label: 'Notes', icon: 'fa-sticky-note', direction: directions.notes || 'both', count: null },
     ];
 
     // Page types for the "journals made in Foundry" dropdown; the selected one
@@ -1049,45 +1044,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       excludedEntityCount: exclusions.excludedEntities.length,
       syncTypes,
     };
-  }
-
-  // ---------------------------------------------------------------------------
-  // Notes data
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Build notes tab data. Fetches notes from Chronicle and cross-references
-   * with local Foundry JournalEntries that have a noteId flag.
-   * @returns {Promise<Array>}
-   * @private
-   */
-  async _buildNotesData() {
-    if (!getSetting('syncNotes')) return [];
-
-    try {
-      const result = await this.api.getNotes('/notes');
-      const notes = result?.data || result || [];
-      if (!Array.isArray(notes)) return [];
-
-      return notes
-        .filter((n) => !n.is_folder)
-        .map((note) => {
-          const localJournal = game.journal.find(
-            (j) => j.getFlag(FLAG_SCOPE, 'noteId') === note.id
-          );
-          return {
-            id: note.id,
-            title: note.title || 'Untitled',
-            color: note.color,
-            is_shared: note.is_shared ?? note.isShared ?? false,
-            status: localJournal ? 'synced' : 'chronicle-only',
-            lastSync: localJournal?.getFlag(FLAG_SCOPE, 'lastSync') || null,
-          };
-        });
-    } catch (err) {
-      console.warn('Chronicle Dashboard: Failed to fetch notes', err);
-      return [];
-    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1361,6 +1317,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // --- Tab navigation ---
     this._initTabs(el);
+    this._historyTab.mount(el, this._activeTab === 'history');
 
     // --- Search input ---
     const search = el.querySelector('.dashboard-search');
@@ -1565,6 +1522,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!el) return;
     this._applyActiveTab(el);
     el.querySelector('.dashboard-content')?.scrollTo?.({ top: 0 });
+    if (tabName === 'history') this._historyTab.shown();
   }
 
   // ---------------------------------------------------------------------------

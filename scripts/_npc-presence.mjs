@@ -81,6 +81,22 @@ export function spotlightAction({ isGM, sameScene, tokenFound, tokenHidden, visi
 }
 
 /**
+ * Which token a "Show in Foundry" press from Chronicle spotlights: one
+ * linked to that page on the scene the GM is viewing, a shown one before a
+ * hidden one. A hidden pick still goes through spotlightAction, which only
+ * tells the GM.
+ *
+ * @param {Array<{id: string, entityId: string|null, hidden: boolean}>} tokens
+ * @param {string} entityId
+ * @returns {{id: string, entityId: string, hidden: boolean}|null}
+ */
+export function chooseSpotlightToken(tokens, entityId) {
+  if (!entityId) return null;
+  const mine = (tokens || []).filter((t) => t?.id && t.entityId === entityId);
+  return mine.find((t) => !t.hidden) ?? mine[0] ?? null;
+}
+
+/**
  * Whether a talking flag is still live.
  * @param {{at?: number}|null|undefined} flag
  * @param {number} now

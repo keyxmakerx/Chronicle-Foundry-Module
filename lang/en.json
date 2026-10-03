@@ -76,10 +76,6 @@
         "Name": "Skip incoming HTML sanitization (advanced)",
         "Hint": "Disable Foundry-side HTML sanitization of Chronicle content at ingress. Chronicle already sanitizes server-side; Foundry sanitizes at render. This is a defense-in-depth middle layer. Turn ON only if you find legitimate inline styling from Chronicle is being stripped."
       },
-      "SyncNotes": {
-        "Name": "Sync Notes",
-        "Hint": "Sync Chronicle campaign notes with Foundry journal entries"
-      },
       "UpdateInfo": {
         "Name": "Update Source",
         "Hint": "Show the install-time manifest URL Foundry uses for updates and run a manual check against Chronicle.",
@@ -122,7 +118,6 @@
         "Entities": "Entities",
         "Shops": "Shops",
         "Maps": "Maps",
-        "Notes": "Notes",
         "Characters": "Characters",
         "Members": "Members",
         "Calendar": "Calendar",
@@ -212,17 +207,6 @@
         "WorldStateTitle": "Chronicle world state",
         "WorldStateHint": "Latest weather, season, era and moon phases received from Chronicle this session. Display only — the Foundry calendar is never modified from these.",
         "WorldStateEmpty": "No world-state broadcasts received yet this session."
-      },
-      "Notes": {
-        "Synced": "Synced",
-        "ChronicleOnly": "Chronicle Only",
-        "Pull": "Pull",
-        "Shared": "Shared",
-        "Private": "Private",
-        "NoNotes": "No Chronicle notes found.",
-        "NoNotesHint": "Notes created in Chronicle will appear here when note sync is enabled.",
-        "Disabled": "Note sync is disabled.",
-        "DisabledHint": "Enable \"Sync Notes\" in Module Settings."
       },
       "Characters": {
         "Synced": "Synced",
@@ -316,6 +300,12 @@
       "MarkerConfig": "Configure Chronicle Marker",
       "MarkerName": "Name",
       "MarkerCategory": "Category",
+      "MarkerIcon": "Icon",
+      "MarkerIconSearch": "Search icons, e.g. tavern",
+      "MarkerIconGroups": "Icon groups",
+      "MarkerIconAll": "All",
+      "MarkerIconNone": "No icon matches.",
+      "MarkerIconPreview": "How it looks on this map",
       "MarkerDescription": "Description",
       "MarkerVisibilityLabel": "Visibility",
       "MarkerSave": "Save",
@@ -359,7 +349,6 @@
         "Tags": "Tags",
         "Characters": "Characters",
         "Calendar": "Calendar",
-        "Maps": "Maps",
         "Review": "Review"
       },
       "ConnectDesc": "Verifying connection to Chronicle and detecting your campaign configuration.",
@@ -403,11 +392,6 @@
       "CalendarPull": "Pull Chronicle calendar into Foundry",
       "CalendarPush": "Push Foundry calendar to Chronicle",
       "CalendarSkip": "Skip calendar sync for now",
-      "MapsDesc": "Link Foundry scenes to Chronicle maps. Scenes with matching names are auto-suggested.",
-      "FoundryScene": "Foundry Scene",
-      "ChronicleMap": "Chronicle Map",
-      "NoLink": "No link",
-      "NoScenes": "No unlinked scenes found.",
       "ReviewSummary": "The following operations will be performed:",
       "Errors": "errors",
       "NoPlan": "No import plan generated — go back and configure at least one step.",
@@ -476,7 +460,21 @@
     },
     "SceneControl": {
       "SyncCalendar": "Open Sync Calendar",
-      "Notebook": "Open my Chronicle notebook"
+      "Notebook": "Open my Chronicle notebook",
+      "DMScreen": "Open the DM Screen"
+    },
+    "DMScreen": {
+      "Title": "DM Screen",
+      "Skip": "Click anywhere to skip",
+      "Retry": "Try again",
+      "Error": {
+        "NotSetUp": "Connect this world to Chronicle first (Chronicle Sync settings).",
+        "NeedsUpdate": "This Chronicle doesn't have the DM Screen yet. Update Chronicle to use it here.",
+        "BadKey": "Chronicle didn't accept this world's sync key. Check it in the Chronicle Sync settings.",
+        "NotAllowed": "Chronicle refused the DM Screen for this sync key. Check that the Sync API is on for the campaign and the key can read.",
+        "Failed": "The DM Screen couldn't load from Chronicle. Try again in a moment.",
+        "Action": "Chronicle didn't accept that change. Try again in a moment."
+      }
     },
     "Stashes": {
       "Title": "Stashes",
@@ -858,6 +856,8 @@
       "OpenPage": "Open Chronicle page",
       "SpotlightHidden": "{name} is hidden. Nothing was shown to players. Reveal the token first to spotlight it.",
       "SpotlightElsewhere": "That token isn't on the scene you're viewing, so nothing was shown.",
+      "SpotlightNotHere": "Chronicle asked to show {name}, but no token for them is on the scene you're viewing.",
+      "SpotlightUnknown": "Chronicle asked to show an NPC whose page isn't synced to this world yet.",
       "TalkFailed": "Chronicle: couldn't switch talking on or off.",
       "RevealTitle": "Show their Chronicle page?",
       "RevealAsk": "You revealed {name} on the map. Show their Chronicle page to players too?",

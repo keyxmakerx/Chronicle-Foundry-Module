@@ -55,6 +55,7 @@ const ALLOWED_WS_TYPE_PREFIXES = Object.freeze([
   'sync.',
   'stash.',
   'downtime.',
+  'npc.',
 ]);
 
 /**
@@ -116,18 +117,6 @@ function snakeToCamel(obj) {
 }
 
 /**
- * Normalize a Notes API response: convert camelCase keys to snake_case
- * so internal code uses a consistent key format.
- * Handles both single objects and arrays.
- * @param {object|Array} data
- * @returns {object|Array}
- */
-function normalizeNoteResponse(data) {
-  if (Array.isArray(data)) return data.map(camelToSnake);
-  return camelToSnake(data);
-}
-
-/**
  * Strip authorization headers and signed-URL tokens from a text payload
  * before it lands in the in-memory error log. Defense-in-depth for the
  * theoretical case where Chronicle's error body echoes the request
@@ -158,6 +147,9 @@ export class ChronicleAPI {
   constructor() {
     /** @type {WebSocket|null} */
     this._ws = null;
+
+    /** @type {((path: string) => void)|null} Called before every write request. */
+    this.onWrite = null;
 
     /** @type {Map<string, Set<Function>>} */
     this._listeners = new Map();
@@ -231,6 +223,10 @@ export class ChronicleAPI {
 
     const url = `${baseUrl}/api/v1/campaigns/${campaignId}${path}`;
     const method = options.method || 'GET';
+    // Lets the sync history tell this world's own writes from new changes.
+    if (method !== 'GET' && typeof this.onWrite === 'function') {
+      try { this.onWrite(path); } catch { /* never block a request */ }
+    }
 
     const headers = {
       'Authorization': `Bearer ${apiKey}`,
@@ -359,55 +355,6 @@ export class ChronicleAPI {
    */
   async delete(path) {
     return this.fetch(path, { method: 'DELETE' });
-  }
-
-  // --- Notes API (camelCase ↔ snake_case normalization) ---
-
-  /**
-   * GET notes from the Chronicle API, normalizing camelCase response keys to snake_case.
-   * @param {string} path - API path (e.g., '/notes').
-   * @returns {Promise<any>} Normalized response.
-   */
-  async getNotes(path) {
-    const data = await this.get(path);
-    if (!data) return data;
-    // Handle { data: [...] } wrapper or plain array/object.
-    if (data.data) {
-      return { ...data, data: normalizeNoteResponse(data.data) };
-    }
-    return normalizeNoteResponse(data);
-  }
-
-  /**
-   * POST a note, converting snake_case request body to snake_case (already native).
-   * Normalizes the camelCase response.
-   * @param {string} path
-   * @param {object} body - Request body in snake_case.
-   * @returns {Promise<any>}
-   */
-  async postNote(path, body) {
-    const data = await this.post(path, body);
-    return data ? normalizeNoteResponse(data) : data;
-  }
-
-  /**
-   * PUT a note, normalizing the camelCase response.
-   * @param {string} path
-   * @param {object} body - Request body in snake_case.
-   * @returns {Promise<any>}
-   */
-  async putNote(path, body) {
-    const data = await this.put(path, body);
-    return data ? normalizeNoteResponse(data) : data;
-  }
-
-  /**
-   * DELETE a note.
-   * @param {string} path
-   * @returns {Promise<any>}
-   */
-  async deleteNote(path) {
-    return this.delete(path);
   }
 
   /**

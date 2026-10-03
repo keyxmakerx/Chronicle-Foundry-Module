@@ -63,9 +63,6 @@
     <a class="item" data-tab="maps">
       <i class="fa-solid fa-map"></i> Maps
     </a>
-    <a class="item" data-tab="notes">
-      <i class="fa-solid fa-sticky-note"></i> Notes
-    </a>
 
     <div class="rail-group-label">Setup</div>
     <a class="item" data-tab="config">
@@ -83,6 +80,9 @@
     <a class="item" data-tab="debug">
       <i class="fa-solid fa-bug"></i> {{localize "CHRONICLE.Debug.TabLabel"}}
       {{#if debug.unread}}<span class="member-tab-badge" title="{{localize 'CHRONICLE.Debug.NewBadge' count=debug.unread}}">{{debug.unread}}</span>{{/if}}
+    </a>
+    <a class="item" data-tab="history">
+      <i class="fa-solid fa-clock-rotate-left"></i> History
     </a>
   </nav>
 
@@ -600,7 +600,11 @@
         {{#each chronicleMaps}}
         <div class="map-row {{#if materialized}}linked{{/if}}">
           <div class="map-info">
+            {{#if thumbSrc}}
+            <img class="cs-map-thumb" src="{{thumbSrc}}" alt="" loading="lazy">
+            {{else}}
             <i class="fa-solid fa-map" style="color: #60a5fa"></i>
+            {{/if}}
             <span class="map-name">{{name}}</span>
           </div>
           <div class="map-link-info">
@@ -851,36 +855,6 @@
         <button type="button" data-action="refresh-members" class="dashboard-btn">
           <i class="fa-solid fa-arrows-rotate"></i> {{localize "CHRONICLE.Dashboard.Members.Refresh"}}
         </button>
-      </div>
-      {{/if}}
-    </div>
-
-    {{!-- ================================================================= --}}
-    {{!-- NOTES TAB                                                         --}}
-    {{!-- ================================================================= --}}
-    <div class="tab" data-tab="notes" data-group="primary">
-      {{#if notes.length}}
-      <div class="notes-list">
-        {{#each notes}}
-        <div class="note-row {{status}}" data-note-id="{{id}}">
-          <span class="note-icon"><i class="fa-solid fa-sticky-note" {{#if color}}style="color: {{color}}"{{/if}}></i></span>
-          <span class="note-title">{{title}}</span>
-          <span class="note-status badge badge-{{status}}">{{status}}</span>
-          <span class="note-shared">{{#if is_shared}}<i class="fa-solid fa-users" title="Shared"></i>{{else}}<i class="fa-solid fa-lock" title="Private"></i>{{/if}}</span>
-          <span class="note-sync-time">{{#if lastSync}}{{timeAgo lastSync}}{{else}}Never{{/if}}</span>
-          {{#if (eq status "chronicle-only")}}
-          <button type="button" data-action="pull-note" data-note-id="{{id}}" class="dashboard-btn btn-xs" title="Pull to Foundry">
-            <i class="fa-solid fa-download"></i>
-          </button>
-          {{/if}}
-        </div>
-        {{/each}}
-      </div>
-      {{else}}
-      <div class="dashboard-empty-tab">
-        <i class="fa-solid fa-sticky-note fa-2x"></i>
-        <p>No Chronicle notes found.</p>
-        <p class="hint">Notes created in Chronicle will appear here when note sync is enabled.</p>
       </div>
       {{/if}}
     </div>
@@ -1438,6 +1412,29 @@
           {{/each}}
         </div>
 
+      </div>
+    </div>
+
+    {{!-- History: Chronicle's sync history, both directions (sync-history-tab.mjs) --}}
+    <div class="tab" data-tab="history" data-group="primary">
+      <div class="sync-history" data-history-root>
+        <form class="sh-bar" data-history-filters>
+          <label class="sh-search">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" name="q" placeholder="Search names, people, calls" aria-label="Search history">
+          </label>
+          <select name="direction" aria-label="Direction">
+            <option value="">Both ways</option>
+            <option value="to_foundry">→ To Foundry</option>
+            <option value="to_chronicle">→ To Chronicle</option>
+            <option value="link">Connects</option>
+          </select>
+          <label class="sh-check"><input type="checkbox" name="failed"> Failures only</label>
+          <button type="button" class="dashboard-btn btn-sm sh-refresh" data-history-refresh title="Refresh" aria-label="Refresh">
+            <i class="fa-solid fa-rotate"></i>
+          </button>
+        </form>
+        <div class="sh-list" data-history-rows></div>
       </div>
     </div>
 

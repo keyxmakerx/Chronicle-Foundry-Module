@@ -25,7 +25,6 @@ const STEPS = Object.freeze([
   { key: 'tags',       labelKey: 'CHRONICLE.Wizard.Steps.Tags',       icon: 'fa-solid fa-tags' },
   { key: 'characters', labelKey: 'CHRONICLE.Wizard.Steps.Characters', icon: 'fa-solid fa-users' },
   { key: 'calendar',   labelKey: 'CHRONICLE.Wizard.Steps.Calendar',   icon: 'fa-solid fa-calendar' },
-  { key: 'maps',       labelKey: 'CHRONICLE.Wizard.Steps.Maps',       icon: 'fa-solid fa-map' },
   { key: 'review',     labelKey: 'CHRONICLE.Wizard.Steps.Review',     icon: 'fa-solid fa-clipboard-check' },
 ]);
 
@@ -153,13 +152,11 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
     /** Step 6: calendar sync direction choice. */
     this._calendarDirection = 'skip';
 
-    /** Step 7: scene ↔ Chronicle map link plan. */
-    this._mapLinkPlan = [];
 
-    /** Step 8: aggregated import plan built from all previous steps. */
+    /** Step 7: aggregated import plan built from all previous steps. */
     this._importPlan = null;
 
-    /** Step 8: live import progress tracking. */
+    /** Step 7: live import progress tracking. */
     this._importProgress = { total: 0, done: 0, errors: 0, log: [] };
 
     /** Whether an import is currently running. */
@@ -215,11 +212,6 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
       if (step.key === 'calendar') {
         const calendarAddon = addonSlugs.has('calendar') || addonSlugs.has('calendars');
         enabled = calendarAddon && hasCalendarModule;
-      }
-      // Maps step: only if maps addon is enabled.
-      if (step.key === 'maps') {
-        const mapsAddon = addonSlugs.has('maps') || addonSlugs.has('map');
-        enabled = mapsAddon;
       }
       return { ...step, index, enabled };
     });
@@ -466,7 +458,7 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   // ---------------------------------------------------------------------------
-  // Step 8: Review & Import
+  // Step 7: Review & Import
   // ---------------------------------------------------------------------------
 
   /**
@@ -505,16 +497,6 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
         type: 'push-actor',
         label: `Push character "${char.name}"`,
         data: { actorId: char.actorId, isPC: char.isPC },
-        status: 'pending',
-      });
-    }
-
-    // Map links (Step 7).
-    for (const link of this._mapLinkPlan.filter((l) => l.chronicleMapId)) {
-      plan.push({
-        type: 'link-map',
-        label: `Link scene "${link.sceneName}" to Chronicle map`,
-        data: { sceneId: link.sceneId, mapId: link.chronicleMapId },
         status: 'pending',
       });
     }
@@ -606,7 +588,6 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
       tagPlan: this._tagPlan,
       characterPlan: this._characterPlan,
       calendarDirection: this._calendarDirection,
-      mapLinkPlan: this._mapLinkPlan,
       importPlan: this._importPlan,
       importProgress: this._importProgress,
       importRunning: this._importRunning,
@@ -683,16 +664,6 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
         this._calendarDirection = e.target.value;
       });
     }
-
-    // Step 7: map link selects.
-    for (const select of el.querySelectorAll('.wizard-map-select')) {
-      select.addEventListener('change', (e) => {
-        const idx = Number(e.target.dataset.mapIndex);
-        if (this._mapLinkPlan[idx]) {
-          this._mapLinkPlan[idx].chronicleMapId = e.target.value || null;
-        }
-      });
-    }
   }
 
   // ---------------------------------------------------------------------------
@@ -760,9 +731,6 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
       case 'characters':
         if (this._characterPlan.length === 0) this._buildCharacterPlan();
         break;
-      case 'maps':
-        if (this._mapLinkPlan.length === 0) await this._buildMapLinkPlan();
-        break;
       case 'review':
         this._buildImportPlan();
         break;
@@ -782,35 +750,6 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
       isPC: a.type === 'character' || a.type === 'hero',
       include: true,
     }));
-  }
-
-  /**
-   * Build the map linking plan by matching Foundry scenes with Chronicle maps.
-   */
-  async _buildMapLinkPlan() {
-    if (!this._worldScan || !this.api) return;
-
-    let chronicleMaps = [];
-    try {
-      const result = await this.api.get('/maps');
-      chronicleMaps = Array.isArray(result) ? result : (result?.data ?? result?.maps ?? []);
-    } catch {
-      // Maps endpoint not available.
-    }
-
-    this._mapLinkPlan = this._worldScan.scenes.map((scene) => {
-      // Auto-match by name.
-      const nameLower = scene.name.toLowerCase();
-      const match = chronicleMaps.find(
-        (m) => (m.name || '').toLowerCase() === nameLower
-      );
-      return {
-        sceneId: scene.id,
-        sceneName: scene.name,
-        chronicleMapId: match?.id ?? null,
-        chronicleMaps,
-      };
-    });
   }
 
   // ---------------------------------------------------------------------------

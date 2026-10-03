@@ -104,16 +104,6 @@ export function registerSettings() {
     default: false,
   });
 
-  // Notes sync toggle.
-  game.settings.register(MODULE_ID, 'syncNotes', {
-    name: game.i18n.localize('CHRONICLE.Settings.SyncNotes.Name'),
-    hint: game.i18n.localize('CHRONICLE.Settings.SyncNotes.Hint'),
-    scope: 'world',
-    config: true,
-    type: Boolean,
-    default: false,
-  });
-
   // Character sync toggle (requires matching game system).
   game.settings.register(MODULE_ID, 'syncCharacters', {
     name: game.i18n.localize('CHRONICLE.Settings.SyncCharacters.Name'),
@@ -254,7 +244,7 @@ export function registerSettings() {
     scope: 'world',
     config: false,
     type: String,
-    default: '{"journals":"both","maps":"both","calendar":"both","characters":"both","shops":"both","notes":"both"}',
+    default: '{"journals":"both","maps":"both","calendar":"both","characters":"both","shops":"both"}',
   });
 
   // Permission mapping: sync Chronicle visibility to Foundry ownership levels.

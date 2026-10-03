@@ -242,3 +242,34 @@ async function JournalSync_resync(world) {
   await js.resyncAll({ verbose: false });
   await settle();
 }
+
+test('both directions land in one sync history, without the echo', () => scenario('history-both-ways', async ({ seed, world }) => {
+  const e = await chroniclePage(seed, 'Lantern Row');
+  const sm = await openWorld(world);
+  await JournalSync_resync(world);
+  const j = await JournalEntry.create({ name: 'The Gilded Eel', pages: [{ name: 'The Gilded Eel', type: 'text', text: { content: '<p>x</p>' } }] });
+  await settle();
+  await seed.chronicle.put(`/entities/${e.id}`, { name: 'Lantern Row (flooded)' });
+  await waitFor(() => byEntity(world, e.id)?.name === 'Lantern Row (flooded)', 15000, 'rename to arrive');
+  await settle();
+  await sm._history.flush();
+  assert.equal(sm._history.disabled, false, 'Chronicle took the reports');
+
+  const eelId = j.getFlag(FLAG, 'entityId');
+  let rows = [];
+  await waitFor(async () => {
+    await new Promise((r) => setTimeout(r, 400));
+    rows = (await seed.chronicle.get('/sync/history?limit=200')).data;
+    return rows.some((r) => r.resourceId === eelId) && rows.some((r) => r.direction === 'to_foundry' && r.resourceId === e.id);
+  }, 10000, 'history rows');
+  const pushed = rows.find((r) => r.resourceId === eelId && r.direction === 'to_chronicle');
+  assert.ok(pushed, 'the Foundry-made page is recorded going to Chronicle');
+  assert.equal(pushed.reportedBy, 'chronicle');
+  assert.equal(pushed.name, 'The Gilded Eel');
+  assert.equal(pushed.ok, true);
+  const applied = rows.find((r) => r.resourceId === e.id && r.direction === 'to_foundry');
+  assert.equal(applied.reportedBy, 'client');
+  assert.equal(applied.name, 'Lantern Row (flooded)', 'Chronicle names the page the module reported');
+  assert.equal(applied.ok, true);
+  assert.deepEqual(rows.filter((r) => r.resourceId === eelId && r.direction === 'to_foundry'), [], 'the module’s own push coming back is not a change');
+}));
