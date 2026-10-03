@@ -10,7 +10,6 @@
 
 import { getSetting, setSetting, getSyncDirections, setSyncDirections, getExcludedTags, setExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
-import { moduleVersionHeaders } from './_module-version.mjs';
 import { confirmDialog, promptDialog } from './_dialogs.mjs';
 import { openSyncCalendar } from './sync-calendar.mjs';
 import { buildCalendarDiagnostics } from './sync-calendar-diagnostics.mjs';
@@ -2408,7 +2407,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     try {
       resp = await fetch(`${baseUrl}/api/v1/campaigns/${campaignId}/entity-types`, {
         method: 'GET',
-        headers: { 'Authorization': `Bearer ${key}`, 'Accept': 'application/json', ...moduleVersionHeaders() },
+        headers: { 'Authorization': `Bearer ${key}`, 'Accept': 'application/json' },
       });
     } catch (err) {
       const isCors = err instanceof TypeError && /failed to fetch|networkerror/i.test(err.message || '');
@@ -2461,7 +2460,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     try {
       const sysResp = await fetch(`${baseUrl}/api/v1/campaigns/${campaignId}/systems`, {
         method: 'GET',
-        headers: { 'Authorization': `Bearer ${key}`, 'Accept': 'application/json', ...moduleVersionHeaders() },
+        headers: { 'Authorization': `Bearer ${key}`, 'Accept': 'application/json' },
       });
       if (sysResp.ok) {
         const sysResult = await sysResp.json();

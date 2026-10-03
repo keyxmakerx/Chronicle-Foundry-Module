@@ -9,14 +9,17 @@ All REST requests include a Bearer token:
 Authorization: Bearer <api-key>
 ```
 
-Every REST request also carries the module's manifest version, so Chronicle
+REST requests through the API client also carry the module's manifest version, so Chronicle
 can tell an owner when the module is out of date:
 ```
 X-Chronicle-Module-Version: <module.json version>
 ```
-The header is omitted when the version cannot be read. It is informational
-only; Chronicle never rejects a request over it. WebSocket connections do not
-send it.
+The header is omitted when the version cannot be read. A Chronicle that
+records it lists it in its CORS `Access-Control-Allow-Headers`; an older one
+doesn't, so the browser refuses the preflight. The module then retries that
+request once without the header and stops sending it for the session
+(`scripts/_module-version.mjs`), so an older server keeps syncing. WebSocket
+connections do not send it.
 
 WebSocket connections authenticate via query parameter at connection time:
 ```

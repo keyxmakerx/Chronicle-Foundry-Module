@@ -47,9 +47,10 @@ Install/update flow: also `.ai.md` → "Chronicle Integration — Install & Upda
 
 ## Calendar blackout and date-push pauses
 
-Chronicle's date and event routes are live; some calendar routes (structure
-and settings writes, import, export, advance) still answer
-`HTTP 503 {"error":"calendar_rebuilding", ...}`. Only a 503 whose body says
+Chronicle's date and event routes are live. Current Chronicle answers the
+old structure, settings, import, export and advance routes with
+`410 {"error":"calendar_route_retired"}` (the module calls none of them); an
+older Chronicle answers them with `HTTP 503 {"error":"calendar_rebuilding", ...}`. Only a 503 whose body says
 `calendar_rebuilding` arms the blackout (`scripts/_calendar-blackout-guard.mjs`,
 `_calendar-probe-state.mjs`); a bare 503 from a proxy or restart is an ordinary
 failed request retried next tick. The GM gets one notice when it arms; pushes
