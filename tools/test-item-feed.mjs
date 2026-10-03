@@ -36,7 +36,10 @@ function makeActor(id, entityId) {
             a.writes.push(`update ${iid} ${JSON.stringify(c)}`);
             for (const [k, v] of Object.entries(c)) {
               const [root, ...rest] = k.split('.');
-              if (root === 'flags') flags[rest.at(-1)] = v; else it.system[rest[0]] = v;
+              const key = rest.at(-1);
+              if (root !== 'flags') it.system[rest[0]] = v;
+              else if (key.startsWith('-=')) delete flags[key.slice(2)];
+              else flags[key] = v;
             }
           },
         };
@@ -45,10 +48,8 @@ function makeActor(id, entityId) {
       }
       a.items.contents = [...items.values()];
     },
-    async deleteEmbeddedDocuments(_t, ids, opts) {
-      assert.ok(opts?.chronicleSyncApply);
-      for (const iid of ids) { items.delete(iid); a.writes.push(`delete ${iid}`); }
-      a.items.contents = [...items.values()];
+    async deleteEmbeddedDocuments() {
+      assert.fail('sync never deletes a Foundry item');
     },
   };
   return a;
@@ -104,7 +105,7 @@ test('events for an item row, another relation type or an unlinked entity do not
   assert.deepEqual(gets, []);
 });
 
-test('a quantity change and a removal arrive; nothing else is written', async () => {
+test('a quantity change and a removal arrive; the removed item is unlinked, not deleted', async () => {
   const hero = makeActor('hero-actor', 'hero');
   const rels = { hero: [hasItem(1, 'sword', { quantity: 1 }), hasItem(2, 'rope', { quantity: 1 })] };
   const { is } = make([hero], rels);
@@ -112,7 +113,42 @@ test('a quantity change and a removal arrive; nothing else is written', async ()
   hero.writes.length = 0;
   rels.hero = [hasItem(1, 'sword', { quantity: 4 })];
   await is.onMessage({ type: 'relation.metadata_updated', resourceId: 'hero', payload: hasItem(1, 'sword') });
-  assert.deepEqual(hero.writes, ['update i1 {"system.quantity":4}', 'delete i2']);
+  assert.deepEqual(hero.writes, ['update i1 {"system.quantity":4}', 'update i2 {"flags.chronicle-sync.-=relationId":null}']);
+  assert.equal(hero.items.contents.length, 2, 'the item stays in Foundry');
+  hero.writes.length = 0;
+  await is.onMessage({ type: 'relation.deleted', resourceId: 'hero', payload: hasItem(2, 'rope') });
+  assert.deepEqual(hero.writes, [], 'a repeat writes nothing');
+});
+
+test('a copy dragged from another actor keeps its item and the original keeps its relation', async () => {
+  const hero = makeActor('hero-actor', 'hero');
+  // The copy carries the other character's relation id (5).
+  await hero.createEmbeddedDocuments('Item', [{ name: 'sword', system: { quantity: 1 }, flags: { 'chronicle-sync': { relationId: 5, entityId: 'sword' } } }], { chronicleSyncApply: true });
+  hero.writes.length = 0;
+  const { is } = make([hero], { hero: [] });
+  const calls = [];
+  is._api.delete = async (...a) => calls.push(['delete', ...a]);
+  await is.onMessage({ type: 'relation.created', resourceId: 'hero', payload: hasItem(7, 'shield') });
+  assert.deepEqual(hero.writes, ['update i1 {"flags.chronicle-sync.-=relationId":null}']);
+  // Deleting the copy afterwards no longer touches the original's relation.
+  const copy = hero.items.get('i1');
+  await is._handleDeleteItem({ ...copy, parent: hero }, {}, globalThis.game.user.id);
+  assert.deepEqual(calls, []);
+});
+
+test('a new item that arrives with a relation flag is pushed as its own item', async () => {
+  const hero = makeActor('hero-actor', 'hero');
+  await hero.createEmbeddedDocuments('Item', [{ name: 'sword', system: { quantity: 1 }, flags: { 'chronicle-sync': { relationId: 5, entityId: 'sword' } } }], { chronicleSyncApply: true });
+  hero.writes.length = 0;
+  const { is } = make([hero], {});
+  const posts = [];
+  is._api.post = async (url, body) => { posts.push([url, body.target_entity_id]); return { id: 11 }; };
+  globalThis.Actor ??= class {};
+  Object.setPrototypeOf(hero, globalThis.Actor.prototype);
+  const copy = hero.items.get('i1');
+  await is._handleCreateItem(Object.assign(copy, { parent: hero }), {}, globalThis.game.user.id);
+  assert.deepEqual(posts, [['/entities/hero/relations', 'sword']]);
+  assert.equal(copy.getFlag('chronicle-sync', 'relationId'), 11);
 });
 
 test('a Foundry item whose push is in flight is linked, not copied', async () => {

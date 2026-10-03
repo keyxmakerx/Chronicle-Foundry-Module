@@ -1219,7 +1219,8 @@ If the token is invalid, the server rejects the upgrade.
 `relation.*` messages go to owner and co-DM sockets only (a relation can
 name a private entity). Item sync treats any of them for a linked character
 as "reconcile this character's inventory" (`scripts/_inventory-plan.mjs`),
-so a missed or repeated message cannot leave it wrong. Re-verify by:
+so a missed or repeated message cannot leave it wrong. A removed relation
+only unlinks its Foundry item; the module never deletes it. Re-verify by:
 2026-11-03 (Chronicle `internal/widgets/relations/service.go`,
 `internal/app/routes.go` `relationEventPublisherAdapter`; sent since
 keyxmakerx/Chronicle#1025).

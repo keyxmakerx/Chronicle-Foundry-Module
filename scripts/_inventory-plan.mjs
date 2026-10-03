@@ -4,6 +4,10 @@
  * than applying single events, makes every reconcile safe to repeat: an item
  * already right is not written, and running it twice changes nothing.
  *
+ * Nothing here deletes a Foundry item: sync never deletes without asking. An
+ * item whose relation is not on this character (removed in Chronicle, or a
+ * copy dragged from another actor) is only unlinked, and stays in Foundry.
+ *
  * Pure — see tools/test-inventory-plan.mjs.
  */
 
@@ -28,22 +32,28 @@ export function relationMeta(rel) {
  * @param {object[]} relations  The character's relations (`GET /entities/:id/relations`).
  * @param {Array<{id: string, relationId: *, entityId: string|null, quantity?: number, equipped?: boolean}>} items
  *   The actor's items as they stand.
- * @returns {{create: object[], update: Array<{id: string, change: object}>, adopt: Array<{id: string, relationId: *}>, remove: string[]}}
- *   `create`: relations with no item yet. `adopt`: an item made in Foundry
- *   whose push has not recorded its relation yet (same Chronicle item, no
- *   relation flag), linked instead of copied. `update`: quantity or equipped
- *   differ. `remove`: items whose relation is gone from Chronicle.
+ * @returns {{create: object[], update: Array<{id: string, change: object}>, adopt: Array<{id: string, relationId: *}>, unlink: string[]}}
+ *   `create`: relations with no item yet. `adopt`: an item with the same
+ *   Chronicle item and no live relation (a Foundry push not recorded yet, or
+ *   one just unlinked), linked instead of copied. `update`: quantity or
+ *   equipped differ. `unlink`: items whose relation is not on this character;
+ *   their relation flag is cleared, the item kept.
  */
 export function planInventory(relations, items) {
   const rels = (relations || []).filter((r) => r?.relationType === HAS_ITEM && r.id != null);
   const relIds = new Set(rels.map((r) => String(r.id)));
   const byRelation = new Map();
+  const stale = [];
   for (const it of items || []) {
-    if (it.relationId != null) byRelation.set(String(it.relationId), it);
+    if (it.relationId == null) continue;
+    if (relIds.has(String(it.relationId))) byRelation.set(String(it.relationId), it);
+    else stale.push(it);
   }
-  const unlinked = (items || []).filter((it) => it.relationId == null && it.entityId);
+  // A stale item can be adopted by a live relation for the same Chronicle
+  // item (Chronicle replaced the row), so it joins the unlinked pool.
+  const unlinked = [...stale, ...(items || []).filter((it) => it.relationId == null)].filter((it) => it.entityId);
 
-  const plan = { create: [], update: [], adopt: [], remove: [] };
+  const plan = { create: [], update: [], adopt: [], unlink: [] };
   for (const rel of rels) {
     const item = byRelation.get(String(rel.id));
     if (item) {
@@ -54,13 +64,16 @@ export function planInventory(relations, items) {
     const i = unlinked.findIndex((it) => it.entityId === rel.targetEntityId);
     if (i >= 0) {
       plan.adopt.push({ id: unlinked[i].id, relationId: rel.id });
+      const change = metaChange(relationMeta(rel), unlinked[i]);
+      if (change) plan.update.push({ id: unlinked[i].id, change });
       unlinked.splice(i, 1);
       continue;
     }
     plan.create.push(rel);
   }
-  for (const [relId, item] of byRelation) {
-    if (!relIds.has(relId)) plan.remove.push(item.id);
+  const adopted = new Set(plan.adopt.map((a) => a.id));
+  for (const it of stale) {
+    if (!adopted.has(it.id)) plan.unlink.push(it.id);
   }
   return plan;
 }

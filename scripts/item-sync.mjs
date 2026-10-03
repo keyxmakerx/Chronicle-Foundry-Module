@@ -199,7 +199,7 @@ export class ItemSync {
       quantity: i.system?.quantity,
       equipped: i.system?.equipped,
     })));
-    if (!plan.create.length && !plan.update.length && !plan.adopt.length && !plan.remove.length) return;
+    if (!plan.create.length && !plan.update.length && !plan.adopt.length && !plan.unlink.length) return;
 
     // Tagged per write rather than behind `_syncing`: a GM edit to another
     // item while this runs must still push, and a reconcile on another
@@ -214,8 +214,9 @@ export class ItemSync {
     if (plan.create.length) {
       await actor.createEmbeddedDocuments('Item', plan.create.map((r) => itemDataFor(r)), opts);
     }
-    if (plan.remove.length) {
-      await actor.deleteEmbeddedDocuments('Item', plan.remove, opts);
+    // Never deleted: the item stays in Foundry, only its link is dropped.
+    for (const id of plan.unlink) {
+      await actor.items.get(id)?.update({ [`flags.${FLAG_SCOPE}.-=relationId`]: null }, opts);
     }
   }
 
@@ -245,8 +246,13 @@ export class ItemSync {
     if (userId !== game.user.id) return;
     if (!item.parent || !(item.parent instanceof Actor)) return;
 
-    // Skip if already linked (came from Chronicle).
-    if (item.getFlag(FLAG_SCOPE, 'relationId')) return;
+    // Items this module creates carry APPLY_OPTION, so a new item that already
+    // has a relation flag is a copy (dragged from another actor, duplicated):
+    // that relation belongs to the original. Drop it and push the copy as its
+    // own item instead.
+    if (item.getFlag(FLAG_SCOPE, 'relationId')) {
+      await item.update({ [`flags.${FLAG_SCOPE}.-=relationId`]: null }, { [APPLY_OPTION]: true });
+    }
 
     const actor = item.parent;
     const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');

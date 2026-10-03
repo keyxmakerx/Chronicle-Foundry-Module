@@ -43,7 +43,7 @@ function assertNoDuplicateItems(world) {
   }
 }
 
-test('inventory changes in Chronicle reach the open world: add, quantity, remove', () => scenario('chr-items-live', async ({ seed, world }) => {
+test('inventory changes in Chronicle reach the open world: add, quantity, and a removal unlinks without deleting', () => scenario('chr-items-live', async ({ seed, world }) => {
   await openWorld(world, MODULES);
   const { hero, item, actor } = await heroAndItem(seed, world, 'Longsword');
   const rel = await give(seed, hero, item, 1);
@@ -51,7 +51,8 @@ test('inventory changes in Chronicle reach the open world: add, quantity, remove
   await seed.chronicle.put(`/relations/${rel.id}`, { metadata: { quantity: 3 } });
   await waitFor(() => itemFor(actor, item.id)?.system?.quantity === 3, 10000, 'quantity updated');
   await seed.chronicle.del(`/relations/${rel.id}`);
-  await waitFor(() => !itemFor(actor, item.id), 10000, 'item removed');
+  await waitFor(() => itemFor(actor, item.id) && !itemFor(actor, item.id).getFlag(FLAG, 'relationId'), 10000, 'item unlinked');
+  assert.equal(itemsOf(actor).length, 1, 'the item stays in Foundry');
   await settle();
   assertNoDuplicateItems(world);
 }, { settings: ON }));
@@ -73,9 +74,10 @@ test('inventory changed while Foundry was closed arrives on open, and a second o
 
   await openWorld(world, MODULES);
   assert.equal(itemFor(actor, item.id)?.system?.quantity, 5, 'quantity caught up');
-  assert.equal(itemFor(actor, torch.id), null, 'removed item gone');
+  assert.ok(itemFor(actor, torch.id), 'removed item kept in Foundry');
+  assert.equal(itemFor(actor, torch.id).getFlag(FLAG, 'relationId'), undefined, 'and unlinked');
   assert.ok(itemFor(actor, shield.id), 'new item added');
-  assert.equal(itemsOf(actor).length, 2);
+  assert.equal(itemsOf(actor).length, 3);
   await closeWorld(world);
 
   const before = world.log.writes.length;
@@ -109,5 +111,34 @@ test('an item added in Foundry becomes one relation, and its echo does not copy 
   const before = world.log.writes.length;
   await openWorld(world, MODULES);
   assert.deepEqual(world.log.writes.slice(before).filter((w) => w.type === 'Item').map((w) => `${w.op} ${JSON.stringify(w.change || {})}`), [], 'own push not re-applied');
+  assertNoDuplicateItems(world);
+}, { settings: ON }));
+
+test('an item dragged to another character is its own copy: nothing deleted, the original keeps its relation', () => scenario('fvtt-items-drag', async ({ seed, world }) => {
+  await openWorld(world, MODULES);
+  const { hero, item, actor } = await heroAndItem(seed, world, 'Dagger');
+  const other = await entityOfType(seed, 'Dagger Taker', /character/i);
+  await waitFor(() => actorFor(world, other.id), 10000, 'second actor created');
+  const taker = actorFor(world, other.id);
+  const rel = await give(seed, hero, item, 1);
+  await waitFor(() => itemFor(actor, item.id)?.getFlag(FLAG, 'relationId'), 10000, 'item added');
+  await settle();
+
+  // Foundry's drag copies the item's data, flags included.
+  await taker.createEmbeddedDocuments('Item', [itemFor(actor, item.id).toObject()]);
+  await waitFor(() => itemFor(taker, item.id)?.getFlag(FLAG, 'relationId'), 10000, 'copy got its own relation');
+  await settle();
+  const copyRel = itemFor(taker, item.id).getFlag(FLAG, 'relationId');
+  assert.notEqual(String(copyRel), String(rel.id), 'the copy does not reuse the original relation');
+  assert.equal(String(itemFor(actor, item.id).getFlag(FLAG, 'relationId')), String(rel.id), 'original untouched');
+  const takerRels = (await seed.chronicle.get(`/entities/${other.id}/relations`)).filter((r) => r.relationType === 'Has Item');
+  assert.equal(takerRels.length, 1, 'one relation for the new owner');
+
+  await closeWorld(world);
+  const before = world.log.writes.length;
+  await openWorld(world, MODULES);
+  assert.deepEqual(world.log.writes.slice(before).filter((w) => w.type === 'Item' && w.op === 'delete'), [], 'nothing deleted on reopen');
+  assert.equal(itemsOf(actor).length, 1);
+  assert.equal(itemsOf(taker).length, 1);
   assertNoDuplicateItems(world);
 }, { settings: ON }));
