@@ -113,7 +113,7 @@ test('a quantity change and a removal arrive; the removed item is unlinked, not 
   hero.writes.length = 0;
   rels.hero = [hasItem(1, 'sword', { quantity: 4 })];
   await is.onMessage({ type: 'relation.metadata_updated', resourceId: 'hero', payload: hasItem(1, 'sword') });
-  assert.deepEqual(hero.writes, ['update i1 {"system.quantity":4}', 'update i2 {"flags.chronicle-sync.-=relationId":null}']);
+  assert.deepEqual(hero.writes, ['update i1 {"system.quantity":4}', 'update i2 {"flags.chronicle-sync.-=relationId":null,"flags.chronicle-sync.unlinkedRelationId":2}']);
   assert.equal(hero.items.contents.length, 2, 'the item stays in Foundry');
   hero.writes.length = 0;
   await is.onMessage({ type: 'relation.deleted', resourceId: 'hero', payload: hasItem(2, 'rope') });
@@ -129,7 +129,7 @@ test('a copy dragged from another actor keeps its item and the original keeps it
   const calls = [];
   is._api.delete = async (...a) => calls.push(['delete', ...a]);
   await is.onMessage({ type: 'relation.created', resourceId: 'hero', payload: hasItem(7, 'shield') });
-  assert.deepEqual(hero.writes, ['update i1 {"flags.chronicle-sync.-=relationId":null}']);
+  assert.deepEqual(hero.writes, ['update i1 {"flags.chronicle-sync.-=relationId":null,"flags.chronicle-sync.unlinkedRelationId":5}']);
   // Deleting the copy afterwards no longer touches the original's relation.
   const copy = hero.items.get('i1');
   await is._handleDeleteItem({ ...copy, parent: hero }, {}, globalThis.game.user.id);
@@ -157,7 +157,7 @@ test('a Foundry item whose push is in flight is linked, not copied', async () =>
   hero.writes.length = 0;
   const { is } = make([hero], { hero: [hasItem(9, 'rope', { quantity: 1 })] });
   await is.onMessage({ type: 'relation.created', resourceId: 'hero', payload: hasItem(9, 'rope') });
-  assert.deepEqual(hero.writes, ['update i1 {"flags.chronicle-sync.relationId":9}']);
+  assert.deepEqual(hero.writes, ['update i1 {"flags.chronicle-sync.relationId":9,"flags.chronicle-sync.-=unlinkedRelationId":null}']);
   assert.equal(hero.items.contents.length, 1);
 });
 

@@ -22,6 +22,12 @@
  *     flags — the next sync (GM login, "Resync All Maps", or any
  *     marker/drawing/token/layer event) strips them instead of leaving
  *     them until a viewer opens.
+ *   - Shadow areas (`drawing_type: "shadow"`): pins under one, drawings
+ *     wholly under one, and the shadow drawings themselves stay out of the
+ *     player copy, on live writes and on the stored-flags reconcile; a
+ *     failed drawing fetch leaves the stored copy alone.
+ *   - `userCanSeeMarker`: the viewer's render-time check honors the
+ *     wire-format (JSON string) per-user rules.
  */
 
 import test from 'node:test';
@@ -66,6 +72,11 @@ const {
   isMarkerSafeForPlayerFlags,
   isDrawingSafeForPlayerFlags,
   isTokenSafeForPlayerFlags,
+  shadowAreasOf,
+  isMarkerUnderShadow,
+  isDrawingUnderShadow,
+  playerSafeMapItems,
+  userCanSeeMarker,
 } = await import('../scripts/_map-flag-filter.mjs');
 const { MapSync } = await import('../scripts/map-sync.mjs');
 const { FLAG_SCOPE } = await import('../scripts/constants.mjs');
@@ -405,17 +416,16 @@ test('_materializeMap: existing page with only safe data is left untouched (no s
 // Static-source regression pins
 // ---------------------------------------------------------------------
 
-test('pin: _refreshPageFlags imports and uses the per-kind helpers, not bare field checks', () => {
+test('pin: _refreshPageFlags filters through the shared helpers, not bare field checks', () => {
   const src = readFileSync(resolve(REPO_ROOT, 'scripts/map-sync.mjs'), 'utf8');
   assert.ok(
-    /import\s*\{[^}]*isMarkerSafeForPlayerFlags[^}]*isDrawingSafeForPlayerFlags[^}]*isTokenSafeForPlayerFlags[^}]*\}\s*from\s*['"]\.\/_map-flag-filter\.mjs['"]/.test(src),
-    'map-sync.mjs must import all three helpers from the shared filter module',
+    /import\s*\{[^}]*playerSafeMapItems[^}]*isTokenSafeForPlayerFlags[^}]*\}\s*from\s*['"]\.\/_map-flag-filter\.mjs['"]/.test(src),
+    'map-sync.mjs must import its filters from the shared filter module',
   );
   const m = src.match(/async _refreshPageFlags\([^)]*\)\s*\{([\s\S]*?)\n {2}\}/);
   assert.ok(m, '_refreshPageFlags body could not be located');
   const body = m[1];
-  assert.ok(/\.filter\(isMarkerSafeForPlayerFlags\)/.test(body), '_refreshPageFlags must filter markers with isMarkerSafeForPlayerFlags');
-  assert.ok(/\.filter\(isDrawingSafeForPlayerFlags\)/.test(body), '_refreshPageFlags must filter drawings with isDrawingSafeForPlayerFlags');
+  assert.ok(/playerSafeMapItems\(markers, drawings\)/.test(body), '_refreshPageFlags must filter markers and drawings with playerSafeMapItems');
   assert.ok(/\.filter\(isTokenSafeForPlayerFlags\)/.test(body), '_refreshPageFlags must filter tokens with isTokenSafeForPlayerFlags');
   assert.ok(
     !/is_visible\s*!==\s*false/.test(body) && !/is_hidden\s*!==\s*true/.test(body),
@@ -432,7 +442,206 @@ test('pin: _materializeMap reconciles stored markers, drawings, and tokens throu
   const m = src.match(/async _materializeMap\([^)]*\)\s*\{([\s\S]*?)\n {2}\}\n/);
   assert.ok(m, '_materializeMap body could not be located');
   const body = m[1];
-  assert.ok(/chronicleMarkers['"]\)[\s\S]*?isMarkerSafeForPlayerFlags/.test(body), '_materializeMap must reconcile stored markers through isMarkerSafeForPlayerFlags');
-  assert.ok(/chronicleDrawings['"]\)[\s\S]*?isDrawingSafeForPlayerFlags/.test(body), '_materializeMap must reconcile stored drawings through isDrawingSafeForPlayerFlags');
+  assert.ok(/chronicleDrawings['"]\)[\s\S]*?playerSafeMapItems\(storedMarkers, storedDrawings\)/.test(body), '_materializeMap must reconcile stored markers and drawings through playerSafeMapItems');
   assert.ok(/chronicleTokens['"]\)[\s\S]*?isTokenSafeForPlayerFlags/.test(body), '_materializeMap must reconcile stored tokens through isTokenSafeForPlayerFlags');
+});
+
+test('pin: the map viewer uses the shared userCanSeeMarker, not its own copy', () => {
+  const src = readFileSync(resolve(REPO_ROOT, 'scripts/map-viewer.mjs'), 'utf8');
+  assert.ok(/import\s*\{\s*userCanSeeMarker\s*\}\s*from\s*['"]\.\/_map-flag-filter\.mjs['"]/.test(src));
+  assert.ok(!/function _userCanSeeMarker/.test(src), 'the old object-only check must be gone');
+});
+
+// ---------------------------------------------------------------------
+// §7 — shadow areas
+// ---------------------------------------------------------------------
+
+const SHADOW = {
+  id: 'dr-shadow', drawing_type: 'shadow', visibility: 'everyone',
+  // Dragged from the bottom-right corner: corners must be normalised.
+  points: [{ x: 60, y: 60 }, { x: 20, y: 20 }],
+};
+
+// A drawing clear of SHADOW. Points are required once a shadow exists: a
+// drawing without them can't be placed, so it fails closed.
+const CLEAR_MARKER = { id: 'mk-open', visibility: 'everyone', x: 80, y: 80 };
+const CLEAR_DRAWING = { id: 'dr-open', visibility: 'everyone', points: [{ x: 70, y: 70 }, { x: 90, y: 90 }] };
+
+test('shadowAreasOf: two corners, normalised; other shapes and bad points are not areas', () => {
+  assert.deepEqual(shadowAreasOf([SHADOW]), [{ minX: 20, minY: 20, maxX: 60, maxY: 60 }]);
+  assert.deepEqual(shadowAreasOf([{ ...SHADOW, points: JSON.stringify(SHADOW.points) }]).length, 1, 'string points parse');
+  assert.deepEqual(shadowAreasOf([{ drawing_type: 'rectangle', points: SHADOW.points }]), []);
+  assert.deepEqual(shadowAreasOf([{ drawing_type: 'shadow', points: [{ x: 1, y: 1 }] }]), []);
+  assert.deepEqual(shadowAreasOf([{ drawing_type: 'shadow', points: 'nope' }]), []);
+  assert.deepEqual(shadowAreasOf(null), []);
+});
+
+test('isMarkerUnderShadow: inside and on the edge are hidden, outside is not', () => {
+  const areas = shadowAreasOf([SHADOW]);
+  assert.equal(isMarkerUnderShadow({ x: 40, y: 40 }, areas), true);
+  assert.equal(isMarkerUnderShadow({ x: 20, y: 60 }, areas), true, 'edges count as inside');
+  assert.equal(isMarkerUnderShadow({ x: 61, y: 40 }, areas), false);
+  assert.equal(isMarkerUnderShadow({ x: 'bad' }, areas), true, 'no usable position fails closed');
+  assert.equal(isMarkerUnderShadow({ x: 'bad' }, []), false, 'no shadows: nothing hidden');
+});
+
+test('isDrawingUnderShadow: wholly under is hidden, touching is not, unparseable is hidden', () => {
+  const areas = shadowAreasOf([SHADOW]);
+  assert.equal(isDrawingUnderShadow({ points: [{ x: 30, y: 30 }, { x: 50, y: 50 }] }, areas), true);
+  assert.equal(isDrawingUnderShadow({ points: [{ x: 30, y: 30 }, { x: 90, y: 90 }] }, areas), false);
+  assert.equal(isDrawingUnderShadow({ points: 'garbage' }, areas), true);
+  assert.equal(isDrawingUnderShadow({ points: [] }, areas), false);
+  assert.equal(isDrawingUnderShadow(SHADOW, areas), false, 'a shadow does not hide itself');
+});
+
+test('playerSafeMapItems: drops shadowed pins and drawings and the shadow itself', () => {
+  const inside = { id: 'mk-in', visibility: 'everyone', x: 30, y: 30 };
+  const outside = { id: 'mk-out', visibility: 'everyone', x: 80, y: 80 };
+  const under = { id: 'dr-under', visibility: 'everyone', points: [{ x: 25, y: 25 }, { x: 35, y: 35 }] };
+  const across = { id: 'dr-across', visibility: 'everyone', points: [{ x: 25, y: 25 }, { x: 95, y: 95 }] };
+  const out = playerSafeMapItems([inside, outside, DM_ONLY_MARKER], [SHADOW, under, across, RESTRICTED_DRAWING]);
+  assert.deepEqual(out.markers.map((m) => m.id), ['mk-out']);
+  assert.deepEqual(out.drawings.map((d) => d.id), ['dr-across']);
+});
+
+test('_refreshPageFlags: shadowed pins never reach the player copy', async () => {
+  const ms = new MapSync();
+  const page = makeFakePage();
+  ms.findPageByMapId = () => page;
+
+  await ms._refreshPageFlags('map-1', {
+    markers: [{ id: 'mk-in', visibility: 'everyone', x: 30, y: 30 }, CLEAR_MARKER],
+    drawings: [SHADOW, CLEAR_DRAWING],
+    tokens: [],
+    layers: [],
+  });
+
+  assert.deepEqual(page.getFlag(FLAG_SCOPE, 'chronicleMarkers').map((m) => m.id), ['mk-open']);
+  assert.deepEqual(page.getFlag(FLAG_SCOPE, 'chronicleDrawings').map((d) => d.id), ['dr-open']);
+});
+
+test('_refreshPageFlags: a failed drawing fetch leaves stored markers and drawings alone', async () => {
+  const ms = new MapSync();
+  const page = makeFakePage({ markers: [OPEN_MARKER], drawings: [OPEN_DRAWING] });
+  ms.findPageByMapId = () => page;
+
+  await ms._refreshPageFlags('map-1', {
+    markers: [{ id: 'mk-new', visibility: 'everyone', x: 30, y: 30 }],
+    drawings: [],
+    tokens: [VISIBLE_TOKEN],
+    layers: [],
+    drawingsKnown: false,
+  });
+
+  assert.deepEqual(page.getFlag(FLAG_SCOPE, 'chronicleMarkers').map((m) => m.id), ['mk-open']);
+  assert.deepEqual(page.getFlag(FLAG_SCOPE, 'chronicleDrawings').map((d) => d.id), ['dr-open']);
+  assert.deepEqual(page.getFlag(FLAG_SCOPE, 'chronicleTokens').map((t) => t.id), ['tk-visible']);
+});
+
+test('_refreshSubResources: a failed drawing fetch is passed on as unknown', async () => {
+  const ms = new MapSync();
+  const page = makeFakePage({ markers: [OPEN_MARKER], drawings: [OPEN_DRAWING] });
+  ms.findPageByMapId = () => page;
+  ms._logError = () => {};
+  ms._api = {
+    get: async (path) => {
+      if (path.endsWith('/drawings')) throw Object.assign(new Error('boom'), { status: 500 });
+      if (path.endsWith('/markers')) return [{ id: 'mk-new', visibility: 'everyone', x: 30, y: 30 }];
+      return [];
+    },
+  };
+
+  await ms._refreshSubResources('map-1');
+  assert.deepEqual(page.getFlag(FLAG_SCOPE, 'chronicleMarkers').map((m) => m.id), ['mk-open']);
+});
+
+test('_pollSubResources: drawings failing on refresh and again on poll never publish shadowed pins', async () => {
+  const ms = new MapSync();
+  const page = makeFakePage({ markers: [CLEAR_MARKER], drawings: [CLEAR_DRAWING] });
+  ms.findPageByMapId = () => page;
+  ms._logError = () => {};
+  ms._notifyViewers = () => {};
+  ms._api = {
+    get: async (path) => {
+      if (path.endsWith('/drawings')) throw Object.assign(new Error('boom'), { status: 500 });
+      if (path.endsWith('/markers')) return [{ id: 'mk-in', visibility: 'everyone', x: 30, y: 30 }];
+      return [];
+    },
+  };
+
+  await ms._refreshSubResources('map-1');
+  await ms._pollSubResources('map-1');
+  assert.deepEqual(page.getFlag(FLAG_SCOPE, 'chronicleMarkers').map((m) => m.id), ['mk-open']);
+});
+
+test('_pollSubResources: a failed drawing poll after a good fetch keeps applying the cached shadows', async () => {
+  const ms = new MapSync();
+  const page = makeFakePage();
+  ms.findPageByMapId = () => page;
+  ms._logError = () => {};
+  ms._notifyViewers = () => {};
+  let drawingsFail = false;
+  ms._api = {
+    get: async (path) => {
+      if (path.endsWith('/drawings')) {
+        if (drawingsFail) throw new Error('boom');
+        return [SHADOW];
+      }
+      if (path.endsWith('/markers')) return [{ id: 'mk-in', visibility: 'everyone', x: 30, y: 30 }, CLEAR_MARKER];
+      return [];
+    },
+  };
+
+  await ms._refreshSubResources('map-1');
+  drawingsFail = true;
+  await ms._pollSubResources('map-1');
+  assert.deepEqual(page.getFlag(FLAG_SCOPE, 'chronicleMarkers').map((m) => m.id), ['mk-open']);
+});
+
+test('playerSafeMapItems: a GM-only shadow still hides what is under it', () => {
+  const out = playerSafeMapItems(
+    [{ id: 'mk-in', visibility: 'everyone', x: 30, y: 30 }, CLEAR_MARKER],
+    [{ ...SHADOW, visibility: 'dm_only' }],
+  );
+  assert.deepEqual(out.markers.map((m) => m.id), ['mk-open']);
+  assert.deepEqual(out.drawings, []);
+});
+
+test('_materializeMap: shadow data an older module wrote is stripped on the next sync', async () => {
+  const ms = new MapSync();
+  ms._ensureMapsFolder = async () => ({ id: 'folder-1' });
+  const page = makeFakePage({
+    markers: [{ id: 'mk-in', visibility: 'everyone', x: 30, y: 30 }, CLEAR_MARKER],
+    drawings: [SHADOW, CLEAR_DRAWING],
+  });
+  ms.findPageByMapId = () => page;
+
+  await ms._materializeMap({ id: 'map-1', name: 'Test Map', image_url: 'http://localhost:8080/media/x.png' });
+
+  assert.deepEqual(page.getFlag(FLAG_SCOPE, 'chronicleMarkers').map((m) => m.id), ['mk-open']);
+  assert.deepEqual(page.getFlag(FLAG_SCOPE, 'chronicleDrawings').map((d) => d.id), ['dr-open']);
+});
+
+// ---------------------------------------------------------------------
+// §8 — userCanSeeMarker (viewer render-time check)
+// ---------------------------------------------------------------------
+
+test('userCanSeeMarker: per-user rules arrive as a JSON string and are honored', () => {
+  const allow = { visibility: 'everyone', visibility_rules: '{"allowed_users":["cu-7"]}' };
+  const deny = { visibility: 'everyone', visibility_rules: '{"denied_users":["cu-9"]}' };
+  assert.equal(userCanSeeMarker(allow, false, 'cu-7'), true);
+  assert.equal(userCanSeeMarker(allow, false, 'cu-8'), false);
+  assert.equal(userCanSeeMarker(allow, false, null), false, 'unmapped player is not on an allow list');
+  assert.equal(userCanSeeMarker(deny, false, 'cu-9'), false);
+  assert.equal(userCanSeeMarker(deny, false, 'cu-8'), true);
+});
+
+test('userCanSeeMarker: dm_only, GM, empty and broken rules', () => {
+  assert.equal(userCanSeeMarker(DM_ONLY_MARKER, false, 'cu-7'), false);
+  assert.equal(userCanSeeMarker(DM_ONLY_MARKER, true, null), true);
+  assert.equal(userCanSeeMarker(RESTRICTED_MARKER, true, null), true, 'the GM sees everything');
+  assert.equal(userCanSeeMarker(OPEN_MARKER, false, null), true);
+  assert.equal(userCanSeeMarker({ visibility: 'everyone', visibility_rules: '{}' }, false, null), true);
+  assert.equal(userCanSeeMarker({ visibility: 'everyone', visibility_rules: 'not json' }, false, 'cu-7'), false);
+  assert.equal(userCanSeeMarker(null, true, null), false);
 });

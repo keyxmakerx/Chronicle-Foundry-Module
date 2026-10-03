@@ -20,6 +20,7 @@ import { getSetting } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import { collapseChanges } from './_change-feed.mjs';
 import { HAS_ITEM, planInventory, itemDataFor } from './_inventory-plan.mjs';
+import { itemsToRemove } from './_stash-reconcile.mjs';
 
 /** Write option marking an item change as applied from Chronicle, so its hook does not push it back. */
 const APPLY_OPTION = 'chronicleSyncApply';
@@ -171,14 +172,32 @@ export class ItemSync {
   }
 
   /**
+   * Pull one actor's inventory after a stash move: the same reconcile as a
+   * relation event, plus the one removal a move the GM just applied calls
+   * for (`removeItemIds`, see _stash-reconcile.mjs). A failure is logged and
+   * changes nothing.
+   * @param {Actor} actor
+   * @param {{removeItemIds?: string[]}} [opts]
+   */
+  async refreshInventory(actor, { removeItemIds = [] } = {}) {
+    if (!this._api || !actor?.getFlag(FLAG_SCOPE, 'entityId')) return;
+    try {
+      await this._reconcileActor(actor, { removeItemIds });
+    } catch (err) {
+      console.warn(`Chronicle: Failed to sync inventory for "${actor.name}"`, err);
+    }
+  }
+
+  /**
    * Bring one actor's Chronicle-linked items in line with its "Has Item"
    * relations. Serialized per actor so two events never both add an item.
    * @param {Actor} actor
+   * @param {{removeItemIds?: string[]}} [opts]
    * @private
    */
-  _reconcileActor(actor) {
+  _reconcileActor(actor, opts = {}) {
     const prev = this._reconciling.get(actor.id) || Promise.resolve();
-    const run = prev.catch(() => {}).then(() => this._reconcileNow(actor));
+    const run = prev.catch(() => {}).then(() => this._reconcileNow(actor, opts));
     this._reconciling.set(actor.id, run);
     run.finally(() => {
       if (this._reconciling.get(actor.id) === run) this._reconciling.delete(actor.id);
@@ -187,26 +206,40 @@ export class ItemSync {
   }
 
   /** @private */
-  async _reconcileNow(actor) {
+  async _reconcileNow(actor, { removeItemIds = [] } = {}) {
     const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
     const relations = await this._api.get(`/entities/${entityId}/relations`);
     const list = Array.isArray(relations) ? relations : (relations?.data || []);
-    const plan = planInventory(list, actor.items.contents.map((i) => ({
+    const items = actor.items.contents.map((i) => ({
       id: i.id,
       relationId: i.getFlag(FLAG_SCOPE, 'relationId') ?? null,
       entityId: i.getFlag(FLAG_SCOPE, 'entityId') ?? null,
       quantity: i.system?.quantity,
       equipped: i.system?.equipped,
-    })));
-    if (!plan.create.length && !plan.update.length && !plan.adopt.length && !plan.unlink.length) return;
+    }));
+    const plan = planInventory(list, items);
+    // The only delete: an item a stash move the GM just applied took off
+    // this character. Every other gone relation is only unlinked. The move's
+    // own relation event may have unlinked the item already, so its last
+    // relation id still counts here.
+    const live = list.filter((r) => r?.relationType === HAS_ITEM).map((r) => r.id);
+    const lastLinked = actor.items.contents.map((i) => ({
+      id: i.id,
+      relationId: i.getFlag(FLAG_SCOPE, 'relationId') ?? i.getFlag(FLAG_SCOPE, 'unlinkedRelationId') ?? null,
+      entityId: i.getFlag(FLAG_SCOPE, 'entityId') ?? null,
+    }));
+    const adopted = new Set(plan.adopt.map((a) => a.id));
+    const moved = new Set(itemsToRemove(lastLinked, live, removeItemIds).map((g) => g.id).filter((id) => !adopted.has(id)));
+    const unlink = plan.unlink.filter((id) => !moved.has(id));
+    if (!plan.create.length && !plan.update.length && !plan.adopt.length && !unlink.length && !moved.size) return;
 
     // Tagged per write rather than behind `_syncing`: a GM edit to another
     // item while this runs must still push, and a reconcile on another
     // actor must not lift this one's guard.
     const opts = { [APPLY_OPTION]: true };
     for (const { id, relationId } of plan.adopt) {
-      await actor.items.get(id)?.update({ [`flags.${FLAG_SCOPE}.relationId`]: relationId }, opts);
+      await actor.items.get(id)?.update({ [`flags.${FLAG_SCOPE}.relationId`]: relationId, [`flags.${FLAG_SCOPE}.-=unlinkedRelationId`]: null }, opts);
     }
     for (const { id, change } of plan.update) {
       await actor.items.get(id)?.update(change, opts);
@@ -215,8 +248,15 @@ export class ItemSync {
       await actor.createEmbeddedDocuments('Item', plan.create.map((r) => itemDataFor(r)), opts);
     }
     // Never deleted: the item stays in Foundry, only its link is dropped.
-    for (const id of plan.unlink) {
-      await actor.items.get(id)?.update({ [`flags.${FLAG_SCOPE}.-=relationId`]: null }, opts);
+    for (const id of unlink) {
+      const item = actor.items.get(id);
+      await item?.update({
+        [`flags.${FLAG_SCOPE}.-=relationId`]: null,
+        [`flags.${FLAG_SCOPE}.unlinkedRelationId`]: item.getFlag(FLAG_SCOPE, 'relationId'),
+      }, opts);
+    }
+    if (moved.size) {
+      await actor.deleteEmbeddedDocuments('Item', [...moved], opts);
     }
   }
 
@@ -250,8 +290,11 @@ export class ItemSync {
     // has a relation flag is a copy (dragged from another actor, duplicated):
     // that relation belongs to the original. Drop it and push the copy as its
     // own item instead.
-    if (item.getFlag(FLAG_SCOPE, 'relationId')) {
-      await item.update({ [`flags.${FLAG_SCOPE}.-=relationId`]: null }, { [APPLY_OPTION]: true });
+    if (item.getFlag(FLAG_SCOPE, 'relationId') || item.getFlag(FLAG_SCOPE, 'unlinkedRelationId')) {
+      await item.update({
+        [`flags.${FLAG_SCOPE}.-=relationId`]: null,
+        [`flags.${FLAG_SCOPE}.-=unlinkedRelationId`]: null,
+      }, { [APPLY_OPTION]: true });
     }
 
     const actor = item.parent;
