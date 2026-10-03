@@ -846,7 +846,6 @@ export class JournalSync {
         [FLAG_SCOPE]: {
           entityId: entity.id,
           entityType: entity.type_name || '',
-          fields: entity.fields_data || {},
           tags: entity.tags || [],
           lastSync: new Date().toISOString(),
           chronicleUpdatedAt: entity.updated_at || '',

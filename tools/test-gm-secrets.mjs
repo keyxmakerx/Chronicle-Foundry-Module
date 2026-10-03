@@ -152,6 +152,7 @@ test('journal-sync wires the helper on every pull and push path', () => {
   assert.match(src, /_collectTextPages\(journal\) \{\s*return toChronicleSecrets\(/);
   assert.match(src, /return toChronicleSecrets\(playerNotesPage\.text\?\.content \|\| ''\);/);
   assert.match(src, /secretBlockRanges\(html\)/, 'page breaks skip headings inside secret blocks');
+  assert.doesNotMatch(src, /fields:\s*entity\.fields_data/, 'field values (GM-only ones included) are never stored in journal flags');
 });
 
 test('a heading that starts GM-only stays one page and comes back with no extra heading', async () => {
