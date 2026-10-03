@@ -208,46 +208,6 @@ test('delete(): builds /api/v1/campaigns/{id}/<path> + Bearer header', async () 
   } finally { restoreFetch(); }
 });
 
-test('getNotes(): routes through get() — same URL + header shape', async () => {
-  installFetchStub();
-  try {
-    await makeApi().getNotes('/notes');
-    assertUrlShape(fetchCalls[0], '/notes', 'getNotes()');
-    assertBearerHeader(fetchCalls[0], 'getNotes()');
-    assertNoTokenInRestUrl(fetchCalls[0], 'getNotes()');
-  } finally { restoreFetch(); }
-});
-
-test('postNote(): routes through post() — same URL + header shape', async () => {
-  installFetchStub();
-  try {
-    await makeApi().postNote('/notes', { title: 'x' });
-    assertUrlShape(fetchCalls[0], '/notes', 'postNote()');
-    assertBearerHeader(fetchCalls[0], 'postNote()');
-    assertNoTokenInRestUrl(fetchCalls[0], 'postNote()');
-  } finally { restoreFetch(); }
-});
-
-test('putNote(): routes through put() — same URL + header shape', async () => {
-  installFetchStub();
-  try {
-    await makeApi().putNote('/notes/abc', { title: 'x' });
-    assertUrlShape(fetchCalls[0], '/notes/abc', 'putNote()');
-    assertBearerHeader(fetchCalls[0], 'putNote()');
-    assertNoTokenInRestUrl(fetchCalls[0], 'putNote()');
-  } finally { restoreFetch(); }
-});
-
-test('deleteNote(): routes through delete() — same URL + header shape', async () => {
-  installFetchStub();
-  try {
-    await makeApi().deleteNote('/notes/abc');
-    assertUrlShape(fetchCalls[0], '/notes/abc', 'deleteNote()');
-    assertBearerHeader(fetchCalls[0], 'deleteNote()');
-    assertNoTokenInRestUrl(fetchCalls[0], 'deleteNote()');
-  } finally { restoreFetch(); }
-});
-
 test('uploadMedia(): builds /api/v1/campaigns/{id}/media + Bearer header', async () => {
   installFetchStub();
   try {
@@ -358,7 +318,7 @@ test('WS dispatch: every prefix in ALLOWED_WS_TYPE_PREFIXES is accepted', () => 
     const allowedPrefixes = [
       'entity.', 'entity_type.', 'map.', 'marker.', 'drawing.',
       'token.', 'layer.', 'fog.', 'note.', 'calendar.', 'relation.', 'sync.',
-      'stash.', 'downtime.',
+      'stash.', 'downtime.', 'npc.',
     ];
     for (const prefix of allowedPrefixes) {
       let fired = false;

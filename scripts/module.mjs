@@ -14,19 +14,24 @@ import { ShopWidget } from './shop-widget.mjs';
 import { CalendarSync } from './calendar-sync.mjs';
 import { ActorSync } from './actor-sync.mjs';
 import { ItemSync } from './item-sync.mjs';
-import { NoteSync } from './note-sync.mjs';
 import { StashSync } from './stash-sync.mjs';
 import { registerStashSocket } from './stash-client.mjs';
 import { registerStashChat } from './stash-chat.mjs';
 import { registerStashButton } from './stash-window.mjs';
 import { SyncDashboard } from './sync-dashboard.mjs';
 import { MapViewerSheet } from './map-viewer.mjs';
+import { openDMScreen } from './dm-screen.mjs';
 import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs';
+import { registerNpcPresence, npcSpotlightRelay } from './npc-presence.mjs';
 import { registerMapSheetItems } from './map-sheet-items.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { openSyncCalendar } from './sync-calendar.mjs';
+import { registerShopRoomSocket } from './shop-room-window.mjs';
 import { notebookAvailable, openNotebook, registerPlayerNotebook } from './player-notebook.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
+import { retireNotesFolder } from './_notes-folder.mjs';
+import { FLAG_SCOPE, SYNC_OPTIONS } from './constants.mjs';
+import { removedFolder } from './_set-aside.mjs';
 
 /** @type {SyncManager|null} */
 let syncManager = null;
@@ -113,14 +118,17 @@ Hooks.once('ready', async () => {
   syncManager.registerModule(new CalendarSync());
   syncManager.registerModule(new ActorSync());
   syncManager.registerModule(new ItemSync());
-  syncManager.registerModule(new NoteSync());
   syncManager.registerModule(new StashSync());
+  syncManager.registerModule(npcSpotlightRelay);
 
   // Create UI first so it's always available, even if start() fails.
   dashboard = new SyncDashboard();
   dashboard.bind(syncManager);
   _addStatusIndicator();
   registerCharacterClaimIndicator();
+  // Players open a shop room when the GM shows one (they have no API key);
+  // the active GM answers their buying requests.
+  registerShopRoomSocket();
   try {
     registerStashSocket();
     registerStashChat();
@@ -138,6 +146,11 @@ Hooks.once('ready', async () => {
   } catch (err) {
     console.warn('Chronicle Sync | Map items unavailable', err);
   }
+  try {
+    registerNpcPresence(() => syncManager?.api ?? null);
+  } catch (err) {
+    console.warn('Chronicle Sync | NPC token tools unavailable', err);
+  }
 
   // Move a legacy world-scoped API key into this GM's client scope and
   // delete the world copy before start() reads the setting. GM only —
@@ -147,6 +160,16 @@ Hooks.once('ready', async () => {
       await migrateApiKeyToClientScope();
     } catch (err) {
       console.error('Chronicle Sync | API key scope migration failed', err);
+    }
+    // The player notebook replaced the old note sync; set its folder aside
+    // before sync starts. Idempotent, so it runs on every load.
+    try {
+      await retireNotesFolder({
+        game, scope: FLAG_SCOPE, removedFolder,
+        maxDepth: CONST.FOLDER_MAX_DEPTH, options: SYNC_OPTIONS,
+      });
+    } catch (err) {
+      console.warn('Chronicle Sync | Setting the old notes folder aside failed', err);
     }
   }
 
@@ -254,7 +277,7 @@ async function _runtimeValidateDescriptor() {
 
 /**
  * Add the Chronicle group to Foundry's scene controls toolbar: the Sync
- * Dashboard and Sync Calendar for GMs, the Notebook for everyone once the
+ * Dashboard, Sync Calendar and DM Screen for GMs, the Notebook for everyone once the
  * world is connected to Chronicle.
  */
 Hooks.on('getSceneControlButtons', (controls) => {
@@ -266,10 +289,12 @@ Hooks.on('getSceneControlButtons', (controls) => {
     run: {
       dashboard: openDashboard,
       syncCalendar: () => { openSyncCalendar(); },
+      dmScreen: () => { openDMScreen(() => syncManager?.api ?? null); },
       notebook: () => { openNotebook(); },
     },
     titles: {
       syncCalendar: game.i18n.localize('CHRONICLE.SceneControl.SyncCalendar'),
+      dmScreen: game.i18n.localize('CHRONICLE.SceneControl.DMScreen'),
       notebook: game.i18n.localize('CHRONICLE.SceneControl.Notebook'),
     },
   });

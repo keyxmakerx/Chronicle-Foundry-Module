@@ -69,9 +69,7 @@ test('setAside moves the journal instead of deleting it', async () => {
 
 test('the sync files set journals aside rather than deleting them', () => {
   const src = (f) => readFileSync(resolve(REPO_ROOT, 'scripts', f), 'utf8');
-  const journal = src('journal-sync.mjs'), note = src('note-sync.mjs');
+  const journal = src('journal-sync.mjs');
   assert.doesNotMatch(journal, /journal\.delete\(\)/, 'journal-sync must not delete journals');
-  assert.doesNotMatch(note, /journal\.delete\(\)/, 'note-sync must not delete journals');
   assert.match(journal, /setAside\(journal, FLAG_SCOPE(, SYNC_OPTIONS)?\)/);
-  assert.match(note, /setAside\(journal, FLAG_SCOPE\)/);
 });

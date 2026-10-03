@@ -13,12 +13,16 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
   `tools/check-package-descriptor.mjs`.
 - `scripts/*.mjs`: sync (`journal-sync`, `map-sync`+`map-viewer`,
   `calendar-sync`+`sync-calendar`+`sync-calendar-*`, `actor-sync`,
-  `item-sync`, `note-sync`, `stash-sync`+`stash-client`), UI (`sync-dashboard`+`sync-history-tab`,
+  `item-sync`, `stash-sync`+`stash-client`), UI (`sync-dashboard`+`sync-history-tab`, `npc-presence`,
   `sync-diagnostic-bundle`, `update-info`, `character-claim-indicator`,
-  `capability-inspector`, `import-wizard`, `shop-widget`, `player-notebook`, `stash-window`+`stash-chat`), core (`module`,
+  `capability-inspector`, `import-wizard`, `shop-widget`+`shop-room-window`, `player-notebook`, `stash-window`+`stash-chat`), core (`module`,
   `settings`, `constants`, `logger`, `sync-manager`, `api-client`),
   `adapters/generic-adapter.mjs`. `.ai.md` has what each does. `_*.mjs` are
   pure helpers, each unit-tested by its own `tools/test-*.mjs`.
+- `vendor/chronicle/`: Chronicle's shop room widget, copied unchanged; a
+  Chronicle change to it means copying it again (`tools/test-shop-room.mjs`).
+- `scripts/dm-screen.mjs` (UI): the GM's DM Screen window, drawn from
+  Chronicle's `GET /dm-screen`.
 - `templates/` Handlebars, `styles/` CSS, `lang/en.json` strings,
   `tools/test-*.mjs` (Node's test runner, see TESTING.md).
 - `bench/`: the two-sided sync bench (real Chronicle + the real sync code in
@@ -47,10 +51,10 @@ Install/update flow: also `.ai.md` → "Chronicle Integration — Install & Upda
 - **Calendar sub-resources are display-only** (dashboard + optional GM-whisper, never public); `structure.updated` badges mismatches, never auto-applies. `scripts/_calendar-subresources.mjs`, `tools/test-calendar-subresources.mjs`, `tools/test-calendar-subresource-routing.mjs`.
 - **Chronicle update endpoints are PARTIAL**: absent preserves, `null` clears, present replaces (API-CONTRACT.md → "partial-update contract"). Send only changed fields; never echo untouched ones back. `tools/test-partial-put-contract.mjs`. One deliberate exception: the marker dialog in `scripts/map-viewer.mjs` spreads the stored marker, harmless on current Chronicle and needed by older servers that replace the whole record. Actor field pushes do the same for `fields_data` (`ActorSync._putFieldsMerged`).
 - **GM-only text goes in Foundry secret blocks.** Sync's Owner key receives Chronicle's `<span data-secret>` text and GM-only pictures; journal pulls put them in Foundry secret blocks (hidden from players who don't own the page) and pushes turn everything in a secret block back into GM-only content (`scripts/_gm-secrets.mjs`). `tools/test-gm-secrets.mjs`.
-- **Sync never deletes without asking.** A Chronicle-side removal sets the Foundry journal aside (unlinked, in a "Chronicle: removed" folder, `scripts/_set-aside.mjs`); a Foundry-side delete of a linked actor or journal asks before deleting the Chronicle copy (`scripts/_remote-deletes.mjs`). `tools/test-set-aside.mjs`, `tools/test-remote-deletes.mjs`.
+- **Sync never deletes without asking.** A Chronicle-side removal sets the Foundry journal aside (unlinked, in a "Chronicle: removed" folder, `scripts/_set-aside.mjs`); an item whose "Has Item" relation is gone is only unlinked (`scripts/_inventory-plan.mjs`), unless a stash move the GM just applied took it off that character (`scripts/_stash-reconcile.mjs`); a Foundry-side delete of a linked actor or journal asks before deleting the Chronicle copy (`scripts/_remote-deletes.mjs`). `tools/test-set-aside.mjs`, `tools/test-remote-deletes.mjs`.
 - **Never hard-cap a list walk.** `JournalSync.resyncAll` and `_buildEntityGroups` share `scripts/_entity-page-walk.mjs` (200-page bound); its `truncated` flag must be surfaced. `tools/test-entity-page-walk.mjs`.
 - WebSocket messages route by type through `SyncManager`, which then reports each applied change to Chronicle's sync history (`scripts/_history-report.mjs`); a change arriving within 10 s of this world writing the same id is its own echo and isn't reported.
-- **Connect catch-up reads Chronicle's change feed** (`GET /sync/changes`, `scripts/_change-feed.mjs`); journals and characters use it so far. The cursor is saved only after its changes applied, so replays must be harmless: skip what is already at its version, decide "new" by the page's own `created_at` against the cursor's `createdAfter`, which moves only with the cursor. A journal's recorded version never moves backwards. `tools/test-change-feed.mjs`, `tools/test-journal-versions.mjs`.
+- **Connect catch-up reads Chronicle's change feed** (`GET /sync/changes`, `scripts/_change-feed.mjs`); journals, characters and inventories use it so far. Inventories reconcile a whole character from its relations (`scripts/_inventory-plan.mjs`), and use the delta only once the saved cursor shows the server records `relation`. The cursor is saved only after its changes applied, so replays must be harmless: skip what is already at its version, decide "new" by the page's own `created_at` against the cursor's `createdAfter`, which moves only with the cursor. A journal's recorded version never moves backwards. `tools/test-change-feed.mjs`, `tools/test-journal-versions.mjs`, `tools/test-inventory-plan.mjs`.
 
 ## Calendar blackout and date-push pauses
 

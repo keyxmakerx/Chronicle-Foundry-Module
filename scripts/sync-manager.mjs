@@ -548,7 +548,7 @@ export class SyncManager {
    * player's key): areas then rescan and no cursor is saved.
    *
    * @param {{seq: number}|null} cursor
-   * @returns {Promise<{mode: 'delta'|'full', changes: object[], next: number, complete: boolean}|null>}
+   * @returns {Promise<{mode: 'delta'|'full', changes: object[], next: number, complete: boolean, types: string[]|null}|null>}
    * @private
    */
   async _readChangeFeed(cursor) {
@@ -563,7 +563,7 @@ export class SyncManager {
         cursor ? cursor.seq : 0,
       );
       const mode = cursor && !walked.resetRequired ? 'delta' : 'full';
-      return { mode, changes: mode === 'delta' ? walked.changes : [], next: walked.next, complete: walked.complete };
+      return { mode, changes: mode === 'delta' ? walked.changes : [], next: walked.next, complete: walked.complete, types: walked.types };
     } catch (err) {
       console.debug('Chronicle: change feed unavailable; areas will rescan', err?.status ?? err);
       return null;
@@ -624,7 +624,7 @@ export class SyncManager {
         if (typeof mod.onInitialSync === 'function') {
           const area = mod.feedArea && mod.feedActive?.() ? mod.feedArea : null;
           try {
-            await mod.onInitialSync(area ? { feed: feedForArea(feed, cursor, area) } : undefined);
+            await mod.onInitialSync(area ? { feed: feedForArea(feed, cursor, area, mod.feedType) } : undefined);
             if (area) feedAreas.push(area);
           } catch (err) {
             if (area) feedFailed = true;
@@ -639,7 +639,7 @@ export class SyncManager {
         const createdAfter = feed.complete
           ? (result.serverTime || new Date().toISOString())
           : (cursor?.createdAfter ?? null);
-        await setSetting('changeFeedCursor', { campaignId, seq: feed.next, areas: feedAreas, createdAfter });
+        await setSetting('changeFeedCursor', { campaignId, seq: feed.next, areas: feedAreas, createdAfter, types: feed.types || [] });
       }
 
       // Post-pass: modules that need to coordinate with each other after
@@ -764,17 +764,6 @@ export class SyncManager {
    */
   clearActivityLog() {
     this._activityLog = [];
-  }
-
-  /**
-   * Create or update a sync mapping on the server. Delegates to
-   * `ensureMapping` so legacy callers (wizard `link-map`, dashboard
-   * manual-sync) inherit conflict-tolerant idempotency.
-   * @param {object} mapping
-   * @returns {Promise<object>}
-   */
-  async createMapping(mapping) {
-    return this.ensureMapping(mapping);
   }
 
   /**
@@ -926,20 +915,6 @@ export class SyncManager {
         const actorSync = this._modules.find((m) => m.constructor.name === 'ActorSync');
         if (!actorSync) throw new Error('ActorSync module not loaded');
         await actorSync._handleCreateActor(actor, {}, game.user.id);
-        break;
-      }
-      case 'link-map': {
-        const scene = game.scenes.get(item.data.sceneId);
-        if (!scene) throw new Error(`Scene ${item.data.sceneId} not found`);
-        await scene.setFlag('chronicle-sync', 'mapId', item.data.mapId);
-        await this.createMapping({
-          chronicle_type: 'map',
-          chronicle_id: item.data.mapId,
-          external_system: 'foundry',
-          external_id: item.data.sceneId,
-          sync_direction: 'both',
-          sync_metadata: { foundry_type: 'Scene' },
-        });
         break;
       }
       case 'assign-tags': {

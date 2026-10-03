@@ -95,17 +95,61 @@ export function markerIconClass(icon, catalog = null) {
  * null for anything that isn't the expected object (an older Chronicle
  * answers 404), so callers keep their defaults.
  * @param {*} resp
- * @returns {{ campaignFrame: string, icons: string[] }|null}
+ * @returns {{ campaignFrame: string, icons: string[], iconCatalog: {id: string, label: string, category: string}[] }|null}
  */
 export function parseMapLook(resp) {
   if (!resp || typeof resp !== 'object' || Array.isArray(resp)) return null;
-  const icons = Array.isArray(resp.icons)
-    ? resp.icons.map((i) => i?.id).filter((id) => typeof id === 'string' && /^fa-[a-z0-9-]{1,40}$/.test(id))
+  const iconCatalog = Array.isArray(resp.icons)
+    ? resp.icons
+      .filter((i) => typeof i?.id === 'string' && /^fa-[a-z0-9-]{1,40}$/.test(i.id))
+      .map((i) => ({
+        id: i.id,
+        label: _shortText(i.label) || i.id.slice(3),
+        category: _shortText(i.category) || 'Other',
+      }))
     : [];
   return {
     campaignFrame: _oneOf(resp.campaign_frame, FRAMES, DEFAULT_FRAME),
-    icons,
+    icons: iconCatalog.map((i) => i.id),
+    iconCatalog,
   };
+}
+
+/** A label from Chronicle, trimmed and capped; '' when not a string. */
+function _shortText(v) {
+  return typeof v === 'string' ? v.trim().slice(0, 40) : '';
+}
+
+/**
+ * Chronicle's icon catalog grouped for the marker window's picker, in
+ * Chronicle's own order (groups by first appearance).
+ * @param {{id: string, label: string, category: string}[]} catalog
+ * @returns {{category: string, icons: {id: string, label: string}[]}[]}
+ */
+export function groupIconCatalog(catalog) {
+  const groups = new Map();
+  for (const i of catalog || []) {
+    if (!groups.has(i.category)) groups.set(i.category, []);
+    groups.get(i.category).push({ id: i.id, label: i.label });
+  }
+  return Array.from(groups, ([category, icons]) => ({ category, icons }));
+}
+
+/**
+ * The picture to show for a map in the sync window: the page's own picture,
+ * which for a shadowed map is the stored player copy. A Foundry-relative
+ * path is used as is; a full URL only when it is on the Chronicle host.
+ * @param {*} src the map page's `src`
+ * @param {(url: string) => boolean} isAllowedHost
+ * @returns {string} '' when there is nothing safe to show
+ */
+export function mapThumbSrc(src, isAllowedHost) {
+  if (typeof src !== 'string' || !src) return '';
+  if (/^https?:\/\//i.test(src)) return isAllowedHost(src) ? src : '';
+  // Any other scheme, a protocol-relative URL, or a step up out of Foundry's
+  // data folder is not a stored picture.
+  if (/^[a-z][a-z0-9+.-]*:/i.test(src) || src.startsWith('//') || src.split(/[\\/]/).includes('..')) return '';
+  return src;
 }
 
 /* ------------------------------------------------------------------

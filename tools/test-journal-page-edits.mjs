@@ -13,7 +13,6 @@ const { SYNC_OPTIONS } = await import('../scripts/constants.mjs');
 
 function make() {
   const js = new JournalSync();
-  js._isHandledByNoteSync = () => false;
   const scheduled = [];
   js._journalPushDebouncer = { schedule: (id) => scheduled.push(id), flush() {}, flushAll() {} };
   return { js, scheduled };
