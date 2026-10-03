@@ -22,6 +22,7 @@ import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { openSyncCalendar } from './sync-calendar.mjs';
 import { notebookAvailable, openNotebook, registerPlayerNotebook } from './player-notebook.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
+import { openDMScreen } from './dm-screen.mjs';
 
 /** @type {SyncManager|null} */
 let syncManager = null;
@@ -236,7 +237,7 @@ async function _runtimeValidateDescriptor() {
 
 /**
  * Add the Chronicle group to Foundry's scene controls toolbar: the Sync
- * Dashboard and Sync Calendar for GMs, the Notebook for everyone once the
+ * Dashboard, Sync Calendar and DM Screen for GMs, the Notebook for everyone once the
  * world is connected to Chronicle.
  */
 Hooks.on('getSceneControlButtons', (controls) => {
@@ -248,10 +249,12 @@ Hooks.on('getSceneControlButtons', (controls) => {
     run: {
       dashboard: openDashboard,
       syncCalendar: () => { openSyncCalendar(); },
+      dmScreen: () => { openDMScreen(() => syncManager?.api ?? null); },
       notebook: () => { openNotebook(); },
     },
     titles: {
       syncCalendar: game.i18n.localize('CHRONICLE.SceneControl.SyncCalendar'),
+      dmScreen: game.i18n.localize('CHRONICLE.SceneControl.DMScreen'),
       notebook: game.i18n.localize('CHRONICLE.SceneControl.Notebook'),
     },
   });

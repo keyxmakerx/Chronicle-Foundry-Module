@@ -1,0 +1,128 @@
+<div class="dms" data-dms-root>
+{{#if error}}
+  <div class="dms-error">
+    <p>{{error}}</p>
+    <button type="button" data-action="retry">{{retryLabel}}</button>
+  </div>
+{{else}}
+  <div class="dms-strip">
+    {{#if night}}
+      <span><b>Next game night:</b> {{night.name}}, {{night.when}}</span>
+      <span>{{night.tally}}</span>
+    {{else}}
+      <span>No game night planned</span>
+    {{/if}}
+  </div>
+  <div class="dms-leaves">
+    <section class="dms-leaf dms-leaf-l" data-dms-leaf="l" aria-label="The world">
+      <h3>The world</h3>
+      {{#if downtime}}
+        <div class="dms-blk">
+          <span class="dms-lbl">Game state</span>
+          <div class="dms-seg" role="group" aria-label="Game state">
+            <button type="button" data-action="downtime" data-open="false" aria-pressed="{{#if downtime.open}}false{{else}}true{{/if}}" {{#unless downtime.canToggle}}disabled{{/unless}} {{#unless downtime.open}}disabled{{/unless}}>In session</button>
+            <button type="button" data-action="downtime" data-open="true" aria-pressed="{{#if downtime.open}}true{{else}}false{{/if}}" {{#unless downtime.canToggle}}disabled{{/unless}} {{#if downtime.open}}disabled{{/if}}>Downtime</button>
+          </div>
+          <span class="dms-small">{{downtime.note}}{{#unless downtime.canToggle}} Only the campaign owner can switch this.{{/unless}}</span>
+          {{#if downtime.pending}}
+            <a class="dms-link" href="{{downtime.pendingUrl}}" target="_blank" rel="noopener">{{downtime.pending}}</a>
+          {{/if}}
+        </div>
+      {{/if}}
+      {{#if world}}
+        <div class="dms-blk">
+          <span class="dms-lbl">In the world</span>
+          <span class="dms-big">{{world.date}}</span>
+          <a class="dms-link" href="{{world.calendarUrl}}" target="_blank" rel="noopener">Open the calendar</a>
+        </div>
+        <div class="dms-blk">
+          <span class="dms-lbl">Weather today</span>
+          {{#if world.weather}}<span>{{world.weather}}</span>{{else}}<span class="dms-small">No weather set for today.</span>{{/if}}
+        </div>
+      {{/if}}
+      {{#if worldEmpty}}
+        <p class="dms-small">Add a calendar or turn on the Armory to see the world's date and game state here.</p>
+      {{/if}}
+    </section>
+    <section class="dms-leaf dms-leaf-m" data-dms-leaf="m" aria-label="The party">
+      <h3>The party</h3>
+      {{#if party.length}}
+        <div class="dms-partywrap">
+          <div class="dms-party" data-dms-party>
+            {{#each party}}
+              <div class="dms-hero" data-dms-hero>
+                <button type="button" class="dms-hrow" aria-expanded="false" data-action="hero">
+                  <span class="dms-hero-name">{{name}}{{#if conditions.length}} <em class="dms-cdot" title="{{conditionList}}">{{conditions.length}}</em>{{/if}}</span>
+                  <span class="dms-mini">
+                    {{#if bar}}
+                      <span class="dms-bar" aria-hidden="true"><span class="{{#if bar.low}}dms-low{{/if}}" style="width:{{bar.percent}}%"></span></span>
+                      <span class="dms-num">{{bar.current}}/{{bar.max}}</span>
+                    {{/if}}
+                  </span>
+                  <span class="dms-chips">{{#each chips}}<span class="dms-chip">{{label}} {{current}}</span>{{/each}}</span>
+                  <span class="dms-chev" aria-hidden="true">▾</span>
+                </button>
+                <div class="dms-hmore">
+                  <div class="dms-hin">
+                    {{#if showWho}}
+                      <div class="dms-who"><span>{{subtitle}}</span>{{#if playerName}}<span>Played by {{playerName}}</span>{{/if}}</div>
+                    {{/if}}
+                    {{#each rest}}
+                      <div class="dms-meter">
+                        <span>{{label}}</span>
+                        <span class="dms-bar" aria-hidden="true"><span class="{{#if low}}dms-low{{/if}}" style="width:{{percent}}%"></span></span>
+                        <span class="dms-num">{{current}}/{{max}}</span>
+                      </div>
+                    {{/each}}
+                    {{#if conditions.length}}
+                      <div class="dms-hconds">{{#each conditions}}<span>{{this}}</span>{{/each}}</div>
+                    {{/if}}
+                  </div>
+                </div>
+              </div>
+            {{/each}}
+          </div>
+          <span class="dms-more" data-dms-more hidden></span>
+        </div>
+      {{else}}
+        <p class="dms-small">No player characters yet.</p>
+      {{/if}}
+      {{#if partyNote}}<p class="dms-small">{{partyNote}}</p>{{/if}}
+    </section>
+    <section class="dms-leaf dms-leaf-r" data-dms-leaf="r" aria-label="Rules and reveals">
+      <div class="dms-tabs" role="tablist">
+        {{#if hasRules}}
+          <button type="button" role="tab" aria-selected="true" data-action="tab" data-tab="rules">Rules</button>
+        {{/if}}
+        <button type="button" role="tab" aria-selected="{{#if hasRules}}false{{else}}true{{/if}}" data-action="tab" data-tab="reveal">Reveal</button>
+      </div>
+      {{#if hasRules}}
+        <div class="dms-blk" data-dms-pane="rules">
+          <input type="search" class="dms-search" placeholder="Find a condition" aria-label="Find a condition" data-dms-filter>
+          {{#each conditions}}
+            <details class="dms-cond" data-dms-cond="{{name}}">
+              <summary>{{name}}</summary>
+              <p>{{text}}</p>
+            </details>
+          {{/each}}
+        </div>
+      {{/if}}
+      <div class="dms-blk" data-dms-pane="reveal" {{#if hasRules}}hidden{{/if}}>
+        <span class="dms-lbl">Hidden from players</span>
+        {{#each hidden}}
+          <div class="dms-row">
+            <span>{{name}}</span>
+            {{#if revealed}}
+              <span class="dms-done">Revealed</span>
+            {{else}}
+              <button type="button" data-action="reveal" data-id="{{id}}">Reveal</button>
+            {{/if}}
+          </div>
+        {{else}}
+          <p class="dms-small">Nothing hidden right now.</p>
+        {{/each}}
+      </div>
+    </section>
+  </div>
+{{/if}}
+</div>

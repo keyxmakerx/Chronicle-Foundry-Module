@@ -445,7 +445,21 @@
     },
     "SceneControl": {
       "SyncCalendar": "Open Sync Calendar",
-      "Notebook": "Open my Chronicle notebook"
+      "Notebook": "Open my Chronicle notebook",
+      "DMScreen": "Open the DM Screen"
+    },
+    "DMScreen": {
+      "Title": "DM Screen",
+      "Skip": "Click anywhere to skip",
+      "Retry": "Try again",
+      "Error": {
+        "NotSetUp": "Connect this world to Chronicle first (Chronicle Sync settings).",
+        "NeedsUpdate": "This Chronicle doesn't have the DM Screen yet. Update Chronicle to use it here.",
+        "BadKey": "Chronicle didn't accept this world's sync key. Check it in the Chronicle Sync settings.",
+        "NotAllowed": "Chronicle refused the DM Screen for this sync key. Check that the Sync API is on for the campaign and the key can read.",
+        "Failed": "The DM Screen couldn't load from Chronicle. Try again in a moment.",
+        "Action": "Chronicle didn't accept that change. Try again in a moment."
+      }
     },
     "Notebook": {
       "Title": "Notebook",
