@@ -27,6 +27,7 @@
 import { getSetting } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
+import { parseMapLook, resolveMapLook } from './_map-look.mjs';
 import {
   PLAYER_IMAGE_DIR, parsePlayerImageUrl, playerImageFileName,
   shadowSignature,
@@ -135,6 +136,13 @@ export class MapSync {
      * }>}
      */
     this._cache = new Map();
+
+    /**
+     * Campaign-wide map look from `GET /maps/look` (campaign frame), or
+     * null before it loads or on a Chronicle without the route.
+     * @type {{ campaignFrame: string, icons: string[] }|null}
+     */
+    this._look = null;
 
     /** Active poll timers keyed by mapId. */
     this._pollTimers = new Map();
@@ -433,6 +441,8 @@ export class MapSync {
       );
       return { materialized: 0, errors: 1 };
     }
+
+    await this._loadMapLook();
 
     console.debug(`Chronicle: /maps returned ${maps.length} map(s).`);
     if (maps.length) {
@@ -1036,6 +1046,22 @@ export class MapSync {
   }
 
   /**
+   * Fetch the campaign map look. Cosmetic: a failure (or an older Chronicle
+   * without the route) keeps the last answer and is only logged.
+   * @private
+   */
+  async _loadMapLook() {
+    try {
+      const look = parseMapLook(await this._api.get('/maps/look'));
+      if (look) this._look = look;
+    } catch (err) {
+      if (err?.status !== 404) {
+        console.warn(`Chronicle: GET /maps/look failed: ${err?.message || err}`);
+      }
+    }
+  }
+
+  /**
    * Build the `chronicleMapMeta` page flag from a Chronicle map row.
    * `imageSrc` is the resolved URL (already through `_resolveMediaUrl` on
    * GM); persisting it on the flag means players never need to re-resolve.
@@ -1049,6 +1075,9 @@ export class MapSync {
    */
   _buildMapMeta(mapData, imageSrc = '', { shadowed = false } = {}) {
     return {
+      // How Chronicle draws this map, resolved here so player clients read
+      // it from the page without the campaign settings.
+      look: resolveMapLook(mapData.display_settings, this._look?.campaignFrame),
       id: mapData.id,
       name: mapData.name || '',
       description: mapData.description || '',

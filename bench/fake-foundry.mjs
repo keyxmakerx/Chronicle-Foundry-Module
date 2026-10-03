@@ -275,12 +275,77 @@ class BenchJournal extends BenchDocument {
   }
 }
 
+/** Embedded item: lives in its actor's `items`, fires Item hooks with `parent` set. */
+class BenchItem extends BenchDocument {
+  constructor(world, parent, data) {
+    super(world, 'Item', { type: 'equipment', system: {}, ...data });
+    this._parent = parent;
+    this.parent = parent;
+  }
+
+  async update(data, options = {}) {
+    const change = diff(this._source, expandObject(data));
+    if (!Object.keys(change).length) return this;
+    mergeInto(this._source, change);
+    this._refresh();
+    this._world.log.writes.push({ op: 'update', type: 'Item', id: this.id, parent: this.parent.id, change, options });
+    change._id = this.id;
+    this._world.Hooks.callAll('updateItem', this, change, options, this._world.game.user.id);
+    return this;
+  }
+
+  async delete(options = {}) {
+    return (await this.parent.deleteEmbeddedDocuments('Item', [this.id], options))[0];
+  }
+}
+
 class BenchActor extends BenchDocument {
   constructor(world, data) {
     const { items = [], ...rest } = data;
     super(world, 'Actor', { type: 'character', system: {}, img: '', prototypeToken: {}, ...rest });
     this.items = new Collection();
-    for (const i of items) this.items.set(i._id || randomID(), { ...i });
+    for (const i of items) {
+      const item = new BenchItem(world, this, i);
+      this.items.set(item.id, item);
+    }
+  }
+
+  toObject() {
+    return { ...clone(this._source), items: this.items.map((i) => i.toObject()) };
+  }
+
+  async createEmbeddedDocuments(type, list, options = {}) {
+    const made = [];
+    for (const data of list) {
+      const item = new BenchItem(this._world, this, data);
+      this.items.set(item.id, item);
+      made.push(item);
+      this._world.log.writes.push({ op: 'create', type: 'Item', id: item.id, parent: this.id, options });
+      this._world.Hooks.callAll('createItem', item, options, this._world.game.user.id);
+    }
+    return made;
+  }
+
+  async updateEmbeddedDocuments(type, list, options = {}) {
+    const out = [];
+    for (const data of list) {
+      const item = this.items.get(data._id);
+      if (item) out.push(await item.update(data, options));
+    }
+    return out;
+  }
+
+  async deleteEmbeddedDocuments(type, ids, options = {}) {
+    const out = [];
+    for (const id of ids) {
+      const item = this.items.get(id);
+      if (!item) continue;
+      this.items.delete(id);
+      out.push(item);
+      this._world.log.writes.push({ op: 'delete', type: 'Item', id, parent: this.id, options });
+      this._world.Hooks.callAll('deleteItem', item, options, this._world.game.user.id);
+    }
+    return out;
   }
 }
 
@@ -387,6 +452,8 @@ export function installFoundry({ settings = {}, systemId = 'dnd5e' } = {}) {
   function makeDocClass(type, Impl) {
     return class {
       static get documentName() { return type; }
+      // `item.parent instanceof Actor` must hold for the documents this makes.
+      static [Symbol.hasInstance](doc) { return doc instanceof Impl; }
       static async create(data, options = {}) {
         const list = Array.isArray(data) ? data : [data];
         const out = [];

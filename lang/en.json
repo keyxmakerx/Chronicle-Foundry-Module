@@ -1,6 +1,20 @@
 {
   "CHRONICLE": {
     "ModuleTitle": "Chronicle Sync",
+    "ShopRoom": {
+      "OpenShop": "Open Chronicle Shop",
+      "ShowToPlayers": "Show to players",
+      "StopShowing": "Stop showing",
+      "LoadFailed": "Couldn't load this shop's room from Chronicle.",
+      "BuyFailed": "That didn't go through. Try again.",
+      "NoGM": "Buying needs the GM in the game.",
+      "GMNoAnswer": "The GM's game didn't answer. Try again.",
+      "GMNoAnswerBuy": "The GM's game didn't answer. Check your coins before buying again.",
+      "NotShown": "The GM isn't showing this shop any more.",
+      "NotMatched": "Your Foundry user isn't matched to a Chronicle member yet. Ask the GM to match it in Chronicle Sync.",
+      "NoSender": "Foundry didn't say who sent this, so nothing was bought.",
+      "SomeCharacter": "A character"
+    },
     "Settings": {
       "ApiUrl": {
         "Name": "Chronicle URL",
@@ -261,6 +275,21 @@
         "CalDiagCopyFailed": "Failed to copy calendar diagnostics — check the console (F12)."
       }
     },
+    "MapItems": {
+      "Give": "Give this map to a character",
+      "GiveTitle": "Give {name} to a character",
+      "GiveButton": "Give map",
+      "Character": "Character",
+      "GiveFailed": "Chronicle: could not give the map. See the console for details.",
+      "NoCharacters": "Chronicle: no characters have a player owner yet.",
+      "NoItemType": "Chronicle: this game system has no item type a map can become.",
+      "AlreadyHas": "{actor} already has this map.",
+      "ItemName": "Map of the area: {name}",
+      "Given": "Gave {name} to {actor}.",
+      "CannotOpen": "Chronicle: you can't open this map. Ask the GM to give it to your character again.",
+      "Open": "Open",
+      "FromChronicle": "From Chronicle · opens the live map"
+    },
     "MapViewer": {
       "SheetLabel": "Chronicle Map Viewer",
       "PlacePin": "Click map to place pin",
@@ -279,7 +308,9 @@
       "MarkerAudienceDm": "Chronicle marker, DM only",
       "PlaceChronicleMarker": "Place Chronicle marker",
       "ResyncThisMap": "Resync this map from Chronicle",
-      "OpenInChronicle": "Open in Chronicle web editor",
+      "OpenInChronicle": "Open in Chronicle",
+      "LiveFromChronicle": "Live from Chronicle",
+      "MapTools": "Map tools",
       "NotChronicleMap": "This page isn't linked to a Chronicle map. Place local pins instead.",
       "MapArchivedNotice": "Chronicle map \"{name}\" was deleted, but your local annotations have been preserved on the archived journal entry.",
       "MarkerConfig": "Configure Chronicle Marker",
@@ -751,6 +782,22 @@
     "CalendarDatePush": {
       "Rejected": "Chronicle won't accept this date: its calendar has different months or leap days. Date sync is paused.",
       "Forbidden": "Only the campaign owner's key can change Chronicle's date. Date sync is paused."
+    },
+    "Npc": {
+      "Spotlight": "Spotlight",
+      "Talk": "Talk as this NPC",
+      "TalkStop": "Stop talking",
+      "OpenPage": "Open Chronicle page",
+      "SpotlightHidden": "{name} is hidden. Nothing was shown to players. Reveal the token first to spotlight it.",
+      "SpotlightElsewhere": "That token isn't on the scene you're viewing, so nothing was shown.",
+      "TalkFailed": "Chronicle: couldn't switch talking on or off.",
+      "RevealTitle": "Show their Chronicle page?",
+      "RevealAsk": "You revealed {name} on the map. Show their Chronicle page to players too?",
+      "Revealed": "Chronicle: {name}'s page is now shown to players.",
+      "RevealFailed": "Chronicle: couldn't show the page. Check the connection in the Chronicle dashboard.",
+      "Linked": "Chronicle: {name} is now linked to the page \"{page}\".",
+      "LinkHero": "{name} is a hero kept in step by character sync, so it stays linked to its own page.",
+      "LinkFailed": "Chronicle: couldn't link the token to that page."
     }
   }
 }
