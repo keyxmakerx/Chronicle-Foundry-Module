@@ -261,6 +261,21 @@
         "CalDiagCopyFailed": "Failed to copy calendar diagnostics — check the console (F12)."
       }
     },
+    "MapItems": {
+      "Give": "Give this map to a character",
+      "GiveTitle": "Give {name} to a character",
+      "GiveButton": "Give map",
+      "Character": "Character",
+      "GiveFailed": "Chronicle: could not give the map. See the console for details.",
+      "NoCharacters": "Chronicle: no characters have a player owner yet.",
+      "NoItemType": "Chronicle: this game system has no item type a map can become.",
+      "AlreadyHas": "{actor} already has this map.",
+      "ItemName": "Map of the area: {name}",
+      "Given": "Gave {name} to {actor}.",
+      "CannotOpen": "Chronicle: you can't open this map. Ask the GM to give it to your character again.",
+      "Open": "Open",
+      "FromChronicle": "From Chronicle · opens the live map"
+    },
     "MapViewer": {
       "SheetLabel": "Chronicle Map Viewer",
       "PlacePin": "Click map to place pin",
