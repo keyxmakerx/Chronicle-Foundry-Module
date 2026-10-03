@@ -14,7 +14,7 @@
  */
 
 import { FLAG_SCOPE, MODULE_ID, REPORT_STORE_FLAG, SYNC_OPTIONS } from './constants.mjs';
-import { getSetting, setSetting } from './settings.mjs';
+import { getSetting } from './settings.mjs';
 import { SOCKET_CHANNEL, getStashSync } from './stash-sync.mjs';
 import { isAnsweringGM, PendingRequests } from './_stash-relay.mjs';
 import { normalizeView } from './_stash-model.mjs';
@@ -24,9 +24,10 @@ import { getLogBuffer, log } from './logger.mjs';
 import { compareSideBySide, findMoneyField } from './_debug-compare.mjs';
 import { buildModuleInfo, buildSyncLog, sanitizeSnapshot } from './_debug-snapshot.mjs';
 import {
-  ACK_TIMEOUT_MS, DEBUG_MSG, acceptReport, appendReport, isDebugMessage,
-  markDone, mergeLegacyReports, normalizeReports, unreadCount,
+  ACK_TIMEOUT_MS, DEBUG_MSG, acceptReport, appendReport, intakeReport, isDebugMessage,
+  markDone, normalizeReports, pruneReports, unreadCount,
 } from './_debug-reports.mjs';
+import { decryptReply, encryptReply, generateRequestKeys, isPublicJwk } from './_stash-crypto.mjs';
 
 /** Fired (all clients) when the stored reports change, so open windows redraw. */
 export const REPORTS_CHANGED_HOOK = 'chronicleDebugReportsChanged';
@@ -41,6 +42,13 @@ let stamps = {};
 let writeChain = Promise.resolve();
 
 const acks = new PendingRequests({ timeoutMs: ACK_TIMEOUT_MS });
+/** Player side: waiting for the GM's one-off public key. */
+const keyWaits = new PendingRequests({ timeoutMs: ACK_TIMEOUT_MS });
+
+/** How long a GM-side one-off private key waits for its report. */
+const HELLO_KEY_TTL_MS = 60000;
+/** GM side: `senderId:helloId` -> private key and expiry. Used once. */
+const helloKeys = new Map();
 
 /** @param {() => any} syncManagerGetter */
 export function bindDebugHub(syncManagerGetter) {
@@ -58,8 +66,9 @@ const REPORTS_FLAG = 'reports';
 
 /**
  * The entry that holds the reports, found by its module flag (never by
- * name). Its default ownership is NONE, so Foundry does not send it, or its
- * flags, to a player's client at all.
+ * name). Its default ownership is NONE, which is meant to keep Foundry from
+ * sending it, or its flags, to a player's client; the live check in
+ * TESTING.md (module #94) is what confirms that on each Foundry version.
  * @returns {JournalEntry|null}
  */
 export function findStore() {
@@ -69,8 +78,8 @@ export function findStore() {
 let storeChain = Promise.resolve();
 
 /**
- * Make sure the store exists and fold in reports left in the old world
- * setting. Only the active GM creates it; any other client gets what exists.
+ * Make sure the store exists. Only the active GM creates it; any other client
+ * gets what exists.
  * @returns {Promise<JournalEntry|null>}
  */
 export function ensureStore() {
@@ -84,20 +93,9 @@ export function ensureStore() {
         flags: { [FLAG_SCOPE]: { [REPORT_STORE_FLAG]: true, [REPORTS_FLAG]: [] } },
       }, { ...SYNC_OPTIONS });
     }
-    if (game.user.isGM) await migrateLegacy(store);
     return store;
   });
   return storeChain;
-}
-
-/** Move reports from the old world setting into the store, then clear it. */
-async function migrateLegacy(store) {
-  let legacy;
-  try { legacy = getSetting('problemReports'); } catch { return; }
-  if (!Array.isArray(legacy) || !legacy.length) return;
-  const merged = mergeLegacyReports(normalizeReports(store.getFlag(FLAG_SCOPE, REPORTS_FLAG)), legacy);
-  await store.update({ [`flags.${FLAG_SCOPE}.${REPORTS_FLAG}`]: merged }, { ...SYNC_OPTIONS });
-  await setSetting('problemReports', []);
 }
 
 /** @returns {object[]} the stored reports (oldest first); empty on a client that cannot see the store. */
@@ -120,7 +118,8 @@ function writeReports(update) {
     .then(async () => {
       const store = findStore() ?? await ensureStore();
       if (!store) throw new Error('no report store');
-      await store.update({ [`flags.${FLAG_SCOPE}.${REPORTS_FLAG}`]: update(getReports()) }, { ...SYNC_OPTIONS });
+      const next = pruneReports(update(getReports()), Date.now());
+      await store.update({ [`flags.${FLAG_SCOPE}.${REPORTS_FLAG}`]: next }, { ...SYNC_OPTIONS });
     });
   return writeChain;
 }
@@ -183,7 +182,7 @@ export async function gatherSideBySide(actor) {
       log.warn('Debug: could not read character fields', err);
     }
   }
-  const money = findMoneyField(fieldDefs, view?.character.moneyKey || '');
+  const money = findMoneyField(fieldDefs, view?.character.moneyKey || '', !!view);
 
   let chronicle;
   try {
@@ -261,57 +260,86 @@ const senderOwns = (senderId, characterId) => {
 };
 
 /**
- * Take in one report on the GM client: validate, snapshot, store, tell the GM.
- * @param {object} msg
+ * Take in one report on the GM client: validate, acknowledge, snapshot, store,
+ * tell the GM. The acknowledgement goes out before the snapshot work (see
+ * `intakeReport`).
+ * @param {object} msg - `{characterId, text}`.
  * @param {string} senderId - Foundry user id from the socket layer (or the GM's own id).
+ * @param {(r: {ok: boolean, code?: string}) => void} [ack]
  * @returns {Promise<{ok: boolean, code?: string}>}
  */
-export async function receiveReport(msg, senderId) {
-  if (!game.user.isGM) return { ok: false, code: 'no_gm' };
-  const user = game.users.get(senderId);
-  const accepted = acceptReport(msg, {
-    senderId,
-    senderName: user?.name,
-    senderOwns: (characterId) => senderOwns(senderId, characterId),
-    stamps,
-    now: Date.now(),
-    makeId: () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
-  });
-  if (!accepted.ok) return { ok: false, code: accepted.code };
-  stamps = accepted.stamps;
-
-  const report = accepted.report;
-  const actor = game.actors.find((a) => a.getFlag(FLAG_SCOPE, 'entityId') === report.characterId);
-  try {
-    // Built here from live data; whatever the sender attached is never read.
-    const sbs = actor ? await gatherSideBySide(actor) : { ok: false };
-    report.snapshot = snapshotFrom(sbs.ok ? sbs : { characterName: actor?.name });
-    await writeReports((list) => appendReport(list, report));
-  } catch (err) {
-    log.error('Debug: could not store a problem report', err);
-    return { ok: false, code: 'store_failed' };
+export async function receiveReport(msg, senderId, ack = () => {}) {
+  if (!game.user.isGM) {
+    ack({ ok: false, code: 'no_gm' });
+    return { ok: false, code: 'no_gm' };
   }
-  ui.notifications.info(game.i18n.format('CHRONICLE.Debug.ReportedNotice', { name: esc(report.fromName) }));
+  const user = game.users.get(senderId);
+  const res = await intakeReport({
+    accept: () => {
+      const accepted = acceptReport(msg, {
+        senderId,
+        senderName: user?.name,
+        senderOwns: (characterId) => senderOwns(senderId, characterId),
+        stamps,
+        now: Date.now(),
+        makeId: () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+      });
+      if (accepted.ok) stamps = accepted.stamps;
+      return accepted;
+    },
+    ack,
+    // Built here from live data; whatever the sender attached is never read.
+    buildSnapshot: async (report) => {
+      const actor = game.actors.find((a) => a.getFlag(FLAG_SCOPE, 'entityId') === report.characterId);
+      const sbs = actor ? await gatherSideBySide(actor) : { ok: false };
+      return snapshotFrom(sbs.ok ? sbs : { characterName: actor?.name });
+    },
+    store: (report) => writeReports((list) => appendReport(list, report)),
+  });
+  if (!res.ok) {
+    if (res.code === 'store_failed') log.error('Debug: could not store a problem report');
+    return { ok: false, code: res.code };
+  }
+  ui.notifications.info(game.i18n.format('CHRONICLE.Debug.ReportedNotice', { name: esc(res.report.fromName) }));
   return { ok: true };
 }
 
 // --- Sending (any client) -------------------------------------------------
 
 /**
- * File a report about a character.
+ * File a report about a character. A player's text never travels in the clear:
+ * the active GM answers a `debug:hello` with a one-off public key, and the
+ * text is encrypted to it, so another client on the module channel sees only
+ * ciphertext.
  * @param {{characterId: string, text: string}} p
  * @returns {Promise<{ok: boolean, code?: string}>} `code`: no_gm, rate_limited, bad_request, not_owner, store_failed.
  */
 export async function submitReport({ characterId, text }) {
   const msg = { characterId: String(characterId ?? ''), text: String(text ?? '') };
   if (game.user.isGM) return receiveReport(msg, game.user.id);
-  if (!game.users.activeGM) return { ok: false, code: 'no_gm' };
+  const gm = game.users.activeGM;
+  if (!gm) return { ok: false, code: 'no_gm' };
+  const to = { recipients: [gm.id] };
+
+  const hello = keyWaits.create(null);
+  game.socket.emit(SOCKET_CHANNEL, { type: DEBUG_MSG.HELLO, requestId: hello.id }, to);
+  const key = await hello.promise;
+  if (!key?.ok) return { ok: false, code: 'no_gm' };
+
+  let envelope;
+  try {
+    envelope = await encryptReply(key.publicKey, msg);
+  } catch {
+    return { ok: false, code: 'store_failed' };
+  }
   const { id, promise } = acks.create(null);
-  game.socket.emit(SOCKET_CHANNEL, { type: DEBUG_MSG.REPORT, requestId: id, ...msg });
+  game.socket.emit(SOCKET_CHANNEL, { type: DEBUG_MSG.REPORT, requestId: id, helloId: hello.id, envelope }, to);
   const res = await promise;
   if (res?.error?.code === 'timeout') return { ok: false, code: 'no_gm' };
   return res?.ok ? { ok: true } : { ok: false, code: res?.error?.code || 'store_failed' };
 }
+
+const reply = (userId, body) => game.socket.emit(SOCKET_CHANNEL, { toUserId: userId, ...body }, { recipients: [userId] });
 
 /** Listen on the module socket. Called once at ready on every client. */
 export function registerDebugHub() {
@@ -324,21 +352,57 @@ export function registerDebugHub() {
   if (game.user.isGM) ensureStore().catch((err) => log.warn('Debug: could not prepare the report store', err));
 
   game.socket.on(SOCKET_CHANNEL, (data, senderId) => {
-    if (!isDebugMessage(data)) return;
-    if (data.type === DEBUG_MSG.REPORT) {
-      if (!isAnsweringGM(game.user, game.users.activeGM) || typeof data.requestId !== 'string') return;
-      receiveReport(data, senderId).then((res) => {
-        game.socket.emit(SOCKET_CHANNEL, {
-          type: DEBUG_MSG.ACK, requestId: data.requestId, toUserId: senderId, ok: res.ok, code: res.code ?? null,
-        }, { recipients: [senderId] });
-      });
-    } else if (data.type === DEBUG_MSG.ACK) {
-      // Only a GM's word counts, and only for the user it names.
-      const fromGM = game.users.get(senderId)?.isGM === true;
-      if (!fromGM || data.toUserId !== game.user.id || typeof data.requestId !== 'string') return;
-      acks.settle(data.requestId, data.ok === true ? { ok: true } : { ok: false, error: { code: String(data.code || 'store_failed') } });
+    if (!isDebugMessage(data) || typeof data.requestId !== 'string') return;
+    const fromGM = game.users.get(senderId)?.isGM === true;
+    switch (data.type) {
+      case DEBUG_MSG.HELLO:
+        if (isAnsweringGM(game.user, game.users.activeGM)) answerHello(data.requestId, senderId);
+        break;
+      case DEBUG_MSG.KEY:
+        // Only a GM's key counts, so a player cannot swap in their own.
+        if (fromGM && data.toUserId === game.user.id && isPublicJwk(data.publicKey)) {
+          keyWaits.settle(data.requestId, { ok: true, publicKey: data.publicKey });
+        }
+        break;
+      case DEBUG_MSG.REPORT:
+        if (isAnsweringGM(game.user, game.users.activeGM)) takeEncryptedReport(data, senderId);
+        break;
+      case DEBUG_MSG.ACK:
+        // Only a GM's word counts, and only for the user it names.
+        if (!fromGM || data.toUserId !== game.user.id) return;
+        acks.settle(data.requestId, data.ok === true ? { ok: true } : { ok: false, error: { code: String(data.code || 'store_failed') } });
+        break;
     }
   });
+}
+
+/** GM: hand out a one-off public key for one report. */
+async function answerHello(helloId, senderId) {
+  const now = Date.now();
+  for (const [k, v] of helloKeys) if (v.expires < now) helloKeys.delete(k);
+  try {
+    const pair = await generateRequestKeys();
+    helloKeys.set(`${senderId}:${helloId}`, { privateKey: pair.privateKey, expires: now + HELLO_KEY_TTL_MS });
+    reply(senderId, { type: DEBUG_MSG.KEY, requestId: helloId, publicKey: pair.publicJwk });
+  } catch (err) {
+    log.warn('Debug: could not make a report key', err);
+  }
+}
+
+/** GM: open a report with the key handed out for it (once), then take it in. */
+async function takeEncryptedReport(data, senderId) {
+  const ack = (r) => reply(senderId, { type: DEBUG_MSG.ACK, requestId: data.requestId, ok: r.ok, code: r.code ?? null });
+  const keyId = `${senderId}:${data.helloId}`;
+  const entry = helloKeys.get(keyId);
+  helloKeys.delete(keyId);
+  if (!entry || entry.expires < Date.now()) return ack({ ok: false, code: 'bad_request' });
+  let msg;
+  try {
+    msg = await decryptReply(entry.privateKey, data.envelope);
+  } catch {
+    return ack({ ok: false, code: 'bad_request' });
+  }
+  await receiveReport(msg, senderId, ack);
 }
 
 /** Remove the store's row from a rendered Journal directory (v12 jQuery or v13 element). */

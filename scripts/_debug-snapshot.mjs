@@ -4,11 +4,15 @@
  * module only shapes and scrubs what it was handed, so a snapshot that was
  * stored (or later copied into an issue) holds nothing it should not.
  *
- * Pure — see tools/test-debug-snapshot.mjs.
+ * Pure — see tools/test-debug-markdown.mjs.
  */
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SECRET_PARAM = /([?&;](?:token|key|api[_-]?key|secret|sig|signature|access[_-]?token|auth|password|pwd)=)[^&\s"')]+/gi;
+
+/** A stored snapshot keeps at most this many table rows and log lines. */
+export const MAX_ROWS = 100;
+export const MAX_LOG = 20;
 
 /** Longest single line kept from the sync log or a table cell. */
 export const MAX_LINE = 300;
@@ -101,8 +105,8 @@ export function buildSyncLog({ apiErrors = [], logRing = [], limit = 50 } = {}) 
  */
 export function sanitizeSnapshot(raw) {
   const r = raw && typeof raw === 'object' ? raw : {};
-  const rows = Array.isArray(r.compare?.rows) ? r.compare.rows.slice(0, 200) : [];
-  const log = Array.isArray(r.log) ? r.log.slice(0, 50) : [];
+  const rows = Array.isArray(r.compare?.rows) ? r.compare.rows.slice(0, MAX_ROWS) : [];
+  const log = Array.isArray(r.log) ? r.log.slice(0, MAX_LOG) : [];
   const info = r.info && typeof r.info === 'object' ? r.info : {};
   return {
     characterName: cleanLine(r.characterName, 120),

@@ -1733,6 +1733,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         isOpen: this._debugOpen.has(r.id),
         headline: game.i18n.format('CHRONICLE.Debug.ReportLine', { name: r.fromName, when: this._debugAge(r.at), state }),
         text: `\u201c${r.text}\u201d`,
+        noSnapshot: r.note || game.i18n.localize('CHRONICLE.Debug.NoSnapshot'),
         attached: game.i18n.format('CHRONICLE.Debug.Attached', { name: snap?.characterName || r.fromName }),
         snapshot: snap ? {
           rows: (snap.compare?.rows ?? []).map((x) => ({ ...x, statusLabel: labels[x.status] || x.status })),

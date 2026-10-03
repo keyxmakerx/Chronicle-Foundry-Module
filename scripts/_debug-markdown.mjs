@@ -29,6 +29,11 @@ export function reportToMarkdown(report, { statusLabels = {} } = {}) {
   L.push(quoted || '> ');
   L.push('');
 
+  if (!snap && r.note) {
+    L.push(`_${cleanLine(r.note, 100)}_`);
+    L.push('');
+  }
+
   const info = snap?.info;
   if (info) {
     L.push('### Module and system');

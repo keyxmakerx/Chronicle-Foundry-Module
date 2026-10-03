@@ -114,3 +114,10 @@ test('findMoneyField: by stash key, by guess, or nothing', () => {
   assert.equal(findMoneyField([{ key: 'str' }], ''), null);
   assert.equal(findMoneyField(null, ''), null);
 });
+
+test('findMoneyField does not guess by name once the stash view answered', () => {
+  const fields = [{ key: 'gp', label: 'Gold', foundry_path: 'system.currency.gp' }];
+  assert.equal(findMoneyField(fields, '', true), null);
+  assert.equal(findMoneyField(fields, 'gp', true).key, 'gp');
+  assert.equal(findMoneyField(fields, '', false).key, 'gp');
+});

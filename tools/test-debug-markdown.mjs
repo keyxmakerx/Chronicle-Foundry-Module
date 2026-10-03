@@ -84,3 +84,16 @@ test('markdown export tolerates an empty report', () => {
   const md = reportToMarkdown({});
   assert.ok(md.startsWith('## Problem reported from Foundry'));
 });
+
+test('snapshot size caps: 100 rows, 20 log lines', () => {
+  const s = sanitizeSnapshot({
+    compare: { rows: Array.from({ length: 150 }, (_, i) => ({ thing: `t${i}` })) },
+    log: Array.from({ length: 60 }, (_, i) => ({ at: i, level: 'error', text: 'x' })),
+  });
+  assert.equal(s.compare.rows.length, 100);
+  assert.equal(s.log.length, 20);
+});
+
+test('markdown says why a report has no snapshot', () => {
+  assert.ok(reportToMarkdown({ text: 'x', note: 'snapshot timed out' }).includes('snapshot timed out'));
+});

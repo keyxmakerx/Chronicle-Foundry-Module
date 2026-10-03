@@ -8,12 +8,16 @@
  */
 
 export const DEBUG_MSG = Object.freeze({
+  HELLO: 'debug:hello',
+  KEY: 'debug:key',
   REPORT: 'debug:report',
   ACK: 'debug:ack',
 });
 
 export const MAX_TEXT = 1000;
-export const MAX_REPORTS = 200;
+export const MAX_REPORTS = 100;
+/** Done reports older than this are dropped whenever the list is written. */
+export const DONE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 export const RATE_LIMIT = Object.freeze({ max: 5, windowMs: 10 * 60 * 1000 });
 /** How long a player's box waits for the GM client before saying no GM answered. */
 export const ACK_TIMEOUT_MS = 5000;
@@ -60,7 +64,7 @@ export function acceptReport(msg, { senderId, senderName, senderOwns, stamps = {
     stamps: { ...stamps, [senderId]: limited.stamps },
     report: {
       id: makeId(), fromUserId: senderId, fromName: String(senderName || '').slice(0, 80),
-      characterId, text, at: now, status: REPORT_STATUS.NEW, snapshot: null,
+      characterId, text, at: now, status: REPORT_STATUS.NEW, snapshot: null, note: '',
     },
   };
 }
@@ -138,6 +142,7 @@ export function normalizeReports(raw) {
       at: Number(r.at) || 0,
       status: r.status === REPORT_STATUS.DONE ? REPORT_STATUS.DONE : REPORT_STATUS.NEW,
       snapshot: r.snapshot && typeof r.snapshot === 'object' ? r.snapshot : null,
+      note: typeof r.note === 'string' ? r.note.slice(0, 100) : '',
     }));
 }
 
@@ -155,18 +160,62 @@ export function relativeAge(at, now) {
 }
 
 /**
- * Fold reports left in the old world setting into the store's list: ids
- * already in the store win, and the cap applies afterwards.
- * @param {object[]} stored
- * @param {*} legacyRaw - the old setting's value.
- * @param {number} [cap]
- * @returns {object[]}
+ * Drop done reports older than `maxAgeMs`; new ones are never pruned by age.
+ * @returns {object[]} a new list.
  */
-export function mergeLegacyReports(stored, legacyRaw, cap = MAX_REPORTS) {
-  const have = new Set((stored || []).map((r) => r.id));
-  let out = [...(stored || [])];
-  for (const r of normalizeReports(legacyRaw).sort((a, b) => a.at - b.at)) {
-    if (!have.has(r.id)) out = appendReport(out, r, cap);
+export function pruneReports(list, now, maxAgeMs = DONE_MAX_AGE_MS) {
+  return (list || []).filter((r) => !(r.status === REPORT_STATUS.DONE && now - r.at > maxAgeMs));
+}
+
+/** What a report carries when its snapshot could not be built in time. */
+export const SNAPSHOT_TIMED_OUT = 'snapshot timed out';
+/** Longest the GM client spends building a snapshot. */
+export const SNAPSHOT_TIMEOUT_MS = 8000;
+
+/**
+ * Take in one report in the order that matters to the player: the
+ * acknowledgement goes out as soon as the report passes validation (owner and
+ * rate limit), before any snapshot work, so a slow Chronicle cannot make the
+ * player's box think no GM answered. The snapshot then gets a time limit; past
+ * it the report is stored without one and says why.
+ *
+ * @param {object} p
+ * @param {() => ({ok: true, report: object} | {ok: false, code: string})} p.accept - runs `acceptReport`.
+ * @param {(r: {ok: boolean, code?: string}) => void} p.ack - called once.
+ * @param {(report: object) => Promise<object|null>} p.buildSnapshot
+ * @param {(report: object) => Promise<void>} p.store
+ * @param {number} [p.timeoutMs]
+ * @param {typeof setTimeout} [p.setTimer]
+ * @param {typeof clearTimeout} [p.clearTimer]
+ * @returns {Promise<{ok: boolean, code?: string, report?: object}>}
+ */
+export async function intakeReport({ accept, ack, buildSnapshot, store, timeoutMs = SNAPSHOT_TIMEOUT_MS, setTimer = setTimeout, clearTimer = clearTimeout }) {
+  const accepted = accept();
+  if (!accepted.ok) {
+    ack({ ok: false, code: accepted.code });
+    return { ok: false, code: accepted.code };
   }
-  return out;
+  ack({ ok: true });
+
+  const TIMEOUT = Symbol('timeout');
+  let timer;
+  const timeout = new Promise((resolve) => { timer = setTimer(() => resolve(TIMEOUT), timeoutMs); });
+  let snapshot = null;
+  let note = '';
+  try {
+    const built = await Promise.race([Promise.resolve().then(() => buildSnapshot(accepted.report)), timeout]);
+    if (built === TIMEOUT) note = SNAPSHOT_TIMED_OUT;
+    else snapshot = built ?? null;
+  } catch {
+    note = 'snapshot failed';
+  } finally {
+    clearTimer(timer);
+  }
+  const report = { ...accepted.report, snapshot, note };
+  try {
+    await store(report);
+  } catch {
+    return { ok: false, code: 'store_failed', report };
+  }
+  return { ok: true, report };
 }

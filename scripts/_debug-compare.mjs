@@ -96,9 +96,12 @@ const MONEY_GUESS = /^(gold|gp|money|wealth|coins?|currency|funds|cash)$/i;
  * The system field that holds a character's money.
  * @param {Array<{key: string, label?: string, foundry_path?: string}>} fields - the system's character fields.
  * @param {string} [moneyKey] - the key Chronicle's stash view names, when it answered.
+ * @param {boolean} [viewAnswered] - the stash view answered; an empty `moneyKey` then
+ *   means the system has no money field, so nothing is guessed from names.
  * @returns {{key: string, label: string, foundryPath: string}|null}
  */
-export function findMoneyField(fields, moneyKey = '') {
+export function findMoneyField(fields, moneyKey = '', viewAnswered = false) {
+  if (viewAnswered && !moneyKey) return null;
   const list = Array.isArray(fields) ? fields : [];
   const hit = moneyKey
     ? list.find((f) => f?.key === moneyKey)

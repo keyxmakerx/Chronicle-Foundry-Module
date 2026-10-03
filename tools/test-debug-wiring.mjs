@@ -29,7 +29,7 @@ const lang = JSON.parse(read('lang/en.json')).CHRONICLE.Debug;
 function body(src, signature) {
   const start = src.indexOf(signature);
   assert.ok(start >= 0, `${signature} not found`);
-  const open = src.indexOf('{', start);
+  const open = signature.endsWith('{') ? start + signature.length - 1 : src.indexOf('{', start);
   let depth = 0;
   for (let i = open; i < src.length; i++) {
     if (src[i] === '{') depth++;
@@ -40,8 +40,9 @@ function body(src, signature) {
 
 test('the socket listener passes the sender id on and reads no identity from the payload', () => {
   assert.match(hub, /game\.socket\.on\(SOCKET_CHANNEL,\s*\(data,\s*senderId\)/);
-  assert.match(hub, /receiveReport\(data,\s*senderId\)/);
-  const src = body(hub, 'export async function receiveReport');
+  assert.match(body(hub, 'async function takeEncryptedReport(data, senderId) {'), /receiveReport\(msg,\s*senderId,\s*ack\)/);
+  assert.equal(/data\??\.(userId|fromUserId|fromName|user|snapshot|characterId|text)\b/.test(body(hub, 'async function takeEncryptedReport(data, senderId) {')), false);
+  const src = body(hub, 'export async function receiveReport(msg, senderId, ack = () => {}) {');
   assert.equal(/msg\??\.(userId|fromUserId|fromName|user|snapshot)\b/.test(src), false);
   assert.match(src, /game\.users\.get\(senderId\)/);
 });
@@ -53,14 +54,14 @@ test('only the active GM takes reports, and only a GM may acknowledge', () => {
 });
 
 test('the snapshot is built on the GM client from live data', () => {
-  const src = body(hub, 'export async function receiveReport');
+  const src = body(hub, 'export async function receiveReport(msg, senderId, ack = () => {}) {');
   assert.match(src, /gatherSideBySide\(actor\)/);
   assert.match(src, /snapshotFrom\(/);
 });
 
 test('reports are written by the GM only', () => {
   assert.match(body(hub, 'export async function markReportDone'), /game\.user\.isGM/);
-  assert.match(body(hub, 'export async function receiveReport'), /!game\.user\.isGM/);
+  assert.match(body(hub, 'export async function receiveReport(msg, senderId, ack = () => {}) {'), /!game\.user\.isGM/);
 });
 
 test('reports live in a journal entry nobody but GMs can see, found by flag', () => {
@@ -71,9 +72,8 @@ test('reports live in a journal entry nobody but GMs can see, found by flag', ()
   assert.match(ensure, /ownership:\s*\{\s*default:\s*CONST\.DOCUMENT_OWNERSHIP_LEVELS\.NONE\s*\}/);
   assert.match(ensure, /isAnsweringGM\(game\.user,\s*game\.users\.activeGM\)/);
   assert.match(ensure, /SYNC_OPTIONS/);
-  // Nothing writes the old world setting except to clear it.
-  const setCalls = [...hub.matchAll(/setSetting\('problemReports',\s*([^)]*)\)/g)].map((m) => m[1]);
-  assert.deepEqual(setCalls, ['[]']);
+  // No world setting carries reports.
+  assert.equal(/problemReports['"]/.test(hub + settings), false);
   assert.match(hub, /renderJournalDirectory/);
   assert.match(dashboard, /REPORT_STORE_FLAG/);
   assert.match(read('scripts/import-wizard.mjs'), /REPORT_STORE_FLAG/);
@@ -84,6 +84,18 @@ test('the side by side only reads', () => {
   assert.equal(/\.(post|put|patch|delete)\(/.test(src), false);
   assert.equal(/\.(update|create|delete)\w*\(/.test(src), false);
   assert.equal(/action:\s*'(move|history)'/.test(src), false);
+});
+
+test('the report text is encrypted to a GM-handed key and the ack precedes snapshot work', () => {
+  const sub = body(hub, 'export async function submitReport({ characterId, text }) {');
+  assert.match(sub, /DEBUG_MSG\.HELLO/);
+  assert.match(sub, /encryptReply\(key\.publicKey,\s*msg\)/);
+  assert.match(sub, /recipients:\s*\[gm\.id\]/);
+  assert.equal(/type: DEBUG_MSG\.REPORT[^}]*\btext\b/.test(sub), false);
+  // The key is honoured only from a GM sender.
+  assert.match(hub, /fromGM && data\.toUserId === game\.user\.id && isPublicJwk/);
+  assert.match(body(hub, 'async function takeEncryptedReport(data, senderId) {'), /decryptReply\(entry\.privateKey/);
+  assert.match(body(hub, 'export async function receiveReport(msg, senderId, ack = () => {}) {'), /intakeReport\(/);
 });
 
 test('the Stashes window sends through submitReport and caps the box', () => {

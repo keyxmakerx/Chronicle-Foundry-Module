@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MAX_REPORTS, MAX_TEXT, acceptReport, appendReport, checkRateLimit, cleanReportText,
-  isDebugMessage, markDone, mergeLegacyReports, normalizeReports, relativeAge, splitReports, unreadCount,
+  intakeReport, isDebugMessage, markDone, pruneReports, normalizeReports, relativeAge, splitReports, unreadCount,
 } from '../scripts/_debug-reports.mjs';
 
 const ctx = (over = {}) => ({
@@ -64,7 +64,7 @@ test('cap drops the oldest done report first, then the oldest overall', () => {
   assert.deepEqual(list.map((r) => r.id), ['a', 'd', 'e', 'f']);
   list = appendReport(list, mk('g', 7, 'new'), 4);
   assert.deepEqual(list.map((r) => r.id), ['d', 'e', 'f', 'g']);
-  assert.equal(MAX_REPORTS, 200);
+  assert.equal(MAX_REPORTS, 100);
 });
 
 test('append returns a new list', () => {
@@ -105,13 +105,72 @@ test('relativeAge and message type', () => {
   assert.equal(isDebugMessage(null), false);
 });
 
-test('legacy reports fold into the store: store wins on ids, cap applies', () => {
-  const stored = [{ id: 'a', at: 5, status: 'done', text: 'x' }];
-  const legacy = [{ id: 'a', at: 1, text: 'old a' }, { id: 'b', at: 2, text: 'b' }, 'junk'];
-  const out = mergeLegacyReports(stored, legacy);
-  assert.deepEqual(out.map((r) => r.id), ['a', 'b']);
-  assert.equal(out[0].status, 'done');
-  assert.deepEqual(mergeLegacyReports([], null), []);
-  const many = Array.from({ length: 5 }, (_, i) => ({ id: `l${i}`, at: i, text: 't', status: 'done' }));
-  assert.equal(mergeLegacyReports([], many, 3).length, 3);
+test('done reports older than 30 days are pruned; new ones never by age', () => {
+  const day = 86400000;
+  const now = 100 * day;
+  const list = [
+    { id: 'old-done', at: now - 31 * day, status: 'done' },
+    { id: 'fresh-done', at: now - 29 * day, status: 'done' },
+    { id: 'old-new', at: now - 90 * day, status: 'new' },
+  ];
+  assert.deepEqual(pruneReports(list, now).map((r) => r.id), ['fresh-done', 'old-new']);
+});
+
+const accepted = () => ({ ok: true, report: { id: 'r', at: 1, status: 'new', snapshot: null, note: '' } });
+
+test('intake sends the ack before any snapshot work', async () => {
+  const order = [];
+  const res = await intakeReport({
+    accept: () => { order.push('accept'); return accepted(); },
+    ack: (r) => order.push(`ack:${r.ok}`),
+    buildSnapshot: async () => { order.push('snapshot'); return { characterName: 'B' }; },
+    store: async (rep) => { order.push(`store:${rep.snapshot?.characterName}`); },
+  });
+  assert.deepEqual(order, ['accept', 'ack:true', 'snapshot', 'store:B']);
+  assert.equal(res.ok, true);
+});
+
+test('a rejected report is acknowledged with its code and does no snapshot work', async () => {
+  let built = false;
+  const acks = [];
+  const res = await intakeReport({
+    accept: () => ({ ok: false, code: 'rate_limited' }),
+    ack: (r) => acks.push(r),
+    buildSnapshot: async () => { built = true; return null; },
+    store: async () => { built = true; },
+  });
+  assert.deepEqual(acks, [{ ok: false, code: 'rate_limited' }]);
+  assert.equal(built, false);
+  assert.equal(res.code, 'rate_limited');
+});
+
+test('a snapshot that never finishes is cut off and the report is stored without it', async () => {
+  let fire;
+  const stored = [];
+  const acks = [];
+  const p = intakeReport({
+    accept: accepted,
+    ack: (r) => acks.push(r),
+    buildSnapshot: () => new Promise(() => {}),
+    store: async (rep) => { stored.push(rep); },
+    setTimer: (fn) => { fire = fn; return 1; },
+    clearTimer: () => {},
+  });
+  await new Promise((r) => setImmediate(r));
+  assert.equal(acks.length, 1);
+  assert.equal(stored.length, 0);
+  fire();
+  const res = await p;
+  assert.equal(res.ok, true);
+  assert.equal(stored[0].snapshot, null);
+  assert.equal(stored[0].note, 'snapshot timed out');
+});
+
+test('a snapshot that throws still stores the report; a store failure is reported', async () => {
+  const stored = [];
+  await intakeReport({ accept: accepted, ack() {}, buildSnapshot: async () => { throw new Error('x'); }, store: async (r) => { stored.push(r); } });
+  assert.equal(stored[0].snapshot, null);
+  assert.equal(stored[0].note, 'snapshot failed');
+  const res = await intakeReport({ accept: accepted, ack() {}, buildSnapshot: async () => null, store: async () => { throw new Error('x'); } });
+  assert.equal(res.code, 'store_failed');
 });
