@@ -8,59 +8,8 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seedCampaign } from './chronicle.mjs';
-import { newWorld, openWorld, closeWorld, settle, traffic, recordRequests, waitFor } from './world.mjs';
-
-const FLAG = 'chronicle-sync';
-const linked = (world) => world.game.journal.contents.filter((j) => j.getFlag(FLAG, 'entityId'));
-const byEntity = (world, id) => world.game.journal.find((j) => j.getFlag(FLAG, 'entityId') === id);
-const writes = (reqs) => reqs.filter((r) => r.method !== 'GET');
-const pageText = (j) => j.pages.contents.map((p) => p.text?.content || '').join('');
-
-/** The checks every scenario must pass, whatever it did. */
-async function assertHealthy(world, seed, since = 0) {
-  const entities = await seed.chronicle.allEntities();
-  const names = entities.map((e) => e.name);
-  assert.deepEqual(names.filter((n, i) => names.indexOf(n) !== i), [], 'no duplicate pages in Chronicle');
-  const ids = linked(world).map((j) => j.getFlag(FLAG, 'entityId'));
-  assert.deepEqual(ids.filter((n, i) => ids.indexOf(n) !== i), [], 'no two journals linked to one page');
-  // Server errors and dropped requests fail anything; a refused write fails
-  // too, except a 409 (a version check doing its job). A 404 on a read is
-  // normal (lookups, pages removed in Chronicle).
-  const failed = traffic.requests.slice(since).filter((r) => r.status >= 500 || r.status === 0
-    || (r.method !== 'GET' && r.status >= 400 && r.status !== 409));
-  assert.deepEqual(failed.map((r) => `${r.method} ${r.url} ${r.status}`), [], 'no failed requests');
-  assert.deepEqual(world.log.hookErrors.map((e) => `${e.name}: ${e.err?.message}`), [], 'no hook errors');
-  assert.deepEqual(world.log.notifications.error, [], 'no error pop-ups');
-  // Both sides agree on every linked page's name once things are quiet.
-  const byId = new Map(entities.map((e) => [e.id, e]));
-  const disagree = linked(world)
-    .filter((j) => byId.has(j.getFlag(FLAG, 'entityId')) && byId.get(j.getFlag(FLAG, 'entityId')).name !== j.name)
-    .map((j) => `${j.name} ≠ ${byId.get(j.getFlag(FLAG, 'entityId')).name}`);
-  assert.deepEqual(disagree, [], 'both sides converge');
-  return entities;
-}
-
-/** A page made in Chronicle by someone else, with body text. */
-async function chroniclePage(seed, name, html = `<p>${name} text</p>`) {
-  const types = await seed.chronicle.entityTypes();
-  const e = await seed.chronicle.post('/entities', { name, entity_type_id: types[0].id, is_private: false });
-  if (html) await seed.chronicle.put(`/entities/${e.id}`, { entry: html });
-  return e;
-}
-
-async function scenario(label, fn) {
-  const seed = await seedCampaign(label);
-  const world = newWorld(seed);
-  const since = traffic.requests.length;
-  try {
-    await fn({ seed, world });
-    await settle();
-    await assertHealthy(world, seed, since);
-  } finally {
-    await closeWorld(world);
-  }
-}
+import { openWorld, closeWorld, settle, recordRequests, waitFor } from './world.mjs';
+import { FLAG, linked, byEntity, writes, pageText, chroniclePage, scenario } from './scenario.mjs';
 
 test('a journal made in Foundry becomes exactly one page, with its text', () => scenario('fvtt-create', async ({ seed, world }) => {
   await openWorld(world);
@@ -225,6 +174,32 @@ test('editing page text in Foundry reaches Chronicle', () => scenario('fvtt-page
   await settle();
   const full = await seed.chronicle.get(`/entities/${j.getFlag(FLAG, 'entityId')}`);
   assert.match(full.entry_html || '', /second/);
+}));
+
+test('GM-only text reaches Foundry only inside a secret block, and a GM edit keeps it GM-only', () => scenario('gm-secrets', async ({ seed, world }) => {
+  const e = await chroniclePage(seed, 'Duke Varn');
+  await seed.chronicle.put(`/entities/${e.id}`, { entry: '<p>The duke is <span data-secret="true">a vampire</span> and kind.</p>' });
+  await openWorld(world);
+  await JournalSync_resync(world);
+  const j = byEntity(world, e.id);
+  assert.ok(j, 'journal exists');
+  const page = j.pages.contents.find((p) => p.type === 'text');
+  const html = page.text.content;
+  assert.doesNotMatch(html, /data-secret/);
+  assert.match(html, /<section class="secret"[^>]*><p[^>]*>a vampire<\/p><\/section>/);
+  assert.doesNotMatch(html.replace(/<section class="secret"[\s\S]*?<\/section>/g, ''), /vampire/, 'not in what players see');
+
+  await page.update({ 'text.content': html.replace('and kind.', 'and cruel.') });
+  await settle();
+  const full = await seed.chronicle.get(`/entities/${e.id}`);
+  assert.match(full.entry_html || '', /<span data-secret="true">a vampire<\/span>/);
+  assert.match(full.entry_html || '', /cruel/);
+  assert.doesNotMatch(full.entry_html || '', /<section/);
+  await seed.chronicle.put(`/entities/${e.id}`, { entry: '<p>Now <span data-secret="true">a lich</span>.</p>' });
+  await waitFor(() => /a lich/.test(pageText(j)), 15000, 'Chronicle edit to arrive');
+  await settle();
+  assert.doesNotMatch(pageText(j), /data-secret/);
+  assert.equal(j.getFlag(FLAG, 'fields'), undefined, 'field values (GM-only ones included) are not stored on the journal');
 }));
 
 test('changes made while the connection was down arrive when it comes back', () => scenario('ws-drop', async ({ seed, world }) => {

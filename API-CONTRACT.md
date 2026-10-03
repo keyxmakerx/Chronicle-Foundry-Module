@@ -522,13 +522,21 @@ Lists all sync mappings for the campaign.
 
 **Used by:** `sync-manager.mjs` → initial sync setup
 
-**Response:**
+**Query:** `?limit=` (max 1000) and `?offset=`.
+
+**Response:** full `SyncMapping` objects (same shape as `/sync/lookup` below)
+plus paging fields.
 ```json
 {
   "data": [
-    { "id": "uuid", "chronicle_id": "entity-uuid", "foundry_id": "foundry-doc-id",
-      "type": "entity", "last_synced": "2026-01-15T12:00:00Z" }
-  ]
+    { "id": "mapping-uuid", "campaign_id": "campaign-uuid",
+      "chronicle_type": "entity", "chronicle_id": "entity-uuid",
+      "external_system": "foundry", "external_id": "foundry-doc-id",
+      "sync_version": 1, "last_synced_at": "2026-01-15T12:00:00Z",
+      "sync_direction": "both", "sync_metadata": {},
+      "created_at": "2026-01-15T12:00:00Z", "updated_at": "2026-01-15T12:00:00Z" }
+  ],
+  "total": 1, "limit": 50, "offset": 0
 }
 ```
 
@@ -628,6 +636,19 @@ Lists all maps in the campaign.
 > with an SVG overlay (`MapViewerSheet`), not a Foundry Scene. Drawing, token,
 > fog and layer endpoints below are read-only for that overlay; only markers
 > are editable and pushed back.
+
+`player_image_url` is set on every map row (list and single) whose map has a
+picture and at least one shadow area, whatever the key's role:
+`/api/v1/campaigns/:id/maps/:mapId/player-image?v=<version>`. That route
+returns the picture as JPEG with the shadowed areas smudged in; the version
+changes whenever the picture or a shadow does. The owner's key still gets the
+original in `image_id`/`image_url`, so the module fetches the player copy,
+stores it in Foundry, and points the page every player reads at that file
+only (`scripts/_map-player-image.mjs`). A missing field means no shadows
+(also what an older Chronicle sends). `drawing_type` also includes `shadow`
+(exactly two corner points).
+
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/map_api_handler.go` `PlayerImage`, `playerImageAPIURL`)
 
 #### GET /maps/:mapId/drawings
 All coordinates are percentage-based (0–100), not pixels. `drawing_type` is
@@ -1064,8 +1085,10 @@ by the wire-contract decision above:
 https://raw.githubusercontent.com/keyxmakerx/Chronicle/main/internal/plugins/foundry_vtt/error-catalog.json
 ```
 
-The artifact is treated as **implicit schema v1** — it carries no explicit
-`schema_version` field.
+The catalog carries `"schemaVersion": 1`. CI (`tools/check-error-catalog.mjs`,
+`.github/workflows/check-error-catalog.yml`) fetches it on every PR, push to
+`main` and weekly, and fails when the table below or `update-info.mjs`'s
+`CHRONICLE_CATEGORIES` no longer match it, or when `schemaVersion` changes.
 
 | `error` code | `category` | Description | HTTP |
 |---|---|---|---|
@@ -1174,6 +1197,49 @@ If Chronicle's URL shape changes, update all three together:
 
 ---
 
+### Stashes
+
+Move items and money between characters and stashes. All routes need the
+Armory addon; an older Chronicle, or a campaign with the addon off, answers
+**404** and the module simply does not offer Stashes (it probes
+`GET /stashes/downtime` once per session, caches a definitive answer, and keeps
+that 404 out of the error log). JSON is camelCase, money is a number in whole
+currency units, ids are strings (a stash id may arrive as a number).
+
+**Used by:** `scripts/stash-sync.mjs` (GM client only), reached by players
+through the module socket (`scripts/stash-client.mjs`).
+
+**Acting member.** Every call may carry `actingUserId` (query on GET, body on
+POST/PUT): the Chronicle user id of a current member. The call then runs under
+THAT member's role and rules. Only an Owner or co-DM key may name someone
+else (403 otherwise), so naming a player only narrows what the call may do.
+The module sends it only when relaying for a player, and takes the member from
+the Foundry user id the socket layer attached to the request, never from the
+request body.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/stashes/view?characterId=&actingUserId=` | `{downtimeOpen, canApprove, character:{id,name,moneyKey,money,items:[{itemId,name,quantity}]}, stashes:[{id,name,money,items}], destinations:[{kind,id,name}]}`. `characterId` is the Chronicle entity id (the actor's `entityId` flag). `moneyKey` is empty when the system has no money field. |
+| POST | `/stashes/moves` | Body `{actingUserId, kind:"item"\|"money", itemId, quantity, amount, from:{kind,id}, to:{kind,id}}`, endpoint kinds `character`\|`stash`. Items send `itemId`+integer `quantity`; money sends a number `amount` (at most two decimals). Answer `{status:"applied"\|"pending", move}`. 403 not your character, 404 unseen stash, 409 not enough / not applicable. |
+| GET | `/stashes/history?characterId=&actingUserId=` | `{history:[line]}`, newest first, at most 50. A line has `id, kind, status, quantity, amount, itemName, fromName, toName, requesterName, summary, createdAt`; a sheet money edit has both ends the same character and reads e.g. "Wealth changed 2 → 3 · in Foundry". |
+| GET | `/stashes/requests` | `{requests:[line]}`, pending only; the actor must be able to approve. |
+| POST | `/stashes/requests/:moveId/approve`, `/decline` | Body `{actingUserId}` optional; the actor must be able to approve. Answer `{status, move}` (`applied`, `declined` or `failed`). |
+| GET | `/stashes/downtime` | `{open}`. |
+| PUT | `/stashes/downtime` | `{open, actingUserId}`; approver only. The module does not call it. |
+
+Known limits: only the active GM client answers players, posts request cards and
+refreshes actors; the Stashes button treats any Chronicle-linked actor as a
+character. Replies to players travel encrypted on the module socket; a refresh
+never deletes a Foundry item except the one an applied move took from a
+character.
+
+Lists are unwrapped defensively (`{history}`/`{requests}`/`{data}` or a bare
+array): `scripts/_stash-model.mjs`.
+
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/stash_api_handler.go`, `internal/plugins/armory/stash_api.go`, `docs/api/openapi.yaml` Stashes tag; the routes are on Chronicle PR #1022 and unreleased as of 2026-10-03)
+
+---
+
 ## WebSocket Protocol
 
 > **Every `calendar.*` message type below is DORMANT.** Chronicle's calendar
@@ -1227,9 +1293,23 @@ If the token is invalid, the server rejects the upgrade.
 | `calendar.festival.changed` | `null` | Festival edited (always fires alongside `structure.updated`) |
 | `calendar.era.changed` | `{ id, name, color }` | Era boundary crossed |
 | `calendar.worldstate.changed` | `{ date: {year, month, day}, moodTint: {color, intensity} }` | World state changed — dormant along with every other `calendar.*` type during the blackout |
+| `stash.requested` | `{ moveId, requestedBy, summary }` — ids and a size summary only | A player asked to move something; the GM client fetches `GET /stashes/requests` and posts a card |
+| `stash.settled` | `{ moveId, status, decidedBy }` | A request was answered (here or on the website); the card is rewritten |
+| `stash.moved` | `{ moveId, status, characterIds, stashIds }` | A move ran; the touched linked actors are re-pulled |
+| `stash.money_changed` | `{ characterId, moveId }` | A character's money changed (including a sheet edit); the actor is re-pulled |
+| `downtime.changed` | `{ open }` | Downtime was opened or closed; relayed to players' open windows |
 | `sync.status` | `{ connected: bool }` | Connection state change |
 | `sync.error` | `{ message }` | Synchronization error |
 | `sync.conflict` | Conflict details | Data conflict detected |
+
+### What the module does with `stash.*` and `downtime.changed`
+
+These reach DM-equivalent sockets only, with ids and statuses, never names.
+Handled in `scripts/stash-sync.mjs` `onMessage`, by the **active GM client
+only** (`game.users.activeGM`), and only once the Stashes probe said yes. The
+module's WebSocket allowlist includes the `stash.` and `downtime.` prefixes.
+
+Re-verify by: 2026-11-03 (Chronicle `internal/websocket/.ai.md`, `internal/plugins/armory/stash_events.go`)
 
 ### What the module does with `note.*`
 
