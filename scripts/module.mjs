@@ -21,6 +21,7 @@ import { registerStashChat } from './stash-chat.mjs';
 import { registerStashButton } from './stash-window.mjs';
 import { SyncDashboard } from './sync-dashboard.mjs';
 import { MapViewerSheet } from './map-viewer.mjs';
+import { openDMScreen } from './dm-screen.mjs';
 import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs';
 import { registerNpcPresence } from './npc-presence.mjs';
 import { registerMapSheetItems } from './map-sheet-items.mjs';
@@ -29,7 +30,6 @@ import { openSyncCalendar } from './sync-calendar.mjs';
 import { registerShopRoomSocket } from './shop-room-window.mjs';
 import { notebookAvailable, openNotebook, registerPlayerNotebook } from './player-notebook.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
-import { openDMScreen } from './dm-screen.mjs';
 
 /** @type {SyncManager|null} */
 let syncManager = null;
