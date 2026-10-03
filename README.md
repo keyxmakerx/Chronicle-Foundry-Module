@@ -92,8 +92,7 @@ Do these in order whenever you ship a new module version:
    picks the new version under **Settings → Integrations → Pin to Version**
    and presses **Save Pin**.
 5. **Update in Foundry.** The GM (whoever hosts the world) opens **Add-on
-   Modules**, updates Chronicle Sync, and reloads the world; players get it on
-   their next join. Decline Foundry's offer to
+   Modules**, updates Chronicle Sync, and reloads the world. Decline Foundry's offer to
    switch to the Package Repository's URL.
 
 Working: the campaign's **Manage → Apps & game system** page shows the new
