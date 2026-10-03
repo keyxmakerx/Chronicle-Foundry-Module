@@ -9,6 +9,12 @@
 
 import { getSetting } from './settings.mjs';
 import { describeCampaignIdError } from './_settings-validation.mjs';
+import {
+  MODULE_VERSION_HEADER,
+  markModuleVersionHeaderRefused,
+  moduleVersionHeaders,
+  shouldRetryWithoutVersionHeader,
+} from './_module-version.mjs';
 
 /**
  * Validate the campaignId setting and abort with a clear notification if
@@ -227,15 +233,20 @@ export class ChronicleAPI {
     const headers = {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
+      ...moduleVersionHeaders(),
       ...options.headers,
     };
 
     let response;
     try {
-      response = await fetch(url, {
-        ...options,
-        headers,
-      });
+      try {
+        response = await fetch(url, { ...options, headers });
+      } catch (err) {
+        if (!shouldRetryWithoutVersionHeader(err, headers)) throw err;
+        markModuleVersionHeaderRefused();
+        const { [MODULE_VERSION_HEADER]: _dropped, ...withoutVersion } = headers;
+        response = await fetch(url, { ...options, headers: withoutVersion });
+      }
     } catch (err) {
       // Network error (no response at all).
       this.health.restErrorCount++;
@@ -411,14 +422,17 @@ export class ChronicleAPI {
     const formData = new FormData();
     formData.append('file', file, filename || file.name);
 
-    const response = await fetch(
-      `${baseUrl}/api/v1/campaigns/${campaignId}/media`,
-      {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}` },
-        body: formData,
-      }
-    );
+    const url = `${baseUrl}/api/v1/campaigns/${campaignId}/media`;
+    const headers = { 'Authorization': `Bearer ${apiKey}`, ...moduleVersionHeaders() };
+    let response;
+    try {
+      response = await fetch(url, { method: 'POST', headers, body: formData });
+    } catch (err) {
+      if (!shouldRetryWithoutVersionHeader(err, headers)) throw err;
+      markModuleVersionHeaderRefused();
+      const { [MODULE_VERSION_HEADER]: _dropped, ...withoutVersion } = headers;
+      response = await fetch(url, { method: 'POST', headers: withoutVersion, body: formData });
+    }
 
     if (!response.ok) {
       this.health.restErrorCount++;

@@ -9,6 +9,18 @@ All REST requests include a Bearer token:
 Authorization: Bearer <api-key>
 ```
 
+REST requests through the API client also carry the module's manifest version, so Chronicle
+can tell an owner when the module is out of date:
+```
+X-Chronicle-Module-Version: <module.json version>
+```
+The header is omitted when the version cannot be read. A Chronicle that
+records it lists it in its CORS `Access-Control-Allow-Headers`; an older one
+doesn't, so the browser refuses the preflight. The module then retries that
+request once without the header and stops sending it for the session
+(`scripts/_module-version.mjs`), so an older server keeps syncing. WebSocket
+connections do not send it.
+
 WebSocket connections authenticate via query parameter at connection time:
 ```
 wss://chronicle.example.com/ws?token=<api-key>
@@ -19,6 +31,27 @@ API keys are scoped to a single campaign. The key determines:
 - Permission level: `read` (GET), `write` (POST/PUT/DELETE), `sync` (sync endpoints)
 - A `sync`-level key covers read + write + sync
 - Rate limit: 60 requests/minute (default)
+
+## Connect Line
+
+Chronicle shows campaign owners a one-paste line that carries everything the
+module needs:
+```
+chronicle://chronicle.example.net/c/<campaignId>?key=<apiKey>
+chronicle+http://192.168.1.5:8080/sub/c/<campaignId>?key=<apiKey>
+```
+- Scheme `chronicle:` means `https://<host[:port]><path>`; `chronicle+http:`
+  means `http://<host[:port]><path>` (plain-http instances).
+- `<path>` is everything before the final `/c/<campaignId>` segment; it is
+  empty unless Chronicle is served under a sub-path. The result is the `apiUrl`
+  setting.
+- `key` is the URL-decoded query parameter and becomes the API key.
+- Any other scheme, a missing key or campaign id, or userinfo in the line is
+  invalid and changes nothing.
+
+The module parses it in `scripts/_connect-line.mjs` (`parseConnectLine`); a GM
+pastes it into the "Connect line" module setting, which fills the URL,
+campaign ID and client-scoped API key and then clears itself.
 
 ## Base URL Pattern
 
@@ -725,6 +758,10 @@ a retryable sync error.
 { "year": 1492, "month": 3, "day": 1, "hour": 8, "minute": 0 }
 ```
 
+#### POST /calendar
+Creates the campaign's calendar. Answers `201 {"created": …, "warnings": […]}`;
+`409` when the campaign already has a calendar.
+
 #### POST /calendar/date/confirm
 **Optional** (newer Chronicle deployments only). Confirms Foundry *applied* a
 date pulled from Chronicle to the active local calendar module (Calendaria or
@@ -750,15 +787,11 @@ Any other failure is debug-logged and swallowed — a missed confirmation only
 leaves the applied-beacon stale, never blocks sync. See
 `scripts/_applied-date-confirm.mjs::isConfirmNotSupported`.
 
-#### POST /calendar/advance
-Advances the calendar by N days (1-3650).
+#### POST /calendar/advance — retired
+Answers `410 {"error":"calendar_route_retired"}`.
 
-**Request:** `{ "days": 7 }`
-
-#### POST /calendar/advance-time
-Advances time by hours/minutes (rolls over into days).
-
-**Request:** `{ "hours": 2, "minutes": 30 }`
+#### POST /calendar/advance-time — retired
+Answers `410 {"error":"calendar_route_retired"}`.
 
 ---
 
@@ -836,7 +869,7 @@ Returns a single event by ID.
 | `GET /calendar/weather` | Returns current weather state, or `{}` if none set |
 | `PUT /calendar/weather` | Sets current weather state (GM override) |
 | `GET /calendar/export` | Exports the full calendar as Chronicle JSON; `?events=true` includes events |
-| `POST /calendar/import` | Imports a calendar from JSON (Chronicle, Simple Calendar, Calendaria, Fantasy-Calendar formats) |
+| `POST /calendar/import` | Retired: answers `410 {"error":"calendar_route_retired"}`; use `POST /calendar` |
 
 ---
 
