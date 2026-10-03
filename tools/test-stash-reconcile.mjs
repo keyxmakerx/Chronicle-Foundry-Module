@@ -49,18 +49,16 @@ function setup(relations, itemDefs) {
     id: d.id,
     name: d.id,
     getFlag: (_s, k) => d[k],
-    delete: async () => { deleted.push(d.id); },
     update: async () => {},
   }));
   const actor = {
+    id: 'aria',
     name: 'Aria',
-    items: Object.assign(items, {}),
+    items: { contents: items, get: (id) => items.find((i) => i.id === id) },
     getFlag: (_s, k) => (k === 'entityId' ? 'char1' : undefined),
     createEmbeddedDocuments: async (_t, docs) => { created.push(...docs); },
+    deleteEmbeddedDocuments: async (_t, ids) => { deleted.push(...ids); },
   };
-  actor.items.find = Array.prototype.find.bind(items);
-  actor.items.filter = Array.prototype.filter.bind(items);
-  actor.items.map = Array.prototype.map.bind(items);
   globalThis.game.actors = { find: () => actor };
   const sync = new ItemSync();
   sync._api = { get: async () => relations };
@@ -90,6 +88,12 @@ test('refreshInventory: a moved item whose relation still exists is kept', async
   const { sync, actor, deleted } = setup([rel], ORPHANS);
   await sync.refreshInventory(actor, { removeItemIds: ['E-rope'] });
   assert.deepEqual(deleted, []);
+});
+
+test('refreshInventory: a moved item its relation event already unlinked is still removed', async () => {
+  const { sync, actor, deleted } = setup([], [{ id: 'rope', unlinkedRelationId: 1, entityId: 'E-rope' }, ...ORPHANS.slice(1)]);
+  await sync.refreshInventory(actor, { removeItemIds: ['E-rope'] });
+  assert.deepEqual(deleted, ['rope']);
 });
 
 test('refreshInventory: a failed fetch deletes nothing', async () => {

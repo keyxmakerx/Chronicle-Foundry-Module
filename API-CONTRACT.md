@@ -604,13 +604,13 @@ Pulls all changes since a timestamp.
 Change feed: ids of what changed after a cursor. Owner or co-DM keys only
 (403 otherwise); absent on older Chronicle (404).
 
-**Used by:** `sync-manager.mjs` → initial sync (`_readChangeFeed`), journals first
+**Used by:** `sync-manager.mjs` → initial sync (`_readChangeFeed`): journals, characters and inventories
 
 **Query:** `?since=<seq>&limit=1000` (default 500, max 1000)
 
 **Response:**
 ```json
-{ "changes": [ { "seq": 12, "type": "entity", "resourceId": "uuid", "op": "created" } ], "next": 12, "hasMore": false, "resetRequired": false }
+{ "changes": [ { "seq": 12, "type": "entity", "resourceId": "uuid", "op": "created" } ], "next": 12, "hasMore": false, "resetRequired": false, "types": ["entity", "relation", "..."] }
 ```
 
 - `op` is `created`, `updated` or `deleted`; content is refetched through the
@@ -619,6 +619,12 @@ Change feed: ids of what changed after a cursor. Owner or co-DM keys only
   do a full rescan and resume from `next`.
 - Rows younger than 2 s are held back, so a cursor never passes a change
   still committing; the module reads at least 2.5 s after its socket opened.
+- A `relation` change's `resourceId` is the relation's **source entity**: "this
+  entity's relations changed". Item sync refetches `GET /entities/:id/relations`.
+- `types` lists the resource types the server records (absent on an older
+  Chronicle). The module saves it with the cursor; inventories use the delta
+  only when the cursor was saved while `relation` was recorded, else every
+  linked character is reconciled.
 
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/sync_changes_handler.go`, `sync_change_repository.go`)
 
@@ -1297,6 +1303,9 @@ If the token is invalid, the server rejects the upgrade.
 | `note.created` | `{ noteId, entityId }` — ids only; the module fetches the note. An older Chronicle sends the full note object instead | Note created |
 | `note.updated` | `{ noteId, entityId }` — ids only; the module fetches the note. An older Chronicle sends the full note object instead | Note modified |
 | `note.deleted` | `{ noteId, entityId }` (an older Chronicle sends the full note object; only the id is read) | Note deleted |
+| `relation.created` | Full relation row (`id`, `sourceEntityId`, `targetEntityId`, `relationType`, `metadata`, …); `resourceId` is the source entity | Relation row created (one message per direction) |
+| `relation.deleted` | Same | Relation row deleted |
+| `relation.metadata_updated` | Same | Relation metadata changed (quantity, equipped, stash moves) |
 | `calendar.event.created` | Full event object | Calendar event created |
 | `calendar.event.updated` | Full event object | Calendar event modified |
 | `calendar.event.deleted` | `{ id }` | Calendar event deleted |
@@ -1317,6 +1326,16 @@ If the token is invalid, the server rejects the upgrade.
 | `sync.status` | `{ connected: bool }` | Connection state change |
 | `sync.error` | `{ message }` | Synchronization error |
 | `sync.conflict` | Conflict details | Data conflict detected |
+
+`relation.*` messages go to owner and co-DM sockets only (a relation can
+name a private entity). Item sync treats any of them for a linked character
+as "reconcile this character's inventory" (`scripts/_inventory-plan.mjs`),
+so a missed or repeated message cannot leave it wrong. A removed relation
+only unlinks its Foundry item; the module deletes it only when a stash
+move the GM just applied took it off that character. Re-verify by:
+2026-11-03 (Chronicle `internal/widgets/relations/service.go`,
+`internal/app/routes.go` `relationEventPublisherAdapter`; sent since
+keyxmakerx/Chronicle#1025).
 
 ### What the module does with `stash.*` and `downtime.changed`
 
