@@ -393,7 +393,7 @@ Lists all tags in the campaign.
 #### POST /tags
 Create a new tag.
 
-**Used by:** `import-wizard.mjs` → Step 8 tag creation during import
+**Used by:** `import-wizard.mjs` → Step 7 (Review) tag creation during import
 
 **Request:**
 ```json
