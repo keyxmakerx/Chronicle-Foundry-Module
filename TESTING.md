@@ -245,6 +245,20 @@ that reads each field's `foundry_path` from the matched Chronicle system's manif
 - [ ] Only current user's changes pushed (other users' changes ignored)
 - [ ] Pre-existing actors can be manually pushed via dashboard Push button
 
+## NPC Tokens (Spotlight, Talking)
+
+Needs a GM and a player client on the same scene, and an NPC page synced as a journal.
+
+- [ ] Right-click a token named like an NPC page: the HUD shows a star, a speech icon and a book; the book opens the page
+- [ ] Drag a Chronicle journal onto any token: "linked" notice, no map note placed; the book now opens that page
+- [ ] Dragging a journal onto a hero synced by character sync only warns; the hero keeps its own page
+- [ ] Star on a visible token: both clients glide to it and see the gold ring; the player sees the name only if the page is shown to players or the nameplate shows to everyone
+- [ ] Star on a hidden token: only the GM gets a notice; the player's camera doesn't move
+- [ ] Speech icon: ring breathes and a speech mark shows on both clients; GM chat comes from the NPC with a bubble
+- [ ] Starting a second NPC talking stops the first; two minutes with no lines switches it off; a reload doesn't leave it on
+- [ ] Leave a client idle for a minute, or switch its tab away: the glow slows to still, and comes back on return
+- [ ] Reveal a hidden NPC token whose page is hidden: asked once "Show their Chronicle page?"; Yes shows the page to players in Chronicle, No leaves it hidden
+
 ## Error Recovery
 
 - [ ] Invalid API key shows clear error message

@@ -22,6 +22,7 @@ import { registerStashButton } from './stash-window.mjs';
 import { SyncDashboard } from './sync-dashboard.mjs';
 import { MapViewerSheet } from './map-viewer.mjs';
 import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs';
+import { registerNpcPresence } from './npc-presence.mjs';
 import { registerMapSheetItems } from './map-sheet-items.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { openSyncCalendar } from './sync-calendar.mjs';
@@ -141,6 +142,11 @@ Hooks.once('ready', async () => {
     registerMapSheetItems();
   } catch (err) {
     console.warn('Chronicle Sync | Map items unavailable', err);
+  }
+  try {
+    registerNpcPresence(() => syncManager?.api ?? null);
+  } catch (err) {
+    console.warn('Chronicle Sync | NPC token tools unavailable', err);
   }
 
   // Move a legacy world-scoped API key into this GM's client scope and

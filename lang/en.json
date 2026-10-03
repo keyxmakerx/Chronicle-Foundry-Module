@@ -782,6 +782,22 @@
     "CalendarDatePush": {
       "Rejected": "Chronicle won't accept this date: its calendar has different months or leap days. Date sync is paused.",
       "Forbidden": "Only the campaign owner's key can change Chronicle's date. Date sync is paused."
+    },
+    "Npc": {
+      "Spotlight": "Spotlight",
+      "Talk": "Talk as this NPC",
+      "TalkStop": "Stop talking",
+      "OpenPage": "Open Chronicle page",
+      "SpotlightHidden": "{name} is hidden. Nothing was shown to players. Reveal the token first to spotlight it.",
+      "SpotlightElsewhere": "That token isn't on the scene you're viewing, so nothing was shown.",
+      "TalkFailed": "Chronicle: couldn't switch talking on or off.",
+      "RevealTitle": "Show their Chronicle page?",
+      "RevealAsk": "You revealed {name} on the map. Show their Chronicle page to players too?",
+      "Revealed": "Chronicle: {name}'s page is now shown to players.",
+      "RevealFailed": "Chronicle: couldn't show the page. Check the connection in the Chronicle dashboard.",
+      "Linked": "Chronicle: {name} is now linked to the page \"{page}\".",
+      "LinkHero": "{name} is a hero kept in step by character sync, so it stays linked to its own page.",
+      "LinkFailed": "Chronicle: couldn't link the token to that page."
     }
   }
 }
