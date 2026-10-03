@@ -87,22 +87,23 @@ test('shim hands buying to the window and serves fresh stock after a sale', asyn
   assert.equal((await refused.json()).message, 'Buying opens when the GM opens downtime.');
 });
 
+const JWK = { kty: 'EC', crv: 'P-256', x: 'xx', y: 'yy' };
 const buyReq = (over = {}) => ({
-  type: SHOP_ROOM_MESSAGE, action: 'buy', requestId: 'r1', shopId: SHOP, userId: 'p1',
+  type: SHOP_ROOM_MESSAGE, action: 'buy', requestId: 'r1', shopId: SHOP, userId: 'p1', publicKey: JWK,
   body: { buyerEntityId: 'char-1', items: [{ relationId: '7', quantity: 2 }] }, ...over,
 });
 
 test('buy request: keeps only shop, character and goods with quantities', () => {
   const r = sanitizeShopBuyRequest(buyReq({ body: { buyerEntityId: 'char-1', items: [{ relationId: '7', quantity: 2, price: 0 }], actingUserId: 'gm' } }));
-  assert.deepEqual(r, { action: 'buy', requestId: 'r1', shopId: SHOP, body: { buyerEntityId: 'char-1', items: [{ relationId: 7, quantity: 2 }] } },
+  assert.deepEqual(r, { action: 'buy', requestId: 'r1', shopId: SHOP, publicKey: JWK, body: { buyerEntityId: 'char-1', items: [{ relationId: 7, quantity: 2 }] } },
     'no price and no acting member travel from a player');
-  assert.deepEqual(sanitizeShopBuyRequest(buyReq({ action: 'buyers', body: undefined })), { action: 'buyers', requestId: 'r1', shopId: SHOP });
+  assert.deepEqual(sanitizeShopBuyRequest(buyReq({ action: 'buyers', body: undefined })), { action: 'buyers', requestId: 'r1', shopId: SHOP, publicKey: JWK });
 });
 
 test('buy request: rejects malformed requests', () => {
   const items = (it) => buyReq({ body: { buyerEntityId: 'char-1', items: it } });
   const bad = [
-    null, buyReq({ type: 'x' }), buyReq({ action: 'refund' }), buyReq({ requestId: '' }), buyReq({ shopId: '../x' }),
+    null, buyReq({ type: 'x' }), buyReq({ publicKey: undefined }), buyReq({ publicKey: { ...JWK, d: 'private' } }), buyReq({ action: 'refund' }), buyReq({ requestId: '' }), buyReq({ shopId: '../x' }),
     buyReq({ body: null }), buyReq({ body: { buyerEntityId: 'a b', items: [{ relationId: 1, quantity: 1 }] } }),
     items([]), items(Array.from({ length: 51 }, (_, i) => ({ relationId: i + 1, quantity: 1 }))),
     items([{ relationId: 0, quantity: 1 }]), items([{ relationId: 1.5, quantity: 1 }]),
@@ -111,7 +112,7 @@ test('buy request: rejects malformed requests', () => {
   for (const m of bad) assert.equal(sanitizeShopBuyRequest(m), null, JSON.stringify(m)?.slice(0, 80));
 });
 
-test('buy reply: passes a good answer, rejects a malformed one', () => {
+test('buy reply (decrypted): passes a good answer, rejects a malformed one', () => {
   const ok = { type: SHOP_ROOM_MESSAGE, action: 'reply', requestId: 'r1', toUserId: 'p1', status: 200, body: { status: 'bought' }, goods: [{ id: 1 }, 'x'] };
   assert.deepEqual(sanitizeShopBuyReply(ok), { requestId: 'r1', toUserId: 'p1', status: 200, body: { status: 'bought' }, goods: [{ id: 1 }] });
   assert.equal(sanitizeShopBuyReply({ ...ok, goods: undefined }).goods, undefined);
@@ -214,4 +215,18 @@ test('vendored files match Chronicle (needs CHRONICLE_DIR)', { skip: !(chronicle
     assert.equal(readFileSync(join(VENDOR, f), 'utf8'), readFileSync(join(chronicleWidgets, f), 'utf8'),
       `vendor/chronicle/${f} differs from Chronicle's; copy it again from static/js/widgets/`);
   }
+});
+
+test('a buying answer opens only with the asking request\'s key', async () => {
+  const { generateRequestKeys, encryptReply, decryptReply } = await import('../scripts/_stash-crypto.mjs');
+  const mine = await generateRequestKeys();
+  const other = await generateRequestKeys();
+  const req = sanitizeShopBuyRequest({ type: SHOP_ROOM_MESSAGE, action: 'buyers', requestId: 'r9', shopId: SHOP, publicKey: mine.publicJwk });
+  assert.ok(req, 'a real public key passes the request check');
+  const envelope = await encryptReply(req.publicKey, { status: 200, body: { buyers: [{ id: 'c1', money: 50 }] } });
+  assert.ok(!JSON.stringify(envelope).includes('money'), 'the answer is not readable on the wire');
+  const inner = await decryptReply(mine.privateKey, envelope);
+  const reply = sanitizeShopBuyReply({ ...inner, type: SHOP_ROOM_MESSAGE, action: 'reply', requestId: 'r9', toUserId: 'p1' });
+  assert.equal(reply.body.buyers[0].money, 50);
+  await assert.rejects(decryptReply(other.privateKey, envelope));
 });

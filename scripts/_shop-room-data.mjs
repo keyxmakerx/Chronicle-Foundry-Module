@@ -6,6 +6,7 @@
  */
 
 import { _isAllowedImageHost } from './_url-validation.mjs';
+import { isPublicJwk } from './_stash-crypto.mjs';
 
 /** Socket message type for showing and hiding a shop room to players. */
 export const SHOP_ROOM_MESSAGE = 'shop-room';
@@ -117,13 +118,16 @@ const MAX_REPLY_CHARS = 64 * 1024;
  * Check a player's buying request before the GM's client acts on it. The
  * request names only a shop, a character and goods with quantities; who is
  * buying comes from the socket's own sender, never from the message, and
- * prices always come from Chronicle. Returns a cleaned copy, or null.
+ * prices always come from Chronicle. The request carries the public half of
+ * a one-off key, so the answer (which shows a character's coins) can be
+ * encrypted to the asking client alone. Returns a cleaned copy, or null.
  */
 export function sanitizeShopBuyRequest(msg) {
   if (!msg || typeof msg !== 'object' || msg.type !== SHOP_ROOM_MESSAGE) return null;
   if (msg.action !== 'buyers' && msg.action !== 'buy') return null;
   if (!ID_RE.test(String(msg.requestId || '')) || !ID_RE.test(String(msg.shopId || ''))) return null;
-  const out = { action: msg.action, requestId: msg.requestId, shopId: msg.shopId };
+  if (!isPublicJwk(msg.publicKey)) return null;
+  const out = { action: msg.action, requestId: msg.requestId, shopId: msg.shopId, publicKey: msg.publicKey };
   if (msg.action === 'buyers') return out;
 
   const b = msg.body;
@@ -142,8 +146,9 @@ export function sanitizeShopBuyRequest(msg) {
 }
 
 /**
- * Check the GM's answer to a buying request before the player's widget reads
- * it. Returns `{requestId, toUserId, status, body, goods?}`, or null.
+ * Check the GM's answer to a buying request, once decrypted, before the
+ * player's widget reads it. Returns `{requestId, toUserId, status, body,
+ * goods?}`, or null.
  */
 export function sanitizeShopBuyReply(msg) {
   if (!msg || typeof msg !== 'object' || msg.type !== SHOP_ROOM_MESSAGE || msg.action !== 'reply') return null;

@@ -20,6 +20,7 @@
 import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
 import { getSetting, getUserMappings } from './settings.mjs';
 import { _isAllowedImageHost } from './_url-validation.mjs';
+import { decryptReply, encryptReply, generateRequestKeys } from './_stash-crypto.mjs';
 import {
   createChronicleShim, describeSale, sanitizeShopBuyReply, sanitizeShopBuyRequest,
   sanitizeShopRoomMessage, shopEndpoints, SHOP_ROOM_MESSAGE,
@@ -41,6 +42,8 @@ let shim = null;
 let widgetLoad = null;
 /** Player side: buying requests waiting for the GM's answer, by request id. */
 const pending = new Map();
+/** Player side: each waiting request's private key, by request id. */
+const replyKeys = new Map();
 /** GM side: answers players' buying requests; set by the shop widget. */
 let buyRelay = null;
 
@@ -54,17 +57,29 @@ export function setShopBuyRelay(fn) {
 
 const t = (key) => game.i18n.localize(`CHRONICLE.ShopRoom.${key}`);
 
-/** Player side: ask the GM's client to make a buying call for this user. */
-function requestFromGM(shopId, action, body) {
-  if (!game.users.activeGM) return Promise.resolve({ status: 503, body: { message: t('NoGM') } });
+/**
+ * Player side: ask the GM's client to make a buying call for this user. The
+ * answer shows a character's coins and every client may see socket traffic,
+ * so it comes back encrypted to a key only this request holds.
+ */
+async function requestFromGM(shopId, action, body) {
+  if (!game.users.activeGM) return { status: 503, body: { message: t('NoGM') } };
   const requestId = foundry.utils.randomID(16);
+  const pair = await generateRequestKeys();
+  replyKeys.set(requestId, pair.privateKey);
   return new Promise((resolve) => {
-    const timer = setTimeout(() => {
+    const finish = (reply) => {
+      clearTimeout(timer);
       pending.delete(requestId);
-      resolve({ status: 504, body: { message: t('GMNoAnswer') } });
-    }, REQUEST_TIMEOUT_MS[action] || REQUEST_TIMEOUT_MS.buy);
-    pending.set(requestId, (reply) => { clearTimeout(timer); resolve(reply); });
-    game.socket.emit(SOCKET_CHANNEL, { type: SHOP_ROOM_MESSAGE, action, requestId, shopId, userId: game.user.id, body });
+      replyKeys.delete(requestId);
+      resolve(reply);
+    };
+    const timer = setTimeout(() => finish({ status: 504, body: { message: t('GMNoAnswer') } }),
+      REQUEST_TIMEOUT_MS[action] || REQUEST_TIMEOUT_MS.buy);
+    pending.set(requestId, finish);
+    game.socket.emit(SOCKET_CHANNEL, {
+      type: SHOP_ROOM_MESSAGE, action, requestId, shopId, userId: game.user.id, publicKey: pair.publicJwk, body,
+    });
   });
 }
 
@@ -400,11 +415,7 @@ export function registerShopRoomSocket() {
     // Shows, hides and answers count only from a GM.
     if (!game.users.get(senderId ?? data.userId)?.isGM) return;
     if (data.action === 'reply') {
-      const reply = sanitizeShopBuyReply(data);
-      if (!reply || reply.toUserId !== game.user.id) return;
-      const done = pending.get(reply.requestId);
-      pending.delete(reply.requestId);
-      done?.(reply);
+      onBuyReply(data);
       return;
     }
     const msg = sanitizeShopRoomMessage(data, getSetting('apiUrl'));
@@ -430,15 +441,37 @@ export function registerShopRoomSocket() {
   });
 }
 
+/** Player side: open the GM's encrypted answer to one of this client's requests. */
+async function onBuyReply(data) {
+  if (data.toUserId !== game.user.id || typeof data.requestId !== 'string') return;
+  const key = replyKeys.get(data.requestId);
+  const done = pending.get(data.requestId);
+  if (!key || !done) return;
+  try {
+    const inner = await decryptReply(key, data.envelope);
+    const reply = sanitizeShopBuyReply({ ...inner, type: SHOP_ROOM_MESSAGE, action: 'reply', requestId: data.requestId, toUserId: data.toUserId });
+    if (reply) done(reply);
+  } catch (err) {
+    console.warn('Chronicle: could not read the GM\'s shop answer', err);
+  }
+}
+
 /** GM side: answer one player's buying request. Only the active GM answers. */
 async function onBuyRequest(data, senderId) {
   if (!game.users.activeGM?.isSelf) return;
   const req = sanitizeShopBuyRequest(data);
   if (!req) return;
   const toUserId = senderId ?? data.userId;
-  const answer = ({ status, body, goods }) => game.socket.emit(SOCKET_CHANNEL, {
-    type: SHOP_ROOM_MESSAGE, action: 'reply', requestId: req.requestId, toUserId, userId: game.user.id, status, body, goods,
-  });
+  const answer = async ({ status, body, goods }) => {
+    try {
+      const envelope = await encryptReply(req.publicKey, { status, body, goods });
+      game.socket.emit(SOCKET_CHANNEL, {
+        type: SHOP_ROOM_MESSAGE, action: 'reply', requestId: req.requestId, toUserId, userId: game.user.id, envelope,
+      });
+    } catch (err) {
+      console.error('Chronicle: could not answer a shop buying request', err);
+    }
+  };
   const user = game.users.get(senderId);
   // Without Foundry's sender id the buyer can't be known, so nothing is bought.
   if (!user || senderId !== data.userId || user.isGM) {
@@ -450,7 +483,7 @@ async function onBuyRequest(data, senderId) {
     return;
   }
   try {
-    answer(await buyRelay(user, req));
+    await answer(await buyRelay(user, req));
   } catch (err) {
     console.error('Chronicle: shop buying request failed', err);
     answer({ status: 502, body: { message: t('BuyFailed') } });
