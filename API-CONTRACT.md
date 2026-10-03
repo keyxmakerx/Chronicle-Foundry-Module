@@ -979,6 +979,40 @@ Lists relations for an entity (used for shop inventory).
 }
 ```
 
+#### GET /armory/shops/:entityId/room
+The shop room window's read (`scripts/shop-room-window.mjs`). Needs the armory
+addon. 404 when the shop is missing, not a shop, or hidden from the key.
+
+**Response:**
+```json
+{ "layout": { "...": "saved room, or null to generate one" },
+  "goods": [ { "id": 7, "relationType": "sells", "targetEntityId": "item-uuid",
+               "targetEntityName": "Rope", "metadata": { "price": 1, "currency": "gp", "quantity": 3 } } ] }
+```
+`goods` are the shop's `sells` relations a plain player can see (no `dmOnly`
+rows, no items hidden from players), so the room can be shown to every player.
+
+#### GET /armory/shops/:entityId/buyers?actingUserId=
+#### POST /armory/shops/:entityId/buy
+The shop room's buying calls (`scripts/shop-room-window.mjs`), made by the
+GM's client: for the GM, or for a player as the Chronicle member the player
+is matched to (`actingUserId`, a query parameter on GET and a body field on
+POST). Only an Owner or co-DM key may name someone else (403); the name must
+be a current member (404); the call then has that member's rights only. Needs
+the armory addon.
+
+**Buyers response:** `{"downtimeOpen": true, "canBuyNow": true, "buyers": [{"id": "char-uuid", "name": "Brin", "moneyKey": "gp", "money": 50}]}`
+
+**Buy body:** `{"actingUserId": "member-uuid", "buyerEntityId": "char-uuid", "items": [{"relationId": 7, "quantity": 2}]}`
+(at most 50 lines, quantity 1–99; prices come from the listing, never the body)
+
+**Buy response:** `{"status": "bought", "spent": 6, "currency": "gp", "moneyLeft": 44}`.
+Refusals are `{"message": "..."}`: 400 (empty basket, no coin field, not
+enough coin, mixed currencies), 403 (not their character), 404 (shop or good
+hidden), 409 (a player while downtime is closed).
+
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/shop_api_handler.go`)
+
 ---
 
 ## Chronicle-served Module Distribution

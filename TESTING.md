@@ -165,16 +165,20 @@ GM notice. See API-CONTRACT.md.
 
 ## Shop Widget
 
-- [ ] Right-click a JournalEntry linked to a Shop entity in the Journal sidebar -> "Open Chronicle Shop" option appears (not on non-shop journals)
-- [ ] Dashboard Shops tab -> each shop row has an **Open** button that opens the same window
-- [ ] Shop window opens with correct shop name
-- [ ] Inventory loads from relations API (items with price/quantity metadata)
-- [ ] Items show name, price, quantity
-- [ ] Out-of-stock items visually distinct
-- [ ] Drag item from shop -> Drop on character sheet -> Foundry Item created
-- [ ] Real-time refresh: update shop entity in Chronicle -> Shop window updates
-- [ ] Multiple shop windows can be open simultaneously
-- [ ] Closing shop window cleans up properly
+- [ ] Right-click JournalEntry linked to Shop entity -> "Open Chronicle Shop" option appears
+- [ ] Dashboard Shops tab -> each shop row has an **Open** button that opens the same shop room
+- [ ] Shop room opens with the shop's name; the room matches the Chronicle shop page (same furniture, keeper picture, wares)
+- [ ] Hovering an item in the room shows its name and price; clicking the keeper shows their lines
+- [ ] Wares list shows price and stock; sold-out goods are faded; hidden or GM-only goods are missing
+- [ ] Drag a row from the wares list -> Drop on character sheet -> Foundry Item created
+- [ ] Real-time refresh: change price or stock in Chronicle -> the open room updates
+- [ ] "Show to players" -> the room opens on each player's screen; players see no "Arrange" or "Show" buttons
+- [ ] "Stop showing" -> the room closes on players' screens
+- [ ] Multiple shop rooms can be open simultaneously; closing one cleans up its tooltip
+- [ ] GM: open the wares, Add an item, pick who pays, Buy -> "Bought … left." in the room; the coins drop on that character's sheet and the item appears in its inventory; a whispered chat line names the character, goods and cost
+- [ ] Player (matched to a Chronicle member, downtime open, shop shown): the basket lists only their own characters; Buy works the same; the GM gets the chat line naming the player
+- [ ] Player while downtime is closed: Buy reads "Buying opens in downtime" and nothing is charged
+- [ ] Player whose Foundry user is not matched: no basket appears; GM stops showing the shop mid-basket -> Buy says the GM isn't showing it any more
 
 ## Initial Sync
 
