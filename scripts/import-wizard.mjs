@@ -9,7 +9,7 @@
  */
 
 import { getSetting, setSetting } from './settings.mjs';
-import { FLAG_SCOPE } from './constants.mjs';
+import { FLAG_SCOPE, REPORT_STORE_FLAG } from './constants.mjs';
 import { DEFAULT_ICON, toIconName } from './_icon-name.mjs';
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -328,6 +328,7 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
     // Journals: exclude those already linked to Chronicle entities.
     for (const j of game.journal.contents) {
       if (j.getFlag(FLAG_SCOPE, 'entityId')) continue;
+      if (j.getFlag(FLAG_SCOPE, REPORT_STORE_FLAG)) continue;
       scan.journals.push({
         id: j.id,
         name: j.name,

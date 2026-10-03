@@ -16,4 +16,7 @@ export const MODULE_ID = 'chronicle-sync';
  * ignore a write that carries it, so only sync's own echoes are dropped and a
  * GM edit made while sync is writing something else still pushes.
  */
+/** Flag that marks the one hidden journal entry holding problem reports. */
+export const REPORT_STORE_FLAG = 'problemReportsStore';
+
 export const SYNC_OPTIONS = Object.freeze({ chronicleSync: true });

@@ -259,6 +259,18 @@ Needs a GM and a player client on the same scene, and an NPC page synced as a jo
 - [ ] Leave a client idle for a minute, or switch its tab away: the glow slows to still, and comes back on return
 - [ ] Reveal a hidden NPC token whose page is hidden: asked once "Show their Chronicle page?"; Yes shows the page to players in Chronicle, No leaves it hidden
 
+## Problem reports (privacy, module #94)
+
+Needs a GM client and a player client, on each of Foundry v12, v13 and v14.
+
+- [ ] As a player, open a character's Stashes window, click "Report a problem", send text: "Sent to your GM"; the GM sees "{name} reported a problem" and the Debug tab badge goes up
+- [ ] In the GM's Journal sidebar there is no "Chronicle: problem reports" entry
+- [ ] In the player's browser console, `game.journal.find(j => j.getFlag("chronicle-sync", "problemReportsStore"))` returns `undefined`, and `game.journal.contents.some(j => j.name.includes("problem reports"))` is `false`
+- [ ] In the player's console, `game.settings.get("chronicle-sync", "problemReports")` is an empty list (no report text appears)
+- [ ] As the GM, the same first console line returns the entry, and its `flags["chronicle-sync"].reports` lists the report
+- [ ] Reload the GM client: the report is still there and no second entry was made
+- [ ] The entry does not appear in the Import wizard's journal list or the dashboard's Foundry-only journals, and nothing was pushed to Chronicle
+
 ## Error Recovery
 
 - [ ] Invalid API key shows clear error message

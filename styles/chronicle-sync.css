@@ -2974,3 +2974,80 @@
 .chronicle-jot-panel[hidden] {
   display: none;
 }
+
+/* Debug tab */
+
+.debug-panel .debug-subheading {
+  margin: 12px 0 4px;
+  font-size: 0.95em;
+  opacity: 0.8;
+}
+
+.debug-report {
+  margin: 6px 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 6px;
+}
+
+.debug-report-done {
+  opacity: 0.75;
+}
+
+.debug-report-head {
+  font-weight: bold;
+}
+
+.debug-report-text {
+  margin: 6px 0;
+  padding: 4px 8px;
+  border-left: 3px solid rgba(128, 128, 128, 0.5);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.debug-snapshot {
+  margin-top: 8px;
+}
+
+.debug-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 6px 0;
+}
+
+.debug-table th,
+.debug-table td {
+  padding: 3px 6px;
+  text-align: left;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.25);
+}
+
+.debug-table .debug-different td,
+.debug-table .debug-missing td {
+  background: rgba(250, 204, 21, 0.18);
+}
+
+.debug-table .debug-foundry-only td {
+  background: rgba(96, 165, 250, 0.15);
+}
+
+.debug-table .debug-flag {
+  margin-left: 8px;
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+.debug-report-box textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.debug-panel .debug-error {
+  color: #ef4444;
+}
+
+.debug-panel .log-entry.log-warn .log-time,
+.debug-panel .log-entry.log-error .log-time {
+  opacity: 0.8;
+}

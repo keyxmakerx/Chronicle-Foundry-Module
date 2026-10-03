@@ -216,6 +216,16 @@ export function registerSettings() {
     default: false,
   });
 
+  // Legacy: dev builds kept problem reports here, readable by every client.
+  // The GM client moves any left into the hidden report journal entry and
+  // clears this; nothing writes it any more.
+  game.settings.register(MODULE_ID, 'problemReports', {
+    scope: 'world',
+    config: false,
+    type: Array,
+    default: [],
+  });
+
   // Internal: Chronicle user → Foundry user ID mapping (not shown in settings UI).
   // Stored as JSON: { "chronicle-user-uuid": "foundry-user-id", ... }
   game.settings.register(MODULE_ID, 'userMappings', {
