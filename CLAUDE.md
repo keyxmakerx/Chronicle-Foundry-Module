@@ -14,7 +14,7 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
 - `scripts/*.mjs`: sync (`journal-sync`, `map-sync`+`map-viewer`,
   `calendar-sync`+`sync-calendar`+`sync-calendar-*`, `actor-sync`,
   `item-sync`, `note-sync`, `stash-sync`+`stash-client`), UI (`sync-dashboard`,
-  `sync-diagnostic-bundle`, `update-info`, `character-claim-indicator`,
+  `sync-diagnostic-bundle`, `update-info`, `gm-secret-view`, `character-claim-indicator`,
   `capability-inspector`, `import-wizard`, `shop-widget`, `player-notebook`, `stash-window`+`stash-chat`), core (`module`,
   `settings`, `constants`, `logger`, `sync-manager`, `api-client`),
   `adapters/generic-adapter.mjs`. `.ai.md` has what each does. `_*.mjs` are
@@ -46,7 +46,7 @@ Install/update flow: also `.ai.md` → "Chronicle Integration — Install & Upda
 - **Real-time calendars are read-only for dates**: `tracks_real_time` from `GET /calendar/date` pauses date-push only, via `scripts/_realtime-date-guard.mjs`. `tools/test-realtime-date-signal.mjs`.
 - **Calendar sub-resources are display-only** (dashboard + optional GM-whisper, never public); `structure.updated` badges mismatches, never auto-applies. `scripts/_calendar-subresources.mjs`, `tools/test-calendar-subresources.mjs`, `tools/test-calendar-subresource-routing.mjs`.
 - **Chronicle update endpoints are PARTIAL**: absent preserves, `null` clears, present replaces (API-CONTRACT.md → "partial-update contract"). Send only changed fields; never echo untouched ones back. `tools/test-partial-put-contract.mjs`. One deliberate exception: the marker dialog in `scripts/map-viewer.mjs` spreads the stored marker, harmless on current Chronicle and needed by older servers that replace the whole record. Actor field pushes do the same for `fields_data` (`ActorSync._putFieldsMerged`).
-- **GM-only text goes in Foundry secret blocks.** Sync's Owner key receives Chronicle's `<span data-secret>` text and GM-only pictures; journal pulls put them in Foundry secret blocks (hidden from players who don't own the page) and pushes turn everything in a secret block back into GM-only content (`scripts/_gm-secrets.mjs`). `tools/test-gm-secrets.mjs`.
+- **GM-only content never goes into a saved Foundry document.** Every client receives every journal page, so a pulled page holds a placeholder secret block (id keyed by an HMAC under the GM's API key) where Chronicle has GM-only text or pictures; the GM's client fills it on screen (`scripts/gm-secret-view.mjs`) and puts the content back before a push, which leaves the text out rather than send it without a placeholder's content. Anything in a secret block goes back to Chronicle GM-only. `scripts/_gm-secrets.mjs`, `tools/test-gm-secrets.mjs`.
 - **Sync never deletes without asking.** A Chronicle-side removal sets the Foundry journal aside (unlinked, in a "Chronicle: removed" folder, `scripts/_set-aside.mjs`); a Foundry-side delete of a linked actor or journal asks before deleting the Chronicle copy (`scripts/_remote-deletes.mjs`). `tools/test-set-aside.mjs`, `tools/test-remote-deletes.mjs`.
 - **Never hard-cap a list walk.** `JournalSync.resyncAll` and `_buildEntityGroups` share `scripts/_entity-page-walk.mjs` (200-page bound); its `truncated` flag must be surfaced. `tools/test-entity-page-walk.mjs`.
 - WebSocket messages route by type through `SyncManager`.

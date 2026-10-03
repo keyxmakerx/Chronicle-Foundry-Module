@@ -264,11 +264,14 @@ test('scripts/journal-sync.mjs: every entity.entry_html / player_notes_html inge
 
     if (isComment || isPropertyKeyContext || isTruthinessCheck) continue;
 
+    // _pullHtml hides GM-only content and then sanitizes (pinned below).
     assert.ok(
-      /_sanitizeIncomingHTML\(/.test(line),
+      /_sanitizeIncomingHTML\(|this\._pullHtml\(/.test(line),
       `journal-sync.mjs:${num}: \`${line.trim()}\` references Chronicle HTML but is not wrapped by _sanitizeIncomingHTML — likely a new ingestion site that bypasses the sanitizer`,
     );
   }
+  assert.match(source, /async _pullHtml\([^)]*\) \{[\s\S]*?return _sanitizeIncomingHTML\(hidden\);\n  \}/,
+    '_pullHtml ends by sanitizing what it stores');
 });
 
 test('scripts/note-sync.mjs: every note.entry_html read into a Foundry text page goes through _sanitizeIncomingHTML', () => {
@@ -287,8 +290,9 @@ test('scripts/note-sync.mjs: every note.entry_html read into a Foundry text page
     const isOutboundPayload = /entry_html\s*:/.test(line);
     if (isComment || isOutboundPayload) continue;
 
+    // _pullHtml hides GM-only content and then sanitizes (pinned below).
     assert.ok(
-      /_sanitizeIncomingHTML\(/.test(line),
+      /_sanitizeIncomingHTML\(|this\._pullHtml\(/.test(line),
       `note-sync.mjs:${num}: \`${line.trim()}\` reads note.entry_html for storage but is not wrapped by _sanitizeIncomingHTML`,
     );
   }

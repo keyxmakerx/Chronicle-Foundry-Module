@@ -176,7 +176,7 @@ test('editing page text in Foundry reaches Chronicle', () => scenario('fvtt-page
   assert.match(full.entry_html || '', /second/);
 }));
 
-test('GM-only text reaches Foundry only inside a secret block, and a GM edit keeps it GM-only', () => scenario('gm-secrets', async ({ seed, world }) => {
+test('GM-only text never reaches the saved journal, and GM edits in Foundry keep it GM-only', () => scenario('gm-secrets', async ({ seed, world }) => {
   const e = await chroniclePage(seed, 'Duke Varn');
   await seed.chronicle.put(`/entities/${e.id}`, { entry: '<p>The duke is <span data-secret="true">a vampire</span> and kind.</p>' });
   await openWorld(world);
@@ -185,21 +185,53 @@ test('GM-only text reaches Foundry only inside a secret block, and a GM edit kee
   assert.ok(j, 'journal exists');
   const page = j.pages.contents.find((p) => p.type === 'text');
   const html = page.text.content;
-  assert.doesNotMatch(html, /data-secret/);
-  assert.match(html, /<section class="secret"[^>]*><p[^>]*>a vampire<\/p><\/section>/);
-  assert.doesNotMatch(html.replace(/<section class="secret"[\s\S]*?<\/section>/g, ''), /vampire/, 'not in what players see');
+  assert.doesNotMatch(html, /vampire|data-secret/, 'the saved page every client receives holds no GM-only text');
+  assert.match(html, /<section class="secret"[^>]* id="secret-chrk[0-9a-f]{32}"/);
 
   await page.update({ 'text.content': html.replace('and kind.', 'and cruel.') });
   await settle();
-  const full = await seed.chronicle.get(`/entities/${e.id}`);
-  assert.match(full.entry_html || '', /<span data-secret="true">a vampire<\/span>/);
-  assert.match(full.entry_html || '', /cruel/);
-  assert.doesNotMatch(full.entry_html || '', /<section/);
-  await seed.chronicle.put(`/entities/${e.id}`, { entry: '<p>Now <span data-secret="true">a lich</span>.</p>' });
-  await waitFor(() => /a lich/.test(pageText(j)), 15000, 'Chronicle edit to arrive');
+  let full = await seed.chronicle.get(`/entities/${e.id}`);
+  assert.equal(full.entry_html, '<p>The duke is <span data-secret="true">a vampire</span> and cruel.</p>');
+
+  // A secret block the GM types in Foundry goes to Chronicle GM-only, then
+  // leaves the saved page.
+  await page.update({ 'text.content': `${page.text.content}<section class="secret" id="secret-gm1"><p>hates garlic</p></section>` });
   await settle();
-  assert.doesNotMatch(pageText(j), /data-secret/);
+  full = await seed.chronicle.get(`/entities/${e.id}`);
+  assert.match(full.entry_html, /<span data-secret="true">hates garlic<\/span>/);
+  await waitFor(() => !/garlic/.test(pageText(j)), 15000, 'typed secret to leave the saved page');
+
+  // Words typed after a placeholder's label reach Chronicle GM-only, then
+  // leave the saved page.
+  await page.update({ 'text.content': page.text.content.replace('kept in Chronicle</p>', 'kept in Chronicle and fears silver</p>') });
+  await settle();
+  full = await seed.chronicle.get(`/entities/${e.id}`);
+  assert.match(full.entry_html, /<span data-secret="true">a vampire<\/span>/);
+  assert.match(full.entry_html, /<span data-secret="true">and fears silver<\/span>/);
+  await waitFor(() => !/silver/.test(pageText(j)), 15000, 'typed words to leave the saved page');
+
+  await seed.chronicle.put(`/entities/${e.id}`, { entry: '<p>Now <span data-secret="true">a lich</span>.</p>' });
+  await waitFor(() => /Now/.test(pageText(j)), 15000, 'Chronicle edit to arrive');
+  await settle();
+  assert.doesNotMatch(pageText(j), /lich|data-secret/);
   assert.equal(j.getFlag(FLAG, 'fields'), undefined, 'field values (GM-only ones included) are not stored on the journal');
+}));
+
+test('a journal an older version left with GM-only text in the clear is hidden on the next connect', () => scenario('gm-secrets-old', async ({ seed, world }) => {
+  const e = await chroniclePage(seed, 'Old Keep');
+  await seed.chronicle.put(`/entities/${e.id}`, { entry: '<p>Gate <span data-secret="true">is trapped</span>.</p>' });
+  await openWorld(world);
+  await JournalSync_resync(world);
+  const j = byEntity(world, e.id);
+  const page = j.pages.contents.find((p) => p.type === 'text');
+  await closeWorld(world);
+  // What an older module stored: the Chronicle span as is, and field values.
+  await page.update({ 'text.content': '<p>Gate <span data-secret="true">is trapped</span>.</p>' }, { chronicleSync: true });
+  await j.update({ [`flags.${FLAG}.fields`]: { gm_notes: 'x' } }, { chronicleSync: true });
+  await openWorld(world);
+  await settle();
+  assert.doesNotMatch(pageText(j), /trapped|data-secret/);
+  assert.equal(j.getFlag(FLAG, 'fields'), undefined);
 }));
 
 test('changes made while the connection was down arrive when it comes back', () => scenario('ws-drop', async ({ seed, world }) => {
