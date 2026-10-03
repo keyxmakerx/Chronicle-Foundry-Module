@@ -1,0 +1,164 @@
+@layer chronicle-sync {
+
+/*
+ * Chronicle's map look inside the module's map viewer: the six frames
+ * (ported from Chronicle's static/css/map_frames.css, same names under a
+ * cs- prefix), Chronicle's pin shapes, and floating controls in place of a
+ * toolbar row. Atlas and Modern use Chronicle's dark values, since
+ * Foundry's chrome is dark; the other four are fixed looks, as on Chronicle.
+ */
+
+/* ---- Head strip: map name, live chip, open in Chronicle ---- */
+.chronicle-map-viewer .cs-mp-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #2b2722; border-bottom: 1px solid #000; color: #efe6d8; font-size: 13px; flex: none; }
+.chronicle-map-viewer .cs-mp-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.chronicle-map-viewer .cs-mp-sp { flex: 1; }
+.chronicle-map-viewer .cs-livechip { display: inline-flex; align-items: center; gap: 5px; font: 600 10.5px system-ui, sans-serif; color: #9be7b0; background: rgb(34 197 94 / 0.14); border: 1px solid rgb(34 197 94 / 0.35); padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
+.chronicle-map-viewer .cs-livechip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #22c55e; }
+.chronicle-map-viewer .cs-mp-headbtn { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 4px; color: #cfc5b4; font-size: 12px; text-decoration: none; white-space: nowrap; }
+.chronicle-map-viewer .cs-mp-headbtn:hover { background: rgb(255 255 255 / 0.08); color: #fff; }
+
+/* ---- Stage and frame ---- */
+.chronicle-map-viewer .cs-mp-stage { flex: 1; min-height: 0; display: flex; padding: 10px; background: #1f1d1a; }
+.chronicle-map-viewer .cs-mp-frame {
+  --mp-mat: #161e2b; --mp-rule: #a8956c; --mp-gold: #c9a24f; --mp-gold-2: #f0d491;
+  position: relative; flex: 1; min-width: 0; display: flex;
+  padding: 10px; border-radius: 14px; border: 1px solid #000;
+  background: var(--mp-mat);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.4);
+}
+.chronicle-map-viewer .cs-mp-vpwrap { position: relative; flex: 1; min-width: 0; min-height: 0; display: flex; overflow: hidden; border-radius: 8px; }
+.chronicle-map-viewer .cs-mp-vpwrap > .map-viewport { flex: 1; background: #111; }
+
+.chronicle-map-viewer .cs-mp-orn { position: absolute; inset: 0; pointer-events: none; z-index: 2; color: var(--mp-rule); }
+.chronicle-map-viewer .cs-mp-orn [data-o] { display: none; position: absolute; inset: 0; }
+.chronicle-map-viewer .cs-mp-frame[data-frame="atlas"] .cs-mp-orn [data-o="atlas"],
+.chronicle-map-viewer .cs-mp-frame[data-frame="arcane"] .cs-mp-orn [data-o="arcane"],
+.chronicle-map-viewer .cs-mp-frame[data-frame="old"] .cs-mp-orn [data-o="old"],
+.chronicle-map-viewer .cs-mp-frame[data-frame="futuristic"] .cs-mp-orn [data-o="futuristic"] { display: block; }
+.chronicle-map-viewer .cs-mp-cart { position: absolute; left: 50%; transform: translateX(-50%); max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 10.5px/1 Georgia, "Palatino Linotype", serif; letter-spacing: 0.32em; text-transform: uppercase; }
+
+/* Atlas */
+.chronicle-map-viewer .cs-mp-frame[data-frame="atlas"] { padding: 26px 26px 34px; }
+.chronicle-map-viewer .cs-mp-frame[data-frame="atlas"] .cs-mp-vpwrap { border-radius: 2px; box-shadow: 0 0 0 1px var(--mp-rule), 0 0 0 5px var(--mp-mat), 0 0 0 6px var(--mp-rule); overflow: visible; }
+.chronicle-map-viewer .cs-mp-frame[data-frame="atlas"] .map-viewport { border-radius: 2px; }
+.chronicle-map-viewer .cs-mp-orn svg { position: absolute; width: 30px; height: 30px; }
+.chronicle-map-viewer .cs-mp-orn .tl { top: 3px; left: 3px; }
+.chronicle-map-viewer .cs-mp-orn .tr { top: 3px; right: 3px; transform: rotate(90deg); }
+.chronicle-map-viewer .cs-mp-orn .br { bottom: 3px; right: 3px; transform: rotate(180deg); }
+.chronicle-map-viewer .cs-mp-orn .bl { bottom: 3px; left: 3px; transform: rotate(270deg); }
+.chronicle-map-viewer .cs-mp-ticks { position: absolute; left: 44px; right: 44px; top: 8px; display: flex; justify-content: space-between; font: 10px ui-monospace, monospace; letter-spacing: 0.08em; }
+.chronicle-map-viewer .cs-mp-side-ticks { position: absolute; top: 44px; bottom: 44px; left: 9px; display: flex; flex-direction: column; justify-content: space-between; font: 10px ui-monospace, monospace; }
+.chronicle-map-viewer [data-o="atlas"] .cs-mp-cart { bottom: 10px; background: var(--mp-mat); padding: 4px 14px; border: 1px solid var(--mp-rule); outline: 1px solid var(--mp-rule); outline-offset: 2px; }
+
+/* Arcane */
+.chronicle-map-viewer .cs-mp-frame[data-frame="arcane"] { padding: 26px; background: radial-gradient(120% 90% at 50% 50%, #2a1b4d, #120b24); border-color: #3b2a6b; }
+.chronicle-map-viewer .cs-mp-frame[data-frame="arcane"] .cs-mp-vpwrap { border-radius: 4px; box-shadow: 0 0 0 1px #c4b5fd, 0 0 0 4px #120b24, 0 0 0 5px #7c3aed, 0 0 28px 4px rgb(124 58 237 / 0.55); overflow: visible; }
+.chronicle-map-viewer [data-o="arcane"] { color: #c4b5fd; }
+.chronicle-map-viewer [data-o="arcane"] svg { filter: drop-shadow(0 0 4px #a78bfa); }
+.chronicle-map-viewer .cs-mp-runes { position: absolute; left: 30px; right: 30px; font: 13px/1 serif; letter-spacing: 0.6em; text-align: center; white-space: nowrap; overflow: hidden; text-shadow: 0 0 8px #a78bfa; animation: cs-mp-breathe 4s ease-in-out infinite; }
+.chronicle-map-viewer .cs-mp-runes.t { top: 6px; }
+.chronicle-map-viewer .cs-mp-runes.b { bottom: 6px; animation-delay: 2s; }
+/* Looping animation rests when the person steps away (see _map-motion-rest). */
+.chronicle-map-viewer.cs-motion-rest .cs-mp-runes { animation-play-state: paused; }
+@keyframes cs-mp-breathe { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .chronicle-map-viewer .cs-mp-runes { animation: none; } }
+
+/* Old */
+.chronicle-map-viewer .cs-mp-frame[data-frame="old"] {
+  padding: 22px 22px 30px; border-radius: 3px; border-color: transparent;
+  background:
+    radial-gradient(60% 50% at 20% 25%, rgb(120 80 30 / 0.22), transparent 70%),
+    radial-gradient(40% 40% at 85% 80%, rgb(110 70 20 / 0.25), transparent 70%),
+    linear-gradient(135deg, #e9d8ae, #d6bd84);
+  clip-path: polygon(0 1%, 4% 0, 11% 1%, 19% 0, 28% .6%, 37% 0, 46% 1%, 55% 0, 64% .8%, 73% 0, 82% 1%, 91% 0, 97% .7%, 100% 0, 99.4% 9%, 100% 18%, 99.3% 30%, 100% 41%, 99.5% 53%, 100% 66%, 99.3% 78%, 100% 90%, 99% 100%, 90% 99.3%, 80% 100%, 70% 99.2%, 60% 100%, 49% 99.4%, 38% 100%, 27% 99.3%, 16% 100%, 7% 99.2%, 0 100%, .6% 88%, 0 76%, .7% 63%, 0 50%, .5% 38%, 0 25%, .7% 13%);
+  box-shadow: inset 0 0 40px rgb(90 50 10 / 0.55);
+}
+.chronicle-map-viewer .cs-mp-frame[data-frame="old"] .cs-mp-vpwrap { border-radius: 2px; box-shadow: 0 0 0 1px rgb(90 60 20 / 0.6); }
+.chronicle-map-viewer [data-o="old"] .cs-mp-cart { bottom: 5px; color: #5b3d17; font-style: italic; letter-spacing: 0.18em; }
+.chronicle-map-viewer .cs-mp-seal { position: absolute; right: 16px; bottom: 12px; width: 46px; height: 46px; border-radius: 50%; background: radial-gradient(circle at 38% 35%, #d0453a, #8e1b14 70%); box-shadow: 0 2px 4px rgb(0 0 0 / 0.4), inset 0 0 0 5px rgb(0 0 0 / 0.14); display: grid; place-items: center; color: rgb(255 220 200 / 0.75); font: 700 18px Georgia, serif; z-index: 3; }
+
+/* Modern */
+.chronicle-map-viewer .cs-mp-frame[data-frame="modern"] { padding: 8px; border-radius: 18px; background: #24211d; }
+.chronicle-map-viewer .cs-mp-frame[data-frame="modern"] .cs-mp-vpwrap { border-radius: 12px; }
+
+/* Futuristic */
+.chronicle-map-viewer .cs-mp-frame[data-frame="futuristic"] { padding: 24px 18px 30px; border-radius: 4px; background: #04121a; border-color: #0e3a4a; }
+.chronicle-map-viewer .cs-mp-frame[data-frame="futuristic"] .cs-mp-vpwrap { border-radius: 0; box-shadow: 0 0 0 1px rgb(34 211 238 / 0.55), 0 0 22px rgb(34 211 238 / 0.18); }
+.chronicle-map-viewer [data-o="futuristic"] i { position: absolute; width: 22px; height: 22px; border: 0 solid #22d3ee; }
+.chronicle-map-viewer [data-o="futuristic"] i.tl { top: 6px; left: 6px; border-width: 2px 0 0 2px; transform: none; }
+.chronicle-map-viewer [data-o="futuristic"] i.tr { top: 6px; right: 6px; border-width: 2px 2px 0 0; transform: none; }
+.chronicle-map-viewer [data-o="futuristic"] i.br { bottom: 6px; right: 6px; border-width: 0 2px 2px 0; transform: none; }
+.chronicle-map-viewer [data-o="futuristic"] i.bl { bottom: 6px; left: 6px; border-width: 0 0 2px 2px; transform: none; }
+.chronicle-map-viewer .cs-mp-hud { position: absolute; left: 18px; right: 18px; bottom: 8px; display: flex; justify-content: space-between; gap: 12px; font: 10.5px ui-monospace, monospace; color: #67e8f9; letter-spacing: 0.12em; white-space: nowrap; }
+.chronicle-map-viewer .cs-mp-hud.top { top: 6px; bottom: auto; }
+.chronicle-map-viewer .cs-mp-hud span { overflow: hidden; text-overflow: ellipsis; }
+.chronicle-map-viewer .cs-mp-frame[data-frame="futuristic"] .map-viewport::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 8;
+  background: repeating-linear-gradient(0deg, rgb(34 211 238 / 0.06) 0 1px, transparent 1px 4px), linear-gradient(rgb(8 51 68 / 0.18), rgb(8 51 68 / 0.18));
+}
+
+/* Gilded */
+.chronicle-map-viewer .cs-mp-frame[data-frame="gilded"] { padding: 16px; border-radius: 6px; border: 0; background: linear-gradient(135deg, var(--mp-gold-2), var(--mp-gold) 30%, #7a5a22 50%, var(--mp-gold) 70%, var(--mp-gold-2)); }
+.chronicle-map-viewer .cs-mp-frame[data-frame="gilded"] .cs-mp-vpwrap { border-radius: 1px; box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.35), 0 0 0 3px #5b4318; }
+
+/* Tint: the map picture only, never pins or controls. */
+.chronicle-map-viewer .cs-mp-frame[data-tint="1"][data-frame="old"] .map-image { filter: sepia(0.55) saturate(0.9) contrast(1.05); }
+.chronicle-map-viewer .cs-mp-frame[data-tint="1"][data-frame="futuristic"] .map-image { filter: grayscale(0.6) brightness(0.72) contrast(1.1); }
+.chronicle-map-viewer .cs-mp-frame[data-tint="1"][data-frame="arcane"] .map-image { filter: saturate(0.75) brightness(0.88); }
+
+/* ---- Floating controls ---- */
+.chronicle-map-viewer .cs-float { position: absolute; z-index: 20; display: flex; gap: 2px; padding: 4px; background: rgb(30 28 25 / 0.94); border: 1px solid #000; border-radius: 8px; box-shadow: 0 2px 10px rgb(0 0 0 / 0.6); }
+.chronicle-map-viewer .cs-rail { left: 10px; top: 10px; flex-direction: column; }
+.chronicle-map-viewer .cs-zoom { right: 10px; bottom: 10px; flex-direction: column; align-items: center; }
+/* Old's wax seal sits on the bottom-right corner; keep the zoom box clear of it. */
+.chronicle-map-viewer .cs-mp-frame[data-frame="old"] .cs-zoom { bottom: 44px; }
+.chronicle-map-viewer .cs-float-sep { width: 22px; height: 1px; background: #4a443c; margin: 3px auto; }
+.chronicle-map-viewer .cs-float button { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #efe6d8; font-size: 14px; cursor: pointer; padding: 0; line-height: 1; }
+.chronicle-map-viewer .cs-float button:hover { background: rgb(255 255 255 / 0.08); }
+.chronicle-map-viewer .cs-float button.active { background: rgb(255 100 0 / 0.16); border-color: #ff6400; }
+.chronicle-map-viewer .cs-float button:focus-visible { outline: 2px solid #ff6400; outline-offset: 1px; }
+.chronicle-map-viewer .cs-zoom .zoom-indicator { position: static; font: 600 11px system-ui, sans-serif; color: #a69d8f; padding: 2px 0; background: none; }
+
+/* ---- Chronicle pins: Chronicle's shapes around the marker's own icon,
+   the same size on screen at any zoom. ---- */
+.chronicle-map-viewer .chronicle-marker.cs-pin {
+  transform: scale(var(--cs-inv-zoom, 1)); padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; display: block;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.55));
+}
+.chronicle-map-viewer .chronicle-marker.cs-pin > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.chronicle-map-viewer .chronicle-marker.cs-pin .pin-icon { position: absolute; transform: translate(-50%, -50%); color: #fff; filter: none; line-height: 1; }
+.chronicle-map-viewer .chronicle-marker.cs-pin:hover { filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.55)) brightness(1.15); }
+.chronicle-map-viewer .chronicle-marker.cs-pin:hover .pin-icon { transform: translate(-50%, -50%); }
+.chronicle-map-viewer .chronicle-marker.cs-pin.dm-only { outline: none; }
+.chronicle-map-viewer .chronicle-marker.cs-pin.dm-only::after { content: none; }
+.chronicle-map-viewer .cs-pin-badge { position: absolute; right: -6px; top: -4px; width: 16px; height: 16px; border-radius: 50%; background: #1f1d1a; color: #f87171; display: grid; place-items: center; font-size: 8px; border: 1px solid #000; }
+.chronicle-map-viewer .chronicle-marker.cs-pin .pin-label { position: absolute; left: 50%; transform: translateX(-50%); margin-top: 2px; padding: 1px 6px; border-radius: 4px; background: rgb(20 18 16 / 0.85); color: #efe6d8; font-size: 11px; max-width: 160px; }
+/* Chronicle's per-map name setting: always, on hover, or never. */
+.chronicle-map-viewer .cs-labels-hover .chronicle-marker.cs-pin .pin-label { display: none; }
+.chronicle-map-viewer .cs-labels-hover .chronicle-marker.cs-pin:hover .pin-label,
+.chronicle-map-viewer .cs-labels-hover .chronicle-marker.cs-pin:focus-within .pin-label { display: block; }
+.chronicle-map-viewer .cs-labels-never .chronicle-marker.cs-pin .pin-label { display: none !important; }
+
+@media (max-width: 760px) {
+  .chronicle-map-viewer .cs-mp-stage { padding: 4px; }
+  .chronicle-map-viewer .cs-mp-frame[data-frame="atlas"] { padding: 14px 14px 30px; }
+  .chronicle-map-viewer .cs-mp-frame[data-frame="arcane"] { padding: 18px 14px; }
+  .chronicle-map-viewer .cs-mp-frame[data-frame="futuristic"] { padding: 22px 10px 28px; }
+  .chronicle-map-viewer .cs-mp-ticks, .chronicle-map-viewer .cs-mp-side-ticks { display: none; }
+}
+
+}
+
+@layer chronicle-sync {
+/* ---- Maps on character sheets: the Open button and the unfold ---- */
+.cs-map-item { background: rgb(255 100 0 / 0.07); }
+.cs-open-map { display: inline-flex; align-items: center; gap: 5px; width: auto; margin-left: auto; padding: 2px 8px; flex: none; font: 600 11.5px system-ui, sans-serif; line-height: 1.4; color: #ffb27a; background: none; border: 1px solid rgb(255 100 0 / 0.5); border-radius: 4px; cursor: pointer; }
+.cs-open-map:hover { background: rgb(255 100 0 / 0.14); color: #ffd2b0; }
+.cs-open-map:focus-visible { outline: 2px solid #ff6400; outline-offset: 1px; }
+.cs-map-item-banner { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; padding: 6px 10px; border-radius: 6px; background: rgb(255 100 0 / 0.07); border: 1px solid rgb(255 100 0 / 0.3); font-size: 12px; }
+/* The folds of a paper map, gone by the time it is flat. */
+.cs-map-creases { position: absolute; inset: 0; pointer-events: none; z-index: 100;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 calc(33.33% - 1px), rgb(0 0 0 / 0.25) calc(33.33% - 1px) 33.33%),
+    repeating-linear-gradient(180deg, transparent 0 calc(50% - 1px), rgb(0 0 0 / 0.25) calc(50% - 1px) 50%); }
+}

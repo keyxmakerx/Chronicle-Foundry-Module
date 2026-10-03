@@ -645,3 +645,24 @@ test('userCanSeeMarker: dm_only, GM, empty and broken rules', () => {
   assert.equal(userCanSeeMarker({ visibility: 'everyone', visibility_rules: 'not json' }, false, 'cu-7'), false);
   assert.equal(userCanSeeMarker(null, true, null), false);
 });
+
+// ---------------------------------------------------------------------
+// §9 — the map's look travels in the page meta players read
+// ---------------------------------------------------------------------
+
+test('_buildMapMeta: resolves the map look with the campaign frame', () => {
+  const ms = new MapSync();
+  ms._look = { campaignFrame: 'arcane', icons: [] };
+  assert.equal(ms._buildMapMeta({ id: 'm1' }).look.frame, 'arcane');
+  const own = ms._buildMapMeta({ id: 'm1', display_settings: { frame: { style: 'old' }, pins: { style: 'flag' } } });
+  assert.equal(own.look.frame, 'old');
+  assert.equal(own.look.pinStyle, 'flag');
+});
+
+test('_loadMapLook: a missing route keeps the defaults', async () => {
+  const ms = new MapSync();
+  ms._api = { get: async () => { throw Object.assign(new Error('nope'), { status: 404 }); } };
+  await ms._loadMapLook();
+  assert.equal(ms._look, null);
+  assert.equal(ms._buildMapMeta({ id: 'm1' }).look.frame, 'atlas');
+});
