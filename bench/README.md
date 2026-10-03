@@ -6,8 +6,8 @@ time; the bench checks the whole round trip, which is where most past sync
 bugs lived (a field Chronicle refused, a delete that came back, an edit that
 never left Foundry).
 
-- `fake-foundry.mjs` is an in-memory Foundry world: journals, pages, actors,
-  folders, settings and hooks, with Foundry's semantics where sync bugs hide
+- `fake-foundry.mjs` is an in-memory Foundry world: journals, pages, actors
+  and their items, folders, settings and hooks, with Foundry's semantics where sync bugs hide
   (every write fires its hook with the diff, options and user id; handlers
   are not awaited; page edits fire page hooks).
 - `chronicle.mjs` sets up a campaign through Chronicle's own sign-up and

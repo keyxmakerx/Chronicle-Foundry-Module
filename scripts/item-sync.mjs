@@ -11,12 +11,21 @@
  * actor-sync.mjs, loading item field definitions from the /item-fields API.
  *
  * Sync flow:
- * - Chronicle → Foundry: Relation events arrive via WebSocket, add/remove Actor items.
+ * - Chronicle → Foundry: a relation event or a change-feed entry for a
+ *   character reconciles that character's inventory with its relations.
  * - Foundry → Chronicle: Item hooks on Actors push to Chronicle API as relations.
  */
 
 import { getSetting } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
+import { collapseChanges } from './_change-feed.mjs';
+import { HAS_ITEM, planInventory, itemDataFor } from './_inventory-plan.mjs';
+
+/** The actor linked to a Chronicle character, or null. */
+function linkedActor(entityId) {
+  if (!entityId) return null;
+  return game.actors.find((a) => a.getFlag(FLAG_SCOPE, 'entityId') === entityId) || null;
+}
 
 /**
  * ItemSync handles item inventory synchronization between Chronicle
@@ -46,6 +55,9 @@ export class ItemSync {
      * @type {boolean}
      */
     this._loggedSkipNoTarget = false;
+
+    /** @type {Map<string, Promise>} Per-actor reconcile chain. */
+    this._reconciling = new Map();
 
     // Bound hook handlers for cleanup.
     this._onCreateItem = this._handleCreateItem.bind(this);
@@ -79,20 +91,23 @@ export class ItemSync {
   }
 
   /**
-   * Handle incoming WebSocket messages for relation events.
-   * Processes "Has Item" relations to sync inventory.
+   * Relation events from Chronicle, one per relation row, keyed on the
+   * row's source entity. Any change to a character's relations reconciles
+   * that character's whole inventory, so a missed, repeated or out-of-order
+   * event cannot leave it wrong and the item's own echo cannot copy it.
    * @param {object} msg
    */
   async onMessage(msg) {
-    if (!this._api) return;
-
-    // Handle relation events for item inventory.
-    if (msg.type === 'relation.created') {
-      await this._onRelationCreated(msg.payload);
-    } else if (msg.type === 'relation.deleted') {
-      await this._onRelationDeleted(msg.payload);
-    } else if (msg.type === 'relation.metadata_updated') {
-      await this._onRelationMetadataUpdated(msg.payload);
+    if (!this._api || !getSetting('syncCharacters')) return;
+    if (!String(msg?.type || '').startsWith('relation.')) return;
+    const p = msg.payload || {};
+    if (p.relationType && p.relationType !== HAS_ITEM) return;
+    const actor = linkedActor(p.sourceEntityId || msg.resourceId);
+    if (!actor) return;
+    try {
+      await this._reconcileActor(actor);
+    } catch (err) {
+      console.warn(`Chronicle: Failed to refresh inventory for "${actor.name}"`, err);
     }
   }
 
@@ -105,34 +120,96 @@ export class ItemSync {
     // Items are synced via relations, not top-level mappings.
   }
 
+  /** Change-feed area (see SyncManager._performInitialSync). */
+  get feedArea() { return 'items'; }
+
   /**
-   * Perform initial sync: pull inventory relations for linked actors.
+   * Inventory changes are recorded as `relation`; until a cursor was taken
+   * while the server recorded them, every character is reconciled.
    */
-  async onInitialSync() {
-    if (!this._api) return;
+  get feedType() { return 'relation'; }
 
-    // For each synced actor, pull their "Has Item" relations.
-    const syncedActors = game.actors.filter(
-      (a) => a.getFlag(FLAG_SCOPE, 'entityId')
-    );
+  /** Inventories sync only alongside characters. */
+  feedActive() {
+    return !!this._api && !!getSetting('syncCharacters');
+  }
 
-    for (const actor of syncedActors) {
-      const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
-      if (!entityId) continue;
+  /**
+   * Connect catch-up. With the change feed only characters whose relations
+   * changed are reconciled; without it, every linked character. A failure
+   * throws so the cursor stays and the next connect replays.
+   * @param {{feed?: {mode: 'delta'|'full', changes?: object[]}}} [opts]
+   */
+  async onInitialSync({ feed } = {}) {
+    if (!this._api || !getSetting('syncCharacters')) return;
 
+    let actors;
+    if (feed?.mode === 'delta') {
+      const changed = collapseChanges(feed.changes, 'relation');
+      actors = [...changed.keys()].map(linkedActor).filter(Boolean);
+    } else {
+      actors = game.actors.filter((a) => a.getFlag(FLAG_SCOPE, 'entityId'));
+    }
+
+    let errors = 0;
+    for (const actor of actors) {
       try {
-        const relations = await this._api.get(`/entities/${entityId}/relations`);
-        const itemRelations = (relations || []).filter(
-          (r) => r.relationType === 'Has Item'
-        );
-
-        // Reconcile Foundry inventory with Chronicle relations.
-        for (const rel of itemRelations) {
-          await this._ensureFoundryItem(actor, rel);
-        }
+        await this._reconcileActor(actor);
       } catch (err) {
+        errors++;
         console.warn(`Chronicle: Failed to sync inventory for "${actor.name}"`, err);
       }
+    }
+    if (errors) throw new Error(`inventory catch-up failed for ${errors} character(s)`);
+  }
+
+  /**
+   * Bring one actor's Chronicle-linked items in line with its "Has Item"
+   * relations. Serialized per actor so two events never both add an item.
+   * @param {Actor} actor
+   * @private
+   */
+  _reconcileActor(actor) {
+    const prev = this._reconciling.get(actor.id) || Promise.resolve();
+    const run = prev.catch(() => {}).then(() => this._reconcileNow(actor));
+    this._reconciling.set(actor.id, run);
+    run.finally(() => {
+      if (this._reconciling.get(actor.id) === run) this._reconciling.delete(actor.id);
+    }).catch(() => {});
+    return run;
+  }
+
+  /** @private */
+  async _reconcileNow(actor) {
+    const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
+    if (!entityId) return;
+    const relations = await this._api.get(`/entities/${entityId}/relations`);
+    const list = Array.isArray(relations) ? relations : (relations?.data || []);
+    const plan = planInventory(list, actor.items.contents.map((i) => ({
+      id: i.id,
+      relationId: i.getFlag(FLAG_SCOPE, 'relationId') ?? null,
+      entityId: i.getFlag(FLAG_SCOPE, 'entityId') ?? null,
+      quantity: i.system?.quantity,
+      equipped: i.system?.equipped,
+    })));
+    if (!plan.create.length && !plan.update.length && !plan.adopt.length && !plan.remove.length) return;
+
+    this._syncing = true;
+    try {
+      for (const { id, relationId } of plan.adopt) {
+        await actor.items.get(id)?.setFlag(FLAG_SCOPE, 'relationId', relationId);
+      }
+      for (const { id, change } of plan.update) {
+        await actor.items.get(id)?.update(change);
+      }
+      if (plan.create.length) {
+        await actor.createEmbeddedDocuments('Item', plan.create.map((r) => itemDataFor(r)));
+      }
+      if (plan.remove.length) {
+        await actor.deleteEmbeddedDocuments('Item', plan.remove);
+      }
+    } finally {
+      this._syncing = false;
     }
   }
 
@@ -143,146 +220,6 @@ export class ItemSync {
     Hooks.off('createItem', this._onCreateItem);
     Hooks.off('deleteItem', this._onDeleteItem);
     Hooks.off('updateItem', this._onUpdateItem);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Chronicle → Foundry
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Handle a new "Has Item" relation from Chronicle.
-   * Adds the item to the Foundry actor's inventory.
-   * @param {object} relation
-   * @private
-   */
-  async _onRelationCreated(relation) {
-    if (relation.relationType !== 'Has Item') return;
-
-    // Find the linked Foundry actor for the source entity.
-    const actor = game.actors.find(
-      (a) => a.getFlag(FLAG_SCOPE, 'entityId') === relation.sourceEntityId
-    );
-    if (!actor) return;
-
-    await this._ensureFoundryItem(actor, relation);
-  }
-
-  /**
-   * Handle a deleted "Has Item" relation from Chronicle.
-   * Removes the item from the Foundry actor's inventory.
-   * @param {object} data
-   * @private
-   */
-  async _onRelationDeleted(data) {
-    if (data.relationType !== 'Has Item') return;
-
-    const actor = game.actors.find(
-      (a) => a.getFlag(FLAG_SCOPE, 'entityId') === data.sourceEntityId
-    );
-    if (!actor) return;
-
-    // Find the Foundry item linked to this relation.
-    const item = actor.items.find(
-      (i) => i.getFlag(FLAG_SCOPE, 'relationId') === data.id
-    );
-    if (!item) return;
-
-    try {
-      this._syncing = true;
-      await item.delete();
-      console.debug(`Chronicle: Removed item "${item.name}" from "${actor.name}" inventory`);
-    } catch (err) {
-      console.error('Chronicle: Failed to remove inventory item', err);
-    } finally {
-      this._syncing = false;
-    }
-  }
-
-  /**
-   * Handle updated relation metadata (quantity, equipped, attuned).
-   * @param {object} data
-   * @private
-   */
-  async _onRelationMetadataUpdated(data) {
-    if (data.relationType !== 'Has Item') return;
-
-    const actor = game.actors.find(
-      (a) => a.getFlag(FLAG_SCOPE, 'entityId') === data.sourceEntityId
-    );
-    if (!actor) return;
-
-    const item = actor.items.find(
-      (i) => i.getFlag(FLAG_SCOPE, 'relationId') === data.id
-    );
-    if (!item) return;
-
-    try {
-      this._syncing = true;
-      const meta = typeof data.metadata === 'string'
-        ? JSON.parse(data.metadata)
-        : data.metadata || {};
-
-      const updateData = {};
-      if (meta.quantity !== undefined) {
-        updateData['system.quantity'] = meta.quantity;
-      }
-      if (meta.equipped !== undefined) {
-        updateData['system.equipped'] = meta.equipped;
-      }
-
-      if (Object.keys(updateData).length > 0) {
-        await item.update(updateData);
-      }
-      console.debug(`Chronicle: Updated item "${item.name}" metadata in "${actor.name}" inventory`);
-    } catch (err) {
-      console.error('Chronicle: Failed to update inventory item metadata', err);
-    } finally {
-      this._syncing = false;
-    }
-  }
-
-  /**
-   * Ensure a Foundry item exists on the actor for a Chronicle relation.
-   * @param {Actor} actor
-   * @param {object} relation
-   * @private
-   */
-  async _ensureFoundryItem(actor, relation) {
-    // Check if already linked.
-    const existing = actor.items.find(
-      (i) => i.getFlag(FLAG_SCOPE, 'relationId') === relation.id
-    );
-    if (existing) return;
-
-    try {
-      this._syncing = true;
-      const meta = typeof relation.metadata === 'string'
-        ? JSON.parse(relation.metadata)
-        : relation.metadata || {};
-
-      const itemData = {
-        name: relation.targetEntityName || 'Unknown Item',
-        type: 'equipment', // Default Foundry item type.
-        flags: {
-          [FLAG_SCOPE]: {
-            relationId: relation.id,
-            entityId: relation.targetEntityId,
-            lastSync: new Date().toISOString(),
-          },
-        },
-        system: {
-          quantity: meta.quantity ?? 1,
-          equipped: meta.equipped ?? false,
-        },
-      };
-
-      await actor.createEmbeddedDocuments('Item', [itemData]);
-      console.debug(`Chronicle: Added "${itemData.name}" to "${actor.name}" inventory`);
-    } catch (err) {
-      console.error('Chronicle: Failed to add item to actor inventory', err);
-    } finally {
-      this._syncing = false;
-    }
   }
 
   // ---------------------------------------------------------------------------
@@ -332,7 +269,7 @@ export class ItemSync {
       // structured JSON rather than a double-encoded string.
       const relation = await this._api.post(`/entities/${entityId}/relations`, {
         target_entity_id: targetEntityId,
-        relation_type: 'Has Item',
+        relation_type: HAS_ITEM,
         reverse_relation_type: 'In Inventory Of',
         metadata: {
           quantity: item.system?.quantity ?? 1,

@@ -33,7 +33,7 @@ test('walk follows hasMore and returns the last next', async () => {
 
 test('resetRequired returns the head with no changes', async () => {
   const res = await walkChangeFeed(async () => ({ changes: [], next: 400, resetRequired: true }), 3);
-  assert.deepEqual(res, { changes: [], next: 400, resetRequired: true, complete: true });
+  assert.deepEqual(res, { changes: [], next: 400, resetRequired: true, complete: true, types: null });
 });
 
 test('a response without next is an error, not a cursor of NaN', async () => {
@@ -68,7 +68,7 @@ test('collapse keeps one outcome per resource, filtered by type', () => {
 });
 
 test('a cursor belongs to one campaign', () => {
-  assert.deepEqual(cursorFor({ campaignId: 'c1', seq: 5, areas: ['journals'], createdAfter: 'T0' }, 'c1'), { seq: 5, areas: ['journals'], createdAfter: 'T0' });
+  assert.deepEqual(cursorFor({ campaignId: 'c1', seq: 5, areas: ['journals'], createdAfter: 'T0' }, 'c1'), { seq: 5, areas: ['journals'], createdAfter: 'T0', types: [] });
   assert.equal(cursorFor({ campaignId: 'c1', seq: 5 }, 'c1').createdAfter, null);
   assert.equal(cursorFor({ campaignId: 'c1', seq: 5 }, 'c2'), null);
   assert.equal(cursorFor(null, 'c1'), null);
@@ -119,7 +119,7 @@ test('no cursor: walk to the head, rescan, save the head', async () => {
   assert.equal(await sm._performInitialSync(), true);
   assert.match(urls.find((u) => u.startsWith('/sync/changes')), /since=0/);
   assert.deepEqual(mod.seen, [{ mode: 'full' }]);
-  assert.deepEqual(settings.changeFeedCursor, { campaignId: 'c1', seq: 10, areas: ['journals'], createdAfter: 'T' });
+  assert.deepEqual(settings.changeFeedCursor, { campaignId: 'c1', seq: 10, areas: ['journals'], createdAfter: 'T', types: [] });
 });
 
 test('a saved cursor hands the area its changes and advances', async () => {
@@ -163,7 +163,7 @@ test('another campaign\'s cursor is ignored', async () => {
   await sm._performInitialSync();
   assert.match(urls.find((u) => u.startsWith('/sync/changes')), /since=0/);
   assert.deepEqual(mod.seen, [{ mode: 'full' }]);
-  assert.deepEqual(settings.changeFeedCursor, { campaignId: 'c1', seq: 3, areas: ['journals'], createdAfter: 'T' });
+  assert.deepEqual(settings.changeFeedCursor, { campaignId: 'c1', seq: 3, areas: ['journals'], createdAfter: 'T', types: [] });
 });
 
 test('no feed on the server: rescan and save nothing', async () => {
@@ -181,7 +181,7 @@ test('an area switched off is left out of the saved cursor', async () => {
   const { sm } = makeManager({ feed: () => ({ changes: [], next: 12, hasMore: false }), modules: [off] });
   await sm._performInitialSync();
   assert.deepEqual(off.seen, [undefined]);
-  assert.deepEqual(settings.changeFeedCursor, { campaignId: 'c1', seq: 12, areas: [], createdAfter: 'T' });
+  assert.deepEqual(settings.changeFeedCursor, { campaignId: 'c1', seq: 12, areas: [], createdAfter: 'T', types: [] });
   settings.changeFeedCursor = null;
 });
 
@@ -266,4 +266,32 @@ test('delta: a failed fetch throws so the cursor is not advanced', async () => {
   await assert.rejects(js.onInitialSync({ feed: { mode: 'delta', changes: [ch(1, 'e1'), ch(2, 'e2')] } }));
   // The other page still applied; the replay will skip it by version.
   assert.deepEqual(updated, ['e2']);
+});
+
+test('an area needing a resource type gets the delta only if the server recorded it when the cursor was saved', () => {
+  const feed = { mode: 'delta', changes: [ch(1, 'hero', 'updated', 'relation')], next: 1 };
+  assert.equal(feedForArea(feed, { seq: 0, areas: ['items'], types: ['entity', 'relation'] }, 'items', 'relation').mode, 'delta');
+  assert.equal(feedForArea(feed, { seq: 0, areas: ['items'], types: ['entity'] }, 'items', 'relation').mode, 'full');
+  assert.equal(feedForArea(feed, { seq: 0, areas: ['items'] }, 'items', 'relation').mode, 'full');
+});
+
+test('the walk reports the recorded types; an older server reports none', async () => {
+  const pages = [{ changes: [], next: 3, hasMore: false, types: ['entity', 'relation', 7] }];
+  assert.deepEqual((await walkChangeFeed(async () => pages[0], 0)).types, ['entity', 'relation']);
+  assert.equal((await walkChangeFeed(async () => ({ changes: [], next: 3, hasMore: false }), 0)).types, null);
+});
+
+test('the saved cursor keeps the types the server recorded, and an area needing one waits a connect for it', async () => {
+  settings.campaignId = 'c1';
+  settings.changeFeedCursor = { campaignId: 'c1', seq: 10, areas: ['items'], createdAfter: 'T0' };
+  const mod = { ...feedModule('items'), feedType: 'relation' };
+  const { sm } = makeManager({ feed: () => ({ changes: [ch(11, 'hero', 'updated', 'relation')], next: 11, hasMore: false, types: ['entity', 'relation'] }), modules: [mod] });
+  assert.equal(await sm._performInitialSync(), true);
+  assert.deepEqual(mod.seen, [{ mode: 'full' }], 'cursor from before the server recorded relations');
+  assert.deepEqual(settings.changeFeedCursor.types, ['entity', 'relation']);
+
+  mod.seen.length = 0;
+  const again = makeManager({ feed: () => ({ changes: [ch(12, 'hero', 'updated', 'relation')], next: 12, hasMore: false, types: ['entity', 'relation'] }), modules: [mod] });
+  assert.equal(await again.sm._performInitialSync(), true);
+  assert.equal(mod.seen[0].mode, 'delta');
 });
