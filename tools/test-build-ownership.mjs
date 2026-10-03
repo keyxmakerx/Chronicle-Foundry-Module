@@ -4,8 +4,8 @@
  *
  * Covers:
  *   - The shared `_ownership` helper honors the operator's `dmOnlyHidden` +
- *     `defaultOwnership` dashboard settings; JournalSync._buildOwnership and
- *     NoteSync._buildNoteOwnership must both consume it.
+ *     `defaultOwnership` dashboard settings; JournalSync._buildOwnership
+ *     must consume it.
  *   - JournalSync._buildOwnership fails CLOSED (NONE) when the
  *     custom-visibility permissions API errors — a transient error must
  *     never widen a GM-restricted entity to player-visible.
@@ -54,7 +54,6 @@ globalThis.Hooks = globalThis.Hooks || { on: () => {}, once: () => {}, off: () =
 globalThis.ui = globalThis.ui || { notifications: { warn: () => {}, error: () => {}, info: () => {} } };
 
 const { JournalSync } = await import('../scripts/journal-sync.mjs');
-const { NoteSync } = await import('../scripts/note-sync.mjs');
 const { defaultLevelForVisibility, configuredDefaultOwnership } =
   await import('../scripts/_ownership.mjs');
 
@@ -341,24 +340,6 @@ test('§1A _buildOwnership: dmOnlyHidden OFF does NOT count (entity is visible)'
 });
 
 // ---------------------------------------------------------------------
-// §1 — NoteSync._buildNoteOwnership consumes the same helper
-// ---------------------------------------------------------------------
-
-test('_buildNoteOwnership: shared note → defaultOwnership; unshared → NONE', () => {
-  resetSettings();
-  const ns = new NoteSync();
-  assert.deepEqual(ns._buildNoteOwnership({ is_shared: true }), { default: L.OBSERVER });
-  assert.deepEqual(ns._buildNoteOwnership({ is_shared: false }), { default: L.NONE });
-});
-
-test('_buildNoteOwnership: dmOnlyHidden OFF surfaces unshared note at default level', () => {
-  resetSettings();
-  settings.dmOnlyHidden = false;
-  const ns = new NoteSync();
-  assert.deepEqual(ns._buildNoteOwnership({ is_shared: false }), { default: L.OBSERVER });
-});
-
-// ---------------------------------------------------------------------
 // Static-source regression pins
 // ---------------------------------------------------------------------
 
@@ -377,16 +358,6 @@ test('pin: journal-sync custom-visibility catch fails closed (no is_private fall
   assert.ok(
     /defaultLevelForVisibility\(/.test(body),
     '_buildOwnership must use defaultLevelForVisibility (FM-SYNC-HARDENING §1)',
-  );
-});
-
-test('pin: note-sync _buildNoteOwnership uses the shared helper', () => {
-  const src = readFileSync(resolve(REPO_ROOT, 'scripts/note-sync.mjs'), 'utf8');
-  const m = src.match(/_buildNoteOwnership\([^)]*\)\s*\{([\s\S]*?)\n {2}\}/);
-  assert.ok(m, '_buildNoteOwnership body could not be located');
-  assert.ok(
-    /defaultLevelForVisibility\(/.test(m[1]),
-    '_buildNoteOwnership must use defaultLevelForVisibility (FM-SYNC-HARDENING §1)',
   );
 });
 

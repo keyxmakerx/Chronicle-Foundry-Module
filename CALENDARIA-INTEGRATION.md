@@ -119,8 +119,8 @@ cinematic hooks, …) — see `HOOKS` in upstream `constants.mjs`.
 Relevant overlap: Calendaria registers `createJournalEntry`,
 `createJournalEntryPage`, `updateJournalEntry`, `updateJournalEntryPage`,
 `preUpdateJournalEntryPage`, `deleteJournalEntry`, `deleteJournalEntryPage`,
-`preDeleteJournalEntry`, `preDeleteFolder`. **This module's `JournalSync`,
-`NoteSync`, and (SimpleCalendar) `CalendarSync` all share `createJournalEntry`
+`preDeleteJournalEntry`, `preDeleteFolder`. **This module's `JournalSync` and
+(SimpleCalendar) `CalendarSync` both share `createJournalEntry`
 with Calendaria** — hence the need for strict domain ownership checks.
 
 ---
@@ -180,7 +180,7 @@ the entity server‑side. See the cleanup macro below.
    there. The wizard maps types deliberately; the realtime hook should not push
    ambiguous documents at all.
 3. **Multiple modules share `createJournalEntry`.** Scope every journal hook
-   handler to its own domain (flags/folder), the way `NoteSync._isNoteJournal`
+   handler to its own domain (flags/folder), the way `isOldNotesJournal`
    and the calendar guard do — don't assume "any new journal is mine".
 4. **Cleanup must unlink before deleting** (see the delete‑protection note).
 

@@ -258,6 +258,8 @@ Needs a GM and a player client on the same scene, and an NPC page synced as a jo
 - [ ] Starting a second NPC talking stops the first; two minutes with no lines switches it off; a reload doesn't leave it on
 - [ ] Leave a client idle for a minute, or switch its tab away: the glow slows to still, and comes back on return
 - [ ] Reveal a hidden NPC token whose page is hidden: asked once "Show their Chronicle page?"; Yes shows the page to players in Chronicle, No leaves it hidden
+- [ ] On the NPC's Chronicle page press "Show in Foundry": the page says "Sent to Foundry." and both clients play the same spotlight as the star
+- [ ] "Show in Foundry" for an NPC with no token on the GM's scene, or only a hidden one: only the GM gets a notice
 
 ## Error Recovery
 
@@ -300,7 +302,6 @@ Shops, Maps, Notes; Setup: Config, Members; Diagnostics: Status.
 - [ ] **Issues:** badge shows the number of character actors that cannot be matched. Each row offers a "Match to existing…" dropdown with **Match**, and **Create new**. Resolving a row links it and removes it. With none, the tab says every character is linked
 - [ ] **Shops:** shop entities with type, keeper, private lock, "Synced" badge and an **Open** button that opens the Shop window; empty states say whether the "Shop" entity type is missing or just has no shops
 - [ ] **Maps:** per-map rows with marker / drawing / token counts, **Open in Foundry**, external-link icon; **Resync All Maps**, **Open Chronicle Maps Folder**; summary row and dismissible error list (see Map Sync)
-- [ ] **Notes:** Chronicle notes with a status badge (synced / chronicle-only), shared or private icon, last-sync time, and a Pull button on chronicle-only notes
 - [ ] **Config:** Connection (URL, API key as password field, campaign ID, **Test Connection**), Import Wizard button, Sync Scope, Permissions, Behavior (conflict resolution), Exclusion Rules (tags, name) and **Save**; unsaved checkbox/select changes are marked until saved
 - [ ] **Members:** one row per Chronicle campaign member with Matched / Unmatched badge and a Foundry-user dropdown; changing the dropdown saves the mapping; the rail badge counts unmatched members; **Refresh** re-fetches
 - [ ] **Status:** Game System (Foundry and Chronicle system, Character Sync), Diagnostics, Field Mapping, Sync Capability (pick an actor to inspect; **Copy** report and JSON), Error Log, Recent Activity, Diagnostic Bundle copy and System Debug Export copy

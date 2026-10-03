@@ -63,9 +63,6 @@
     <a class="item" data-tab="maps">
       <i class="fa-solid fa-map"></i> Maps
     </a>
-    <a class="item" data-tab="notes">
-      <i class="fa-solid fa-sticky-note"></i> Notes
-    </a>
 
     <div class="rail-group-label">Setup</div>
     <a class="item" data-tab="config">
@@ -847,36 +844,6 @@
         <button type="button" data-action="refresh-members" class="dashboard-btn">
           <i class="fa-solid fa-arrows-rotate"></i> {{localize "CHRONICLE.Dashboard.Members.Refresh"}}
         </button>
-      </div>
-      {{/if}}
-    </div>
-
-    {{!-- ================================================================= --}}
-    {{!-- NOTES TAB                                                         --}}
-    {{!-- ================================================================= --}}
-    <div class="tab" data-tab="notes" data-group="primary">
-      {{#if notes.length}}
-      <div class="notes-list">
-        {{#each notes}}
-        <div class="note-row {{status}}" data-note-id="{{id}}">
-          <span class="note-icon"><i class="fa-solid fa-sticky-note" {{#if color}}style="color: {{color}}"{{/if}}></i></span>
-          <span class="note-title">{{title}}</span>
-          <span class="note-status badge badge-{{status}}">{{status}}</span>
-          <span class="note-shared">{{#if is_shared}}<i class="fa-solid fa-users" title="Shared"></i>{{else}}<i class="fa-solid fa-lock" title="Private"></i>{{/if}}</span>
-          <span class="note-sync-time">{{#if lastSync}}{{timeAgo lastSync}}{{else}}Never{{/if}}</span>
-          {{#if (eq status "chronicle-only")}}
-          <button type="button" data-action="pull-note" data-note-id="{{id}}" class="dashboard-btn btn-xs" title="Pull to Foundry">
-            <i class="fa-solid fa-download"></i>
-          </button>
-          {{/if}}
-        </div>
-        {{/each}}
-      </div>
-      {{else}}
-      <div class="dashboard-empty-tab">
-        <i class="fa-solid fa-sticky-note fa-2x"></i>
-        <p>No Chronicle notes found.</p>
-        <p class="hint">Notes created in Chronicle will appear here when note sync is enabled.</p>
       </div>
       {{/if}}
     </div>

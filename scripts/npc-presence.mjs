@@ -9,6 +9,9 @@
  *   switches itself off after two quiet minutes.
  * - Open page: the NPC's synced Chronicle journal.
  *
+ * "Show in Foundry" on a Chronicle NPC page arrives as `npc.spotlight` and
+ * runs the same spotlight on the active GM's client (`npcSpotlightRelay`).
+ *
  * A token finds its page by an explicit link (a Chronicle journal dropped on
  * the token) or by a unique name match. Revealing a hidden NPC token asks
  * whether to show the page to players too. Nothing here ever reveals a token
@@ -27,6 +30,7 @@ import {
   stepAmp,
   isResting,
   shouldAskReveal,
+  chooseSpotlightToken,
 } from './_npc-presence.mjs';
 
 const CHANNEL = `module.${MODULE_ID}`;
@@ -141,6 +145,38 @@ function _spotlight(token) {
   };
   game.socket.emit(CHANNEL, payload);
   _playSpotlight({ ...payload, name: doc.name });
+}
+
+/**
+ * SyncManager module for Chronicle's `npc.spotlight` (resourceId = page id,
+ * no payload). Only the active GM acts, so several GMs connected at once
+ * don't spotlight twice.
+ */
+export const npcSpotlightRelay = {
+  init() {},
+  destroy() {},
+  onMessage(msg) {
+    if (msg?.type !== 'npc.spotlight') return;
+    if (!game.user.isGM || !game.users?.activeGM?.isSelf) return;
+    _spotlightFromChronicle(msg.resourceId);
+  },
+};
+
+function _spotlightFromChronicle(entityId) {
+  const pages = _pages();
+  const placeables = canvas?.ready ? (canvas.tokens?.placeables ?? []) : [];
+  const pick = chooseSpotlightToken(placeables.map((t) => ({
+    id: t.id, hidden: !!t.document?.hidden, entityId: _tokenPage(t.document, pages)?.entityId ?? null,
+  })), entityId);
+  const token = pick ? canvas.tokens.get(pick.id) : null;
+  if (!token) {
+    const name = pages.find((p) => p.entityId === entityId)?.name;
+    ui.notifications.info(name
+      ? game.i18n.format('CHRONICLE.Npc.SpotlightNotHere', { name })
+      : game.i18n.localize('CHRONICLE.Npc.SpotlightUnknown'));
+    return;
+  }
+  _spotlight(token);
 }
 
 function _onSocket(data, senderId) {

@@ -19,6 +19,7 @@ import {
   TALK_TIMEOUT_MS, IDLE_MS, SPOT,
   normalizeName, matchPageByName, resolveTokenPage, spotlightAction,
   isTalkLive, spotlightRing, talkingRing, stepAmp, isResting, shouldAskReveal,
+  chooseSpotlightToken,
 } from '../scripts/_npc-presence.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -126,4 +127,25 @@ test('players never get the HUD tools', () => {
 test('only a spotlight sent by a GM plays, judged by Foundry\'s sender id', () => {
   assert.match(glue, /function _onSocket\(data, senderId\)/);
   assert.match(glue, /if \(!game\.users\?\.get\(senderId\)\?\.isGM\) return;/);
+});
+
+test('Show in Foundry picks a shown token for that page on this scene, else a hidden one, else none', () => {
+  const tokens = [
+    { id: 't1', entityId: 'e1', hidden: true },
+    { id: 't2', entityId: 'e2', hidden: false },
+    { id: 't3', entityId: 'e1', hidden: false },
+    { id: 't4', entityId: null, hidden: false },
+  ];
+  assert.equal(chooseSpotlightToken(tokens, 'e1').id, 't3');
+  assert.equal(chooseSpotlightToken(tokens.slice(0, 2), 'e1').id, 't1');
+  assert.equal(chooseSpotlightToken(tokens, 'e9'), null);
+  assert.equal(chooseSpotlightToken(tokens, ''), null);
+  assert.equal(chooseSpotlightToken(null, 'e1'), null);
+});
+
+test('a Chronicle spotlight runs once, on the active GM, through the normal spotlight', () => {
+  const relay = glue.slice(glue.indexOf('export const npcSpotlightRelay'));
+  assert.match(relay, /msg\?\.type !== 'npc\.spotlight'/);
+  assert.match(relay, /if \(!game\.user\.isGM \|\| !game\.users\?\.activeGM\?\.isSelf\) return;/);
+  assert.match(relay.slice(relay.indexOf('function _spotlightFromChronicle')), /_spotlight\(token\);/);
 });
