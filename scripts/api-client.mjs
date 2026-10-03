@@ -148,6 +148,9 @@ export class ChronicleAPI {
     /** @type {WebSocket|null} */
     this._ws = null;
 
+    /** @type {((path: string) => void)|null} Called before every write request. */
+    this.onWrite = null;
+
     /** @type {Map<string, Set<Function>>} */
     this._listeners = new Map();
 
@@ -220,6 +223,10 @@ export class ChronicleAPI {
 
     const url = `${baseUrl}/api/v1/campaigns/${campaignId}${path}`;
     const method = options.method || 'GET';
+    // Lets the sync history tell this world's own writes from new changes.
+    if (method !== 'GET' && typeof this.onWrite === 'function') {
+      try { this.onWrite(path); } catch { /* never block a request */ }
+    }
 
     const headers = {
       'Authorization': `Bearer ${apiKey}`,

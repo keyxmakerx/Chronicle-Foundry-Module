@@ -9,6 +9,7 @@
  */
 
 import { getSetting, setSetting, getSyncDirections, setSyncDirections, getExcludedTags, setExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
+import { SyncHistoryTab } from './sync-history-tab.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import { confirmDialog, promptDialog } from './_dialogs.mjs';
 import { openSyncCalendar } from './sync-calendar.mjs';
@@ -145,6 +146,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     /** @type {string} Currently active tab (persisted per-client). Defaults to
      * the Overview cockpit so the GM lands on a calm summary, not a dense list. */
     this._activeTab = getSetting('dashboardActiveTab') || 'overview';
+
+    /** The History tab's rows and filters, kept across re-renders. */
+    this._historyTab = new SyncHistoryTab(() => this.api);
 
     /** @type {Set<string>} Currently selected entity IDs for bulk operations. */
     this._selectedEntities = new Set();
@@ -1272,6 +1276,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // --- Tab navigation ---
     this._initTabs(el);
+    this._historyTab.mount(el, this._activeTab === 'history');
 
     // --- Search input ---
     const search = el.querySelector('.dashboard-search');
@@ -1465,6 +1470,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!el) return;
     this._applyActiveTab(el);
     el.querySelector('.dashboard-content')?.scrollTo?.({ top: 0 });
+    if (tabName === 'history') this._historyTab.shown();
   }
 
   // ---------------------------------------------------------------------------

@@ -21,6 +21,7 @@ Bidirectional real-time sync between [Chronicle](https://github.com/keyxmakerx/C
 - **NPC Tokens** — GM token tools for Chronicle NPCs: spotlight, talking glow and open page; "Show in Foundry" on an NPC page spotlights its token
 - **Sync Dashboard** — management UI with diagnostics, error logs, health metrics, a copyable diagnostic bundle and a Setup Wizard for a first import
 - **Permission Mapping** — Chronicle visibility ↔ Foundry ownership levels
+- **Sync History** — a History tab in the Sync Dashboard showing Chronicle's sync history in both directions, the same list the owner sees in Chronicle
 
 ## Compatibility
 

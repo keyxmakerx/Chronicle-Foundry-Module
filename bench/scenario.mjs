@@ -9,7 +9,9 @@ import { newWorld, closeWorld, settle, traffic } from './world.mjs';
 export const FLAG = 'chronicle-sync';
 export const linked = (world) => world.game.journal.contents.filter((j) => j.getFlag(FLAG, 'entityId'));
 export const byEntity = (world, id) => world.game.journal.find((j) => j.getFlag(FLAG, 'entityId') === id);
-export const writes = (reqs) => reqs.filter((r) => r.method !== 'GET');
+// Sync-history reports are a log of the sync, not world data, so they never
+// count as the module writing to Chronicle.
+export const writes = (reqs) => reqs.filter((r) => r.method !== 'GET' && !r.url.startsWith('/sync/history'));
 export const pageText = (j) => j.pages.contents.map((p) => p.text?.content || '').join('');
 
 /** The checks every scenario must pass, whatever it did. */
