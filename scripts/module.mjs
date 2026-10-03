@@ -15,11 +15,18 @@ import { CalendarSync } from './calendar-sync.mjs';
 import { ActorSync } from './actor-sync.mjs';
 import { ItemSync } from './item-sync.mjs';
 import { NoteSync } from './note-sync.mjs';
+import { StashSync } from './stash-sync.mjs';
+import { registerStashSocket } from './stash-client.mjs';
+import { registerStashChat } from './stash-chat.mjs';
+import { registerStashButton } from './stash-window.mjs';
 import { SyncDashboard } from './sync-dashboard.mjs';
 import { MapViewerSheet } from './map-viewer.mjs';
 import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs';
+import { registerNpcPresence } from './npc-presence.mjs';
+import { registerMapSheetItems } from './map-sheet-items.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { openSyncCalendar } from './sync-calendar.mjs';
+import { registerShopRoomSocket } from './shop-room-window.mjs';
 import { notebookAvailable, openNotebook, registerPlayerNotebook } from './player-notebook.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
 import { openDMScreen } from './dm-screen.mjs';
@@ -110,16 +117,37 @@ Hooks.once('ready', async () => {
   syncManager.registerModule(new ActorSync());
   syncManager.registerModule(new ItemSync());
   syncManager.registerModule(new NoteSync());
+  syncManager.registerModule(new StashSync());
 
   // Create UI first so it's always available, even if start() fails.
   dashboard = new SyncDashboard();
   dashboard.bind(syncManager);
   _addStatusIndicator();
   registerCharacterClaimIndicator();
+  // Players open a shop room when the GM shows one (they have no API key);
+  // the active GM answers their buying requests.
+  registerShopRoomSocket();
+  try {
+    registerStashSocket();
+    registerStashChat();
+    registerStashButton();
+  } catch (err) {
+    console.warn('Chronicle Sync | Stashes unavailable', err);
+  }
   try {
     registerPlayerNotebook();
   } catch (err) {
     console.warn('Chronicle Sync | Player notebook unavailable', err);
+  }
+  try {
+    registerMapSheetItems();
+  } catch (err) {
+    console.warn('Chronicle Sync | Map items unavailable', err);
+  }
+  try {
+    registerNpcPresence(() => syncManager?.api ?? null);
+  } catch (err) {
+    console.warn('Chronicle Sync | NPC token tools unavailable', err);
   }
 
   // Move a legacy world-scoped API key into this GM's client scope and

@@ -1,63 +1,22 @@
 <div class="chronicle-map-viewer {{#if hasChronicleMap}}has-chronicle-map{{/if}}" data-page-id="{{pageId}}">
-  {{!-- Toolbar --}}
-  <div class="map-toolbar">
-    <div class="pin-tools">
-      {{#each pinTypes}}
-        <button type="button" class="pin-tool-btn" data-pin-type="{{@key}}"
-                title="{{label}}" style="color: {{color}};">
-          <i class="fa-solid {{faIcon}}"></i>
-        </button>
-      {{/each}}
-    </div>
-
-    {{#if hasChronicleMap}}
-    {{#if isGM}}
-    <div class="toolbar-separator"></div>
-    <div class="chronicle-tools">
-      <button type="button" class="chronicle-tool-btn" data-action="place-chronicle-marker"
-              title="{{localize 'CHRONICLE.MapViewer.PlaceChronicleMarker'}}">
-        <i class="fa-solid fa-location-dot"></i>
-      </button>
-      <button type="button" class="chronicle-tool-btn" data-action="resync-this-map"
-              title="{{localize 'CHRONICLE.MapViewer.ResyncThisMap'}}">
-        <i class="fa-solid fa-arrows-rotate"></i>
-      </button>
-      {{#if chronicleEditUrl}}
-      <a href="{{chronicleEditUrl}}" target="_blank" class="chronicle-tool-btn"
-         title="{{localize 'CHRONICLE.MapViewer.OpenInChronicle'}}">
-        <i class="fa-solid fa-up-right-from-square"></i>
-      </a>
-      {{/if}}
-    </div>
+  {{#if hasChronicleMap}}
+  <div class="cs-mp-head">
+    <i class="fa-solid fa-map" aria-hidden="true"></i>
+    <b class="cs-mp-title">{{mapTitle}}</b>
+    <span class="cs-livechip">{{localize 'CHRONICLE.MapViewer.LiveFromChronicle'}}</span>
+    <span class="cs-mp-sp"></span>
+    {{#if chronicleEditUrl}}
+    <a href="{{chronicleEditUrl}}" target="_blank" rel="noopener" class="cs-mp-headbtn">
+      <i class="fa-solid fa-up-right-from-square" aria-hidden="true"></i>{{localize 'CHRONICLE.MapViewer.OpenInChronicle'}}
+    </a>
     {{/if}}
-    {{/if}}
-
-    <div class="toolbar-separator"></div>
-    <div class="view-tools">
-      <button type="button" class="view-tool-btn" data-action="zoom-in"
-              title="{{localize 'CHRONICLE.MapViewer.ZoomIn'}}">
-        <i class="fa-solid fa-magnifying-glass-plus"></i>
-      </button>
-      <button type="button" class="view-tool-btn" data-action="zoom-out"
-              title="{{localize 'CHRONICLE.MapViewer.ZoomOut'}}">
-        <i class="fa-solid fa-magnifying-glass-minus"></i>
-      </button>
-      <button type="button" class="view-tool-btn" data-action="zoom-reset"
-              title="{{localize 'CHRONICLE.MapViewer.ZoomReset'}}">
-        <i class="fa-solid fa-expand"></i>
-      </button>
-      <button type="button" class="view-tool-btn" data-action="fit-view"
-              title="{{localize 'CHRONICLE.MapViewer.FitView'}}">
-        <i class="fa-solid fa-arrows-to-dot"></i>
-      </button>
-      <button type="button" class="view-tool-btn toggle-labels {{#if showLabels}}active{{/if}}"
-              data-action="toggle-labels"
-              title="{{localize 'CHRONICLE.MapViewer.ToggleLabels'}}">
-        <i class="fa-solid fa-tag"></i>
-      </button>
-    </div>
   </div>
+  {{/if}}
 
+  <div class="cs-mp-stage">
+  <div class="cs-mp-frame" data-frame="{{look.frame}}" data-tint="{{#if look.tint}}1{{else}}0{{/if}}">
+    {{#if hasChronicleMap}}{{> "modules/chronicle-sync/templates/map-frame-ornaments.hbs"}}{{/if}}
+    <div class="cs-mp-vpwrap">
   {{!-- Viewport --}}
   <div class="map-viewport">
     <div class="map-container">
@@ -125,10 +84,8 @@
             <div class="token-hp-fill" style="width: {{hpPercent}}%;"></div>
           </div>
           {{/if}}
-          {{#if ../showLabels}}
           {{#if name}}
-          <span class="token-label">{{name}}</span>
-          {{/if}}
+          <span class="token-label"{{#unless ../showLocalLabels}} style="display: none;"{{/unless}}>{{name}}</span>
           {{/if}}
         </div>
         {{/each}}
@@ -156,30 +113,76 @@
                style="left: {{x}}%; top: {{y}}%;"
                title="{{label}} — {{sharedLabel}}">
             <i class="pin-icon fa-solid {{faIcon}}"></i>
-            {{#if ../showLabels}}
-              <span class="pin-label">{{label}}</span>
-            {{/if}}
+            <span class="pin-label"{{#unless ../showLocalLabels}} style="display: none;"{{/unless}}>{{label}}</span>
           </div>
         {{/each}}
       </div>
 
       {{!-- Chronicle markers (rendered above local pins by DOM order) --}}
       {{#if chronicleMarkers.length}}
-      <div class="chronicle-marker-layer">
+      <div class="chronicle-marker-layer cs-labels-{{labelMode}}" data-labels="{{look.pinLabels}}">
         {{#each chronicleMarkers}}
-          <div class="chronicle-marker {{category}} {{#if isDmOnly}}dm-only{{/if}}"
+          <div class="chronicle-marker cs-pin {{category}} {{#if isDmOnly}}dm-only{{/if}}"
                data-marker-id="{{id}}"
-               style="left: {{x}}%; top: {{y}}%; --marker-color: {{color}};"
+               style="left: {{x}}%; top: {{y}}%; width: {{pin.w}}px; height: {{pin.h}}px; margin-left: -{{pin.ax}}px; margin-top: -{{pin.ay}}px; transform-origin: {{pin.ax}}px {{pin.ay}}px;"
                title="{{label}} — {{audienceLabel}}">
-            <i class="pin-icon fa-solid {{faIcon}}"></i>
-            {{#if ../showLabels}}
-              <span class="pin-label">{{label}}</span>
-            {{/if}}
+            {{{shapeSvg}}}
+            <i class="pin-icon fa-solid {{faIcon}}" style="left: {{pin.icoX}}px; top: {{pin.icoY}}px; font-size: {{pin.icoSize}}px;"></i>
+            {{#if isDmOnly}}<span class="cs-pin-badge"><i class="fa-solid fa-eye-slash"></i></span>{{/if}}
+            {{!-- Shown, on hover, or hidden by the layer's cs-labels-* class. --}}
+            <span class="pin-label" style="top: {{pin.h}}px;">{{label}}</span>
           </div>
         {{/each}}
       </div>
       {{/if}}
     </div>
-    <div class="zoom-indicator">{{zoomPercent}}%</div>
+  </div>
+
+    {{!-- Floating controls sit beside the viewport, not inside it, so a
+          click on them never starts a pan. --}}
+    <div class="cs-float cs-rail" role="toolbar" aria-label="{{localize 'CHRONICLE.MapViewer.MapTools'}}">
+      {{#each pinTypes}}
+        <button type="button" class="pin-tool-btn" data-pin-type="{{@key}}"
+                title="{{label}}" style="color: {{color}};">
+          <i class="fa-solid {{faIcon}}"></i>
+        </button>
+      {{/each}}
+      {{#if hasChronicleMap}}
+      {{#if isGM}}
+      <span class="cs-float-sep"></span>
+      <button type="button" class="chronicle-tool-btn" data-action="place-chronicle-marker"
+              title="{{localize 'CHRONICLE.MapViewer.PlaceChronicleMarker'}}">
+        <i class="fa-solid fa-location-dot"></i>
+      </button>
+      <button type="button" class="chronicle-tool-btn" data-action="resync-this-map"
+              title="{{localize 'CHRONICLE.MapViewer.ResyncThisMap'}}">
+        <i class="fa-solid fa-arrows-rotate"></i>
+      </button>
+      {{/if}}
+      {{/if}}
+    </div>
+    <div class="cs-float cs-zoom">
+      <button type="button" class="view-tool-btn" data-action="zoom-in"
+              title="{{localize 'CHRONICLE.MapViewer.ZoomIn'}}" aria-label="{{localize 'CHRONICLE.MapViewer.ZoomIn'}}">
+        <i class="fa-solid fa-plus"></i>
+      </button>
+      <div class="zoom-indicator">{{zoomPercent}}%</div>
+      <button type="button" class="view-tool-btn" data-action="zoom-out"
+              title="{{localize 'CHRONICLE.MapViewer.ZoomOut'}}" aria-label="{{localize 'CHRONICLE.MapViewer.ZoomOut'}}">
+        <i class="fa-solid fa-minus"></i>
+      </button>
+      <span class="cs-float-sep"></span>
+      <button type="button" class="view-tool-btn" data-action="fit-view"
+              title="{{localize 'CHRONICLE.MapViewer.FitView'}}" aria-label="{{localize 'CHRONICLE.MapViewer.FitView'}}">
+        <i class="fa-solid fa-expand"></i>
+      </button>
+      <button type="button" class="view-tool-btn toggle-labels {{#if showLabels}}active{{/if}}"
+              data-action="toggle-labels"
+              title="{{localize 'CHRONICLE.MapViewer.ToggleLabels'}}" aria-label="{{localize 'CHRONICLE.MapViewer.ToggleLabels'}}">
+        <i class="fa-solid fa-tag"></i>
+      </button>
+    </div>
+    </div>
+  </div>
   </div>
 </div>

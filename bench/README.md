@@ -6,8 +6,8 @@ time; the bench checks the whole round trip, which is where most past sync
 bugs lived (a field Chronicle refused, a delete that came back, an edit that
 never left Foundry).
 
-- `fake-foundry.mjs` is an in-memory Foundry world: journals, pages, actors,
-  folders, settings and hooks, with Foundry's semantics where sync bugs hide
+- `fake-foundry.mjs` is an in-memory Foundry world: journals, pages, actors
+  and their items, folders, settings and hooks, with Foundry's semantics where sync bugs hide
   (every write fires its hook with the diff, options and user id; handlers
   are not awaited; page edits fire page hooks).
 - `chronicle.mjs` sets up a campaign through Chronicle's own sign-up and
@@ -15,9 +15,14 @@ never left Foundry).
   "someone editing in Chronicle".
 - `world.mjs` opens and closes the world (a new `SyncManager` with the real
   sync modules), records the module's requests, and waits until it is quiet.
-- `*.bench.mjs` are the scenarios. Every scenario ends with the same checks:
-  no duplicate pages or journals, both sides agree on names, no failed
-  writes, no hook errors, no error pop-ups.
+  Its `benchAdapter` is the one stand-in: a game system's field mapping
+  (Chronicle `fields_data.hp` ↔ Foundry `system.hp`), because a fresh
+  Chronicle has no system package installed.
+- `scenario.mjs` holds what every scenario shares: the wrapper and the
+  checks each one ends with (no duplicate pages, journals or actors, no
+  character turned into a journal, both sides agree on names, no failed
+  writes, no hook errors, no error pop-ups).
+- `*.bench.mjs` are the scenarios, one file per area.
 
 ## Running it
 

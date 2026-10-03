@@ -47,14 +47,39 @@ async function loadModule() {
     import('../scripts/sync-manager.mjs'),
     import('../scripts/journal-sync.mjs'),
     import('../scripts/actor-sync.mjs'),
-  ]).then(([settings, sm, js, as]) => ({
+    import('../scripts/item-sync.mjs'),
+  ]).then(([settings, sm, js, as, is]) => ({
     registerSettings: settings.registerSettings,
     SyncManager: sm.SyncManager,
     JournalSync: js.JournalSync,
     ActorSync: as.ActorSync,
+    ItemSync: is.ItemSync,
   }));
   return modulesLoaded;
 }
+
+/**
+ * A minimal game-system adapter: Chronicle `fields_data.hp` is Foundry
+ * `system.hp`, and the name follows the entity.
+ */
+export const benchAdapter = {
+  systemId: 'bench',
+  actorType: 'character',
+  characterTypeSlug: 'character',
+  fromChronicleFields(entity) {
+    const out = {};
+    if (entity?.name) out.name = entity.name;
+    const hp = entity?.fields_data?.hp;
+    if (hp !== undefined && hp !== null) out['system.hp'] = hp;
+    return out;
+  },
+  toChronicleFields(actor) {
+    return actor.system?.hp === undefined ? {} : { hp: actor.system.hp };
+  },
+  toChronicleFieldsChanged(actor, change) {
+    return change?.system?.hp === undefined ? null : { hp: change.system.hp };
+  },
+};
 
 /** A new, empty Foundry world wired to `seed`'s campaign. */
 export function newWorld(seed, { settings = {} } = {}) {
@@ -95,7 +120,15 @@ export async function openWorld(world, { modules = ['journals'] } = {}) {
   }
   const sm = new m.SyncManager();
   if (modules.includes('journals')) sm.registerModule(new m.JournalSync());
-  if (modules.includes('actors')) sm.registerModule(new m.ActorSync());
+  if (modules.includes('actors')) {
+    // The one stand-in on the module side: a game system's field mapping.
+    // Real adapters come from an installed system package, which a fresh
+    // bench Chronicle has none of; everything else is the real ActorSync.
+    const actors = new m.ActorSync();
+    actors._loadAdapter = async () => benchAdapter;
+    sm.registerModule(actors);
+  }
+  if (modules.includes('items')) sm.registerModule(new m.ItemSync());
   world.syncManager = sm;
   await sm.start();
   await waitFor(() => sm._initialSyncDone, 20000, 'initial sync');

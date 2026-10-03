@@ -1,0 +1,28 @@
+{{!-- Chronicle's frame decoration (map_frame.templ). Only the active
+      frame's block shows (data-frame on the parent). Decoration only. --}}
+<div class="cs-mp-orn" aria-hidden="true">
+  <div data-o="atlas">
+    {{#each frameCorners}}
+    <svg class="{{this}}" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 28V9q0-7 7-7h19M6 28V12q0-6 6-6h16"></path><path d="M11 11c3 0 5 2 5 5M11 11c0 3 2 5 5 5"></path><circle cx="11" cy="11" r="1.6" fill="currentColor"></circle></svg>
+    {{/each}}
+    <div class="cs-mp-ticks"><span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span></div>
+    <div class="cs-mp-side-ticks"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span></div>
+    <div class="cs-mp-cart">{{mapTitle}}</div>
+  </div>
+  <div data-o="arcane">
+    {{#each frameCorners}}
+    <svg class="{{this}}" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="15" cy="15" r="11"></circle><path d="M15 4l9.5 16.5h-19z"></path><circle cx="15" cy="15" r="3"></circle></svg>
+    {{/each}}
+    <div class="cs-mp-runes t">ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ ᚷ ᚹ ᚺ ᚾ ᛁ ᛃ ᛇ ᛈ ᛉ ᛊ ᛏ ᛒ ᛖ ᛗ ᛚ ᛜ ᛞ ᛟ ᚠ ᚢ ᚦ ᚨ ᚱ ᚲ</div>
+    <div class="cs-mp-runes b">ᛟ ᛞ ᛜ ᛚ ᛗ ᛖ ᛒ ᛏ ᛊ ᛉ ᛈ ᛇ ᛃ ᛁ ᚾ ᚺ ᚹ ᚷ ᚲ ᚱ ᚨ ᚦ ᚢ ᚠ ᛟ ᛞ ᛜ ᛚ ᛗ ᛖ</div>
+  </div>
+  <div data-o="old">
+    <div class="cs-mp-seal">{{mapInitial}}</div>
+    <div class="cs-mp-cart">{{mapTitle}}</div>
+  </div>
+  <div data-o="futuristic">
+    <i class="tl"></i><i class="tr"></i><i class="br"></i><i class="bl"></i>
+    <div class="cs-mp-hud top"><span>CHART // {{mapTitleUpper}}</span><span>LINK OK</span></div>
+    <div class="cs-mp-hud"><span>&nbsp;</span><span class="cs-mp-hudzoom">ZOOM {{zoomPercent}}%</span></div>
+  </div>
+</div>

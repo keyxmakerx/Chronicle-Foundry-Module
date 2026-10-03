@@ -13,6 +13,7 @@ import { getSetting, getSyncExclusions } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
 import { FLAG_SCOPE, SYNC_OPTIONS } from './constants.mjs';
 import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
+import { toFoundrySecrets, toChronicleSecrets, secretBlockRanges, PART_ATTR } from './_gm-secrets.mjs';
 import { defaultLevelForVisibility } from './_ownership.mjs';
 import { isCalendarNoteJournal } from './calendar-sync.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
@@ -52,6 +53,46 @@ function _resolveEntityImageSrc(imagePath) {
 /**
  * JournalSync handles entity ↔ JournalEntry synchronization.
  */
+/**
+ * Where a page that breaks at heading match `m` starts: at the heading, or
+ * earlier at the GM-only start of that same heading, which pull split into
+ * a secret block just before it.
+ * @param {string} html
+ * @param {RegExpMatchArray} m
+ * @param {Array<[number, number]>} secret - secretBlockRanges(html)
+ * @returns {number}
+ */
+function headingStart(html, m, secret) {
+  const part = getPart(m[0]);
+  let start = m.index;
+  if (!part) return start;
+  for (;;) {
+    const before = secret.find(([, end]) => end <= start && !html.slice(end, start).trim());
+    if (!before || getPart(html.slice(before[0], before[1])) !== part) return start;
+    start = before[0];
+  }
+}
+
+function getPart(html) {
+  const tag = /^<[^>]*>/.exec(html);
+  const m = tag && new RegExp(`\\s${PART_ATTR}=(["'])([^"']*)\\1`, 'i').exec(tag[0]);
+  return m ? m[2] : null;
+}
+
+/** True when page text begins with an h1/h2, after any GM-only start of it. */
+function startsWithHeading(content) {
+  const text = content.trim();
+  if (/^<h[12][^>]*>/i.test(text)) return true;
+  const at = secretBlockRanges(text);
+  let pos = 0;
+  for (const [start, end] of at) {
+    if (start !== pos) break;
+    pos = end;
+    while (/\s/.test(text[pos] || '')) pos++;
+  }
+  return pos > 0 && /^<h[12][^>]*>/i.test(text.slice(pos));
+}
+
 export class JournalSync {
   constructor() {
     /** @type {import('./api-client.mjs').ChronicleAPI|null} */
@@ -610,17 +651,20 @@ export class JournalSync {
       name: entity.name,
       ownership,
       [`flags.${FLAG_SCOPE}.entityType`]: entity.type_name || '',
-      [`flags.${FLAG_SCOPE}.fields`]: entity.fields_data || {},
+      // Field values are not kept on the journal: every client receives its
+      // flags, and the Owner key's copy includes GM-only fields. Removes the
+      // copy older versions stored.
+      [`flags.${FLAG_SCOPE}.-=fields`]: null,
       [`flags.${FLAG_SCOPE}.tags`]: entity.tags || [],
       [`flags.${FLAG_SCOPE}.lastSync`]: new Date().toISOString(),
       [`flags.${FLAG_SCOPE}.chronicleUpdatedAt`]: entity.updated_at || '',
     }, SYNC_OPTIONS);
 
     // Split entity content into pages and sync them.
-    await this._syncPagesToJournal(journal, _sanitizeIncomingHTML(entity.entry_html || ''));
+    await this._syncPagesToJournal(journal, _sanitizeIncomingHTML(toFoundrySecrets(entity.entry_html || '')));
 
     // Sync player notes page.
-    await this._syncPlayerNotesPage(journal, _sanitizeIncomingHTML(entity.player_notes_html || ''));
+    await this._syncPlayerNotesPage(journal, _sanitizeIncomingHTML(toFoundrySecrets(entity.player_notes_html || '')));
 
     console.debug(`Chronicle: Updated journal "${journal.name}" from entity`);
   }
@@ -754,7 +798,7 @@ export class JournalSync {
 
     // Split entity content into pages by top-level headings.
     // Sanitize at ingress before splitting (defense-in-depth).
-    const sections = this._splitByHeadings(_sanitizeIncomingHTML(entity.entry_html || ''));
+    const sections = this._splitByHeadings(_sanitizeIncomingHTML(toFoundrySecrets(entity.entry_html || '')));
 
     let sortIndex = 1;
     for (const section of sections) {
@@ -780,7 +824,7 @@ export class JournalSync {
       pages.push({
         name: 'Player Notes',
         type: 'text',
-        text: { content: _sanitizeIncomingHTML(entity.player_notes_html) },
+        text: { content: _sanitizeIncomingHTML(toFoundrySecrets(entity.player_notes_html)) },
         sort: sortIndex++,
         ownership: { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER },
         flags: { [FLAG_SCOPE]: { isPlayerNotes: true } },
@@ -802,7 +846,6 @@ export class JournalSync {
         [FLAG_SCOPE]: {
           entityId: entity.id,
           entityType: entity.type_name || '',
-          fields: entity.fields_data || {},
           tags: entity.tags || [],
           lastSync: new Date().toISOString(),
           chronicleUpdatedAt: entity.updated_at || '',
@@ -1464,8 +1507,13 @@ export class JournalSync {
     if (!html) return [{ title: 'Content', content: '' }];
 
     // Match h1 or h2 tags to use as page break points.
+    // A heading inside a GM secret block is not a break: its text would
+    // become a page name players can read.
     const headingRegex = /<h[12][^>]*>(.*?)<\/h[12]>/gi;
-    const matches = [...html.matchAll(headingRegex)];
+    const secret = secretBlockRanges(html);
+    const matches = [...html.matchAll(headingRegex)]
+      .filter((m) => !secret.some(([start, end]) => m.index >= start && m.index < end))
+      .map((m) => ({ m, start: headingStart(html, m, secret) }));
 
     // No headings found — return as single page.
     if (matches.length === 0) {
@@ -1475,17 +1523,15 @@ export class JournalSync {
     const sections = [];
 
     // Content before the first heading (if any).
-    const preContent = html.substring(0, matches[0].index).trim();
+    const preContent = html.substring(0, matches[0].start).trim();
     if (preContent) {
       sections.push({ title: 'Overview', content: preContent });
     }
 
     // Each heading starts a new section, ending at the next heading or end of string.
     for (let i = 0; i < matches.length; i++) {
-      const match = matches[i];
-      const startAfterHeading = match.index + match[0].length;
-      const endIndex = i + 1 < matches.length ? matches[i + 1].index : html.length;
-      const sectionContent = html.substring(startAfterHeading, endIndex).trim();
+      const { m: match, start } = matches[i];
+      const endIndex = i + 1 < matches.length ? matches[i + 1].start : html.length;
 
       // Strip HTML tags from heading text for the page title.
       const title = match[1].replace(/<[^>]*>/g, '').trim() || `Section ${i + 1}`;
@@ -1493,7 +1539,7 @@ export class JournalSync {
       // Include the heading in the page content for context.
       sections.push({
         title,
-        content: match[0] + sectionContent,
+        content: html.substring(start, endIndex).trim(),
       });
     }
 
@@ -1509,6 +1555,11 @@ export class JournalSync {
    * @private
    */
   _collectTextPages(journal) {
+    return toChronicleSecrets(this._joinTextPages(journal));
+  }
+
+  /** @private */
+  _joinTextPages(journal) {
     const textPages = journal.pages
       .filter((p) => p.type === 'text' && !p.getFlag(FLAG_SCOPE, 'isPlayerNotes'))
       .sort((a, b) => a.sort - b.sort);
@@ -1520,8 +1571,9 @@ export class JournalSync {
     return textPages
       .map((page) => {
         const content = page.text?.content || '';
-        // If the page content already starts with a heading, use it as-is.
-        if (/^<h[12][^>]*>/i.test(content.trim())) return content;
+        // If the page content already starts with a heading, use it as-is
+        // (a GM-only start of that heading may come first).
+        if (startsWithHeading(content)) return content;
         // Otherwise, wrap the page name as an h2 heading.
         return `<h2>${page.name}</h2>\n${content}`;
       })
@@ -1539,7 +1591,7 @@ export class JournalSync {
       (p) => p.getFlag(FLAG_SCOPE, 'isPlayerNotes')
     );
     if (!playerNotesPage) return null;
-    return playerNotesPage.text?.content || '';
+    return toChronicleSecrets(playerNotesPage.text?.content || '');
   }
 
   /**
