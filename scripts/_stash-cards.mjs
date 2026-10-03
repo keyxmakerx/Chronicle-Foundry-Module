@@ -67,6 +67,8 @@ export function requestCardModel(line) {
     what,
     isMoney: money,
     where: [line.fromName, line.toName].filter(Boolean).join(' → '),
+    to: line.toName || '',
+    byId: '',
     state: stateForStatus(line.status) ?? CARD_STATE.PENDING,
     by: '',
   };
