@@ -117,22 +117,54 @@ export class ItemSync {
     );
 
     for (const actor of syncedActors) {
-      const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
-      if (!entityId) continue;
+      await this.refreshInventory(actor, { reconcile: false });
+    }
+  }
 
-      try {
-        const relations = await this._api.get(`/entities/${entityId}/relations`);
-        const itemRelations = (relations || []).filter(
-          (r) => r.relationType === 'Has Item'
-        );
+  /**
+   * Pull one actor's inventory from Chronicle's "Has Item" relations: add what
+   * is missing and, with `reconcile`, also update quantities and drop items
+   * Chronicle no longer has. Goes through the same handlers as the live
+   * relation events. A failed fetch changes nothing.
+   * @param {Actor} actor
+   * @param {{reconcile?: boolean}} [opts] - the startup pass only adds.
+   */
+  async refreshInventory(actor, { reconcile = true } = {}) {
+    if (!this._api) return;
+    const entityId = actor?.getFlag(FLAG_SCOPE, 'entityId');
+    if (!entityId) return;
 
-        // Reconcile Foundry inventory with Chronicle relations.
-        for (const rel of itemRelations) {
+    try {
+      const relations = await this._api.get(`/entities/${entityId}/relations`);
+      const list = Array.isArray(relations) ? relations : relations?.data;
+      if (!Array.isArray(list)) return;
+      const itemRelations = list.filter((r) => r.relationType === 'Has Item');
+
+      for (const rel of itemRelations) {
+        const linked = actor.items.find((i) => i.getFlag(FLAG_SCOPE, 'relationId') === rel.id);
+        if (!linked) {
           await this._ensureFoundryItem(actor, rel);
+        } else if (reconcile) {
+          await this._onRelationMetadataUpdated({ ...rel, sourceEntityId: entityId });
         }
-      } catch (err) {
-        console.warn(`Chronicle: Failed to sync inventory for "${actor.name}"`, err);
       }
+
+      if (reconcile) {
+        const live = new Set(itemRelations.map((r) => r.id));
+        const gone = actor.items.filter((i) => {
+          const rid = i.getFlag(FLAG_SCOPE, 'relationId');
+          return rid !== undefined && rid !== null && !live.has(rid);
+        });
+        for (const item of gone) {
+          await this._onRelationDeleted({
+            relationType: 'Has Item',
+            sourceEntityId: entityId,
+            id: item.getFlag(FLAG_SCOPE, 'relationId'),
+          });
+        }
+      }
+    } catch (err) {
+      console.warn(`Chronicle: Failed to sync inventory for "${actor.name}"`, err);
     }
   }
 

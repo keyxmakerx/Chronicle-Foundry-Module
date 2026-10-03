@@ -324,6 +324,21 @@ export class ActorSync {
   }
 
   /**
+   * Re-read one linked character from Chronicle and apply it to its actor.
+   * The same fetch-and-apply the entity.updated event does, for callers that
+   * know a character changed without receiving the entity (stash moves).
+   * @param {string} entityId
+   * @returns {Promise<boolean>} whether an actor was refreshed.
+   */
+  async refreshFromChronicle(entityId) {
+    if (!this._adapter || !this._api || !getSetting('syncCharacters')) return false;
+    const entity = await this._api.get(`/entities/${entityId}`);
+    if (!entity) return false;
+    await this._onCharacterUpdated(entity);
+    return true;
+  }
+
+  /**
    * Apply Chronicle entity data to a Foundry Actor.
    * @param {Actor} actor
    * @param {object} entity

@@ -1,0 +1,95 @@
+<div class="chronicle-stashes">
+  <header class="cs-top">
+    <span class="cs-pill{{#if downtimeOpen}} cs-pill-open{{/if}}">{{pillText}}</span>
+    <nav class="cs-tabs">
+      <button type="button" data-cs-tab="move" class="{{#if isMove}}active{{/if}}">{{localize "CHRONICLE.Stashes.TabMove"}}</button>
+      <button type="button" data-cs-tab="history" class="{{#unless isMove}}active{{/unless}}">{{localize "CHRONICLE.Stashes.TabHistory"}}</button>
+    </nav>
+    <button type="button" class="cs-refresh" data-cs-refresh title="{{localize 'CHRONICLE.Stashes.Refresh'}}"><i class="fa-solid fa-rotate"></i></button>
+  </header>
+
+  {{#if error}}<p class="cs-error" role="alert">{{error}}</p>{{/if}}
+  {{#if loading}}<p class="cs-note">{{localize "CHRONICLE.Stashes.Loading"}}</p>{{/if}}
+
+  {{#if hasView}}
+    {{#if isMove}}
+      <div class="cs-sides">
+        <section class="cs-side" data-cs-side="left">
+          <h3 class="cs-side-title">{{character.name}}</h3>
+          {{#if character.hasMoney}}
+            <div class="cs-row cs-money{{#if character.moneySelected}} selected{{/if}}" draggable="true" data-cs-pick="left" data-cs-kind="money">
+              <span class="cs-name">{{localize "CHRONICLE.Stashes.Money"}}</span>
+              <span class="cs-qty">{{character.money}}</span>
+            </div>
+          {{else}}
+            <p class="cs-note">{{localize "CHRONICLE.Stashes.NoMoneyField"}}</p>
+          {{/if}}
+          {{#each character.items}}
+            <div class="cs-row{{#if selected}} selected{{/if}}" draggable="true" data-cs-pick="left" data-cs-kind="item" data-cs-item="{{itemId}}">
+              <span class="cs-name">{{name}}</span>
+              <span class="cs-qty">&times;{{quantity}}</span>
+            </div>
+          {{else}}
+            <p class="cs-note">{{localize "CHRONICLE.Stashes.NoItems"}}</p>
+          {{/each}}
+        </section>
+
+        <div class="cs-mid">
+          <button type="button" data-cs-go="right" {{#unless canGoRight}}disabled{{/unless}} title="{{localize 'CHRONICLE.Stashes.MoveToRight'}}"><i class="fa-solid fa-arrow-right"></i></button>
+          <button type="button" data-cs-go="left" {{#unless canGoLeft}}disabled{{/unless}} title="{{localize 'CHRONICLE.Stashes.MoveToLeft'}}"><i class="fa-solid fa-arrow-left"></i></button>
+        </div>
+
+        <section class="cs-side" data-cs-side="right">
+          <select class="cs-dest" data-cs-dest aria-label="{{localize 'CHRONICLE.Stashes.Destination'}}">
+            <option value="">{{localize "CHRONICLE.Stashes.ChooseDestination"}}</option>
+            {{#each destGroups}}
+              <optgroup label="{{label}}">
+                {{#each options}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}
+              </optgroup>
+            {{/each}}
+          </select>
+          {{#if dest}}
+            {{#if dest.loading}}<p class="cs-note">{{localize "CHRONICLE.Stashes.Loading"}}</p>{{/if}}
+            {{#if dest.hidden}}<p class="cs-note">{{localize "CHRONICLE.Stashes.CantSee"}}</p>{{/if}}
+            {{#if dest.showContents}}
+              <div class="cs-row cs-money{{#if dest.moneySelected}} selected{{/if}}" {{#if dest.canTake}}draggable="true"{{/if}} data-cs-pick="right" data-cs-kind="money">
+                <span class="cs-name">{{localize "CHRONICLE.Stashes.Money"}}</span>
+                <span class="cs-qty">{{dest.money}}</span>
+              </div>
+              {{#each dest.items}}
+                <div class="cs-row{{#if selected}} selected{{/if}}" {{#if ../dest.canTake}}draggable="true"{{/if}} data-cs-pick="right" data-cs-kind="item" data-cs-item="{{itemId}}">
+                  <span class="cs-name">{{name}}</span>
+                  <span class="cs-qty">&times;{{quantity}}</span>
+                </div>
+              {{else}}
+                <p class="cs-note">{{localize "CHRONICLE.Stashes.NoItems"}}</p>
+              {{/each}}
+            {{/if}}
+          {{/if}}
+        </section>
+      </div>
+
+      {{#if prompt}}
+        <form class="cs-prompt" data-cs-prompt>
+          <label>
+            <span>{{prompt.label}}</span>
+            <input type="text" inputmode="decimal" name="value" value="{{prompt.value}}" autocomplete="off" data-cs-input>
+          </label>
+          <span class="cs-prompt-sub">{{prompt.summary}}</span>
+          <button type="submit" class="cs-go" {{#if busy}}disabled{{/if}}>{{framing.button}}</button>
+          <button type="button" data-cs-cancel>{{localize "CHRONICLE.Stashes.Cancel"}}</button>
+        </form>
+      {{/if}}
+      <p class="cs-hint">{{framing.hint}}</p>
+      <p class="cs-note">{{localize "CHRONICLE.Stashes.DragHint"}}</p>
+    {{else}}
+      <ul class="cs-history">
+        {{#each history}}
+          <li><span class="cs-when">{{when}}</span> <span class="cs-summary">{{summary}}</span></li>
+        {{else}}
+          <li class="cs-note">{{localize "CHRONICLE.Stashes.NoHistory"}}</li>
+        {{/each}}
+      </ul>
+    {{/if}}
+  {{/if}}
+</div>
