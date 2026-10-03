@@ -22,6 +22,7 @@ import { isMapJournal } from './_journal-ownership.mjs';
 import { pickJournalCreateType, buildEntityCreateBody } from './_journal-create.mjs';
 import { JournalPushDebouncer } from './_journal-push-debounce.mjs';
 import { setAside } from './_set-aside.mjs';
+import { isOldNotesJournal } from './_notes-folder.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { collapseChanges } from './_change-feed.mjs';
 
@@ -295,7 +296,7 @@ export class JournalSync {
    * @private
    */
   async _setAsideIfGone(journal, eid, { knownGone = false } = {}) {
-    if (isCalendarNoteJournal(journal) || this._isHandledByNoteSync(journal) || isMapJournal(journal, FLAG_SCOPE)) return;
+    if (isCalendarNoteJournal(journal) || isOldNotesJournal(journal, FLAG_SCOPE) || isMapJournal(journal, FLAG_SCOPE)) return;
     if (this._isActorLinked(eid)) return;
     let gone = knownGone;
     if (!gone) {
@@ -857,17 +858,18 @@ export class JournalSync {
     // Skip if this journal was created by Chronicle sync.
     if (journal.getFlag(FLAG_SCOPE, 'entityId')) return;
 
-    // Skip journals owned by another sync domain: calendar modules, maps and
-    // Chronicle Notes also persist as JournalEntries, and CalendarSync /
-    // MapSync / NoteSync mirror them to their own Chronicle resource. Pushed
-    // as pages they would fail (maps) or be filed under an arbitrary type.
-    // Mirrors _isHandledByActorSync.
+    // Skip journals owned by another sync domain: calendar modules and maps
+    // also persist as JournalEntries, and CalendarSync / MapSync mirror them
+    // to their own Chronicle resource. Pushed as pages they would fail (maps)
+    // or be filed under an arbitrary type. The old Chronicle Notes folder is
+    // set aside and must never become pages either. Mirrors
+    // _isHandledByActorSync.
     if (isCalendarNoteJournal(journal)) {
       console.debug(`Chronicle: Skipping journal "${journal.name}" — calendar note (owned by CalendarSync).`);
       return;
     }
-    if (this._isHandledByNoteSync(journal)) {
-      console.debug(`Chronicle: Skipping journal "${journal.name}" — Chronicle Note (owned by NoteSync).`);
+    if (isOldNotesJournal(journal, FLAG_SCOPE)) {
+      console.debug(`Chronicle: Skipping journal "${journal.name}" — old Chronicle Notes folder (set aside).`);
       return;
     }
     if (isMapJournal(journal, FLAG_SCOPE)) {
@@ -965,10 +967,10 @@ export class JournalSync {
     const entityId = journal.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
 
-    // Defensive: a calendar note / Chronicle Note may carry a stale entityId
+    // Defensive: a calendar note / old Chronicle Note may carry a stale entityId
     // from before the create-time guard existed. Don't keep pushing edits to
     // that bogus entity — the cleanup pass unlinks it.
-    if (isCalendarNoteJournal(journal) || this._isHandledByNoteSync(journal)
+    if (isCalendarNoteJournal(journal) || isOldNotesJournal(journal, FLAG_SCOPE)
         || isMapJournal(journal, FLAG_SCOPE)) return;
 
     // Debounced: collapse a typing burst into one push, ~2s after
@@ -1149,25 +1151,6 @@ export class JournalSync {
     if (!actorSync?._adapter) return false;
     return typeof actorSync._isCharacterEntity === 'function'
       ? actorSync._isCharacterEntity(entity)
-      : false;
-  }
-
-  /**
-   * Whether a JournalEntry is a Chronicle Note that NoteSync owns. Note
-   * journals carry an `isNote` flag (or live under the "Chronicle Notes"
-   * folder) and must be mirrored to Chronicle *notes*, not pushed as
-   * entities. Delegates to the registered NoteSync module so the detection
-   * logic lives in one place; mirrors {@link _isHandledByActorSync}.
-   * @param {JournalEntry} journal
-   * @returns {boolean}
-   * @private
-   */
-  _isHandledByNoteSync(journal) {
-    const noteSync = this._syncManager?._modules?.find(
-      (m) => m.constructor?.name === 'NoteSync'
-    );
-    return typeof noteSync?._isNoteJournal === 'function'
-      ? noteSync._isNoteJournal(journal)
       : false;
   }
 

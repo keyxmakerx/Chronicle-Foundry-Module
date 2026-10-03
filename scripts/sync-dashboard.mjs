@@ -235,15 +235,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       loadErrors.push({ tab: 'calendar', message: err.message || 'Failed to load calendar' });
     }
 
-    // Build notes tab data.
-    let notesData = [];
-    try {
-      notesData = await this._buildNotesData();
-    } catch (err) {
-      console.error('Chronicle Dashboard: Failed to load notes', err);
-      loadErrors.push({ tab: 'notes', message: err.message || 'Failed to load notes' });
-    }
-
     // Build status tab data.
     const statusData = this._buildStatusData();
 
@@ -338,9 +329,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
       // Members (permission mapping) tab.
       members: membersData,
-
-      // Notes tab.
-      notes: notesData,
 
       // Calendar tab.
       calendar: calendarData,
@@ -981,7 +969,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       { key: 'calendar', label: 'Calendar', icon: 'fa-calendar', direction: directions.calendar || 'both', count: null },
       { key: 'characters', label: 'Characters / Actors', icon: 'fa-users', direction: directions.characters || 'both', count: null },
       { key: 'shops', label: 'Shops', icon: 'fa-store', direction: directions.shops || 'both', count: null },
-      { key: 'notes', label: 'Notes', icon: 'fa-sticky-note', direction: directions.notes || 'both', count: null },
     ];
 
     // Page types for the "journals made in Foundry" dropdown; the selected one
@@ -1008,45 +995,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       excludedEntityCount: exclusions.excludedEntities.length,
       syncTypes,
     };
-  }
-
-  // ---------------------------------------------------------------------------
-  // Notes data
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Build notes tab data. Fetches notes from Chronicle and cross-references
-   * with local Foundry JournalEntries that have a noteId flag.
-   * @returns {Promise<Array>}
-   * @private
-   */
-  async _buildNotesData() {
-    if (!getSetting('syncNotes')) return [];
-
-    try {
-      const result = await this.api.getNotes('/notes');
-      const notes = result?.data || result || [];
-      if (!Array.isArray(notes)) return [];
-
-      return notes
-        .filter((n) => !n.is_folder)
-        .map((note) => {
-          const localJournal = game.journal.find(
-            (j) => j.getFlag(FLAG_SCOPE, 'noteId') === note.id
-          );
-          return {
-            id: note.id,
-            title: note.title || 'Untitled',
-            color: note.color,
-            is_shared: note.is_shared ?? note.isShared ?? false,
-            status: localJournal ? 'synced' : 'chronicle-only',
-            lastSync: localJournal?.getFlag(FLAG_SCOPE, 'lastSync') || null,
-          };
-        });
-    } catch (err) {
-      console.warn('Chronicle Dashboard: Failed to fetch notes', err);
-      return [];
-    }
   }
 
   // ---------------------------------------------------------------------------

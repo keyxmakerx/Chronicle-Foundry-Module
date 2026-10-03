@@ -1333,7 +1333,6 @@ export class SyncCalendarApplication extends HandlebarsApplicationMixin(Applicat
         syncEnabled:        getSetting('syncEnabled'),
         syncCalendar:       getSetting('syncCalendar'),
         syncJournals:       getSetting('syncJournals'),
-        syncNotes:          getSetting('syncNotes'),
         syncCharacters:     getSetting('syncCharacters'),
         conflictResolution: getSetting('conflictResolution'),
         detectedSystem:     getSetting('detectedSystem'),

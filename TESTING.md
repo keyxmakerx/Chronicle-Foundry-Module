@@ -253,7 +253,6 @@ Previously, edits made on Chronicle while Foundry was disconnected were lost unt
 - [ ] Shops tab: shop entities with "Open Shop" button linking to ShopWidget
 - [ ] Maps tab: scene-to-map linking via dropdown, pin count, "View in Chronicle" link
 - [ ] Characters tab: synced/unlinked actors, push button, system badge
-- [ ] Notes tab: Chronicle notes synced as JournalEntries
 - [ ] Calendar tab: date comparison (Chronicle vs Foundry), pull/push buttons, module detection
 - [ ] Status tab: connection health, activity log, error log, diagnostics grid, system match info
 
