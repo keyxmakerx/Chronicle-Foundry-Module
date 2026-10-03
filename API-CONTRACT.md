@@ -1323,6 +1323,7 @@ If the token is invalid, the server rejects the upgrade.
 | `stash.moved` | `{ moveId, status, characterIds, stashIds }` | A move ran; the touched linked actors are re-pulled |
 | `stash.money_changed` | `{ characterId, moveId }` | A character's money changed (including a sheet edit); the actor is re-pulled |
 | `downtime.changed` | `{ open }` | Downtime was opened or closed; relayed to players' open windows |
+| `npc.spotlight` | none; `resourceId` is the NPC's entity id | "Show in Foundry" pressed on a Chronicle NPC page |
 | `sync.status` | `{ connected: bool }` | Connection state change |
 | `sync.error` | `{ message }` | Synchronization error |
 | `sync.conflict` | Conflict details | Data conflict detected |
@@ -1345,6 +1346,19 @@ only** (`game.users.activeGM`), and only once the Stashes probe said yes. The
 module's WebSocket allowlist includes the `stash.` and `downtime.` prefixes.
 
 Re-verify by: 2026-11-03 (Chronicle `internal/websocket/.ai.md`, `internal/plugins/armory/stash_events.go`)
+
+### What the module does with `npc.spotlight`
+
+Sent to DM-equivalent sockets only, with the page id and nothing else, when
+the owner or a member given DM access presses "Show in Foundry" on an NPC
+page. It is not in the change feed, so a missed one is simply gone. The
+module's allowlist includes the `npc.` prefix; `scripts/npc-presence.mjs`
+`npcSpotlightRelay` acts on the **active GM client only**: it finds a token
+on the GM's current scene linked to that page (shown before hidden) and runs
+the same spotlight as the token HUD star. No such token, or a hidden one,
+only tells the GM. `tools/test-npc-presence.mjs`.
+
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/foundry_vtt/npc_spotlight.go`, `internal/app/npc_spotlight_adapters.go`; keyxmakerx/Chronicle#1039)
 
 ### What the module does with `note.*`
 

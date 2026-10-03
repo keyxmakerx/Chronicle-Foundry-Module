@@ -22,7 +22,7 @@ import { registerStashButton } from './stash-window.mjs';
 import { SyncDashboard } from './sync-dashboard.mjs';
 import { MapViewerSheet } from './map-viewer.mjs';
 import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs';
-import { registerNpcPresence } from './npc-presence.mjs';
+import { registerNpcPresence, npcSpotlightRelay } from './npc-presence.mjs';
 import { registerMapSheetItems } from './map-sheet-items.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { openSyncCalendar } from './sync-calendar.mjs';
@@ -117,6 +117,7 @@ Hooks.once('ready', async () => {
   syncManager.registerModule(new ItemSync());
   syncManager.registerModule(new NoteSync());
   syncManager.registerModule(new StashSync());
+  syncManager.registerModule(npcSpotlightRelay);
 
   // Create UI first so it's always available, even if start() fails.
   dashboard = new SyncDashboard();
