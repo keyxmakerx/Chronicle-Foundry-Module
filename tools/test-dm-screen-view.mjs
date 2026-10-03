@@ -6,7 +6,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { errorKey, foldHero, plural, screenContext } from '../scripts/_dm-screen-view.mjs';
+import { downtimeNotice, errorKey, foldHero, plural, screenContext } from '../scripts/_dm-screen-view.mjs';
 
 const VIEW = {
   campaign_id: 'camp 1',
@@ -105,4 +105,12 @@ test('downtime switch asks first and says what starting it does', () => {
   assert.equal(none.text, 'Start downtime? Moves will happen at once and shops open.');
   const open = screenContext({ downtime: { open: true } }).downtime.confirm;
   assert.equal(open.yes, 'End downtime');
+});
+
+test('downtimeNotice matches the Stashes page wording', () => {
+  assert.equal(downtimeNotice(false, {}), 'Downtime is closed.');
+  assert.equal(downtimeNotice(true, { applied: 0, failed: 0 }), 'Downtime is open.');
+  assert.equal(downtimeNotice(true, { applied: 2, failed: 0 }), 'Downtime is open. 2 requests went through.');
+  assert.equal(downtimeNotice(true, { applied: 1, failed: 1 }), 'Downtime is open. 1 request went through; 1 could not.');
+  assert.equal(downtimeNotice(true, null), 'Downtime is open.');
 });

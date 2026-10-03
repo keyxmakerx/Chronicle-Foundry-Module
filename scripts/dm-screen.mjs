@@ -14,7 +14,7 @@
  */
 
 import { getSetting } from './settings.mjs';
-import { errorKey, screenContext } from './_dm-screen-view.mjs';
+import { downtimeNotice, errorKey, screenContext } from './_dm-screen-view.mjs';
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -425,7 +425,8 @@ class DMScreenWindow extends HandlebarsApplicationMixin(ApplicationV2) {
     const open = target.dataset.open === 'true';
     this.element.querySelectorAll('[data-action^="downtime"]').forEach((b) => { b.disabled = true; });
     try {
-      await api.post('/dm-screen/downtime', { open });
+      const res = await api.post('/dm-screen/downtime', { open });
+      ui.notifications.info(downtimeNotice(open, res));
     } catch (err) {
       ui.notifications.warn(err?.serverMessage || t('Error.Action'));
     }

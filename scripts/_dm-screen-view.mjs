@@ -156,3 +156,14 @@ export function errorKey(err) {
     default: return 'Failed';
   }
 }
+
+/** The notice after a switch, worded as Chronicle's own Stashes page words it. */
+export function downtimeNotice(open, res) {
+  if (!open) return 'Downtime is closed.';
+  const applied = num(res?.applied);
+  const failed = num(res?.failed);
+  const went = `${plural(applied, 'request', 'requests')} went through`;
+  if (failed > 0) return `Downtime is open. ${went}; ${failed} could not.`;
+  if (applied > 0) return `Downtime is open. ${went}.`;
+  return 'Downtime is open.';
+}
