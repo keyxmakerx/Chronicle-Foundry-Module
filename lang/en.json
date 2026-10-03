@@ -9,6 +9,7 @@
       "BuyFailed": "That didn't go through. Try again.",
       "NoGM": "Buying needs the GM in the game.",
       "GMNoAnswer": "The GM's game didn't answer. Try again.",
+      "GMNoAnswerBuy": "The GM's game didn't answer. Check your coins before buying again.",
       "NotShown": "The GM isn't showing this shop any more.",
       "NotMatched": "Your Foundry user isn't matched to a Chronicle member yet. Ask the GM to match it in Chronicle Sync.",
       "NoSender": "Foundry didn't say who sent this, so nothing was bought.",

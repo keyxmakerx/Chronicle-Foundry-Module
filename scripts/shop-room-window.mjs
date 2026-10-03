@@ -74,7 +74,9 @@ async function requestFromGM(shopId, action, body) {
       replyKeys.delete(requestId);
       resolve(reply);
     };
-    const timer = setTimeout(() => finish({ status: 504, body: { message: t('GMNoAnswer') } }),
+    // A purchase may still go through after the wait ends, so the player is
+    // told to check before buying again rather than simply to retry.
+    const timer = setTimeout(() => finish({ status: 504, body: { message: t(action === 'buy' ? 'GMNoAnswerBuy' : 'GMNoAnswer') } }),
       REQUEST_TIMEOUT_MS[action] || REQUEST_TIMEOUT_MS.buy);
     pending.set(requestId, finish);
     game.socket.emit(SOCKET_CHANNEL, {
@@ -253,11 +255,16 @@ export class ShopRoomWindow extends ApplicationV2 {
     // The sale's own stock update can reach this client before the answer
     // does; it must not redraw the widget while the basket is in flight.
     if (kind === 'buy') this._quietUntil = Infinity;
-    const reply = await requestFromGM(this._shopId, kind, body);
-    if (kind === 'buy') {
-      this._quietUntil = Date.now() + QUIET_MS;
-      if (reply.status < 400 && reply.goods && this._room) this._room.goods = reply.goods;
+    let reply;
+    try {
+      reply = await requestFromGM(this._shopId, kind, body);
+    } catch (err) {
+      console.error('Chronicle: could not send a shop buying request', err);
+      reply = { status: 502, body: { message: t('BuyFailed') } };
+    } finally {
+      if (kind === 'buy') this._quietUntil = Date.now() + QUIET_MS;
     }
+    if (kind === 'buy' && reply.status < 400 && reply.goods && this._room) this._room.goods = reply.goods;
     return reply;
   }
 
@@ -391,6 +398,11 @@ export class ShopRoomWindow extends ApplicationV2 {
   }
 
   async close(options) {
+    // Players' copies close with the GM's, so none is left that can't buy.
+    if (this._shown) {
+      this._shown = false;
+      this._emit('hide');
+    }
     if (this._host && this._def && this._host.firstChild) this._def.destroy(this._host);
     if (this._onCloseCallback) this._onCloseCallback();
     return super.close(options);
