@@ -8,8 +8,9 @@
  * of listeners.
  */
 
-import { cardFlagOf, getStashSync } from './stash-sync.mjs';
-import { trustedCardMoveId } from './_stash-cards.mjs';
+import { FLAG_SCOPE } from './constants.mjs';
+import { StashSync, cardFlagOf, getStashSync } from './stash-sync.mjs';
+import { modelFromFlag, trustedCardMoveId } from './_stash-cards.mjs';
 
 /**
  * Wire the buttons of a rendered request card.
@@ -29,6 +30,13 @@ function onRenderChatMessage(message, html) {
   if (!game.user.isGM || !moveId) {
     buttons.forEach((b) => b.remove());
     return;
+  }
+  // Tell the GM who answered it was them. The stored line names the answerer,
+  // and every GM sees the same message.
+  const answer = card.querySelector('.chronicle-stash-answer');
+  if (answer && game.user.isGM) {
+    const model = modelFromFlag(message.getFlag?.(FLAG_SCOPE, 'stashRequest'));
+    if (model?.byId && model.byId === game.user.id) answer.textContent = StashSync.answeredLine(model, game.user.id);
   }
   buttons.forEach((button) => {
     button.addEventListener('click', async (event) => {

@@ -99,8 +99,16 @@
   gap: 6px;
 }
 
-.chronicle-stashes .cs-mid button {
-  width: 36px;
+.chronicle-stashes .cs-swap {
+  align-self: center;
+  font-size: 20px;
+  opacity: 0.7;
+}
+
+.chronicle-stashes .cs-movebtn {
+  width: auto;
+  flex: 0 0 auto;
+  line-height: 1.2;
 }
 
 .chronicle-stashes .cs-row {
@@ -189,13 +197,12 @@
   gap: 4px;
 }
 
-.chronicle-stash-title {
+.chronicle-stash-who {
   font-weight: bold;
 }
 
-.chronicle-stash-key {
+.chronicle-stash-what {
   font-weight: bold;
-  margin-right: 4px;
 }
 
 .chronicle-stash-actions {

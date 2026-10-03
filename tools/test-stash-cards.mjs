@@ -26,7 +26,7 @@ import {
 } from '../scripts/_stash-cards.mjs';
 
 const LABELS = {
-  Title: 'Stash request', Who: 'Who', What: 'What', Where: 'Where to', Money: 'Money',
+  Wants: '{who} wants to give', Money: 'Money',
   Approve: 'Approve', Decline: 'Turn down',
 };
 
@@ -176,4 +176,23 @@ test('when both a forged and a real card exist, the real one is found', () => {
   const forged = playerCard('12');
   const real = gmCard('12');
   assert.equal(findCardMessage([forged, real], '12', flagOf), real);
+});
+
+test('cardHtml: one sentence, who wants to give, then what \u2192 where, then buttons', () => {
+  const html = cardHtml(requestCardModel(ITEM_LINE), LABELS);
+  assert.match(html, /Aria P\. wants to give/);
+  assert.match(html, /2 \u00d7 Rope \u2192 Camp/);
+  assert.ok(html.indexOf('wants to give') < html.indexOf('Rope') && html.indexOf('Rope') < html.indexOf('<button'));
+});
+
+test('cardHtml: a wants-label placeholder is escaped around an evil name', () => {
+  const html = cardHtml(requestCardModel({ ...ITEM_LINE, requesterName: '<b>x</b>' }), LABELS);
+  assert.equal(html.includes('<b>'), false);
+  assert.match(html, /&lt;b&gt;x&lt;\/b&gt; wants to give/);
+});
+
+test('settleCardModel: remembers who answered by id so the card can say "you"', () => {
+  const m = settleCardModel(requestCardModel(ITEM_LINE), 'applied', 'Dana', 'u1');
+  assert.equal(m.byId, 'u1');
+  assert.equal(modelFromFlag(cardFlag(m)).byId, 'u1');
 });

@@ -20,6 +20,7 @@
             <div class="cs-row cs-money{{#if character.moneySelected}} selected{{/if}}" draggable="true" data-cs-pick="left" data-cs-kind="money">
               <span class="cs-name">{{localize "CHRONICLE.Stashes.Money"}}</span>
               <span class="cs-qty">{{character.money}}</span>
+              <button type="button" class="cs-movebtn" data-cs-movebtn="left" data-cs-kind="money" {{#unless canMoveFromLeft}}disabled{{/unless}}>{{localize "CHRONICLE.Stashes.MoveRow"}}</button>
             </div>
           {{else}}
             <p class="cs-note">{{localize "CHRONICLE.Stashes.NoMoneyField"}}</p>
@@ -28,6 +29,7 @@
             <div class="cs-row{{#if selected}} selected{{/if}}" draggable="true" data-cs-pick="left" data-cs-kind="item" data-cs-item="{{itemId}}">
               <span class="cs-name">{{name}}</span>
               <span class="cs-qty">&times;{{quantity}}</span>
+              <button type="button" class="cs-movebtn" data-cs-movebtn="left" data-cs-kind="item" data-cs-item="{{itemId}}" {{#unless ../canMoveFromLeft}}disabled{{/unless}}>{{localize "CHRONICLE.Stashes.MoveRow"}}</button>
             </div>
           {{else}}
             <p class="cs-note">{{localize "CHRONICLE.Stashes.NoItems"}}</p>
@@ -35,8 +37,7 @@
         </section>
 
         <div class="cs-mid">
-          <button type="button" data-cs-go="right" {{#unless canGoRight}}disabled{{/unless}} title="{{localize 'CHRONICLE.Stashes.MoveToRight'}}"><i class="fa-solid fa-arrow-right"></i></button>
-          <button type="button" data-cs-go="left" {{#unless canGoLeft}}disabled{{/unless}} title="{{localize 'CHRONICLE.Stashes.MoveToLeft'}}"><i class="fa-solid fa-arrow-left"></i></button>
+          <span class="cs-swap" aria-hidden="true">&#8644;</span>
         </div>
 
         <section class="cs-side" data-cs-side="right">
@@ -55,11 +56,13 @@
               <div class="cs-row cs-money{{#if dest.moneySelected}} selected{{/if}}" {{#if dest.canTake}}draggable="true"{{/if}} data-cs-pick="right" data-cs-kind="money">
                 <span class="cs-name">{{localize "CHRONICLE.Stashes.Money"}}</span>
                 <span class="cs-qty">{{dest.money}}</span>
+                <button type="button" class="cs-movebtn" data-cs-movebtn="right" data-cs-kind="money" {{#unless dest.canTake}}disabled{{/unless}}>{{localize "CHRONICLE.Stashes.MoveRow"}}</button>
               </div>
               {{#each dest.items}}
                 <div class="cs-row{{#if selected}} selected{{/if}}" {{#if ../dest.canTake}}draggable="true"{{/if}} data-cs-pick="right" data-cs-kind="item" data-cs-item="{{itemId}}">
                   <span class="cs-name">{{name}}</span>
                   <span class="cs-qty">&times;{{quantity}}</span>
+                  <button type="button" class="cs-movebtn" data-cs-movebtn="right" data-cs-kind="item" data-cs-item="{{itemId}}" {{#unless ../dest.canTake}}disabled{{/unless}}>{{localize "CHRONICLE.Stashes.MoveRow"}}</button>
                 </div>
               {{else}}
                 <p class="cs-note">{{localize "CHRONICLE.Stashes.NoItems"}}</p>

@@ -77,15 +77,17 @@ export function requestCardModel(line) {
  * @param {object} model
  * @param {string} status - settled server status.
  * @param {string} by - display name of who answered.
+ * @param {string} [byId] - Foundry user id of who answered, when known, so the
+ *   card can say "you" to them.
  * @returns {object} a new model; the input is returned unchanged when the
  *   card is already settled (a second event must not rewrite who answered) or
  *   the status is still pending/unknown.
  */
-export function settleCardModel(model, status, by) {
+export function settleCardModel(model, status, by, byId = '') {
   if (model.state !== CARD_STATE.PENDING) return model;
   const state = stateForStatus(status);
   if (!state || state === CARD_STATE.PENDING) return model;
-  return { ...model, state, by: by || '' };
+  return { ...model, state, by: by || '', byId: byId ? String(byId) : '' };
 }
 
 /**
@@ -112,25 +114,23 @@ export function cardsToPost(requests, haveIds, inFlight = []) {
 }
 
 /**
- * Card body HTML. Every server-supplied string is escaped. The buttons are
- * present only while pending; the click handlers are attached by the render
- * hook, which also checks the clicker is a GM.
+ * Card body HTML. Every server-supplied string is escaped. The card reads as
+ * one sentence: "{who} wants to give", then "{what} \u2192 {to}", then the
+ * buttons (pending) or the answered line. The click handlers are attached by
+ * the render hook, which also checks the clicker is a GM.
  *
  * @param {object} model
- * @param {Object<string,string>} labels - localized strings: Title, Who, What,
- *   Where, Money, Approve, Decline, Approved, Declined, Failed (the answered lines
- *   take `{name}` already substituted by the caller via `answered`).
- * @param {string} answered - the localized "Approved by X" style line, used
+ * @param {Object<string,string>} labels - localized strings: Wants (with a
+ *   `{who}` placeholder), Money, Approve, Decline.
+ * @param {string} answered - the localized "\u2713 Approved by X" line, used
  *   when the card is settled; ignored while pending.
  * @returns {string}
  */
 export function cardHtml(model, labels, answered = '') {
   const e = escapeHtml;
-  const rows = [
-    `<div class="chronicle-stash-row"><span class="chronicle-stash-key">${e(labels.Who)}</span> <span>${e(model.who)}</span></div>`,
-    `<div class="chronicle-stash-row"><span class="chronicle-stash-key">${e(labels.What)}</span> <span>${e(model.isMoney ? `${labels.Money} ${model.what}` : model.what)}</span></div>`,
-    `<div class="chronicle-stash-row"><span class="chronicle-stash-key">${e(labels.Where)}</span> <span>${e(model.where)}</span></div>`,
-  ].join('');
+  const wants = String(labels.Wants).split('{who}').map(e).join(e(model.who));
+  const what = model.isMoney ? `${labels.Money} ${model.what}` : model.what;
+  const to = model.to || model.where;
   let foot;
   if (model.state === CARD_STATE.PENDING) {
     foot = '<div class="chronicle-stash-actions">'
@@ -141,7 +141,8 @@ export function cardHtml(model, labels, answered = '') {
     foot = `<div class="chronicle-stash-answer chronicle-stash-${e(model.state)}">${e(answered)}</div>`;
   }
   return `<div class="chronicle-stash-card" data-move-id="${e(model.moveId)}" data-state="${e(model.state)}">`
-    + `<header class="chronicle-stash-title">${e(labels.Title)}</header>${rows}${foot}</div>`;
+    + `<div class="chronicle-stash-who">${wants}</div>`
+    + `<div class="chronicle-stash-what">${e(what)} \u2192 ${e(to)}</div>${foot}</div>`;
 }
 
 /**
@@ -167,6 +168,8 @@ export function modelFromFlag(flag) {
     what: String(m.what ?? ''),
     isMoney: m.isMoney === true,
     where: String(m.where ?? ''),
+    to: String(m.to ?? ''),
+    byId: String(m.byId ?? ''),
     state: Object.values(CARD_STATE).includes(flag.state) ? flag.state : CARD_STATE.PENDING,
     by: String(flag.by ?? ''),
   };

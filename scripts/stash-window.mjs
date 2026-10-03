@@ -186,8 +186,7 @@ export class StashesWindow extends HandlebarsApplicationMixin(ApplicationV2) {
         when: h.createdAt ? new Date(h.createdAt).toLocaleString() : '',
       })),
       prompt: this.prompt,
-      canGoLeft: false,
-      canGoRight: false,
+      canMoveFromLeft: false,
     };
     if (!view) return ctx;
 
@@ -227,8 +226,7 @@ export class StashesWindow extends HandlebarsApplicationMixin(ApplicationV2) {
         canTake: dc.takeable,
         items: dc.items.map((i) => ({ ...i, selected: sel?.side === 'right' && sel.kind === 'item' && sel.itemId === i.itemId })),
       };
-      ctx.canGoRight = !!sel && sel.side === 'left';
-      ctx.canGoLeft = !!sel && sel.side === 'right' && dc.takeable;
+      ctx.canMoveFromLeft = !dc.loading && !dc.hidden;
     }
     return ctx;
   }
@@ -292,8 +290,9 @@ export class StashesWindow extends HandlebarsApplicationMixin(ApplicationV2) {
       });
     });
 
-    el.querySelectorAll('[data-cs-go]').forEach((b) => b.addEventListener('click', () => {
-      if (this.selected) this._startMove(this.selected);
+    el.querySelectorAll('[data-cs-movebtn]').forEach((b) => b.addEventListener('click', (event) => {
+      event.stopPropagation();
+      this._startMove({ side: b.dataset.csMovebtn, kind: b.dataset.csKind, itemId: b.dataset.csItem });
     }));
 
     const form = el.querySelector('[data-cs-prompt]');

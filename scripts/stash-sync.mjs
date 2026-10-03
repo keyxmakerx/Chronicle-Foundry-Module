@@ -351,14 +351,15 @@ export class StashSync {
   /** The card's localized strings. */
   static cardLabels() {
     return {
-      Title: t('Card.Title'), Who: t('Card.Who'), What: t('Card.What'), Where: t('Card.Where'),
-      Money: t('Card.Money'), Approve: t('Card.Approve'), Decline: t('Card.Decline'),
+      Wants: t('Card.Wants', { who: '{who}' }), Money: t('Card.Money'),
+      Approve: t('Card.Approve'), Decline: t('Card.Decline'),
     };
   }
 
   /** The "Approved by X" line for a model. */
-  static answeredLine(model) {
-    const name = model.by || t('Card.TheGM');
+  static answeredLine(model, viewerId = '') {
+    // "you" for the GM who answered, when the viewer is known.
+    const name = (viewerId && model.byId === viewerId) ? t('Card.You') : (model.by || t('Card.TheGM'));
     if (model.state === CARD_STATE.APPROVED) return t('Card.ApprovedBy', { name });
     if (model.state === CARD_STATE.DECLINED) return t('Card.DeclinedBy', { name });
     if (model.state === CARD_STATE.FAILED) return t('Card.Failed');
@@ -380,12 +381,12 @@ export class StashSync {
   }
 
   /** Rewrite a card to its answered state. No card, or already answered: no-op. */
-  async _settleCard(moveId, status, by) {
+  async _settleCard(moveId, status, by, byId = '') {
     const message = this._findCard(moveId);
     if (!message) return;
     const model = modelFromFlag(message.getFlag(FLAG_SCOPE, 'stashRequest'));
     if (!model) return;
-    const next = settleCardModel(model, status, by);
+    const next = settleCardModel(model, status, by, byId);
     if (next === model) return;
     await message.update({
       content: cardHtml(next, StashSync.cardLabels(), StashSync.answeredLine(next)),
@@ -396,7 +397,8 @@ export class StashSync {
   /** `stash.settled`: someone answered, here or on the website. */
   async _onSettled(payload) {
     if (payload?.moveId === undefined) return;
-    await this._settleCard(payload.moveId, payload.status, this._nameFor(payload.decidedBy));
+    const byId = getUserMappings()[payload.decidedBy] ?? '';
+    await this._settleCard(payload.moveId, payload.status, this._nameFor(payload.decidedBy), byId);
   }
 
   /**
@@ -426,7 +428,7 @@ export class StashSync {
         path: `/stashes/requests/${encodeURIComponent(moveId)}/${action}`,
         body: {},
       });
-      await this._settleCard(moveId, result?.status ?? result?.move?.status, game.user.name);
+      await this._settleCard(moveId, result?.status ?? result?.move?.status, game.user.name, game.user.id);
       this._afterMove(result);
     } catch (err) {
       ui.notifications.warn(t('Card.AnswerFailed'));

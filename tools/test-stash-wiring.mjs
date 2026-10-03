@@ -101,9 +101,15 @@ test('framing keys returned by moveFraming exist', async () => {
 });
 
 test('the downtime pill and hint wording match the signed design', () => {
-  assert.equal(lang.DowntimeOpen, 'Downtime is open');
+  assert.equal(lang.DowntimeOpen, '\u25cf Downtime open');
   assert.equal(lang.DowntimeClosed, 'Not in downtime');
   assert.equal(lang.HintNow, 'This happens now.');
   assert.equal(lang.HintAsk, 'Your GM has to approve this; it stays with you until then.');
   assert.equal(lang.Ask, 'Ask the GM');
+  assert.equal(lang.WindowTitle, 'Chronicle stashes \u00b7 {name}');
+  assert.equal(lang.DragHint, 'Drag an item across to move it.');
+  assert.equal(lang.Asked, 'Sent to your GM');
+  assert.equal(lang.MoveRow, 'Move\u2026');
+  assert.equal(lang.Card.ApprovedBy, '\u2713 Approved by {name}');
+  assert.equal(lang.Card.DeclinedBy, '\u2713 Turned down by {name}');
 });
