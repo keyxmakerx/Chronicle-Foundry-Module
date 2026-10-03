@@ -13,7 +13,7 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
   `tools/check-package-descriptor.mjs`.
 - `scripts/*.mjs`: sync (`journal-sync`, `map-sync`+`map-viewer`,
   `calendar-sync`+`sync-calendar`+`sync-calendar-*`, `actor-sync`,
-  `item-sync`, `note-sync`, `stash-sync`+`stash-client`), UI (`sync-dashboard`,
+  `item-sync`, `note-sync`, `stash-sync`+`stash-client`), UI (`sync-dashboard`+`sync-history-tab`,
   `sync-diagnostic-bundle`, `update-info`, `character-claim-indicator`,
   `capability-inspector`, `import-wizard`, `shop-widget`, `player-notebook`, `stash-window`+`stash-chat`), core (`module`,
   `settings`, `constants`, `logger`, `sync-manager`, `api-client`),
@@ -49,7 +49,7 @@ Install/update flow: also `.ai.md` → "Chronicle Integration — Install & Upda
 - **GM-only text goes in Foundry secret blocks.** Sync's Owner key receives Chronicle's `<span data-secret>` text and GM-only pictures; journal pulls put them in Foundry secret blocks (hidden from players who don't own the page) and pushes turn everything in a secret block back into GM-only content (`scripts/_gm-secrets.mjs`). `tools/test-gm-secrets.mjs`.
 - **Sync never deletes without asking.** A Chronicle-side removal sets the Foundry journal aside (unlinked, in a "Chronicle: removed" folder, `scripts/_set-aside.mjs`); a Foundry-side delete of a linked actor or journal asks before deleting the Chronicle copy (`scripts/_remote-deletes.mjs`). `tools/test-set-aside.mjs`, `tools/test-remote-deletes.mjs`.
 - **Never hard-cap a list walk.** `JournalSync.resyncAll` and `_buildEntityGroups` share `scripts/_entity-page-walk.mjs` (200-page bound); its `truncated` flag must be surfaced. `tools/test-entity-page-walk.mjs`.
-- WebSocket messages route by type through `SyncManager`.
+- WebSocket messages route by type through `SyncManager`, which then reports each applied change to Chronicle's sync history (`scripts/_history-report.mjs`); a change arriving within 10 s of this world writing the same id is its own echo and isn't reported.
 - **Connect catch-up reads Chronicle's change feed** (`GET /sync/changes`, `scripts/_change-feed.mjs`); journals and characters use it so far. The cursor is saved only after its changes applied, so replays must be harmless: skip what is already at its version, decide "new" by the page's own `created_at` against the cursor's `createdAfter`, which moves only with the cursor. A journal's recorded version never moves backwards. `tools/test-change-feed.mjs`, `tools/test-journal-versions.mjs`.
 
 ## Calendar blackout and date-push pauses
