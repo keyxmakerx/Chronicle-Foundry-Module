@@ -20,6 +20,8 @@ import { MapViewerSheet } from './map-viewer.mjs';
 import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { openSyncCalendar } from './sync-calendar.mjs';
+import { notebookAvailable, openNotebook, registerPlayerNotebook } from './player-notebook.mjs';
+import { addChronicleControls } from './_scene-controls.mjs';
 
 /** @type {SyncManager|null} */
 let syncManager = null;
@@ -113,6 +115,11 @@ Hooks.once('ready', async () => {
   dashboard.bind(syncManager);
   _addStatusIndicator();
   registerCharacterClaimIndicator();
+  try {
+    registerPlayerNotebook();
+  } catch (err) {
+    console.warn('Chronicle Sync | Player notebook unavailable', err);
+  }
 
   // Move a legacy world-scoped API key into this GM's client scope and
   // delete the world copy before start() reads the setting. GM only —
@@ -228,68 +235,26 @@ async function _runtimeValidateDescriptor() {
 }
 
 /**
- * Add a Chronicle Sync button to Foundry's scene controls toolbar.
- * Visible only to GMs. Opens the Sync Dashboard on click.
+ * Add the Chronicle group to Foundry's scene controls toolbar: the Sync
+ * Dashboard and Sync Calendar for GMs, the Notebook for everyone once the
+ * world is connected to Chronicle.
  */
 Hooks.on('getSceneControlButtons', (controls) => {
-  if (!game.user.isGM) return;
-
   // openDashboard() recreates the dashboard when a prior close left the
-  // instance non-re-renderable. Surfaces SyncCalendarApplication as a
-  // second tool in the Chronicle Sync scene-control group.
-  const launchSyncCalendar = () => { openSyncCalendar(); };
-  const syncCalendarTitle = game.i18n.localize('CHRONICLE.SceneControl.SyncCalendar');
-
-  // v13: controls and tools are keyed objects with onChange callback.
-  // v12: controls and tools are arrays with onClick callback.
-  if (Array.isArray(controls)) {
-    controls.push({
-      name: 'chronicle-sync',
-      title: 'Chronicle Sync',
-      icon: 'fa-solid fa-rotate',
-      layer: 'controls',
-      visible: true,
-      tools: [{
-        name: 'dashboard',
-        title: 'Open Chronicle Sync Dashboard',
-        icon: 'fa-solid fa-rotate',
-        button: true,
-        onClick: openDashboard,
-      }, {
-        name: 'sync-calendar',
-        title: syncCalendarTitle,
-        icon: 'fa-solid fa-calendar-days',
-        button: true,
-        onClick: launchSyncCalendar,
-      }],
-    });
-  } else {
-    // v13 requires activeTool even for button-only controls, and does not
-    // use the v12 `layer` property. See foundryvtt/foundryvtt#12803.
-    controls['chronicle-sync'] = {
-      name: 'chronicle-sync',
-      title: 'Chronicle Sync',
-      icon: 'fa-solid fa-rotate',
-      visible: true,
-      activeTool: 'dashboard',
-      tools: {
-        dashboard: {
-          name: 'dashboard',
-          title: 'Open Chronicle Sync Dashboard',
-          icon: 'fa-solid fa-rotate',
-          button: true,
-          onChange: openDashboard,
-        },
-        'sync-calendar': {
-          name: 'sync-calendar',
-          title: syncCalendarTitle,
-          icon: 'fa-solid fa-calendar-days',
-          button: true,
-          onChange: launchSyncCalendar,
-        },
-      },
-    };
-  }
+  // instance non-re-renderable.
+  addChronicleControls(controls, {
+    isGM: game.user.isGM,
+    notebook: notebookAvailable(),
+    run: {
+      dashboard: openDashboard,
+      syncCalendar: () => { openSyncCalendar(); },
+      notebook: () => { openNotebook(); },
+    },
+    titles: {
+      syncCalendar: game.i18n.localize('CHRONICLE.SceneControl.SyncCalendar'),
+      notebook: game.i18n.localize('CHRONICLE.SceneControl.Notebook'),
+    },
+  });
 });
 
 /**
