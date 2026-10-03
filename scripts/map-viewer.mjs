@@ -10,9 +10,8 @@
  *
  * Security: `visibility=dm_only` markers and the whole fog overlay never
  * render for non-GMs — they're absent from the flag data, and GM-only
- * memory supplies them only on the GM client. `visibility_rules.
- * allowed_users`/`denied_users` are honored against the mapped Chronicle
- * user id.
+ * memory supplies them only on the GM client. Per-user `visibility_rules`
+ * are honored against the mapped Chronicle user id (`userCanSeeMarker`).
  *
  * Drawings, tokens, fog, and layers are read-only; markers stay editable
  * (with a visibility=dm_only checkbox) for GMs.
@@ -27,6 +26,7 @@ import { PIN_ICONS } from './map-sync.mjs';
 import { getUserMappings } from './settings.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
 import { confirmDialog } from './_dialogs.mjs';
+import { userCanSeeMarker } from './_map-flag-filter.mjs';
 
 /* ============================================================
    Constants
@@ -82,33 +82,6 @@ function _currentChronicleUserId() {
     if (foundryId === game.user.id) return chronicleId;
   }
   return null;
-}
-
-/**
- * Visibility filter for a Chronicle marker. Honors `visibility=dm_only`
- * AND the per-user `visibility_rules.allowed_users` / `denied_users`.
- * @param {object} marker
- * @param {boolean} isGM
- * @param {string|null} chronicleUserId
- * @returns {boolean}
- */
-function _userCanSeeMarker(marker, isGM, chronicleUserId) {
-  if (!marker) return false;
-  if (marker.visibility === 'dm_only') return isGM;
-
-  const rules = marker.visibility_rules;
-  if (!rules || typeof rules !== 'object') return true;
-  // GM always sees regardless of rules (defense-in-depth on top of dm_only check).
-  if (isGM) return true;
-
-  const denied = Array.isArray(rules.denied_users) ? rules.denied_users : null;
-  if (denied && chronicleUserId && denied.includes(chronicleUserId)) return false;
-
-  const allowed = Array.isArray(rules.allowed_users) ? rules.allowed_users : null;
-  if (allowed && allowed.length > 0) {
-    return chronicleUserId ? allowed.includes(chronicleUserId) : false;
-  }
-  return true;
 }
 
 /** Cap a hex color to the standard `#RRGGBB[AA]` shape; strips dangerous chars. */
@@ -244,7 +217,7 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
 
     // Visibility-filter markers; render-time enforcement of dm_only and rules.
     const filteredMarkers = (mapData?.markers || []).filter(
-      (m) => _userCanSeeMarker(m, isGM, userChronicleId)
+      (m) => userCanSeeMarker(m, isGM, userChronicleId)
     );
 
     const chronicleMarkers = filteredMarkers.map((m) => {

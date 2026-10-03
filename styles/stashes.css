@@ -1,0 +1,230 @@
+@layer chronicle-sync {
+
+/* ============================================================
+   Stashes window and GM request card
+   ============================================================ */
+
+.chronicle-stashes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px;
+}
+
+.chronicle-stashes .cs-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chronicle-stashes .cs-pill {
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  border: 1px solid currentColor;
+  color: #94a3b8;
+}
+
+.chronicle-stashes .cs-pill-open {
+  color: #4ade80;
+}
+
+.chronicle-stashes .cs-tabs {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.chronicle-stashes .cs-tabs button.active {
+  font-weight: bold;
+  box-shadow: inset 0 -2px 0 currentColor;
+}
+
+.chronicle-stashes .cs-refresh {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+.chronicle-stashes .cs-error {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 4px;
+  color: #fff;
+  background: #b91c1c;
+}
+
+.chronicle-stashes .cs-note,
+.chronicle-stashes .cs-hint {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.chronicle-stashes .cs-hint {
+  opacity: 1;
+  font-weight: bold;
+}
+
+.chronicle-stashes .cs-sides {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 8px;
+  flex: 1;
+  min-height: 160px;
+}
+
+.chronicle-stashes .cs-side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--color-border-light-tertiary, #8884);
+  border-radius: 4px;
+  overflow: auto;
+}
+
+.chronicle-stashes .cs-side-title {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.chronicle-stashes .cs-mid {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.chronicle-stashes .cs-swap {
+  align-self: center;
+  font-size: 20px;
+  opacity: 0.7;
+}
+
+.chronicle-stashes .cs-movebtn {
+  width: auto;
+  flex: 0 0 auto;
+  line-height: 1.2;
+}
+
+.chronicle-stashes .cs-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.chronicle-stashes .cs-row[draggable="true"] {
+  cursor: grab;
+}
+
+.chronicle-stashes .cs-row:hover {
+  background: #8882;
+}
+
+.chronicle-stashes .cs-row.selected {
+  border-color: currentColor;
+  background: #8883;
+}
+
+.chronicle-stashes .cs-money .cs-name {
+  font-style: italic;
+}
+
+.chronicle-stashes .cs-prompt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px;
+  border: 1px solid var(--color-border-light-tertiary, #8884);
+  border-radius: 4px;
+}
+
+.chronicle-stashes .cs-prompt label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chronicle-stashes .cs-prompt input {
+  width: 90px;
+}
+
+.chronicle-stashes .cs-prompt button {
+  width: auto;
+}
+
+.chronicle-stashes .cs-prompt-sub {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.chronicle-stashes .cs-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+}
+
+.chronicle-stashes .cs-history li {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--color-border-light-tertiary, #8884);
+}
+
+.chronicle-stashes .cs-when {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-right: 6px;
+}
+
+.chronicle-stash-button {
+  cursor: pointer;
+}
+
+/* GM request card in chat */
+
+.chronicle-stash-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chronicle-stash-who {
+  font-weight: bold;
+}
+
+.chronicle-stash-what {
+  font-weight: bold;
+}
+
+.chronicle-stash-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.chronicle-stash-actions button {
+  flex: 1;
+}
+
+.chronicle-stash-answer {
+  font-weight: bold;
+}
+
+.chronicle-stash-approved {
+  color: #15803d;
+}
+
+.chronicle-stash-declined,
+.chronicle-stash-failed {
+  color: #b91c1c;
+}
+
+}

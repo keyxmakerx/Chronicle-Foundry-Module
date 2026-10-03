@@ -225,3 +225,13 @@ test('store: signed links for the GM screen are reused for a while', async () =>
   assert.equal(w.calls.get.length, 1);
   assert.equal(await w.store.signedLink('../x'), '');
 });
+
+test('with the GM-only text pass: pull then push gives Chronicle back exactly what it sent', async () => {
+  const { toFoundrySecrets, toChronicleSecrets } = await import('../scripts/_gm-secrets.mjs');
+  const html = `<p>Mira <span data-secret="true">is the spy</span> runs docks.</p>${shared(A)}${gm(B)}<p>end</p>`;
+  const pulled = toFoundryPictures(toFoundrySecrets(html), (id) => LOCAL(id));
+  assert.ok(pulled.includes(`src="${LOCAL(A)}"`));
+  assert.ok(!pulled.includes(LOCAL(B)), 'the GM-only picture is not swapped for a copy');
+  assert.equal(sharedPictureIds(toFoundrySecrets(html)).join(), A);
+  assert.equal(toChronicleSecrets(toChroniclePictures(pulled, API)), html);
+});
