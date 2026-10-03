@@ -12,9 +12,9 @@ import { newWorld, openWorld, closeWorld, settle, traffic, recordRequests } from
 import { retireNotesFolder } from '../scripts/_notes-folder.mjs';
 import { removedFolder } from '../scripts/_set-aside.mjs';
 import { SYNC_OPTIONS } from '../scripts/constants.mjs';
+import { writes } from './scenario.mjs';
 
 const FLAG = 'chronicle-sync';
-const writes = (reqs) => reqs.filter((r) => r.method !== 'GET');
 
 /** What the retired note sync left in a world: a folder tree of note copies. */
 async function oldNotesFolder() {

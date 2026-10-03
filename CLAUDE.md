@@ -11,7 +11,7 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
 - `module.json` (Foundry manifest, v12–v14), `chronicle-package.json`
   (serving descriptor, schema v1) — cross-validated by
   `tools/check-package-descriptor.mjs`.
-- `scripts/*.mjs`: sync (`journal-sync`, `map-sync`+`map-viewer`,
+- `scripts/*.mjs`: sync (`journal-sync`, `map-sync`+`map-viewer`+`map-sheet-items`,
   `calendar-sync`+`sync-calendar`+`sync-calendar-*`, `actor-sync`,
   `item-sync`, `stash-sync`+`stash-client`), UI (`sync-dashboard`, `npc-presence`,
   `sync-diagnostic-bundle`, `update-info`, `gm-secret-view`, `character-claim-indicator`,
@@ -53,7 +53,7 @@ Install/update flow: also `.ai.md` → "Chronicle Integration — Install & Upda
 - **GM-only content never goes into a saved Foundry document.** Every client receives every journal page, so a pulled page holds a placeholder secret block (id keyed by an HMAC under the GM's API key) where Chronicle has GM-only text or pictures; the GM's client fills it on screen (`scripts/gm-secret-view.mjs`) and puts the content back before a push, which leaves the text out rather than send it without a placeholder's content. Anything in a secret block goes back to Chronicle GM-only. `scripts/_gm-secrets.mjs`, `tools/test-gm-secrets.mjs`.
 - **Sync never deletes without asking.** A Chronicle-side removal sets the Foundry journal aside (unlinked, in a "Chronicle: removed" folder, `scripts/_set-aside.mjs`); an item whose "Has Item" relation is gone is only unlinked (`scripts/_inventory-plan.mjs`), unless a stash move the GM just applied took it off that character (`scripts/_stash-reconcile.mjs`); a Foundry-side delete of a linked actor or journal asks before deleting the Chronicle copy (`scripts/_remote-deletes.mjs`). `tools/test-set-aside.mjs`, `tools/test-remote-deletes.mjs`.
 - **Never hard-cap a list walk.** `JournalSync.resyncAll` and `_buildEntityGroups` share `scripts/_entity-page-walk.mjs` (200-page bound); its `truncated` flag must be surfaced. `tools/test-entity-page-walk.mjs`.
-- WebSocket messages route by type through `SyncManager`.
+- WebSocket messages route by type through `SyncManager`, which then reports each applied change to Chronicle's sync history (`scripts/_history-report.mjs`); a change arriving within 10 s of this world writing the same id is its own echo and isn't reported.
 - **Connect catch-up reads Chronicle's change feed** (`GET /sync/changes`, `scripts/_change-feed.mjs`); journals, characters and inventories use it so far. Inventories reconcile a whole character from its relations (`scripts/_inventory-plan.mjs`), and use the delta only once the saved cursor shows the server records `relation`. The cursor is saved only after its changes applied, so replays must be harmless: skip what is already at its version, decide "new" by the page's own `created_at` against the cursor's `createdAfter`, which moves only with the cursor. A journal's recorded version never moves backwards. `tools/test-change-feed.mjs`, `tools/test-journal-versions.mjs`, `tools/test-inventory-plan.mjs`.
 
 ## Calendar blackout and date-push pauses
@@ -139,8 +139,8 @@ Cordinator's `decisions/2026-05-21-core-tenets.md`.
 
 ## Open work
 
-Tracked in GitHub issues: live checks on a real Foundry v14 world (#94, needs
-`TESTING.md` update #88); calendar V5 (#95, sub-issue of
+Tracked in GitHub issues: live checks on a real Foundry v14 world (#94, using
+`TESTING.md`); calendar V5 (#95, sub-issue of
 keyxmakerx/Chronicle#741); everything else in this repo's open issues; unplanned
 ideas #96.
 

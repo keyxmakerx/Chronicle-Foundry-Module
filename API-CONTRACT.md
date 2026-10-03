@@ -601,8 +601,8 @@ Pulls all changes since a timestamp.
 ```
 
 #### GET /sync/changes
-Change feed: ids of what changed after a cursor. Owner or co-DM keys only
-(403 otherwise); absent on older Chronicle (404).
+Change feed: ids of what changed after a cursor. Keys of the owner or of members the owner
+has given DM access only (403 otherwise); absent on older Chronicle (404).
 
 **Used by:** `sync-manager.mjs` → initial sync (`_readChangeFeed`): journals, characters and inventories
 
@@ -627,6 +627,40 @@ Change feed: ids of what changed after a cursor. Owner or co-DM keys only
   linked character is reconciled.
 
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/sync_changes_handler.go`, `sync_change_repository.go`)
+
+#### GET /sync/history
+The campaign's sync history, both directions, newest first. Owner keys and
+keys of members with DM access only (403 otherwise); absent on older
+Chronicle (404).
+
+**Used by:** `sync-history-tab.mjs` → the dashboard's History tab
+
+**Query:** `?limit=50&before=<id>&direction=to_chronicle|to_foundry|link&failed=1&q=<text>` (limit default 50, max 200; a filter matches a run when any of its steps does)
+
+**Response:**
+```json
+{ "data": [ { "id": 42, "at": "2026-10-03T19:41:40.017Z", "direction": "to_chronicle", "reportedBy": "chronicle", "kind": "page", "resourceId": "uuid", "name": "Port Ashwick", "action": "page updated", "call": "PUT /entities/:entityID", "status": "200", "ok": true, "durationMs": 38, "who": "Ren", "children": [] } ], "nextBefore": 41 }
+```
+
+- `reportedBy: "chronicle"` rows are every write a sync key made, recorded by
+  Chronicle with its result; `"client"` rows are what the module reported.
+- `nextBefore` is present when an older page exists.
+
+#### POST /sync/history
+The module reports what only it sees: changes it applied in Foundry
+(`to_foundry`), its connects and problems (`link`). Same access as the read.
+
+**Used by:** `sync-manager.mjs` → `_history` (`scripts/_history-report.mjs`), every 15 s and on connect
+
+**Body:** `{ "events": [ { "at", "direction", "kind", "resourceId", "name", "action", "call", "status", "ok", "durationMs", "message", "children" } ] }`, at most 50 events of 200 steps. Returns `{ "stored": n }`.
+
+- A time more than 5 min ahead or 7 days back is replaced by the server's.
+- Chronicle names a page the module sent by id only, and for a `to_foundry`
+  page row names who last changed it in Chronicle.
+- 403 or 404 stops reporting for the session; other failures retry on the
+  next flush.
+
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/sync_history_handler.go`, `sync_history_recorder.go`)
 
 #### POST /sync
 Generic sync endpoint for batch operations.
@@ -670,6 +704,9 @@ icons[{id,label,category}], default_icon}`. `campaign_frame` is one of
 own frame wears. Fetched once per full sync; a 404 (older Chronicle) keeps
 the Atlas default. Marker `icon` is a Font Awesome class from `icons`; the
 viewer draws any well-formed `fa-` class and falls back to `default_icon`.
+The marker dialog's icon picker offers `icons` grouped by `category` and
+sends only an `id` from that list; without the list (older Chronicle) the
+picker is hidden and a marker keeps its icon.
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/map_api_look.go`, keyxmakerx/Chronicle#1017)
 
 #### GET /maps/:mapId/drawings
@@ -1003,7 +1040,8 @@ rows, no items hidden from players), so the room can be shown to every player.
 The shop room's buying calls (`scripts/shop-room-window.mjs`), made by the
 GM's client: for the GM, or for a player as the Chronicle member the player
 is matched to (`actingUserId`, a query parameter on GET and a body field on
-POST). Only an Owner or co-DM key may name someone else (403); the name must
+POST). Only an Owner key, or the key of a member the owner has given DM
+access, may name someone else (403); the name must
 be a current member (404); the call then has that member's rights only. Needs
 the armory addon.
 
@@ -1013,9 +1051,12 @@ the armory addon.
 (at most 50 lines, quantity 1–99; prices come from the listing, never the body)
 
 **Buy response:** `{"status": "bought", "spent": 6, "currency": "gp", "moneyLeft": 44}`.
-Refusals are `{"message": "..."}`: 400 (empty basket, no coin field, not
-enough coin, mixed currencies), 403 (not their character), 404 (shop or good
-hidden), 409 (a player while downtime is closed).
+A player while downtime is closed gets `{"status": "requested"}` instead: the
+basket is stored as a request the GM approves on Chronicle's Stashes page, and
+nothing is charged yet (`canBuyNow` is false in the buyers response then).
+Refusals are `{"message": "..."}`: 400 (empty basket, no coin field, a Wealth
+sheet, not enough coin, mixed currencies), 403 (not their character), 404
+(shop or good hidden), 409 (prices changed, or the item could not be added).
 
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/shop_api_handler.go`)
 
@@ -1277,8 +1318,8 @@ through the module socket (`scripts/stash-client.mjs`).
 
 **Acting member.** Every call may carry `actingUserId` (query on GET, body on
 POST/PUT): the Chronicle user id of a current member. The call then runs under
-THAT member's role and rules. Only an Owner or co-DM key may name someone
-else (403 otherwise), so naming a player only narrows what the call may do.
+THAT member's role and rules. Only an Owner key, or the key of a member the owner has given DM
+access, may name someone else (403 otherwise), so naming a player only narrows what the call may do.
 The module sends it only when relaying for a player, and takes the member from
 the Foundry user id the socket layer attached to the request, never from the
 request body.
@@ -1303,6 +1344,29 @@ Lists are unwrapped defensively (`{history}`/`{requests}`/`{data}` or a bare
 array): `scripts/_stash-model.mjs`.
 
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/stash_api_handler.go`, `internal/plugins/armory/stash_api.go`, `docs/api/openapi.yaml` Stashes tag; the routes are on Chronicle PR #1022 and unreleased as of 2026-10-03)
+
+### Player notebook pages
+
+Not part of the REST API: the notebook (`scripts/player-notebook.mjs`,
+checks in `scripts/_notes-grant.mjs`) frames two Chronicle web pages and never
+uses the GM's sync key. Everything crosses `postMessage`, and each side checks
+the other's origin (Chronicle's, taken from `apiUrl`) before acting.
+
+| Page | Address | Purpose |
+|---|---|---|
+| Allow window | `/campaigns/:id/notes/allow-app?origin=<Foundry origin>` | A pop-up where the player presses Allow. Replies `{type:"chronicle:notes-grant", token, userId, campaignId}` (token starts `cnt_`) or `{type:"chronicle:notes-grant-declined"}`. |
+| Notebook frame | `/embed/campaigns/:id/notes/journal` | The player's Journal. |
+| Jot frame | `/embed/campaigns/:id/notes/jots` | Jot notes for the page in view. |
+
+The module keeps a grant only when `campaignId` matches and the GM has matched
+the returned `userId` to this Foundry login (Members tab); an unmatched or
+mismatched account is refused. Frame to module: `chronicle:embed-ready` (the
+module answers `chronicle:notes-token` with the token and current `entityId`),
+`chronicle:grant-rejected` (the stored grant is dropped), `chronicle:open-note`
+with `noteId`. Module to frame: `chronicle:notes-token`, `chronicle:jots-page`
+with `entityId`, `chronicle:open-note`.
+
+Re-verify by: 2026-11-03 (Chronicle `internal/widgets/notes/app_grants_handler.go`, `allow_app.templ`, `static/js/notes_embed.js`)
 
 ---
 
@@ -1372,7 +1436,8 @@ If the token is invalid, the server rejects the upgrade.
 | `sync.error` | `{ message }` | Synchronization error |
 | `sync.conflict` | Conflict details | Data conflict detected |
 
-`relation.*` messages go to owner and co-DM sockets only (a relation can
+`relation.*` messages go to the owner's socket and sockets of members the owner has
+given DM access only (a relation can
 name a private entity). Item sync treats any of them for a linked character
 as "reconcile this character's inventory" (`scripts/_inventory-plan.mjs`),
 so a missed or repeated message cannot leave it wrong. A removed relation

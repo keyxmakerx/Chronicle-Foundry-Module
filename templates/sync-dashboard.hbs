@@ -77,6 +77,9 @@
     <a class="item" data-tab="status">
       <i class="fa-solid fa-signal"></i> Status
     </a>
+    <a class="item" data-tab="history">
+      <i class="fa-solid fa-clock-rotate-left"></i> History
+    </a>
   </nav>
 
   {{!-- Tab content --}}
@@ -593,7 +596,11 @@
         {{#each chronicleMaps}}
         <div class="map-row {{#if materialized}}linked{{/if}}">
           <div class="map-info">
+            {{#if thumbSrc}}
+            <img class="cs-map-thumb" src="{{thumbSrc}}" alt="" loading="lazy">
+            {{else}}
             <i class="fa-solid fa-map" style="color: #60a5fa"></i>
+            {{/if}}
             <span class="map-name">{{name}}</span>
           </div>
           <div class="map-link-info">
@@ -1276,6 +1283,29 @@
           </button>
           <span class="debug-copy-result" data-cal-diag-result></span>
         </div>
+      </div>
+    </div>
+
+    {{!-- History: Chronicle's sync history, both directions (sync-history-tab.mjs) --}}
+    <div class="tab" data-tab="history" data-group="primary">
+      <div class="sync-history" data-history-root>
+        <form class="sh-bar" data-history-filters>
+          <label class="sh-search">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" name="q" placeholder="Search names, people, calls" aria-label="Search history">
+          </label>
+          <select name="direction" aria-label="Direction">
+            <option value="">Both ways</option>
+            <option value="to_foundry">→ To Foundry</option>
+            <option value="to_chronicle">→ To Chronicle</option>
+            <option value="link">Connects</option>
+          </select>
+          <label class="sh-check"><input type="checkbox" name="failed"> Failures only</label>
+          <button type="button" class="dashboard-btn btn-sm sh-refresh" data-history-refresh title="Refresh" aria-label="Refresh">
+            <i class="fa-solid fa-rotate"></i>
+          </button>
+        </form>
+        <div class="sh-list" data-history-rows></div>
       </div>
     </div>
 

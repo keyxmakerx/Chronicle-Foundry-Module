@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 const {
   resolveMapLook, sanitizeLook, markerIconClass, parseMapLook,
   pinMetrics, pinShapeSvg, frameInitial, DEFAULT_FRAME, DEFAULT_MARKER_ICON,
+  groupIconCatalog, mapThumbSrc,
 } = await import('../scripts/_map-look.mjs');
 const { startMotionRest } = await import('../scripts/_map-motion-rest.mjs');
 
@@ -55,12 +56,40 @@ test('markerIconClass: well-formed fa- classes only; catalog narrows when given'
 
 test('parseMapLook: reads GET /maps/look; anything else is null', () => {
   assert.deepEqual(
-    parseMapLook({ campaign_frame: 'old', icons: [{ id: 'fa-ship' }, { id: 'bad id' }, null] }),
-    { campaignFrame: 'old', icons: ['fa-ship'] },
+    parseMapLook({ campaign_frame: 'old', icons: [{ id: 'fa-ship', label: 'Ship', category: 'Maritime' }, { id: 'bad id' }, null] }),
+    {
+      campaignFrame: 'old',
+      icons: ['fa-ship'],
+      iconCatalog: [{ id: 'fa-ship', label: 'Ship', category: 'Maritime' }],
+    },
   );
+  const bare = parseMapLook({ icons: [{ id: 'fa-anchor', label: 7 }] }).iconCatalog[0];
+  assert.deepEqual(bare, { id: 'fa-anchor', label: 'anchor', category: 'Other' }, 'missing label/category fall back');
   assert.equal(parseMapLook({ campaign_frame: 'zzz' }).campaignFrame, DEFAULT_FRAME);
   assert.equal(parseMapLook(null), null);
   assert.equal(parseMapLook([]), null);
+});
+
+test('groupIconCatalog: groups in Chronicle\'s order', () => {
+  const cat = [
+    { id: 'fa-map-pin', label: 'Pin', category: 'General' },
+    { id: 'fa-anchor', label: 'Port', category: 'Maritime' },
+    { id: 'fa-star', label: 'Star', category: 'General' },
+  ];
+  assert.deepEqual(groupIconCatalog(cat), [
+    { category: 'General', icons: [{ id: 'fa-map-pin', label: 'Pin' }, { id: 'fa-star', label: 'Star' }] },
+    { category: 'Maritime', icons: [{ id: 'fa-anchor', label: 'Port' }] },
+  ]);
+  assert.deepEqual(groupIconCatalog(null), []);
+});
+
+test('mapThumbSrc: stored copies and Chronicle-host URLs only', () => {
+  const chronicleHost = (u) => u.startsWith('https://chronicle.example/');
+  assert.equal(mapThumbSrc('chronicle-sync/maps/m1-abc.jpg', chronicleHost), 'chronicle-sync/maps/m1-abc.jpg');
+  assert.equal(mapThumbSrc('https://chronicle.example/media/x.png?sig=1', chronicleHost), 'https://chronicle.example/media/x.png?sig=1');
+  for (const bad of ['https://evil.example/x.png', 'javascript:alert(1)', 'data:image/png;base64,AA', '//evil/x', '../x.png', 'a/../../x', '', null, 5]) {
+    assert.equal(mapThumbSrc(bad, chronicleHost), '', String(bad));
+  }
 });
 
 test('pinMetrics: Chronicle\'s anchors per shape, scaled by size', () => {
