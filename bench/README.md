@@ -15,9 +15,14 @@ never left Foundry).
   "someone editing in Chronicle".
 - `world.mjs` opens and closes the world (a new `SyncManager` with the real
   sync modules), records the module's requests, and waits until it is quiet.
-- `*.bench.mjs` are the scenarios. Every scenario ends with the same checks:
-  no duplicate pages or journals, both sides agree on names, no failed
-  writes, no hook errors, no error pop-ups.
+  Its `benchAdapter` is the one stand-in: a game system's field mapping
+  (Chronicle `fields_data.hp` ↔ Foundry `system.hp`), because a fresh
+  Chronicle has no system package installed.
+- `scenario.mjs` holds what every scenario shares: the wrapper and the
+  checks each one ends with (no duplicate pages, journals or actors, no
+  character turned into a journal, both sides agree on names, no failed
+  writes, no hook errors, no error pop-ups).
+- `*.bench.mjs` are the scenarios, one file per area.
 
 ## Running it
 

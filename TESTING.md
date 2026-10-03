@@ -1,7 +1,10 @@
 # Foundry VTT Sync Module - E2E Testing Checklist
 
 Manual testing checklist for the Chronicle-Foundry bidirectional sync module.
-Requires a running Chronicle instance and Foundry VTT with the chronicle-sync module installed.
+Requires a running Chronicle instance and Foundry VTT (v14) with the chronicle-sync module installed.
+
+Automated checks (no Foundry needed): `node --test tools/test-*.mjs` from the
+repo root. There is no `package.json`.
 
 ## Prerequisites
 
@@ -50,14 +53,14 @@ Requires a running Chronicle instance and Foundry VTT with the chronicle-sync mo
 - [ ] Custom visibility with no player grant → default NONE
 - [ ] Changing journal ownership in Foundry pushes is_private to Chronicle
 - [ ] Changing journal ownership pushes visibility/permissions to Chronicle API
-- [ ] **(FM-SYNC-HARDENING §3, fail-closed)** Permission API failure on a `custom`-visibility
+- [ ] **(fail-closed)** Permission API failure on a `custom`-visibility
       entity → ownership defaults to **NONE** (GM-only), even when `is_private=false`.
       It must NOT fall open to OBSERVER. To reproduce: stop Chronicle (or block the
       `/permissions` endpoint) while a custom-visibility entity syncs; confirm players
       cannot see it.
 
-### Visibility Settings (Config tab → Permissions) — FM-SYNC-HARDENING §1
-These controls were previously dead config (written but never read). Verify they now drive ownership:
+### Visibility Settings (Config tab → Permissions)
+These controls drive journal ownership:
 - [ ] **dmOnlyHidden ON (default):** a DM-only / private Chronicle entity → players have NO
       access to the journal (ownership NONE). Confirm as a player: the journal is hidden.
 - [ ] **dmOnlyHidden OFF:** re-sync (edit the entity on Chronicle so it re-pulls). The same
@@ -65,8 +68,8 @@ These controls were previously dead config (written but never read). Verify they
       dm-only content. Toggle back ON → players lose it again on the next sync.
 - [ ] **defaultOwnership = Owner:** a player-visible entity → journal default ownership is OWNER
       (players can edit). Set it to **None** → public entities sync as GM-only.
-- [ ] **(FM-SYNC-HARDENING §4)** Per-user Chronicle grant: an entity shared with a specific
-      Chronicle user (mapped to a Foundry user via the auto-matched user table) → that Foundry
+- [ ] Per-user Chronicle grant: an entity shared with a specific
+      Chronicle user (mapped to a Foundry user on the dashboard Members tab) → that Foundry
       user gets per-user OWNER/OBSERVER ownership; unmapped Chronicle users are dropped (the
       entity under-shares — no leak to the wrong player).
 
@@ -75,35 +78,72 @@ These controls were previously dead config (written but never read). Verify they
 - [ ] Sync guard prevents infinite loops (edit in A, syncs to B, doesn't re-sync to A)
 - [ ] Monk's Enhanced Journal: content syncs correctly if module active
 
-## Map Sync (Markers Only)
+## Map Sync (Journal Map Viewer)
 
-Note: Drawings, tokens, fog of war, and layers are managed by Chronicle's web
-map editor. Only markers/pins sync to Foundry as Scene Map Notes.
+Each Chronicle map becomes a JournalEntry (one image page) in a "Chronicle Maps"
+folder, drawn by the Chronicle Map Viewer sheet with markers, drawings, tokens,
+layers and fog as overlays. Drawings, tokens, layers and fog are read-only in
+Foundry; markers are editable by the GM. Needs "Sync Maps" on and a Chronicle
+campaign with at least one map that has an image, markers (some `Everyone`, one
+`DM only`), and ideally a drawing, a token and a fog region.
 
-### Chronicle -> Foundry
-- [ ] Create marker in Chronicle -> Scene Note (pin) appears on linked Foundry scene
-- [ ] Update marker position/name -> Scene Note updates
-- [ ] Delete marker -> Scene Note removed
+### Materialize
+- [ ] Dashboard → Maps tab → **Resync All Maps** → each Chronicle map is listed under
+      "Chronicle Maps" with marker / drawing / token counts and an **Open in Foundry** button
+- [ ] **Open Chronicle Maps Folder** reveals the "Chronicle Maps" folder in the Journal sidebar
+- [ ] The summary row shows Materialized count, Open viewers and Last sync (not "never")
+- [ ] Click **Open in Foundry** → the map opens in the Chronicle Map Viewer (image plus overlays, zoom % bottom corner)
+- [ ] A map with no image does not break the Resync (a row appears under recent errors instead, **Dismiss** clears it)
+- [ ] Press **Resync All Maps** twice → no duplicate journals or folders
 
-### Foundry -> Chronicle
-- [ ] Create Scene Note on linked scene -> Marker syncs to Chronicle map
-- [ ] Move/update Scene Note -> Marker updates in Chronicle
-- [ ] Delete Scene Note -> Marker removed from Chronicle
+### Chronicle -> Foundry (viewer open)
+- [ ] Create a marker in Chronicle's map editor → it appears in the open viewer within a few seconds
+- [ ] Move or rename the marker → the viewer updates; the tooltip shows the new name
+- [ ] Delete the marker → it disappears from the viewer
+- [ ] Add/change a drawing (rectangle, ellipse, line, polygon, freehand) → it renders as an overlay; layer order matches Chronicle
+- [ ] Add/move a token → it renders with its image, an HP bar when it has HP, and its name when labels are on
+- [ ] Hide a layer or change a layer's order in Chronicle → items on it follow
+- [ ] Delete the map in Chronicle → the viewer shows the "was deleted, local annotations preserved" notice and the journal is kept
 
-### Coordinate Conversion
-- [ ] Verify percentage-to-pixel conversion is accurate for markers
-- [ ] Markers at scene edge map correctly
+### Foundry -> Chronicle (GM, markers only)
+- [ ] Toolbar → **Place Chronicle marker**, click the map → dialog with name, category, description and visibility; **Create** → marker appears in Chronicle's editor
+- [ ] Right-click a Chronicle marker → **Configure Chronicle Marker**; change name/category → Save → Chronicle shows the change
+- [ ] In that dialog set Visibility to **DM only** → Save → the marker shows the DM-only style for the GM and Chronicle shows it as DM only
+- [ ] **Delete Marker** → confirm → marker is removed in Chronicle
+- [ ] Double-click a marker that has a linked entity → the entity's journal opens
+- [ ] Stop Chronicle, then save a marker edit → an error toast ("Failed to update marker on Chronicle") and the viewer keeps the old value
+- [ ] Viewer toolbar **Resync this map from Chronicle** re-fetches the map; **Open in Chronicle web editor** opens the map URL
+
+### Local pins (never sync to Chronicle)
+- [ ] Pick a pin type in the toolbar, click the map → a local pin is placed; drag moves it; right-click configures; double-click opens its linked journal
+- [ ] A pin marked "Visible to players" shows to a player; one that is not stays GM-only
+- [ ] After a world reload the pins are still there, and they do not appear in Chronicle
+
+### Player Visibility (security)
+Players read only what the GM client wrote into the journal page flags, so
+restricted data must never be written there (`scripts/_map-flag-filter.mjs`).
+Setup: in Chronicle, one `Everyone` marker, one `DM only` marker, a marker or
+drawing restricted to specific users, a hidden token, and a fog region; give the
+test player Observer on the map journal.
+- [ ] As GM, all of them show in the viewer (DM-only marker with the DM-only style; fog as a dark overlay)
+- [ ] As the player, open the same map: only the `Everyone` marker and unrestricted drawings and tokens show
+- [ ] As the player, the `DM only` marker, the user-restricted marker/drawing, the hidden token and the fog overlay are all absent
+- [ ] As the player, F12 console: `game.journal.getName("<map name>").pages.contents[0].flags["chronicle-sync"]` — its `chronicleMarkers` list holds no `DM only` or restricted marker, and no fog data is present
+- [ ] Right-click on a marker as the player does nothing (no config dialog); the Place Chronicle marker tool is absent
+- [ ] Change a visible marker to `DM only` in Chronicle while the player has the map open → it vanishes from the player's view and from the page flags after the next sync
+- [ ] Change it back to Everyone → it reappears for the player
+- [ ] Marker JSON from a map saved by an older module version that already carried a DM-only marker in flags: **Resync All Maps** strips it from the flags
 
 ### View in Chronicle
-- [ ] Right-click linked scene -> "View in Chronicle" opens map URL in browser
-- [ ] Dashboard Maps tab -> "View in Chronicle" link opens map URL
+- [ ] Dashboard Maps tab → the external-link icon on a map row opens the Chronicle map URL
 
 ## Calendar Sync
 
-> **BLACKOUT (2026-08-21):** Chronicle's calendar is deleted pending V5, so the
-> checks in this section cannot be performed end to end. See API-CONTRACT.md →
-> "CALENDAR BLACKOUT". The three boxes that ARE the blackout test are in the
-> API section above.
+Chronicle's date and event routes are live; the old structure, settings,
+import, export and advance routes answer `410 calendar_route_retired` (the
+module calls none of them). An older Chronicle answers those with
+`503 calendar_rebuilding`, which pauses date pushes for 30 seconds and shows one
+GM notice. See API-CONTRACT.md.
 
 ### Chronicle -> Foundry
 - [ ] Advance date in Chronicle -> Calendaria/SimpleCalendar date updates
@@ -113,6 +153,7 @@ map editor. Only markers/pins sync to Foundry as Scene Map Notes.
 
 ### Foundry -> Chronicle
 - [ ] Change date in Calendaria/SimpleCalendar -> Chronicle date updates
+- [ ] A real-time Chronicle calendar is never overwritten by a Foundry date change
 - [ ] Create event in calendar module -> Chronicle event created
 - [ ] Update event -> Chronicle event updates
 - [ ] Delete event -> Chronicle event removed
@@ -124,7 +165,8 @@ map editor. Only markers/pins sync to Foundry as Scene Map Notes.
 
 ## Shop Widget
 
-- [ ] Right-click JournalEntry linked to Shop entity -> "Open Chronicle Shop" option appears
+- [ ] Right-click a JournalEntry linked to a Shop entity in the Journal sidebar -> "Open Chronicle Shop" option appears (not on non-shop journals)
+- [ ] Dashboard Shops tab -> each shop row has an **Open** button that opens the same window
 - [ ] Shop window opens with correct shop name
 - [ ] Inventory loads from relations API (items with price/quantity metadata)
 - [ ] Items show name, price, quantity
@@ -134,30 +176,18 @@ map editor. Only markers/pins sync to Foundry as Scene Map Notes.
 - [ ] Multiple shop windows can be open simultaneously
 - [ ] Closing shop window cleans up properly
 
-## Scene-to-Map Linking
-
-- [ ] Right-click scene in nav bar -> "Link to Chronicle Map" option visible (GM only)
-- [ ] Dialog shows all Chronicle maps for the campaign
-- [ ] Selecting a map links the scene (sets flag)
-- [ ] Unlinking clears the flag
-- [ ] Auto-link: if campaign has exactly one map, scene auto-links on initial sync
-- [ ] Multi-map warning: if campaign has multiple maps, log warning with instructions
-- [ ] Linked scene shows correct map ID in flag inspector
-
 ## Initial Sync
 
 - [ ] Fresh connection triggers initial sync (GET /sync/pull)
 - [ ] Existing entities create proper sync mappings
-- [ ] Existing map-to-scene links and marker mappings created
+- [ ] Existing Chronicle maps are materialized as journals in the "Chronicle Maps" folder
 - [ ] lastSyncTime updates after successful initial sync
 
 ## Permission & Security
 
 - [ ] API key with read-only permission can't write via sync
 - [ ] API key scoped to campaign A can't access campaign B data
-- [ ] Calendar API returns `503 calendar_rebuilding` (blackout, 2026-08-21).
-      The addon-disabled 404 case is untestable until V5.
-- [ ] The dashboard Calendar tab does NOT claim "No calendar configured"
+- [ ] Against a Chronicle that answers calendar routes with `503 calendar_rebuilding`: the dashboard Calendar tab says the calendar is being rebuilt and does NOT claim "No calendar configured"
 - [ ] Maps / actors / items / notes still sync while the calendar is down
 - [ ] Disabled maps addon -> Maps API returns 404
 - [ ] Private entities hidden from non-owner API keys
@@ -184,33 +214,25 @@ map editor. Only markers/pins sync to Foundry as Scene Map Notes.
 - [ ] Delete Actor -> asked "Delete in Chronicle too?": No keeps the entity, Yes deletes it
 
 ### Dashboard - Characters Tab
-- [ ] Characters tab visible in sync dashboard
+- [ ] Characters tab visible in sync dashboard (rail group "Everyday")
 - [ ] System badge shows matched system name
-- [ ] Synced actors show green check with "Synced" label
-- [ ] Unlinked actors show "Not linked" with Push button
+- [ ] Synced actors show green check with "Synced" label, a last-sync time and a **Re-sync** button
+- [ ] Unlinked actors show "Not linked" with a Push button, and **Push All** appears in the toolbar
 - [ ] Push button creates Chronicle entity and links actor
 - [ ] Empty state shown when no character actors exist
 - [ ] Disabled state shown when syncCharacters is off
 - [ ] No-system state shown when game system doesn't match
 
-### System Adapters
-- [ ] D&D 5e: All 6 ability scores sync (str, dex, con, int, wis, cha)
-- [ ] D&D 5e: HP current/max syncs bidirectionally
-- [ ] D&D 5e: AC, speed, level, class, race, alignment, proficiency_bonus push to Chronicle
-- [ ] PF2e: Ability mods sync to Chronicle (str_mod through cha_mod)
-- [ ] PF2e: HP syncs bidirectionally
-- [ ] PF2e: Only HP and name sync back from Chronicle (derived values protected)
-- [ ] PF2e: ancestry, heritage, class, level, perception, speed push to Chronicle
-
-### Generic Adapter (Custom Systems)
-- [ ] Custom system with foundry_path annotations → generic adapter loaded
-- [ ] Generic adapter maps annotated fields bidirectionally (Chronicle ↔ Foundry)
-- [ ] Fields with foundry_writable: false only push to Chronicle, not written back
-- [ ] System without foundry_path on any field → generic adapter returns null, character sync disabled
-- [ ] Type casting: number fields cast via Number(), string fields pass through
-- [ ] _detectSystem() matches by foundry_system_id from API (not SYSTEM_MAP)
-- [ ] _detectSystem() falls back to SYSTEM_MAP_FALLBACK when API fails
-- [ ] _loadAdapter() tries dnd5e/pf2e first, then generic adapter
+### Generic Adapter (all systems)
+Character sync uses one API-driven adapter (`scripts/adapters/generic-adapter.mjs`)
+that reads each field's `foundry_path` from the matched Chronicle system's manifest.
+- [ ] A game system with a Chronicle package that declares `foundry_path` fields (e.g. D&D 5e, PF2e, Draw Steel) -> Dashboard Status tab → Field Mapping shows Adapter loaded and a Character Type
+- [ ] Mapped fields sync Chronicle -> Foundry and Foundry -> Chronicle (change one number field each way)
+- [ ] Fields with `foundry_writable: false` push to Chronicle only and are not written back to the actor
+- [ ] Number fields are cast to numbers; string fields pass through
+- [ ] System package with no `foundry_path` on any field -> character sync is off (Characters tab shows no adapter, Status tab shows Adapter none)
+- [ ] The game system is matched by the Chronicle system's `foundry_system_id` and the system must be enabled for the campaign (Status tab → Game System shows both ids); a system that is installed but not enabled shows the "not enabled" message in the activity log
+- [ ] When Chronicle is unreachable at load, the last matched system is reused
 
 ### Edge Cases
 - [ ] Actor sync disabled when no system adapter available
@@ -225,12 +247,12 @@ map editor. Only markers/pins sync to Foundry as Scene Map Notes.
 - [ ] Network timeout during sync doesn't corrupt state
 - [ ] Partial sync failure (one entity fails) doesn't block others
 - [ ] Module gracefully handles Chronicle server restart
-- [ ] **(FM-SYNC-HARDENING §4)** A failed Foundry→Chronicle push (e.g. Chronicle down)
+- [ ] A failed Foundry→Chronicle push (e.g. Chronicle down)
       surfaces a `ui.notifications.warn` to the GM and appears in the dashboard error log
       (not console-only). Journal/note *updates* are queued for retry and re-push on reconnect.
 
-### Reconnect re-pull (FM-SYNC-HARDENING §2)
-Previously, edits made on Chronicle while Foundry was disconnected were lost until a world reload.
+### Reconnect re-pull
+Edits made on Chronicle while Foundry was disconnected arrive after reconnect, without a world reload.
 - [ ] With Foundry connected, **disconnect** (stop Chronicle, or pull the network) so the status
       pill goes red/yellow.
 - [ ] While disconnected, **edit an entity on Chronicle** (e.g. rename it, change its content).
@@ -242,29 +264,37 @@ Previously, edits made on Chronicle while Foundry was disconnected were lost unt
 
 ## Sync Dashboard
 
-### Access
-- [ ] Click status indicator → dashboard opens (GM only)
-- [ ] Dashboard shows "Not configured" state when settings missing
-- [ ] Dashboard opens to last-active tab
+The dashboard is a left rail of 11 tabs in five groups. Rail order: Overview
+(top, ungrouped); Everyday: Entities, Characters, Calendar, Issues; Library:
+Shops, Maps, Notes; Setup: Config, Members; Diagnostics: Status.
 
-### Tabs (8 total)
-- [ ] Config tab: API URL, key, campaign ID, sync scope, exclusion rules, save config
-- [ ] Entities tab: entity list with sync status dots, pull/push actions, visibility toggle, search filter, bulk tools, "Create Type" button
-- [ ] Shops tab: shop entities with "Open Shop" button linking to ShopWidget
-- [ ] Maps tab: scene-to-map linking via dropdown, pin count, "View in Chronicle" link
-- [ ] Characters tab: synced/unlinked actors, push button, system badge
-- [ ] Notes tab: Chronicle notes synced as JournalEntries
-- [ ] Calendar tab: date comparison (Chronicle vs Foundry), pull/push buttons, module detection
-- [ ] Status tab: connection health, activity log, error log, diagnostics grid, system match info
+### Access
+- [ ] Click the sidebar status indicator (when connected) or the Chronicle Sync button in the scene controls → dashboard opens (GM only); right-click on the indicator opens it even when disconnected; clicking while disconnected tries to reconnect
+- [ ] Dashboard shows "Chronicle Sync is not configured" with an **Open Settings** button when URL, key or campaign ID is missing
+- [ ] Dashboard opens to the last-active tab; an unknown saved tab falls back to Overview
+- [ ] A tab that fails to load shows a "Some data failed to load" banner naming the tab, with **Retry**
+
+### Tabs
+- [ ] **Overview:** connection banner (green/yellow/red) with **Reconnect** when not connected; stat tiles for Entities Synced, Characters Synced (n/total) and Maps Linked, each jumps to its tab on click; "Needs Attention" lists only real problems (each row jumps to the fixing tab) or says "Everything's in sync"; **Sync Everything Now**, **Diagnostics** and **Refresh** work
+- [ ] **Entities:** entity list grouped by type with sync status dots, Pull/Push per row, Pull All / Push All, Resync All Journals, visibility toggle, search filter, bulk select (Make Public / Private / Delete / Change Type), **Create Type**
+- [ ] **Characters:** system badge, synced and unlinked actors, Push / Push All / Re-sync (see Character Sync)
+- [ ] **Calendar:** shows the Chronicle vs Foundry date with Pull Date / Push Date and the detected calendar module; **Open Sync Calendar** opens the Sync Calendar editor; the tab explains why when sync is disabled, no calendar module is active, or the calendar is rebuilding or unreachable
+- [ ] **Issues:** badge shows the number of character actors that cannot be matched. Each row offers a "Match to existing…" dropdown with **Match**, and **Create new**. Resolving a row links it and removes it. With none, the tab says every character is linked
+- [ ] **Shops:** shop entities with type, keeper, private lock, "Synced" badge and an **Open** button that opens the Shop window; empty states say whether the "Shop" entity type is missing or just has no shops
+- [ ] **Maps:** per-map rows with marker / drawing / token counts, **Open in Foundry**, external-link icon; **Resync All Maps**, **Open Chronicle Maps Folder**; summary row and dismissible error list (see Map Sync)
+- [ ] **Notes:** Chronicle notes with a status badge (synced / chronicle-only), shared or private icon, last-sync time, and a Pull button on chronicle-only notes
+- [ ] **Config:** Connection (URL, API key as password field, campaign ID, **Test Connection**), Import Wizard button, Sync Scope, Permissions, Behavior (conflict resolution), Exclusion Rules (tags, name) and **Save**; unsaved checkbox/select changes are marked until saved
+- [ ] **Members:** one row per Chronicle campaign member with Matched / Unmatched badge and a Foundry-user dropdown; changing the dropdown saves the mapping; the rail badge counts unmatched members; **Refresh** re-fetches
+- [ ] **Status:** Game System (Foundry and Chronicle system, Character Sync), Diagnostics, Field Mapping, Sync Capability (pick an actor to inspect; **Copy** report and JSON), Error Log, Recent Activity, Diagnostic Bundle copy and System Debug Export copy
 
 ### Layout Persistence
-- [ ] Switch to Maps tab, close dashboard, reopen -> Maps tab still active
+- [ ] Switch to Maps tab, close dashboard, reopen -> Maps tab still active (a different tab than Overview)
 - [ ] Collapse an entity type group, reload Foundry -> group still collapsed
-- [ ] Different browser/user has independent layout preferences
+- [ ] A different browser/user has independent layout preferences (they are client settings)
 
 ### Entity Type Creation
 - [ ] "Create Type" button visible in Entities tab toolbar
-- [ ] Click -> Dialog with name, plural name, icon class, color fields
+- [ ] Click -> Dialog with name, plural name, icon and color fields
 - [ ] Submit with name "Quest" -> type created, dashboard refreshes
 - [ ] New type appears in bulk "Change Type" dropdown
 - [ ] Cancel/close without name -> no API call, no errors
@@ -277,10 +307,10 @@ Previously, edits made on Chronicle while Foundry was disconnected were lost unt
 - [ ] Test with CORS issue -> Shows origin URL and whitelist instructions
 - [ ] Test with system not matched -> Shows available foundry_system_ids
 
-### Diagnostics (F-QoL)
-- [ ] Health metrics: REST success/error counts, uptime percentage, reconnect attempts
-- [ ] Error log: last 50 errors with timestamp, method, path, status
-- [ ] Retry queue: failed writes queued and processed on reconnect (max 3 retries)
-- [ ] Activity log: last 100 sync actions with color-coded type icons
-- [ ] Clear log button resets activity log
-- [ ] Reconnect button triggers manual WebSocket reconnection
+### Diagnostics
+- [ ] Health metrics: Uptime, API OK, API Errors, Reconnects, Last Success, Last Error
+- [ ] Error log: recent errors (up to 50) with timestamp, method, path, status
+- [ ] Retry queue: failed writes queued and processed on reconnect (Status tab → Pending Retries drains to 0)
+- [ ] Activity log: recent sync actions (up to 100 kept, newest first) with color-coded type icons
+- [ ] Clear log button resets activity log (Status tab)
+- [ ] Reconnect button (Status tab, and Overview when disconnected) triggers manual WebSocket reconnection

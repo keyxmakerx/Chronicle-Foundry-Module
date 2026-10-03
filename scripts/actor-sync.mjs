@@ -22,6 +22,7 @@ import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { walkEntityPages, unwrapEntityList } from './_entity-page-walk.mjs';
 import { JournalPushDebouncer } from './_journal-push-debounce.mjs';
 import { mergeChanges } from './_actor-field-diff.mjs';
+import { collapseChanges } from './_change-feed.mjs';
 
 /**
  * ActorSync handles character entity ↔ Actor synchronization.
@@ -179,14 +180,30 @@ export class ActorSync {
     }
   }
 
+  /** Change-feed area this module reads at connect (see SyncManager). */
+  get feedArea() { return 'actors'; }
+
+  /** Characters use the feed only while character sync is actually running. */
+  feedActive() { return !!(getSetting('syncCharacters') && this._adapter && this._characterTypeId); }
+
   /**
-   * Perform initial sync: pull all character entities and match to actors.
+   * Connect-time catch-up for linked actors. With the change feed only the
+   * characters Chronicle says changed are refetched; without it every
+   * character is listed. Either way an actor already at the entity's version
+   * is left alone, and no actor is created here (live creates and the import
+   * wizard do that). Throws when anything failed, so the feed cursor is not
+   * advanced past it.
+   *
+   * @param {{feed?: {mode: 'delta', changes: object[]}|{mode: 'full'}}} [opts]
    */
-  async onInitialSync() {
+  async onInitialSync({ feed } = {}) {
     if (!this._adapter || !getSetting('syncCharacters')) return;
     if (!this._characterTypeId) return;
 
-    try {
+    let errors = 0;
+    if (feed?.mode === 'delta') {
+      errors = await this._catchUpFromFeed(feed.changes);
+    } else {
       // Pull the parent character type and (when resolved) the PC sub-type so
       // existing actor–entity links are refreshed regardless of which Chronicle
       // type the entity lives under.
@@ -199,24 +216,76 @@ export class ActorSync {
       }
 
       for (const entity of allEntities) {
-        // Check if already linked to an actor.
-        const existingActor = game.actors.find(
-          (a) => a.getFlag(FLAG_SCOPE, 'entityId') === entity.id
-        );
-
-        if (existingActor) {
-          // Update existing actor with latest data.
-          await this._updateActorFromEntity(existingActor, entity);
-        }
-        // Don't auto-create actors during initial sync — only update existing links.
+        const existingActor = this._findLinkedActor(entity.id);
+        if (!existingActor || this._atVersion(existingActor, entity)) continue;
+        if (!(await this._updateActorFromEntity(existingActor, entity))) errors++;
       }
-
-      // Surface unresolved character links (broken / missing) so the GM can
-      // fix them in the dashboard's Issues tab rather than silently desyncing.
-      await this._notifySyncIssues();
-    } catch (err) {
-      console.warn('Chronicle: Actor initial sync failed', err);
     }
+
+    // Surface unresolved character links (broken / missing) so the GM can
+    // fix them in the dashboard's Issues tab rather than silently desyncing.
+    try {
+      await this._notifySyncIssues({ quick: feed?.mode === 'delta' });
+    } catch (err) {
+      console.warn('Chronicle: could not check character links', err);
+    }
+    if (errors > 0) throw new Error(`actor catch-up: ${errors} character(s) failed`);
+  }
+
+  /**
+   * Apply the characters the change feed lists to their linked actors.
+   * A removed character unlinks its actor (the actor is kept).
+   * @param {object[]} changes
+   * @returns {Promise<number>} how many failed
+   * @private
+   */
+  async _catchUpFromFeed(changes) {
+    let errors = 0;
+    for (const [entityId, op] of collapseChanges(changes, 'entity')) {
+      const actor = this._findLinkedActor(entityId);
+      if (!actor) continue;
+      if (op === 'deleted') {
+        await this._onCharacterDeleted({ id: entityId });
+        continue;
+      }
+      let entity;
+      try {
+        entity = await this._api.get(`/entities/${entityId}`);
+      } catch (err) {
+        if ((err?.status ?? err?.statusCode) === 404) {
+          await this._onCharacterDeleted({ id: entityId });
+        } else {
+          errors++;
+          console.warn(`Chronicle: catch-up failed for character ${entityId}`, err);
+        }
+        continue;
+      }
+      if (!entity || !this._isCharacterEntity(entity) || this._atVersion(actor, entity)) continue;
+      if (!(await this._updateActorFromEntity(actor, entity))) errors++;
+    }
+    return errors;
+  }
+
+  /** The actor linked to a Chronicle entity, or undefined. @private */
+  _findLinkedActor(entityId) {
+    return game.actors.find((a) => a.getFlag(FLAG_SCOPE, 'entityId') === entityId);
+  }
+
+  /** True when the actor has already applied this entity version. @private */
+  _atVersion(actor, entity) {
+    return !!entity?.updated_at && actor.getFlag(FLAG_SCOPE, 'chronicleUpdatedAt') === entity.updated_at;
+  }
+
+  /**
+   * True when `ts` is older than the version this actor has recorded: a
+   * stale copy (an echo built before a later save) that must not roll the
+   * actor back. Equal versions still apply (one-second precision).
+   * @private
+   */
+  _olderThanRecorded(actor, ts) {
+    const seen = Date.parse(actor?.getFlag?.(FLAG_SCOPE, 'chronicleUpdatedAt') || '');
+    const t = Date.parse(ts || '');
+    return Number.isFinite(seen) && Number.isFinite(t) && t < seen;
   }
 
   /**
@@ -339,12 +408,18 @@ export class ActorSync {
   }
 
   /**
-   * Apply Chronicle entity data to a Foundry Actor.
+   * Apply Chronicle entity data to a Foundry Actor. A copy older than the
+   * actor's recorded version is ignored.
    * @param {Actor} actor
    * @param {object} entity
+   * @returns {Promise<boolean>} false when the apply failed
    * @private
    */
   async _updateActorFromEntity(actor, entity) {
+    if (this._olderThanRecorded(actor, entity?.updated_at)) {
+      console.debug(`Chronicle: ignored a stale copy of "${actor.name}"`);
+      return true;
+    }
     try {
       this._syncing = true;
 
@@ -377,8 +452,10 @@ export class ActorSync {
       }
 
       console.debug(`Chronicle: Updated actor "${actor.name}" from entity`);
+      return true;
     } catch (err) {
       console.error(`Chronicle: Failed to update actor "${actor.name}"`, err);
+      return false;
     } finally {
       this._syncing = false;
     }
@@ -997,11 +1074,18 @@ export class ActorSync {
   /**
    * If any character actors can't be matched to Chronicle (broken / missing
    * links), nudge the GM toward the dashboard's Issues tab. Quiet when all clear.
+   *
+   * `quick` (after a change-feed catch-up) counts unlinked character actors
+   * without listing Chronicle: the catch-up has just unlinked any actor whose
+   * character was removed, so no broken link can be left to find.
+   * @param {{quick?: boolean}} [opts]
    * @private
    */
-  async _notifySyncIssues() {
+  async _notifySyncIssues({ quick = false } = {}) {
     try {
-      const { issues } = await this.getSyncIssues();
+      const { issues } = quick
+        ? { issues: game.actors.contents.filter((a) => a.type === this._actorType && !a.getFlag(FLAG_SCOPE, 'entityId')) }
+        : await this.getSyncIssues();
       if (!issues.length) return;
       const n = issues.length;
       ui.notifications?.warn(
