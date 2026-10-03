@@ -162,3 +162,24 @@
     repeating-linear-gradient(90deg, transparent 0 calc(33.33% - 1px), rgb(0 0 0 / 0.25) calc(33.33% - 1px) 33.33%),
     repeating-linear-gradient(180deg, transparent 0 calc(50% - 1px), rgb(0 0 0 / 0.25) calc(50% - 1px) 50%); }
 }
+
+/* Marker window: Chronicle's icon picker. */
+.chronicle-marker-config .cs-icon-picker { display: grid; gap: 6px; }
+.chronicle-marker-config .cs-icon-groups { display: flex; flex-wrap: wrap; gap: 4px; }
+.chronicle-marker-config .cs-icon-group { flex: none; width: auto; line-height: 1.4; padding: 1px 8px; font-size: 11px; border-radius: 999px; }
+.chronicle-marker-config .cs-icon-group[aria-pressed="true"] { background: var(--color-warm-2, #c9a44c); color: #1d1a17; border-color: transparent; }
+.chronicle-marker-config .cs-icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 4px; max-height: 196px; overflow-y: auto; }
+.chronicle-marker-config .cs-icon-choice { display: grid; justify-items: center; gap: 2px; height: auto; padding: 6px 2px 4px; font-size: 10px; line-height: 1.2; }
+.chronicle-marker-config .cs-icon-choice i { font-size: 16px; }
+.chronicle-marker-config .cs-icon-choice span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chronicle-marker-config .cs-icon-choice[aria-pressed="true"] { outline: 2px solid var(--color-warm-2, #c9a44c); outline-offset: -2px; }
+.chronicle-marker-config .cs-icon-choice[hidden] { display: none; }
+.chronicle-marker-config .cs-icon-none { grid-column: 1 / -1; margin: 4px 0; opacity: .7; font-size: 12px; }
+.chronicle-marker-config .cs-icon-preview { display: flex; align-items: center; gap: 10px; font-size: 12px; opacity: .85; }
+.chronicle-marker-config .cs-icon-preview-pin { position: relative; flex: none; }
+.chronicle-marker-config .cs-icon-preview-pin svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.chronicle-marker-config .cs-icon-preview-pin i { position: absolute; transform: translate(-50%, -50%); color: #fff; line-height: 1; }
+
+/* Sync window, Maps tab: a small picture of each map. */
+.map-row .cs-map-thumb { width: 64px; height: 42px; flex: none; object-fit: cover; border-radius: 3px; border: 1px solid rgb(0 0 0 / .35); background: rgb(0 0 0 / .15); }
+.map-info:has(.cs-map-thumb) { gap: 10px; }

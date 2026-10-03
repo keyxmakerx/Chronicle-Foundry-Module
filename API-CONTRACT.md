@@ -670,6 +670,9 @@ icons[{id,label,category}], default_icon}`. `campaign_frame` is one of
 own frame wears. Fetched once per full sync; a 404 (older Chronicle) keeps
 the Atlas default. Marker `icon` is a Font Awesome class from `icons`; the
 viewer draws any well-formed `fa-` class and falls back to `default_icon`.
+The marker dialog's icon picker offers `icons` grouped by `category` and
+sends only an `id` from that list; without the list (older Chronicle) the
+picker is hidden and a marker keeps its icon.
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/map_api_look.go`, keyxmakerx/Chronicle#1017)
 
 #### GET /maps/:mapId/drawings

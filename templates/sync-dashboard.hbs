@@ -596,7 +596,11 @@
         {{#each chronicleMaps}}
         <div class="map-row {{#if materialized}}linked{{/if}}">
           <div class="map-info">
+            {{#if thumbSrc}}
+            <img class="cs-map-thumb" src="{{thumbSrc}}" alt="" loading="lazy">
+            {{else}}
             <i class="fa-solid fa-map" style="color: #60a5fa"></i>
+            {{/if}}
             <span class="map-name">{{name}}</span>
           </div>
           <div class="map-link-info">
