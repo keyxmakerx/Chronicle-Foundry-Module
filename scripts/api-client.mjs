@@ -53,6 +53,8 @@ const ALLOWED_WS_TYPE_PREFIXES = Object.freeze([
   'calendar.',
   'relation.',
   'sync.',
+  'stash.',
+  'downtime.',
 ]);
 
 /**

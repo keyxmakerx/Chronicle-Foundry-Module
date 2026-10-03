@@ -17,6 +17,7 @@
 
 import { getSetting } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
+import { itemsToRemove } from './_stash-reconcile.mjs';
 
 /**
  * ItemSync handles item inventory synchronization between Chronicle
@@ -117,22 +118,56 @@ export class ItemSync {
     );
 
     for (const actor of syncedActors) {
-      const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
-      if (!entityId) continue;
+      await this.refreshInventory(actor, { reconcile: false });
+    }
+  }
 
-      try {
-        const relations = await this._api.get(`/entities/${entityId}/relations`);
-        const itemRelations = (relations || []).filter(
-          (r) => r.relationType === 'Has Item'
-        );
+  /**
+   * Pull one actor's inventory from Chronicle's "Has Item" relations: add what
+   * is missing and, with `reconcile`, update quantities. Goes through the same
+   * handlers as the live relation events. A failed fetch changes nothing.
+   *
+   * Never deletes on its own (sync never deletes without asking). The only
+   * removal is `removeItemIds`: Chronicle item entities a just-applied move
+   * took away from this actor, and only items linked to them whose relation is
+   * gone (see _stash-reconcile.mjs).
+   * @param {Actor} actor
+   * @param {{reconcile?: boolean, removeItemIds?: string[]}} [opts]
+   */
+  async refreshInventory(actor, { reconcile = true, removeItemIds = [] } = {}) {
+    if (!this._api) return;
+    const entityId = actor?.getFlag(FLAG_SCOPE, 'entityId');
+    if (!entityId) return;
 
-        // Reconcile Foundry inventory with Chronicle relations.
-        for (const rel of itemRelations) {
+    try {
+      const relations = await this._api.get(`/entities/${entityId}/relations`);
+      const list = Array.isArray(relations) ? relations : relations?.data;
+      if (!Array.isArray(list)) return;
+      const itemRelations = list.filter((r) => r.relationType === 'Has Item');
+
+      for (const rel of itemRelations) {
+        const linked = actor.items.find((i) => i.getFlag(FLAG_SCOPE, 'relationId') === rel.id);
+        if (!linked) {
           await this._ensureFoundryItem(actor, rel);
+        } else if (reconcile) {
+          await this._onRelationMetadataUpdated({ ...rel, sourceEntityId: entityId });
         }
-      } catch (err) {
-        console.warn(`Chronicle: Failed to sync inventory for "${actor.name}"`, err);
       }
+
+      const gone = itemsToRemove(
+        actor.items.map((i) => ({
+          id: i.id,
+          relationId: i.getFlag(FLAG_SCOPE, 'relationId'),
+          entityId: i.getFlag(FLAG_SCOPE, 'entityId'),
+        })),
+        itemRelations.map((r) => r.id),
+        removeItemIds,
+      );
+      for (const g of gone) {
+        await this._onRelationDeleted({ relationType: 'Has Item', sourceEntityId: entityId, id: g.relationId });
+      }
+    } catch (err) {
+      console.warn(`Chronicle: Failed to sync inventory for "${actor.name}"`, err);
     }
   }
 

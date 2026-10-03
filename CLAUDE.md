@@ -13,9 +13,9 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
   `tools/check-package-descriptor.mjs`.
 - `scripts/*.mjs`: sync (`journal-sync`, `map-sync`+`map-viewer`,
   `calendar-sync`+`sync-calendar`+`sync-calendar-*`, `actor-sync`,
-  `item-sync`, `note-sync`), UI (`sync-dashboard`,
+  `item-sync`, `note-sync`, `stash-sync`+`stash-client`), UI (`sync-dashboard`,
   `sync-diagnostic-bundle`, `update-info`, `character-claim-indicator`,
-  `capability-inspector`, `import-wizard`, `shop-widget`, `player-notebook`), core (`module`,
+  `capability-inspector`, `import-wizard`, `shop-widget`, `player-notebook`, `stash-window`+`stash-chat`), core (`module`,
   `settings`, `constants`, `logger`, `sync-manager`, `api-client`),
   `adapters/generic-adapter.mjs`. `.ai.md` has what each does. `_*.mjs` are
   pure helpers, each unit-tested by its own `tools/test-*.mjs`.
