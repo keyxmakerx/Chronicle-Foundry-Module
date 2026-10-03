@@ -84,10 +84,8 @@
             <div class="token-hp-fill" style="width: {{hpPercent}}%;"></div>
           </div>
           {{/if}}
-          {{#if ../showLabels}}
           {{#if name}}
-          <span class="token-label">{{name}}</span>
-          {{/if}}
+          <span class="token-label"{{#unless ../showLocalLabels}} style="display: none;"{{/unless}}>{{name}}</span>
           {{/if}}
         </div>
         {{/each}}
@@ -115,16 +113,14 @@
                style="left: {{x}}%; top: {{y}}%;"
                title="{{label}} — {{sharedLabel}}">
             <i class="pin-icon fa-solid {{faIcon}}"></i>
-            {{#if ../showLabels}}
-              <span class="pin-label">{{label}}</span>
-            {{/if}}
+            <span class="pin-label"{{#unless ../showLocalLabels}} style="display: none;"{{/unless}}>{{label}}</span>
           </div>
         {{/each}}
       </div>
 
       {{!-- Chronicle markers (rendered above local pins by DOM order) --}}
       {{#if chronicleMarkers.length}}
-      <div class="chronicle-marker-layer cs-labels-{{look.pinLabels}}">
+      <div class="chronicle-marker-layer cs-labels-{{labelMode}}" data-labels="{{look.pinLabels}}">
         {{#each chronicleMarkers}}
           <div class="chronicle-marker cs-pin {{category}} {{#if isDmOnly}}dm-only{{/if}}"
                data-marker-id="{{id}}"
@@ -133,9 +129,8 @@
             {{{shapeSvg}}}
             <i class="pin-icon fa-solid {{faIcon}}" style="left: {{pin.icoX}}px; top: {{pin.icoY}}px; font-size: {{pin.icoSize}}px;"></i>
             {{#if isDmOnly}}<span class="cs-pin-badge"><i class="fa-solid fa-eye-slash"></i></span>{{/if}}
-            {{#if ../showLabels}}
-              <span class="pin-label" style="top: {{pin.h}}px;">{{label}}</span>
-            {{/if}}
+            {{!-- Shown, on hover, or hidden by the layer's cs-labels-* class. --}}
+            <span class="pin-label" style="top: {{pin.h}}px;">{{label}}</span>
           </div>
         {{/each}}
       </div>

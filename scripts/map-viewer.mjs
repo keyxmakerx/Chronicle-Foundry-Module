@@ -151,7 +151,12 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
     this._zoom = 1;
     this._panX = 0;
     this._panY = 0;
-    this._showLabels = true;
+    /**
+     * Name display chosen with the viewer's label button, overriding the
+     * map's own setting (`look.pinLabels`) for this view; null follows it.
+     * @type {'always'|'never'|null}
+     */
+    this._labelMode = null;
     /** @type {string|null} Active placement tool: a pin-type key or 'chronicle-marker'. */
     this._activeTool = null;
     this._isPanning = false;
@@ -228,6 +233,7 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
     // The map's look as Chronicle draws it; the GM's sync resolves it into
     // the page meta so players never need the campaign settings.
     const look = sanitizeLook(meta?.look);
+    const labelMode = this._labelMode ?? look.pinLabels;
     const pin = pinMetrics(look.pinStyle, look.pinSize);
 
     const chronicleMarkers = filteredMarkers.map((m) => {
@@ -295,7 +301,9 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
       tokens,
       fog,
       hasFog: !!fog,
-      showLabels: this._showLabels,
+      labelMode,
+      showLabels: labelMode === 'always',
+      showLocalLabels: labelMode !== 'never',
       zoomPercent: Math.round(this._zoom * 100),
       look,
       mapTitle: meta?.name || this.document.name || '',
@@ -712,12 +720,24 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
     this._applyTransform();
   }
 
+  /**
+   * The label button shows every name, or, when they all show, hides them.
+   * It swaps the marker layer's mode class, since the map's hover and never
+   * settings hide names in CSS that an inline style can't undo.
+   */
   _toggleLabels() {
-    this._showLabels = !this._showLabels;
+    const layer = this._viewer?.querySelector('.chronicle-marker-layer');
+    const current = this._labelMode ?? layer?.dataset.labels ?? 'always';
+    this._labelMode = current === 'always' ? 'never' : 'always';
+    if (layer) {
+      layer.classList.remove('cs-labels-always', 'cs-labels-hover', 'cs-labels-never');
+      layer.classList.add(`cs-labels-${this._labelMode}`);
+    }
     const btn = this._viewer?.querySelector('.toggle-labels');
-    if (btn) btn.classList.toggle('active', this._showLabels);
-    this._viewer?.querySelectorAll('.pin-label').forEach((el) => {
-      el.style.display = this._showLabels ? '' : 'none';
+    if (btn) btn.classList.toggle('active', this._labelMode === 'always');
+    this._viewer?.querySelectorAll('.pin-label, .token-label').forEach((el) => {
+      if (el.closest('.cs-pin')) return;
+      el.style.display = this._labelMode === 'never' ? 'none' : '';
     });
   }
 
