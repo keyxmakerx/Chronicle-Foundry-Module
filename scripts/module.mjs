@@ -23,6 +23,7 @@ import { SyncDashboard } from './sync-dashboard.mjs';
 import { MapViewerSheet } from './map-viewer.mjs';
 import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs';
 import { registerNpcPresence } from './npc-presence.mjs';
+import { registerMapSheetItems } from './map-sheet-items.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { openSyncCalendar } from './sync-calendar.mjs';
 import { notebookAvailable, openNotebook, registerPlayerNotebook } from './player-notebook.mjs';
@@ -132,6 +133,11 @@ Hooks.once('ready', async () => {
     registerPlayerNotebook();
   } catch (err) {
     console.warn('Chronicle Sync | Player notebook unavailable', err);
+  }
+  try {
+    registerMapSheetItems();
+  } catch (err) {
+    console.warn('Chronicle Sync | Map items unavailable', err);
   }
   try {
     registerNpcPresence(() => syncManager?.api ?? null);

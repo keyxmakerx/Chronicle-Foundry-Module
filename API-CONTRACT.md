@@ -650,6 +650,22 @@ only (`scripts/_map-player-image.mjs`). A missing field means no shadows
 
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/map_api_handler.go` `PlayerImage`, `playerImageAPIURL`)
 
+Each map row carries `display_settings` (nullable object): the map's own
+look. The module reads `frame.style`/`frame.tint` and `pins.style`
+(`drop|seal|flag|dot`), `pins.size` (`s|m|l`), `pins.labels`
+(`always|hover|never`); absent means "follow the campaign" / the default.
+Resolved by `scripts/_map-look.mjs` `resolveMapLook` into the page meta
+(`chronicleMapMeta.look`) so players never need campaign settings.
+
+#### GET /maps/look
+The campaign map look: `{campaign_frame, frames[], kinds[{id,label,color}],
+icons[{id,label,category}], default_icon}`. `campaign_frame` is one of
+`atlas|arcane|old|modern|futuristic|gilded` and is what a map without its
+own frame wears. Fetched once per full sync; a 404 (older Chronicle) keeps
+the Atlas default. Marker `icon` is a Font Awesome class from `icons`; the
+viewer draws any well-formed `fa-` class and falls back to `default_icon`.
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/map_api_look.go`, keyxmakerx/Chronicle#1017)
+
 #### GET /maps/:mapId/drawings
 All coordinates are percentage-based (0–100), not pixels. `drawing_type` is
 one of `freehand`, `rectangle`, `ellipse`, `polygon`, `text`.
