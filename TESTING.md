@@ -125,14 +125,14 @@ map editor. Only markers/pins sync to Foundry as Scene Map Notes.
 ## Shop Widget
 
 - [ ] Right-click JournalEntry linked to Shop entity -> "Open Chronicle Shop" option appears
-- [ ] Shop window opens with correct shop name
-- [ ] Inventory loads from relations API (items with price/quantity metadata)
-- [ ] Items show name, price, quantity
-- [ ] Out-of-stock items visually distinct
-- [ ] Drag item from shop -> Drop on character sheet -> Foundry Item created
-- [ ] Real-time refresh: update shop entity in Chronicle -> Shop window updates
-- [ ] Multiple shop windows can be open simultaneously
-- [ ] Closing shop window cleans up properly
+- [ ] Shop room opens with the shop's name; the room matches the Chronicle shop page (same furniture, keeper picture, wares)
+- [ ] Hovering an item in the room shows its name and price; clicking the keeper shows their lines
+- [ ] Wares list shows price and stock; sold-out goods are faded; hidden or GM-only goods are missing
+- [ ] Drag a row from the wares list -> Drop on character sheet -> Foundry Item created
+- [ ] Real-time refresh: change price or stock in Chronicle -> the open room updates
+- [ ] "Show to players" -> the room opens on each player's screen; players see no "Arrange" or "Show" buttons
+- [ ] "Stop showing" -> the room closes on players' screens
+- [ ] Multiple shop rooms can be open simultaneously; closing one cleans up its tooltip
 
 ## Scene-to-Map Linking
 

@@ -1,6 +1,12 @@
 {
   "CHRONICLE": {
     "ModuleTitle": "Chronicle Sync",
+    "ShopRoom": {
+      "OpenShop": "Open Chronicle Shop",
+      "ShowToPlayers": "Show to players",
+      "StopShowing": "Stop showing",
+      "LoadFailed": "Couldn't load this shop's room from Chronicle."
+    },
     "Settings": {
       "ApiUrl": {
         "Name": "Chronicle URL",

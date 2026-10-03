@@ -942,6 +942,21 @@ Lists relations for an entity (used for shop inventory).
 }
 ```
 
+#### GET /armory/shops/:entityId/room
+The shop room window's read (`scripts/shop-room-window.mjs`). Needs the armory
+addon. 404 when the shop is missing, not a shop, or hidden from the key.
+
+**Response:**
+```json
+{ "layout": { "...": "saved room, or null to generate one" },
+  "goods": [ { "id": 7, "relationType": "sells", "targetEntityId": "item-uuid",
+               "targetEntityName": "Rope", "metadata": { "price": 1, "currency": "gp", "quantity": 3 } } ] }
+```
+`goods` are the shop's `sells` relations a plain player can see (no `dmOnly`
+rows, no items hidden from players), so the room can be shown to every player.
+
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/shop_api_handler.go`)
+
 ---
 
 ## Chronicle-served Module Distribution

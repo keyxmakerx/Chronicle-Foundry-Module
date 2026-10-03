@@ -15,10 +15,12 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
   `calendar-sync`+`sync-calendar`+`sync-calendar-*`, `actor-sync`,
   `item-sync`, `note-sync`), UI (`sync-dashboard`,
   `sync-diagnostic-bundle`, `update-info`, `character-claim-indicator`,
-  `capability-inspector`, `import-wizard`, `shop-widget`), core (`module`,
+  `capability-inspector`, `import-wizard`, `shop-widget`+`shop-room-window`), core (`module`,
   `settings`, `constants`, `logger`, `sync-manager`, `api-client`),
   `adapters/generic-adapter.mjs`. `.ai.md` has what each does. `_*.mjs` are
   pure helpers, each unit-tested by its own `tools/test-*.mjs`.
+- `vendor/chronicle/`: Chronicle's shop room widget, copied unchanged; a
+  Chronicle change to it means copying it again (`tools/test-shop-room.mjs`).
 - `templates/` Handlebars, `styles/` CSS, `lang/en.json` strings,
   `tools/test-*.mjs` (Node's test runner, see TESTING.md).
 - `bench/`: the two-sided sync bench (real Chronicle + the real sync code in

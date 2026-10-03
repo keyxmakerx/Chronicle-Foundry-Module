@@ -20,6 +20,7 @@ import { MapViewerSheet } from './map-viewer.mjs';
 import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { openSyncCalendar } from './sync-calendar.mjs';
+import { registerShopRoomSocket } from './shop-room-window.mjs';
 
 /** @type {SyncManager|null} */
 let syncManager = null;
@@ -113,6 +114,8 @@ Hooks.once('ready', async () => {
   dashboard.bind(syncManager);
   _addStatusIndicator();
   registerCharacterClaimIndicator();
+  // Players open a shop room when the GM shows one (they have no API key).
+  registerShopRoomSocket();
 
   // Move a legacy world-scoped API key into this GM's client scope and
   // delete the world copy before start() reads the setting. GM only —
