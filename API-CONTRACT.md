@@ -601,8 +601,8 @@ Pulls all changes since a timestamp.
 ```
 
 #### GET /sync/changes
-Change feed: ids of what changed after a cursor. Owner or co-DM keys only
-(403 otherwise); absent on older Chronicle (404).
+Change feed: ids of what changed after a cursor. Keys of the owner or of members the owner
+has given DM access only (403 otherwise); absent on older Chronicle (404).
 
 **Used by:** `sync-manager.mjs` → initial sync (`_readChangeFeed`): journals, characters and inventories
 
@@ -1006,7 +1006,8 @@ rows, no items hidden from players), so the room can be shown to every player.
 The shop room's buying calls (`scripts/shop-room-window.mjs`), made by the
 GM's client: for the GM, or for a player as the Chronicle member the player
 is matched to (`actingUserId`, a query parameter on GET and a body field on
-POST). Only an Owner or co-DM key may name someone else (403); the name must
+POST). Only an Owner key, or the key of a member the owner has given DM
+access, may name someone else (403); the name must
 be a current member (404); the call then has that member's rights only. Needs
 the armory addon.
 
@@ -1280,8 +1281,8 @@ through the module socket (`scripts/stash-client.mjs`).
 
 **Acting member.** Every call may carry `actingUserId` (query on GET, body on
 POST/PUT): the Chronicle user id of a current member. The call then runs under
-THAT member's role and rules. Only an Owner or co-DM key may name someone
-else (403 otherwise), so naming a player only narrows what the call may do.
+THAT member's role and rules. Only an Owner key, or the key of a member the owner has given DM
+access, may name someone else (403 otherwise), so naming a player only narrows what the call may do.
 The module sends it only when relaying for a player, and takes the member from
 the Foundry user id the socket layer attached to the request, never from the
 request body.
@@ -1306,6 +1307,29 @@ Lists are unwrapped defensively (`{history}`/`{requests}`/`{data}` or a bare
 array): `scripts/_stash-model.mjs`.
 
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/stash_api_handler.go`, `internal/plugins/armory/stash_api.go`, `docs/api/openapi.yaml` Stashes tag; the routes are on Chronicle PR #1022 and unreleased as of 2026-10-03)
+
+### Player notebook pages
+
+Not part of the REST API: the notebook (`scripts/player-notebook.mjs`,
+checks in `scripts/_notes-grant.mjs`) frames two Chronicle web pages and never
+uses the GM's sync key. Everything crosses `postMessage`, and each side checks
+the other's origin (Chronicle's, taken from `apiUrl`) before acting.
+
+| Page | Address | Purpose |
+|---|---|---|
+| Allow window | `/campaigns/:id/notes/allow-app?origin=<Foundry origin>` | A pop-up where the player presses Allow. Replies `{type:"chronicle:notes-grant", token, userId, campaignId}` (token starts `cnt_`) or `{type:"chronicle:notes-grant-declined"}`. |
+| Notebook frame | `/embed/campaigns/:id/notes/journal` | The player's Journal. |
+| Jot frame | `/embed/campaigns/:id/notes/jots` | Jot notes for the page in view. |
+
+The module keeps a grant only when `campaignId` matches and the GM has matched
+the returned `userId` to this Foundry login (Members tab); an unmatched or
+mismatched account is refused. Frame to module: `chronicle:embed-ready` (the
+module answers `chronicle:notes-token` with the token and current `entityId`),
+`chronicle:grant-rejected` (the stored grant is dropped), `chronicle:open-note`
+with `noteId`. Module to frame: `chronicle:notes-token`, `chronicle:jots-page`
+with `entityId`, `chronicle:open-note`.
+
+Re-verify by: 2026-11-03 (Chronicle `internal/widgets/notes/app_grants_handler.go`, `allow_app.templ`, `static/js/notes_embed.js`)
 
 ---
 
@@ -1375,7 +1399,8 @@ If the token is invalid, the server rejects the upgrade.
 | `sync.error` | `{ message }` | Synchronization error |
 | `sync.conflict` | Conflict details | Data conflict detected |
 
-`relation.*` messages go to owner and co-DM sockets only (a relation can
+`relation.*` messages go to the owner's socket and sockets of members the owner has
+given DM access only (a relation can
 name a private entity). Item sync treats any of them for a linked character
 as "reconcile this character's inventory" (`scripts/_inventory-plan.mjs`),
 so a missed or repeated message cannot leave it wrong. A removed relation

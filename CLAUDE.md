@@ -11,7 +11,7 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
 - `module.json` (Foundry manifest, v12–v14), `chronicle-package.json`
   (serving descriptor, schema v1) — cross-validated by
   `tools/check-package-descriptor.mjs`.
-- `scripts/*.mjs`: sync (`journal-sync`, `map-sync`+`map-viewer`,
+- `scripts/*.mjs`: sync (`journal-sync`, `map-sync`+`map-viewer`+`map-sheet-items`,
   `calendar-sync`+`sync-calendar`+`sync-calendar-*`, `actor-sync`,
   `item-sync`, `stash-sync`+`stash-client`), UI (`sync-dashboard`, `npc-presence`,
   `sync-diagnostic-bundle`, `update-info`, `character-claim-indicator`,
@@ -139,8 +139,8 @@ Cordinator's `decisions/2026-05-21-core-tenets.md`.
 
 ## Open work
 
-Tracked in GitHub issues: live checks on a real Foundry v14 world (#94, needs
-`TESTING.md` update #88); calendar V5 (#95, sub-issue of
+Tracked in GitHub issues: live checks on a real Foundry v14 world (#94, using
+`TESTING.md`); calendar V5 (#95, sub-issue of
 keyxmakerx/Chronicle#741); everything else in this repo's open issues; unplanned
 ideas #96.
 

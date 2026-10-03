@@ -25,6 +25,10 @@ module. Useful when debugging sync behavior or tuning performance.
 | Activity log max | 100 | `sync-manager.mjs` `_maxLogEntries` | Dashboard activity log entries |
 | Error log max | 50 | `api-client.mjs` `_maxErrorLogEntries` | Dashboard error log entries |
 | Error message truncation | 200 chars | `api-client.mjs` `_logError` | Truncated with `…` |
+| Sync pull page | 1000 rows | `_sync-pull-walk.mjs` `PULL_PAGE_SIZE` | `GET /sync/pull` is walked page by page until `has_more` is false |
+| Change feed page | 1000 rows | `_change-feed.mjs` `FEED_PAGE_SIZE` | `GET /sync/changes` page size |
+| Change feed settle | 2500ms | `_change-feed.mjs` `FEED_SETTLE_MS` | Minimum wait after the socket opens before reading the feed |
+| NPC talking timeout | 2 min | `_npc-presence.mjs` `TALK_TIMEOUT_MS` | An NPC's Talking state switches off after this long without a line |
 | Entity pagination | 100/page, 200 pages | `_entity-page-walk.mjs` `ENTITY_PAGE_SIZE`/`MAX_ENTITY_PAGES` | Bound is 20,000 entities; a walk that hits it sets a `truncated` flag the caller must surface |
 
 ## Coordinate Systems
