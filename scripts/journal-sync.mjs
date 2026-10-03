@@ -24,6 +24,8 @@ import { JournalPushDebouncer } from './_journal-push-debounce.mjs';
 import { setAside } from './_set-aside.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { collapseChanges } from './_change-feed.mjs';
+import { sharedPictureIds, toFoundryPictures, toChroniclePictures } from './_inline-pictures.mjs';
+import { PictureStore, watchGMPictures } from './picture-store.mjs';
 
 /**
  * Validate and resolve a Chronicle entity's `image_path` to a safe src
@@ -104,6 +106,9 @@ export class JournalSync {
     this._api = api;
 
     if (!getSetting('syncJournals')) return;
+
+    this._pictures = new PictureStore({ api });
+    this._stopGMPictures = watchGMPictures(this._pictures);
 
     // Register Foundry hooks for JournalEntry changes.
     Hooks.on('createJournalEntry', this._onCreateJournal);
@@ -490,6 +495,8 @@ export class JournalSync {
     Hooks.off('closeJournalSheet', this._onCloseJournalSheet);
     Hooks.off('closeJournalEntrySheet', this._onCloseJournalSheet);
     globalThis.window?.removeEventListener?.('beforeunload', this._onBeforeUnload);
+    this._stopGMPictures?.();
+    this._stopGMPictures = null;
     // Module stop is itself a form of "unload" — never drop the last edit.
     this._journalPushDebouncer.flushAll();
   }
@@ -617,10 +624,10 @@ export class JournalSync {
     }, SYNC_OPTIONS);
 
     // Split entity content into pages and sync them.
-    await this._syncPagesToJournal(journal, _sanitizeIncomingHTML(entity.entry_html || ''));
+    await this._syncPagesToJournal(journal, await this._withPictures(_sanitizeIncomingHTML(entity.entry_html || '')));
 
     // Sync player notes page.
-    await this._syncPlayerNotesPage(journal, _sanitizeIncomingHTML(entity.player_notes_html || ''));
+    await this._syncPlayerNotesPage(journal, await this._withPictures(_sanitizeIncomingHTML(entity.player_notes_html || '')));
 
     console.debug(`Chronicle: Updated journal "${journal.name}" from entity`);
   }
@@ -754,7 +761,7 @@ export class JournalSync {
 
     // Split entity content into pages by top-level headings.
     // Sanitize at ingress before splitting (defense-in-depth).
-    const sections = this._splitByHeadings(_sanitizeIncomingHTML(entity.entry_html || ''));
+    const sections = this._splitByHeadings(await this._withPictures(_sanitizeIncomingHTML(entity.entry_html || '')));
 
     let sortIndex = 1;
     for (const section of sections) {
@@ -780,7 +787,7 @@ export class JournalSync {
       pages.push({
         name: 'Player Notes',
         type: 'text',
-        text: { content: _sanitizeIncomingHTML(entity.player_notes_html) },
+        text: { content: await this._withPictures(_sanitizeIncomingHTML(entity.player_notes_html)) },
         sort: sortIndex++,
         ownership: { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER },
         flags: { [FLAG_SCOPE]: { isPlayerNotes: true } },
@@ -1509,6 +1516,11 @@ export class JournalSync {
    * @private
    */
   _collectTextPages(journal) {
+    return toChroniclePictures(this._collectTextPagesRaw(journal), getSetting('apiUrl'));
+  }
+
+  /** @private */
+  _collectTextPagesRaw(journal) {
     const textPages = journal.pages
       .filter((p) => p.type === 'text' && !p.getFlag(FLAG_SCOPE, 'isPlayerNotes'))
       .sort((a, b) => a.sort - b.sort);
@@ -1539,7 +1551,7 @@ export class JournalSync {
       (p) => p.getFlag(FLAG_SCOPE, 'isPlayerNotes')
     );
     if (!playerNotesPage) return null;
-    return playerNotesPage.text?.content || '';
+    return toChroniclePictures(playerNotesPage.text?.content || '', getSetting('apiUrl'));
   }
 
   /**
@@ -1627,6 +1639,22 @@ export class JournalSync {
         break;
       }
     }
+  }
+
+  /**
+   * Chronicle HTML with its pictures made showable in Foundry: shared ones
+   * copied into the world's files, GM-only ones inside a secret block
+   * (scripts/_inline-pictures.mjs). A picture that can't be copied keeps
+   * its Chronicle path and is retried on the next pull.
+   * @param {string} html
+   * @returns {Promise<string>}
+   * @private
+   */
+  async _withPictures(html) {
+    if (!html) return html;
+    const ids = sharedPictureIds(html);
+    const local = ids.length && this._pictures ? await this._pictures.ensure(ids) : new Map();
+    return toFoundryPictures(html, (id) => local.get(id));
   }
 
   /**

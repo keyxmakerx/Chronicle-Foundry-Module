@@ -13,7 +13,7 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
   `tools/check-package-descriptor.mjs`.
 - `scripts/*.mjs`: sync (`journal-sync`, `map-sync`+`map-viewer`,
   `calendar-sync`+`sync-calendar`+`sync-calendar-*`, `actor-sync`,
-  `item-sync`, `note-sync`), UI (`sync-dashboard`,
+  `item-sync`, `note-sync`, `picture-store`), UI (`sync-dashboard`,
   `sync-diagnostic-bundle`, `update-info`, `character-claim-indicator`,
   `capability-inspector`, `import-wizard`, `shop-widget`), core (`module`,
   `settings`, `constants`, `logger`, `sync-manager`, `api-client`),

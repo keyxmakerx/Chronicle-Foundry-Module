@@ -919,7 +919,10 @@ Uploads a media file (image, etc.).
 ```
 
 #### GET /media/:mediaId
-Returns media metadata.
+Returns media metadata: `mime_type`, `file_size`, and `url`, a signed
+`/media/<id>?expires=…&sig=…` link valid for about 15 minutes. Journal sync
+uses it to copy pictures inside page text into the world's files
+(`scripts/picture-store.mjs`); a saved signed link would expire.
 
 #### DELETE /media/:mediaId
 Deletes a media file.

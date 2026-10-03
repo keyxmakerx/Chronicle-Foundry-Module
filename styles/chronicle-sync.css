@@ -2972,3 +2972,33 @@
   background: rgba(96, 165, 250, 0.22);
 }
 } /* end @layer chronicle-sync */
+
+/* ---- Pictures inside Chronicle page text (scripts/_inline-pictures.mjs) ----
+   The same size, side and caption Chronicle gives them. */
+.journal-page-content:has(.ce-img) { display: flow-root; }
+.ce-img { position: relative; margin: 1rem auto; max-width: 100%; }
+.ce-img img { display: block; width: 100%; height: auto; margin: 0; border: 0; border-radius: 0.375rem; }
+.ce-img figcaption { margin-top: 0.35rem; font-size: 0.85em; text-align: center; opacity: 0.8; }
+.ce-img--left { float: left; margin: 0.25rem 1.25rem 0.75rem 0; }
+.ce-img--right { float: right; margin: 0.25rem 0 0.75rem 1.25rem; }
+.ce-img--center { clear: both; }
+.ce-img--w10 { width: 10%; }
+.ce-img--w15 { width: 15%; }
+.ce-img--w20 { width: 20%; }
+.ce-img--w25 { width: 25%; }
+.ce-img--w30 { width: 30%; }
+.ce-img--w35 { width: 35%; }
+.ce-img--w40 { width: 40%; }
+.ce-img--w45 { width: 45%; }
+.ce-img--w50 { width: 50%; }
+.ce-img--w55 { width: 55%; }
+.ce-img--w60 { width: 60%; }
+.ce-img--w65 { width: 65%; }
+.ce-img--w70 { width: 70%; }
+.ce-img--w75 { width: 75%; }
+.ce-img--w80 { width: 80%; }
+.ce-img--w85 { width: 85%; }
+.ce-img--w90 { width: 90%; }
+.ce-img--w95 { width: 95%; }
+.ce-img--w100 { width: 100%; }
+.ce-img--w100 { float: none; margin-inline: 0; }
