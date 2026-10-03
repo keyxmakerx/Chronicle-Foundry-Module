@@ -15,6 +15,40 @@
     </select>
   </div>
 
+  {{#if hasIcons}}
+  <div class="form-group cs-icon-picker">
+    <label for="cs-icon-search-{{pickerId}}">{{localize "CHRONICLE.MapViewer.MarkerIcon"}}</label>
+    <input type="hidden" name="icon" value="{{currentIcon}}" />
+    <input type="search" id="cs-icon-search-{{pickerId}}" class="cs-icon-search"
+           placeholder="{{localize 'CHRONICLE.MapViewer.MarkerIconSearch'}}" autocomplete="off" />
+    <div class="cs-icon-groups" role="group" aria-label="{{localize 'CHRONICLE.MapViewer.MarkerIconGroups'}}">
+      <button type="button" class="cs-icon-group" data-group="" aria-pressed="{{#if currentGroup}}false{{else}}true{{/if}}">{{localize "CHRONICLE.MapViewer.MarkerIconAll"}}</button>
+      {{#each iconGroups}}
+      <button type="button" class="cs-icon-group" data-group="{{category}}" aria-pressed="{{#if (eq category ../currentGroup)}}true{{else}}false{{/if}}">{{category}}</button>
+      {{/each}}
+    </div>
+    <div class="cs-icon-grid">
+      {{#each iconGroups}}
+        {{#each icons}}
+        <button type="button" class="cs-icon-choice" data-icon="{{id}}" data-group="{{../category}}" data-label="{{label}}"
+                aria-pressed="{{#if (eq id ../../currentIcon)}}true{{else}}false{{/if}}"
+                title="{{label}}">
+          <i class="fa-solid {{id}}"></i><span>{{label}}</span>
+        </button>
+        {{/each}}
+      {{/each}}
+      <p class="cs-icon-none" hidden>{{localize "CHRONICLE.MapViewer.MarkerIconNone"}}</p>
+    </div>
+    <div class="cs-icon-preview">
+      <span class="cs-icon-preview-pin" style="width: {{pin.w}}px; height: {{pin.h}}px;">
+        {{{previewSvg}}}
+        <i class="fa-solid {{currentIcon}}" style="left: {{pin.icoX}}px; top: {{pin.icoY}}px; font-size: {{pin.icoSize}}px;"></i>
+      </span>
+      <span>{{localize "CHRONICLE.MapViewer.MarkerIconPreview"}}</span>
+    </div>
+  </div>
+  {{/if}}
+
   <div class="form-group">
     <label>{{localize "CHRONICLE.MapViewer.MarkerVisibilityLabel"}}</label>
     <select name="visibility">

@@ -27,6 +27,8 @@ import { buildOverviewModel } from './_overview-model.mjs';
 import { log, getLogBuffer } from './logger.mjs';
 import { shouldSkipDatePush, isRealTimeRejection, notifyRealTimePushPaused } from './_realtime-date-guard.mjs';
 import { walkEntityPages } from './_entity-page-walk.mjs';
+import { mapThumbSrc } from './_map-look.mjs';
+import { _isAllowedImageHost } from './_url-validation.mjs';
 import { pickJournalCreateType } from './_journal-create.mjs';
 import { compareCalendarStructures } from './calendar-sync.mjs';
 import { classifyCalendarSyncState } from './_calendar-sync-state.mjs';
@@ -525,6 +527,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         drawingCount,
         tokenCount,
         chronicleUrl,
+        // The page's own picture: for a shadowed map, the stored player copy.
+        thumbSrc: mapThumbSrc(page?.src, (url) => _isAllowedImageHost(url, getSetting('apiUrl'))),
       };
     });
 
