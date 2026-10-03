@@ -774,6 +774,8 @@
       "OpenPage": "Open Chronicle page",
       "SpotlightHidden": "{name} is hidden. Nothing was shown to players. Reveal the token first to spotlight it.",
       "SpotlightElsewhere": "That token isn't on the scene you're viewing, so nothing was shown.",
+      "SpotlightNotHere": "Chronicle asked to show {name}, but no token for them is on the scene you're viewing.",
+      "SpotlightUnknown": "Chronicle asked to show an NPC whose page isn't synced to this world yet.",
       "TalkFailed": "Chronicle: couldn't switch talking on or off.",
       "RevealTitle": "Show their Chronicle page?",
       "RevealAsk": "You revealed {name} on the map. Show their Chronicle page to players too?",

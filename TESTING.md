@@ -258,6 +258,8 @@ Needs a GM and a player client on the same scene, and an NPC page synced as a jo
 - [ ] Starting a second NPC talking stops the first; two minutes with no lines switches it off; a reload doesn't leave it on
 - [ ] Leave a client idle for a minute, or switch its tab away: the glow slows to still, and comes back on return
 - [ ] Reveal a hidden NPC token whose page is hidden: asked once "Show their Chronicle page?"; Yes shows the page to players in Chronicle, No leaves it hidden
+- [ ] On the NPC's Chronicle page press "Show in Foundry": the page says "Sent to Foundry." and both clients play the same spotlight as the star
+- [ ] "Show in Foundry" for an NPC with no token on the GM's scene, or only a hidden one: only the GM gets a notice
 
 ## Error Recovery
 

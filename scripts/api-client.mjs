@@ -55,6 +55,7 @@ const ALLOWED_WS_TYPE_PREFIXES = Object.freeze([
   'sync.',
   'stash.',
   'downtime.',
+  'npc.',
 ]);
 
 /**
