@@ -80,6 +80,8 @@ export class JournalSync {
     this._onCreateJournal = this._handleCreateJournal.bind(this);
     this._onUpdateJournal = this._handleUpdateJournal.bind(this);
     this._onDeleteJournal = this._handleDeleteJournal.bind(this);
+    this._onPageChange = this._handlePageChange.bind(this);
+    this._onPageUpdate = (page, change, options, userId) => this._handlePageChange(page, options, userId);
     this._onCloseJournalSheet = this._handleCloseJournalSheet.bind(this);
     this._onBeforeUnload = () => this._journalPushDebouncer.flushAll();
 
@@ -106,6 +108,11 @@ export class JournalSync {
     Hooks.on('createJournalEntry', this._onCreateJournal);
     Hooks.on('updateJournalEntry', this._onUpdateJournal);
     Hooks.on('deleteJournalEntry', this._onDeleteJournal);
+    // Page text lives in embedded pages, whose edits fire their own hooks
+    // and never updateJournalEntry.
+    Hooks.on('createJournalEntryPage', this._onPageChange);
+    Hooks.on('updateJournalEntryPage', this._onPageUpdate);
+    Hooks.on('deleteJournalEntryPage', this._onPageChange);
     // v12's sheet fires closeJournalSheet; v13+ (ApplicationV2) fires
     // closeJournalEntrySheet.
     Hooks.on('closeJournalSheet', this._onCloseJournalSheet);
@@ -165,16 +172,12 @@ export class JournalSync {
       );
     }
 
-    if (journal) return;
-
-    try {
-      const entity = await this._api.get(`/entities/${mapping.chronicle_id}`);
-      if (!entity) return;
-      // Defer character entities to ActorSync.
-      if (this._isHandledByActorSync(entity)) return;
-      await this._createJournalFromEntity(entity, mapping.external_id);
-    } catch (err) {
-      console.warn(`Chronicle: Failed to sync entity ${mapping.chronicle_id}`, err);
+    // No journal: a mapping is only ever written by this module after it
+    // made the journal, so the journal was deleted here. Recreating it would
+    // undo the GM's delete on every connect; the dashboard Resync is the
+    // way to bring it back on purpose.
+    if (!journal) {
+      console.debug(`Chronicle: mapping for entity ${mapping.chronicle_id} has no journal here; not recreating`);
     }
   }
 
@@ -398,6 +401,9 @@ export class JournalSync {
     Hooks.off('createJournalEntry', this._onCreateJournal);
     Hooks.off('updateJournalEntry', this._onUpdateJournal);
     Hooks.off('deleteJournalEntry', this._onDeleteJournal);
+    Hooks.off('createJournalEntryPage', this._onPageChange);
+    Hooks.off('updateJournalEntryPage', this._onPageUpdate);
+    Hooks.off('deleteJournalEntryPage', this._onPageChange);
     Hooks.off('closeJournalSheet', this._onCloseJournalSheet);
     Hooks.off('closeJournalEntrySheet', this._onCloseJournalSheet);
     globalThis.window?.removeEventListener?.('beforeunload', this._onBeforeUnload);
@@ -878,6 +884,21 @@ export class JournalSync {
     // time the timer fires, so re-reading it at push time (not now)
     // captures whatever the GM last typed.
     this._journalPushDebouncer.schedule(journal.id, journal, entityId);
+  }
+
+  /**
+   * A page was created, edited or deleted in Foundry: push its journal like
+   * any other journal edit (same guards, same debounce). Page writes made by
+   * sync itself carry SYNC_OPTIONS and are skipped.
+   * @param {JournalEntryPage} page
+   * @param {object} options
+   * @param {string} userId
+   * @private
+   */
+  _handlePageChange(page, options, userId) {
+    const journal = page?.parent;
+    if (!journal) return;
+    return this._handleUpdateJournal(journal, {}, options, userId);
   }
 
   /**

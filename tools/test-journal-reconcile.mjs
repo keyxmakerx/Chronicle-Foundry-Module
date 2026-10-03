@@ -97,3 +97,13 @@ test('with syncJournals off the catch-up does nothing', async () => {
   assert.deepEqual(updated, []);
   settings.syncJournals = true;
 });
+
+test('a sync mapping whose journal was deleted here does not recreate it', async () => {
+  installJournals([]);
+  const { js, created } = make({ entities: [] });
+  let fetched = 0;
+  js._api.get = async () => { fetched++; return { id: 'e1', name: 'Gone' }; };
+  await js.onSyncMapping({ chronicle_type: 'entity', chronicle_id: 'e1', external_id: 'deleted-journal' });
+  assert.deepEqual(created, []);
+  assert.equal(fetched, 0);
+});
