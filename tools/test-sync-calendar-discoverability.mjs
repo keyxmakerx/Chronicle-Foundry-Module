@@ -77,32 +77,13 @@ test('module.mjs imports openSyncCalendar', () => {
   );
 });
 
-test('module.mjs registers a sync-calendar tool inside the chronicle-sync scene-control group', () => {
-  // Must appear in BOTH the v12 array shape and the v13 object shape.
-  // We check the tool name string twice — once per shape — anchored to
-  // the calendar-days icon to avoid false positives if somebody adds an
-  // unrelated tool with the same name elsewhere.
-  const occurrences = moduleScript.match(/name:\s*['"]sync-calendar['"]/g) || [];
-  assert.ok(
-    occurrences.length >= 2,
-    `scripts/module.mjs: expected sync-calendar tool registered in BOTH v12 array shape and v13 object shape; found ${occurrences.length} occurrence(s)`,
-  );
+test('the chronicle-sync scene-control group carries a GM-only sync-calendar tool', () => {
+  // Behaviour, both shapes, lives in tools/test-scene-controls.mjs; this
+  // pins that module.mjs routes the hook through that builder.
   assert.match(
     moduleScript,
-    /fa-solid fa-calendar-days/,
-    'scripts/module.mjs: sync-calendar tool must use the fa-calendar-days icon',
-  );
-});
-
-test('module.mjs scene-control sync-calendar tool is GM-gated', () => {
-  // The `if (!game.user.isGM) return;` guard sits at the top of the
-  // getSceneControlButtons hook — both tools (dashboard + sync-calendar)
-  // inherit that guard. Pin the guard's presence so a future PR can't
-  // remove it and accidentally expose the tool to players.
-  assert.match(
-    moduleScript,
-    /Hooks\.on\(['"]getSceneControlButtons['"][\s\S]*?if\s*\(\s*!\s*game\.user\.isGM\s*\)\s*return/,
-    'scripts/module.mjs: getSceneControlButtons hook must short-circuit for non-GMs (guards both dashboard and sync-calendar tools)',
+    /Hooks\.on\(['"]getSceneControlButtons['"][\s\S]*?addChronicleControls\(controls,\s*\{\s*isGM:\s*game\.user\.isGM/,
+    'scripts/module.mjs: getSceneControlButtons must build the group with addChronicleControls and the real isGM',
   );
 });
 

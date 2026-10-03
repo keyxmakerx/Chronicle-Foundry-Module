@@ -143,12 +143,11 @@ function _spotlight(token) {
   _playSpotlight({ ...payload, name: doc.name });
 }
 
-function _onSocket(data) {
+function _onSocket(data, senderId) {
   if (data?.type !== MSG_TYPE) return;
-  // Only a GM's spotlight moves anyone's camera. The sender id is the
-  // payload's own claim, so this stops mistakes, not a determined player;
-  // the most a forged one can do is pan to a token the viewer can see.
-  if (!game.users?.get(data.userId)?.isGM) return;
+  // Only a GM's spotlight moves anyone's camera. senderId comes from
+  // Foundry's server, not the payload, so a player cannot forge one.
+  if (!game.users?.get(senderId)?.isGM) return;
   if (data.action === 'spotlight') _playSpotlight(data);
 }
 

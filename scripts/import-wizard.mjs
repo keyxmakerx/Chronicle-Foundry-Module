@@ -10,6 +10,7 @@
 
 import { getSetting, setSetting } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
+import { DEFAULT_ICON, toIconName } from './_icon-name.mjs';
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**
@@ -628,7 +629,7 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this._typeMappings[idx]) {
           const val = e.target.value;
           if (val === '__new__') {
-            this._newTypeForm = { mappingIndex: idx, name: '', icon: 'fa-solid fa-circle', color: '#60a5fa' };
+            this._newTypeForm = { mappingIndex: idx, name: '', icon: DEFAULT_ICON, color: '#60a5fa' };
             this.render({ force: true });
           } else {
             this._typeMappings[idx].chronicleTypeId = val ? Number(val) : null;
@@ -837,7 +838,7 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
 
   static #onCreateNewType(event, target) {
     const idx = Number(target.dataset.mappingIndex);
-    this._newTypeForm = { mappingIndex: idx, name: '', icon: 'fa-solid fa-circle', color: '#60a5fa' };
+    this._newTypeForm = { mappingIndex: idx, name: '', icon: DEFAULT_ICON, color: '#60a5fa' };
     this.render({ force: true });
   }
 
@@ -850,7 +851,7 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
       const created = await this.api.createEntityType({
         name: name.trim(),
         name_plural: name.trim() + 's',
-        icon: icon || 'fa-solid fa-circle',
+        icon: toIconName(icon),
         color: color || '#60a5fa',
       });
       // Add to known entity types and select it.

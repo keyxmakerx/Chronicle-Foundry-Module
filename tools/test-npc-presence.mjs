@@ -122,3 +122,8 @@ test('the drop link uses its own flag, so character sync never treats an NPC as 
 test('players never get the HUD tools', () => {
   assert.match(glue, /function _onRenderHud\(hud, html\) \{\n\s+if \(!game\.user\.isGM\) return;/);
 });
+
+test('only a spotlight sent by a GM plays, judged by Foundry\'s sender id', () => {
+  assert.match(glue, /function _onSocket\(data, senderId\)/);
+  assert.match(glue, /if \(!game\.users\?\.get\(senderId\)\?\.isGM\) return;/);
+});

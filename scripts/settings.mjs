@@ -206,6 +206,16 @@ export function registerSettings() {
     default: null,
   });
 
+  // Internal: whether Chronicle offers Stashes for this campaign (the routes
+  // exist and the Armory addon is on). The GM client probes and writes it;
+  // players read it to decide whether to show the Stashes button.
+  game.settings.register(MODULE_ID, 'stashesAvailable', {
+    scope: 'world',
+    config: false,
+    type: Boolean,
+    default: false,
+  });
+
   // Internal: Chronicle user → Foundry user ID mapping (not shown in settings UI).
   // Stored as JSON: { "chronicle-user-uuid": "foundry-user-id", ... }
   game.settings.register(MODULE_ID, 'userMappings', {
@@ -320,6 +330,16 @@ export function registerSettings() {
     config: false,
     type: Boolean,
     default: false,
+  });
+
+  // Player notebook grants, keyed by Foundry user id. CLIENT scope like the
+  // API key: each is one player's own notes token and must never sync to
+  // other clients. See _notes-grant.mjs.
+  game.settings.register(MODULE_ID, 'notesGrants', {
+    scope: 'client',
+    config: false,
+    type: String,
+    default: '{}',
   });
 
   // Dashboard layout preferences (per-user, per-browser).
