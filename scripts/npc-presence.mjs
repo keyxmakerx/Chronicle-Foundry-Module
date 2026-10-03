@@ -45,6 +45,13 @@ export const TALK_FLAG = 'talking';
 const TOUCH_EVERY_MS = 10 * 1000;
 const GOLD = 0xf2c14e;
 
+const linkListeners = [];
+
+/** Run `fn(entityId)` after a GM links an NPC actor to a page. */
+export function onNpcLinked(fn) {
+  linkListeners.push(fn);
+}
+
 const state = {
   getApi: () => null,
   layer: null,
@@ -81,7 +88,7 @@ export function registerNpcPresence(getApi) {
 /* ---------------- Page lookup ---------------- */
 
 /** Synced Chronicle page journals (not notes or player notebooks). */
-function _pages() {
+export function syncedPages() {
   const out = [];
   for (const j of game.journal ?? []) {
     const entityId = j.getFlag(FLAG_SCOPE, 'entityId');
@@ -100,7 +107,7 @@ function _baseActor(tokenDoc) {
  * The Chronicle page a token belongs to, with its journal.
  * @returns {{entityId: string, journal: JournalEntry}|null}
  */
-function _tokenPage(tokenDoc, pages = _pages()) {
+function _tokenPage(tokenDoc, pages = syncedPages()) {
   const actor = _baseActor(tokenDoc);
   const entityId = resolveTokenPage({
     heroEntityId: actor?.getFlag(FLAG_SCOPE, 'entityId') ?? null,
@@ -163,7 +170,7 @@ export const npcSpotlightRelay = {
 };
 
 function _spotlightFromChronicle(entityId) {
-  const pages = _pages();
+  const pages = syncedPages();
   const placeables = canvas?.ready ? (canvas.tokens?.placeables ?? []) : [];
   const pick = chooseSpotlightToken(placeables.map((t) => ({
     id: t.id, hidden: !!t.document?.hidden, entityId: _tokenPage(t.document, pages)?.entityId ?? null,
@@ -456,7 +463,10 @@ function _onDropCanvasData(_canvas, data) {
     return false;
   }
   actor.setFlag(FLAG_SCOPE, LINK_FLAG, entityId)
-    .then(() => ui.notifications.info(game.i18n.format('CHRONICLE.Npc.Linked', { name: token.document.name, page: journal.name })))
+    .then(() => {
+      ui.notifications.info(game.i18n.format('CHRONICLE.Npc.Linked', { name: token.document.name, page: journal.name }));
+      for (const fn of linkListeners) fn(entityId);
+    })
     .catch((err) => {
       console.error('Chronicle: linking token to page failed', err);
       ui.notifications.error(game.i18n.localize('CHRONICLE.Npc.LinkFailed'));
