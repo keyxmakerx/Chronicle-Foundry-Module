@@ -53,6 +53,8 @@ const ALLOWED_WS_TYPE_PREFIXES = Object.freeze([
   'calendar.',
   'relation.',
   'sync.',
+  'stash.',
+  'downtime.',
 ]);
 
 /**
@@ -345,6 +347,49 @@ export class ChronicleAPI {
    */
   async delete(path) {
     return this.fetch(path, { method: 'DELETE' });
+  }
+
+  /**
+   * GET a binary resource (a picture) from the Chronicle API.
+   * @param {string} path - API path relative to the campaign.
+   * @returns {Promise<Blob>}
+   */
+  async getBlob(path) {
+    const baseUrl = getSetting('apiUrl').replace(/\/+$/, '');
+    const apiKey = getSetting('apiKey');
+    const campaignId = _validateCampaignIdOrThrow(getSetting('campaignId'));
+
+    const url = `${baseUrl}/api/v1/campaigns/${campaignId}${path}`;
+    const headers = { 'Authorization': `Bearer ${apiKey}`, ...moduleVersionHeaders() };
+    let response;
+    try {
+      try {
+        response = await fetch(url, { method: 'GET', headers });
+      } catch (err) {
+        if (!shouldRetryWithoutVersionHeader(err, headers)) throw err;
+        markModuleVersionHeaderRefused();
+        const { [MODULE_VERSION_HEADER]: _dropped, ...withoutVersion } = headers;
+        response = await fetch(url, { method: 'GET', headers: withoutVersion });
+      }
+    } catch (err) {
+      this.health.restErrorCount++;
+      this.health.lastRestError = Date.now();
+      this._logError('error', 'GET', path, null, err.message || 'Network error');
+      throw err;
+    }
+
+    if (!response.ok) {
+      this.health.restErrorCount++;
+      this.health.lastRestError = Date.now();
+      this._logError('error', 'GET', path, response.status, 'Binary fetch failed');
+      const err = new Error(`Chronicle API error ${response.status}`);
+      err.status = response.status;
+      throw err;
+    }
+
+    this.health.restSuccessCount++;
+    this.health.lastRestSuccess = Date.now();
+    return response.blob();
   }
 
   /**

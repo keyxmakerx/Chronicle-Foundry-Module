@@ -196,6 +196,16 @@ export function registerSettings() {
     default: null,
   });
 
+  // Internal: whether Chronicle offers Stashes for this campaign (the routes
+  // exist and the Armory addon is on). The GM client probes and writes it;
+  // players read it to decide whether to show the Stashes button.
+  game.settings.register(MODULE_ID, 'stashesAvailable', {
+    scope: 'world',
+    config: false,
+    type: Boolean,
+    default: false,
+  });
+
   // Internal: Chronicle user → Foundry user ID mapping (not shown in settings UI).
   // Stored as JSON: { "chronicle-user-uuid": "foundry-user-id", ... }
   game.settings.register(MODULE_ID, 'userMappings', {

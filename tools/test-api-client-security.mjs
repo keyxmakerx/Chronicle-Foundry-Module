@@ -318,6 +318,7 @@ test('WS dispatch: every prefix in ALLOWED_WS_TYPE_PREFIXES is accepted', () => 
     const allowedPrefixes = [
       'entity.', 'entity_type.', 'map.', 'marker.', 'drawing.',
       'token.', 'layer.', 'fog.', 'note.', 'calendar.', 'relation.', 'sync.',
+      'stash.', 'downtime.',
     ];
     for (const prefix of allowedPrefixes) {
       let fired = false;

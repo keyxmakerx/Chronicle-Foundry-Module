@@ -14,6 +14,10 @@ import { ShopWidget } from './shop-widget.mjs';
 import { CalendarSync } from './calendar-sync.mjs';
 import { ActorSync } from './actor-sync.mjs';
 import { ItemSync } from './item-sync.mjs';
+import { StashSync } from './stash-sync.mjs';
+import { registerStashSocket } from './stash-client.mjs';
+import { registerStashChat } from './stash-chat.mjs';
+import { registerStashButton } from './stash-window.mjs';
 import { SyncDashboard } from './sync-dashboard.mjs';
 import { MapViewerSheet } from './map-viewer.mjs';
 import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs';
@@ -110,12 +114,20 @@ Hooks.once('ready', async () => {
   syncManager.registerModule(new CalendarSync());
   syncManager.registerModule(new ActorSync());
   syncManager.registerModule(new ItemSync());
+  syncManager.registerModule(new StashSync());
 
   // Create UI first so it's always available, even if start() fails.
   dashboard = new SyncDashboard();
   dashboard.bind(syncManager);
   _addStatusIndicator();
   registerCharacterClaimIndicator();
+  try {
+    registerStashSocket();
+    registerStashChat();
+    registerStashButton();
+  } catch (err) {
+    console.warn('Chronicle Sync | Stashes unavailable', err);
+  }
   try {
     registerPlayerNotebook();
   } catch (err) {
