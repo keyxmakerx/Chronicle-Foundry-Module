@@ -4,18 +4,22 @@ Bidirectional real-time sync between [Chronicle](https://github.com/keyxmakerx/C
 
 ## Features
 
-> **Calendar sync is paused.** Chronicle's calendar is being rebuilt from
-> scratch, and its API answers `503` while that work is under way.
-> Journals, maps, characters, items and notes are unaffected and sync normally.
-> The module detects this and pauses calendar sync for the session rather than
-> reporting an error — nothing is wrong on your side and there is nothing to fix.
+> **Older Chronicle servers and the calendar.** Chronicle's calendar is rebuilt
+> around new date and event routes, which the module uses. A Chronicle that still
+> answers calendar routes with `503 calendar_rebuilding` makes the module pause
+> calendar pushes for the session rather than report an error — nothing is
+> wrong on your side. Journals, maps, characters and items sync as usual.
 
-- **Journal Sync** — Chronicle entities ↔ Foundry journal entries (with multi-page splitting)
-- **Map Sync** — Chronicle maps render as Foundry journal pages (not Scenes), with markers, drawings, tokens, layers and fog drawn as overlays; markers are editable ("Open in Chronicle web editor" for the full map editor)
+- **Journal Sync** — Chronicle entities ↔ Foundry journal entries (with multi-page splitting); GM-only text and pictures in Chronicle pages sit in Foundry secret blocks, hidden from players who don't own the page; catches up on reconnect from Chronicle's change feed; nothing is deleted without asking
+- **Map Sync** — Chronicle maps render as Foundry journal pages (not Scenes) in Chronicle's own frame and pin shapes, with markers, drawings, tokens, layers and fog drawn as overlays; players get the smudged picture of a shadowed map; markers are editable, with Chronicle's icon picker ("Open in Chronicle web editor" for the full map editor); the GM can give a map to a character, who opens it from their sheet
 - **Calendar Sync** — Calendaria and Simple Calendar integration
 - **Character Sync** — Actor ↔ character entity with system-aware field mapping (D&D 5e, Pathfinder 2e, or any system with annotated fields)
-- **Shop Widget** — Browse and purchase from Chronicle shop entities in Foundry
-- **Sync Dashboard** — management UI with diagnostics, error logs, and health metrics
+- **Shop Rooms** — Chronicle shops open in Foundry as shop rooms; the GM can show a room to players, and players buy in it (charged to the character they pick) while the GM is in the game
+- **Stashes** — A Stashes window on linked character sheets to move items and money between characters and stashes; the GM approves players' requests from a chat card (needs Chronicle's Armory addon)
+- **DM Screen** — The GM's DM Screen from Chronicle in a Foundry window: world and downtime switch, the party, rules and reveals
+- **Player Notebook** — Every player's own Chronicle journal and jot notes in a Foundry window, with jots that follow the page in view
+- **NPC Tokens** — GM token tools for Chronicle NPCs: spotlight, talking glow and open page; "Show in Foundry" on an NPC page spotlights its token
+- **Sync Dashboard** — management UI with diagnostics, error logs, health metrics, a copyable diagnostic bundle and a Setup Wizard for a first import
 - **Permission Mapping** — Chronicle visibility ↔ Foundry ownership levels
 
 ## Compatibility
@@ -34,7 +38,7 @@ your campaign owner selected.
 
 **To install:**
 
-1. In Chronicle, open your campaign → **Settings → Foundry Module** tab.
+1. In Chronicle, open your campaign → **Settings → Integrations**.
 2. Copy the **install URL** shown on that page.
 3. In Foundry VTT, go to **Add-on Modules → Install Module**, paste the
    URL, and click **Install**.
@@ -44,8 +48,8 @@ check — so you'll receive whichever module version your campaign owner
 pins, without further configuration.
 
 > **For Chronicle admins:** Chronicle picks up new versions from this repo's
-> GitHub releases. In Chronicle, open **Admin → Packages**, click **Check for
-> updates** on this module, and install the new version. Campaign owners then
+> GitHub releases. In Chronicle, open **Admin → Packages**, click **Check now**
+> on this module's Settings tab, and install the new version. Campaign owners then
 > pin it per campaign under **Settings → Integrations**.
 >
 > GitHub releases are Chronicle's upstream source, not the install channel for
@@ -68,6 +72,35 @@ one from the Package Repository. **If you see this prompt, decline it
 to keep your install on Chronicle.** Switching to the Package
 Repository's URL bypasses your campaign owner's pinned version and
 sends update traffic to GitHub instead of Chronicle.
+
+### Updating the module (for the operator)
+
+Do these in order whenever you ship a new module version:
+
+1. **Deploy Chronicle first**, with your usual backup. The module keeps
+   working against an older Chronicle, but newer features (the DM Screen,
+   Stashes, map icons) only appear once Chronicle has the matching routes.
+2. **Make the release.** On this repo's GitHub page open **Actions →
+   Release → Run workflow**, type the version as `X.Y.Z` (no leading `v`) and
+   run it. It tags `main` and publishes the release; nothing is uploaded by
+   hand.
+3. **Pick it up in Chronicle.** Open **Admin → Packages**, open this module,
+   press **Check now** on its Settings tab, then install the new version from
+   its version list.
+4. **Roll it out per campaign.** A campaign set to "auto: latest" follows the
+   newest installed version. A pinned campaign stays on its pin until its owner
+   picks the new version under **Settings → Integrations → Pin to Version**
+   and presses **Save Pin**.
+5. **Update in Foundry.** The GM (whoever hosts the world) opens **Add-on
+   Modules**, updates Chronicle Sync, and reloads the world. Decline Foundry's offer to
+   switch to the Package Repository's URL.
+
+Working: the campaign's **Manage → Apps & game system** page shows the new
+module version on the Foundry VTT row after the GM's Foundry reconnects, and Foundry's
+**Update Source & Manual Check** (Game Settings → Module Settings → Chronicle
+Sync) shows a Chronicle address. Broken: the version stays old after a reload
+(the campaign is still pinned, or Foundry is on the GitHub address), or Update
+Source shows a message in red (follow the "What to do" line in it).
 
 ## Configuration
 
