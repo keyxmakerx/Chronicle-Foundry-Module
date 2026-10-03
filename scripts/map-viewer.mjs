@@ -27,6 +27,10 @@ import { getUserMappings } from './settings.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
 import { confirmDialog } from './_dialogs.mjs';
 import { userCanSeeMarker } from './_map-flag-filter.mjs';
+import {
+  sanitizeLook, markerIconClass, pinMetrics, pinShapeSvg, frameInitial,
+} from './_map-look.mjs';
+import { startMotionRest } from './_map-motion-rest.mjs';
 
 /* ============================================================
    Constants
@@ -136,6 +140,7 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
   static PARTS = {
     content: {
       template: 'modules/chronicle-sync/templates/map-viewer.hbs',
+      templates: ['modules/chronicle-sync/templates/map-frame-ornaments.hbs'],
     },
   };
 
@@ -220,10 +225,16 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
       (m) => userCanSeeMarker(m, isGM, userChronicleId)
     );
 
+    // The map's look as Chronicle draws it; the GM's sync resolves it into
+    // the page meta so players never need the campaign settings.
+    const look = sanitizeLook(meta?.look);
+    const pin = pinMetrics(look.pinStyle, look.pinSize);
+
     const chronicleMarkers = filteredMarkers.map((m) => {
       const category = CHRONICLE_MARKER_CATEGORIES.includes(m.pin_category)
         ? m.pin_category : 'note';
       const style = PIN_ICONS[category];
+      const color = _safeColor(m.color, style.color);
       const audience = m.visibility === 'dm_only'
         ? game.i18n.localize('CHRONICLE.MapViewer.MarkerAudienceDm')
         : game.i18n.localize('CHRONICLE.MapViewer.MarkerAudienceEveryone');
@@ -234,8 +245,11 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
         label: m.name || '',
         description: m.description || '',
         category,
-        faIcon: style.faIcon,
-        color: _safeColor(m.color, style.color),
+        faIcon: markerIconClass(m.icon),
+        color,
+        // Markup built only from closed sets and a validated colour.
+        shapeSvg: new Handlebars.SafeString(pinShapeSvg(look.pinStyle, color, m.visibility === 'dm_only')),
+        pin,
         visibility: m.visibility || 'everyone',
         isDmOnly: m.visibility === 'dm_only',
         audienceLabel: audience,
@@ -283,6 +297,11 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
       hasFog: !!fog,
       showLabels: this._showLabels,
       zoomPercent: Math.round(this._zoom * 100),
+      look,
+      mapTitle: meta?.name || this.document.name || '',
+      mapTitleUpper: String(meta?.name || this.document.name || '').toUpperCase(),
+      mapInitial: frameInitial(meta?.name || this.document.name),
+      frameCorners: ['tl', 'tr', 'br', 'bl'],
     };
   }
 
@@ -431,6 +450,9 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
     if (!viewer) return;
 
     this._viewer = viewer;
+    // Each render replaces the viewer element, so rest-tracking restarts on it.
+    this._stopMotionRest?.();
+    this._stopMotionRest = startMotionRest(viewer);
     this._viewport = viewer.querySelector('.map-viewport');
     this._container = viewer.querySelector('.map-container');
     this._pinLayer = viewer.querySelector('.pin-layer');
@@ -536,6 +558,8 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
   async _preClose(options) {
     await super._preClose?.(options);
     this._teardownGlobalListeners();
+    this._stopMotionRest?.();
+    this._stopMotionRest = null;
 
     const mapId = this.document.getFlag(FLAG_SCOPE, 'mapId');
     if (mapId) {
@@ -633,8 +657,14 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
     if (!this._container) return;
     this._container.style.transform = `translate(${this._panX}px, ${this._panY}px) scale(${this._zoom})`;
 
+    // Chronicle's pins keep their screen size at any zoom.
+    this._container.style.setProperty('--cs-inv-zoom', String(1 / this._zoom));
+
+    const pct = `${Math.round(this._zoom * 100)}%`;
     const indicator = this._viewer?.querySelector('.zoom-indicator');
-    if (indicator) indicator.textContent = `${Math.round(this._zoom * 100)}%`;
+    if (indicator) indicator.textContent = pct;
+    const hud = this._viewer?.querySelector('.cs-mp-hudzoom');
+    if (hud) hud.textContent = `ZOOM ${pct}`;
   }
 
   _zoomBy(delta) {
