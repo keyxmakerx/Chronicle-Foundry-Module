@@ -467,7 +467,7 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
     this._markerLayer = viewer.querySelector('.chronicle-marker-layer');
     this._applyTransform();
 
-    // Notify MapSync so it can fetch/refresh sub-resources and start polling.
+    // Notify MapSync so it can fetch/refresh sub-resources.
     const mapId = this.document.getFlag(FLAG_SCOPE, 'mapId');
     if (mapId) {
       const mapSync = _getMapSync();

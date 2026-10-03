@@ -1407,7 +1407,12 @@ If the token is invalid, the server rejects the upgrade.
 | `entity_type.deleted` | `{ id: "uuid" }` | Entity type deleted |
 | `marker.created` | Full marker object | Map marker created |
 | `marker.updated` | Full marker object | Map marker modified |
-| `marker.deleted` | `{ id }` | Map marker deleted |
+| `marker.deleted` | The deleted marker (with `map_id`) | Map marker deleted |
+| `drawing.created` / `.updated` / `.deleted` | Full drawing (`map_id`, `visibility`, …) | Map drawing changed |
+| `token.created` / `.updated` / `.deleted` | Full token (`map_id`, `x`, `y`, `is_hidden`, …) | Map token changed |
+| `token.moved` | `{ x, y }`; `resourceId` is the token id (no `map_id`); GM-only for a hidden token | Token dragged |
+| `layer.created` / `.updated` / `.deleted` | Full layer (`map_id`, …) | Map layer changed |
+| `fog.created` / `.updated` / `.deleted` | `{ event, map_id, region? }`; `resourceId` is the map; GM-only. A fog reset arrives as `fog.updated` | Fog changed |
 | `note.created` | `{ noteId, entityId }` — ids only; the module fetches the note. An older Chronicle sends the full note object instead | Note created |
 | `note.updated` | `{ noteId, entityId }` — ids only; the module fetches the note. An older Chronicle sends the full note object instead | Note modified |
 | `note.deleted` | `{ noteId, entityId }` (an older Chronicle sends the full note object; only the id is read) | Note deleted |
@@ -1455,6 +1460,25 @@ only** (`game.users.activeGM`), and only once the Stashes probe said yes. The
 module's WebSocket allowlist includes the `stash.` and `downtime.` prefixes.
 
 Re-verify by: 2026-11-03 (Chronicle `internal/websocket/.ai.md`, `internal/plugins/armory/stash_events.go`)
+
+### What the module does with map items
+
+Every map item change arrives as one of the messages above, so the module
+never polls. `marker.*`, `drawing.*`, `token.*`, `layer.*` and `fog.*`
+refetch that map's items (`GET /maps/:id/{markers,drawings,tokens,layers,fog}`)
+and rewrite the player-safe copy on the map page. `token.moved` is
+patched into the GM's cached token instead, many per drag, and the stored
+token positions are rewritten once the drag settles. Chronicle answers an
+empty item list as `null`, which the module reads as an empty list; only a
+failed fetch leaves the drawings, and so the shadows, unknown.
+
+Chronicle sends no message for a map row itself (`map.*` is not published),
+so every connect still reads `GET /maps`. On connect the change feed also
+names map items changed while Foundry was closed: fog entries name their
+map, other entries name the item, which the module places from what it has
+stored, refreshing every map once when it cannot. Re-verify by: 2026-11-03
+(Chronicle `internal/app/routes.go` `mapEventPublisherAdapter`,
+`internal/plugins/syncapi/map_api_handler.go`).
 
 ### What the module does with `npc.spotlight`
 
