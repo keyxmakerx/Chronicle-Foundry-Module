@@ -73,7 +73,7 @@ sends update traffic to GitHub instead of Chronicle.
 
 1. Enable the module in your world's **Module Management**
 2. Open **Game Settings → Module Settings → Chronicle Sync**
-3. Enter your Chronicle **API URL**, **API Key**, and **Campaign ID**
+3. Paste the **Connect line** from Chronicle (campaign **Settings → Foundry Module**) and save; it fills in the URL, API key and campaign ID, then reload Foundry. Or enter the **API URL**, **API Key**, and **Campaign ID** by hand
 4. Enable the sync categories you want (Journals, Maps, Calendar, Characters)
 
 The module runs sync for the GM only. Players receive updates passively through Foundry.

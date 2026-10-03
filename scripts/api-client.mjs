@@ -9,6 +9,7 @@
 
 import { getSetting } from './settings.mjs';
 import { describeCampaignIdError } from './_settings-validation.mjs';
+import { moduleVersionHeaders } from './_module-version.mjs';
 
 /**
  * Validate the campaignId setting and abort with a clear notification if
@@ -227,6 +228,7 @@ export class ChronicleAPI {
     const headers = {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
+      ...moduleVersionHeaders(),
       ...options.headers,
     };
 
@@ -415,7 +417,7 @@ export class ChronicleAPI {
       `${baseUrl}/api/v1/campaigns/${campaignId}/media`,
       {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}` },
+        headers: { 'Authorization': `Bearer ${apiKey}`, ...moduleVersionHeaders() },
         body: formData,
       }
     );

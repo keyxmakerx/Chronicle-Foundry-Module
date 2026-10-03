@@ -8,6 +8,7 @@
 import { MODULE_ID } from './constants.mjs';
 import { UpdateInfoApplication } from './update-info.mjs';
 import { SyncCalendarApplication } from './sync-calendar.mjs';
+import { parseConnectLine } from './_connect-line.mjs';
 
 /**
  * Register all Chronicle Sync module settings.
@@ -39,6 +40,19 @@ export function registerSettings() {
     type: String,
     default: '',
     requiresReload: true,
+  });
+
+  // One-paste connect line from Chronicle. Client scope so the pasted key
+  // never touches a world document; the value is consumed and cleared on
+  // change, so it is only ever stored for the instant of the write.
+  game.settings.register(MODULE_ID, 'connectLine', {
+    name: game.i18n.localize('CHRONICLE.Settings.ConnectLine.Name'),
+    hint: game.i18n.localize('CHRONICLE.Settings.ConnectLine.Hint'),
+    scope: 'client',
+    config: true,
+    type: String,
+    default: '',
+    onChange: (value) => { applyConnectLine(value); },
   });
 
   // Campaign UUID.
@@ -390,6 +404,43 @@ export async function migrateApiKeyToClientScope() {
 }
 
 /**
+ * Apply a pasted connect line: write URL, campaign id and the CLIENT-scoped
+ * API key, then clear the raw line. All-or-nothing: an invalid line or a
+ * non-GM changes nothing. Neither the line nor the key is logged. The
+ * running SyncManager is not restarted (it reads these settings in start()),
+ * so the GM is told to reload.
+ *
+ * @param {string} raw - Value of the `connectLine` setting.
+ * @returns {Promise<boolean>} true if the connection settings were written.
+ */
+export async function applyConnectLine(raw) {
+  if (typeof raw !== 'string' || !raw.trim()) return false;
+  const clear = () => game.settings.set(MODULE_ID, 'connectLine', '').catch(() => {});
+  try {
+    if (!game.user?.isGM) {
+      ui.notifications.warn(game.i18n.localize('CHRONICLE.Settings.ConnectLine.GmOnly'));
+      return false;
+    }
+    const parsed = parseConnectLine(raw);
+    if (!parsed.ok) {
+      ui.notifications.warn(game.i18n.format('CHRONICLE.Settings.ConnectLine.Invalid', { reason: parsed.reason }));
+      return false;
+    }
+    await game.settings.set(MODULE_ID, 'apiUrl', parsed.baseUrl);
+    await game.settings.set(MODULE_ID, 'campaignId', parsed.campaignId);
+    await game.settings.set(MODULE_ID, 'apiKey', parsed.apiKey);
+    ui.notifications.info(game.i18n.localize('CHRONICLE.Settings.ConnectLine.Success'));
+    return true;
+  } catch (err) {
+    ui.notifications.error(game.i18n.localize('CHRONICLE.Settings.ConnectLine.Failed'));
+    console.error('Chronicle Sync | Applying the connect line failed:', err?.message);
+    return false;
+  } finally {
+    await clear();
+  }
+}
+
+/**
  * Set a Chronicle Sync setting value.
  * @param {string} key - Setting key without module prefix.
  * @param {*} value - The value to set.
@@ -522,5 +573,10 @@ Hooks.on('renderSettingsConfig', (app, html) => {
   if (keyInput) {
     keyInput.type = 'password';
     keyInput.autocomplete = 'off';
+  }
+  const lineInput = root?.querySelector?.(`input[name="${MODULE_ID}.connectLine"]`);
+  if (lineInput) {
+    lineInput.type = 'password';
+    lineInput.autocomplete = 'off';
   }
 });
