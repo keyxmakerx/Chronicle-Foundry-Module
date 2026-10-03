@@ -1,0 +1,76 @@
+name: Sync bench
+
+# Runs the module's real sync code (in a fake Foundry world) against a real
+# Chronicle built from source, and checks both sides agree: no duplicates,
+# no echo loops, offline changes caught up once. See bench/README.md.
+#
+# Chronicle is checked out at a branch with the same name as this PR's
+# branch when one exists (a change made in both repos together), else main.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      mariadb:
+        image: mariadb:11
+        env:
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: '1'
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Pick the Chronicle branch
+        id: ref
+        env:
+          HEAD_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/keyxmakerx/Chronicle "$HEAD_REF" >/dev/null 2>&1; then
+            echo "ref=$HEAD_REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v6
+        with:
+          repository: keyxmakerx/Chronicle
+          ref: ${{ steps.ref.outputs.ref }}
+          path: chronicle
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: chronicle/go.mod
+          cache-dependency-path: chronicle/go.sum
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Generate Chronicle templates
+        working-directory: chronicle
+        run: go run github.com/a-h/templ/cmd/templ@$(go list -m -f '{{.Version}}' github.com/a-h/templ) generate
+
+      - name: Install MariaDB client
+        run: sudo apt-get update -q && sudo apt-get install -y -q mariadb-client
+
+      - name: Run the bench against Chronicle ${{ steps.ref.outputs.ref }}
+        env:
+          CHRONICLE_DIR: chronicle
+          DATABASE_URL: root@tcp(127.0.0.1:3306)/
+          REDIS_URL: redis://127.0.0.1:6379
+        run: bench/run.sh

@@ -21,8 +21,12 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
   pure helpers, each unit-tested by its own `tools/test-*.mjs`.
 - `templates/` Handlebars, `styles/` CSS, `lang/en.json` strings,
   `tools/test-*.mjs` (Node's test runner, see TESTING.md).
+- `bench/`: the two-sided sync bench (real Chronicle + the real sync code in
+  a fake Foundry world); `CHRONICLE_DIR=../Chronicle bench/run.sh`. A sync
+  change is not ready until its bench scenarios pass. `bench/README.md`.
 - `.github/workflows/`: `check-descriptor.yml`, `release.yml` (Actions → Release
-  with a version; tags main), `snapshot.yml`.
+  with a version; tags main), `snapshot.yml`, `sync-bench.yml` (the bench,
+  against the same-named Chronicle branch or main).
 
 ## API Contract
 
