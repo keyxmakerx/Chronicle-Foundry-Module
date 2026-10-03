@@ -145,6 +145,44 @@ test('changes made while Foundry was closed arrive once on open, and a second op
   assert.deepEqual(writes(reqs).filter((r) => r.url.startsWith('/entities')).map((r) => `${r.method} ${r.url}`), [], 'second open wrote nothing in Chronicle');
 }));
 
+test('a reopen reads only what changed (change feed), and its own pushes do not come back', () => scenario('feed-catchup', async ({ seed, world }) => {
+  const pages = [];
+  for (const n of ['North', 'South', 'East', 'West']) pages.push(await chroniclePage(seed, `${n} Gate`));
+  const [north, south, east, west] = pages;
+  await openWorld(world);
+  await JournalSync_resync(world);
+  // A Foundry edit pushed before closing: Chronicle's feed records it, and
+  // the next open must recognise it as the module's own.
+  await byEntity(world, west.id).update({ name: 'West Gate (ruined)' });
+  await settle();
+  await closeWorld(world);
+
+  await seed.chronicle.put(`/entities/${north.id}`, { name: 'North Gate (rebuilt)' });
+  await seed.chronicle.del(`/entities/${south.id}`);
+  const added = await chroniclePage(seed, 'Harbour Gate');
+
+  const before = world.log.writes.length;
+  const reqs = await recordRequests(async () => { await openWorld(world); });
+  const gets = reqs.filter((r) => r.method === 'GET').map((r) => r.url);
+  assert.ok(gets.some((u) => u.startsWith('/sync/changes')), 'read the change feed');
+  assert.deepEqual(gets.filter((u) => u.startsWith('/entities?')), [], 'did not walk every page');
+  assert.ok(!gets.includes(`/entities/${east.id}`), 'did not refetch an untouched page');
+  assert.equal(byEntity(world, north.id)?.name, 'North Gate (rebuilt)');
+  assert.ok(byEntity(world, added.id), 'new page arrived');
+  const ruined = world.game.journal.find((j) => j.name === 'South Gate');
+  assert.ok(ruined && !ruined.getFlag(FLAG, 'entityId'), 'removed page set aside, not deleted');
+  assert.equal(byEntity(world, west.id)?.name, 'West Gate (ruined)');
+  const westId = byEntity(world, west.id).id;
+  const westWrites = world.log.writes.slice(before).filter((w) => w.id === westId || w.parent === westId);
+  assert.deepEqual(westWrites.map((w) => `${w.op} ${w.type} ${JSON.stringify(w.change)}`), [], 'own push not re-applied');
+  assert.deepEqual(writes(reqs).filter((r) => r.url.startsWith('/entities')).map((r) => `${r.method} ${r.url}`), [], 'reopen wrote nothing in Chronicle');
+  await closeWorld(world);
+
+  // Nothing changed since: a third open reads the feed and fetches no page.
+  const again = await recordRequests(async () => { await openWorld(world); });
+  assert.deepEqual(again.filter((r) => r.url.startsWith('/entities')).map((r) => `${r.method} ${r.url}`), [], 'third open touched no page');
+}));
+
 test('a journal deleted in Foundry (page kept in Chronicle) does not come back on reopen', () => scenario('fvtt-delete-keep', async ({ seed, world }) => {
   const e = await chroniclePage(seed, 'Forgotten Shrine');
   await openWorld(world);
