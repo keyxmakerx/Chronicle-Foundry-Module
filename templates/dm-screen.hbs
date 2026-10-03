@@ -20,8 +20,15 @@
         <div class="dms-blk">
           <span class="dms-lbl">Game state</span>
           <div class="dms-seg" role="group" aria-label="Game state">
-            <button type="button" data-action="downtime" data-open="false" aria-pressed="{{#if downtime.open}}false{{else}}true{{/if}}" {{#unless downtime.canToggle}}disabled{{/unless}} {{#unless downtime.open}}disabled{{/unless}}>In session</button>
-            <button type="button" data-action="downtime" data-open="true" aria-pressed="{{#if downtime.open}}true{{else}}false{{/if}}" {{#unless downtime.canToggle}}disabled{{/unless}} {{#if downtime.open}}disabled{{/if}}>Downtime</button>
+            <button type="button" data-action="downtimeAsk" aria-pressed="{{#if downtime.open}}false{{else}}true{{/if}}" {{#unless downtime.canToggle}}disabled{{/unless}} {{#unless downtime.open}}disabled{{/unless}}>In session</button>
+            <button type="button" data-action="downtimeAsk" aria-pressed="{{#if downtime.open}}true{{else}}false{{/if}}" {{#unless downtime.canToggle}}disabled{{/unless}} {{#if downtime.open}}disabled{{/if}}>Downtime</button>
+          </div>
+          <div class="dms-confirm" data-dms-confirm role="alertdialog" aria-label="{{downtime.confirm.yes}}" hidden>
+            <p>{{downtime.confirm.text}}</p>
+            <div class="dms-confirm-btns">
+              <button type="button" class="dms-confirm-yes" data-action="downtime" data-open="{{#if downtime.open}}false{{else}}true{{/if}}">{{downtime.confirm.yes}}</button>
+              <button type="button" data-action="downtimeCancel">Cancel</button>
+            </div>
           </div>
           <span class="dms-small">{{downtime.note}}{{#unless downtime.canToggle}} Only the campaign owner can switch this.{{/unless}}</span>
           {{#if downtime.pending}}

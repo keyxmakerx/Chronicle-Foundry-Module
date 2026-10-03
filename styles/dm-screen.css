@@ -45,6 +45,11 @@
 .chronicle-dm-screen .dms-seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--dms-leaf-edge); border-radius: .5rem; overflow: hidden; }
 .chronicle-dm-screen .dms-seg button { padding: .4rem; font-size: .9em; text-align: center; }
 .chronicle-dm-screen .dms-seg button[aria-pressed="true"] { background: var(--dms-ok-soft); font-weight: 700; opacity: 1; }
+.chronicle-dm-screen .dms-confirm { display: grid; gap: .4rem; padding: .5rem .6rem; border: 1px solid var(--dms-warn); border-radius: .5rem; background: rgba(180, 83, 9, .07); font-size: .9em; }
+.chronicle-dm-screen .dms-confirm p { margin: 0; }
+.chronicle-dm-screen .dms-confirm-btns { display: flex; gap: .4rem; flex-wrap: wrap; }
+.chronicle-dm-screen .dms-confirm-btns button { border: 1px solid var(--dms-leaf-edge); border-radius: .35rem; padding: .15rem .6rem; font-size: .9em; }
+.chronicle-dm-screen .dms .dms-confirm-yes { background: var(--dms-warn); border-color: var(--dms-warn); color: #fff; font-weight: 700; }
 .chronicle-dm-screen .dms-partywrap { position: relative; }
 .chronicle-dm-screen .dms-party {
   position: relative; max-height: 17rem; overflow-y: auto; display: grid; gap: .1rem; padding: .1rem .1rem .4rem; scrollbar-width: thin;

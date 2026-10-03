@@ -74,6 +74,8 @@ class DMScreenWindow extends HandlebarsApplicationMixin(ApplicationV2) {
     position: { width: 980, height: 'auto' },
     actions: {
       downtime: DMScreenWindow._onDowntime,
+      downtimeAsk: DMScreenWindow._onDowntimeAsk,
+      downtimeCancel: DMScreenWindow._onDowntimeCancel,
       reveal: DMScreenWindow._onReveal,
       tab: DMScreenWindow._onTab,
       hero: DMScreenWindow._onHero,
@@ -404,11 +406,24 @@ class DMScreenWindow extends HandlebarsApplicationMixin(ApplicationV2) {
     }, 340);
   }
 
+  // The switch asks before it changes anything; see screenContext.
+  static _onDowntimeAsk() {
+    const box = this.element.querySelector('[data-dms-confirm]');
+    if (!box) return;
+    box.hidden = false;
+    box.querySelector('[data-action="downtimeCancel"]')?.focus();
+  }
+
+  static _onDowntimeCancel() {
+    const box = this.element.querySelector('[data-dms-confirm]');
+    if (box) box.hidden = true;
+  }
+
   static async _onDowntime(_event, target) {
     const api = this._getApi?.();
     if (!api) return;
     const open = target.dataset.open === 'true';
-    this.element.querySelectorAll('[data-action="downtime"]').forEach((b) => { b.disabled = true; });
+    this.element.querySelectorAll('[data-action^="downtime"]').forEach((b) => { b.disabled = true; });
     try {
       await api.post('/dm-screen/downtime', { open });
     } catch (err) {

@@ -94,3 +94,15 @@ test('errorKey: a 404 means Chronicle needs updating', () => {
   assert.equal(errorKey({ status: 500 }), 'Failed');
   assert.equal(errorKey(new Error('network')), 'Failed');
 });
+
+test('downtime switch asks first and says what starting it does', () => {
+  const closed = screenContext({ downtime: { open: false, can_toggle: true, pending: 2 } }).downtime.confirm;
+  assert.equal(closed.yes, 'Start downtime');
+  assert.equal(closed.text, 'Start downtime? 2 waiting requests go through now and shops open.');
+  const one = screenContext({ downtime: { open: false, pending: 1 } }).downtime.confirm;
+  assert.match(one.text, /1 waiting request goes through now/);
+  const none = screenContext({ downtime: { open: false, pending: 0 } }).downtime.confirm;
+  assert.equal(none.text, 'Start downtime? Moves will happen at once and shops open.');
+  const open = screenContext({ downtime: { open: true } }).downtime.confirm;
+  assert.equal(open.yes, 'End downtime');
+});

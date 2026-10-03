@@ -92,6 +92,16 @@ export function screenContext(view, { apiUrl } = {}) {
       note: open ? 'Moves happen at once. Shops are open.' : 'Moves need your OK. Shops are closed.',
       pending: pending > 0 ? `${plural(pending, 'request', 'requests')} waiting on you` : '',
       pendingUrl: siteUrl(apiUrl, `/campaigns/${campaign}/armory/stashes`),
+      // Switching asks first: starting downtime puts every waiting request
+      // through at once, and neither switch can be taken back cleanly.
+      confirm: open
+        ? { text: 'End downtime? Moves will need your OK again and shops close.', yes: 'End downtime' }
+        : {
+          text: pending > 0
+            ? `Start downtime? ${plural(pending, 'waiting request goes', 'waiting requests go')} through now and shops open.`
+            : 'Start downtime? Moves will happen at once and shops open.',
+          yes: 'Start downtime',
+        },
     };
   }
 
