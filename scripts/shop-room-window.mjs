@@ -9,18 +9,64 @@
  * The GM's window reads the room from Chronicle. Players have no API key:
  * they see a shop only when the GM shows it, from the data the GM's client
  * sends over the module socket.
+ *
+ * Buying is the widget's own basket. On the GM's client it calls Chronicle
+ * directly. A player's basket goes over the socket to the GM's client, which
+ * buys through Chronicle as the Chronicle member that player is matched to,
+ * so Chronicle applies that member's own rules (their characters, downtime).
+ * The GM sees each sale as a whispered chat line.
  */
 
 import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
-import { getSetting } from './settings.mjs';
+import { getSetting, getUserMappings } from './settings.mjs';
 import { _isAllowedImageHost } from './_url-validation.mjs';
-import { createChronicleShim, sanitizeShopRoomMessage, shopEndpoints, SHOP_ROOM_MESSAGE } from './_shop-room-data.mjs';
+import {
+  createChronicleShim, describeSale, sanitizeShopBuyReply, sanitizeShopBuyRequest,
+  sanitizeShopRoomMessage, shopEndpoints, SHOP_ROOM_MESSAGE,
+} from './_shop-room-data.mjs';
 
 const SOCKET_CHANNEL = `module.${MODULE_ID}`;
 const VENDOR = `modules/${MODULE_ID}/vendor/chronicle`;
 
+// How long a player waits for the GM's client to answer. The buyers read
+// holds up the room's first draw, so it gives up sooner (no basket) than a
+// purchase does.
+const REQUEST_TIMEOUT_MS = { buyers: 8000, buy: 20000 };
+// After a sale the widget reloads its own goods and shows what was bought;
+// a room update arriving in this window updates the data without redrawing,
+// so that line stays on screen.
+const QUIET_MS = 5000;
+
 let shim = null;
 let widgetLoad = null;
+/** Player side: buying requests waiting for the GM's answer, by request id. */
+const pending = new Map();
+/** GM side: answers players' buying requests; set by the shop widget. */
+let buyRelay = null;
+
+/**
+ * Set the GM-side handler for players' buying requests:
+ * `(user, request) => Promise<{status, body, goods?}>`.
+ */
+export function setShopBuyRelay(fn) {
+  buyRelay = fn;
+}
+
+const t = (key) => game.i18n.localize(`CHRONICLE.ShopRoom.${key}`);
+
+/** Player side: ask the GM's client to make a buying call for this user. */
+function requestFromGM(shopId, action, body) {
+  if (!game.users.activeGM) return Promise.resolve({ status: 503, body: { message: t('NoGM') } });
+  const requestId = foundry.utils.randomID(16);
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pending.delete(requestId);
+      resolve({ status: 504, body: { message: t('GMNoAnswer') } });
+    }, REQUEST_TIMEOUT_MS[action] || REQUEST_TIMEOUT_MS.buy);
+    pending.set(requestId, (reply) => { clearTimeout(timer); resolve(reply); });
+    game.socket.emit(SOCKET_CHANNEL, { type: SHOP_ROOM_MESSAGE, action, requestId, shopId, userId: game.user.id, body });
+  });
+}
 
 /** Load the vendored widget once; resolves to its definition. */
 function loadShopRoomWidget() {
@@ -105,9 +151,16 @@ export class ShopRoomWindow extends ApplicationV2 {
     this._host = null;
     this._def = null;
     this._shown = false;
+    this._quietUntil = 0;
+    this._mountedLayout = undefined;
+    /** Character names from the last buyers answers, for the GM's sale line. */
+    this._buyerNames = new Map();
   }
 
   get shopId() { return this._shopId; }
+
+  /** Whether the GM is showing this shop to players. */
+  get shown() { return this._shown; }
 
   /** Read the room from Chronicle (GM only). */
   async _fetchRoom() {
@@ -151,9 +204,16 @@ export class ShopRoomWindow extends ApplicationV2 {
       this._def = this._def || await loadShopRoomWidget();
       if (this._api) this._room = await this._fetchRoom();
       if (!this._room) return;
-      const ok = await canLoadImage(this._room.image);
-      shim.setShop(this._campaignId, this._shopId, this._room);
-      this._mount(ok ? this._room.image : '');
+      const onAction = (kind, body) => this._onAction(kind, body);
+      shim.setShop(this._campaignId, this._shopId, this._room, onAction);
+      const layoutKey = JSON.stringify(this._room.layout ?? null);
+      // Just after a sale the widget has already reloaded its goods; redraw
+      // only if the room itself changed.
+      if (!(Date.now() < this._quietUntil && layoutKey === this._mountedLayout)) {
+        const ok = await canLoadImage(this._room.image);
+        this._mount(ok ? this._room.image : '');
+        this._mountedLayout = layoutKey;
+      }
       if (this._shown) this._emit('show');
     } catch (err) {
       console.error('Chronicle: could not show shop room', err);
@@ -170,6 +230,77 @@ export class ShopRoomWindow extends ApplicationV2 {
     ds.shopName = this._name;
     if (image) ds.shopImage = image; else delete ds.shopImage;
     this._def.init(this._host);
+  }
+
+  /** The widget's buying calls: Chronicle directly for the GM, the GM's client for a player. */
+  async _onAction(kind, body) {
+    if (this._api) return this.runAction(kind, body, null, game.user.name);
+    // The sale's own stock update can reach this client before the answer
+    // does; it must not redraw the widget while the basket is in flight.
+    if (kind === 'buy') this._quietUntil = Infinity;
+    const reply = await requestFromGM(this._shopId, kind, body);
+    if (kind === 'buy') {
+      this._quietUntil = Date.now() + QUIET_MS;
+      if (reply.status < 400 && reply.goods && this._room) this._room.goods = reply.goods;
+    }
+    return reply;
+  }
+
+  /**
+   * Make one buying call to Chronicle (GM only). `actingUserId` is the
+   * Chronicle member a player's request is made for; Chronicle then applies
+   * that member's own rules. `who` names the Foundry user for the sale line.
+   * @returns {Promise<{status: number, body: object, goods?: object[]}>}
+   */
+  async runAction(kind, body, actingUserId, who) {
+    const base = `/armory/shops/${this._shopId}`;
+    try {
+      if (kind === 'buyers') {
+        const q = actingUserId ? `?actingUserId=${encodeURIComponent(actingUserId)}` : '';
+        const view = await this._api.get(`${base}/buyers${q}`);
+        for (const b of view?.buyers || []) this._buyerNames.set(b.id, b.name);
+        return { status: 200, body: view || {} };
+      }
+      // Hold redraws while the GM's own basket is in flight, as for a player.
+      if (!actingUserId) this._quietUntil = Infinity;
+      let result;
+      try {
+        result = await this._api.post(`${base}/buy`, actingUserId ? { ...body, actingUserId } : body);
+      } finally {
+        if (!actingUserId) this._quietUntil = Date.now() + QUIET_MS;
+      }
+      const goodsBefore = this._room?.goods || [];
+      let goods;
+      try {
+        this._room = await this._fetchRoom();
+        goods = this._room.goods;
+        shim.setShop(this._campaignId, this._shopId, this._room, (k, b) => this._onAction(k, b));
+      } catch (err) {
+        console.warn('Chronicle: could not re-read the shop after a sale', err);
+      }
+      this._announceSale(describeSale({
+        who, character: this._buyerNames.get(body?.buyerEntityId) || t('SomeCharacter'),
+        shop: this._name, items: body?.items, goods: goodsBefore, result,
+      }));
+      return { status: 200, body: result || {}, goods };
+    } catch (err) {
+      return { status: err.status || 502, body: { message: err.serverMessage || err.data?.message || t('BuyFailed') } };
+    }
+  }
+
+  /** Whisper a sale to the GMs; chat is a courtesy and never fails the sale. */
+  _announceSale(line) {
+    try {
+      const div = document.createElement('div');
+      div.textContent = line;
+      ChatMessage.create({
+        content: `<p>${div.innerHTML}</p>`,
+        whisper: ChatMessage.getWhisperRecipients('GM').map((u) => u.id),
+        speaker: { alias: 'Chronicle' },
+      });
+    } catch (err) {
+      console.debug('Chronicle: shop sale chat line failed', err?.message);
+    }
   }
 
   _showError(text) {
@@ -252,14 +383,30 @@ export class ShopRoomWindow extends ApplicationV2 {
 }
 
 /**
- * Player side: open or close a shop room when a GM shows or hides it. Runs on
- * every non-GM client; messages from anyone but a GM are ignored.
+ * The shop room socket. Players open, refresh and close rooms the GM shows or
+ * hides, and get the GM's answers to their buying requests. The active GM
+ * answers players' buying requests through the relay the shop widget sets.
+ * Who sent a message is taken from Foundry's own sender id, never from the
+ * message, so a player cannot buy as someone else.
  */
 export function registerShopRoomSocket() {
-  if (game.user.isGM) return;
   const open = new Map();
-  game.socket.on(SOCKET_CHANNEL, (data) => {
-    if (data?.type !== SHOP_ROOM_MESSAGE || !game.users.get(data.userId)?.isGM) return;
+  game.socket.on(SOCKET_CHANNEL, (data, senderId) => {
+    if (data?.type !== SHOP_ROOM_MESSAGE) return;
+    if (game.user.isGM) {
+      onBuyRequest(data, senderId);
+      return;
+    }
+    // Shows, hides and answers count only from a GM.
+    if (!game.users.get(senderId ?? data.userId)?.isGM) return;
+    if (data.action === 'reply') {
+      const reply = sanitizeShopBuyReply(data);
+      if (!reply || reply.toUserId !== game.user.id) return;
+      const done = pending.get(reply.requestId);
+      pending.delete(reply.requestId);
+      done?.(reply);
+      return;
+    }
     const msg = sanitizeShopRoomMessage(data, getSetting('apiUrl'));
     if (!msg) return;
     const current = open.get(msg.shopId);
@@ -281,4 +428,40 @@ export function registerShopRoomSocket() {
     open.set(msg.shopId, win);
     win.render({ force: true });
   });
+}
+
+/** GM side: answer one player's buying request. Only the active GM answers. */
+async function onBuyRequest(data, senderId) {
+  if (!game.users.activeGM?.isSelf) return;
+  const req = sanitizeShopBuyRequest(data);
+  if (!req) return;
+  const toUserId = senderId ?? data.userId;
+  const answer = ({ status, body, goods }) => game.socket.emit(SOCKET_CHANNEL, {
+    type: SHOP_ROOM_MESSAGE, action: 'reply', requestId: req.requestId, toUserId, userId: game.user.id, status, body, goods,
+  });
+  const user = game.users.get(senderId);
+  // Without Foundry's sender id the buyer can't be known, so nothing is bought.
+  if (!user || senderId !== data.userId || user.isGM) {
+    answer({ status: 403, body: { message: t('NoSender') } });
+    return;
+  }
+  if (!buyRelay) {
+    answer({ status: 404, body: { message: t('NotShown') } });
+    return;
+  }
+  try {
+    answer(await buyRelay(user, req));
+  } catch (err) {
+    console.error('Chronicle: shop buying request failed', err);
+    answer({ status: 502, body: { message: t('BuyFailed') } });
+  }
+}
+
+/**
+ * The Chronicle member a Foundry user is matched to in Chronicle Sync's user
+ * matching, or null.
+ */
+export function chronicleUserFor(foundryUserId) {
+  const hit = Object.entries(getUserMappings()).find(([, fId]) => fId === foundryUserId);
+  return hit ? hit[0] : null;
 }

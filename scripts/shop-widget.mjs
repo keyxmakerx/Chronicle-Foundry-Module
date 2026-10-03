@@ -8,7 +8,7 @@
 
 import { getSetting } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
-import { ShopRoomWindow } from './shop-room-window.mjs';
+import { ShopRoomWindow, chronicleUserFor, setShopBuyRelay } from './shop-room-window.mjs';
 
 /**
  * ShopWidget manages the shop window UI and drag-and-drop.
@@ -47,6 +47,10 @@ export class ShopWidget {
         },
       });
     });
+
+    // Players' baskets reach Chronicle through this client, for a shop the
+    // GM is showing, as the Chronicle member the player is matched to.
+    setShopBuyRelay((user, req) => this._relayBuy(user, req));
 
     console.debug('Chronicle: Shop widget initialized');
   }
@@ -98,9 +102,24 @@ export class ShopWidget {
   }
 
   /**
+   * Answer a player's buying request. Only a shop this GM is showing can be
+   * bought from, and only as a Chronicle member the GM matched the player to.
+   * @param {User} user - The Foundry user who sent the request.
+   * @param {{action: string, shopId: string, body?: object}} req - Checked request.
+   */
+  async _relayBuy(user, req) {
+    const win = this._openWindows.get(req.shopId);
+    if (!win?.shown) return { status: 404, body: { message: game.i18n.localize('CHRONICLE.ShopRoom.NotShown') } };
+    const chronicleUserId = chronicleUserFor(user.id);
+    if (!chronicleUserId) return { status: 403, body: { message: game.i18n.localize('CHRONICLE.ShopRoom.NotMatched') } };
+    return win.runAction(req.action, req.body, chronicleUserId, user.name);
+  }
+
+  /**
    * Clean up on destroy.
    */
   destroy() {
+    setShopBuyRelay(null);
     for (const window of this._openWindows.values()) {
       window.close();
     }

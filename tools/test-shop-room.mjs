@@ -20,7 +20,10 @@ import vm from 'node:vm';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const VENDOR = join(REPO_ROOT, 'vendor', 'chronicle');
-const { createChronicleShim, sanitizeShopRoomMessage, shopEndpoints, SHOP_ROOM_MESSAGE } = await import('../scripts/_shop-room-data.mjs');
+const {
+  createChronicleShim, describeSale, sanitizeShopBuyReply, sanitizeShopBuyRequest,
+  sanitizeShopRoomMessage, shopEndpoints, SHOP_ROOM_MESSAGE,
+} = await import('../scripts/_shop-room-data.mjs');
 
 const API_URL = 'https://chronicle.example.com';
 const CAMP = '11111111-2222-3333-4444-555555555555';
@@ -30,6 +33,9 @@ test('endpoints are the Chronicle shop page paths, so a generated room matches',
   const ep = shopEndpoints(CAMP, SHOP);
   assert.equal(ep.room, `/campaigns/${CAMP}/armory/shops/${SHOP}/room`);
   assert.equal(ep.relations, `/campaigns/${CAMP}/entities/${SHOP}/relations`);
+  // The widget derives its buying calls from the room endpoint.
+  assert.equal(ep.buyers, ep.room.replace(/\/room$/, '/buyers'));
+  assert.equal(ep.buy, ep.room.replace(/\/room$/, '/buy'));
 });
 
 test('shim answers the widget from the window data and refuses writes', async () => {
@@ -53,6 +59,75 @@ test('shim answers the widget from the window data and refuses writes', async ()
 
   shim.register('shop_room', { init() {} });
   assert.ok(shim.widgets.get('shop_room'));
+});
+
+test('shim hands buying to the window and serves fresh stock after a sale', async () => {
+  const shim = createChronicleShim();
+  const ep = shopEndpoints(CAMP, SHOP);
+  shim.setShop(CAMP, SHOP, { goods: [{ id: 1 }] });
+  assert.equal((await shim.apiFetch(ep.buyers)).status, 404, 'no buying without a handler, so no basket');
+
+  const calls = [];
+  shim.setShop(CAMP, SHOP, { goods: [{ id: 1 }] }, async (kind, body) => {
+    calls.push([kind, body]);
+    if (kind === 'buyers') return { status: 200, body: { canBuyNow: true, buyers: [] } };
+    return { status: 200, body: { status: 'bought', spent: 3 }, goods: [{ id: 1, metadata: { stock: 0 } }] };
+  });
+  assert.deepEqual(await (await shim.apiFetch(ep.buyers)).json(), { canBuyNow: true, buyers: [] });
+  const basket = { buyerEntityId: 'c1', items: [{ relationId: 1, quantity: 1 }] };
+  const bought = await shim.apiFetch(ep.buy, { method: 'POST', body: basket });
+  assert.equal(bought.ok, true);
+  assert.deepEqual(calls, [['buyers', undefined], ['buy', basket]]);
+  assert.deepEqual(await (await shim.apiFetch(ep.relations)).json(), [{ id: 1, metadata: { stock: 0 } }]);
+  assert.equal((await shim.apiFetch(ep.buy)).ok, false, 'buy is POST only');
+
+  shim.setShop(CAMP, SHOP, { goods: [] }, async () => ({ status: 409, body: { message: 'Buying opens when the GM opens downtime.' } }));
+  const refused = await shim.apiFetch(ep.buy, { method: 'POST', body: basket });
+  assert.equal(refused.ok, false);
+  assert.equal((await refused.json()).message, 'Buying opens when the GM opens downtime.');
+});
+
+const buyReq = (over = {}) => ({
+  type: SHOP_ROOM_MESSAGE, action: 'buy', requestId: 'r1', shopId: SHOP, userId: 'p1',
+  body: { buyerEntityId: 'char-1', items: [{ relationId: '7', quantity: 2 }] }, ...over,
+});
+
+test('buy request: keeps only shop, character and goods with quantities', () => {
+  const r = sanitizeShopBuyRequest(buyReq({ body: { buyerEntityId: 'char-1', items: [{ relationId: '7', quantity: 2, price: 0 }], actingUserId: 'gm' } }));
+  assert.deepEqual(r, { action: 'buy', requestId: 'r1', shopId: SHOP, body: { buyerEntityId: 'char-1', items: [{ relationId: 7, quantity: 2 }] } },
+    'no price and no acting member travel from a player');
+  assert.deepEqual(sanitizeShopBuyRequest(buyReq({ action: 'buyers', body: undefined })), { action: 'buyers', requestId: 'r1', shopId: SHOP });
+});
+
+test('buy request: rejects malformed requests', () => {
+  const items = (it) => buyReq({ body: { buyerEntityId: 'char-1', items: it } });
+  const bad = [
+    null, buyReq({ type: 'x' }), buyReq({ action: 'refund' }), buyReq({ requestId: '' }), buyReq({ shopId: '../x' }),
+    buyReq({ body: null }), buyReq({ body: { buyerEntityId: 'a b', items: [{ relationId: 1, quantity: 1 }] } }),
+    items([]), items(Array.from({ length: 51 }, (_, i) => ({ relationId: i + 1, quantity: 1 }))),
+    items([{ relationId: 0, quantity: 1 }]), items([{ relationId: 1.5, quantity: 1 }]),
+    items([{ relationId: 1, quantity: 0 }]), items([{ relationId: 1, quantity: 100 }]), items(['x']),
+  ];
+  for (const m of bad) assert.equal(sanitizeShopBuyRequest(m), null, JSON.stringify(m)?.slice(0, 80));
+});
+
+test('buy reply: passes a good answer, rejects a malformed one', () => {
+  const ok = { type: SHOP_ROOM_MESSAGE, action: 'reply', requestId: 'r1', toUserId: 'p1', status: 200, body: { status: 'bought' }, goods: [{ id: 1 }, 'x'] };
+  assert.deepEqual(sanitizeShopBuyReply(ok), { requestId: 'r1', toUserId: 'p1', status: 200, body: { status: 'bought' }, goods: [{ id: 1 }] });
+  assert.equal(sanitizeShopBuyReply({ ...ok, goods: undefined }).goods, undefined);
+  for (const over of [{ action: 'show' }, { requestId: '' }, { status: 99 }, { status: 'ok' }, { body: [] }, { body: null },
+    { body: { x: 'y'.repeat(70 * 1024) } }, { goods: 'all' }]) {
+    assert.equal(sanitizeShopBuyReply({ ...ok, ...over }), null, JSON.stringify(over).slice(0, 60));
+  }
+});
+
+test('sale line names the buyer, the goods and the cost', () => {
+  const goods = [{ id: 7, targetEntityName: 'Rope' }, { id: 8, metadata: { custom_name: 'Lantern' } }];
+  const result = { status: 'bought', spent: 12, currency: 'gp', moneyLeft: 30 };
+  assert.equal(describeSale({ who: 'Sam', character: 'Brin', shop: 'The Anvil', items: [{ relationId: 7, quantity: 2 }, { relationId: '8', quantity: 1 }], goods, result }),
+    'Brin (Sam) bought 2× Rope, 1× Lantern at The Anvil for 12 gp. Brin has 30 gp left.');
+  assert.equal(describeSale({ who: 'Brin', character: 'Brin', shop: 'S', items: [{ relationId: 9, quantity: 1 }], goods, result: {} }),
+    'Brin bought 1× item at S.');
 });
 
 const show = (over = {}) => ({
@@ -106,6 +181,11 @@ test('vendored widget keeps the contract the shim relies on', () => {
   assert.match(src, /Chronicle\.apiFetch\(ds\.relationsEndpoint\)/);
   assert.match(src, /ds\.roomEndpoint \|\| ''\)\.split\('\/shops\/'\)/, 'room seed comes from the room endpoint');
   for (const key of ['shopName', 'shopImage', 'canArrange', 'campaignUrl']) assert.ok(src.includes(`ds.${key}`), key);
+  // Buying calls are derived from the room endpoint and go through apiFetch.
+  assert.match(src, /\(ds\.roomEndpoint \|\| ''\)\.replace\(\/\\\/room\$\/, '\/buyers'\)/);
+  assert.match(src, /\(ds\.roomEndpoint \|\| ''\)\.replace\(\/\\\/room\$\/, '\/buy'\)/);
+  assert.match(src, /Chronicle\.apiFetch\(buyersEndpoint\)/);
+  assert.match(src, /Chronicle\.apiFetch\(buyEndpoint, \{ method: 'POST', body: \{ buyerEntityId: payer, items: items \}/);
   // Saving goes through apiFetch with PUT, which the shim refuses.
   assert.match(src, /Chronicle\.apiFetch\(ds\.roomEndpoint, \{ method: 'PUT'/);
 });

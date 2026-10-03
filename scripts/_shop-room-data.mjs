@@ -27,29 +27,49 @@ export function shopEndpoints(campaignId, shopId) {
   return {
     room: `/campaigns/${campaignId}/armory/shops/${shopId}/room`,
     relations: `/campaigns/${campaignId}/entities/${shopId}/relations`,
+    buyers: `/campaigns/${campaignId}/armory/shops/${shopId}/buyers`,
+    buy: `/campaigns/${campaignId}/armory/shops/${shopId}/buy`,
   };
 }
 
 /**
  * A stand-in for the `Chronicle` page global the widget expects. `register`
- * keeps the widget definition; `apiFetch` answers the widget's two reads from
- * data the window already holds, so the widget never reaches the network.
+ * keeps the widget definition; `apiFetch` answers the widget's reads from
+ * data the window already holds, and hands its two buying calls to the
+ * window's `onAction(kind, body)`, which answers `{status, body, goods?}`.
+ * A shop with no `onAction` has no buyers, so the widget shows no basket.
  */
 export function createChronicleShim() {
   const widgets = new Map();
   const data = new Map();
+  const actions = new Map();
   const answer = (status, body) => Promise.resolve({ ok: status < 400, status, json: () => Promise.resolve(body) });
   return {
     widgets,
     register(slug, def) { widgets.set(slug, def); },
-    setShop(campaignId, shopId, room) {
+    setShop(campaignId, shopId, room, onAction) {
       const ep = shopEndpoints(campaignId, shopId);
       data.set(ep.room, { layout: room.layout ?? null });
       data.set(ep.relations, room.goods || []);
+      if (onAction) {
+        actions.set(ep.buyers, (body) => onAction('buyers', body));
+        actions.set(ep.buy, (body) => onAction('buy', body));
+      } else {
+        actions.delete(ep.buyers);
+        actions.delete(ep.buy);
+      }
     },
-    apiFetch(url, opts = {}) {
+    async apiFetch(url, opts = {}) {
+      const method = (opts.method || 'GET').toUpperCase();
+      const act = actions.get(url);
+      if (act && method === (url.endsWith('/buy') ? 'POST' : 'GET')) {
+        const res = await act(opts.body);
+        // Fresh stock after a sale, so the widget's reload shows it.
+        if (url.endsWith('/buy') && Array.isArray(res?.goods)) data.set(url.replace(/\/armory\/shops\/([^/]+)\/buy$/, '/entities/$1/relations'), res.goods);
+        return answer(res?.status || 502, res?.body ?? {});
+      }
       // Foundry never saves a room; arranging stays on the Chronicle page.
-      if ((opts.method || 'GET').toUpperCase() !== 'GET') return answer(405, {});
+      if (method !== 'GET') return answer(405, {});
       return data.has(url) ? answer(200, data.get(url)) : answer(404, {});
     },
   };
@@ -86,4 +106,69 @@ export function sanitizeShopRoomMessage(msg, apiUrl) {
     layout,
     goods,
   };
+}
+
+// Limits on a basket, the same as Chronicle's buy route.
+const MAX_BASKET_LINES = 50;
+const MAX_LINE_QTY = 99;
+const MAX_REPLY_CHARS = 64 * 1024;
+
+/**
+ * Check a player's buying request before the GM's client acts on it. The
+ * request names only a shop, a character and goods with quantities; who is
+ * buying comes from the socket's own sender, never from the message, and
+ * prices always come from Chronicle. Returns a cleaned copy, or null.
+ */
+export function sanitizeShopBuyRequest(msg) {
+  if (!msg || typeof msg !== 'object' || msg.type !== SHOP_ROOM_MESSAGE) return null;
+  if (msg.action !== 'buyers' && msg.action !== 'buy') return null;
+  if (!ID_RE.test(String(msg.requestId || '')) || !ID_RE.test(String(msg.shopId || ''))) return null;
+  const out = { action: msg.action, requestId: msg.requestId, shopId: msg.shopId };
+  if (msg.action === 'buyers') return out;
+
+  const b = msg.body;
+  if (!b || typeof b !== 'object' || !ID_RE.test(String(b.buyerEntityId || ''))) return null;
+  if (!Array.isArray(b.items) || b.items.length < 1 || b.items.length > MAX_BASKET_LINES) return null;
+  const items = [];
+  for (const it of b.items) {
+    const relationId = Number(it?.relationId);
+    const quantity = Number(it?.quantity);
+    if (!Number.isInteger(relationId) || relationId <= 0) return null;
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_LINE_QTY) return null;
+    items.push({ relationId, quantity });
+  }
+  out.body = { buyerEntityId: b.buyerEntityId, items };
+  return out;
+}
+
+/**
+ * Check the GM's answer to a buying request before the player's widget reads
+ * it. Returns `{requestId, toUserId, status, body, goods?}`, or null.
+ */
+export function sanitizeShopBuyReply(msg) {
+  if (!msg || typeof msg !== 'object' || msg.type !== SHOP_ROOM_MESSAGE || msg.action !== 'reply') return null;
+  if (!ID_RE.test(String(msg.requestId || '')) || typeof msg.toUserId !== 'string') return null;
+  const status = Number(msg.status);
+  if (!Number.isInteger(status) || status < 200 || status > 599) return null;
+  if (!msg.body || typeof msg.body !== 'object' || Array.isArray(msg.body)) return null;
+  if (JSON.stringify(msg.body).length > MAX_REPLY_CHARS) return null;
+  const out = { requestId: msg.requestId, toUserId: msg.toUserId, status, body: msg.body };
+  if (msg.goods !== undefined) {
+    if (!Array.isArray(msg.goods) || msg.goods.length > MAX_GOODS) return null;
+    out.goods = msg.goods.filter((g) => g && typeof g === 'object' && !Array.isArray(g));
+  }
+  return out;
+}
+
+/**
+ * The GM's chat line for one sale: who bought what, where, and what it cost.
+ * Plain text; the caller escapes it.
+ */
+export function describeSale({ who, character, shop, items, goods, result }) {
+  const names = new Map((goods || []).map((g) => [String(g.id), g.targetEntityName || g.metadata?.custom_name || 'item']));
+  const list = (items || []).map((it) => `${it.quantity}× ${names.get(String(it.relationId)) || 'item'}`).join(', ');
+  const cost = result?.spent != null ? ` for ${result.spent} ${result.currency || ''}`.trimEnd() : '';
+  const left = result?.moneyLeft != null ? ` ${character} has ${result.moneyLeft} ${result.currency || ''}`.trimEnd() + ' left.' : '';
+  const by = who && who !== character ? ` (${who})` : '';
+  return `${character}${by} bought ${list || 'goods'} at ${shop}${cost}.${left}`;
 }

@@ -5,7 +5,14 @@
       "OpenShop": "Open Chronicle Shop",
       "ShowToPlayers": "Show to players",
       "StopShowing": "Stop showing",
-      "LoadFailed": "Couldn't load this shop's room from Chronicle."
+      "LoadFailed": "Couldn't load this shop's room from Chronicle.",
+      "BuyFailed": "That didn't go through. Try again.",
+      "NoGM": "Buying needs the GM in the game.",
+      "GMNoAnswer": "The GM's game didn't answer. Try again.",
+      "NotShown": "The GM isn't showing this shop any more.",
+      "NotMatched": "Your Foundry user isn't matched to a Chronicle member yet. Ask the GM to match it in Chronicle Sync.",
+      "NoSender": "Foundry didn't say who sent this, so nothing was bought.",
+      "SomeCharacter": "A character"
     },
     "Settings": {
       "ApiUrl": {
