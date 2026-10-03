@@ -1348,19 +1348,10 @@ Re-verify by: 2026-11-03 (Chronicle `internal/websocket/.ai.md`, `internal/plugi
 
 ### What the module does with `note.*`
 
-`note.created`/`note.updated` carry no content — `scripts/note-sync.mjs`
-fetches the note by id (`GET /notes/:noteId`, Bearer auth, same shape as an
-item in `GET /notes`) and applies it exactly like a note from the initial
-sync. A message that still carries the full note (an older Chronicle) is
-applied directly, unchanged from before. A 404 or 403 on that fetch means
-the note is gone or no longer visible to this key: the module deletes its
-local copy — the same outcome `note.deleted` produces — and never logs the
-note's title. The message-shape and fetch-outcome decisions live in
-`scripts/_note-event.mjs` (`tools/test-note-event.mjs`).
-
-**Re-verify by: when keyxmakerx/Chronicle#787 merges and deploys.** The
-module's dual-shape handling holds either way; the ids-only wire shape it
-targets is unmerged as of 2026-09-27.
+Nothing. The player notebook shows Chronicle's own Journal and Jot pages in
+frames, so notes never become Foundry journals and no sync module reads
+`note.*`. The old "Chronicle Notes" folder from the retired note sync is set
+aside on the GM's world load (`scripts/_notes-folder.mjs`).
 
 ### What the module does with each `calendar.*` type
 

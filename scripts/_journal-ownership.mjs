@@ -2,8 +2,8 @@
  * Which sync domain owns a Foundry JournalEntry. The create hook pushes a
  * journal to Chronicle as a page only when no other domain claims it:
  * MapSync materializes maps as journals (image page flagged `mapId`, in the
- * flagged "Chronicle Maps" folder) and NoteSync owns Chronicle Notes; pushing
- * either as a page is wrong and surfaces as a failed-push error.
+ * flagged "Chronicle Maps" folder), and the old Chronicle Notes folder is set
+ * aside (`_notes-folder.mjs`); pushing either as a page is wrong and surfaces as a failed-push error.
  *
  * Pure — flags are read through each document's own `getFlag`.
  * See tools/test-journal-ownership.mjs.

@@ -14,7 +14,6 @@ import { ShopWidget } from './shop-widget.mjs';
 import { CalendarSync } from './calendar-sync.mjs';
 import { ActorSync } from './actor-sync.mjs';
 import { ItemSync } from './item-sync.mjs';
-import { NoteSync } from './note-sync.mjs';
 import { StashSync } from './stash-sync.mjs';
 import { registerStashSocket } from './stash-client.mjs';
 import { registerStashChat } from './stash-chat.mjs';
@@ -29,6 +28,9 @@ import { openSyncCalendar } from './sync-calendar.mjs';
 import { registerShopRoomSocket } from './shop-room-window.mjs';
 import { notebookAvailable, openNotebook, registerPlayerNotebook } from './player-notebook.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
+import { retireNotesFolder } from './_notes-folder.mjs';
+import { FLAG_SCOPE, SYNC_OPTIONS } from './constants.mjs';
+import { removedFolder } from './_set-aside.mjs';
 
 /** @type {SyncManager|null} */
 let syncManager = null;
@@ -115,7 +117,6 @@ Hooks.once('ready', async () => {
   syncManager.registerModule(new CalendarSync());
   syncManager.registerModule(new ActorSync());
   syncManager.registerModule(new ItemSync());
-  syncManager.registerModule(new NoteSync());
   syncManager.registerModule(new StashSync());
 
   // Create UI first so it's always available, even if start() fails.
@@ -157,6 +158,16 @@ Hooks.once('ready', async () => {
       await migrateApiKeyToClientScope();
     } catch (err) {
       console.error('Chronicle Sync | API key scope migration failed', err);
+    }
+    // The player notebook replaced the old note sync; set its folder aside
+    // before sync starts. Idempotent, so it runs on every load.
+    try {
+      await retireNotesFolder({
+        game, scope: FLAG_SCOPE, removedFolder,
+        maxDepth: CONST.FOLDER_MAX_DEPTH, options: SYNC_OPTIONS,
+      });
+    } catch (err) {
+      console.warn('Chronicle Sync | Setting the old notes folder aside failed', err);
     }
   }
 

@@ -76,10 +76,6 @@
         "Name": "Skip incoming HTML sanitization (advanced)",
         "Hint": "Disable Foundry-side HTML sanitization of Chronicle content at ingress. Chronicle already sanitizes server-side; Foundry sanitizes at render. This is a defense-in-depth middle layer. Turn ON only if you find legitimate inline styling from Chronicle is being stripped."
       },
-      "SyncNotes": {
-        "Name": "Sync Notes",
-        "Hint": "Sync Chronicle campaign notes with Foundry journal entries"
-      },
       "UpdateInfo": {
         "Name": "Update Source",
         "Hint": "Show the install-time manifest URL Foundry uses for updates and run a manual check against Chronicle.",
@@ -122,7 +118,6 @@
         "Entities": "Entities",
         "Shops": "Shops",
         "Maps": "Maps",
-        "Notes": "Notes",
         "Characters": "Characters",
         "Members": "Members",
         "Calendar": "Calendar",
@@ -212,17 +207,6 @@
         "WorldStateTitle": "Chronicle world state",
         "WorldStateHint": "Latest weather, season, era and moon phases received from Chronicle this session. Display only — the Foundry calendar is never modified from these.",
         "WorldStateEmpty": "No world-state broadcasts received yet this session."
-      },
-      "Notes": {
-        "Synced": "Synced",
-        "ChronicleOnly": "Chronicle Only",
-        "Pull": "Pull",
-        "Shared": "Shared",
-        "Private": "Private",
-        "NoNotes": "No Chronicle notes found.",
-        "NoNotesHint": "Notes created in Chronicle will appear here when note sync is enabled.",
-        "Disabled": "Note sync is disabled.",
-        "DisabledHint": "Enable \"Sync Notes\" in Module Settings."
       },
       "Characters": {
         "Synced": "Synced",
