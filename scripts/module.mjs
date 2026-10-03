@@ -20,6 +20,7 @@ import { registerStashChat } from './stash-chat.mjs';
 import { registerStashButton } from './stash-window.mjs';
 import { SyncDashboard } from './sync-dashboard.mjs';
 import { MapViewerSheet } from './map-viewer.mjs';
+import { openDMScreen } from './dm-screen.mjs';
 import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs';
 import { registerNpcPresence, npcSpotlightRelay } from './npc-presence.mjs';
 import { registerMapSheetItems } from './map-sheet-items.mjs';
@@ -276,7 +277,7 @@ async function _runtimeValidateDescriptor() {
 
 /**
  * Add the Chronicle group to Foundry's scene controls toolbar: the Sync
- * Dashboard and Sync Calendar for GMs, the Notebook for everyone once the
+ * Dashboard, Sync Calendar and DM Screen for GMs, the Notebook for everyone once the
  * world is connected to Chronicle.
  */
 Hooks.on('getSceneControlButtons', (controls) => {
@@ -288,10 +289,12 @@ Hooks.on('getSceneControlButtons', (controls) => {
     run: {
       dashboard: openDashboard,
       syncCalendar: () => { openSyncCalendar(); },
+      dmScreen: () => { openDMScreen(() => syncManager?.api ?? null); },
       notebook: () => { openNotebook(); },
     },
     titles: {
       syncCalendar: game.i18n.localize('CHRONICLE.SceneControl.SyncCalendar'),
+      dmScreen: game.i18n.localize('CHRONICLE.SceneControl.DMScreen'),
       notebook: game.i18n.localize('CHRONICLE.SceneControl.Notebook'),
     },
   });

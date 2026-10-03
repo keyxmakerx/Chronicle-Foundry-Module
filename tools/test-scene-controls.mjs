@@ -4,8 +4,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { addChronicleControls } from '../scripts/_scene-controls.mjs';
 
-const run = { dashboard() {}, syncCalendar() {}, notebook() {} };
-const titles = { syncCalendar: 'Open Sync Calendar', notebook: 'Open my Chronicle notebook' };
+const run = { dashboard() {}, syncCalendar() {}, dmScreen() {}, notebook() {} };
+const titles = { syncCalendar: 'Open Sync Calendar', dmScreen: 'Open the DM Screen', notebook: 'Open my Chronicle notebook' };
 
 function names(controls) {
   if (Array.isArray(controls)) {
@@ -17,8 +17,8 @@ function names(controls) {
 }
 
 const CASES = [
-  ['GM, connected', { isGM: true, notebook: true }, ['dashboard', 'sync-calendar', 'notebook']],
-  ['GM, not connected', { isGM: true, notebook: false }, ['dashboard', 'sync-calendar']],
+  ['GM, connected', { isGM: true, notebook: true }, ['dashboard', 'sync-calendar', 'dm-screen', 'notebook']],
+  ['GM, not connected', { isGM: true, notebook: false }, ['dashboard', 'sync-calendar', 'dm-screen']],
   ['player, connected', { isGM: false, notebook: true }, ['notebook']],
   ['player, not connected', { isGM: false, notebook: false }, null],
 ];
@@ -48,5 +48,7 @@ test('v12 tools use onClick; v13 tools use onChange and name an activeTool', () 
   assert.equal(g.tools['sync-calendar'].onChange, run.syncCalendar);
   assert.equal(g.tools['sync-calendar'].icon, 'fa-solid fa-calendar-days');
   assert.equal(g.tools.notebook.title, titles.notebook);
+  assert.equal(g.tools['dm-screen'].onChange, run.dmScreen);
+  assert.equal(g.tools['dm-screen'].title, titles.dmScreen);
   assert.ok(!('run' in g.tools.notebook));
 });

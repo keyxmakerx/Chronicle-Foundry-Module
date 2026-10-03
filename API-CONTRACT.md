@@ -1021,6 +1021,50 @@ Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/shop_api_handler.g
 
 ---
 
+### DM Screen
+
+The GM's DM Screen window (`dm-screen.mjs`, parsed by `_dm-screen-view.mjs`).
+The body is Chronicle's `dmscreen.View`, the same data its own panel draws.
+A Chronicle without these routes answers 404; the window then says to update
+Chronicle. Players are refused (403) and the downtime switch is owner-only;
+the GM's sync key counts as the owner.
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/dm_screen_api.go`, `internal/plugins/dmscreen/model.go`; added in Chronicle PR #1021)
+
+#### GET /dm-screen
+Used by: `dm-screen.mjs`. Scope: read.
+
+**Response:** sections Chronicle can't fill are left out (`downtime`, `world`, `night`) or empty.
+```json
+{
+  "campaign_id": "uuid",
+  "downtime": { "open": false, "can_toggle": true, "pending": 2 },
+  "world": { "calendar_id": "uuid", "date_label": "3 Frostfall 1204", "time_label": "14:00", "weather": "Light snow" },
+  "night": { "name": "Session 12", "when": "Fri 3 Oct, 7pm", "going": 3, "maybe": 1, "cant": 0, "no_answer": 2 },
+  "foundry": { "connected": true, "never_seen": false, "last_seen": "2026-10-03T15:00:00Z" },
+  "system_name": "Draw Steel",
+  "party_filled": true,
+  "party": [
+    { "id": "uuid", "name": "Vex", "player_name": "Sam", "subtitle": "Shadow", "conditions": ["Bleeding"],
+      "meters": [ { "label": "Stamina", "current": "12", "max": "30", "has_max": true, "percent": 40, "low": true } ] }
+  ],
+  "hidden": [ { "id": "uuid", "name": "The Baron", "type_name": "Character", "revealed": false } ],
+  "conditions": [ { "name": "Bleeding", "text": "Plain rule text." } ]
+}
+```
+
+#### POST /dm-screen/reveal/:entityId
+Used by: `dm-screen.mjs`. Scope: write. Body `{}`. Makes one hidden character visible to players.
+
+**Response:** `{ "id": "uuid", "name": "The Baron", "revealed": true }`
+
+#### POST /dm-screen/downtime
+Used by: `dm-screen.mjs`. Scope: write. Body `{ "open": true }` or `{ "open": false }`; a missing `open` is a 400.
+404 when the campaign has no Armory.
+
+**Response:** `{ "open": true, "applied": 2, "failed": 0 }` (waiting requests that went through or failed on opening)
+
+---
+
 ## Chronicle-served Module Distribution
 
 The install/update contract: the URLs Foundry hits to fetch the module's
