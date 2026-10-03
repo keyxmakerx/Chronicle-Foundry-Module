@@ -28,7 +28,12 @@ import { getSetting } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
 import {
+  PLAYER_IMAGE_DIR, parsePlayerImageUrl, playerImageFileName,
+  shadowSignature,
+} from './_map-player-image.mjs';
+import {
   playerSafeMapItems,
+  shadowAreasOf,
   isTokenSafeForPlayerFlags,
 } from './_map-flag-filter.mjs';
 
@@ -168,6 +173,16 @@ export class MapSync {
 
     /** Pending debounced viewer-notify timers, keyed by mapId. */
     this._notifyTimers = new Map();
+
+    /**
+     * GM-only original picture of each shadowed map. The page carries the
+     * player copy; the GM's own viewer shows the original from here.
+     * @type {Map<string, {imageId: string|null, url: string}>}
+     */
+    this._gmImages = new Map();
+
+    /** Last seen shadow signature per map, to notice a shadow edit. */
+    this._shadowSigs = new Map();
   }
 
   // ---------------------------------------------------------------------------
@@ -516,13 +531,17 @@ export class MapSync {
       return { meta, markers, drawings, tokens, layers, fog: null };
     }
 
+    // The GM's own view of a shadowed map shows the original picture.
+    const original = this._gmImages.get(mapId);
+    const gmMeta = (m) => (original && m ? { ...m, image_url: original.url } : m);
+
     const cached = this._cache.get(mapId);
     if (!cached) {
-      return { meta, markers, drawings, tokens, layers, fog: null };
+      return { meta: gmMeta(meta), markers, drawings, tokens, layers, fog: null };
     }
 
     return {
-      meta: cached.meta || meta,
+      meta: gmMeta(cached.meta || meta),
       markers: this._mergeById(markers, cached.markers || []),
       drawings: this._mergeById(drawings, cached.drawings || []),
       tokens: cached.tokens || tokens,
@@ -567,10 +586,20 @@ export class MapSync {
   async _refreshMapImage(mapId) {
     if (!game.user.isGM || !this._api || !mapId) return;
 
+    // A shadowed map's original is refreshed in GM memory only; the page
+    // keeps the stored player copy.
+    const original = this._gmImages.get(mapId);
+    if (original?.imageId) {
+      const fresh = await this._resolveMediaUrl(original.imageId, { forceFresh: true });
+      if (fresh) this._gmImages.set(mapId, { ...original, url: fresh });
+      return;
+    }
+
     const page = this.findPageByMapId(mapId);
     if (!page) return;
 
     const meta = page.getFlag(FLAG_SCOPE, 'chronicleMapMeta') || null;
+    if (meta?.player_image) return;
     const mediaId = meta?.image_id;
     if (!mediaId) return;
 
@@ -585,6 +614,123 @@ export class MapSync {
     if (Object.keys(updates).length > 0) {
       await page.update(updates);
     }
+  }
+
+  /**
+   * Fetch a shadowed map's player copy with the GM key and store it in
+   * Foundry, so the page can point at a file that holds no shadowed detail.
+   * Already-stored versions are reused.
+   * @param {object} mapData map row carrying `player_image_url`
+   * @param {JournalEntryPage|null} page
+   * @returns {Promise<string>} the stored file's path, or '' on failure.
+   * @private
+   */
+  async _storePlayerImage(mapData, page) {
+    const fail = (message, error) => {
+      this._logError({ kind: 'player_image', mapId: mapData.id, message, error });
+      this._toastOnce(
+        `player_image:${mapData.id}`,
+        'warn',
+        `Chronicle: could not fetch the player picture for map "${mapData.name || mapData.id}". Players see no picture until the next sync brings it.`
+      );
+      return '';
+    };
+
+    const parsed = parsePlayerImageUrl(mapData.player_image_url, getSetting('campaignId'), mapData.id);
+    const fileName = parsed && playerImageFileName(mapData.id, parsed.version);
+    if (!fileName) return fail(`Map "${mapData.name || mapData.id}" has an unusable player picture address.`);
+
+    const target = `${PLAYER_IMAGE_DIR}/${fileName}`;
+    if (typeof page?.src === 'string' && page.src.split('?')[0].endsWith(target)) return page.src;
+
+    try {
+      const blob = await this._api.getBlob(parsed.path);
+      const FP = foundry.applications?.apps?.FilePicker?.implementation ?? globalThis.FilePicker;
+      for (const dir of ['chronicle-sync', PLAYER_IMAGE_DIR]) {
+        // Browse first so an existing folder raises no error toast; the
+        // upload below reports a real failure.
+        const exists = await FP.browse('data', dir).then(() => true, () => false);
+        if (!exists) await FP.createDirectory('data', dir, {}).catch(() => {});
+      }
+      const file = new File([blob], fileName, { type: 'image/jpeg' });
+      const result = await FP.upload('data', PLAYER_IMAGE_DIR, file, {}, { notify: false });
+      const path = result?.path;
+      if (typeof path !== 'string' || !path) return fail(`Storing the player picture for map ${mapData.id} returned no path.`);
+      return path;
+    } catch (err) {
+      return fail(`Fetching the player picture for map ${mapData.id} failed: ${err.message || err}`, err);
+    }
+  }
+
+  /**
+   * Re-read one map row and re-materialize it, so the page follows a new
+   * player copy after a shadow edit.
+   * @param {string} mapId
+   * @private
+   */
+  async _refreshMapRow(mapId) {
+    if (!this._api || !mapId) return;
+    const resp = await this._api.get(`/maps/${mapId}`);
+    const mapData = resp?.data || resp;
+    if (mapData?.id !== mapId) throw new Error(`GET /maps/${mapId} returned no map`);
+    await this._materializeMap(mapData);
+  }
+
+  /**
+   * Record a map's shadows from a fresh drawing list; when they changed
+   * since last seen, the player copy has a new version to fetch.
+   * @param {string} mapId
+   * @param {object[]} drawings
+   * @private
+   */
+  async _noteShadows(mapId, drawings) {
+    const sig = shadowSignature(shadowAreasOf(drawings));
+    const prev = this._shadowSigs.get(mapId);
+    if (prev === sig) return;
+    // First sight with no shadows and no stored copy: the page is current.
+    if (prev === undefined && !sig && !this._gmImages.has(mapId)) {
+      this._shadowSigs.set(mapId, sig);
+      return;
+    }
+    // Take the picture off the page before the slow fetch, unless it is a
+    // copy that may already be current (first sight after a reload).
+    const meta = this.findPageByMapId(mapId)?.getFlag(FLAG_SCOPE, 'chronicleMapMeta');
+    if (sig && !(prev === undefined && meta?.player_image)) await this._blankPageImage(mapId);
+    // Recorded before the re-read, which reads it; put back on failure so
+    // the next poll retries.
+    this._shadowSigs.set(mapId, sig);
+    try {
+      await this._refreshMapRow(mapId);
+    } catch (err) {
+      if (prev === undefined) this._shadowSigs.delete(mapId);
+      else this._shadowSigs.set(mapId, prev);
+      this._logError({
+        kind: 'player_image',
+        mapId,
+        message: `Re-reading map ${mapId} after a shadow change failed: ${err.message || err}`,
+        error: err,
+      });
+    }
+  }
+
+  /**
+   * Remove a map's picture from the page players read, keeping the
+   * original only in GM memory.
+   * @param {string} mapId
+   * @private
+   */
+  async _blankPageImage(mapId) {
+    const page = this.findPageByMapId(mapId);
+    if (!page) return;
+    const meta = page.getFlag(FLAG_SCOPE, 'chronicleMapMeta') || {};
+    if (!this._gmImages.has(mapId) && !meta.player_image && meta.image_url) {
+      this._gmImages.set(mapId, { imageId: meta.image_id || null, url: meta.image_url });
+    }
+    if (page.src === '' && meta.player_image && !meta.image_url) return;
+    await page.update({
+      src: '',
+      [`flags.${FLAG_SCOPE}.chronicleMapMeta`]: { ...meta, image_url: '', image_id: null, player_image: true },
+    });
   }
 
   /** Notify MapSync that a viewer closed. Stops polling when last viewer closes. */
@@ -779,9 +925,26 @@ export class MapSync {
       imageSrc = await this._resolveMediaUrl(mapData.image_id);
     }
 
-    const meta = this._buildMapMeta(mapData, imageSrc);
+    let page = this.findPageByMapId(mapData.id);
 
-    if (!imageSrc) {
+    // A map with a shadow: the page gets only the stored player copy, and
+    // the original stays in GM memory. The copy failing to arrive leaves the
+    // previous stored copy, or no picture, never the original.
+    // Shadows this client has seen but the row doesn't account for count as
+    // shadowed with no copy yet (shadows only exist on servers that send it).
+    let shadowed = false;
+    const knownShadows = !!this._shadowSigs.get(mapData.id);
+    if (mapData.player_image_url || knownShadows) {
+      shadowed = true;
+      if (imageSrc) this._gmImages.set(mapData.id, { imageId: mapData.image_id || null, url: imageSrc });
+      imageSrc = mapData.player_image_url ? await this._storePlayerImage(mapData, page) : '';
+    } else {
+      this._gmImages.delete(mapData.id);
+    }
+
+    const meta = this._buildMapMeta(mapData, imageSrc, { shadowed });
+
+    if (!imageSrc && !shadowed) {
       const reason = mapData.image_id
         ? `media id ${mapData.image_id} did not resolve via /media/:id`
         : (mapData.image_url || mapData.image_path || mapData.image)
@@ -798,8 +961,6 @@ export class MapSync {
         `Chronicle: map "${mapData.name || mapData.id}" has no image — check apiUrl setting and that the map has an uploaded image in Chronicle.`
       );
     }
-
-    let page = this.findPageByMapId(mapData.id);
 
     if (!page) {
       const entry = await JournalEntry.create({
@@ -828,7 +989,7 @@ export class MapSync {
       const updates = {
         [`flags.${FLAG_SCOPE}.chronicleMapMeta`]: meta,
       };
-      if (imageSrc && page.src !== imageSrc) updates.src = imageSrc;
+      if ((imageSrc || shadowed) && page.src !== imageSrc) updates.src = imageSrc;
       if (page.name !== mapData.name && mapData.name) updates.name = mapData.name;
       // Backfill the sheet-class flag on older pages that predate it. Only
       // set it when missing so a user who explicitly switched to a
@@ -878,17 +1039,21 @@ export class MapSync {
    * Build the `chronicleMapMeta` page flag from a Chronicle map row.
    * `imageSrc` is the resolved URL (already through `_resolveMediaUrl` on
    * GM); persisting it on the flag means players never need to re-resolve.
+   * A shadowed map's meta carries no media id, so nothing re-resolves the
+   * original into the flags players read.
    * @param {object} mapData
    * @param {string} [imageSrc]
+   * @param {{shadowed?: boolean}} [opts]
    * @returns {object}
    * @private
    */
-  _buildMapMeta(mapData, imageSrc = '') {
+  _buildMapMeta(mapData, imageSrc = '', { shadowed = false } = {}) {
     return {
       id: mapData.id,
       name: mapData.name || '',
       description: mapData.description || '',
-      image_id: mapData.image_id || null,
+      image_id: shadowed ? null : (mapData.image_id || null),
+      player_image: shadowed,
       // imageSrc is already the host-validated, fully-resolved URL from
       // `_mapImageSrc` / `_resolveMediaUrl`. Never fall back to the raw
       // `mapData.image_url`/`image_path` here — that would bypass the
@@ -966,6 +1131,7 @@ export class MapSync {
     await this._refreshPageFlags(mapId, {
       markers, drawings, tokens, layers, drawingsKnown: drawingsR != null,
     });
+    if (drawingsR != null) await this._noteShadows(mapId, drawings);
   }
 
   /**
@@ -1102,6 +1268,7 @@ export class MapSync {
       tokens: updates.tokens || [],
       layers: updates.layers || [],
     });
+    if (drawingsResp != null) await this._noteShadows(mapId, updates.drawings || []);
 
     this._notifyViewers(mapId);
   }
@@ -1114,13 +1281,37 @@ export class MapSync {
   async _onMapCreated(mapData) {
     if (!mapData?.id) return;
     await this._ensureMapsFolder();
-    await this._materializeMap(mapData);
+    const row = await this._withPlayerImageField(mapData);
+    if (row) await this._materializeMap(row);
+  }
+
+  /**
+   * Event payloads may not carry `player_image_url`; trusting that absence
+   * would point players at the original of a shadowed map. Re-read the row
+   * from the sync API, which sets it whenever the map has a shadow.
+   * @param {object} mapData
+   * @returns {Promise<object|null>} null when the re-read failed: the event
+   *   is skipped, and the next full sync applies it.
+   * @private
+   */
+  async _withPlayerImageField(mapData) {
+    if (mapData.player_image_url || !this._api) return mapData;
+    try {
+      const resp = await this._api.get(`/maps/${mapData.id}`);
+      const row = resp?.data || resp;
+      if (row?.id === mapData.id) return row;
+    } catch (err) {
+      console.warn(`Chronicle: re-reading map ${mapData.id} failed`, err);
+    }
+    return null;
   }
 
   /** Update map metadata + image on the materialized JournalEntry. */
   async _onMapUpdated(mapData) {
     if (!mapData?.id) return;
-    await this._materializeMap(mapData);
+    const row = await this._withPlayerImageField(mapData);
+    if (!row) return;
+    await this._materializeMap(row);
 
     // Pull the freshly-written meta (with resolved image URL) from the page
     // and mirror it into the cache so GM render reuses it.

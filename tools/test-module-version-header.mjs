@@ -38,13 +38,13 @@ test('api-client REST fetches attach the header before caller headers', () => {
   const src = read('scripts/api-client.mjs');
   assert.match(src, /moduleVersionHeaders,?\s[\s\S]*?\} from '\.\/_module-version\.mjs'/);
   const uses = src.match(/\.\.\.moduleVersionHeaders\(\)/g) || [];
-  assert.equal(uses.length, 2, 'fetch() and uploadMedia() both send it');
+  assert.equal(uses.length, 3, 'fetch(), getBlob() and uploadMedia() all send it');
   const f = src.indexOf("'Content-Type': 'application/json',");
   const callers = src.indexOf('...options.headers', f);
   const own = src.indexOf('...moduleVersionHeaders()', f);
   assert.ok(own > -1 && own < callers, 'caller headers still win');
-  // Two REST paths, each with its one header-less retry.
-  assert.equal((src.match(/await fetch\(/g) || []).length, 4, 'no new un-covered raw fetch');
+  // Three REST paths, each with its one header-less retry.
+  assert.equal((src.match(/await fetch\(/g) || []).length, 6, 'no new un-covered raw fetch');
 });
 
 // The dashboard's raw connection probes send no version header: they have no
@@ -97,8 +97,8 @@ test('older server: header stops after a refusal', () => {
   }
 });
 
-test('api-client retries without the header on both fetch paths', () => {
+test('api-client retries without the header on every fetch path', () => {
   const src = read('scripts/api-client.mjs');
   const n = (src.match(/shouldRetryWithoutVersionHeader\(err, headers\)/g) || []).length;
-  assert.equal(n, 2, 'fetch() and uploadMedia() both fall back');
+  assert.equal(n, 3, 'fetch(), getBlob() and uploadMedia() all fall back');
 });

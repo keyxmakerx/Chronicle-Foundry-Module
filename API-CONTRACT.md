@@ -629,6 +629,19 @@ Lists all maps in the campaign.
 > fog and layer endpoints below are read-only for that overlay; only markers
 > are editable and pushed back.
 
+`player_image_url` is set on every map row (list and single) whose map has a
+picture and at least one shadow area, whatever the key's role:
+`/api/v1/campaigns/:id/maps/:mapId/player-image?v=<version>`. That route
+returns the picture as JPEG with the shadowed areas smudged in; the version
+changes whenever the picture or a shadow does. The owner's key still gets the
+original in `image_id`/`image_url`, so the module fetches the player copy,
+stores it in Foundry, and points the page every player reads at that file
+only (`scripts/_map-player-image.mjs`). A missing field means no shadows
+(also what an older Chronicle sends). `drawing_type` also includes `shadow`
+(exactly two corner points).
+
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/map_api_handler.go` `PlayerImage`, `playerImageAPIURL`)
+
 #### GET /maps/:mapId/drawings
 All coordinates are percentage-based (0–100), not pixels. `drawing_type` is
 one of `freehand`, `rectangle`, `ellipse`, `polygon`, `text`.
