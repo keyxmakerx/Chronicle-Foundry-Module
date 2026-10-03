@@ -15,7 +15,7 @@ Bidirectional real-time sync between [Chronicle](https://github.com/keyxmakerx/C
 - **Calendar Sync** — Calendaria and Simple Calendar integration
 - **Character Sync** — Actor ↔ character entity with system-aware field mapping (D&D 5e, Pathfinder 2e, or any system with annotated fields)
 - **Shop Widget** — Browse and purchase from Chronicle shop entities in Foundry
-- **Sync Dashboard** — management UI with diagnostics, error logs, and health metrics
+- **Sync Dashboard** — management UI with diagnostics, error logs, health metrics and a History tab: Chronicle's sync history, both directions, the same list the owner sees in Chronicle
 - **Permission Mapping** — Chronicle visibility ↔ Foundry ownership levels
 
 ## Compatibility
