@@ -165,16 +165,20 @@ GM notice. See API-CONTRACT.md.
 
 ## Shop Widget
 
-- [ ] Right-click a JournalEntry linked to a Shop entity in the Journal sidebar -> "Open Chronicle Shop" option appears (not on non-shop journals)
-- [ ] Dashboard Shops tab -> each shop row has an **Open** button that opens the same window
-- [ ] Shop window opens with correct shop name
-- [ ] Inventory loads from relations API (items with price/quantity metadata)
-- [ ] Items show name, price, quantity
-- [ ] Out-of-stock items visually distinct
-- [ ] Drag item from shop -> Drop on character sheet -> Foundry Item created
-- [ ] Real-time refresh: update shop entity in Chronicle -> Shop window updates
-- [ ] Multiple shop windows can be open simultaneously
-- [ ] Closing shop window cleans up properly
+- [ ] Right-click JournalEntry linked to Shop entity -> "Open Chronicle Shop" option appears
+- [ ] Dashboard Shops tab -> each shop row has an **Open** button that opens the same shop room
+- [ ] Shop room opens with the shop's name; the room matches the Chronicle shop page (same furniture, keeper picture, wares)
+- [ ] Hovering an item in the room shows its name and price; clicking the keeper shows their lines
+- [ ] Wares list shows price and stock; sold-out goods are faded; hidden or GM-only goods are missing
+- [ ] Drag a row from the wares list -> Drop on character sheet -> Foundry Item created
+- [ ] Real-time refresh: change price or stock in Chronicle -> the open room updates
+- [ ] "Show to players" -> the room opens on each player's screen; players see no "Arrange" or "Show" buttons
+- [ ] "Stop showing" -> the room closes on players' screens
+- [ ] Multiple shop rooms can be open simultaneously; closing one cleans up its tooltip
+- [ ] GM: open the wares, Add an item, pick who pays, Buy -> "Bought … left." in the room; the coins drop on that character's sheet and the item appears in its inventory; a whispered chat line names the character, goods and cost
+- [ ] Player (matched to a Chronicle member, downtime open, shop shown): the basket lists only their own characters; Buy works the same; the GM gets the chat line naming the player
+- [ ] Player while downtime is closed: Buy reads "Buying opens in downtime" and nothing is charged
+- [ ] Player whose Foundry user is not matched: no basket appears; GM stops showing the shop mid-basket -> Buy says the GM isn't showing it any more
 
 ## Initial Sync
 
@@ -240,6 +244,20 @@ that reads each field's `foundry_path` from the matched Chronicle system's manif
 - [ ] Only character-type actors processed (NPCs, vehicles ignored)
 - [ ] Only current user's changes pushed (other users' changes ignored)
 - [ ] Pre-existing actors can be manually pushed via dashboard Push button
+
+## NPC Tokens (Spotlight, Talking)
+
+Needs a GM and a player client on the same scene, and an NPC page synced as a journal.
+
+- [ ] Right-click a token named like an NPC page: the HUD shows a star, a speech icon and a book; the book opens the page
+- [ ] Drag a Chronicle journal onto any token: "linked" notice, no map note placed; the book now opens that page
+- [ ] Dragging a journal onto a hero synced by character sync only warns; the hero keeps its own page
+- [ ] Star on a visible token: both clients glide to it and see the gold ring; the player sees the name only if the page is shown to players or the nameplate shows to everyone
+- [ ] Star on a hidden token: only the GM gets a notice; the player's camera doesn't move
+- [ ] Speech icon: ring breathes and a speech mark shows on both clients; GM chat comes from the NPC with a bubble
+- [ ] Starting a second NPC talking stops the first; two minutes with no lines switches it off; a reload doesn't leave it on
+- [ ] Leave a client idle for a minute, or switch its tab away: the glow slows to still, and comes back on return
+- [ ] Reveal a hidden NPC token whose page is hidden: asked once "Show their Chronicle page?"; Yes shows the page to players in Chronicle, No leaves it hidden
 
 ## Error Recovery
 

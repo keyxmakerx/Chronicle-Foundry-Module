@@ -21,8 +21,11 @@ import { registerStashButton } from './stash-window.mjs';
 import { SyncDashboard } from './sync-dashboard.mjs';
 import { MapViewerSheet } from './map-viewer.mjs';
 import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs';
+import { registerNpcPresence } from './npc-presence.mjs';
+import { registerMapSheetItems } from './map-sheet-items.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { openSyncCalendar } from './sync-calendar.mjs';
+import { registerShopRoomSocket } from './shop-room-window.mjs';
 import { notebookAvailable, openNotebook, registerPlayerNotebook } from './player-notebook.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
 import { retireNotesFolder } from './_notes-folder.mjs';
@@ -121,6 +124,9 @@ Hooks.once('ready', async () => {
   dashboard.bind(syncManager);
   _addStatusIndicator();
   registerCharacterClaimIndicator();
+  // Players open a shop room when the GM shows one (they have no API key);
+  // the active GM answers their buying requests.
+  registerShopRoomSocket();
   try {
     registerStashSocket();
     registerStashChat();
@@ -132,6 +138,16 @@ Hooks.once('ready', async () => {
     registerPlayerNotebook();
   } catch (err) {
     console.warn('Chronicle Sync | Player notebook unavailable', err);
+  }
+  try {
+    registerMapSheetItems();
+  } catch (err) {
+    console.warn('Chronicle Sync | Map items unavailable', err);
+  }
+  try {
+    registerNpcPresence(() => syncManager?.api ?? null);
+  } catch (err) {
+    console.warn('Chronicle Sync | NPC token tools unavailable', err);
   }
 
   // Move a legacy world-scoped API key into this GM's client scope and

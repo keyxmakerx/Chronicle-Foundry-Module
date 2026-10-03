@@ -604,13 +604,13 @@ Pulls all changes since a timestamp.
 Change feed: ids of what changed after a cursor. Owner or co-DM keys only
 (403 otherwise); absent on older Chronicle (404).
 
-**Used by:** `sync-manager.mjs` → initial sync (`_readChangeFeed`), journals first
+**Used by:** `sync-manager.mjs` → initial sync (`_readChangeFeed`): journals, characters and inventories
 
 **Query:** `?since=<seq>&limit=1000` (default 500, max 1000)
 
 **Response:**
 ```json
-{ "changes": [ { "seq": 12, "type": "entity", "resourceId": "uuid", "op": "created" } ], "next": 12, "hasMore": false, "resetRequired": false }
+{ "changes": [ { "seq": 12, "type": "entity", "resourceId": "uuid", "op": "created" } ], "next": 12, "hasMore": false, "resetRequired": false, "types": ["entity", "relation", "..."] }
 ```
 
 - `op` is `created`, `updated` or `deleted`; content is refetched through the
@@ -619,6 +619,12 @@ Change feed: ids of what changed after a cursor. Owner or co-DM keys only
   do a full rescan and resume from `next`.
 - Rows younger than 2 s are held back, so a cursor never passes a change
   still committing; the module reads at least 2.5 s after its socket opened.
+- A `relation` change's `resourceId` is the relation's **source entity**: "this
+  entity's relations changed". Item sync refetches `GET /entities/:id/relations`.
+- `types` lists the resource types the server records (absent on an older
+  Chronicle). The module saves it with the cursor; inventories use the delta
+  only when the cursor was saved while `relation` was recorded, else every
+  linked character is reconciled.
 
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/sync_changes_handler.go`, `sync_change_repository.go`)
 
@@ -649,6 +655,22 @@ only (`scripts/_map-player-image.mjs`). A missing field means no shadows
 (exactly two corner points).
 
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/map_api_handler.go` `PlayerImage`, `playerImageAPIURL`)
+
+Each map row carries `display_settings` (nullable object): the map's own
+look. The module reads `frame.style`/`frame.tint` and `pins.style`
+(`drop|seal|flag|dot`), `pins.size` (`s|m|l`), `pins.labels`
+(`always|hover|never`); absent means "follow the campaign" / the default.
+Resolved by `scripts/_map-look.mjs` `resolveMapLook` into the page meta
+(`chronicleMapMeta.look`) so players never need campaign settings.
+
+#### GET /maps/look
+The campaign map look: `{campaign_frame, frames[], kinds[{id,label,color}],
+icons[{id,label,category}], default_icon}`. `campaign_frame` is one of
+`atlas|arcane|old|modern|futuristic|gilded` and is what a map without its
+own frame wears. Fetched once per full sync; a 404 (older Chronicle) keeps
+the Atlas default. Marker `icon` is a Font Awesome class from `icons`; the
+viewer draws any well-formed `fa-` class and falls back to `default_icon`.
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/map_api_look.go`, keyxmakerx/Chronicle#1017)
 
 #### GET /maps/:mapId/drawings
 All coordinates are percentage-based (0–100), not pixels. `drawing_type` is
@@ -963,6 +985,40 @@ Lists relations for an entity (used for shop inventory).
 }
 ```
 
+#### GET /armory/shops/:entityId/room
+The shop room window's read (`scripts/shop-room-window.mjs`). Needs the armory
+addon. 404 when the shop is missing, not a shop, or hidden from the key.
+
+**Response:**
+```json
+{ "layout": { "...": "saved room, or null to generate one" },
+  "goods": [ { "id": 7, "relationType": "sells", "targetEntityId": "item-uuid",
+               "targetEntityName": "Rope", "metadata": { "price": 1, "currency": "gp", "quantity": 3 } } ] }
+```
+`goods` are the shop's `sells` relations a plain player can see (no `dmOnly`
+rows, no items hidden from players), so the room can be shown to every player.
+
+#### GET /armory/shops/:entityId/buyers?actingUserId=
+#### POST /armory/shops/:entityId/buy
+The shop room's buying calls (`scripts/shop-room-window.mjs`), made by the
+GM's client: for the GM, or for a player as the Chronicle member the player
+is matched to (`actingUserId`, a query parameter on GET and a body field on
+POST). Only an Owner or co-DM key may name someone else (403); the name must
+be a current member (404); the call then has that member's rights only. Needs
+the armory addon.
+
+**Buyers response:** `{"downtimeOpen": true, "canBuyNow": true, "buyers": [{"id": "char-uuid", "name": "Brin", "moneyKey": "gp", "money": 50}]}`
+
+**Buy body:** `{"actingUserId": "member-uuid", "buyerEntityId": "char-uuid", "items": [{"relationId": 7, "quantity": 2}]}`
+(at most 50 lines, quantity 1–99; prices come from the listing, never the body)
+
+**Buy response:** `{"status": "bought", "spent": 6, "currency": "gp", "moneyLeft": 44}`.
+Refusals are `{"message": "..."}`: 400 (empty basket, no coin field, not
+enough coin, mixed currencies), 403 (not their character), 404 (shop or good
+hidden), 409 (a player while downtime is closed).
+
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/shop_api_handler.go`)
+
 ---
 
 ## Chronicle-served Module Distribution
@@ -1247,6 +1303,9 @@ If the token is invalid, the server rejects the upgrade.
 | `note.created` | `{ noteId, entityId }` — ids only; the module fetches the note. An older Chronicle sends the full note object instead | Note created |
 | `note.updated` | `{ noteId, entityId }` — ids only; the module fetches the note. An older Chronicle sends the full note object instead | Note modified |
 | `note.deleted` | `{ noteId, entityId }` (an older Chronicle sends the full note object; only the id is read) | Note deleted |
+| `relation.created` | Full relation row (`id`, `sourceEntityId`, `targetEntityId`, `relationType`, `metadata`, …); `resourceId` is the source entity | Relation row created (one message per direction) |
+| `relation.deleted` | Same | Relation row deleted |
+| `relation.metadata_updated` | Same | Relation metadata changed (quantity, equipped, stash moves) |
 | `calendar.event.created` | Full event object | Calendar event created |
 | `calendar.event.updated` | Full event object | Calendar event modified |
 | `calendar.event.deleted` | `{ id }` | Calendar event deleted |
@@ -1267,6 +1326,16 @@ If the token is invalid, the server rejects the upgrade.
 | `sync.status` | `{ connected: bool }` | Connection state change |
 | `sync.error` | `{ message }` | Synchronization error |
 | `sync.conflict` | Conflict details | Data conflict detected |
+
+`relation.*` messages go to owner and co-DM sockets only (a relation can
+name a private entity). Item sync treats any of them for a linked character
+as "reconcile this character's inventory" (`scripts/_inventory-plan.mjs`),
+so a missed or repeated message cannot leave it wrong. A removed relation
+only unlinks its Foundry item; the module deletes it only when a stash
+move the GM just applied took it off that character. Re-verify by:
+2026-11-03 (Chronicle `internal/widgets/relations/service.go`,
+`internal/app/routes.go` `relationEventPublisherAdapter`; sent since
+keyxmakerx/Chronicle#1025).
 
 ### What the module does with `stash.*` and `downtime.changed`
 
