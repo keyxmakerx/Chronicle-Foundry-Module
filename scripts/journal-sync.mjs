@@ -1017,11 +1017,13 @@ export class JournalSync {
         await this._pushPermissions(entity.id, journal.ownership, isPrivate, journal.name, journal);
 
         console.debug(`Chronicle: Pushed new journal "${journal.name}" to Chronicle`);
+        this._syncManager?.recordUserOutcome?.(userId);
       }
     } catch (err) {
       // Surface push failures to the GM instead of failing silently; the
       // REST error itself is already in the dashboard's error log.
       console.error('Chronicle: Failed to push journal to Chronicle', err);
+      this._syncManager?.recordUserOutcome?.(userId, err);
       ui.notifications?.warn?.(`Chronicle: Failed to push journal "${journal.name}". Check the sync dashboard for details.`);
     } finally {
       this._inFlightCreates.delete(journal.id);
@@ -1149,11 +1151,14 @@ export class JournalSync {
       await this._hidePushedSecrets(journal, result);
 
       console.debug(`Chronicle: Pushed journal update "${journal.name}" to Chronicle`);
+      // The debounce has no hook userId; the hooks only schedule this for the local user's own edits.
+      this._syncManager?.recordUserOutcome?.(game.user.id);
     } catch (err) {
       // Surface the failure and queue the (idempotent) update for retry on
       // reconnect; a stale expected_updated_at surfaces as a conflict on
       // the next pull rather than corrupting data.
       console.error('Chronicle: Failed to push journal update', err);
+      this._syncManager?.recordUserOutcome?.(game.user.id, err);
       const retry = {
         name: journal.name,
         is_private: (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER,

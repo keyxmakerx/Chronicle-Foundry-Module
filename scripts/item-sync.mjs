@@ -336,9 +336,11 @@ export class ItemSync {
       if (relation) {
         await item.update({ [`flags.${FLAG_SCOPE}.relationId`]: relation.id }, { [APPLY_OPTION]: true });
         console.debug(`Chronicle: Pushed new item "${item.name}" from "${actor.name}" to Chronicle`);
+        this._syncManager?.recordUserOutcome?.(userId);
       }
     } catch (err) {
       console.warn(`Chronicle: Failed to push new item "${item.name}" to Chronicle`, err);
+      this._syncManager?.recordUserOutcome?.(userId, err);
     }
   }
 
@@ -365,8 +367,10 @@ export class ItemSync {
       // Chronicle serves a flat relation route: DELETE /relations/:relationId.
       await this._api.delete(`/relations/${relationId}`);
       console.debug(`Chronicle: Removed item relation for "${item.name}" from Chronicle`);
+      this._syncManager?.recordUserOutcome?.(userId);
     } catch (err) {
       console.warn(`Chronicle: Failed to remove item relation for "${item.name}"`, err);
+      this._syncManager?.recordUserOutcome?.(userId, err);
     }
   }
 
@@ -403,8 +407,10 @@ export class ItemSync {
       await this._api.put(`/relations/${relationId}`, {
         metadata: meta,
       });
+      this._syncManager?.recordUserOutcome?.(userId);
     } catch (err) {
       console.warn(`Chronicle: Failed to update item metadata for "${item.name}"`, err);
+      this._syncManager?.recordUserOutcome?.(userId, err);
     }
   }
 
