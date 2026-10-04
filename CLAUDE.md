@@ -13,7 +13,7 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
   `tools/check-package-descriptor.mjs`.
 - `scripts/*.mjs`: sync (`journal-sync`, `map-sync`+`map-viewer`+`map-sheet-items`,
   `calendar-sync`+`sync-calendar`+`sync-calendar-*`, `actor-sync`,
-  `item-sync`, `stash-sync`+`stash-client`), UI (`sync-dashboard`, `npc-presence`,
+  `item-sync`, `stash-sync`+`stash-client`), UI (`sync-dashboard`, `npc-presence`, `negotiation-mirror`,
   `sync-diagnostic-bundle`, `update-info`, `gm-secret-view`, `character-claim-indicator`,
   `capability-inspector`, `import-wizard`, `shop-widget`+`shop-room-window`, `player-notebook`, `stash-window`+`stash-chat`), core (`module`,
   `settings`, `constants`, `logger`, `sync-manager`, `api-client`),

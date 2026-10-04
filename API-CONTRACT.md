@@ -1437,6 +1437,7 @@ If the token is invalid, the server rejects the upgrade.
 | `stash.money_changed` | `{ characterId, moveId }` | A character's money changed (including a sheet edit); the actor is re-pulled |
 | `downtime.changed` | `{ open }` | Downtime was opened or closed; relayed to players' open windows |
 | `npc.spotlight` | none; `resourceId` is the NPC's entity id | "Show in Foundry" pressed on a Chronicle NPC page |
+| `system_state.updated` | `{ systemId, key }`; `resourceId` is the page's entity id; DM-equivalent sockets only | A system widget saved a page's per-system state (Draw Steel negotiation tracker: `systemId` `drawsteel`, `key` `negotiation`) |
 | `sync.status` | `{ connected: bool }` | Connection state change |
 | `sync.error` | `{ message }` | Synchronization error |
 | `sync.conflict` | Conflict details | Data conflict detected |
@@ -1492,6 +1493,29 @@ the same spotlight as the token HUD star. No such token, or a hidden one,
 only tells the GM. `tools/test-npc-presence.mjs`.
 
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/foundry_vtt/npc_spotlight.go`, `internal/app/npc_spotlight_adapters.go`; keyxmakerx/Chronicle#1039)
+
+### What the module does with `system_state.updated`
+
+Sent to DM-equivalent sockets only, with ids and nothing of the state
+itself. The module's allowlist includes the `system_state.` prefix;
+`scripts/negotiation-mirror.mjs` acts on the **active GM client only**, on
+worlds where `game.system.id` is `draw-steel`, and only for `systemId`
+`drawsteel` with `key` `negotiation`. It reads
+
+`GET /entities/:entityId/system-state/:system/:key` →
+`{ "systemId", "key", "public": {...}, "gm": {...}, "isGm": true, "updatedAt" }`
+
+(the `gm` half is present only for an owner-level key; a 404 means an older
+Chronicle or no such page and is ignored quietly) and copies interest and
+patience (clamped 0 to 5), motivations, pitfalls (`higher-authority` becomes
+the system's `authority`; unknown slugs are dropped) and impression (only
+when the tracker has one) onto `system.negotiation` of the NPC actors linked
+to that page (actor flag `npcEntityId`, else a unique NPC name match; heroes
+never). It runs once more when a GM links a page by dropping its journal on a
+token. Nothing is written back: edits on the Foundry sheet don't sync to
+Chronicle yet. `tools/test-negotiation-mirror.mjs`.
+
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/systemstate`, `internal/plugins/syncapi/system_state_api.go`; keyxmakerx/Chronicle#1051)
 
 ### What the module does with `note.*`
 

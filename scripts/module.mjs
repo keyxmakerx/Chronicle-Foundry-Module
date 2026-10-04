@@ -24,6 +24,7 @@ import { MapViewerSheet } from './map-viewer.mjs';
 import { openDMScreen } from './dm-screen.mjs';
 import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs';
 import { registerNpcPresence, npcSpotlightRelay } from './npc-presence.mjs';
+import { negotiationMirror } from './negotiation-mirror.mjs';
 import { registerMapSheetItems } from './map-sheet-items.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { openSyncCalendar } from './sync-calendar.mjs';
@@ -121,6 +122,7 @@ Hooks.once('ready', async () => {
   syncManager.registerModule(new ItemSync());
   syncManager.registerModule(new StashSync());
   syncManager.registerModule(npcSpotlightRelay);
+  syncManager.registerModule(negotiationMirror);
 
   // Create UI first so it's always available, even if start() fails.
   dashboard = new SyncDashboard();
