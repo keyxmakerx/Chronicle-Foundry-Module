@@ -18,6 +18,9 @@ never left Foundry).
   Its `benchAdapter` is the one stand-in: a game system's field mapping
   (Chronicle `fields_data.hp` ↔ Foundry `system.hp`), because a fresh
   Chronicle has no system package installed.
+- `chronicle.mjs` also makes maps (`seed.createMap`), through the owner's
+  web route with the campaign's maps add-on switched on, since the sync API
+  only reads maps.
 - `scenario.mjs` holds what every scenario shares: the wrapper and the
   checks each one ends with (no duplicate pages, journals or actors, no
   character turned into a journal, both sides agree on names, no failed

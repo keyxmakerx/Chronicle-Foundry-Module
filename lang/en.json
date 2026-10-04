@@ -1,6 +1,10 @@
 {
   "CHRONICLE": {
     "ModuleTitle": "Chronicle Sync",
+    "Secrets": {
+      "Placeholder": "GM-only text, kept in Chronicle",
+      "NotSent": "Chronicle: your edit of \"{name}\" wasn't sent, because its GM-only text changed in Chronicle. Pull it from the sync dashboard, then edit again."
+    },
     "ShopRoom": {
       "OpenShop": "Open Chronicle Shop",
       "ShowToPlayers": "Show to players",

@@ -6,9 +6,9 @@
  * `mapId` page flag) inside a "Chronicle Maps" folder; `MapViewerSheet`
  * renders the map with all sub-resources (markers, drawings, tokens, fog,
  * layers) as SVG overlays. Handles Chronicle WebSocket events for `map.*`,
- * `marker.*`, `drawing.*`, `token.*`, `layer.*`, `fog.*` (5s polling
- * fallback for types Chronicle doesn't yet emit — TODO(#90) markers), and
- * provides the marker CRUD helpers MapViewerSheet's edit affordances use.
+ * `marker.*`, `drawing.*`, `token.*`, `layer.*`, `fog.*`, catches up on
+ * connect from the change feed (`_map-feed.mjs`), and provides the marker
+ * CRUD helpers MapViewerSheet's edit affordances use.
  *
  * Visibility gate (restricted data must never reach flags, which sync to
  * players): `dm_only` markers/drawings, markers/drawings whose
@@ -32,6 +32,7 @@ import {
   PLAYER_IMAGE_DIR, parsePlayerImageUrl, playerImageFileName,
   shadowSignature,
 } from './_map-player-image.mjs';
+import { mapsToRefresh } from './_map-feed.mjs';
 import {
   playerSafeMapItems,
   shadowAreasOf,
@@ -50,20 +51,19 @@ const MAPS_FOLDER_NAME = 'Chronicle Maps';
  */
 const MAP_VIEWER_SHEET_CLASS = 'chronicle-sync.MapViewerSheet';
 
-/** Polling interval for sub-resource types Chronicle doesn't yet emit events for. */
-const POLL_INTERVAL_MS = 5000;
-
 /** Maximum entries retained in `_recentErrors` (FIFO). */
 const MAX_RECENT_ERRORS = 50;
 
 /** Debounce window for coalescing WS-driven viewer re-renders. */
 const NOTIFY_DEBOUNCE_MS = 200;
 
-/** Sub-resource types we currently poll. `marker.*` is omitted because
- *  Chronicle's `MapEventPublisher` already emits marker events. */
-// TODO(#90): remove drawing/token/layer/fog from this list once Chronicle
-// ships event emission for those resource types.
-const POLLED_SUBRESOURCES = Object.freeze(['drawings', 'tokens', 'layers', 'fog']);
+/** What a failed sub-resource fetch resolves to, unlike Chronicle's `null` for an empty list. */
+const FETCH_FAILED = Symbol('fetch failed');
+
+/** Page flag holding each kind of map item, for placing a feed entry on its map. */
+const ITEM_FLAGS = Object.freeze({
+  marker: 'chronicleMarkers', drawing: 'chronicleDrawings', token: 'chronicleTokens', layer: 'chronicleLayers',
+});
 
 /**
  * Pin category → Foundry icon and color mapping.
@@ -144,8 +144,8 @@ export class MapSync {
      */
     this._look = null;
 
-    /** Active poll timers keyed by mapId. */
-    this._pollTimers = new Map();
+    /** Pending token-position flag writes keyed by mapId. */
+    this._tokenFlagTimers = new Map();
 
     /** Open-viewer registry: mapId → count of open MapViewerSheets needing data. */
     this._openCounts = new Map();
@@ -364,6 +364,8 @@ export class MapSync {
         case 'token.updated':
         case 'token.deleted':
           await this._onTokenEvent(msg.type, msg.payload); break;
+        case 'token.moved':
+          await this._onTokenMoved(msg.resourceId, msg.payload); break;
 
         case 'layer.created':
         case 'layer.updated':
@@ -390,27 +392,84 @@ export class MapSync {
     }
   }
 
-  /** Stop polling and clear caches on shutdown. */
+  /** Clear timers and caches on shutdown. */
   destroy() {
-    for (const timer of this._pollTimers.values()) clearInterval(timer);
-    this._pollTimers.clear();
+    for (const timer of this._tokenFlagTimers.values()) clearTimeout(timer);
+    this._tokenFlagTimers.clear();
     for (const timer of this._notifyTimers.values()) clearTimeout(timer);
     this._notifyTimers.clear();
     this._cache.clear();
     this._openCounts.clear();
   }
 
+  /** Change-feed area (see SyncManager._performInitialSync). */
+  get feedArea() { return 'maps'; }
+
+  /** Map items are in the feed only on a server that records them. */
+  get feedType() { return 'marker'; }
+
+  /** Maps sync only when enabled. */
+  feedActive() {
+    return !!this._api && !!getSetting('syncMaps');
+  }
+
   /**
    * Initial sync: fetch all Chronicle maps and materialize each as a
    * JournalEntry. Idempotent — re-running matches existing entries by
-   * `mapId` page flag, not by name.
+   * `mapId` page flag, not by name. Chronicle sends no event for a map row
+   * itself, so `/maps` is always read. With the change feed, maps whose
+   * markers, drawings, tokens, layers or fog changed while Foundry was
+   * closed also get their stored items refreshed; a failed refresh throws
+   * so the cursor stays and the next connect replays.
+   * @param {{feed?: {mode: 'delta'|'full', changes?: object[]}}} [opts]
    */
-  async onInitialSync() {
+  async onInitialSync({ feed } = {}) {
     if (!getSetting('syncMaps')) return;
     if (!this._api) return;
 
     this._materializedThisStartup = 0;
-    return this._runMapSync({ verbose: false });
+    const result = await this._runMapSync({ verbose: false });
+    if (feed?.mode !== 'delta') return result;
+
+    const { mapIds, all } = mapsToRefresh(feed.changes, (type, id) => this._mapOfItem(type, id));
+    const targets = all ? this._materializedMapIds() : [...mapIds].filter((id) => this.findPageByMapId(id));
+    let failed = 0;
+    for (const mapId of targets) {
+      const { complete } = await this._refreshSubResources(mapId);
+      if (!complete) failed++;
+      this._notifyViewers(mapId);
+    }
+    if (failed) throw new Error(`map catch-up incomplete for ${failed} map(s)`);
+    return result;
+  }
+
+  /**
+   * The map holding a marker, drawing, token or layer this world knows,
+   * from the GM cache (GM-only items included) or the stored page flags.
+   * @private
+   */
+  _mapOfItem(type, id) {
+    for (const [mapId, c] of this._cache) {
+      if ((c?.[`${type}s`] || []).some((x) => String(x?.id) === id)) return mapId;
+    }
+    const flag = ITEM_FLAGS[type];
+    for (const mapId of this._materializedMapIds()) {
+      const items = this.findPageByMapId(mapId)?.getFlag(FLAG_SCOPE, flag) || [];
+      if (items.some((x) => String(x?.id) === id)) return mapId;
+    }
+    return null;
+  }
+
+  /** Ids of every map with a page in this world. @private */
+  _materializedMapIds() {
+    const ids = new Set();
+    for (const entry of game.journal?.contents || []) {
+      for (const page of entry.pages?.contents || []) {
+        const id = page.getFlag?.(FLAG_SCOPE, 'mapId');
+        if (id) ids.add(id);
+      }
+    }
+    return [...ids];
   }
 
   /**
@@ -562,7 +621,7 @@ export class MapSync {
 
   /**
    * Notify MapSync that a viewer for this map opened. GM-only — triggers
-   * sub-resource fetch and starts polling for non-event types.
+   * a sub-resource fetch; Chronicle's events keep it current after that.
    * @param {string} mapId
    */
   async onViewerOpen(mapId) {
@@ -582,7 +641,6 @@ export class MapSync {
       await this._refreshSubResources(mapId).catch((err) =>
         console.warn(`Chronicle: Sub-resource fetch failed for map ${mapId}`, err)
       );
-      this._startPolling(mapId);
     }
   }
 
@@ -707,7 +765,7 @@ export class MapSync {
     const meta = this.findPageByMapId(mapId)?.getFlag(FLAG_SCOPE, 'chronicleMapMeta');
     if (sig && !(prev === undefined && meta?.player_image)) await this._blankPageImage(mapId);
     // Recorded before the re-read, which reads it; put back on failure so
-    // the next poll retries.
+    // the next drawing refresh retries.
     this._shadowSigs.set(mapId, sig);
     try {
       await this._refreshMapRow(mapId);
@@ -743,13 +801,12 @@ export class MapSync {
     });
   }
 
-  /** Notify MapSync that a viewer closed. Stops polling when last viewer closes. */
+  /** Notify MapSync that a viewer closed. */
   onViewerClose(mapId) {
     if (!mapId) return;
     const count = (this._openCounts.get(mapId) || 0) - 1;
     if (count <= 0) {
       this._openCounts.delete(mapId);
-      this._stopPolling(mapId);
     } else {
       this._openCounts.set(mapId, count);
     }
@@ -1115,7 +1172,8 @@ export class MapSync {
    * @private
    */
   async _refreshSubResources(mapId) {
-    if (!this._api || !mapId) return;
+    if (!this._api || !mapId) return { complete: false };
+    let failures = 0;
 
     // Fetch in parallel. Each `.catch` records to `_recentErrors` so a
     // failing endpoint surfaces in the dashboard instead of silently
@@ -1126,6 +1184,7 @@ export class MapSync {
       .catch((err) => {
         const status = err?.status || null;
         if (status !== 404) {
+          failures++;
           this._logError({
             kind: `subresource:${kind}`,
             mapId,
@@ -1134,7 +1193,7 @@ export class MapSync {
             error: err,
           });
         }
-        return null;
+        return FETCH_FAILED;
       });
 
     const [markersR, drawingsR, tokensR, layersR, fogR] = await Promise.all([
@@ -1145,11 +1204,16 @@ export class MapSync {
       sub('fog'),
     ]);
 
-    const markers = this._coerceArray(markersR);
-    const drawings = this._coerceArray(drawingsR);
-    const tokens = this._coerceArray(tokensR);
-    const layers = this._coerceArray(layersR);
-    const fog = (fogR && !Array.isArray(fogR)) ? fogR : null;
+    // Chronicle answers an empty list as `null`, which is a known (empty)
+    // list; only a failed fetch leaves the drawings, and so the shadows,
+    // unknown.
+    const drawingsKnown = drawingsR !== FETCH_FAILED;
+    const got = (r) => (r === FETCH_FAILED ? null : r);
+    const markers = this._coerceArray(got(markersR));
+    const drawings = this._coerceArray(got(drawingsR));
+    const tokens = this._coerceArray(got(tokensR));
+    const layers = this._coerceArray(got(layersR));
+    const fog = (got(fogR) && !Array.isArray(fogR)) ? fogR : null;
 
     const cached = this._cache.get(mapId) || {};
     this._cache.set(mapId, {
@@ -1159,7 +1223,7 @@ export class MapSync {
       tokens,
       layers,
       fog,
-      drawingsKnown: drawingsR != null,
+      drawingsKnown,
       lastFetched: Date.now(),
     });
 
@@ -1167,9 +1231,10 @@ export class MapSync {
     // drawings in the player copy are left as they were rather than
     // rewritten from data that might sit under a shadow.
     await this._refreshPageFlags(mapId, {
-      markers, drawings, tokens, layers, drawingsKnown: drawingsR != null,
+      markers, drawings, tokens, layers, drawingsKnown,
     });
-    if (drawingsR != null) await this._noteShadows(mapId, drawings);
+    if (drawingsKnown) await this._noteShadows(mapId, drawings);
+    return { complete: failures === 0 };
   }
 
   /**
@@ -1230,85 +1295,6 @@ export class MapSync {
       if (c?.id) byId.set(c.id, c);
     }
     return Array.from(byId.values());
-  }
-
-  // ---------------------------------------------------------------------------
-  // Polling fallback
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Start polling sub-resources for a map. Used while at least one viewer
-   * is open. Markers are NOT polled — Chronicle emits `marker.*` events.
-   * @param {string} mapId
-   * @private
-   */
-  _startPolling(mapId) {
-    if (this._pollTimers.has(mapId)) return;
-
-    // TODO(#90): remove this entire polling path once Chronicle emits
-    // drawing/token/layer/fog events. Markers are already real-time.
-    const timer = setInterval(async () => {
-      try {
-        await this._pollSubResources(mapId);
-      } catch (err) {
-        console.warn(`Chronicle: Poll failed for map ${mapId}`, err);
-      }
-    }, POLL_INTERVAL_MS);
-    this._pollTimers.set(mapId, timer);
-  }
-
-  /** Stop polling a map. */
-  _stopPolling(mapId) {
-    const timer = this._pollTimers.get(mapId);
-    if (timer) {
-      clearInterval(timer);
-      this._pollTimers.delete(mapId);
-    }
-  }
-
-  /**
-   * Poll only the sub-resource types Chronicle doesn't yet emit events for.
-   * @param {string} mapId
-   * @private
-   */
-  async _pollSubResources(mapId) {
-    if (!this._api) return;
-
-    const fetches = await Promise.all(
-      POLLED_SUBRESOURCES.map((kind) =>
-        this._api.get(`/maps/${mapId}/${kind}`).catch(() => null)
-      )
-    );
-
-    const cached = this._cache.get(mapId) || {};
-    const updates = { ...cached };
-
-    fetches.forEach((resp, i) => {
-      const kind = POLLED_SUBRESOURCES[i];
-      if (resp == null) return;
-      if (kind === 'fog') {
-        updates.fog = (resp && !Array.isArray(resp)) ? resp : null;
-      } else {
-        updates[kind] = this._coerceArray(resp);
-      }
-    });
-    // A failed drawing poll keeps the cached list, which only counts if it
-    // came from a successful fetch (see _refreshSubResources).
-    const drawingsResp = fetches[POLLED_SUBRESOURCES.indexOf('drawings')];
-    updates.drawingsKnown = drawingsResp != null || cached.drawingsKnown === true;
-    updates.lastFetched = Date.now();
-    this._cache.set(mapId, updates);
-
-    await this._refreshPageFlags(mapId, {
-      drawingsKnown: updates.drawingsKnown,
-      markers: cached.markers || [],
-      drawings: updates.drawings || [],
-      tokens: updates.tokens || [],
-      layers: updates.layers || [],
-    });
-    if (drawingsResp != null) await this._noteShadows(mapId, updates.drawings || []);
-
-    this._notifyViewers(mapId);
   }
 
   // ---------------------------------------------------------------------------
@@ -1406,7 +1392,6 @@ export class MapSync {
     }
 
     this._cache.delete(mapId);
-    this._stopPolling(mapId);
     this._openCounts.delete(mapId);
   }
 
@@ -1430,6 +1415,39 @@ export class MapSync {
     if (!mapId) return;
     await this._refreshSubResources(mapId);
     this._notifyViewers(mapId);
+  }
+
+  /**
+   * A token drag sends only `{x, y}` keyed by token id, many per drag. The
+   * position is patched into the cached token of whichever map holds it and
+   * the player-safe token flag is rewritten once the drag settles. A token
+   * not in the cache belongs to a map no viewer has loaded since connect;
+   * its stored positions catch up at the next viewer open or connect.
+   * @private
+   */
+  async _onTokenMoved(tokenId, payload) {
+    if (!tokenId || !Number.isFinite(payload?.x) || !Number.isFinite(payload?.y)) return;
+    for (const [mapId, c] of this._cache) {
+      const token = (c?.tokens || []).find((t) => String(t?.id) === String(tokenId));
+      if (!token) continue;
+      token.x = payload.x;
+      token.y = payload.y;
+      this._scheduleTokenFlags(mapId);
+      this._notifyViewers(mapId);
+      return;
+    }
+  }
+
+  /** Debounced write of a map's player-safe tokens from the cache. @private */
+  _scheduleTokenFlags(mapId) {
+    clearTimeout(this._tokenFlagTimers.get(mapId));
+    this._tokenFlagTimers.set(mapId, setTimeout(() => {
+      this._tokenFlagTimers.delete(mapId);
+      const page = this.findPageByMapId(mapId);
+      const tokens = this._cache.get(mapId)?.tokens || [];
+      page?.update({ [`flags.${FLAG_SCOPE}.chronicleTokens`]: tokens.filter(isTokenSafeForPlayerFlags) })
+        .catch((err) => console.warn(`Chronicle: token positions not saved for map ${mapId}`, err));
+    }, NOTIFY_DEBOUNCE_MS));
   }
 
   async _onLayerEvent(_type, payload) {

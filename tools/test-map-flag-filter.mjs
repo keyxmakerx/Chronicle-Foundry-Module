@@ -555,31 +555,23 @@ test('_refreshSubResources: a failed drawing fetch is passed on as unknown', asy
   assert.deepEqual(page.getFlag(FLAG_SCOPE, 'chronicleMarkers').map((m) => m.id), ['mk-open']);
 });
 
-test('_pollSubResources: drawings failing on refresh and again on poll never publish shadowed pins', async () => {
-  const ms = new MapSync();
-  const page = makeFakePage({ markers: [CLEAR_MARKER], drawings: [CLEAR_DRAWING] });
-  ms.findPageByMapId = () => page;
-  ms._logError = () => {};
-  ms._notifyViewers = () => {};
-  ms._api = {
-    get: async (path) => {
-      if (path.endsWith('/drawings')) throw Object.assign(new Error('boom'), { status: 500 });
-      if (path.endsWith('/markers')) return [{ id: 'mk-in', visibility: 'everyone', x: 30, y: 30 }];
-      return [];
-    },
-  };
-
-  await ms._refreshSubResources('map-1');
-  await ms._pollSubResources('map-1');
-  assert.deepEqual(page.getFlag(FLAG_SCOPE, 'chronicleMarkers').map((m) => m.id), ['mk-open']);
-});
-
-test('_pollSubResources: a failed drawing poll after a good fetch keeps applying the cached shadows', async () => {
+test('_refreshSubResources: a map with no drawings (Chronicle answers null) still stores its markers', async () => {
   const ms = new MapSync();
   const page = makeFakePage();
   ms.findPageByMapId = () => page;
   ms._logError = () => {};
-  ms._notifyViewers = () => {};
+  ms._api = {
+    get: async (path) => (path.endsWith('/markers') ? [{ id: 'mk-new', visibility: 'everyone', x: 30, y: 30 }] : null),
+  };
+  assert.deepEqual(await ms._refreshSubResources('map-1'), { complete: true });
+  assert.deepEqual(page.getFlag(FLAG_SCOPE, 'chronicleMarkers').map((m) => m.id), ['mk-new']);
+});
+
+test('_refreshSubResources: a failed drawing fetch after a good one leaves the shadowed flags as they were', async () => {
+  const ms = new MapSync();
+  const page = makeFakePage();
+  ms.findPageByMapId = () => page;
+  ms._logError = () => {};
   let drawingsFail = false;
   ms._api = {
     get: async (path) => {
@@ -592,10 +584,29 @@ test('_pollSubResources: a failed drawing poll after a good fetch keeps applying
     },
   };
 
-  await ms._refreshSubResources('map-1');
+  assert.deepEqual(await ms._refreshSubResources('map-1'), { complete: true });
   drawingsFail = true;
-  await ms._pollSubResources('map-1');
+  assert.deepEqual(await ms._refreshSubResources('map-1'), { complete: false });
   assert.deepEqual(page.getFlag(FLAG_SCOPE, 'chronicleMarkers').map((m) => m.id), ['mk-open']);
+});
+
+test('token.moved: a hidden token\'s new position never reaches the flags', async () => {
+  const ms = new MapSync();
+  const page = makeFakePage();
+  ms.findPageByMapId = () => page;
+  ms._logError = () => {};
+  ms._notifyViewers = () => {};
+  ms._api = {
+    get: async (path) => (path.endsWith('/tokens')
+      ? [{ id: 'tk-open', map_id: 'map-1', x: 1, y: 1, is_hidden: false }, { id: 'tk-hidden', map_id: 'map-1', x: 2, y: 2, is_hidden: true }]
+      : []),
+  };
+  await ms._refreshSubResources('map-1');
+  await ms._onTokenMoved('tk-hidden', { x: 50, y: 50 });
+  await ms._onTokenMoved('tk-open', { x: 10, y: 20 });
+  await new Promise((r) => setTimeout(r, 300));
+  assert.deepEqual(page.getFlag(FLAG_SCOPE, 'chronicleTokens').map((t) => [t.id, t.x, t.y]), [['tk-open', 10, 20]]);
+  assert.equal(ms._cache.get('map-1').tokens.find((t) => t.id === 'tk-hidden').x, 50, 'the GM still sees it move');
 });
 
 test('playerSafeMapItems: a GM-only shadow still hides what is under it', () => {
