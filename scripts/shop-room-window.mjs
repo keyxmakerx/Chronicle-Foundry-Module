@@ -44,6 +44,8 @@ let widgetLoad = null;
 const pending = new Map();
 /** Player side: each waiting request's private key, by request id. */
 const replyKeys = new Map();
+/** Tells the sync manager how a player's relayed request went (userId, error?). */
+export const RELAY_OUTCOME_HOOK = 'chronicleRelayOutcome';
 /** GM side: answers players' buying requests; set by the shop widget. */
 let buyRelay = null;
 
@@ -497,9 +499,14 @@ async function onBuyRequest(data, senderId) {
     return;
   }
   try {
-    await answer(await buyRelay(user, req));
+    const result = await buyRelay(user, req);
+    // Bookkeeping only, keyed on the socket sender; runAction reports a failed
+    // Chronicle call as a status of 400 or more rather than throwing.
+    Hooks.callAll(RELAY_OUTCOME_HOOK, senderId, Number(result?.status) >= 400 ? { status: result.status } : undefined);
+    await answer(result);
   } catch (err) {
     console.error('Chronicle: shop buying request failed', err);
+    Hooks.callAll(RELAY_OUTCOME_HOOK, senderId, err);
     answer({ status: 502, body: { message: t('BuyFailed') } });
   }
 }

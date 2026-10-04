@@ -662,6 +662,29 @@ The module reports what only it sees: changes it applied in Foundry
 
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/sync_history_handler.go`, `sync_history_recorder.go`)
 
+#### POST /sync/players
+The GM's client reports the world's Foundry users. Chronicle sees only the
+GM's key, so this is how it learns which Foundry player is linked to which
+member, who is online, and who last changed or failed. The campaign owner's
+Foundry page shows it as "Players in Foundry".
+
+**Used by:** `sync-manager.mjs` → `_players` (`scripts/_player-report.mjs`), sent from the GM client only, with the GM's own key
+
+**Body:** `{ "players": [ { "foundryUserId", "name", "memberId", "online", "lastChangeAt", "lastFailedAt", "lastFailure", "failedCount" } ] }`
+
+- At most 100 players, GMs first; a full snapshot, so each report replaces the server's list.
+- `name` at most 100 chars; `memberId` is the Chronicle user id from `userMappings`, `""` when unlinked.
+- `lastChangeAt` / `lastFailedAt` are RFC 3339 or `null`; `lastFailure` is a short status line (e.g. `HTTP 500 Internal Server Error`, at most 200 chars), never page text; `failedCount` counts failures over the last 7 days.
+- No emails or other account details are sent.
+
+**Response:** `{ "stored": n }`
+
+**Errors:** 403 when the key is not the owner's or a DM-access key; 404 on an older Chronicle; both stop reporting for the session. 400 is a bad body: logged once, reporting continues.
+
+**When:** on connect, shortly after a Foundry user logs in or out or is edited, or the mappings change, and otherwise at most every 5 min while connected, only when the snapshot changed.
+
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi`, the players handler)
+
 #### POST /sync
 Generic sync endpoint for batch operations.
 

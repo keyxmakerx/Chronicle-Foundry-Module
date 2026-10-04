@@ -213,6 +213,8 @@ export function registerSettings() {
     config: false,
     type: String,
     default: '{}',
+    // The player report to Chronicle carries each user's linked member.
+    onChange: () => Hooks.callAll('chronicleUserMappingsChanged'),
   });
 
   // Internal: per-type and per-entity sync exclusions (not shown in settings UI).

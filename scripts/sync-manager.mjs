@@ -7,6 +7,7 @@
  */
 
 import { ChronicleAPI } from './api-client.mjs';
+import { PlayerActivity, PlayerReporter, buildPlayerReport, reasonFromError, REPORT_INTERVAL_MS, EVENT_DEBOUNCE_MS } from './_player-report.mjs';
 import { walkSyncPull, PULL_PAGE_SIZE } from './_sync-pull-walk.mjs';
 import { HistoryReporter, activityToEvent, describeMessage, resourceIdOf, resourceNameOf } from './_history-report.mjs';
 import { walkChangeFeed, cursorFor, feedForArea, FEED_PAGE_SIZE, FEED_SETTLE_MS } from './_change-feed.mjs';
@@ -60,6 +61,28 @@ export class SyncManager {
     this.api.onWrite = (path) => this._history.noteWrite(path);
     /** @type {ReturnType<typeof setInterval>|null} */
     this._historyTimer = null;
+
+    /**
+     * Which Foundry player last changed or failed to change what. Chronicle
+     * only sees this client's key, so this world reports it (see
+     * _player-report.mjs). Only the GM client runs a SyncManager.
+     */
+    this.playerActivity = new PlayerActivity();
+    this._players = new PlayerReporter({
+      send: (body) => this.api.reportPlayers(body),
+      build: () => buildPlayerReport({
+        users: (game.users?.contents ?? []).map((u) => ({ id: u.id, name: u.name, active: u.active, isGM: u.isGM })),
+        mappings: getUserMappings(),
+        activityFor: (id) => this.playerActivity.get(id),
+      }),
+      log: (msg, err) => console.debug(`Chronicle: ${msg}`, err ?? ''),
+    });
+    /** @type {ReturnType<typeof setInterval>|null} */
+    this._playerTimer = null;
+    /** @type {ReturnType<typeof setTimeout>|null} */
+    this._playerDebounce = null;
+    /** @type {Array<[string, Function]>} Foundry hooks to remove on stop. */
+    this._playerHooks = [];
 
     /** @type {Array<object>} Registered sync modules. */
     this._modules = [];
@@ -151,6 +174,7 @@ export class SyncManager {
     await this._fetchAddons();
 
     this._historyTimer ??= setInterval(() => { this._history.flush(); }, HISTORY_FLUSH_MS);
+    this._startPlayerReporting();
 
     // Initialize all registered modules.
     for (const mod of this._modules) {
@@ -230,6 +254,7 @@ export class SyncManager {
     if (state === 'connected') {
       this._connectedAt ??= Date.now();
       this._history.flush();
+      this._players.report({ force: true });
     }
     if (state === 'connected' && this._initialSyncDone && this._sawDisconnect) {
       this._scheduleReconnectResync();
@@ -403,10 +428,63 @@ export class SyncManager {
   }
 
   /**
+   * Note the outcome of a push to Chronicle for the Foundry user whose change
+   * it was. Never throws: it must not get in the way of a sync.
+   * @param {string} userId - Foundry user id from the change hook.
+   * @param {unknown} [err] - Set for a failed push; only its HTTP status is kept.
+   */
+  recordUserOutcome(userId, err) {
+    try {
+      if (err === undefined) this.playerActivity.recordChange(userId);
+      else this.playerActivity.recordFailure(userId, reasonFromError(err));
+    } catch { /* never block a sync */ }
+  }
+
+  /**
+   * Start telling Chronicle about the world's players. A login or logout, a
+   * user edit or a mapping change reports soon after; otherwise a report
+   * goes out every few minutes, and only when something changed.
+   * @private
+   */
+  _startPlayerReporting() {
+    if (this._playerTimer) return;
+    const soon = () => this._schedulePlayerReport();
+    for (const [name, fn] of [
+      ['userConnected', soon],
+      ['updateUser', soon],
+      ['createUser', soon],
+      ['deleteUser', soon],
+      ['chronicleUserMappingsChanged', soon],
+      // A player's request relayed through this GM client, done or failed.
+      ['chronicleRelayOutcome', (userId, err) => this.recordUserOutcome(userId, err)],
+    ]) {
+      Hooks.on(name, fn);
+      this._playerHooks.push([name, fn]);
+    }
+    this._playerTimer = setInterval(() => {
+      // Activity changes are picked up here, not one report per synced change.
+      this._players.report();
+    }, REPORT_INTERVAL_MS);
+  }
+
+  /** Coalesce a burst of user events into one report. @private */
+  _schedulePlayerReport() {
+    if (this._playerDebounce) clearTimeout(this._playerDebounce);
+    this._playerDebounce = setTimeout(() => {
+      this._playerDebounce = null;
+      this._players.report();
+    }, EVENT_DEBOUNCE_MS);
+  }
+
+  /**
    * Stop the sync manager and disconnect.
    */
   stop() {
     this.api.disconnect();
+    for (const [name, fn] of this._playerHooks) Hooks.off(name, fn);
+    this._playerHooks = [];
+    if (this._playerTimer) { clearInterval(this._playerTimer); this._playerTimer = null; }
+    if (this._playerDebounce) { clearTimeout(this._playerDebounce); this._playerDebounce = null; }
     for (const mod of this._modules) {
       if (typeof mod.destroy === 'function') {
         mod.destroy();
