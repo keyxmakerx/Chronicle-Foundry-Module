@@ -186,6 +186,16 @@ export function registerSettings() {
     onChange: () => Hooks.callAll('chronicleSyncCalendarSnapshot'),
   });
 
+  // Where this person dragged the calendar strip, and whether it is shrunk
+  // to the clock. Client scope: each player keeps their own spot.
+  game.settings.register(MODULE_ID, 'calendarBarPlace', {
+    scope: 'client',
+    config: false,
+    type: Object,
+    default: {},
+    onChange: () => Hooks.callAll('chronicleSyncCalendarSnapshot'),
+  });
+
   game.settings.register(MODULE_ID, 'calendarTemperatureUnit', {
     name: game.i18n.localize('CHRONICLE.Settings.CalendarTemperatureUnit.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.CalendarTemperatureUnit.Hint'),

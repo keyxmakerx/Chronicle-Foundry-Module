@@ -237,7 +237,9 @@ export function calendarOpenToPlayers(cal) {
  * @param {boolean} p.eventsConfirmed - every events page echoed the players audience.
  * @param {(e:object)=>boolean} p.isPublic - isChronicleEventPublic.
  */
-export function buildPlayerSnapshot({ calendar, dateInfo, events = [], eventsConfirmed = false, isPublic }) {
+export function buildPlayerSnapshot({
+  calendar, dateInfo, events = [], eventsConfirmed = false, isPublic, dayWeather = [], dayWeatherConfirmed = false,
+}) {
   if (!calendarOpenToPlayers(calendar) || !dateInfo) return { v: SNAPSHOT_VERSION, hidden: true };
   const filtered = dateInfo.audience === 'players';
   const w = dateInfo.current_weather;
@@ -271,7 +273,53 @@ export function buildPlayerSnapshot({ calendar, dateInfo, events = [], eventsCon
       }))
       : [],
     events: keep.slice(0, SNAPSHOT_EVENT_LIMIT).map(snapshotEvent),
+    dayWeather: dayWeatherConfirmed ? pastDayWeather(dayWeather, dateInfo) : [],
   };
+}
+
+/**
+ * Day readings up to `today`, reduced to what the month view draws. Chronicle
+ * already holds future days back from players; this drops them again so a
+ * forecast can never reach the snapshot.
+ */
+export function pastDayWeather(days, today) {
+  const t = today && [num(today.year), num(today.month), num(today.day)];
+  if (!t || t.some((v) => v === null)) return [];
+  const onOrBefore = (d) => d.year < t[0] || (d.year === t[0] && (d.month < t[1] || (d.month === t[1] && d.day <= t[2])));
+  return (days || [])
+    .map((d) => ({ year: num(d?.year), month: num(d?.month), day: num(d?.day), icon: str(d?.icon, 20), label: str(d?.preset_label, 80) || str(d?.description, 80) }))
+    .filter((d) => d.year !== null && d.month !== null && d.day !== null && onOrBefore(d))
+    .slice(0, SNAPSHOT_EVENT_LIMIT);
+}
+
+/** Background for a day cell: the sky that weather gives. */
+const DAY_SKY = Object.freeze({
+  clear: 'linear-gradient(#9cc7ea, #dfeaf2)',
+  cloud: 'linear-gradient(#7d8fa3, #b9c3cc)',
+  rain: 'linear-gradient(#5b6b80, #9aa6b4)',
+  snow: 'linear-gradient(#c9d6e2, #eef1f4)',
+  storm: 'linear-gradient(#4b5a73, #8b97a6)',
+  fog: 'linear-gradient(#a7adb3, #d3d6d9)',
+});
+
+export function daySky(icon) {
+  return DAY_SKY[icon] || DAY_SKY.cloud;
+}
+
+/** Which particles the strip's mini sky shows for a weather icon and hour. */
+export function skyParticles(cal, hour, icon) {
+  if (icon === 'snow') return 'snow';
+  if (icon === 'rain' || icon === 'storm') return 'rain';
+  const phase = skyPhase(cal, hour);
+  if ((phase === 'night') && icon !== 'fog') return 'stars';
+  return 'none';
+}
+
+/** Keep a dragged strip on screen. */
+export function clampPlace(place, box, viewport) {
+  const x = Math.min(Math.max(Number(place?.x) || 0, 0), Math.max(viewport.width - box.width, 0));
+  const y = Math.min(Math.max(Number(place?.y) || 0, 0), Math.max(viewport.height - box.height, 0));
+  return { x: Math.round(x), y: Math.round(y) };
 }
 
 /** The fields the month view shows for an event. */

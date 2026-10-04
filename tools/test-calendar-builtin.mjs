@@ -154,3 +154,16 @@ test('a failed players events read keeps the last snapshot instead of blanking e
   try { await cs.publishPlayerSnapshot(); } finally { console.debug = original; }
   assert.equal(saved.length, 0);
 });
+
+test('an older Chronicle without the day-weather route still publishes, with no day weather', async () => {
+  saved.length = 0;
+  const cs = makeSync(makeApi([
+    ['/calendar/date?audience=players', { year: 1492, month: 2, day: 30, audience: 'players' }],
+    ['/calendar/events?', { data: [], audience: 'players' }],
+    ['/calendar/weather/days?', err404],
+    ['/calendar?audience=players', cal],
+  ]));
+  await cs.publishPlayerSnapshot();
+  assert.equal(saved.length, 1);
+  assert.deepEqual(saved[0][1].dayWeather, []);
+});

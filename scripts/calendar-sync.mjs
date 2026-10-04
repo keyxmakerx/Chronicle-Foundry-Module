@@ -208,6 +208,9 @@ export class CalendarSync {
     /** @type {object[]} GM-view events for the months around the current date. */
     this._events = [];
 
+    /** @type {object[]} Day weather readings for the months around the current date. */
+    this._dayWeather = [];
+
     /** @type {Set<Function>} Built-in calendar listeners, called after each refresh. */
     this._listeners = new Set();
 
@@ -237,7 +240,10 @@ export class CalendarSync {
 
   /** What the GM's calendar draws: structure, date, world state and every event. */
   get gmView() {
-    return { calendar: this._chronicleCalendar, date: this.chronicleDate, dateInfo: this._dateInfo, events: this._events };
+    return {
+      calendar: this._chronicleCalendar, date: this.chronicleDate, dateInfo: this._dateInfo,
+      events: this._events, dayWeather: this._dayWeather ?? [],
+    };
   }
 
   /**
@@ -268,23 +274,25 @@ export class CalendarSync {
       if (!handleIfCalendarRebuilding(err)) console.debug('Chronicle: calendar date read failed', err?.message);
     }
     this._events = (await this._fetchMonthsAround()).events;
+    this._dayWeather = (await this._readMonthsAround('/calendar/weather/days')).items;
     this._emitChange();
     await this.publishPlayerSnapshot();
   }
 
   /**
-   * Events for the current month and one either side, the window the month
-   * view opens on. `audience` reads them as players see them.
+   * Read a month-filtered list (events or day weather) for the current month
+   * and one either side, the window the month view opens on. `audience`
+   * reads it as players see it.
+   * @param {string} path - '/calendar/events' or '/calendar/weather/days'.
    * @param {string} [audience]
-   * @returns {Promise<{events: object[], confirmed: boolean, failed: boolean}>} confirmed: every page
-   *   echoed the audience; failed: a page could not be read.
+   * @returns {Promise<{items: object[], confirmed: boolean, failed: boolean}>} confirmed: every
+   *   page echoed the audience; failed: a page could not be read.
    * @private
    */
-  async _fetchMonthsAround(audience) {
+  async _readMonthsAround(path, audience) {
     const d = this.chronicleDate;
-    if (!d) return { events: [], confirmed: false, failed: false };
-    const seen = new Set();
-    const events = [];
+    if (!d) return { items: [], confirmed: false, failed: false };
+    const items = [];
     let confirmed = true;
     let failed = false;
     for (const delta of [-1, 0, 1]) {
@@ -292,23 +300,37 @@ export class CalendarSync {
       const q = `year=${y}&month=${m}${audience ? `&audience=${audience}` : ''}`;
       let payload;
       try {
-        payload = await this._api.get(`/calendar/events?${q}`);
+        payload = await this._api.get(`${path}?${q}`);
       } catch (err) {
-        console.debug('Chronicle: calendar events read failed', err?.message);
         confirmed = false;
+        // A 404 is an older Chronicle without the route: nothing to show, not a failure.
+        if (err?.status === 404) continue;
+        console.debug(`Chronicle: ${path} read failed`, err?.message);
         failed = true;
         continue;
       }
       if (audience && payload?.audience !== audience) confirmed = false;
       const page = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
-      for (const e of page) {
-        // A repeating event appears once per occurrence, all under one id.
-        const key = `${e?.id}|${e?.year}-${e?.month}-${e?.day}`;
-        if (!e || e.id == null || seen.has(key)) continue;
-        seen.add(key);
-        events.push(e);
-      }
+      items.push(...page.filter((x) => x && typeof x === 'object'));
     }
+    return { items, confirmed, failed };
+  }
+
+  /**
+   * Events around the current month, one entry per occurrence (a repeating
+   * event appears once per date, all under one id).
+   * @param {string} [audience]
+   * @private
+   */
+  async _fetchMonthsAround(audience) {
+    const { items, confirmed, failed } = await this._readMonthsAround('/calendar/events', audience);
+    const seen = new Set();
+    const events = items.filter((e) => {
+      const key = `${e.id}|${e.year}-${e.month}-${e.day}`;
+      if (e.id == null || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
     return { events, confirmed, failed };
   }
 
@@ -323,6 +345,8 @@ export class CalendarSync {
     let dateInfo = null;
     let events = [];
     let eventsConfirmed = false;
+    let dayWeather = [];
+    let dayWeatherConfirmed = false;
     try {
       calendar = await this._api.get('/calendar?audience=players');
       if (calendar) {
@@ -332,6 +356,10 @@ export class CalendarSync {
         // A passing read error would publish an empty list over the players'
         // events; keep the last snapshot until a full read succeeds.
         if (failed) return;
+        const wx = await this._readMonthsAround('/calendar/weather/days', 'players');
+        if (wx.failed) return;
+        dayWeather = wx.items;
+        dayWeatherConfirmed = wx.confirmed;
       }
     } catch (err) {
       if (err?.status !== 404) {
@@ -341,7 +369,9 @@ export class CalendarSync {
       }
       calendar = null;
     }
-    const snap = buildPlayerSnapshot({ calendar, dateInfo, events, eventsConfirmed, isPublic: isChronicleEventPublic });
+    const snap = buildPlayerSnapshot({
+      calendar, dateInfo, events, eventsConfirmed, isPublic: isChronicleEventPublic, dayWeather, dayWeatherConfirmed,
+    });
     const json = JSON.stringify(snap);
     if (json === this._lastSnapshotJson) return;
     this._lastSnapshotJson = json;

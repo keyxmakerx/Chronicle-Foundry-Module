@@ -170,17 +170,22 @@ GM notice. See API-CONTRACT.md.
 
 Chronicle brings its own calendar; no Foundry calendar module is used.
 
-### Built-in calendar (date bar)
-- [ ] With Calendar sync on, a date bar sits at the top centre: weekday, date, time, season, weather and temperature, moons; its colour follows the hour (night, dawn, day, dusk)
-- [ ] GM: the ‹ › arrows move the date by the chosen step (hour, day, week); Chronicle's calendar page shows the new date after a refresh
+### Built-in calendar (strip)
+- [ ] With Calendar sync on, a thin strip sits at the top centre: date, time and a weather icon over a small sky coloured for the hour; snow, rain or night stars move in it to match Chronicle
+- [ ] Hover the strip -> it widens to show season, temperature and moons
+- [ ] Drag the strip by its dots anywhere -> it stays there after a reload, and each player's spot is their own
+- [ ] Click the clock icon -> the strip shrinks to a round clock; click the clock -> the strip comes back with the month open
+- [ ] Leave the mouse still for 20 seconds -> the sky's motion stops; move it -> it starts again
+- [ ] Click the date -> the month opens under the strip; days up to today show their sky colour and weather icon, later days are plain; event days have a dot and the month's events are listed below; ‹ › flips months; click outside or Esc closes it
+- [ ] GM: the small ‹ › arrows move the time one hour; Chronicle's calendar page shows the new time after a refresh
 - [ ] GM: on a real-time calendar the arrows are greyed out and Set date is disabled
-- [ ] Click the bar -> the month view opens under it with Chronicle's events; ‹ › flips months; click outside or Esc closes it
-- [ ] GM: **Set date** in the month view moves Chronicle's date; a date the calendar doesn't have is refused with a warning
-- [ ] GM: **Add event** creates the event in Chronicle (check the Chronicle calendar page); "GM only" makes it GM-only there
-- [ ] Player client: the same bar and month view, without arrows, Set date or Add event; GM-only events, hidden moons and secret eras never appear
-- [ ] Move the date in Chronicle -> the bar updates for the GM and every player
-- [ ] A calendar hidden from players in Chronicle -> players see no bar
-- [ ] Module Settings -> Calendar temperature unit °F -> only your bar switches to °F
+- [ ] GM: **Set date…** in the month moves Chronicle's date; a date the calendar doesn't have is refused with a warning
+- [ ] GM: **Add event** creates the event in Chronicle (check the Chronicle calendar page); "GM only" makes it GM-only there and shows "(GM only)" in the list
+- [ ] Player client: the same strip and month, without arrows, Set date or Add event; GM-only events, hidden moons, secret eras and future days' weather never appear
+- [ ] Move the date in Chronicle -> the strip updates for the GM and every player
+- [ ] A calendar hidden from players in Chronicle -> players see no strip
+- [ ] Turn Calendar sync off in Module Settings -> the strip disappears for everyone without a reload
+- [ ] Module Settings -> Calendar temperature unit °F -> only your strip switches to °F
 
 ### Dashboard
 - [ ] Calendar tab shows Chronicle's calendar name, date (day, month, year) and time

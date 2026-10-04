@@ -925,13 +925,17 @@ Lists events for a month. Query: `?year=1492&month=3` or `?entity_id=uuid`.
 **Used by:** `calendar-sync.mjs` → `fetchEvents`, one request per month across the
 current year ±1, and the built-in calendar's month window (current month ±1).
 
-**Players' view.** `GET /calendar`, `GET /calendar/date` and `GET /calendar/events`
-take `?audience=players`: Chronicle filters the read for an anonymous player
+**Day weather.** `GET /calendar/weather/days?year=&month=` returns `{data,total}` of
+that month's day readings (`year`, `month`, `day`, `icon`, `preset_label`, …); below
+the Director only days up to today. **Used by:** the built-in calendar's month view.
+
+**Players' view.** `GET /calendar`, `GET /calendar/date`, `GET /calendar/events` and
+`GET /calendar/weather/days` take `?audience=players`: Chronicle filters the read for an anonymous player
 (hidden moons, secret eras, GM-only, per-player and unannounced events left out)
-whatever the key's role, and the date and events answers carry
+whatever the key's role, and the date, events and day-weather answers carry
 `"audience": "players"`. An older Chronicle ignores the parameter and answers
-with the GM's view; without the echo the module leaves moons, era and events
-out of the players' snapshot. **Used by:** `CalendarSync.publishPlayerSnapshot`.
+with the GM's view; without the echo the module leaves moons, era, events and
+day weather out of the players' snapshot. **Used by:** `CalendarSync.publishPlayerSnapshot`.
 Re-verify by: 2026-11-04 (Chronicle `internal/plugins/syncapi/calendar_api_handler.go` `readViewer`; lands with Chronicle #1084)
 
 #### POST /calendar/events

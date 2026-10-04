@@ -166,3 +166,35 @@ test('a calendar not open to every player gives a hidden snapshot', () => {
     assert.equal(VM.buildPlayerSnapshot({ calendar: c, dateInfo, isPublic }).hidden, hidden, JSON.stringify([c.visibility, c.visibility_rules]));
   }
 });
+
+test('day weather reaches the snapshot only when confirmed, and never after today', () => {
+  const dateInfo = { year: 1492, month: 2, day: 10, audience: 'players' };
+  const days = [
+    { year: 1492, month: 2, day: 9, icon: 'snow', preset_label: 'Snow', locked: true },
+    { year: 1492, month: 2, day: 10, icon: 'clear' },
+    { year: 1492, month: 2, day: 11, icon: 'storm' },
+    { year: 1492, month: 3, day: 1, icon: 'rain' },
+    { year: 1491, month: 4, day: 30, icon: 'fog' },
+  ];
+  const s = VM.buildPlayerSnapshot({ calendar: cal, dateInfo, isPublic, dayWeather: days, dayWeatherConfirmed: true });
+  assert.deepEqual(s.dayWeather.map((d) => `${d.year}-${d.month}-${d.day}`), ['1492-2-9', '1492-2-10', '1491-4-30']);
+  assert.deepEqual(Object.keys(s.dayWeather[0]).sort(), ['day', 'icon', 'label', 'month', 'year']);
+  const old = VM.buildPlayerSnapshot({ calendar: cal, dateInfo, isPublic, dayWeather: days, dayWeatherConfirmed: false });
+  assert.deepEqual(old.dayWeather, []);
+});
+
+test('mini sky particles follow weather and hour', () => {
+  assert.equal(VM.skyParticles(cal, 12, 'snow'), 'snow');
+  assert.equal(VM.skyParticles(cal, 12, 'storm'), 'rain');
+  assert.equal(VM.skyParticles(cal, 23, 'clear'), 'stars');
+  assert.equal(VM.skyParticles(cal, 12, 'clear'), 'none');
+  assert.equal(VM.skyParticles(cal, 23, 'fog'), 'none');
+});
+
+test('clampPlace keeps the strip on screen', () => {
+  const box = { width: 200, height: 24 };
+  const vp = { width: 1000, height: 600 };
+  assert.deepEqual(VM.clampPlace({ x: -5, y: 900 }, box, vp), { x: 0, y: 576 });
+  assert.deepEqual(VM.clampPlace({ x: 950, y: 10 }, box, vp), { x: 800, y: 10 });
+  assert.deepEqual(VM.clampPlace(null, box, vp), { x: 0, y: 0 });
+});
