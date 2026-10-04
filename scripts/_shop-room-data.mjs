@@ -113,6 +113,8 @@ export function sanitizeShopRoomMessage(msg, apiUrl) {
 const MAX_BASKET_LINES = 50;
 const MAX_LINE_QTY = 99;
 const MAX_REPLY_CHARS = 64 * 1024;
+// An "open" answer carries the whole room: its layout plus every good.
+export const MAX_ROOM_REPLY_CHARS = MAX_LAYOUT_CHARS + 384 * 1024;
 
 /**
  * Check a player's buying request before the GM's client acts on it. The
@@ -124,11 +126,11 @@ const MAX_REPLY_CHARS = 64 * 1024;
  */
 export function sanitizeShopBuyRequest(msg) {
   if (!msg || typeof msg !== 'object' || msg.type !== SHOP_ROOM_MESSAGE) return null;
-  if (msg.action !== 'buyers' && msg.action !== 'buy') return null;
+  if (msg.action !== 'buyers' && msg.action !== 'buy' && msg.action !== 'open') return null;
   if (!ID_RE.test(String(msg.requestId || '')) || !ID_RE.test(String(msg.shopId || ''))) return null;
   if (!isPublicJwk(msg.publicKey)) return null;
   const out = { action: msg.action, requestId: msg.requestId, shopId: msg.shopId, publicKey: msg.publicKey };
-  if (msg.action === 'buyers') return out;
+  if (msg.action === 'buyers' || msg.action === 'open') return out;
 
   const b = msg.body;
   if (!b || typeof b !== 'object' || !ID_RE.test(String(b.buyerEntityId || ''))) return null;
@@ -150,13 +152,13 @@ export function sanitizeShopBuyRequest(msg) {
  * player's widget reads it. Returns `{requestId, toUserId, status, body,
  * goods?}`, or null.
  */
-export function sanitizeShopBuyReply(msg) {
+export function sanitizeShopBuyReply(msg, maxChars = MAX_REPLY_CHARS) {
   if (!msg || typeof msg !== 'object' || msg.type !== SHOP_ROOM_MESSAGE || msg.action !== 'reply') return null;
   if (!ID_RE.test(String(msg.requestId || '')) || typeof msg.toUserId !== 'string') return null;
   const status = Number(msg.status);
   if (!Number.isInteger(status) || status < 200 || status > 599) return null;
   if (!msg.body || typeof msg.body !== 'object' || Array.isArray(msg.body)) return null;
-  if (JSON.stringify(msg.body).length > MAX_REPLY_CHARS) return null;
+  if (JSON.stringify(msg.body).length > Math.min(maxChars, MAX_ROOM_REPLY_CHARS)) return null;
   const out = { requestId: msg.requestId, toUserId: msg.toUserId, status, body: msg.body };
   if (msg.goods !== undefined) {
     if (!Array.isArray(msg.goods) || msg.goods.length > MAX_GOODS) return null;

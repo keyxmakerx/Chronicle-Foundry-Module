@@ -222,6 +222,11 @@ Chronicle brings its own calendar; no Foundry calendar module is used.
 - [ ] Player (matched to a Chronicle member, downtime open, shop shown): the basket lists only their own characters; Buy works the same; the GM gets the chat line naming the player
 - [ ] Player while downtime is closed: the button reads "Ask to buy"; pressing it says "Asked the GM for …", nothing is charged and no chat line appears; the request waits on Chronicle's Stashes page
 - [ ] Player whose Foundry user is not matched: no basket appears; GM stops showing the shop mid-basket -> Buy says the GM isn't showing it any more
+- [ ] Open a shop's journal entry -> the title bar has an **Open shop** button; the GM's opens the GM room
+- [ ] Player with Observer or more on the shop journal: **Open shop** opens the room on that player's screen only, and their basket works as above
+- [ ] Player with no access to the shop journal: the entry and its button are not visible; a player given Owner on it gets no button
+- [ ] Player presses **Open shop** with no GM logged in -> the window says "The shop is closed"
+- [ ] GM shows then stops showing a shop a player opened from its journal -> the player's room stays open
 
 ## Initial Sync
 

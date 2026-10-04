@@ -17,7 +17,11 @@
       "NotShown": "The GM isn't showing this shop any more.",
       "NotMatched": "Your Foundry user isn't matched to a Chronicle member yet. Ask the GM to match it in Chronicle Sync.",
       "NoSender": "Foundry didn't say who sent this, so nothing was bought.",
-      "SomeCharacter": "A character"
+      "SomeCharacter": "A character",
+      "OpenShopButton": "Open shop",
+      "ClosedTitle": "The shop is closed",
+      "ClosedNoGM": "No GM is online right now. Try again when your GM joins.",
+      "NoAccess": "You can't see this shop's journal entry."
     },
     "CalendarBar": {
       "Label": "Chronicle calendar",

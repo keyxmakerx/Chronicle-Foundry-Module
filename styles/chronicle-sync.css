@@ -2414,3 +2414,13 @@ body.ccal-rest #chronicle-calendar-bar .ccal-sky * { animation-play-state: pause
 @media (prefers-reduced-motion: reduce) {
   #chronicle-calendar-bar *, #chronicle-calendar-month { animation: none !important; transition: none !important; }
 }
+
+/* A player's room with no GM online to serve it. */
+.chronicle-shop-closed {
+  margin: 0; padding: 22px 16px; text-align: center;
+  background: #f9fafb; color: #374151;
+}
+.chronicle-shop-closed b { display: block; margin-bottom: 4px; color: #111827; }
+
+/* The journal header's "Open shop" button, tinted like the shop's coin. */
+.chronicle-shop-open { width: auto; gap: 4px; padding: 0 6px; color: #e0b44a; }
