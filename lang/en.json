@@ -21,7 +21,7 @@
     },
     "CalendarBar": {
       "Label": "Chronicle calendar",
-      "OpenMonth": "Open the month",
+      "OpenCalendar": "Open the calendar",
       "MonthLabel": "Chronicle calendar month",
       "BackHour": "Back one hour",
       "ForwardHour": "Forward one hour",
@@ -474,6 +474,7 @@
     },
     "SceneControl": {
       "Notebook": "Open my Chronicle notebook",
+      "Calendar": "Open the Chronicle calendar",
       "DMScreen": "Open the DM Screen"
     },
     "DMScreen": {
@@ -561,6 +562,7 @@
     "Notebook": {
       "Title": "Notebook",
       "JotsTitle": "Jot notes",
+      "CalendarTitle": "Calendar",
       "Connect": "Connect to Chronicle",
       "NotConnected": "Your Chronicle notes aren't connected to Foundry yet. Connect once and Chronicle will ask you to press Allow.",
       "Rejected": "Chronicle no longer accepts this connection (it was disconnected, or your sign-in changed). Connect again to keep going.",

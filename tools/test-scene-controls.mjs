@@ -4,8 +4,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { addChronicleControls } from '../scripts/_scene-controls.mjs';
 
-const run = { dashboard() {}, dmScreen() {}, notebook() {} };
-const titles = { dmScreen: 'Open the DM Screen', notebook: 'Open my Chronicle notebook' };
+const run = { dashboard() {}, dmScreen() {}, notebook() {}, calendar() {} };
+const titles = { dmScreen: 'Open the DM Screen', notebook: 'Open my Chronicle notebook', calendar: 'Open the Chronicle calendar' };
 
 function names(controls) {
   if (Array.isArray(controls)) {
@@ -17,9 +17,9 @@ function names(controls) {
 }
 
 const CASES = [
-  ['GM, connected', { isGM: true, notebook: true }, ['dashboard', 'dm-screen', 'notebook']],
+  ['GM, connected', { isGM: true, notebook: true }, ['dashboard', 'dm-screen', 'notebook', 'calendar']],
   ['GM, not connected', { isGM: true, notebook: false }, ['dashboard', 'dm-screen']],
-  ['player, connected', { isGM: false, notebook: true }, ['notebook']],
+  ['player, connected', { isGM: false, notebook: true }, ['notebook', 'calendar']],
   ['player, not connected', { isGM: false, notebook: false }, null],
 ];
 
@@ -49,4 +49,13 @@ test('v12 tools use onClick; v13 tools use onChange and name an activeTool', () 
   assert.equal(g.tools['dm-screen'].onChange, run.dmScreen);
   assert.equal(g.tools['dm-screen'].title, titles.dmScreen);
   assert.ok(!('run' in g.tools.notebook));
+  assert.equal(g.tools.calendar.onChange, run.calendar);
+  assert.equal(g.tools.calendar.title, titles.calendar);
+});
+
+test('without a calendar opener there is no Calendar button', () => {
+  const controls = {};
+  const { calendar, ...noCal } = run;
+  addChronicleControls(controls, { isGM: false, notebook: true, run: noCal, titles });
+  assert.deepEqual(names(controls), ['notebook']);
 });

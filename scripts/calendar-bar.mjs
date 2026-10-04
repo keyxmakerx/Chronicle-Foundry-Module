@@ -14,6 +14,7 @@
 
 import { getSetting, setSetting } from './settings.mjs';
 import { promptDialog } from './_dialogs.mjs';
+import { openCalendarWindow } from './player-notebook.mjs';
 import {
   clampPlace, daySky, eventsOn, formatDate, formatTemperature, formatTime, isUsableSnapshot,
   monthGrid, monthName, moonIconClass, shiftMonth, skyGradient, skyParticles, weatherIconClass,
@@ -107,7 +108,7 @@ function stripHtml(v) {
   return `<div class="ccal-sky"></div>
     ${v.locked ? '' : `<span class="ccal-grip" title="${esc(t('Drag'))}" aria-hidden="true">&#8942;&#8942;</span>`}
     ${arrow(-1)}
-    <button type="button" class="ccal-open" aria-haspopup="dialog" aria-expanded="${popover ? 'true' : 'false'}" title="${esc(t('OpenMonth'))}">
+    <button type="button" class="ccal-open" aria-haspopup="dialog" aria-expanded="${popover ? 'true' : 'false'}" title="${esc(t('OpenCalendar'))}">
       <b>${esc(formatDate(v.calendar, v.date))}</b> <span class="ccal-time">${esc(formatTime(v.calendar, v.date))}</span>
     </button>
     ${weather}${more ? `<span class="ccal-more">${more}</span>` : ''}
@@ -234,7 +235,10 @@ async function onClick(ev) {
     return;
   }
   if (ev.target.closest('.ccal-open')) {
-    if (popover) closeMonth(); else openMonth();
+    if (popover) return closeMonth();
+    // The date opens Chronicle's full calendar; the small month view is the
+    // fallback for a player who isn't connected (or says "Not now").
+    if (!(await openCalendarWindow())) openMonth();
   }
 }
 

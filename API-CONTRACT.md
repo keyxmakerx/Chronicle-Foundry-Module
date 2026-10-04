@@ -1362,7 +1362,7 @@ Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/stash_api_handler.
 ### Player notebook pages
 
 Not part of the REST API: the notebook (`scripts/player-notebook.mjs`,
-checks in `scripts/_notes-grant.mjs`) frames two Chronicle web pages and never
+checks in `scripts/_notes-grant.mjs`) frames Chronicle web pages and never
 uses the GM's sync key. Everything crosses `postMessage`, and each side checks
 the other's origin (Chronicle's, taken from `apiUrl`) before acting.
 
@@ -1371,6 +1371,7 @@ the other's origin (Chronicle's, taken from `apiUrl`) before acting.
 | Allow window | `/campaigns/:id/notes/allow-app?origin=<Foundry origin>` | A pop-up where the player presses Allow. Replies `{type:"chronicle:notes-grant", token, userId, campaignId}` (token starts `cnt_`) or `{type:"chronicle:notes-grant-declined"}`. |
 | Notebook frame | `/embed/campaigns/:id/notes/journal` | The player's Journal. |
 | Jot frame | `/embed/campaigns/:id/notes/jots` | Jot notes for the page in view. |
+| Calendar frame | `/embed/campaigns/:id/notes/calendar` | The campaign's default calendar, Chronicle's own page, as this player sees it (same grant; the frame reads `/api/notes-app/campaigns/:id/calendars/…`). An older Chronicle answers 404. |
 
 The module keeps a grant only when `campaignId` matches and the GM has matched
 the returned `userId` to this Foundry login (Members tab); an unmatched or
@@ -1380,7 +1381,7 @@ module answers `chronicle:notes-token` with the token and current `entityId`),
 with `noteId`. Module to frame: `chronicle:notes-token`, `chronicle:jots-page`
 with `entityId`, `chronicle:open-note`.
 
-Re-verify by: 2026-11-03 (Chronicle `internal/widgets/notes/app_grants_handler.go`, `allow_app.templ`, `static/js/notes_embed.js`)
+Re-verify by: 2026-11-04 (Chronicle `internal/widgets/notes/app_grants_handler.go`, `allow_app.templ`, `static/js/notes_embed.js`, `internal/plugins/calendar/routes.go` `RegisterAppRoutes`)
 
 ---
 

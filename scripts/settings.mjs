@@ -207,6 +207,14 @@ export function registerSettings() {
     onChange: () => Hooks.callAll('chronicleSyncCalendarSnapshot'),
   });
 
+  // The calendar window's size and place, per player.
+  game.settings.register(MODULE_ID, 'calendarWindowPlace', {
+    scope: 'client',
+    config: false,
+    type: Object,
+    default: {},
+  });
+
   game.settings.register(MODULE_ID, 'calendarTemperatureUnit', {
     name: game.i18n.localize('CHRONICLE.Settings.CalendarTemperatureUnit.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.CalendarTemperatureUnit.Hint'),

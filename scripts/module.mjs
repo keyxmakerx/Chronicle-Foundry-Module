@@ -29,7 +29,7 @@ import { negotiationMirror } from './negotiation-mirror.mjs';
 import { registerMapSheetItems } from './map-sheet-items.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { registerShopRoomSocket } from './shop-room-window.mjs';
-import { notebookAvailable, openNotebook, registerPlayerNotebook } from './player-notebook.mjs';
+import { notebookAvailable, openCalendarWindow, openNotebook, registerPlayerNotebook } from './player-notebook.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
 import { retireNotesFolder } from './_notes-folder.mjs';
 import { FLAG_SCOPE, SYNC_OPTIONS } from './constants.mjs';
@@ -293,8 +293,8 @@ async function _runtimeValidateDescriptor() {
 
 /**
  * Add the Chronicle group to Foundry's scene controls toolbar: the Sync
- * Dashboard and DM Screen for GMs, the Notebook for everyone once the
- * world is connected to Chronicle.
+ * Dashboard and DM Screen for GMs, the Notebook and Calendar for everyone
+ * once the world is connected to Chronicle.
  */
 Hooks.on('getSceneControlButtons', (controls) => {
   // openDashboard() recreates the dashboard when a prior close left the
@@ -306,10 +306,12 @@ Hooks.on('getSceneControlButtons', (controls) => {
       dashboard: openDashboard,
       dmScreen: () => { openDMScreen(() => syncManager?.api ?? null); },
       notebook: () => { openNotebook(); },
+      calendar: () => { openCalendarWindow(); },
     },
     titles: {
       dmScreen: game.i18n.localize('CHRONICLE.SceneControl.DMScreen'),
       notebook: game.i18n.localize('CHRONICLE.SceneControl.Notebook'),
+      calendar: game.i18n.localize('CHRONICLE.SceneControl.Calendar'),
     },
   });
 });
