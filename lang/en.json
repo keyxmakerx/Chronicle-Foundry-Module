@@ -552,6 +552,9 @@
     "Notebook": {
       "Title": "Notebook",
       "JotsTitle": "Jot notes",
+      "TabHint": "Click to open or close. Drag to move.",
+      "DragToMove": "Drag to move",
+      "Close": "Close jot notes",
       "Connect": "Connect to Chronicle",
       "NotConnected": "Your Chronicle notes aren't connected to Foundry yet. Connect once and Chronicle will ask you to press Allow.",
       "Rejected": "Chronicle no longer accepts this connection (it was disconnected, or your sign-in changed). Connect again to keep going.",
