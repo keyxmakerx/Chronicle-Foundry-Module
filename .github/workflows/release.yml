@@ -9,7 +9,8 @@ name: Release
 #
 # Nothing is attached, on purpose: Chronicle installs the release's source zip
 # and writes the tag into module.json at install time, so module.json's
-# version on main is never read.
+# version on main is never read. .gitattributes keeps bench/, tools/ and .github/
+# out of that zip; Chronicle refuses a package holding a shell script.
 
 on:
   workflow_dispatch:

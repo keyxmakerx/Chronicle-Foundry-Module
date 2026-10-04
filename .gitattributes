@@ -1,0 +1,7 @@
+# Chronicle installs a release from GitHub's source zip, which honours
+# export-ignore. Dev-only folders stay out of it: Chronicle's package scan
+# rejects shell scripts (bench/run.sh), and Foundry never loads these.
+# tools/test-release-archive.mjs pins this.
+/bench export-ignore
+/tools export-ignore
+/.github export-ignore
