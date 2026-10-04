@@ -186,6 +186,17 @@ export function registerSettings() {
     onChange: () => Hooks.callAll('chronicleSyncCalendarSnapshot'),
   });
 
+  // The calendar strip is an extra each person turns on; nothing shows by default.
+  game.settings.register(MODULE_ID, 'calendarStrip', {
+    name: game.i18n.localize('CHRONICLE.Settings.CalendarStrip.Name'),
+    hint: game.i18n.localize('CHRONICLE.Settings.CalendarStrip.Hint'),
+    scope: 'client',
+    config: true,
+    type: Boolean,
+    default: false,
+    onChange: () => Hooks.callAll('chronicleSyncCalendarSnapshot'),
+  });
+
   // Where this person dragged the calendar strip, and whether it is shrunk
   // to the clock. Client scope: each player keeps their own spot.
   game.settings.register(MODULE_ID, 'calendarBarPlace', {

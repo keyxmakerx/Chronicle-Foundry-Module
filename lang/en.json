@@ -93,6 +93,10 @@
         "Name": "Announce season and era changes in chat",
         "Hint": "Whisper a GM-only chat line when the Chronicle calendar crosses a season or era boundary. Never posted to players."
       },
+      "CalendarStrip": {
+        "Name": "Show the calendar strip",
+        "Hint": "A thin strip with Chronicle's date, time and weather over a small sky, which you can drag anywhere. For you only."
+      },
       "CalendarTemperatureUnit": {
         "Name": "Calendar temperature unit",
         "Hint": "How the date bar shows Chronicle's temperature, for you only."

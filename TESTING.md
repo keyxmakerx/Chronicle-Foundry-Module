@@ -171,7 +171,8 @@ GM notice. See API-CONTRACT.md.
 Chronicle brings its own calendar; no Foundry calendar module is used.
 
 ### Built-in calendar (strip)
-- [ ] With Calendar sync on, a thin strip sits at the top centre: date, time and a weather icon over a small sky coloured for the hour; snow, rain or night stars move in it to match Chronicle
+- [ ] With Calendar sync on and nothing else changed, no strip shows
+- [ ] Module Settings -> Show the calendar strip on -> a thin strip sits at the top centre: date, time and a weather icon over a small sky coloured for the hour; snow, rain or night stars move in it to match Chronicle
 - [ ] Hover the strip -> it widens to show season, temperature and moons
 - [ ] Drag the strip by its dots anywhere -> it stays there after a reload, and each player's spot is their own
 - [ ] Click the clock icon -> the strip shrinks to a round clock; click the clock -> the strip comes back with the month open

@@ -48,7 +48,7 @@ const extraMonths = new Map();
  * the calendar (sync off, no calendar, or one players may not see).
  */
 function currentView() {
-  if (!getSetting('syncEnabled') || !getSetting('syncCalendar')) return null;
+  if (!getSetting('calendarStrip') || !getSetting('syncEnabled') || !getSetting('syncCalendar')) return null;
   if (game.user.isGM && source) {
     const v = source.gmView;
     if (v.calendar && v.date) {
