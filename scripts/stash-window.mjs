@@ -10,6 +10,8 @@
  */
 
 import { FLAG_SCOPE } from './constants.mjs';
+import { submitReport } from './debug-hub.mjs';
+import { MAX_TEXT } from './_debug-reports.mjs';
 import { canOpenStashes, cancelStashRequests, describeError, stashRequest } from './stash-client.mjs';
 import {
   buildMovePayload,
@@ -63,6 +65,8 @@ export class StashesWindow extends HandlebarsApplicationMixin(ApplicationV2) {
     /** @type {object|null} the open quantity/amount prompt */
     this.prompt = null;
     this._busy = false;
+    /** @type {{open: boolean, text: string, sending: boolean, message: string, error: boolean}} the "Report a problem" box */
+    this.report = { open: false, text: '', sending: false, message: '', error: false };
     this._onChanged = this._onChanged.bind(this);
   }
 
@@ -187,6 +191,7 @@ export class StashesWindow extends HandlebarsApplicationMixin(ApplicationV2) {
       })),
       prompt: this.prompt,
       canMoveFromLeft: false,
+      report: { ...this.report, max: MAX_TEXT, canReport: !!this.characterId },
     };
     if (!view) return ctx;
 
@@ -295,6 +300,8 @@ export class StashesWindow extends HandlebarsApplicationMixin(ApplicationV2) {
       this._startMove({ side: b.dataset.csMovebtn, kind: b.dataset.csKind, itemId: b.dataset.csItem });
     }));
 
+    this._wireReport(el);
+
     const form = el.querySelector('[data-cs-prompt]');
     if (form) {
       const input = form.querySelector('[data-cs-input]');
@@ -321,6 +328,52 @@ export class StashesWindow extends HandlebarsApplicationMixin(ApplicationV2) {
     cancelStashRequests(this);
     open.delete(this.actor.id);
     super._onClose?.(options);
+  }
+
+  // --- Report a problem ---------------------------------------------------
+
+  _wireReport(el) {
+    el.querySelector('[data-cs-report-open]')?.addEventListener('click', (event) => {
+      event.preventDefault();
+      this.report = { open: true, text: this.report.text, sending: false, message: '', error: false };
+      this._focusReport = true;
+      this.render();
+    });
+    const form = el.querySelector('[data-cs-report-form]');
+    if (!form) return;
+    const box = form.querySelector('[data-cs-report-text]');
+    // Kept as typed so a live refresh of the window never wipes it.
+    box?.addEventListener('input', () => { this.report.text = box.value; });
+    form.querySelector('[data-cs-report-cancel]')?.addEventListener('click', () => {
+      this.report = { open: false, text: '', sending: false, message: '', error: false };
+      this.render();
+    });
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      this.sendReport();
+    });
+    if (this._focusReport) {
+      this._focusReport = false;
+      box?.focus();
+    }
+  }
+
+  /** Send the typed report to the GM and say what happened. */
+  async sendReport() {
+    const r = this.report;
+    if (r.sending) return;
+    if (!r.text.trim()) return;
+    r.sending = true;
+    r.message = '';
+    this.render();
+    const res = await submitReport({ characterId: this.characterId, text: r.text });
+    if (res.ok) {
+      this.report = { open: false, text: '', sending: false, message: game.i18n.localize('CHRONICLE.Debug.Report.Sent'), error: false };
+    } else {
+      const key = res.code === 'no_gm' ? 'NoGM' : res.code === 'rate_limited' ? 'RateLimited' : 'Failed';
+      this.report = { open: true, text: r.text, sending: false, message: game.i18n.localize(`CHRONICLE.Debug.Report.${key}`), error: true };
+    }
+    this.render();
   }
 
   // --- Actions ------------------------------------------------------------

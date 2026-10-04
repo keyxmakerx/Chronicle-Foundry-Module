@@ -10,7 +10,7 @@
 
 import { getSetting, setSetting, getSyncDirections, setSyncDirections, getExcludedTags, setExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
 import { SyncHistoryTab } from './sync-history-tab.mjs';
-import { FLAG_SCOPE } from './constants.mjs';
+import { FLAG_SCOPE, REPORT_STORE_FLAG } from './constants.mjs';
 import { confirmDialog, promptDialog } from './_dialogs.mjs';
 import { openSyncCalendar } from './sync-calendar.mjs';
 import { buildCalendarDiagnostics } from './sync-calendar-diagnostics.mjs';
@@ -36,6 +36,11 @@ import { classifyCalendarSyncState } from './_calendar-sync-state.mjs';
 import { projectSubresourcePanel } from './_calendar-subresources.mjs';
 import { calendarStateFromError } from './_calendar-probe-state.mjs';
 import { handleIfCalendarRebuilding } from './_calendar-blackout-guard.mjs';
+import {
+  REPORTS_CHANGED_HOOK, collectModuleInfo, collectSyncLog, gatherSideBySide, getReports, markReportDone, submitReport,
+} from './debug-hub.mjs';
+import { MAX_TEXT, relativeAge, splitReports, unreadCount } from './_debug-reports.mjs';
+import { reportToMarkdown } from './_debug-markdown.mjs';
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**
@@ -105,6 +110,13 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'resolve-match': SyncDashboard.#onResolveMatchAction,
       'resolve-create': SyncDashboard.#onResolveCreateAction,
       'resolve-repush': SyncDashboard.#onResolveRepushAction,
+      'debug-open-report': SyncDashboard.#onDebugOpenReportAction,
+      'debug-done': SyncDashboard.#onDebugDoneAction,
+      'debug-copy-issue': SyncDashboard.#onDebugCopyIssueAction,
+      'debug-check': SyncDashboard.#onDebugCheckAction,
+      'debug-report-row': SyncDashboard.#onDebugReportRowAction,
+      'debug-report-send': SyncDashboard.#onDebugReportSendAction,
+      'debug-report-cancel': SyncDashboard.#onDebugReportCancelAction,
     },
   };
 
@@ -152,6 +164,29 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     /** @type {Set<string>} Currently selected entity IDs for bulk operations. */
     this._selectedEntities = new Set();
+
+    // Debug tab state (per window, like _capabilityActorId).
+    /** @type {string|null} Actor id picked for the side by side. */
+    this._debugActorId = null;
+    /** @type {{loading: boolean, result: object|null, error: string}} */
+    this._debugSbs = { loading: false, result: null, error: '' };
+    /** @type {Set<string>} Reports whose snapshot is expanded. */
+    this._debugOpen = new Set();
+    /** @type {{open: boolean, text: string, message: string}} the GM's own report box */
+    this._debugSelf = { open: false, text: '', message: '' };
+    this._onReportsChanged = () => { if (this.rendered) this.render({ force: true }); };
+  }
+
+  /** @override */
+  _onFirstRender(context, options) {
+    super._onFirstRender?.(context, options);
+    Hooks.on(REPORTS_CHANGED_HOOK, this._onReportsChanged);
+  }
+
+  /** @override */
+  _onClose(options) {
+    Hooks.off(REPORTS_CHANGED_HOOK, this._onReportsChanged);
+    super._onClose?.(options);
   }
 
   /**
@@ -256,6 +291,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     // Build characters tab data.
     const characterData = this._buildCharacterData();
 
+    const debugData = this._buildDebugData();
+
     // Build sync-issues (resolver) tab data.
     let issuesData = { issues: [], hasIssues: false, count: 0, headline: '' };
     try {
@@ -344,6 +381,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
       // Sync Capability (status tab panel).
       capability: capabilityData,
+
+      // Debug tab.
+      debug: debugData,
     };
   }
 
@@ -466,6 +506,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     for (const j of game.journal.contents) {
       if (j.getFlag(FLAG_SCOPE, 'entityId')) continue;
+      if (j.getFlag(FLAG_SCOPE, REPORT_STORE_FLAG)) continue;
       // Skip SimpleCalendar note journals.
       if (j.flags?.['foundryvtt-simple-calendar'] || j.flags?.['simple-calendar']) continue;
 
@@ -1408,6 +1449,17 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       });
     }
 
+    // --- Debug tab: character picker and the GM's own report box ---
+    el.querySelector('[data-debug-actor]')?.addEventListener('change', (e) => {
+      this._debugActorId = e.currentTarget.value || null;
+      this._debugSbs = { loading: false, result: null, error: '' };
+      this._debugSelf = { open: false, text: '', message: '' };
+      this.render({ force: true });
+      if (this._debugActorId) this._debugCheck();
+    });
+    const selfText = el.querySelector('[data-debug-self-text]');
+    selfText?.addEventListener('input', () => { this._debugSelf.text = selfText.value; });
+
     // Map tab handlers are wired via the `open-map-journal` action above;
     // no additional select listeners are needed.
   }
@@ -1592,6 +1644,181 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   static #onReconnectAction() {
     this.api?.connect();
     setTimeout(() => this.render({ force: true }), 1000);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Debug tab
+  // ---------------------------------------------------------------------------
+
+  /** Localized "5m ago" style age. @private */
+  _debugAge(at) {
+    const { unit, n } = relativeAge(at, Date.now());
+    const key = { now: 'Now', minutes: 'Minutes', hours: 'Hours', days: 'Days' }[unit];
+    return game.i18n.format(`CHRONICLE.Debug.Time.${key}`, { n });
+  }
+
+  /** Words for each side-by-side result. @private */
+  _debugStatusLabels() {
+    const L = (k) => game.i18n.localize(`CHRONICLE.Debug.Status.${k}`);
+    return { match: L('Match'), different: L('Different'), missing: L('Missing'), 'foundry-only': L('FoundryOnly') };
+  }
+
+  /** Rows with their result word and the "Info" label/value pairs. @private */
+  _debugInfoRows(info) {
+    const L = (k) => game.i18n.localize(`CHRONICLE.Debug.${k}`);
+    const v = (x) => x || L('InfoUnknown');
+    return [
+      { label: L('InfoModule'), value: v(info.moduleVersion) },
+      { label: L('InfoFoundry'), value: v(info.foundryVersion) },
+      { label: L('InfoSystem'), value: `${v(info.systemId)} ${info.systemVersion || ''}`.trim() },
+      { label: L('InfoHost'), value: v(info.chronicleHost) },
+      { label: L('InfoMoney'), value: info.moneyField || L('InfoMoneyPending') },
+    ];
+  }
+
+  /** Everything the Debug tab shows. Reads only what is already in memory. @private */
+  _buildDebugData() {
+    const labels = this._debugStatusLabels();
+    const reports = getReports();
+    const { open, done } = splitReports(reports);
+    const shape = (r, isDone) => {
+      const snap = r.snapshot;
+      const state = game.i18n.localize(isDone ? 'CHRONICLE.Debug.StateDone' : 'CHRONICLE.Debug.StateNew');
+      return {
+        id: r.id,
+        isDone,
+        firstDone: false,
+        isOpen: this._debugOpen.has(r.id),
+        headline: game.i18n.format('CHRONICLE.Debug.ReportLine', { name: r.fromName, when: this._debugAge(r.at), state }),
+        text: `\u201c${r.text}\u201d`,
+        noSnapshot: r.note || game.i18n.localize('CHRONICLE.Debug.NoSnapshot'),
+        attached: game.i18n.format('CHRONICLE.Debug.Attached', { name: snap?.characterName || r.fromName }),
+        snapshot: snap ? {
+          rows: (snap.compare?.rows ?? []).map((x) => ({ ...x, statusLabel: labels[x.status] || x.status })),
+          moneyLine: snap.compare?.moneyLine ?? '',
+          log: (snap.log ?? []).slice(0, 20).map((e) => ({ level: e.level, text: e.text, time: e.at ? new Date(e.at).toLocaleString() : '' })),
+          info: this._debugInfoRows(snap.info ?? {}),
+        } : null,
+      };
+    };
+    const list = [...open.map((r) => shape(r, false)), ...done.map((r) => shape(r, true))];
+    const firstDone = list.find((r) => r.isDone);
+    if (firstDone) firstDone.firstDone = true;
+
+    const actors = (game.actors?.contents ?? [])
+      .filter((a) => a.getFlag?.(FLAG_SCOPE, 'entityId'))
+      .map((a) => ({ id: a.id, name: a.name || '(unnamed)', selected: a.id === this._debugActorId }))
+      .sort((x, y) => x.name.localeCompare(y.name));
+
+    const sbs = this._debugSbs;
+    const res = sbs.result;
+    const self = this._debugSelf;
+    return {
+      unread: unreadCount(reports),
+      reports: list,
+      actors,
+      sbs: {
+        canCheck: !!this._debugActorId,
+        loading: sbs.loading,
+        error: sbs.error,
+        ready: !!res,
+        rows: (res?.rows ?? []).map((x) => ({ ...x, statusLabel: labels[x.status] || x.status })),
+        differences: res?.differences ?? 0,
+        moneyLine: res?.moneyLine ?? '',
+      },
+      selfReport: { ...self, max: MAX_TEXT },
+      log: collectSyncLog(50).map((e) => ({ level: e.level, text: e.text, time: e.at ? new Date(e.at).toLocaleTimeString() : '' })),
+      info: this._debugInfoRows(collectModuleInfo(res?.moneyField ?? '')),
+    };
+  }
+
+  /** (Re)run the side by side for the picked character. Read-only. @private */
+  async _debugCheck() {
+    const actor = game.actors.get(this._debugActorId);
+    if (!actor) return;
+    this._debugSbs = { loading: true, result: this._debugSbs.result, error: '' };
+    this.render({ force: true });
+    let out;
+    try {
+      out = await gatherSideBySide(actor);
+    } catch (err) {
+      log.error('Dashboard: side by side failed', err);
+      out = { ok: false, reason: 'chronicle' };
+    }
+    if (this._debugActorId !== actor.id) return;
+    if (out.ok) {
+      this._debugSbs = { loading: false, result: out, error: '' };
+    } else {
+      const key = out.reason === 'unlinked' ? 'Unlinked' : 'ChronicleError';
+      this._debugSbs = { loading: false, result: null, error: game.i18n.localize(`CHRONICLE.Debug.${key}`) };
+    }
+    this.render({ force: true });
+  }
+
+  static #onDebugCheckAction() {
+    this._debugCheck();
+  }
+
+  static #onDebugOpenReportAction(_event, target) {
+    const id = target.dataset.reportId;
+    if (!id) return;
+    if (this._debugOpen.has(id)) this._debugOpen.delete(id); else this._debugOpen.add(id);
+    this.render({ force: true });
+  }
+
+  static async #onDebugDoneAction(_event, target) {
+    const id = target.dataset.reportId;
+    if (id) await markReportDone(id);
+    this.render({ force: true });
+  }
+
+  static async #onDebugCopyIssueAction(_event, target) {
+    const id = target.dataset.reportId;
+    const resultEl = this.element?.querySelector(`[data-debug-copy-result="${CSS.escape(id ?? '')}"]`);
+    try {
+      const report = getReports().find((r) => r.id === id);
+      if (!report) throw new Error('report not found');
+      await game.clipboard.copyPlainText(reportToMarkdown(report, { statusLabels: this._debugStatusLabels() }));
+      if (resultEl) {
+        resultEl.textContent = game.i18n.localize('CHRONICLE.Debug.Copied');
+        resultEl.className = 'debug-copy-result test-success';
+        setTimeout(() => { resultEl.textContent = ''; }, 3000);
+      }
+    } catch (err) {
+      log.error('Dashboard: report copy failed', err);
+      if (resultEl) {
+        resultEl.textContent = game.i18n.localize('CHRONICLE.Debug.CopyFailed');
+        resultEl.className = 'debug-copy-result test-error';
+      }
+    }
+  }
+
+  /** "Report a problem" on a row: open the GM's own box, started with the row's name. */
+  static #onDebugReportRowAction(event, target) {
+    event.preventDefault();
+    const thing = target.dataset.thing || '';
+    const prefix = game.i18n.format('CHRONICLE.Debug.RowPrefix', { thing });
+    this._debugSelf = { open: true, text: this._debugSelf.text || prefix, message: '' };
+    this.render({ force: true });
+  }
+
+  static async #onDebugReportSendAction() {
+    const characterId = game.actors.get(this._debugActorId)?.getFlag(FLAG_SCOPE, 'entityId');
+    const text = this._debugSelf.text;
+    if (!characterId || !text.trim()) return;
+    const res = await submitReport({ characterId, text });
+    if (res.ok) {
+      this._debugSelf = { open: false, text: '', message: game.i18n.localize('CHRONICLE.Debug.Report.Sent') };
+    } else {
+      const key = res.code === 'rate_limited' ? 'RateLimited' : 'Failed';
+      this._debugSelf = { open: true, text, message: game.i18n.localize(`CHRONICLE.Debug.Report.${key}`) };
+    }
+    this.render({ force: true });
+  }
+
+  static #onDebugReportCancelAction() {
+    this._debugSelf = { open: false, text: '', message: '' };
+    this.render({ force: true });
   }
 
   /** Clear the activity log. */

@@ -77,6 +77,10 @@
     <a class="item" data-tab="status">
       <i class="fa-solid fa-signal"></i> Status
     </a>
+    <a class="item" data-tab="debug">
+      <i class="fa-solid fa-bug"></i> {{localize "CHRONICLE.Debug.TabLabel"}}
+      {{#if debug.unread}}<span class="member-tab-badge" title="{{localize 'CHRONICLE.Debug.NewBadge' count=debug.unread}}">{{debug.unread}}</span>{{/if}}
+    </a>
     <a class="item" data-tab="history">
       <i class="fa-solid fa-clock-rotate-left"></i> History
     </a>
@@ -1283,6 +1287,131 @@
           </button>
           <span class="debug-copy-result" data-cal-diag-result></span>
         </div>
+      </div>
+    </div>
+
+    {{!-- ================================================================= --}}
+    {{!-- DEBUG TAB                                                         --}}
+    {{!-- ================================================================= --}}
+    <div class="tab" data-tab="debug" data-group="primary">
+      <div class="debug-panel">
+
+        <h3 class="section-heading">{{localize "CHRONICLE.Debug.Reported" count=debug.unread}}</h3>
+        {{#each debug.reports}}
+        {{#if firstDone}}<h4 class="debug-subheading">{{localize "CHRONICLE.Debug.Done"}}</h4>{{/if}}
+        <div class="debug-report{{#if isDone}} debug-report-done{{/if}}">
+          <div class="debug-report-head">{{headline}}</div>
+          <blockquote class="debug-report-text">{{text}}</blockquote>
+          <div class="config-hint">{{attached}}</div>
+          <div class="config-actions">
+            <button type="button" class="dashboard-btn btn-sm" data-action="debug-open-report" data-report-id="{{id}}">{{#if isOpen}}{{localize "CHRONICLE.Debug.Close"}}{{else}}{{localize "CHRONICLE.Debug.Open"}}{{/if}}</button>
+            {{#unless isDone}}<button type="button" class="dashboard-btn btn-sm" data-action="debug-done" data-report-id="{{id}}">{{localize "CHRONICLE.Debug.MarkDone"}}</button>{{/unless}}
+            <button type="button" class="dashboard-btn btn-sm" data-action="debug-copy-issue" data-report-id="{{id}}"><i class="fa-solid fa-clipboard"></i> {{localize "CHRONICLE.Debug.CopyIssue"}}</button>
+            <span class="debug-copy-result" data-debug-copy-result="{{id}}"></span>
+          </div>
+          {{#if isOpen}}
+          <div class="debug-snapshot">
+            {{#if snapshot}}
+            {{#if snapshot.rows.length}}
+            <table class="debug-table">
+              <thead><tr><th>{{localize "CHRONICLE.Debug.Thing"}}</th><th>{{localize "CHRONICLE.Debug.InChronicle"}}</th><th>{{localize "CHRONICLE.Debug.InFoundry"}}</th><th></th></tr></thead>
+              <tbody>
+                {{#each snapshot.rows}}
+                <tr class="debug-row debug-{{status}}"><td>{{thing}}</td><td>{{chronicle}}</td><td>{{foundry}}</td><td>{{statusLabel}}</td></tr>
+                {{/each}}
+              </tbody>
+            </table>
+            {{/if}}
+            {{#if snapshot.moneyLine}}<p class="config-hint">{{snapshot.moneyLine}}</p>{{/if}}
+            {{#each snapshot.log}}
+            <div class="log-entry log-{{level}}"><span class="log-time">{{time}}</span><span class="log-message">{{text}}</span></div>
+            {{/each}}
+            {{#each snapshot.info}}
+            <div class="system-info-row"><span class="system-label">{{label}}:</span><span class="system-value">{{value}}</span></div>
+            {{/each}}
+            {{else}}
+            <p class="config-hint">{{noSnapshot}}</p>
+            {{/if}}
+          </div>
+          {{/if}}
+        </div>
+        {{else}}
+        <p class="config-hint">{{localize "CHRONICLE.Debug.NoReports"}}</p>
+        {{/each}}
+
+        <h3 class="section-heading">{{localize "CHRONICLE.Debug.SideBySide"}}</h3>
+        {{#if debug.actors.length}}
+        <div class="capability-actor-picker">
+          <select class="config-select debug-actor-select" data-debug-actor aria-label="{{localize 'CHRONICLE.Debug.SideBySide'}}">
+            <option value="">{{localize "CHRONICLE.Debug.PickCharacter"}}</option>
+            {{#each debug.actors}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}
+          </select>
+          {{#if debug.sbs.canCheck}}
+          <button type="button" class="dashboard-btn btn-sm" data-action="debug-check" {{#if debug.sbs.loading}}disabled{{/if}}>
+            <i class="fa-solid fa-rotate"></i> {{#if debug.sbs.loading}}{{localize "CHRONICLE.Debug.Checking"}}{{else}}{{localize "CHRONICLE.Debug.CheckAgain"}}{{/if}}
+          </button>
+          {{/if}}
+        </div>
+        {{#if debug.sbs.error}}<p class="config-hint debug-error">{{debug.sbs.error}}</p>{{/if}}
+        {{#if debug.sbs.ready}}
+        <table class="debug-table">
+          <thead>
+            <tr><th>{{localize "CHRONICLE.Debug.Thing"}}</th><th>{{localize "CHRONICLE.Debug.InChronicle"}}</th><th>{{localize "CHRONICLE.Debug.InFoundry"}}</th><th></th></tr>
+          </thead>
+          <tbody>
+            {{#each debug.sbs.rows}}
+            <tr class="debug-row debug-{{status}}">
+              <td>{{thing}}</td>
+              <td>{{chronicle}}</td>
+              <td>{{foundry}}</td>
+              <td>
+                <span class="debug-status">{{statusLabel}}</span>
+                <a href="#" class="debug-flag" data-action="debug-report-row" data-thing="{{thing}}" title="{{localize 'CHRONICLE.Debug.ReportRow'}}">&#9873; {{localize "CHRONICLE.Debug.ReportRow"}}</a>
+              </td>
+            </tr>
+            {{/each}}
+          </tbody>
+        </table>
+        {{#unless debug.sbs.differences}}<p class="config-hint">{{localize "CHRONICLE.Debug.AllMatch"}}</p>{{/unless}}
+        <p class="config-hint">{{debug.sbs.moneyLine}}</p>
+        {{/if}}
+        {{#if debug.selfReport.open}}
+        <div class="debug-report-box">
+          <label for="debug-self-report">{{localize "CHRONICLE.Debug.Report.Prompt"}}</label>
+          <textarea id="debug-self-report" rows="3" maxlength="{{debug.selfReport.max}}" data-debug-self-text>{{debug.selfReport.text}}</textarea>
+          <p class="config-hint">{{localize "CHRONICLE.Debug.Report.Hint"}}</p>
+          {{#if debug.selfReport.message}}<p class="config-hint debug-error">{{debug.selfReport.message}}</p>{{/if}}
+          <div class="config-actions">
+            <button type="button" class="dashboard-btn btn-sm" data-action="debug-report-send">{{localize "CHRONICLE.Debug.Report.Send"}}</button>
+            <button type="button" class="dashboard-btn btn-sm" data-action="debug-report-cancel">{{localize "CHRONICLE.Debug.Report.Cancel"}}</button>
+          </div>
+        </div>
+        {{else if debug.selfReport.message}}
+        <p class="config-hint">{{debug.selfReport.message}}</p>
+        {{/if}}
+        {{else}}
+        <p class="config-hint">{{localize "CHRONICLE.Debug.NoLinked"}}</p>
+        {{/if}}
+
+        <h3 class="section-heading">{{localize "CHRONICLE.Debug.SyncLog"}}</h3>
+        <div class="error-log">
+          {{#each debug.log}}
+          <div class="log-entry log-{{level}}">
+            <span class="log-time">{{time}}</span>
+            <span class="log-message">{{text}}</span>
+          </div>
+          {{else}}
+          <div class="log-empty">{{localize "CHRONICLE.Debug.NoLog"}}</div>
+          {{/each}}
+        </div>
+
+        <h3 class="section-heading">{{localize "CHRONICLE.Debug.Info"}}</h3>
+        <div class="diagnostics-detail">
+          {{#each debug.info}}
+          <div class="system-info-row"><span class="system-label">{{label}}:</span><span class="system-value">{{value}}</span></div>
+          {{/each}}
+        </div>
+
       </div>
     </div>
 

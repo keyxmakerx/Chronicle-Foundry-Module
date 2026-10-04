@@ -95,4 +95,25 @@
       </ul>
     {{/if}}
   {{/if}}
+  {{#if report.canReport}}
+    <footer class="cs-report">
+      {{#if report.open}}
+        <form data-cs-report-form>
+          <label class="cs-report-label">
+            <span>{{localize "CHRONICLE.Debug.Report.Prompt"}}</span>
+            <textarea name="text" rows="4" maxlength="{{report.max}}" data-cs-report-text>{{report.text}}</textarea>
+          </label>
+          <p class="cs-note">{{localize "CHRONICLE.Debug.Report.Hint"}}</p>
+          {{#if report.message}}<p class="cs-error" role="alert">{{report.message}}</p>{{/if}}
+          <div class="cs-report-buttons">
+            <button type="submit" class="cs-go" {{#if report.sending}}disabled{{/if}}>{{localize "CHRONICLE.Debug.Report.Send"}}</button>
+            <button type="button" data-cs-report-cancel>{{localize "CHRONICLE.Debug.Report.Cancel"}}</button>
+          </div>
+        </form>
+      {{else}}
+        {{#if report.message}}<p class="cs-note" role="status">{{report.message}}</p>{{/if}}
+        <a href="#" class="cs-report-link" data-cs-report-open>&#9873; {{localize "CHRONICLE.Debug.Report.Link"}}</a>
+      {{/if}}
+    </footer>
+  {{/if}}
 </div>
