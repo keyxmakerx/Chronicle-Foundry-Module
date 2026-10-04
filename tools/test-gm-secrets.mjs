@@ -151,11 +151,14 @@ test('journal-sync wires the helpers on every pull and push path', () => {
   const pulls = src.match(/_sanitizeIncomingHTML\(entity\.(?:entry_html|player_notes_html)\b[^)]*\)/g) || [];
   assert.deepEqual(pulls, [], 'every entity HTML pull goes through _pullHtml');
   assert.equal((src.match(/await this\._pullHtml\(entity\.id, entity\.(?:entry_html|player_notes_html)\)/g) || []).length, 4);
-  assert.match(src, /hideSecrets\(\s*toFoundrySecrets\(html\)/, '_pullHtml hides what toFoundrySecrets made');
+  assert.match(src, /hideSecrets\(\s*(?:await this\._withPictures\()?toFoundrySecrets\(html\)/, '_pullHtml hides what toFoundrySecrets made');
   assert.equal((src.match(/await this\._entryForPush\(journal, (?:entity\.id|entityId)/g) || []).length, 3, 'every entry push restores placeholders');
   assert.match(src, /await this\._playerNotesForPush\(journal, entityId\)/);
-  assert.match(src, /return toChronicleSecrets\(r\.html\);/);
   assert.doesNotMatch(src, /_collectTextPages|_collectPlayerNotes/, 'no push path skips the restore');
+  // Pictures go in before hiding (GM-only ones become secret blocks) and
+  // come back after the restore, so restored GM pictures leave GM-only.
+  assert.match(src, /hideSecrets\(\s*await this\._withPictures\(toFoundrySecrets\(html\)\)/);
+  assert.match(src, /return toChronicleSecrets\(toChroniclePictures\(r\.html, getSetting\('apiUrl'\)\)\);/);
   assert.match(src, /secretBlockRanges\(html\)/, 'page breaks skip headings inside secret blocks');
   assert.doesNotMatch(src, /fields:\s*entity\.fields_data/, 'field values (GM-only ones included) are never stored in journal flags');
 });

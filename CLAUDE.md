@@ -11,7 +11,7 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
 - `module.json` (Foundry manifest, v12–v14), `chronicle-package.json`
   (serving descriptor, schema v1) — cross-validated by
   `tools/check-package-descriptor.mjs`.
-- `scripts/*.mjs`: sync (`journal-sync`, `map-sync`+`map-viewer`+`map-sheet-items`,
+- `scripts/*.mjs`: sync (`journal-sync`+`picture-store`, `map-sync`+`map-viewer`+`map-sheet-items`,
   `calendar-sync`+`sync-calendar`+`sync-calendar-*`, `actor-sync`,
   `item-sync`, `stash-sync`+`stash-client`), UI (`sync-dashboard`, `npc-presence`, `negotiation-mirror`,
   `sync-diagnostic-bundle`, `update-info`, `gm-secret-view`, `character-claim-indicator`,

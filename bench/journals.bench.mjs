@@ -8,6 +8,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { CHRONICLE_URL } from './chronicle.mjs';
 import { openWorld, closeWorld, settle, recordRequests, waitFor } from './world.mjs';
 import { FLAG, linked, byEntity, writes, pageText, chroniclePage, scenario } from './scenario.mjs';
 
@@ -266,6 +267,64 @@ test('the same page edited on both sides at once ends the same on both sides', (
   // Which side wins is the conflict setting's call; the bench only demands
   // that they agree (checked for every scenario) and nothing is duplicated.
   assert.equal(world.game.journal.filter((x) => x.name.startsWith('Crossroads')).length, 1);
+}));
+
+// Two tiny, different PNGs: Chronicle gives identical bytes one media id.
+const PNGS = [
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGM4IScHRAwQCgAfJgQRoo8irwAAAABJRU5ErkJggg==',
+].map((b) => Buffer.from(b, 'base64'));
+
+async function uploadPicture(seed, name, bytes) {
+  const form = new FormData();
+  form.append('file', new Blob([bytes], { type: 'image/png' }), name);
+  const res = await fetch(`${CHRONICLE_URL}/api/v1/campaigns/${seed.campaignId}/media`, {
+    method: 'POST', headers: { authorization: `Bearer ${seed.moduleKey}` }, body: form,
+  });
+  assert.equal(res.status, 201, `upload ${name}: ${await res.clone().text()}`);
+  return (await res.json()).id;
+}
+
+test('pictures inside page text show in Foundry, GM-only ones stay secret, and an edit sends both back unchanged', (t) => scenario('pictures', async ({ seed, world }) => {
+  const shared = await uploadPicture(seed, 'mira.png', PNGS[0]);
+  const secret = await uploadPicture(seed, 'traitor.png', PNGS[1]);
+  assert.notEqual(shared, secret);
+  const html = `<p>Mira runs the docks.</p>`
+    + `<figure class="ce-img ce-img--w40 ce-img--right"><img src="/media/${shared}" alt="Mira"><figcaption>Mira Kell</figcaption></figure>`
+    + `<figure class="ce-img ce-img--w30 ce-img--left ce-img--gm"><img src="/media/${secret}" alt="x"><figcaption>The traitor</figcaption></figure>`
+    + `<p>She owes the guild.</p>`;
+  const e = await chroniclePage(seed, 'Mira Kell', html);
+  const stored = (await seed.chronicle.get(`/entities/${e.id}`)).entry_html || '';
+  if (!stored.includes('ce-img--gm')) {
+    t.skip('this Chronicle does not keep pictures inside page text yet (Chronicle#997)');
+    return;
+  }
+
+  await openWorld(world);
+  await JournalSync_resync(world);
+  const j = byEntity(world, e.id);
+  const text = pageText(j);
+  const local = `worlds/bench-world/chronicle-media/${shared}.png`;
+  assert.ok(text.includes(`src="${local}"`), `shared picture points at its copy: ${text}`);
+  assert.ok(world.files.has(local), 'the copy is in the world files');
+  // The GM-only picture is a placeholder in the saved page, like GM-only text.
+  assert.ok(!text.includes(secret) && !text.includes('ce-img--gm'), `the GM-only picture is not in the saved page: ${text}`);
+  assert.match(text, /<section class="secret[^"]*"[^>]* id="secret-chrk[0-9a-f]{32}"/);
+  assert.ok(![...world.files.keys()].some((p) => p.includes(secret)), 'a GM-only picture is never copied');
+
+  // A second pull reuses the copy.
+  await JournalSync_resync(world);
+  assert.equal([...world.files.keys()].filter((p) => p.includes(shared)).length, 1);
+
+  // An edit in Foundry sends the plain Chronicle paths back, GM-only intact.
+  const page = j.pages.contents.find((p) => p.type === 'text');
+  await page.update({ 'text.content': page.text.content.replace('She owes the guild.', 'She owes the guild 40 gold.') });
+  await settle();
+  const after = (await seed.chronicle.get(`/entities/${e.id}`)).entry_html || '';
+  assert.match(after, /40 gold/);
+  assert.ok(after.includes(`src="/media/${shared}"`), `shared path restored: ${after}`);
+  assert.match(after, new RegExp(`<figure class="[^"]*ce-img--gm[^"]*"><img src="/media/${secret}"`));
+  assert.ok(!after.includes('chronicle-media') && !after.includes('<section'), `no Foundry-side markup leaks back: ${after}`);
 }));
 
 /** The dashboard's Resync, used where a scenario needs every page linked up front. */

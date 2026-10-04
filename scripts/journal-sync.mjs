@@ -30,6 +30,8 @@ import { setAside } from './_set-aside.mjs';
 import { isOldNotesJournal } from './_notes-folder.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { collapseChanges } from './_change-feed.mjs';
+import { sharedPictureIds, toFoundryPictures, toChroniclePictures } from './_inline-pictures.mjs';
+import { PictureStore, watchGMPictures } from './picture-store.mjs';
 
 /**
  * Validate and resolve a Chronicle entity's `image_path` to a safe src
@@ -179,6 +181,9 @@ export class JournalSync {
     this._api = api;
 
     if (!getSetting('syncJournals')) return;
+
+    this._pictures = new PictureStore({ api });
+    if (game.user?.isGM) this._stopGMPictures = watchGMPictures(this._pictures);
 
     // Register Foundry hooks for JournalEntry changes.
     Hooks.on('createJournalEntry', this._onCreateJournal);
@@ -568,6 +573,8 @@ export class JournalSync {
     Hooks.off('closeJournalSheet', this._onCloseJournalSheet);
     Hooks.off('closeJournalEntrySheet', this._onCloseJournalSheet);
     globalThis.window?.removeEventListener?.('beforeunload', this._onBeforeUnload);
+    this._stopGMPictures?.();
+    this._stopGMPictures = null;
     this._stopGMSecrets?.();
     this._stopGMSecrets = null;
     // Module stop is itself a form of "unload" — never drop the last edit.
@@ -1657,7 +1664,9 @@ export class JournalSync {
       console.warn(`Chronicle: did not send the text of "${journal.name}": its GM-only parts changed in Chronicle`);
       return undefined;
     }
-    return toChronicleSecrets(r.html);
+    // Pictures after the restore, so a GM-only one in restored content or
+    // in a block the GM typed leaves marked GM-only.
+    return toChronicleSecrets(toChroniclePictures(r.html, getSetting('apiUrl')));
   }
 
   /**
@@ -1671,8 +1680,10 @@ export class JournalSync {
    */
   async _pullHtml(entityId, html) {
     if (!html) return '';
+    // Pictures before hiding: shared ones point at their local copy, and
+    // GM-only ones go in a secret block, so they are hidden like GM text.
     const { html: hidden, pieces } = await hideSecrets(
-      toFoundrySecrets(html), secretPlaceholderText(), secretKeyer(getSetting('apiKey'), entityId),
+      await this._withPictures(toFoundrySecrets(html)), secretPlaceholderText(), secretKeyer(getSetting('apiKey'), entityId),
     );
     for (const [id, content] of pieces) this._secretPieces.set(id, content);
     return _sanitizeIncomingHTML(hidden);
@@ -1693,8 +1704,9 @@ export class JournalSync {
       const entity = await this._api.get(`/entities/${entityId}`);
       for (const html of [entity?.entry_html, entity?.player_notes_html]) {
         if (!html) continue;
+        // Same blocks as the pull, so the placeholder ids match; no copies.
         const { pieces } = await hideSecrets(
-          toFoundrySecrets(html), secretPlaceholderText(), secretKeyer(getSetting('apiKey'), entityId),
+          toFoundryPictures(toFoundrySecrets(html), () => undefined), secretPlaceholderText(), secretKeyer(getSetting('apiKey'), entityId),
         );
         for (const [id, content] of pieces) this._secretPieces.set(id, content);
       }
@@ -1870,6 +1882,22 @@ export class JournalSync {
         break;
       }
     }
+  }
+
+  /**
+   * Chronicle HTML with its pictures made showable in Foundry: shared ones
+   * copied into the world's files, GM-only ones inside a secret block
+   * (scripts/_inline-pictures.mjs). A picture that can't be copied keeps
+   * its Chronicle path and is retried on the next pull.
+   * @param {string} html
+   * @returns {Promise<string>}
+   * @private
+   */
+  async _withPictures(html) {
+    if (!html) return html;
+    const ids = sharedPictureIds(html);
+    const local = ids.length && this._pictures ? await this._pictures.ensure(ids) : new Map();
+    return toFoundryPictures(html, (id) => local.get(id));
   }
 
   /**

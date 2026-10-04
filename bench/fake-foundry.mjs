@@ -397,6 +397,7 @@ export function installFoundry({ settings = {}, systemId = 'dnd5e' } = {}) {
     items: new Collection(),
     scenes: new Collection(),
     system: { id: systemId, version: '5.0.0' },
+    world: { id: 'bench-world' },
     version: '14.300',
     modules: { get: () => null },
     time: { worldTime: 0, components: {} },
@@ -423,6 +424,28 @@ export function installFoundry({ settings = {}, systemId = 'dnd5e' } = {}) {
   };
   world.game = game;
   world.settingsValues = values;
+
+  // The world's user-data files, in memory: path → { size, type }.
+  const files = new Map();
+  world.files = files;
+  const FilePicker = {
+    async browse(source, dir) {
+      const prefix = `${dir}/`;
+      const listed = [...files.keys()].filter((p) => p.startsWith(prefix));
+      if (listed.length === 0 && ![...files.keys()].some((p) => p === dir)) throw new Error(`ENOENT: ${dir}`);
+      return { files: listed, dirs: [] };
+    },
+    async createDirectory(source, dir) {
+      if (files.has(dir)) throw new Error(`EEXIST: ${dir}`);
+      files.set(dir, { dir: true });
+    },
+    async upload(source, dir, file) {
+      const path = `${dir}/${file.name}`;
+      files.set(path, { size: file.size, type: file.type });
+      log.writes.push({ op: 'upload', type: 'File', id: path });
+      return { status: 'success', path };
+    },
+  };
 
   world.collectionFor = (type) => ({ JournalEntry: journal, Actor: actors, Folder: folders }[type]);
 
@@ -478,6 +501,7 @@ export function installFoundry({ settings = {}, systemId = 'dnd5e' } = {}) {
         escapeHTML: (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
       },
       applications: {
+        apps: { FilePicker: { implementation: FilePicker } },
         api: {
           ApplicationV2: class { render() { return this; } close() {} },
           HandlebarsApplicationMixin: (b) => b,
