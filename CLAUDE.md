@@ -23,6 +23,8 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
   Chronicle change to it means copying it again (`tools/test-shop-room.mjs`).
 - `scripts/dm-screen.mjs` (UI): the GM's DM Screen window, drawn from
   Chronicle's `GET /dm-screen`.
+- `scripts/debug-hub.mjs` (UI): the dashboard's Debug tab and player
+  problem reports.
 - `templates/` Handlebars, `styles/` CSS, `lang/en.json` strings,
   `tools/test-*.mjs` (Node's test runner, see TESTING.md).
 - `bench/`: the two-sided sync bench (real Chronicle + the real sync code in

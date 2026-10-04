@@ -228,3 +228,28 @@
 }
 
 }
+
+/* Report a problem */
+
+.chronicle-stashes .cs-report {
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(128, 128, 128, 0.3);
+  font-size: 0.9em;
+}
+
+.chronicle-stashes .cs-report-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chronicle-stashes .cs-report-label textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.chronicle-stashes .cs-report-buttons {
+  display: flex;
+  gap: 6px;
+}

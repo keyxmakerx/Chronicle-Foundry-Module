@@ -18,6 +18,7 @@ import { StashSync } from './stash-sync.mjs';
 import { registerStashSocket } from './stash-client.mjs';
 import { registerStashChat } from './stash-chat.mjs';
 import { registerStashButton } from './stash-window.mjs';
+import { bindDebugHub, registerDebugHub } from './debug-hub.mjs';
 import { SyncDashboard } from './sync-dashboard.mjs';
 import { MapViewerSheet } from './map-viewer.mjs';
 import { openDMScreen } from './dm-screen.mjs';
@@ -135,6 +136,12 @@ Hooks.once('ready', async () => {
     registerStashButton();
   } catch (err) {
     console.warn('Chronicle Sync | Stashes unavailable', err);
+  }
+  try {
+    bindDebugHub(() => syncManager);
+    registerDebugHub();
+  } catch (err) {
+    console.warn('Chronicle Sync | Problem reports unavailable', err);
   }
   try {
     registerPlayerNotebook();
