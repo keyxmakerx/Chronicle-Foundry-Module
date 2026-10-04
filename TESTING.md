@@ -45,6 +45,13 @@ repo root. There is no `package.json`.
 - [ ] Page titles match heading text (HTML stripped)
 - [ ] Pre-heading content creates "Overview" page
 
+### GM-only text and pictures
+Needs a player client that can see the journal but does not own its page.
+- [ ] In Chronicle, mark a sentence inside a paragraph as GM-only (secret text) and sync -> the Foundry page shows it inside a secret block for the GM; the player's view of the page has no trace of the sentence
+- [ ] Add a GM-only picture in Chronicle -> it is inside a secret block for the GM and absent for the player
+- [ ] As GM, edit a normal sentence next to the secret block and save -> in Chronicle the secret text is still GM-only and the rest of the paragraph reads as one paragraph
+- [ ] As GM, wrap a new line in a Foundry secret block and save -> Chronicle shows it as GM-only text
+
 ### Permission Sync
 - [ ] Private entity (is_private=true) creates journal with default ownership NONE
 - [ ] Public entity (is_private=false) creates journal with default ownership OBSERVER
@@ -134,6 +141,22 @@ test player Observer on the map journal.
 - [ ] Change it back to Everyone → it reappears for the player
 - [ ] Marker JSON from a map saved by an older module version that already carried a DM-only marker in flags: **Resync All Maps** strips it from the flags
 
+### Marker icons and the map's look
+- [ ] A map set to a frame or pin shape in Chronicle shows that frame and pin shape in the viewer
+- [ ] The viewer's **Toggle Labels** button overrides the map's name setting for that viewer
+- [ ] **Place Chronicle marker** or **Configure Chronicle Marker**: the Icon picker lists icon groups and a search box ("Search icons, e.g. tavern"); picking one updates the preview pin; Save -> Chronicle shows that icon
+- [ ] Against an older Chronicle that has no icon list, the dialog hides the picker and an edited marker keeps its icon
+
+### Maps with a shadow (security)
+- [ ] In Chronicle, draw a shadow area over part of a map with a picture; as a player, open the map in Foundry -> the shadowed part of the picture is smudged and pins under the shadow are absent; the GM sees the original and the pins
+- [ ] Move or remove the shadow in Chronicle -> the player's picture follows after the next sync
+
+### Giving a map to a character
+- [ ] GM: right-click a Chronicle map in the journal sidebar -> **Give this map to a character**, pick a character, **Give map** -> an item "Map of the area: <name>" is in that character's inventory and the owning players can open the map journal
+- [ ] GM: drag a Chronicle map journal onto a character sheet -> same result, with no second item if it was already given
+- [ ] On the sheet, the item's **Open** button unfolds the live map in its own window while the sheet stays open; the same works for the owning player
+- [ ] A player who does not own the character cannot open the map
+
 ### View in Chronicle
 - [ ] Dashboard Maps tab → the external-link icon on a map row opens the Chronicle map URL
 
@@ -177,7 +200,7 @@ GM notice. See API-CONTRACT.md.
 - [ ] Multiple shop rooms can be open simultaneously; closing one cleans up its tooltip
 - [ ] GM: open the wares, Add an item, pick who pays, Buy -> "Bought … left." in the room; the coins drop on that character's sheet and the item appears in its inventory; a whispered chat line names the character, goods and cost
 - [ ] Player (matched to a Chronicle member, downtime open, shop shown): the basket lists only their own characters; Buy works the same; the GM gets the chat line naming the player
-- [ ] Player while downtime is closed: Buy reads "Buying opens in downtime" and nothing is charged
+- [ ] Player while downtime is closed: the button reads "Ask to buy"; pressing it says "Asked the GM for …", nothing is charged and no chat line appears; the request waits on Chronicle's Stashes page
 - [ ] Player whose Foundry user is not matched: no basket appears; GM stops showing the shop mid-basket -> Buy says the GM isn't showing it any more
 
 ## Initial Sync
@@ -258,6 +281,46 @@ Needs a GM and a player client on the same scene, and an NPC page synced as a jo
 - [ ] Starting a second NPC talking stops the first; two minutes with no lines switches it off; a reload doesn't leave it on
 - [ ] Leave a client idle for a minute, or switch its tab away: the glow slows to still, and comes back on return
 - [ ] Reveal a hidden NPC token whose page is hidden: asked once "Show their Chronicle page?"; Yes shows the page to players in Chronicle, No leaves it hidden
+- [ ] On the NPC's Chronicle page press "Show in Foundry": the page says "Sent to Foundry." and both clients play the same spotlight as the star
+- [ ] "Show in Foundry" for an NPC with no token on the GM's scene, or only a hidden one: only the GM gets a notice
+
+## DM Screen
+
+GM only. Needs a Chronicle that serves the DM Screen.
+
+- [ ] The scene controls' Chronicle group has a d20 button for the GM; a player's group has only the notebook button
+- [ ] Click it: a d20 rolls out of the button, lands on 20 and the screen unfolds into three leaves (The world, The party, Rules and reveals); a click or Escape skips the opening
+- [ ] The world leaf shows In session / Downtime; pressing the other one asks first, **Cancel** leaves it, confirming switches it and a notice says how many waiting requests went through
+- [ ] The party leaf lists each hero on one line; a row expands for detail
+- [ ] Rules tab: **Find a condition** filters the list. Reveal tab: **Reveal** on a hidden character makes it visible to players in Chronicle
+- [ ] Against a Chronicle without the DM Screen, the window says to update Chronicle; with a wrong key it says the key was not accepted; **Try again** reloads
+
+## Stashes
+
+Needs the Armory addon on in Chronicle, a character linked to an actor, and a player matched to a Chronicle member (Members tab).
+
+- [ ] A **Stashes** button is in the title bar of a linked character sheet (players on characters they own, the GM on all); with the Armory off, or on a Chronicle without stash routes, it is absent
+- [ ] The window shows the character on the left and a destination on the right, a downtime badge, and Move / History tabs
+- [ ] As GM, move an item or an amount of money to another character or a stash -> it happens at once and both sheets update
+- [ ] As a player, move something -> "Sent to your GM"; the GM gets a whispered **Stash request** chat card
+- [ ] **Approve** on the card -> the card reads "Approved by <name>", the player's window updates and both inventories change; **Turn down** -> "Turned down by <name>" and nothing moves
+- [ ] An item moved away from a character in Chronicle disappears from the Foundry sheet; a relation removed any other way only unlinks the Foundry item
+- [ ] With no GM connected, a player's move says stashes need the GM to be connected
+
+## Player Notebook
+
+- [ ] Every user (GM and players) has an **Open my Chronicle notebook** button in the Chronicle scene controls and a **Jot notes** tab in the bottom-right corner while the world is connected to Chronicle
+- [ ] First use: **Connect to Chronicle** opens Chronicle's Allow window; **Allow** closes it and the player's own Journal appears in the frame
+- [ ] A player whose Foundry user is not matched to a Chronicle member sees the "hasn't matched your Foundry login" message; one who allows with a different Chronicle account sees the "isn't the one your GM matched" message
+- [ ] Open a Chronicle-linked journal, then the Jot notes tab -> the jots follow the page in view; opening another linked journal moves them
+- [ ] Disconnect the player in Chronicle -> the frame shows "no longer accepts this connection" with a Connect button
+- [ ] The old "Chronicle Notes" journal folder, if the world had one, is moved into "Chronicle: removed" on the GM's world load and nothing in it is deleted
+
+## Import Wizard
+
+- [ ] Dashboard Config tab -> **Setup Wizard** opens a seven-step wizard: Connect, Scan, Types, Tags, Characters, Calendar, Review; there is no maps step
+- [ ] Tags, Characters and Calendar steps are skipped when tags are unavailable, no game system matched, or no calendar addon and module are active
+- [ ] Review lists what will be created; running it creates the entities and marks the wizard completed
 
 ## Error Recovery
 
@@ -268,6 +331,12 @@ Needs a GM and a player client on the same scene, and an NPC page synced as a jo
 - [ ] A failed Foundry→Chronicle push (e.g. Chronicle down)
       surfaces a `ui.notifications.warn` to the GM and appears in the dashboard error log
       (not console-only). Journal/note *updates* are queued for retry and re-push on reconnect.
+
+### Catch-up after a closed world
+- [ ] Close Foundry, edit a page and a character in Chronicle, change a character's inventory there, then reopen the world -> the page, the character and the inventory change appear without Resync All
+- [ ] Delete a page in Chronicle while Foundry is closed, then reopen -> its journal is set aside in the "Chronicle: removed" folder, not deleted
+- [ ] Against an older Chronicle with no change feed, reopening still catches up (a full rescan; slower)
+- [ ] Remove a "Has Item" relation in Chronicle -> the Foundry item is unlinked from Chronicle but not deleted from the character
 
 ### Reconnect re-pull
 Edits made on Chronicle while Foundry was disconnected arrive after reconnect, without a world reload.
@@ -282,9 +351,9 @@ Edits made on Chronicle while Foundry was disconnected arrive after reconnect, w
 
 ## Sync Dashboard
 
-The dashboard is a left rail of 11 tabs in five groups. Rail order: Overview
-(top, ungrouped); Everyday: Entities, Characters, Calendar, Issues; Library:
-Shops, Maps, Notes; Setup: Config, Members; Diagnostics: Status.
+The dashboard is a left rail of 10 tabs in four labelled groups. Rail order:
+Overview (top, ungrouped); Everyday: Entities, Characters, Calendar, Issues;
+Library: Shops, Maps; Setup: Config, Members; Diagnostics: Status.
 
 ### Access
 - [ ] Click the sidebar status indicator (when connected) or the Chronicle Sync button in the scene controls → dashboard opens (GM only); right-click on the indicator opens it even when disconnected; clicking while disconnected tries to reconnect
@@ -299,9 +368,8 @@ Shops, Maps, Notes; Setup: Config, Members; Diagnostics: Status.
 - [ ] **Calendar:** shows the Chronicle vs Foundry date with Pull Date / Push Date and the detected calendar module; **Open Sync Calendar** opens the Sync Calendar editor; the tab explains why when sync is disabled, no calendar module is active, or the calendar is rebuilding or unreachable
 - [ ] **Issues:** badge shows the number of character actors that cannot be matched. Each row offers a "Match to existing…" dropdown with **Match**, and **Create new**. Resolving a row links it and removes it. With none, the tab says every character is linked
 - [ ] **Shops:** shop entities with type, keeper, private lock, "Synced" badge and an **Open** button that opens the Shop window; empty states say whether the "Shop" entity type is missing or just has no shops
-- [ ] **Maps:** per-map rows with marker / drawing / token counts, **Open in Foundry**, external-link icon; **Resync All Maps**, **Open Chronicle Maps Folder**; summary row and dismissible error list (see Map Sync)
-- [ ] **Notes:** Chronicle notes with a status badge (synced / chronicle-only), shared or private icon, last-sync time, and a Pull button on chronicle-only notes
-- [ ] **Config:** Connection (URL, API key as password field, campaign ID, **Test Connection**), Import Wizard button, Sync Scope, Permissions, Behavior (conflict resolution), Exclusion Rules (tags, name) and **Save**; unsaved checkbox/select changes are marked until saved
+- [ ] **Maps:** per-map rows with the map's picture (a shadowed map shows the players' copy), marker / drawing / token counts, **Open in Foundry**, external-link icon; **Resync All Maps**, **Open Chronicle Maps Folder**; summary row and dismissible error list (see Map Sync)
+- [ ] **Config:** Connection (URL, API key as password field, campaign ID, **Test Connection**), **Setup Wizard** button, Sync Scope, Permissions, Behavior (conflict resolution), Exclusion Rules (tags, name) and **Save**; unsaved checkbox/select changes are marked until saved
 - [ ] **Members:** one row per Chronicle campaign member with Matched / Unmatched badge and a Foundry-user dropdown; changing the dropdown saves the mapping; the rail badge counts unmatched members; **Refresh** re-fetches
 - [ ] **Status:** Game System (Foundry and Chronicle system, Character Sync), Diagnostics, Field Mapping, Sync Capability (pick an actor to inspect; **Copy** report and JSON), Error Log, Recent Activity, Diagnostic Bundle copy and System Debug Export copy
 
@@ -330,5 +398,6 @@ Shops, Maps, Notes; Setup: Config, Members; Diagnostics: Status.
 - [ ] Error log: recent errors (up to 50) with timestamp, method, path, status
 - [ ] Retry queue: failed writes queued and processed on reconnect (Status tab → Pending Retries drains to 0)
 - [ ] Activity log: recent sync actions (up to 100 kept, newest first) with color-coded type icons
+- [ ] Status tab -> **Copy Diagnostic Bundle** puts a Markdown report (versions, connection health, sync state, field mapping, recent activity and errors) on the clipboard; it contains no API key
 - [ ] Clear log button resets activity log (Status tab)
 - [ ] Reconnect button (Status tab, and Overview when disconnected) triggers manual WebSocket reconnection

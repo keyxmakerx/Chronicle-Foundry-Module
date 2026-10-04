@@ -28,7 +28,7 @@ import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
 import { confirmDialog } from './_dialogs.mjs';
 import { userCanSeeMarker } from './_map-flag-filter.mjs';
 import {
-  sanitizeLook, markerIconClass, pinMetrics, pinShapeSvg, frameInitial,
+  sanitizeLook, markerIconClass, pinMetrics, pinShapeSvg, frameInitial, groupIconCatalog,
 } from './_map-look.mjs';
 import { startMotionRest } from './_map-motion-rest.mjs';
 
@@ -467,7 +467,7 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
     this._markerLayer = viewer.querySelector('.chronicle-marker-layer');
     this._applyTransform();
 
-    // Notify MapSync so it can fetch/refresh sub-resources and start polling.
+    // Notify MapSync so it can fetch/refresh sub-resources.
     const mapId = this.document.getFlag(FLAG_SCOPE, 'mapId');
     if (mapId) {
       const mapSync = _getMapSync();
@@ -921,6 +921,7 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
     }
 
     new ChronicleMarkerConfigDialog({
+      look: this._currentLook(),
       marker: {
         id: null,
         name: '',
@@ -943,6 +944,13 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
     this._setActiveTool(null);
   }
 
+  /** This map's resolved look, for the marker window's pin preview. */
+  _currentLook() {
+    const meta = _getMapSync()?.getMapData(this.document)?.meta
+      || this.document.getFlag(FLAG_SCOPE, 'chronicleMapMeta');
+    return sanitizeLook(meta?.look);
+  }
+
   _openChronicleMarkerConfig(markerId) {
     if (!game.user.isGM || !markerId) return;
     const mapId = this.document.getFlag(FLAG_SCOPE, 'mapId');
@@ -954,6 +962,7 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
     if (!marker) return;
 
     new ChronicleMarkerConfigDialog({
+      look: this._currentLook(),
       marker: { ...marker },
       mode: 'edit',
       onSave: async (updated) => {
@@ -1136,7 +1145,7 @@ export class ChronicleMarkerConfigDialog extends HandlebarsApplicationMixin(Appl
     },
   };
 
-  constructor({ marker, mode, onSave, onDelete }) {
+  constructor({ marker, mode, onSave, onDelete, look }) {
     const id = marker?.id ? `chronicle-marker-config-${marker.id}` : 'chronicle-marker-config-new';
     super({
       id,
@@ -1146,9 +1155,25 @@ export class ChronicleMarkerConfigDialog extends HandlebarsApplicationMixin(Appl
     this._mode = mode || 'edit';
     this._onSaveCallback = onSave;
     this._onDeleteCallback = onDelete;
+    this._look = sanitizeLook(look);
+    /** Chronicle's icon catalog; empty on an older Chronicle (no picker then). */
+    this._iconCatalog = _getMapSync()?.getIconCatalog?.() || [];
+  }
+
+  /** The marker's icon to start from: its own, else its kind's. */
+  _startIcon() {
+    const kind = CHRONICLE_MARKER_CATEGORIES.includes(this._marker?.pin_category)
+      ? this._marker.pin_category : 'note';
+    return this._marker?.icon ? markerIconClass(this._marker.icon) : PIN_ICONS[kind].faIcon;
   }
 
   async _prepareContext(_options = {}) {
+    const currentIcon = this._startIcon();
+    const iconGroups = groupIconCatalog(this._iconCatalog);
+    const currentGroup = this._iconCatalog.find((i) => i.id === currentIcon)?.category || '';
+    const pin = pinMetrics(this._look.pinStyle, 'm');
+    const kind = CHRONICLE_MARKER_CATEGORIES.includes(this._marker?.pin_category)
+      ? this._marker.pin_category : 'note';
     const categories = CHRONICLE_MARKER_CATEGORIES.map((key) => ({
       key,
       label: game.i18n.localize(`CHRONICLE.MapViewer.PinTypes.${key}`),
@@ -1165,7 +1190,52 @@ export class ChronicleMarkerConfigDialog extends HandlebarsApplicationMixin(Appl
       isCreate: this._mode === 'create',
       categories,
       visibilityOptions,
+      hasIcons: iconGroups.length > 0,
+      iconGroups,
+      currentIcon,
+      currentGroup,
+      pickerId: this._marker?.id || 'new',
+      pin,
+      previewSvg: new Handlebars.SafeString(pinShapeSvg(this._look.pinStyle, PIN_ICONS[kind].color, false)),
     };
+  }
+
+  /** Wire the icon picker: groups and search filter the grid, a click picks. */
+  _onRender(context, options) {
+    super._onRender?.(context, options);
+    const root = this.element?.querySelector('.cs-icon-picker');
+    if (!root) return;
+    const hidden = root.querySelector('[name="icon"]');
+    const search = root.querySelector('.cs-icon-search');
+    const choices = [...root.querySelectorAll('.cs-icon-choice')];
+    const groups = [...root.querySelectorAll('.cs-icon-group')];
+    const none = root.querySelector('.cs-icon-none');
+    const glyph = root.querySelector('.cs-icon-preview-pin i');
+    let group = groups.find((g) => g.getAttribute('aria-pressed') === 'true')?.dataset.group || '';
+
+    const filter = () => {
+      const q = search.value.trim().toLowerCase();
+      let shown = 0;
+      for (const c of choices) {
+        const ok = q ? c.dataset.label.toLowerCase().includes(q) : (!group || c.dataset.group === group);
+        c.hidden = !ok;
+        if (ok) shown++;
+      }
+      none.hidden = shown > 0;
+      for (const g of groups) g.setAttribute('aria-pressed', String(!q && g.dataset.group === group));
+    };
+    for (const g of groups) {
+      g.addEventListener('click', () => { group = g.dataset.group; search.value = ''; filter(); });
+    }
+    search.addEventListener('input', filter);
+    for (const c of choices) {
+      c.addEventListener('click', () => {
+        hidden.value = c.dataset.icon;
+        for (const o of choices) o.setAttribute('aria-pressed', String(o === c));
+        if (glyph) glyph.className = `fa-solid ${markerIconClass(c.dataset.icon)}`;
+      });
+    }
+    filter();
   }
 
   static #onSave(_event, _target) {
@@ -1196,12 +1266,26 @@ export class ChronicleMarkerConfigDialog extends HandlebarsApplicationMixin(Appl
       y: this._marker.y,
       pin_category: safeCategory,
       color: PIN_ICONS[safeCategory].color,
-      icon: PIN_ICONS[safeCategory].faIcon,
+      icon: this._iconForSave(form, safeCategory),
       visibility: safeVisibility,
     };
 
     if (this._onSaveCallback) this._onSaveCallback(data);
     this.close();
+  }
+
+  /**
+   * The icon to send: the picked one when it is in Chronicle's catalog;
+   * without a catalog (older Chronicle) the marker keeps its own icon, and
+   * a new one takes its kind's.
+   */
+  _iconForSave(form, kind) {
+    const picked = this._iconCatalog.length ? form.querySelector('[name="icon"]')?.value : null;
+    if (picked) {
+      const ids = new Set(this._iconCatalog.map((i) => i.id));
+      if (ids.has(picked)) return picked;
+    }
+    return this._marker?.icon ? markerIconClass(this._marker.icon) : PIN_ICONS[kind].faIcon;
   }
 
   static async #onDelete(_event, _target) {

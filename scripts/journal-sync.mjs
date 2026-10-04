@@ -13,7 +13,11 @@ import { getSetting, getSyncExclusions } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
 import { FLAG_SCOPE, SYNC_OPTIONS } from './constants.mjs';
 import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
-import { toFoundrySecrets, toChronicleSecrets, secretBlockRanges, PART_ATTR } from './_gm-secrets.mjs';
+import {
+  toFoundrySecrets, toChronicleSecrets, secretBlockRanges, PART_ATTR,
+  hideSecrets, restoreSecrets, secretKeyer, hasClearSecrets, DEFAULT_PLACEHOLDER_TEXT,
+} from './_gm-secrets.mjs';
+import { watchGMSecrets } from './gm-secret-view.mjs';
 import { defaultLevelForVisibility } from './_ownership.mjs';
 import { isCalendarNoteJournal } from './calendar-sync.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
@@ -23,6 +27,7 @@ import { isMapJournal } from './_journal-ownership.mjs';
 import { pickJournalCreateType, buildEntityCreateBody } from './_journal-create.mjs';
 import { JournalPushDebouncer } from './_journal-push-debounce.mjs';
 import { setAside } from './_set-aside.mjs';
+import { isOldNotesJournal } from './_notes-folder.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { collapseChanges } from './_change-feed.mjs';
 import { sharedPictureIds, toFoundryPictures, toChroniclePictures } from './_inline-pictures.mjs';
@@ -95,6 +100,20 @@ function startsWithHeading(content) {
   return pos > 0 && /^<h[12][^>]*>/i.test(text.slice(pos));
 }
 
+/**
+ * Text a saved page shows where GM-only content was. Owners of a page see
+ * it; the GM's client shows the content over it.
+ * @returns {string}
+ */
+/** Journals re-pulled per connect to hide GM-only text an older version stored. */
+const STORED_SECRET_PULLS_PER_CONNECT = 20;
+
+function secretPlaceholderText() {
+  const key = 'CHRONICLE.Secrets.Placeholder';
+  const text = globalThis.game?.i18n?.localize?.(key);
+  return text && text !== key ? text : DEFAULT_PLACEHOLDER_TEXT;
+}
+
 export class JournalSync {
   constructor() {
     /** @type {import('./api-client.mjs').ChronicleAPI|null} */
@@ -119,6 +138,21 @@ export class JournalSync {
 
     /** Entity ids seen / completeness of the last full walk, for reconcile. */
     this._lastWalk = null;
+
+    /**
+     * GM-only content behind each placeholder in a journal page (placeholder
+     * id -> Chronicle HTML). Memory only, on the GM's client: a saved page
+     * never holds it (scripts/_gm-secrets.mjs).
+     * @type {Map<string, string>}
+     */
+    this._secretPieces = new Map();
+    /** @type {Map<string, Promise<void>>} entity id -> read in flight */
+    this._secretLoads = new Map();
+    /** Journals already warned about this session, by id. */
+    this._warnedUnrestored = new Set();
+    /** Entities whose GM-only content the view has read this session. */
+    this._secretViewLoaded = new Set();
+    this._stopGMSecrets = null;
 
     // Bound hook handlers for cleanup.
     this._onCreateJournal = this._handleCreateJournal.bind(this);
@@ -149,7 +183,7 @@ export class JournalSync {
     if (!getSetting('syncJournals')) return;
 
     this._pictures = new PictureStore({ api });
-    this._stopGMPictures = watchGMPictures(this._pictures);
+    if (game.user?.isGM) this._stopGMPictures = watchGMPictures(this._pictures);
 
     // Register Foundry hooks for JournalEntry changes.
     Hooks.on('createJournalEntry', this._onCreateJournal);
@@ -165,6 +199,7 @@ export class JournalSync {
     Hooks.on('closeJournalSheet', this._onCloseJournalSheet);
     Hooks.on('closeJournalEntrySheet', this._onCloseJournalSheet);
     globalThis.window?.addEventListener?.('beforeunload', this._onBeforeUnload);
+    if (game.user?.isGM) this._stopGMSecrets = watchGMSecrets((id) => this._secretFor(id));
 
     console.debug('Chronicle: Journal sync initialized');
   }
@@ -257,12 +292,14 @@ export class JournalSync {
     const createdAfter = getSetting('lastSyncTime') || null;
     if (feed?.mode === 'delta') {
       await this._catchUpFromFeed(feed.changes, feed.createdAfter ?? createdAfter);
+      await this._hideStoredSecrets();
       return;
     }
     const summary = await this.resyncAll({ verbose: false, onlyChanged: true, createdAfter });
     // A failed or partial walk proves nothing about deletions.
     if (summary.errors > 0 && !this._lastWalk) throw new Error('journal reconcile: entity list failed');
     await this._setAsideMissing();
+    await this._hideStoredSecrets();
   }
 
   /**
@@ -341,7 +378,7 @@ export class JournalSync {
    * @private
    */
   async _setAsideIfGone(journal, eid, { knownGone = false } = {}) {
-    if (isCalendarNoteJournal(journal) || this._isHandledByNoteSync(journal) || isMapJournal(journal, FLAG_SCOPE)) return;
+    if (isCalendarNoteJournal(journal) || isOldNotesJournal(journal, FLAG_SCOPE) || isMapJournal(journal, FLAG_SCOPE)) return;
     if (this._isActorLinked(eid)) return;
     let gone = knownGone;
     if (!gone) {
@@ -538,6 +575,8 @@ export class JournalSync {
     globalThis.window?.removeEventListener?.('beforeunload', this._onBeforeUnload);
     this._stopGMPictures?.();
     this._stopGMPictures = null;
+    this._stopGMSecrets?.();
+    this._stopGMSecrets = null;
     // Module stop is itself a form of "unload" — never drop the last edit.
     this._journalPushDebouncer.flushAll();
   }
@@ -668,10 +707,10 @@ export class JournalSync {
     }, SYNC_OPTIONS);
 
     // Split entity content into pages and sync them.
-    await this._syncPagesToJournal(journal, await this._withPictures(_sanitizeIncomingHTML(toFoundrySecrets(entity.entry_html || ''))));
+    await this._syncPagesToJournal(journal, await this._pullHtml(entity.id, entity.entry_html));
 
     // Sync player notes page.
-    await this._syncPlayerNotesPage(journal, await this._withPictures(_sanitizeIncomingHTML(toFoundrySecrets(entity.player_notes_html || ''))));
+    await this._syncPlayerNotesPage(journal, await this._pullHtml(entity.id, entity.player_notes_html));
 
     console.debug(`Chronicle: Updated journal "${journal.name}" from entity`);
   }
@@ -805,7 +844,7 @@ export class JournalSync {
 
     // Split entity content into pages by top-level headings.
     // Sanitize at ingress before splitting (defense-in-depth).
-    const sections = this._splitByHeadings(await this._withPictures(_sanitizeIncomingHTML(toFoundrySecrets(entity.entry_html || ''))));
+    const sections = this._splitByHeadings(await this._pullHtml(entity.id, entity.entry_html));
 
     let sortIndex = 1;
     for (const section of sections) {
@@ -831,7 +870,7 @@ export class JournalSync {
       pages.push({
         name: 'Player Notes',
         type: 'text',
-        text: { content: await this._withPictures(_sanitizeIncomingHTML(toFoundrySecrets(entity.player_notes_html))) },
+        text: { content: await this._pullHtml(entity.id, entity.player_notes_html) },
         sort: sortIndex++,
         ownership: { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER },
         flags: { [FLAG_SCOPE]: { isPlayerNotes: true } },
@@ -907,17 +946,18 @@ export class JournalSync {
     // Skip if this journal was created by Chronicle sync.
     if (journal.getFlag(FLAG_SCOPE, 'entityId')) return;
 
-    // Skip journals owned by another sync domain: calendar modules, maps and
-    // Chronicle Notes also persist as JournalEntries, and CalendarSync /
-    // MapSync / NoteSync mirror them to their own Chronicle resource. Pushed
-    // as pages they would fail (maps) or be filed under an arbitrary type.
-    // Mirrors _isHandledByActorSync.
+    // Skip journals owned by another sync domain: calendar modules and maps
+    // also persist as JournalEntries, and CalendarSync / MapSync mirror them
+    // to their own Chronicle resource. Pushed as pages they would fail (maps)
+    // or be filed under an arbitrary type. The old Chronicle Notes folder is
+    // set aside and must never become pages either. Mirrors
+    // _isHandledByActorSync.
     if (isCalendarNoteJournal(journal)) {
       console.debug(`Chronicle: Skipping journal "${journal.name}" — calendar note (owned by CalendarSync).`);
       return;
     }
-    if (this._isHandledByNoteSync(journal)) {
-      console.debug(`Chronicle: Skipping journal "${journal.name}" — Chronicle Note (owned by NoteSync).`);
+    if (isOldNotesJournal(journal, FLAG_SCOPE)) {
+      console.debug(`Chronicle: Skipping journal "${journal.name}" — old Chronicle Notes folder (set aside).`);
       return;
     }
     if (isMapJournal(journal, FLAG_SCOPE)) {
@@ -956,10 +996,11 @@ export class JournalSync {
           [`flags.${FLAG_SCOPE}.chronicleUpdatedAt`]: entity.updated_at || '',
         }, SYNC_OPTIONS);
 
-        const entryHtml = this._collectTextPages(journal);
+        const entryHtml = await this._entryForPush(journal, entity.id);
         if (entryHtml) {
           const updated = await this._api.put(`/entities/${entity.id}`, { entry: entryHtml });
           await this._recordPush(journal, updated);
+          await this._hidePushedSecrets(journal, updated);
         }
 
         // Create sync mapping (idempotent — tolerates server-side
@@ -1015,10 +1056,10 @@ export class JournalSync {
     const entityId = journal.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
 
-    // Defensive: a calendar note / Chronicle Note may carry a stale entityId
+    // Defensive: a calendar note / old Chronicle Note may carry a stale entityId
     // from before the create-time guard existed. Don't keep pushing edits to
     // that bogus entity — the cleanup pass unlinks it.
-    if (isCalendarNoteJournal(journal) || this._isHandledByNoteSync(journal)
+    if (isCalendarNoteJournal(journal) || isOldNotesJournal(journal, FLAG_SCOPE)
         || isMapJournal(journal, FLAG_SCOPE)) return;
 
     // Debounced: collapse a typing burst into one push, ~2s after
@@ -1065,20 +1106,22 @@ export class JournalSync {
   async _pushJournalUpdate(journal, entityId) {
     try {
       // Concatenate all text pages into a single entry for Chronicle.
-      const entryHtml = this._collectTextPages(journal);
-      const playerNotesHtml = this._collectPlayerNotes(journal);
+      const entryHtml = await this._entryForPush(journal, entityId);
+      const playerNotesHtml = await this._playerNotesForPush(journal, entityId);
       const isPrivate =
         (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER;
 
-      // Build the update body with optimistic concurrency.
+      // Build the update body with optimistic concurrency. Text whose GM-only
+      // content can't be put back (undefined) is left out, never sent
+      // without it.
       const body = {
         name: journal.name,
         is_private: isPrivate,
-        entry: entryHtml,
       };
+      if (entryHtml !== undefined) body.entry = entryHtml;
 
       // Include player notes if present.
-      if (playerNotesHtml !== null) {
+      if (playerNotesHtml !== null && playerNotesHtml !== undefined) {
         body.player_notes = playerNotesHtml;
       }
 
@@ -1103,6 +1146,7 @@ export class JournalSync {
       await this._pushPermissions(entityId, journal.ownership, isPrivate, journal.name, journal);
 
       await this._recordPush(journal, result);
+      await this._hidePushedSecrets(journal, result);
 
       console.debug(`Chronicle: Pushed journal update "${journal.name}" to Chronicle`);
     } catch (err) {
@@ -1110,11 +1154,13 @@ export class JournalSync {
       // reconnect; a stale expected_updated_at surfaces as a conflict on
       // the next pull rather than corrupting data.
       console.error('Chronicle: Failed to push journal update', err);
-      this._api.queueForRetry?.('PUT', `/entities/${entityId}`, {
+      const retry = {
         name: journal.name,
         is_private: (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER,
-        entry: this._collectTextPages(journal),
-      });
+      };
+      const entry = await this._entryForPush(journal, entityId, { fetch: false }).catch(() => undefined);
+      if (entry !== undefined) retry.entry = entry;
+      this._api.queueForRetry?.('PUT', `/entities/${entityId}`, retry);
       ui.notifications?.warn?.(`Chronicle: Failed to push update for "${journal.name}" — queued for retry. See the sync dashboard.`);
     }
   }
@@ -1199,25 +1245,6 @@ export class JournalSync {
     if (!actorSync?._adapter) return false;
     return typeof actorSync._isCharacterEntity === 'function'
       ? actorSync._isCharacterEntity(entity)
-      : false;
-  }
-
-  /**
-   * Whether a JournalEntry is a Chronicle Note that NoteSync owns. Note
-   * journals carry an `isNote` flag (or live under the "Chronicle Notes"
-   * folder) and must be mirrored to Chronicle *notes*, not pushed as
-   * entities. Delegates to the registered NoteSync module so the detection
-   * logic lives in one place; mirrors {@link _isHandledByActorSync}.
-   * @param {JournalEntry} journal
-   * @returns {boolean}
-   * @private
-   */
-  _isHandledByNoteSync(journal) {
-    const noteSync = this._syncManager?._modules?.find(
-      (m) => m.constructor?.name === 'NoteSync'
-    );
-    return typeof noteSync?._isNoteJournal === 'function'
-      ? noteSync._isNoteJournal(journal)
       : false;
   }
 
@@ -1554,20 +1581,12 @@ export class JournalSync {
   }
 
   /**
-   * Collect all text pages from a Foundry JournalEntry and concatenate
-   * them into a single HTML string for Chronicle. Pages are joined in
-   * sort order.
+   * Concatenate a journal's text pages, in sort order, into one HTML string
+   * as Foundry holds it (placeholders and all).
    * @param {JournalEntry} journal
-   * @returns {string} Combined HTML content.
+   * @returns {string}
    * @private
    */
-  _collectTextPages(journal) {
-    // Pictures first: they leave as plain Chronicle paths, and every one in
-    // a secret block is marked GM-only before the secret pass sees it.
-    return toChronicleSecrets(toChroniclePictures(this._joinTextPages(journal), getSetting('apiUrl')));
-  }
-
-  /** @private */
   _joinTextPages(journal) {
     const textPages = journal.pages
       .filter((p) => p.type === 'text' && !p.getFlag(FLAG_SCOPE, 'isPlayerNotes'))
@@ -1590,17 +1609,190 @@ export class JournalSync {
   }
 
   /**
-   * Extract player notes content from a journal's Player Notes page.
+   * The Player Notes page's HTML as Foundry holds it, or null when the
+   * journal has none.
    * @param {JournalEntry} journal
-   * @returns {string|null} HTML content, or null if no player notes page exists.
+   * @returns {string|null}
    * @private
    */
-  _collectPlayerNotes(journal) {
+  _playerNotesPageHtml(journal) {
     const playerNotesPage = journal.pages.find(
       (p) => p.getFlag(FLAG_SCOPE, 'isPlayerNotes')
     );
     if (!playerNotesPage) return null;
-    return toChronicleSecrets(toChroniclePictures(playerNotesPage.text?.content || '', getSetting('apiUrl')));
+    return playerNotesPage.text?.content || '';
+  }
+
+  /**
+   * The journal's page text for Chronicle: placeholders get their GM-only
+   * content back and secret blocks become GM-only text. Undefined when a
+   * placeholder's content can't be found, so the caller leaves the text out
+   * rather than sending it without that content.
+   * @param {JournalEntry} journal
+   * @param {string} entityId
+   * @param {{fetch?: boolean}} [opts] - false: never ask Chronicle
+   * @returns {Promise<string|undefined>}
+   * @private
+   */
+  async _entryForPush(journal, entityId, opts) {
+    return this._forPush(journal, this._joinTextPages(journal), entityId, opts);
+  }
+
+  /**
+   * As _entryForPush, for the Player Notes page; null when there is none.
+   * @returns {Promise<string|null|undefined>}
+   * @private
+   */
+  async _playerNotesForPush(journal, entityId, opts) {
+    const html = this._playerNotesPageHtml(journal);
+    return html === null ? null : this._forPush(journal, html, entityId, opts);
+  }
+
+  /** @private */
+  async _forPush(journal, html, entityId, { fetch = true } = {}) {
+    const label = secretPlaceholderText();
+    let r = restoreSecrets(html, this._secretPieces, label);
+    if (r.missing.length && fetch && entityId) {
+      await this._loadSecretPieces(entityId);
+      r = restoreSecrets(html, this._secretPieces, label);
+    }
+    if (r.missing.length) {
+      if (!this._warnedUnrestored.has(journal.id)) {
+        this._warnedUnrestored.add(journal.id);
+        ui.notifications?.warn?.(game.i18n.format('CHRONICLE.Secrets.NotSent', { name: journal.name }));
+      }
+      console.warn(`Chronicle: did not send the text of "${journal.name}": its GM-only parts changed in Chronicle`);
+      return undefined;
+    }
+    // Pictures after the restore, so a GM-only one in restored content or
+    // in a block the GM typed leaves marked GM-only.
+    return toChronicleSecrets(toChroniclePictures(r.html, getSetting('apiUrl')));
+  }
+
+  /**
+   * Chronicle HTML -> what a journal page stores: GM-only content as
+   * placeholders (scripts/_gm-secrets.mjs), the content itself kept in
+   * memory for the GM's view and the next push.
+   * @param {string} entityId
+   * @param {string|null|undefined} html
+   * @returns {Promise<string>}
+   * @private
+   */
+  async _pullHtml(entityId, html) {
+    if (!html) return '';
+    // Pictures before hiding: shared ones point at their local copy, and
+    // GM-only ones go in a secret block, so they are hidden like GM text.
+    const { html: hidden, pieces } = await hideSecrets(
+      await this._withPictures(toFoundrySecrets(html)), secretPlaceholderText(), secretKeyer(getSetting('apiKey'), entityId),
+    );
+    for (const [id, content] of pieces) this._secretPieces.set(id, content);
+    return _sanitizeIncomingHTML(hidden);
+  }
+
+  /**
+   * Read an entity's GM-only content from Chronicle into memory. One read
+   * per entity at a time.
+   * @param {string} entityId
+   * @returns {Promise<void>}
+   * @private
+   */
+  _loadSecretPieces(entityId) {
+    if (!this._api) return Promise.resolve();
+    const pending = this._secretLoads.get(entityId);
+    if (pending) return pending;
+    const load = (async () => {
+      const entity = await this._api.get(`/entities/${entityId}`);
+      for (const html of [entity?.entry_html, entity?.player_notes_html]) {
+        if (!html) continue;
+        // Same blocks as the pull, so the placeholder ids match; no copies.
+        const { pieces } = await hideSecrets(
+          toFoundryPictures(toFoundrySecrets(html), () => undefined), secretPlaceholderText(), secretKeyer(getSetting('apiKey'), entityId),
+        );
+        for (const [id, content] of pieces) this._secretPieces.set(id, content);
+      }
+    })().finally(() => this._secretLoads.delete(entityId));
+    this._secretLoads.set(entityId, load);
+    return load;
+  }
+
+  /**
+   * GM-only content for one placeholder, for the GM's view: from memory,
+   * else read from Chronicle for the journal that holds the placeholder.
+   * @param {string} id - placeholder id
+   * @returns {Promise<string|null>}
+   * @private
+   */
+  async _secretFor(id) {
+    if (this._secretPieces.has(id)) return this._secretPieces.get(id);
+    const journal = game.journal?.find?.((j) => j.pages?.some?.((p) => (p.text?.content || '').includes(id)));
+    const entityId = journal?.getFlag(FLAG_SCOPE, 'entityId');
+    // Read each page at most once a session for the view; a placeholder
+    // still unknown after that stays a placeholder until the next pull.
+    if (!entityId || this._secretViewLoaded.has(entityId)) return null;
+    this._secretViewLoaded.add(entityId);
+    try {
+      await this._loadSecretPieces(entityId);
+    } catch (err) {
+      console.warn('Chronicle: could not read GM-only text from Chronicle', err);
+      return null;
+    }
+    return this._secretPieces.get(id) ?? null;
+  }
+
+  /**
+   * After a push, replace secret blocks the GM typed in Foundry with
+   * placeholders, from the copy Chronicle answered with, so their text
+   * leaves the saved page.
+   * @param {JournalEntry} journal
+   * @param {object} result - Chronicle's answer to the PUT
+   * @private
+   */
+  async _hidePushedSecrets(journal, result) {
+    if (!result?.id) return;
+    // A newer edit still waiting to be sent is never overwritten with this
+    // older answer; its own push hides it.
+    if (this._journalPushDebouncer.has(journal.id)) return;
+    const placeholderText = secretPlaceholderText();
+    const clear = (p) => hasClearSecrets(p.text?.content || '', { placeholderText });
+    const textPages = journal.pages.filter((p) => p.type === 'text');
+    if (typeof result.entry_html === 'string'
+      && textPages.some((p) => !p.getFlag(FLAG_SCOPE, 'isPlayerNotes') && clear(p))) {
+      await this._syncPagesToJournal(journal, await this._pullHtml(result.id, result.entry_html));
+    }
+    if (typeof result.player_notes_html === 'string'
+      && textPages.some((p) => p.getFlag(FLAG_SCOPE, 'isPlayerNotes') && clear(p))) {
+      await this._syncPlayerNotesPage(journal, await this._pullHtml(result.id, result.player_notes_html));
+    }
+  }
+
+  /**
+   * Clean up what an older module version left in saved journals: field
+   * values in flags are removed in place, and journals holding GM-only text
+   * in the clear (Chronicle secret spans, or sync's own secret blocks without
+   * placeholders) are pulled again, a few per connect so other sync requests
+   * stay inside the API key's rate limit. Idempotent: a clean journal is
+   * skipped.
+   * @private
+   */
+  async _hideStoredSecrets() {
+    let pulls = 0;
+    for (const journal of game.journal?.contents ?? []) {
+      const entityId = journal.getFlag(FLAG_SCOPE, 'entityId');
+      if (!entityId) continue;
+      try {
+        if (journal.flags?.[FLAG_SCOPE]?.fields !== undefined) {
+          await journal.update({ [`flags.${FLAG_SCOPE}.-=fields`]: null }, SYNC_OPTIONS);
+        }
+        const clear = journal.pages.some((p) => p.type === 'text'
+          && hasClearSecrets(p.text?.content || '', { chronicleOnly: true }));
+        if (!clear || pulls >= STORED_SECRET_PULLS_PER_CONNECT) continue;
+        pulls++;
+        const entity = await this._api.get(`/entities/${entityId}`);
+        if (entity?.id) await this._onEntityUpdated(entity);
+      } catch (err) {
+        console.warn(`Chronicle: could not refresh "${journal.name}" to hide its GM-only text`, err);
+      }
+    }
   }
 
   /**
@@ -1666,6 +1858,7 @@ export class JournalSync {
         delete body.expected_updated_at;
         const result = await this._api.put(`/entities/${entityId}`, body);
         await this._recordPush(journal, result);
+        await this._hidePushedSecrets(journal, result);
         ui.notifications.warn(`Chronicle: Conflict on "${journal.name}" — kept Foundry version.`);
         break;
       }
@@ -1679,6 +1872,7 @@ export class JournalSync {
           delete body.expected_updated_at;
           const result = await this._api.put(`/entities/${entityId}`, body);
           await this._recordPush(journal, result);
+          await this._hidePushedSecrets(journal, result);
           ui.notifications.info(`Chronicle: Conflict on "${journal.name}" — Foundry version was newer.`);
         } else if (remote) {
           // Remote is newer — re-pull.

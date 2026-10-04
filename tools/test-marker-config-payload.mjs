@@ -84,13 +84,16 @@ function storedMarker(overrides = {}) {
  * returning the given field values, then invoke the real save action.
  * @returns {object} the payload handed to the onSave callback
  */
-function runSave(marker, fields) {
+function runSave(marker, fields, iconCatalog = null) {
   let payload = null;
   const dialog = new ChronicleMarkerConfigDialog({
     marker: { ...marker },
-    mode: 'edit',
+    mode: marker.id ? 'edit' : 'create',
     onSave: (data) => { payload = data; },
   });
+  // The catalog comes from MapSync's GET /maps/look; none here means an
+  // older Chronicle, where the picker is hidden.
+  if (iconCatalog) dialog._iconCatalog = iconCatalog;
 
   const form = {
     querySelector: (sel) => {
@@ -167,8 +170,40 @@ test('edited fields override the stored values', () => {
   assert.equal(payload.description, 'Durnan pours');
   assert.equal(payload.pin_category, 'quest');
   assert.equal(payload.visibility, 'dm_only');
-  // color + icon are derived from the chosen category, not from the store.
+  // Colour follows the chosen category; the marker keeps its own icon.
   assert.equal(payload.color, '#8B5CF6');
+  assert.equal(payload.icon, 'fa-note-sticky');
+});
+
+/* ------------------------------------------------------------------
+   The icon picker: only Chronicle's catalog icons are ever sent.
+   ------------------------------------------------------------------ */
+
+const CATALOG = [
+  { id: 'fa-anchor', label: 'Port', category: 'Maritime' },
+  { id: 'fa-castle', label: 'Castle', category: 'Places' },
+];
+
+test('a picked catalog icon is sent', () => {
+  const payload = runSave(storedMarker(), { ...EDIT_FIELDS, icon: 'fa-anchor' }, CATALOG);
+  assert.equal(payload.icon, 'fa-anchor');
+});
+
+test('a picked icon outside the catalog is ignored; the marker keeps its own', () => {
+  for (const bad of ['fa-skull', 'fa-anchor" onclick="x', '']) {
+    const payload = runSave(storedMarker(), { ...EDIT_FIELDS, icon: bad }, CATALOG);
+    assert.equal(payload.icon, 'fa-note-sticky', JSON.stringify(bad));
+  }
+});
+
+test('a new marker with no pick takes its kind\'s icon', () => {
+  const payload = runSave({ x: 5, y: 6 }, { ...EDIT_FIELDS, icon: '' }, CATALOG);
+  assert.equal(payload.icon, 'fa-scroll');
+});
+
+test('without a catalog the icon field is never read', () => {
+  // EDIT_FIELDS has no icon: the stub form throws if the dialog asks for it.
+  const payload = runSave({ x: 5, y: 6 }, EDIT_FIELDS);
   assert.equal(payload.icon, 'fa-scroll');
 });
 

@@ -270,45 +270,9 @@
     </div>
 
     {{!-- ================================================================= --}}
-    {{!-- STEP 7: Map Linking                                              --}}
+    {{!-- STEP 7: Review & Import                                          --}}
     {{!-- ================================================================= --}}
     <div class="wizard-step" data-step="6">
-      <h2 class="wizard-step-title"><i class="fa-solid fa-map"></i> {{localize "CHRONICLE.Wizard.Steps.Maps"}}</h2>
-      <p class="wizard-step-desc">{{localize "CHRONICLE.Wizard.MapsDesc"}}</p>
-
-      {{#if mapLinkPlan.length}}
-      <table class="wizard-mapping-table">
-        <thead>
-          <tr>
-            <th>{{localize "CHRONICLE.Wizard.FoundryScene"}}</th>
-            <th>{{localize "CHRONICLE.Wizard.ChronicleMap"}}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {{#each mapLinkPlan}}
-          <tr>
-            <td><i class="fa-solid fa-image"></i> {{sceneName}}</td>
-            <td>
-              <select class="wizard-map-select" data-map-index="{{@index}}">
-                <option value="">— {{localize "CHRONICLE.Wizard.NoLink"}} —</option>
-                {{#each chronicleMaps}}
-                <option value="{{id}}" {{#if (eq id ../chronicleMapId)}}selected{{/if}}>{{name}}</option>
-                {{/each}}
-              </select>
-            </td>
-          </tr>
-          {{/each}}
-        </tbody>
-      </table>
-      {{else}}
-      <div class="wizard-empty">{{localize "CHRONICLE.Wizard.NoScenes"}}</div>
-      {{/if}}
-    </div>
-
-    {{!-- ================================================================= --}}
-    {{!-- STEP 8: Review & Import                                          --}}
-    {{!-- ================================================================= --}}
-    <div class="wizard-step" data-step="7">
       <h2 class="wizard-step-title"><i class="fa-solid fa-clipboard-check"></i> {{localize "CHRONICLE.Wizard.Steps.Review"}}</h2>
 
       {{#if importRunning}}

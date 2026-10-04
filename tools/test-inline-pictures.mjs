@@ -235,3 +235,18 @@ test('with the GM-only text pass: pull then push gives Chronicle back exactly wh
   assert.equal(sharedPictureIds(toFoundrySecrets(html)).join(), A);
   assert.equal(toChronicleSecrets(toChroniclePictures(pulled, API)), html);
 });
+
+test('with placeholders: a GM-only picture leaves the stored page and comes back GM-only', async () => {
+  const { toFoundrySecrets, toChronicleSecrets, hideSecrets, restoreSecrets } = await import('../scripts/_gm-secrets.mjs');
+  const keyOf = async (c) => String(c.length);
+  const html = `<p>Mira <span data-secret="true">is the spy</span>.</p>${shared(A)}${gm(B)}`;
+  const { html: stored, pieces } = await hideSecrets(toFoundryPictures(toFoundrySecrets(html), (id) => LOCAL(id)), 'label', keyOf);
+  assert.ok(stored.includes(`src="${LOCAL(A)}"`));
+  assert.ok(!stored.includes(B), 'the GM-only picture is not in the stored page');
+  // A reload rebuilds the same placeholders without copying anything.
+  const again = await hideSecrets(toFoundryPictures(toFoundrySecrets(html), () => undefined), 'label', keyOf);
+  assert.deepEqual([...again.pieces.keys()], [...pieces.keys()]);
+  const r = restoreSecrets(stored, pieces, 'label');
+  assert.deepEqual(r.missing, []);
+  assert.equal(toChronicleSecrets(toChroniclePictures(r.html, API)), html);
+});

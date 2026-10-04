@@ -13,7 +13,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
   toFoundrySecrets, toChronicleSecrets, secretBlockRanges, PART_ATTR,
+  hideSecrets, restoreSecrets, secretKeyer, hasClearSecrets, sha256, hmacSha256, PLACEHOLDER_ID_PREFIX,
 } from '../scripts/_gm-secrets.mjs';
+import { createHash, createHmac } from 'node:crypto';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const S = (t) => `<span data-secret="true">${t}</span>`;
@@ -38,7 +40,7 @@ const cases = [
   ['secret at paragraph start', `<p>${S('Hidden')} then shown.</p>`],
   ['secret at paragraph end', `<p>Shown then ${S('hidden')}</p>`],
   ['whole paragraph secret', `<p>${S('All hidden')}</p>`],
-  ['two secrets, space between', `<p>A ${S('x')} ${S('y')} B</p>`],
+  ['two secrets, space between', `<p>A ${S('xenon')} ${S('yttrium')} B</p>`],
   ['secret in heading', `<h2>Title ${S('Real name')}</h2><p>Body</p>`],
   ['secret in list item', `<ul><li><p>One ${S('two')}</p></li><li><p>three</p></li></ul>`],
   ['secret with link', `<p>See ${S('<a href="/x">the vault</a>')} now</p>`],
@@ -144,15 +146,19 @@ test('secret block ranges cover nested blocks', () => {
   assert.ok(html.slice(start, end).endsWith('</section>'));
 });
 
-test('journal-sync wires the helper on every pull and push path', () => {
+test('journal-sync wires the helpers on every pull and push path', () => {
   const src = readFileSync(resolve(REPO_ROOT, 'scripts/journal-sync.mjs'), 'utf8');
   const pulls = src.match(/_sanitizeIncomingHTML\(entity\.(?:entry_html|player_notes_html)\b[^)]*\)/g) || [];
-  assert.deepEqual(pulls, [], 'every entity HTML pull goes through toFoundrySecrets first');
-  assert.equal((src.match(/_sanitizeIncomingHTML\(toFoundrySecrets\(entity\./g) || []).length, 4);
-  // The pictures pass runs inside (first), so pictures in a secret block
-  // are already marked GM-only when the secret pass sees them.
-  assert.match(src, /_collectTextPages\(journal\) \{\s*(?:\/\/[^\n]*\n\s*)*return toChronicleSecrets\(toChroniclePictures\(/);
-  assert.match(src, /return toChronicleSecrets\(toChroniclePictures\(playerNotesPage\.text\?\.content \|\| '', getSetting\('apiUrl'\)\)\);/);
+  assert.deepEqual(pulls, [], 'every entity HTML pull goes through _pullHtml');
+  assert.equal((src.match(/await this\._pullHtml\(entity\.id, entity\.(?:entry_html|player_notes_html)\)/g) || []).length, 4);
+  assert.match(src, /hideSecrets\(\s*(?:await this\._withPictures\()?toFoundrySecrets\(html\)/, '_pullHtml hides what toFoundrySecrets made');
+  assert.equal((src.match(/await this\._entryForPush\(journal, (?:entity\.id|entityId)/g) || []).length, 3, 'every entry push restores placeholders');
+  assert.match(src, /await this\._playerNotesForPush\(journal, entityId\)/);
+  assert.doesNotMatch(src, /_collectTextPages|_collectPlayerNotes/, 'no push path skips the restore');
+  // Pictures go in before hiding (GM-only ones become secret blocks) and
+  // come back after the restore, so restored GM pictures leave GM-only.
+  assert.match(src, /hideSecrets\(\s*await this\._withPictures\(toFoundrySecrets\(html\)\)/);
+  assert.match(src, /return toChronicleSecrets\(toChroniclePictures\(r\.html, getSetting\('apiUrl'\)\)\);/);
   assert.match(src, /secretBlockRanges\(html\)/, 'page breaks skip headings inside secret blocks');
   assert.doesNotMatch(src, /fields:\s*entity\.fields_data/, 'field values (GM-only ones included) are never stored in journal flags');
 });
@@ -169,6 +175,142 @@ test('a heading that starts GM-only stays one page and comes back with no extra 
   const pages = sections.map((p) => ({
     name: p.title, type: 'text', sort: n++, text: { content: p.content }, getFlag: () => undefined,
   }));
-  const back = js._collectTextPages({ pages });
+  const back = toChronicleSecrets(js._joinTextPages({ pages }));
   assert.equal(back, `<h2>${S('True name:')} Bob</h2><p>body</p>\n<h2>Later</h2><p>z</p>`);
+});
+
+// --- Placeholders: the saved page never holds GM-only content ---
+
+const LABEL = 'GM-only text, kept in Chronicle';
+const keyOf = secretKeyer('api-key-1', 'entity-1');
+const pull = (html) => hideSecrets(toFoundrySecrets(html), LABEL, keyOf);
+const push = (html, pieces) => {
+  const r = restoreSecrets(html, pieces, LABEL);
+  return { ...r, html: toChronicleSecrets(r.html) };
+};
+
+test('SHA-256 and HMAC match Node\'s own', () => {
+  const enc = new TextEncoder();
+  for (const t of ['', 'abc', 'x'.repeat(55), 'x'.repeat(56), 'x'.repeat(64), 'é'.repeat(300)]) {
+    assert.equal(Buffer.from(sha256(enc.encode(t))).toString('hex'), createHash('sha256').update(t).digest('hex'));
+    for (const k of ['k', 'K'.repeat(100)]) {
+      assert.equal(Buffer.from(hmacSha256(enc.encode(k), enc.encode(t))).toString('hex'), createHmac('sha256', k).update(t).digest('hex'));
+    }
+  }
+});
+
+for (const [name, html] of cases) {
+  test(`saved page holds no GM-only words: ${name}`, async () => {
+    const { html: saved } = await pull(html);
+    const secretWords = [...html.matchAll(/<span data-secret="true">([\s\S]*?)<\/span>/g)].map((m) => m[1].replace(/<[^>]*>/g, ''));
+    const text = saved.replace(/<[^>]*>/g, '');
+    for (const w of secretWords) assert.ok(!text.includes(w), `"${w}" is not in the saved page: ${saved}`);
+    assert.doesNotMatch(saved, /data-secret/);
+  });
+
+  test(`placeholders round trip to the same Chronicle text: ${name}`, async () => {
+    const { html: saved, pieces } = await pull(html);
+    const r = push(saved, pieces);
+    assert.deepEqual(r.missing, []);
+    assert.equal(r.html, html);
+  });
+}
+
+test('a GM-only picture caption is not in the saved page', async () => {
+  const { html: saved, pieces } = await pull('<p>x</p><figure class="ce-img ce-img--gm"><img src="/media/a"><figcaption>the lair</figcaption></figure>');
+  assert.doesNotMatch(saved, /lair|\/media\/a/);
+  assert.equal(push(saved, pieces).html, '<p>x</p><figure class="ce-img ce-img--gm"><img src="/media/a"><figcaption>the lair</figcaption></figure>');
+});
+
+test('placeholder ids are keyed: they differ by API key and page, and are stable', async () => {
+  const html = `<p>a ${S('vampire')}</p>`;
+  const a = (await pull(html)).html;
+  assert.equal((await pull(html)).html, a, 'same page, same key: same placeholder');
+  const other = (await hideSecrets(toFoundrySecrets(html), LABEL, secretKeyer('api-key-2', 'entity-1'))).html;
+  const page2 = (await hideSecrets(toFoundrySecrets(html), LABEL, secretKeyer('api-key-1', 'entity-2'))).html;
+  assert.notEqual(other, a);
+  assert.notEqual(page2, a);
+  assert.match(a, new RegExp(`id="${PLACEHOLDER_ID_PREFIX}[0-9a-f]{32}"`));
+});
+
+test('the same secret twice gets two placeholders, both restored', async () => {
+  const html = `<p>${S('x')} and ${S('x')}</p>`;
+  const { html: saved, pieces } = await pull(html);
+  assert.equal(pieces.size, 2);
+  assert.equal(push(saved, pieces).html, html);
+});
+
+test('GM edits around a placeholder keep the secret and the edit', async () => {
+  const { html: saved, pieces } = await pull(`<p>The king is ${S('a lich')} and old.</p>`);
+  const r = push(saved.replace('and old.', 'and tired.'), pieces);
+  assert.equal(r.html, `<p>The king is ${S('a lich')} and tired.</p>`);
+});
+
+test('text the GM adds inside a placeholder block stays, as GM-only text', async () => {
+  const { html: saved, pieces } = await pull(`<p>${S('a lich')}</p>`);
+  const edited = saved.replace('</section>', '<p>also a liar</p></section>');
+  const out = push(edited, pieces).html;
+  assert.ok(out.includes(S('a lich')));
+  assert.ok(out.includes(S('also a liar')));
+  assert.doesNotMatch(chroniclePlayerView(out).replace(/<[^>]*>/g, ''), /lich|liar/);
+});
+
+test('an unknown placeholder means the text is not sent', async () => {
+  const { html: saved } = await pull(`<p>a ${S('b')}</p>`);
+  const r = restoreSecrets(saved, new Map(), LABEL);
+  assert.equal(r.missing.length, 1);
+});
+
+test('a placeholder that lost its id is treated as unknown, never pushed as its label', async () => {
+  const { html: saved, pieces } = await pull(`<p>a ${S('b')}</p>`);
+  const r = restoreSecrets(saved.replace(/ id="[^"]*"/, ''), pieces, LABEL);
+  assert.equal(r.missing.length, 1);
+});
+
+test('a placeholder written in another language is still restored', async () => {
+  const { html: saved, pieces } = await pull(`<p>a ${S('b')}</p>`);
+  const r = restoreSecrets(saved, pieces, 'Texte réservé au MJ');
+  assert.deepEqual(r.missing, []);
+  assert.ok(toChronicleSecrets(r.html).includes(S('b')));
+});
+
+test('a secret block the GM typed is pushed as GM-only text and flagged for hiding', async () => {
+  const r = restoreSecrets('<p>x</p><section class="secret" id="secret-abc"><p>new secret</p></section>', new Map(), LABEL);
+  assert.equal(r.gmMade, true);
+  assert.ok(toChronicleSecrets(r.html).includes(S('new secret')));
+});
+
+test('hasClearSecrets finds GM-only content left in the clear', async () => {
+  const { html: saved } = await pull(`<p>a ${S('b')}</p>`);
+  assert.equal(hasClearSecrets(saved), false);
+  assert.equal(hasClearSecrets(`<p>a ${S('b')}</p>`, { chronicleOnly: true }), true, 'Chronicle spans from an older version');
+  assert.equal(hasClearSecrets(toFoundrySecrets(`<p>a ${S('b')}</p>`), { chronicleOnly: true }), true, 'unkeyed blocks from an older version');
+  const gm = '<section class="secret" id="secret-abc"><p>t</p></section>';
+  assert.equal(hasClearSecrets(gm), true);
+  assert.equal(hasClearSecrets(gm, { chronicleOnly: true }), false, 'a GM-made block waits for its push');
+});
+
+test('words typed after the placeholder label reach Chronicle as GM-only text', async () => {
+  const { html: saved, pieces } = await pull(`<p>The duke is ${S('a vampire')} and kind.</p>`);
+  const edited = saved.replace(`${LABEL}</p>`, `${LABEL} and hates garlic</p>`);
+  assert.equal(hasClearSecrets(edited, { placeholderText: LABEL }), true, 'typed text counts as in the clear until hidden');
+  const r = push(edited, pieces);
+  assert.equal(r.gmMade, true);
+  assert.ok(r.html.includes(S('a vampire')));
+  assert.ok(r.html.includes(S('and hates garlic')));
+  assert.doesNotMatch(chroniclePlayerView(r.html).replace(/<[^>]*>/g, ''), /vampire|garlic/);
+});
+
+test('words typed over the placeholder label are kept, after the restored text', async () => {
+  const { html: saved, pieces } = await pull(`<p>The duke is ${S('a vampire')} and kind.</p>`);
+  const r = push(saved.replace(LABEL, 'actually a werewolf'), pieces);
+  assert.ok(r.html.includes(S('a vampire')));
+  assert.ok(r.html.includes(S('actually a werewolf')));
+  assert.doesNotMatch(chroniclePlayerView(r.html).replace(/<[^>]*>/g, ''), /vampire|werewolf/);
+});
+
+test('an untouched placeholder is not in the clear', async () => {
+  const { html: saved } = await pull(`<p>a ${S('b')}</p>`);
+  assert.equal(hasClearSecrets(saved, { placeholderText: LABEL }), false);
+  assert.equal(hasClearSecrets(saved, { placeholderText: 'Texte réservé au MJ' }), false, 'English label is always recognized');
 });

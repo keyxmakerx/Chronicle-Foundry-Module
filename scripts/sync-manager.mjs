@@ -8,6 +8,7 @@
 
 import { ChronicleAPI } from './api-client.mjs';
 import { walkSyncPull, PULL_PAGE_SIZE } from './_sync-pull-walk.mjs';
+import { HistoryReporter, activityToEvent, describeMessage, resourceIdOf, resourceNameOf } from './_history-report.mjs';
 import { walkChangeFeed, cursorFor, feedForArea, FEED_PAGE_SIZE, FEED_SETTLE_MS } from './_change-feed.mjs';
 import { getSetting, setSetting, isConfigured, getSyncDirections, getExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
 
@@ -18,6 +19,9 @@ import { getSetting, setSetting, isConfigured, getSyncDirections, getExcludedTag
  * @type {number}
  */
 const RECONNECT_RESYNC_DEBOUNCE_MS = 3000;
+
+/** How often queued sync-history events are sent to Chronicle. */
+const HISTORY_FLUSH_MS = 15_000;
 
 /**
  * Resolve the stable Chronicle user-id key for a campaign member. The
@@ -47,6 +51,15 @@ export class SyncManager {
   constructor() {
     /** @type {ChronicleAPI} */
     this.api = new ChronicleAPI();
+
+    /**
+     * Reports what only this world sees to Chronicle's sync history. Every
+     * write is noted so Chronicle's echo of it isn't reported as a change.
+     */
+    this._history = new HistoryReporter({ send: (body) => this.api.post('/sync/history', body) });
+    this.api.onWrite = (path) => this._history.noteWrite(path);
+    /** @type {ReturnType<typeof setInterval>|null} */
+    this._historyTimer = null;
 
     /** @type {Array<object>} Registered sync modules. */
     this._modules = [];
@@ -137,6 +150,8 @@ export class SyncManager {
     // read isPcClaimingEnabled() during their init() call below.
     await this._fetchAddons();
 
+    this._historyTimer ??= setInterval(() => { this._history.flush(); }, HISTORY_FLUSH_MS);
+
     // Initialize all registered modules.
     for (const mod of this._modules) {
       if (typeof mod.init === 'function') {
@@ -207,11 +222,15 @@ export class SyncManager {
    */
   _onConnectionStateChange(state) {
     if (state === 'disconnected' || state === 'reconnecting') {
+      if (this._connectedAt) this.logActivity('disconnect', 'Lost the connection to Chronicle');
       this._sawDisconnect = true;
       this._connectedAt = null;
       return;
     }
-    if (state === 'connected') this._connectedAt ??= Date.now();
+    if (state === 'connected') {
+      this._connectedAt ??= Date.now();
+      this._history.flush();
+    }
     if (state === 'connected' && this._initialSyncDone && this._sawDisconnect) {
       this._scheduleReconnectResync();
     }
@@ -396,6 +415,10 @@ export class SyncManager {
     this._modules = [];
     this._initialSyncDone = false;
     this._sawDisconnect = false;
+    if (this._historyTimer) {
+      clearInterval(this._historyTimer);
+      this._historyTimer = null;
+    }
     if (this._reconnectResyncTimer) {
       clearTimeout(this._reconnectResyncTimer);
       this._reconnectResyncTimer = null;
@@ -660,15 +683,53 @@ export class SyncManager {
    * @private
    */
   _routeMessage(msg) {
+    const started = Date.now();
+    const runs = [];
     for (const mod of this._modules) {
       if (typeof mod.onMessage === 'function') {
         try {
-          mod.onMessage(msg);
+          runs.push(Promise.resolve(mod.onMessage(msg)));
         } catch (err) {
           console.error(`Chronicle: Module message handler error`, err);
+          runs.push(Promise.reject(err));
         }
       }
     }
+    this._recordApplied(msg, started, runs);
+  }
+
+  /**
+   * Add a history row for a change Chronicle sent, once every module has
+   * handled it, with the first failure if any. This world's own writes
+   * coming back are not changes and are skipped.
+   * @param {object} msg
+   * @param {number} started - epoch ms
+   * @param {Promise<any>[]} runs - each module's handling
+   * @returns {Promise<void>}
+   * @private
+   */
+  async _recordApplied(msg, started, runs) {
+    const results = await Promise.allSettled(runs);
+    const failed = results.find((r) => r.status === 'rejected');
+    if (failed) console.error('Chronicle: Module message handler error', failed.reason);
+    const what = describeMessage(msg?.type);
+    if (!what) return;
+    const id = resourceIdOf(msg);
+    if (this._history.isEcho(id)) return;
+    const reason = failed ? (failed.reason?.message || String(failed.reason)) : '';
+    this._history.add({
+      at: new Date(started).toISOString(),
+      direction: 'to_foundry',
+      kind: what.kind,
+      resourceId: id,
+      name: resourceNameOf(msg).slice(0, 200),
+      action: what.action,
+      call: `ws ${msg.type}`,
+      status: failed ? 'failed' : 'ok',
+      ok: !failed,
+      durationMs: Date.now() - started,
+      message: reason.slice(0, 500),
+    });
   }
 
   /**
@@ -677,12 +738,14 @@ export class SyncManager {
    * @param {string} message - Human-readable description.
    */
   logActivity(type, message) {
+    const time = Date.now();
     this._activityLog.unshift({
-      time: Date.now(),
+      time,
       type,
       message,
-      timeFormatted: new Date().toLocaleTimeString(),
+      timeFormatted: new Date(time).toLocaleTimeString(),
     });
+    this._history?.add(activityToEvent(type, message, time));
     if (this._activityLog.length > this._maxLogEntries) {
       this._activityLog.length = this._maxLogEntries;
     }
@@ -701,17 +764,6 @@ export class SyncManager {
    */
   clearActivityLog() {
     this._activityLog = [];
-  }
-
-  /**
-   * Create or update a sync mapping on the server. Delegates to
-   * `ensureMapping` so legacy callers (wizard `link-map`, dashboard
-   * manual-sync) inherit conflict-tolerant idempotency.
-   * @param {object} mapping
-   * @returns {Promise<object>}
-   */
-  async createMapping(mapping) {
-    return this.ensureMapping(mapping);
   }
 
   /**
@@ -863,20 +915,6 @@ export class SyncManager {
         const actorSync = this._modules.find((m) => m.constructor.name === 'ActorSync');
         if (!actorSync) throw new Error('ActorSync module not loaded');
         await actorSync._handleCreateActor(actor, {}, game.user.id);
-        break;
-      }
-      case 'link-map': {
-        const scene = game.scenes.get(item.data.sceneId);
-        if (!scene) throw new Error(`Scene ${item.data.sceneId} not found`);
-        await scene.setFlag('chronicle-sync', 'mapId', item.data.mapId);
-        await this.createMapping({
-          chronicle_type: 'map',
-          chronicle_id: item.data.mapId,
-          external_system: 'foundry',
-          external_id: item.data.sceneId,
-          sync_direction: 'both',
-          sync_metadata: { foundry_type: 'Scene' },
-        });
         break;
       }
       case 'assign-tags': {
