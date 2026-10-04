@@ -168,7 +168,19 @@ module calls none of them). An older Chronicle answers those with
 `503 calendar_rebuilding`, which pauses date pushes for 30 seconds and shows one
 GM notice. See API-CONTRACT.md.
 
-No Foundry calendar module is integrated, so nothing is written into Foundry.
+Chronicle brings its own calendar; no Foundry calendar module is used.
+
+### Built-in calendar (date bar)
+- [ ] With Calendar sync on, a date bar sits at the top centre: weekday, date, time, season, weather and temperature, moons; its colour follows the hour (night, dawn, day, dusk)
+- [ ] GM: the ‹ › arrows move the date by the chosen step (hour, day, week); Chronicle's calendar page shows the new date after a refresh
+- [ ] GM: on a real-time calendar the arrows are greyed out and Set date is disabled
+- [ ] Click the bar -> the month view opens under it with Chronicle's events; ‹ › flips months; click outside or Esc closes it
+- [ ] GM: **Set date** in the month view moves Chronicle's date; a date the calendar doesn't have is refused with a warning
+- [ ] GM: **Add event** creates the event in Chronicle (check the Chronicle calendar page); "GM only" makes it GM-only there
+- [ ] Player client: the same bar and month view, without arrows, Set date or Add event; GM-only events, hidden moons and secret eras never appear
+- [ ] Move the date in Chronicle -> the bar updates for the GM and every player
+- [ ] A calendar hidden from players in Chronicle -> players see no bar
+- [ ] Module Settings -> Calendar temperature unit °F -> only your bar switches to °F
 
 ### Dashboard
 - [ ] Calendar tab shows Chronicle's calendar name, date (day, month, year) and time
@@ -312,8 +324,8 @@ Needs the Armory addon on in Chronicle, a character linked to an actor, and a pl
 
 ## Import Wizard
 
-- [ ] Dashboard Config tab -> **Setup Wizard** opens a seven-step wizard: Connect, Scan, Types, Tags, Characters, Calendar, Review; there is no maps step
-- [ ] Tags, Characters and Calendar steps are skipped when tags are unavailable, no game system matched, or no calendar addon and module are active
+- [ ] Dashboard Config tab -> **Setup Wizard** opens a six-step wizard: Connect, Scan, Types, Tags, Characters, Review; there are no maps or calendar steps
+- [ ] Tags and Characters steps are skipped when tags are unavailable or no game system matched
 - [ ] Review lists what will be created; running it creates the entities and marks the wizard completed
 
 ## Problem reports (privacy, module #94)
@@ -370,7 +382,7 @@ Library: Shops, Maps; Setup: Config, Members; Diagnostics: Status.
 - [ ] **Overview:** connection banner (green/yellow/red) with **Reconnect** when not connected; stat tiles for Entities Synced, Characters Synced (n/total) and Maps Linked, each jumps to its tab on click; "Needs Attention" lists only real problems (each row jumps to the fixing tab) or says "Everything's in sync"; **Sync Everything Now**, **Diagnostics** and **Refresh** work
 - [ ] **Entities:** entity list grouped by type with sync status dots, Pull/Push per row, Pull All / Push All, Resync All Journals, visibility toggle, search filter, bulk select (Make Public / Private / Delete / Change Type), **Create Type**
 - [ ] **Characters:** system badge, synced and unlinked actors, Push / Push All / Re-sync (see Character Sync)
-- [ ] **Calendar:** shows the Chronicle vs Foundry date with Pull Date / Push Date and the detected calendar module; **Open Sync Calendar** opens the Sync Calendar editor; the tab explains why when sync is disabled, no calendar module is active, or the calendar is rebuilding or unreachable
+- [ ] **Calendar:** shows Chronicle's date and time and the world-state panel (weather, season, era, moons); the tab explains why when sync is disabled, no calendar is configured, or the calendar is rebuilding or unreachable
 - [ ] **Issues:** badge shows the number of character actors that cannot be matched. Each row offers a "Match to existing…" dropdown with **Match**, and **Create new**. Resolving a row links it and removes it. With none, the tab says every character is linked
 - [ ] **Shops:** shop entities with type, keeper, private lock, "Synced" badge and an **Open** button that opens the Shop window; empty states say whether the "Shop" entity type is missing or just has no shops
 - [ ] **Maps:** per-map rows with the map's picture (a shadowed map shows the players' copy), marker / drawing / token counts, **Open in Foundry**, external-link icon; **Resync All Maps**, **Open Chronicle Maps Folder**; summary row and dismissible error list (see Map Sync)

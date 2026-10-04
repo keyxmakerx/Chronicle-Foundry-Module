@@ -923,10 +923,19 @@ Each resource has a `GET` (returns all definitions) and a `PUT` (bulk-replaces a
 Lists events for a month. Query: `?year=1492&month=3` or `?entity_id=uuid`.
 
 **Used by:** `calendar-sync.mjs` → `fetchEvents`, one request per month across the
-current year ±1.
+current year ±1, and the built-in calendar's month window (current month ±1).
+
+**Players' view.** `GET /calendar`, `GET /calendar/date` and `GET /calendar/events`
+take `?audience=players`: Chronicle filters the read for an anonymous player
+(hidden moons, secret eras, GM-only, per-player and unannounced events left out)
+whatever the key's role, and the date and events answers carry
+`"audience": "players"`. An older Chronicle ignores the parameter and answers
+with the GM's view; without the echo the module leaves moons, era and events
+out of the players' snapshot. **Used by:** `CalendarSync.publishPlayerSnapshot`.
+Re-verify by: 2026-11-04 (Chronicle `internal/plugins/syncapi/calendar_api_handler.go` `readViewer`; lands with Chronicle #1084)
 
 #### POST /calendar/events
-Creates a calendar event. The module does not call it.
+Creates a calendar event. **Used by:** the built-in calendar's Add event (GM), sending `name`, `year`, `month`, `day`, `all_day`, `start_hour`/`start_minute` when timed, and `visibility` (`everyone` or `gm-only`).
 
 **Request:**
 ```json

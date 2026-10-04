@@ -19,6 +19,35 @@
       "NoSender": "Foundry didn't say who sent this, so nothing was bought.",
       "SomeCharacter": "A character"
     },
+    "CalendarBar": {
+      "Label": "Chronicle calendar",
+      "OpenMonth": "Open the month",
+      "MonthLabel": "Chronicle calendar month",
+      "Back": "Back one {step}",
+      "Forward": "Forward one {step}",
+      "StepLabel": "Step size",
+      "Step": {
+        "hour": "hour",
+        "day": "day",
+        "week": "week"
+      },
+      "RealTime": "This calendar follows real time, so its date can't be moved here.",
+      "StepRefused": "Chronicle didn't take the new date. The Calendar tab of the Chronicle dashboard says why.",
+      "SetRefused": "Chronicle didn't take that date. Check that it exists in the calendar.",
+      "PrevMonth": "Previous month",
+      "NextMonth": "Next month",
+      "More": "+{count} more",
+      "SetDate": "Set date",
+      "AddEvent": "Add event",
+      "Day": "Date",
+      "Time": "Time",
+      "AllDay": "all day",
+      "EventName": "Event",
+      "GmOnly": "GM only",
+      "NameNeeded": "Give the event a name.",
+      "EventAdded": "Added \"{name}\" to Chronicle's calendar.",
+      "AddRefused": "Chronicle didn't take the event. Check the date and your key's role."
+    },
     "Settings": {
       "ApiUrl": {
         "Name": "Chronicle URL",
@@ -67,6 +96,10 @@
       "CalendarAnnounceSeasonEra": {
         "Name": "Announce season and era changes in chat",
         "Hint": "Whisper a GM-only chat line when the Chronicle calendar crosses a season or era boundary. Never posted to players."
+      },
+      "CalendarTemperatureUnit": {
+        "Name": "Calendar temperature unit",
+        "Hint": "How the date bar shows Chronicle's temperature, for you only."
       },
       "CalendarAnnounceMoon": {
         "Name": "Announce moon phase changes in chat",

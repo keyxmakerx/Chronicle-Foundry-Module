@@ -2,15 +2,15 @@
  * Chronicle Sync - Calendar
  *
  * Pulls Chronicle's calendar (current date, events, weather, season, era,
- * moon phases) over REST and the WebSocket and exposes it to the dashboard.
- * No Foundry calendar module is integrated, so nothing here writes a date or
- * a note into Foundry. The guarded date push (`pushDate`) and the
- * `calendar.*` message routing are what the built-in calendar plugs into.
- * TODO(#95): apply Chronicle's date and events to the built-in calendar and
- * call `pushDate` from its date-change hook.
+ * moon phases) over REST and the WebSocket. It feeds the built-in calendar
+ * (`calendar-bar.mjs`): the GM's view directly, and every player through a
+ * player-safe snapshot in the `calendarSnapshot` world setting, built from
+ * Chronicle's players-audience reads (`_calendar-view-model.mjs`). The GM's
+ * date moves and new events go back through `pushDate` and `addEvent`.
  */
 
-import { getSetting } from './settings.mjs';
+import { getSetting, setSetting } from './settings.mjs';
+import { buildPlayerSnapshot, clampDate, shiftMonth, stepDate } from './_calendar-view-model.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import { shouldSkipDatePush, isRealTimeRejection, notifyRealTimePushPaused } from './_realtime-date-guard.mjs';
 import { calendarBlackoutActive, handleIfCalendarRebuilding, noteCalendarAnswerOk } from './_calendar-blackout-guard.mjs';
@@ -175,8 +175,8 @@ export function isCalendarNoteJournal(journal) {
 }
 
 /**
- * CalendarSync keeps Chronicle's calendar state for the dashboard and routes
- * its `calendar.*` WebSocket types.
+ * CalendarSync keeps Chronicle's calendar state for the dashboard and the
+ * built-in calendar, and routes its `calendar.*` WebSocket types.
  */
 export class CalendarSync {
   constructor() {
@@ -201,6 +201,202 @@ export class CalendarSync {
      * @type {Set<string>}
      */
     this._loggedUnhandledTypes = new Set();
+
+    /** @type {object|null} Last GM-view GET /calendar/date (season, weather, moons). */
+    this._dateInfo = null;
+
+    /** @type {object[]} GM-view events for the months around the current date. */
+    this._events = [];
+
+    /** @type {Set<Function>} Built-in calendar listeners, called after each refresh. */
+    this._listeners = new Set();
+
+    /** @type {ReturnType<typeof setTimeout>|null} */
+    this._refreshTimer = null;
+
+    /** JSON of the last snapshot written, so an unchanged one is not saved again. */
+    this._lastSnapshotJson = null;
+  }
+
+  /**
+   * Subscribe to calendar changes (the built-in calendar re-renders).
+   * @param {Function} fn
+   * @returns {Function} unsubscribe
+   */
+  onChange(fn) {
+    (this._listeners ??= new Set()).add(fn);
+    return () => this._listeners.delete(fn);
+  }
+
+  /** @private */
+  _emitChange() {
+    for (const fn of this._listeners ?? []) {
+      try { fn(this); } catch (err) { console.debug('Chronicle: calendar listener failed', err?.message); }
+    }
+  }
+
+  /** What the GM's calendar draws: structure, date, world state and every event. */
+  get gmView() {
+    return { calendar: this._chronicleCalendar, date: this.chronicleDate, dateInfo: this._dateInfo, events: this._events };
+  }
+
+  /**
+   * Coalesce the refreshes a burst of WebSocket messages asks for into one.
+   * @param {number} [delay=400]
+   */
+  scheduleRefresh(delay = 400) {
+    if (this._refreshTimer) clearTimeout(this._refreshTimer);
+    this._refreshTimer = setTimeout(() => {
+      this._refreshTimer = null;
+      this.refresh().catch((err) => console.debug('Chronicle: calendar refresh failed', err?.message));
+    }, delay);
+  }
+
+  /**
+   * Re-read the date, world state and nearby events, tell the built-in
+   * calendar, and publish the players' snapshot. GM only: players have no key.
+   */
+  async refresh() {
+    if (!this._api || !game.user?.isGM || !getSetting('syncCalendar') || !this._chronicleCalendar) return;
+    try {
+      const info = await this._api.get('/calendar/date');
+      if (info) {
+        this._dateInfo = info;
+        this._onChronicleDateAdvanced(info);
+      }
+    } catch (err) {
+      if (!handleIfCalendarRebuilding(err)) console.debug('Chronicle: calendar date read failed', err?.message);
+    }
+    this._events = (await this._fetchMonthsAround()).events;
+    this._emitChange();
+    await this.publishPlayerSnapshot();
+  }
+
+  /**
+   * Events for the current month and one either side, the window the month
+   * view opens on. `audience` reads them as players see them.
+   * @param {string} [audience]
+   * @returns {Promise<{events: object[], confirmed: boolean}>} confirmed: every page echoed the audience.
+   * @private
+   */
+  async _fetchMonthsAround(audience) {
+    const d = this.chronicleDate;
+    if (!d) return { events: [], confirmed: false };
+    const seen = new Set();
+    const events = [];
+    let confirmed = true;
+    for (const delta of [-1, 0, 1]) {
+      const { y, m } = shiftMonth(this._chronicleCalendar, d.year, d.month, delta);
+      const q = `year=${y}&month=${m}${audience ? `&audience=${audience}` : ''}`;
+      let payload;
+      try {
+        payload = await this._api.get(`/calendar/events?${q}`);
+      } catch (err) {
+        console.debug('Chronicle: calendar events read failed', err?.message);
+        confirmed = false;
+        continue;
+      }
+      if (audience && payload?.audience !== audience) confirmed = false;
+      const page = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
+      for (const e of page) {
+        // A repeating event appears once per occurrence, all under one id.
+        const key = `${e?.id}|${e?.year}-${e?.month}-${e?.day}`;
+        if (!e || e.id == null || seen.has(key)) continue;
+        seen.add(key);
+        events.push(e);
+      }
+    }
+    return { events, confirmed };
+  }
+
+  /**
+   * Build the players' snapshot from players-audience reads and save it in
+   * the `calendarSnapshot` world setting, which every client receives. A
+   * calendar players can't see (404) publishes a hidden snapshot.
+   */
+  async publishPlayerSnapshot() {
+    if (!this._api || !game.user?.isGM) return;
+    let calendar = null;
+    let dateInfo = null;
+    let events = [];
+    let eventsConfirmed = false;
+    try {
+      calendar = await this._api.get('/calendar?audience=players');
+      if (calendar) {
+        dateInfo = await this._api.get('/calendar/date?audience=players');
+        ({ events, confirmed: eventsConfirmed } = await this._fetchMonthsAround('players'));
+      }
+    } catch (err) {
+      if (err?.status !== 404) {
+        // Leave the last snapshot in place rather than blank the players' bar.
+        console.debug('Chronicle: players calendar read failed', err?.message);
+        return;
+      }
+      calendar = null;
+    }
+    const snap = buildPlayerSnapshot({ calendar, dateInfo, events, eventsConfirmed, isPublic: isChronicleEventPublic });
+    const json = JSON.stringify(snap);
+    if (json === this._lastSnapshotJson) return;
+    this._lastSnapshotJson = json;
+    try {
+      await setSetting('calendarSnapshot', snap);
+    } catch (err) {
+      this._lastSnapshotJson = null;
+      console.debug('Chronicle: saving the players calendar failed', err?.message);
+    }
+  }
+
+  /**
+   * Move Chronicle's date by `n` steps of `unit` ('hour' | 'day' | 'week').
+   * @returns {Promise<boolean>} true when Chronicle took the new date.
+   */
+  async step(unit, n = 1) {
+    const from = this.chronicleDate;
+    if (!from || !this._chronicleCalendar) return false;
+    return this.setDate(stepDate(this._chronicleCalendar, from, unit, n));
+  }
+
+  /**
+   * Set Chronicle's date (GM). Refused dates and paused pushes return false.
+   * @param {{year:number, month:number, day:number, hour?:number, minute?:number}} date
+   * @returns {Promise<boolean>}
+   */
+  async setDate(date) {
+    const clean = clampDate(this._chronicleCalendar, date);
+    if (!clean) return false;
+    const ok = await this.pushDate(clean);
+    if (ok) {
+      this._onChronicleDateAdvanced(clean);
+      this._emitChange();
+      this.scheduleRefresh(0);
+    }
+    return ok;
+  }
+
+  /**
+   * Add an event to Chronicle's calendar (GM). Visibility is the wire form.
+   * @param {{name:string, year:number, month:number, day:number, hour?:number|null, minute?:number|null, gmOnly?:boolean}} ev
+   * @returns {Promise<boolean>}
+   */
+  async addEvent(ev) {
+    if (!this._api || !game.user?.isGM || !ev?.name?.trim()) return false;
+    const day = clampDate(this._chronicleCalendar, ev);
+    if (!day) return false;
+    const timed = Number.isFinite(ev.hour);
+    try {
+      await this._api.post('/calendar/events', {
+        name: ev.name.trim().slice(0, 200),
+        year: day.year, month: day.month, day: day.day,
+        all_day: !timed,
+        ...(timed ? { start_hour: day.hour, start_minute: day.minute } : {}),
+        visibility: ev.gmOnly ? WIRE_VISIBILITY.GM_ONLY : WIRE_VISIBILITY.EVERYONE,
+      });
+    } catch (err) {
+      console.error('Chronicle: adding a calendar event failed', err);
+      return false;
+    }
+    this.scheduleRefresh(0);
+    return true;
   }
 
   /**
@@ -210,8 +406,12 @@ export class CalendarSync {
     this._api = api;
   }
 
-  /** Nothing is registered with Foundry, so there is nothing to release. */
-  destroy() {}
+  /** Stop a pending refresh and drop listeners. */
+  destroy() {
+    if (this._refreshTimer) clearTimeout(this._refreshTimer);
+    this._refreshTimer = null;
+    this._listeners?.clear();
+  }
 
   /**
    * Handle incoming WebSocket messages for calendar events.
@@ -228,6 +428,8 @@ export class CalendarSync {
     switch (msg?.type) {
       case 'calendar.date.advanced':
         this._onChronicleDateAdvanced(msg.payload);
+        this._emitChange();
+        this.scheduleRefresh();
         break;
       case 'calendar.event.created':
         this._onChronicleEventCreated(msg.payload);
@@ -245,12 +447,14 @@ export class CalendarSync {
       // chat line.
       case 'calendar.weather.changed':
         await this._onChronicleWeatherChanged(msg.payload);
+        this.scheduleRefresh();
         break;
       case 'calendar.worldstate.changed':
       case 'calendar.season.changed':
       case 'calendar.era.changed':
       case 'calendar.moon.phase_changed':
         await this._onChronicleSubresourceChanged(msg.type, msg.payload);
+        this.scheduleRefresh();
         break;
 
       default:
@@ -296,8 +500,7 @@ export class CalendarSync {
         return false;
       }
       noteCalendarAnswerOk();
-      // TODO(#95): apply the date to the built-in calendar, then
-      // confirmAppliedDate (_applied-date-confirm.mjs).
+      await this.refresh();
       console.debug('Chronicle: Calendar initial sync complete');
       return true;
     } catch (err) {
@@ -328,8 +531,8 @@ export class CalendarSync {
   // --- Chronicle → Foundry ---
 
   /**
-   * Record the date Chronicle advanced to. TODO(#95): apply it to the
-   * built-in calendar and confirm it back with confirmAppliedDate.
+   * Record the date Chronicle is on. The built-in calendar reads it through
+   * `chronicleDate` after the refresh that follows.
    * @param {object} data - { year, month, day, hour, minute }
    * @private
    */
@@ -344,16 +547,15 @@ export class CalendarSync {
   }
 
   /**
-   * Chronicle event created / updated / deleted. TODO(#95): mirror these into
-   * the built-in calendar; until it exists there is nothing to write to.
-   * @param {object} data - the Chronicle event (`{ id }` for a delete).
+   * Chronicle event created / updated / deleted: re-read the month window.
+   * Events stay Chronicle's own; nothing is written into Foundry documents.
    * @private
    */
-  _onChronicleEventCreated(data) {}
+  _onChronicleEventCreated() { this.scheduleRefresh(); }
   /** @private */
-  _onChronicleEventUpdated(data) {}
+  _onChronicleEventUpdated() { this.scheduleRefresh(); }
   /** @private */
-  _onChronicleEventDeleted(data) {}
+  _onChronicleEventDeleted() { this.scheduleRefresh(); }
 
   // --- Chronicle → Foundry: sub-resources -----------------------------
 
@@ -469,7 +671,10 @@ export class CalendarSync {
   async _onChronicleStructureUpdated(type = 'calendar.structure.updated') {
     try {
       const cal = await this._api.get('/calendar');
-      if (cal) this._chronicleCalendar = cal;
+      if (cal) {
+        this._chronicleCalendar = cal;
+        this.scheduleRefresh();
+      }
     } catch (err) {
       console.debug(`Chronicle: ${type} received; could not refetch /calendar`, err?.message);
     }
@@ -481,20 +686,20 @@ export class CalendarSync {
    * Push a date to Chronicle (PUT /calendar/date), behind the date-push
    * guards: GM only, the rebuild blackout, a refused-push pause, and the
    * real-time-calendar signal. Refusals pause the push with one notice
-   * rather than one error per tick. TODO(#95): call this from the built-in
-   * calendar's date-change hook.
+   * rather than one error per tick.
    * @param {{year:number, month:number, day:number, hour?:number, minute?:number}} date - 1-indexed month/day.
+   * @returns {Promise<boolean>} true when Chronicle took the date.
    */
   async pushDate(date) {
-    if (!date) return;
-    if (!getSetting('syncCalendar')) return;
-    if (!game.user.isGM) return;
+    if (!date) return false;
+    if (!getSetting('syncCalendar')) return false;
+    if (!game.user.isGM) return false;
 
     // Check before the pre-push probe so a known blackout costs zero requests.
-    if (calendarBlackoutActive() || datePushPaused()) return;
+    if (calendarBlackoutActive() || datePushPaused()) return false;
 
     try {
-      if (await shouldSkipDatePush(this._api)) return;
+      if (await shouldSkipDatePush(this._api)) return false;
       await this._api.put('/calendar/date', {
         year: date.year,
         month: date.month,
@@ -503,21 +708,22 @@ export class CalendarSync {
         minute: date.minute || 0,
       });
       noteCalendarAnswerOk();
+      return true;
     } catch (err) {
       // 400/403/422 refusals pause date push with one notice, not one error per tick.
-      if (handleDatePushRefusal(err)) return;
-      if (isRealTimeRejection(err)) { notifyRealTimePushPaused(); return; }
+      if (handleDatePushRefusal(err)) return false;
+      if (isRealTimeRejection(err)) { notifyRealTimePushPaused(); return false; }
       // A 503 calendar_rebuilding arms the session guard and notifies once.
-      if (handleIfCalendarRebuilding(err)) return;
+      if (handleIfCalendarRebuilding(err)) return false;
       console.error('Chronicle: Failed to push date to Chronicle', err);
+      return false;
     }
   }
 
   /**
    * Fetch Chronicle's calendar events for the current year ±`yearSpan`,
    * month by month (GET /calendar/events is month-filtered), deduped by id.
-   * Bounded, never unbounded history. TODO(#95): feed these to the built-in
-   * calendar on connect.
+   * Bounded, never unbounded history.
    * @param {number} [yearSpan=1]
    * @returns {Promise<object[]>}
    */

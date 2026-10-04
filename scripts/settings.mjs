@@ -170,6 +170,29 @@ export function registerSettings() {
     default: false,
   });
 
+  // The built-in calendar as every player may see it, written by the GM's
+  // client from Chronicle's players-audience reads (players hold no key).
+  // World scope is deliberate: every client receives it, so it carries
+  // only what buildPlayerSnapshot keeps.
+  game.settings.register(MODULE_ID, 'calendarSnapshot', {
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
+    onChange: () => Hooks.callAll('chronicleSyncCalendarSnapshot'),
+  });
+
+  game.settings.register(MODULE_ID, 'calendarTemperatureUnit', {
+    name: game.i18n.localize('CHRONICLE.Settings.CalendarTemperatureUnit.Name'),
+    hint: game.i18n.localize('CHRONICLE.Settings.CalendarTemperatureUnit.Hint'),
+    scope: 'client',
+    config: true,
+    type: String,
+    choices: { C: '°C', F: '°F' },
+    default: 'C',
+    onChange: () => Hooks.callAll('chronicleSyncCalendarSnapshot'),
+  });
+
   // Internal: detected Chronicle system ID matched from Foundry's game.system.id.
   game.settings.register(MODULE_ID, 'detectedSystem', {
     scope: 'world',

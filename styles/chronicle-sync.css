@@ -994,11 +994,6 @@
   padding: 8px 0;
 }
 
-.calendar-module-info {
-  font-size: 13px;
-  margin-bottom: 12px;
-}
-
 .calendar-date-compare {
   display: flex;
   gap: 16px;
@@ -2271,3 +2266,52 @@
 .sync-history .sh-error { color: #ff7b72; opacity: 1; }
 .sync-history .sh-more { padding: 6px; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.08); }
 @media (prefers-reduced-motion: reduce) { .sync-history .sh-caret { transition: none; } }
+
+/* Built-in calendar: date bar at the top centre and its month view. */
+#chronicle-calendar-bar {
+  position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 60;
+  display: flex; align-items: center; gap: 4px; padding: 3px 6px;
+  border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.18);
+  background: var(--ccal-sky, #1b2350); color: #f4f1ea;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45); font-size: var(--font-size-13, 13px);
+  transition: background 1.2s ease;
+}
+#chronicle-calendar-bar button { background: none; border: none; color: inherit; line-height: 1; width: auto; margin: 0; }
+#chronicle-calendar-bar .ccal-face { display: flex; align-items: center; gap: 8px; padding: 3px 10px; border-radius: 999px; cursor: pointer; }
+#chronicle-calendar-bar .ccal-face:hover, #chronicle-calendar-bar .ccal-face:focus-visible { background: rgba(0, 0, 0, 0.25); }
+#chronicle-calendar-bar .ccal-date { font-weight: 600; white-space: nowrap; }
+#chronicle-calendar-bar .ccal-time { opacity: 0.85; font-variant-numeric: tabular-nums; }
+#chronicle-calendar-bar .ccal-chip { padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--ccal-chip) 55%, transparent); font-size: 0.9em; }
+#chronicle-calendar-bar .ccal-moons { display: inline-flex; gap: 4px; opacity: 0.9; }
+#chronicle-calendar-bar .ccal-step { padding: 4px 6px; border-radius: 50%; cursor: pointer; }
+#chronicle-calendar-bar .ccal-step:hover:not(:disabled) { background: rgba(0, 0, 0, 0.25); }
+#chronicle-calendar-bar .ccal-step:disabled { opacity: 0.4; cursor: default; }
+#chronicle-calendar-bar .ccal-unit { height: 22px; width: auto; background: rgba(0, 0, 0, 0.3); color: inherit; border: none; border-radius: 6px; font-size: 0.9em; }
+
+#chronicle-calendar-month {
+  position: fixed; top: 46px; left: 50%; z-index: 61; width: min(560px, 94vw);
+  transform: translateX(-50%) translateY(-6px) scale(0.98); opacity: 0; transform-origin: top center;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  padding: 8px 10px 10px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(20, 22, 32, 0.96); color: #eee; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+}
+#chronicle-calendar-month.open { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+#chronicle-calendar-month header { display: flex; align-items: center; justify-content: space-between; }
+#chronicle-calendar-month header h3 { margin: 0; border: none; font-size: 1.05em; }
+#chronicle-calendar-month button { width: auto; flex: 0 0 auto; background: rgba(255, 255, 255, 0.06); color: inherit; border: 1px solid rgba(255, 255, 255, 0.12); }
+#chronicle-calendar-month .ccal-grid { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 6px 0 0; background: none; border: none; }
+#chronicle-calendar-month .ccal-grid th { font-size: 0.75em; font-weight: 500; opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: none; color: inherit; }
+#chronicle-calendar-month .ccal-grid td { vertical-align: top; height: 52px; padding: 2px 3px; border: 1px solid rgba(255, 255, 255, 0.06); overflow: hidden; }
+#chronicle-calendar-month .ccal-grid tr:nth-child(even) { background: none; }
+#chronicle-calendar-month .ccal-pad { background: rgba(0, 0, 0, 0.2); }
+#chronicle-calendar-month .ccal-n { display: block; font-size: 0.8em; opacity: 0.8; }
+#chronicle-calendar-month .ccal-today { outline: 2px solid #e0b25b; outline-offset: -2px; }
+#chronicle-calendar-month .ccal-ev { display: block; font-size: 0.72em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid var(--ccal-ev); padding-left: 3px; margin-top: 1px; }
+#chronicle-calendar-month .ccal-ev-gm { font-style: italic; opacity: 0.8; }
+#chronicle-calendar-month .ccal-ev-gm::before { content: "\f023"; font-family: "Font Awesome 6 Pro", "Font Awesome 6 Free"; font-weight: 900; font-style: normal; margin-right: 3px; font-size: 0.9em; }
+#chronicle-calendar-month .ccal-more { display: block; font-size: 0.7em; opacity: 0.7; }
+#chronicle-calendar-month footer { display: flex; gap: 6px; justify-content: flex-end; margin-top: 8px; }
+.ccal-form .form-fields input[type="number"] { max-width: 6em; }
+@media (prefers-reduced-motion: reduce) {
+  #chronicle-calendar-bar, #chronicle-calendar-month { transition: none; }
+}

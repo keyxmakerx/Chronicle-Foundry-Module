@@ -12,7 +12,7 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
   (serving descriptor, schema v1) — cross-validated by
   `tools/check-package-descriptor.mjs`.
 - `scripts/*.mjs`: sync (`journal-sync`+`picture-store`, `map-sync`+`map-viewer`+`map-sheet-items`,
-  `calendar-sync`, `actor-sync`,
+  `calendar-sync`+`calendar-bar`, `actor-sync`,
   `item-sync`, `stash-sync`+`stash-client`), UI (`sync-dashboard`, `npc-presence`, `negotiation-mirror`,
   `sync-diagnostic-bundle`, `update-info`, `gm-secret-view`, `character-claim-indicator`,
   `capability-inspector`, `import-wizard`, `shop-widget`+`shop-room-window`, `player-notebook`, `stash-window`+`stash-chat`), core (`module`,
@@ -49,7 +49,7 @@ Install/update flow: also `.ai.md` → "Chronicle Integration — Install & Upda
 - Adapters implement `toChronicleFields()`/`fromChronicleFields()`; REST uses Bearer auth via `api-client.mjs`.
 - **API key is CLIENT-scoped, never world-scoped** (a world setting syncs to every client). `migrateApiKeyToClientScope()` migrates legacy values. `tools/test-api-key-scope.mjs`.
 - **List responses are bare array or `{"data":[…],"total":N}`** — unwrap defensively everywhere. Envelope: `/entities`, `/entity-types`, `/systems`, `/addons`, `/tags`, `/relations/types`, `/calendar/events`. Bare: `/maps`, `/maps/:id/*`, `/members`, `/entities/:id/relations`, `/notes`. `tools/test-envelope-audit.mjs`.
-- **No Foundry calendar module is integrated.** `calendar-sync.mjs` pulls Chronicle's date, events and world state and writes nothing into Foundry; the built-in calendar plugs in there (TODO(#95)).
+- **Chronicle brings its own calendar; no Foundry calendar module is integrated.** `calendar-sync.mjs` pulls Chronicle's date, events and world state; `calendar-bar.mjs` draws the date bar and month view and writes dates and events back to Chronicle. Players have no key, so the GM's client publishes the `calendarSnapshot` world setting, built only from `?audience=players` reads that Chronicle echoes back (`buildPlayerSnapshot` in `_calendar-view-model.mjs`: copied by field, public events only). Day maths is Chronicle's own (`_chronicle-caldate.mjs`). `tools/test-calendar-view-model.mjs`, `tools/test-calendar-builtin.mjs`, `tools/test-chronicle-caldate.mjs`.
 - **Real-time calendars are read-only for dates**: `tracks_real_time` from `GET /calendar/date` pauses date-push only, via `scripts/_realtime-date-guard.mjs`. `tools/test-realtime-date-signal.mjs`.
 - **Calendar sub-resources are display-only** (dashboard + optional GM-whisper, never public); `structure.updated` only refetches the calendar. `scripts/_calendar-subresources.mjs`, `tools/test-calendar-subresources.mjs`, `tools/test-calendar-subresource-routing.mjs`.
 - **Chronicle update endpoints are PARTIAL**: absent preserves, `null` clears, present replaces (API-CONTRACT.md → "partial-update contract"). Send only changed fields; never echo untouched ones back. `tools/test-partial-put-contract.mjs`. One deliberate exception: the marker dialog in `scripts/map-viewer.mjs` spreads the stored marker, harmless on current Chronicle and needed by older servers that replace the whole record. Actor field pushes do the same for `fields_data` (`ActorSync._putFieldsMerged`).

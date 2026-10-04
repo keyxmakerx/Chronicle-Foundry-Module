@@ -12,6 +12,7 @@ import { JournalSync } from './journal-sync.mjs';
 import { MapSync } from './map-sync.mjs';
 import { ShopWidget } from './shop-widget.mjs';
 import { CalendarSync } from './calendar-sync.mjs';
+import { registerCalendarBar } from './calendar-bar.mjs';
 import { ActorSync } from './actor-sync.mjs';
 import { ItemSync } from './item-sync.mjs';
 import { StashSync } from './stash-sync.mjs';
@@ -115,7 +116,8 @@ Hooks.once('ready', async () => {
   syncManager.registerModule(new JournalSync());
   syncManager.registerModule(new MapSync());
   syncManager.registerModule(new ShopWidget());
-  syncManager.registerModule(new CalendarSync());
+  const calendarSync = new CalendarSync();
+  syncManager.registerModule(calendarSync);
   syncManager.registerModule(new ActorSync());
   syncManager.registerModule(new ItemSync());
   syncManager.registerModule(new StashSync());
@@ -142,6 +144,13 @@ Hooks.once('ready', async () => {
     registerDebugHub();
   } catch (err) {
     console.warn('Chronicle Sync | Problem reports unavailable', err);
+  }
+  try {
+    // Chronicle's own calendar: the GM's bar reads calendarSync, players
+    // draw the snapshot it publishes.
+    registerCalendarBar(calendarSync);
+  } catch (err) {
+    console.warn('Chronicle Sync | Calendar bar unavailable', err);
   }
   try {
     registerPlayerNotebook();
