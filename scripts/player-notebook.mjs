@@ -417,16 +417,14 @@ function buildJotTab() {
   panel.hidden = true;
   panel.setAttribute('aria-label', t('JotsTitle'));
 
-  // A title bar to drag the panel by, like a Foundry window's.
+  // A slim bar to drag the panel by; the frame below already shows the
+  // "Jot notes" title, so this bar only carries a grip and the X.
   const header = document.createElement('header');
   header.className = 'chronicle-jot-header';
   header.title = t('DragToMove');
-  const title = document.createElement('span');
-  title.className = 'chronicle-jot-title';
-  const titleIcon = document.createElement('i');
-  titleIcon.className = 'fa-solid fa-pen';
-  titleIcon.setAttribute('aria-hidden', 'true');
-  title.append(titleIcon, ` ${t('JotsTitle')}`);
+  const grip = document.createElement('i');
+  grip.className = 'fa-solid fa-grip-lines chronicle-jot-grip';
+  grip.setAttribute('aria-hidden', 'true');
   const close = document.createElement('button');
   close.type = 'button';
   close.className = 'chronicle-jot-close';
@@ -437,7 +435,7 @@ function buildJotTab() {
   closeIcon.setAttribute('aria-hidden', 'true');
   close.append(closeIcon);
   close.addEventListener('click', closeJots);
-  header.append(title, close);
+  header.append(grip, close);
 
   const host = document.createElement('div');
   host.className = 'chronicle-notes-host';

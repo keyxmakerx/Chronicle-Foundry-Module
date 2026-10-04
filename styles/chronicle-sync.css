@@ -3020,7 +3020,8 @@
   align-items: center;
   gap: 6px;
   flex: none;
-  padding: 4px 6px 4px 10px;
+  height: 22px;
+  padding: 0 4px 0 28px;
   border-bottom: 1px solid var(--color-border-dark, #3a3833);
   background: rgba(28, 27, 25, 0.92);
   color: var(--color-text-light-highlight, #f0e9d8);
@@ -3030,8 +3031,10 @@
   touch-action: none;
 }
 
-.chronicle-jot-title {
+.chronicle-jot-grip {
   flex: 1;
+  text-align: center;
+  opacity: 0.6;
 }
 
 .chronicle-jot-close {
