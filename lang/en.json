@@ -26,6 +26,8 @@
       "BackHour": "Back one hour",
       "ForwardHour": "Forward one hour",
       "Drag": "Drag to move",
+      "Lock": "Lock in place",
+      "Unlock": "Unlock to move",
       "Shrink": "Shrink to a clock",
       "Clock": "Chronicle calendar: {date}, {time}. Click to open; drag to move",
       "RealTime": "This calendar follows real time, so its date can't be moved here.",

@@ -2278,12 +2278,15 @@
 #chronicle-calendar-bar:not(.ccal-mini) { isolation: isolate; }
 #chronicle-calendar-bar .ccal-grip { cursor: grab; opacity: 0.55; padding: 0 3px; letter-spacing: -2px; font-size: 11px; }
 #chronicle-calendar-bar .ccal-grip:active { cursor: grabbing; }
+#chronicle-calendar-bar .ccal-lock { opacity: 0.55; font-size: 11px; }
+#chronicle-calendar-bar .ccal-lock[aria-pressed="true"] { opacity: 0.9; }
+#chronicle-calendar-bar.ccal-locked .ccal-dot { cursor: pointer; }
 #chronicle-calendar-bar .ccal-open { cursor: pointer; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
 #chronicle-calendar-bar .ccal-open b { font-weight: 600; }
 #chronicle-calendar-bar .ccal-time { opacity: 0.85; font-variant-numeric: tabular-nums; }
 #chronicle-calendar-bar .ccal-more { max-width: 0; overflow: hidden; opacity: 0.85; transition: max-width 0.35s ease; }
 #chronicle-calendar-bar:hover .ccal-more, #chronicle-calendar-bar:focus-within .ccal-more { max-width: 260px; }
-#chronicle-calendar-bar .ccal-step, #chronicle-calendar-bar .ccal-shrink { cursor: pointer; opacity: 0.85; font-size: 13px; }
+#chronicle-calendar-bar .ccal-step, #chronicle-calendar-bar .ccal-shrink, #chronicle-calendar-bar .ccal-lock { cursor: pointer; opacity: 0.85; font-size: 13px; }
 #chronicle-calendar-bar .ccal-step:disabled { opacity: 0.35; cursor: default; }
 #chronicle-calendar-bar.ccal-mini .ccal-dot {
   position: relative; isolation: isolate; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; overflow: hidden;

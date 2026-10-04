@@ -105,13 +105,14 @@ function stripHtml(v) {
     ? `<i class="fa-solid ${weatherIconClass(v.weather.icon)} ccal-wx" title="${esc(v.weather.label || '')}" aria-label="${esc(v.weather.label || '')}"></i>` : '';
   const more = moreText(v);
   return `<div class="ccal-sky"></div>
-    <span class="ccal-grip" title="${esc(t('Drag'))}" aria-hidden="true">&#8942;&#8942;</span>
+    ${v.locked ? '' : `<span class="ccal-grip" title="${esc(t('Drag'))}" aria-hidden="true">&#8942;&#8942;</span>`}
     ${arrow(-1)}
     <button type="button" class="ccal-open" aria-haspopup="dialog" aria-expanded="${popover ? 'true' : 'false'}" title="${esc(t('OpenMonth'))}">
       <b>${esc(formatDate(v.calendar, v.date))}</b> <span class="ccal-time">${esc(formatTime(v.calendar, v.date))}</span>
     </button>
     ${weather}${more ? `<span class="ccal-more">${more}</span>` : ''}
     ${arrow(1)}
+    <button type="button" class="ccal-lock" aria-pressed="${v.locked ? 'true' : 'false'}" title="${esc(t(v.locked ? 'Unlock' : 'Lock'))}" aria-label="${esc(t(v.locked ? 'Unlock' : 'Lock'))}"><i class="fa-solid ${v.locked ? 'fa-lock' : 'fa-lock-open'}"></i></button>
     <button type="button" class="ccal-shrink" title="${esc(t('Shrink'))}" aria-label="${esc(t('Shrink'))}"><i class="fa-regular fa-clock"></i></button>`;
 }
 
@@ -158,8 +159,11 @@ export function renderCalendarBar() {
     wid.addEventListener('click', onClick);
     wid.addEventListener('pointerdown', onDragStart);
   }
-  const mini = !!savedPlace().mini;
+  const place = savedPlace();
+  const mini = !!place.mini;
+  v.locked = !!place.locked;
   wid.classList.toggle('ccal-mini', mini);
+  wid.classList.toggle('ccal-locked', v.locked);
   wid.classList.toggle('ccal-gm', v.gm);
   wid.style.setProperty('--ccal-sky', skyGradient(v.calendar, v.date.hour));
   wid.innerHTML = mini ? dotHtml(v) : stripHtml(v);
@@ -173,6 +177,8 @@ let drag = null;
 
 function onDragStart(ev) {
   if (!ev.target.closest('.ccal-grip, .ccal-dot') || ev.button !== 0) return;
+  // Locked means it stays put; the clock still restores the strip on click.
+  if (savedPlace().locked) return;
   const box = wid.getBoundingClientRect();
   drag = { dx: ev.clientX - box.left, dy: ev.clientY - box.top, x0: ev.clientX, y0: ev.clientY, moved: false };
   wid.setPointerCapture(ev.pointerId);
@@ -210,6 +216,10 @@ async function onClick(ev) {
     const ok = await source.step('hour', Number(stepBtn.dataset.dir));
     if (!ok) ui.notifications.warn(t('StepRefused'));
     renderCalendarBar();
+    return;
+  }
+  if (ev.target.closest('.ccal-lock')) {
+    savePlace({ locked: !savedPlace().locked });
     return;
   }
   if (ev.target.closest('.ccal-shrink')) {
