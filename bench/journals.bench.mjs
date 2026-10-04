@@ -307,7 +307,9 @@ test('pictures inside page text show in Foundry, GM-only ones stay secret, and a
   const local = `worlds/bench-world/chronicle-media/${shared}.png`;
   assert.ok(text.includes(`src="${local}"`), `shared picture points at its copy: ${text}`);
   assert.ok(world.files.has(local), 'the copy is in the world files');
-  assert.match(text, new RegExp(`<section class="secret[^"]*"[^>]*><figure class="[^"]*ce-img--gm[^"]*"><img src="/media/${secret}"`));
+  // The GM-only picture is a placeholder in the saved page, like GM-only text.
+  assert.ok(!text.includes(secret) && !text.includes('ce-img--gm'), `the GM-only picture is not in the saved page: ${text}`);
+  assert.match(text, /<section class="secret[^"]*"[^>]* id="secret-chrk[0-9a-f]{32}"/);
   assert.ok(![...world.files.keys()].some((p) => p.includes(secret)), 'a GM-only picture is never copied');
 
   // A second pull reuses the copy.
