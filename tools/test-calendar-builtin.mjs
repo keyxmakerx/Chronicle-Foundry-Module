@@ -141,3 +141,16 @@ test('addEvent posts a Chronicle event with wire visibility', async () => {
     ['/calendar/events', { name: 'Plot', year: 1492, month: 1, day: 5, all_day: false, start_hour: 9, start_minute: 30, visibility: 'gm-only' }],
   ]);
 });
+
+test('a failed players events read keeps the last snapshot instead of blanking events', async () => {
+  saved.length = 0;
+  let n = 0;
+  const cs = makeSync(makeApi([
+    ['/calendar/date?audience=players', { year: 1492, month: 2, day: 30, audience: 'players' }],
+    ['/calendar/events?', () => { n += 1; if (n === 2) throw new Error('500'); return { data: [], audience: 'players' }; }],
+    ['/calendar?audience=players', cal],
+  ]));
+  const original = console.debug; console.debug = () => {};
+  try { await cs.publishPlayerSnapshot(); } finally { console.debug = original; }
+  assert.equal(saved.length, 0);
+});

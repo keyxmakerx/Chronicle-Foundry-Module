@@ -164,7 +164,8 @@ function onOutside(ev) {
 }
 
 function onKey(ev) {
-  if (ev.key === 'Escape' && popover) { ev.stopPropagation(); closeMonth(); }
+  // Not stopped: an open Set date or Add event dialog still gets its Escape.
+  if (ev.key === 'Escape' && popover) closeMonth();
 }
 
 function monthEvents(v, y, m) {
@@ -184,6 +185,8 @@ async function ensureMonth(v, y, m) {
     extraMonths.set(key, Array.isArray(payload) ? payload : (payload?.data || []));
     renderMonth();
   } catch (err) {
+    // Forget the month so reopening it tries again.
+    extraMonths.delete(key);
     console.debug('Chronicle: month events read failed', err?.message);
   }
 }

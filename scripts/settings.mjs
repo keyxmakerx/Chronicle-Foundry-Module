@@ -73,6 +73,8 @@ export function registerSettings() {
     config: true,
     type: Boolean,
     default: true,
+    // The built-in calendar shows or hides with sync, on every client.
+    onChange: () => Hooks.callAll('chronicleSyncCalendarSnapshot'),
   });
 
   // Per-feature toggles.
@@ -101,6 +103,8 @@ export function registerSettings() {
     config: true,
     type: Boolean,
     default: false,
+    // The built-in calendar shows or hides with sync, on every client.
+    onChange: () => Hooks.callAll('chronicleSyncCalendarSnapshot'),
   });
 
   // Character sync toggle (requires matching game system).

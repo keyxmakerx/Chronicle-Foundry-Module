@@ -276,15 +276,17 @@ export class CalendarSync {
    * Events for the current month and one either side, the window the month
    * view opens on. `audience` reads them as players see them.
    * @param {string} [audience]
-   * @returns {Promise<{events: object[], confirmed: boolean}>} confirmed: every page echoed the audience.
+   * @returns {Promise<{events: object[], confirmed: boolean, failed: boolean}>} confirmed: every page
+   *   echoed the audience; failed: a page could not be read.
    * @private
    */
   async _fetchMonthsAround(audience) {
     const d = this.chronicleDate;
-    if (!d) return { events: [], confirmed: false };
+    if (!d) return { events: [], confirmed: false, failed: false };
     const seen = new Set();
     const events = [];
     let confirmed = true;
+    let failed = false;
     for (const delta of [-1, 0, 1]) {
       const { y, m } = shiftMonth(this._chronicleCalendar, d.year, d.month, delta);
       const q = `year=${y}&month=${m}${audience ? `&audience=${audience}` : ''}`;
@@ -294,6 +296,7 @@ export class CalendarSync {
       } catch (err) {
         console.debug('Chronicle: calendar events read failed', err?.message);
         confirmed = false;
+        failed = true;
         continue;
       }
       if (audience && payload?.audience !== audience) confirmed = false;
@@ -306,7 +309,7 @@ export class CalendarSync {
         events.push(e);
       }
     }
-    return { events, confirmed };
+    return { events, confirmed, failed };
   }
 
   /**
@@ -324,7 +327,11 @@ export class CalendarSync {
       calendar = await this._api.get('/calendar?audience=players');
       if (calendar) {
         dateInfo = await this._api.get('/calendar/date?audience=players');
-        ({ events, confirmed: eventsConfirmed } = await this._fetchMonthsAround('players'));
+        let failed;
+        ({ events, confirmed: eventsConfirmed, failed } = await this._fetchMonthsAround('players'));
+        // A passing read error would publish an empty list over the players'
+        // events; keep the last snapshot until a full read succeeds.
+        if (failed) return;
       }
     } catch (err) {
       if (err?.status !== 404) {
