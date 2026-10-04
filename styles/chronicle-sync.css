@@ -137,6 +137,29 @@
   z-index: 10000 !important;
 }
 
+/* The widget colours its text and panels from Chronicle's theme variables.
+   Foundry defines some of the same names for its own (often dark) theme but
+   not the panel ones, which left light text on the widget's white fallback
+   panels. Pin Chronicle's light palette wherever the widget draws: in the
+   window, and on the tooltip, speech bubble and picker it adds to the page. */
+.chronicle-shop-room,
+.shr-tip,
+.shr-say,
+.shr-pick {
+  --color-bg-primary: #f9fafb;
+  --color-bg-tertiary: #f3f4f6;
+  --color-text-primary: #111827;
+  --color-text-body: #374151;
+  --color-text-secondary: #6b7280;
+  --color-text-muted: #9ca3af;
+  --color-border: #e5e7eb;
+  --color-card-bg: #ffffff;
+  --color-input-bg: #ffffff;
+  --color-input-border: #d1d5db;
+  --color-accent: #6366f1;
+  color: var(--color-text-body);
+}
+
 /* ================================================================= */
 /* SYNC DASHBOARD                                                     */
 /* ================================================================= */
