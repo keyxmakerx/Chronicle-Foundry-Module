@@ -206,6 +206,11 @@ test('vendored drawing engine runs and draws a room', () => {
   S.its = SR.shopItems([{ id: 1, targetEntityId: 'i', targetEntityName: 'Rope', metadata: { price: 1 } }], {}, room.MAT, sandbox.ShopRoomIcons);
   const out = room.draw();
   assert.match(out.svg, /^<defs>/);
+  // A <use> whose symbol the drawing never defines renders as nothing.
+  const used = new Set([...out.svg.matchAll(/href="#(i-[a-z0-9-]+)"/g)].map((m) => m[1]));
+  const defined = new Set([...out.svg.matchAll(/<symbol id="(i-[a-z0-9-]+)"/g)].map((m) => m[1]));
+  assert.ok(used.size > 0, 'the room draws icons');
+  for (const u of used) assert.ok(defined.has(u), `${u} has no symbol`);
 });
 
 const chronicleDir = process.env.CHRONICLE_DIR;
