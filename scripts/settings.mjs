@@ -332,6 +332,14 @@ export function registerSettings() {
     default: '{}',
   });
 
+  // Where this player dragged the jot tab and panel (scripts/_jot-placement.mjs).
+  game.settings.register(MODULE_ID, 'jotPlacement', {
+    scope: 'client',
+    config: false,
+    type: String,
+    default: '{}',
+  });
+
   // Dashboard layout preferences (per-user, per-browser).
   game.settings.register(MODULE_ID, 'dashboardActiveTab', {
     scope: 'client',
