@@ -168,23 +168,15 @@ module calls none of them). An older Chronicle answers those with
 `503 calendar_rebuilding`, which pauses date pushes for 30 seconds and shows one
 GM notice. See API-CONTRACT.md.
 
-### Chronicle -> Foundry
-- [ ] Advance date in Chronicle -> Calendaria/SimpleCalendar date updates
-- [ ] Create calendar event -> Event appears in calendar module
-- [ ] Update event -> Calendar module event updates
-- [ ] Delete event -> Calendar module event removed
+No Foundry calendar module is integrated, so nothing is written into Foundry.
 
-### Foundry -> Chronicle
-- [ ] Change date in Calendaria/SimpleCalendar -> Chronicle date updates
-- [ ] A real-time Chronicle calendar is never overwritten by a Foundry date change
-- [ ] Create event in calendar module -> Chronicle event created
-- [ ] Update event -> Chronicle event updates
-- [ ] Delete event -> Chronicle event removed
-
-### Adapter Compatibility
-- [ ] Test with Calendaria module active
-- [ ] Test with SimpleCalendar module active (note 0-indexed months/days)
-- [ ] Test with neither module -> Calendar sync gracefully disabled
+### Dashboard
+- [ ] Calendar tab shows Chronicle's calendar name, date (day, month, year) and time
+- [ ] Advance the date in Chronicle -> the tab shows the new date after the next refresh
+- [ ] Change weather, season, era or a moon phase in Chronicle -> the world-state panel updates
+- [ ] With the announce settings on, a GM-only whisper appears for each change; players never see it
+- [ ] Calendar sync off in Module Settings -> the tab says it is disabled
+- [ ] A campaign with no calendar -> the tab says none is configured
 
 ## Shop Widget
 

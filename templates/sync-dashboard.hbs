@@ -863,51 +863,8 @@
     {{!-- CALENDAR TAB                                                      --}}
     {{!-- ================================================================= --}}
     <div class="tab" data-tab="calendar" data-group="primary">
-      {{!-- FM-CAL-DASHBOARD-LINK: surface the Sync Calendar editor. The
-           dashboard's Calendar tab is a status panel; the Sync Calendar
-           app is the full editor (import / events / moon strip /
-           validation). Surface it here so the operator doesn't have to
-           dig through Game Settings → Module Settings to find it. --}}
-      <div class="calendar-tab-actions">
-        <button type="button" data-action="open-sync-calendar" class="dashboard-btn primary-action">
-          <i class="fa-solid fa-calendar-days"></i>
-          {{localize "CHRONICLE.Dashboard.Calendar.OpenSyncCalendar"}}
-        </button>
-        <p class="action-hint">{{localize "CHRONICLE.Dashboard.Calendar.OpenSyncCalendarHint"}}</p>
-      </div>
       {{#if calendar.available}}
-      {{#if calendar.isPaused}}
-      <div class="dashboard-load-errors calendar-mismatch-banner">
-        <i class="fa-solid fa-triangle-exclamation"></i>
-        <div>
-          <strong>Calendar sync paused — structure mismatch.</strong>
-          <div>{{calendar.syncStateDetail}}</div>
-          {{!-- THE REMEDY IS AN EDIT. "Import or author the matching calendar
-               in Chronicle" was unreachable both ways: the create endpoint
-               409s whenever the campaign has any calendar (always true here),
-               and an authored calendar is not is_default with no control
-               anywhere to make it one, so this module keeps being served the
-               old one. Editing either calendar's months/weekdays IS one page
-               away. See tools/test-calendar-mismatch-remedy.mjs. --}}
-          <div class="action-hint">Edit either calendar so the two agree — in Chronicle, Calendar Settings &rarr; Months / Weekdays; in Foundry, your calendar module. Journals, characters, and maps still sync.</div>
-        </div>
-      </div>
-      {{else if calendar.isIncompatible}}
-      <div class="dashboard-load-errors calendar-mismatch-banner">
-        <i class="fa-solid fa-triangle-exclamation"></i>
-        <div>
-          <strong>Calendar structures don’t match.</strong>
-          <div>{{calendar.syncStateDetail}}</div>
-          <div class="action-hint">The dates below aren’t comparable across the wire. Sync will pause on the next world reload — edit either calendar so the two agree, in Chronicle&rsquo;s Calendar Settings (Months / Weekdays) or in your Foundry calendar module.</div>
-        </div>
-      </div>
-      {{/if}}
       <div class="calendar-panel">
-        <div class="calendar-module-info">
-          <i class="fa-solid fa-check-circle" style="color: #4ade80"></i>
-          Calendar Module: <strong>{{calendar.module}}</strong>
-        </div>
-
         <div class="calendar-date-compare">
           <div class="calendar-date-box">
             <div class="date-label">Chronicle</div>
@@ -919,61 +876,11 @@
               {{calendar.chronicleDate.hour}}:{{#if (lt calendar.chronicleDate.minute 10)}}0{{/if}}{{calendar.chronicleDate.minute}}
             </div>
           </div>
-
-          <div class="calendar-date-box">
-            <div class="date-label">Foundry</div>
-            {{#if calendar.localDate}}
-            <div class="date-value">
-              Day {{calendar.localDate.day}}, Month {{calendar.localDate.month}}
-            </div>
-            <div class="date-year">Year {{calendar.localDate.year}}</div>
-            <div class="date-time">
-              {{calendar.localDate.hour}}:{{#if (lt calendar.localDate.minute 10)}}0{{/if}}{{calendar.localDate.minute}}
-            </div>
-            {{else}}
-            <div class="date-value">Unable to read</div>
-            {{/if}}
-          </div>
-        </div>
-
-        <div class="calendar-status">
-          {{#if calendar.isPaused}}
-          <span class="sync-badge out-of-sync" title="{{calendar.syncStateDetail}}"><i class="fa-solid fa-pause"></i> Sync Paused</span>
-          {{else if calendar.isIncompatible}}
-          <span class="sync-badge out-of-sync" title="{{calendar.syncStateDetail}}"><i class="fa-solid fa-triangle-exclamation"></i> Incompatible Structures</span>
-          {{else if calendar.isStructureChanged}}
-          {{!-- FM-SYNC-SUBRESOURCES-P1: Chronicle broadcast structure.updated
-                this session; the re-compare came back compatible. Advisory —
-                sync keeps running, but the badge stops claiming a clean
-                "In Sync" the operator hasn't eyeballed. The Foundry calendar
-                was NOT modified. --}}
-          <span class="sync-badge out-of-sync" title="{{calendar.syncStateDetail}}"><i class="fa-solid fa-rotate"></i> Structure Changed — Re-check</span>
-          {{else if calendar.isDrift}}
-            {{#if (eq calendar.syncDirection "chronicle-ahead")}}
-            <span class="sync-badge out-of-sync" title="Chronicle is ahead of Foundry — pull to advance the Foundry calendar."><i class="fa-solid fa-arrow-right"></i> Date Drift — Chronicle Ahead</span>
-            {{else if (eq calendar.syncDirection "foundry-ahead")}}
-            <span class="sync-badge out-of-sync" title="Foundry is ahead of Chronicle — push to advance the Chronicle calendar."><i class="fa-solid fa-arrow-left"></i> Date Drift — Foundry Ahead</span>
-            {{else}}
-            <span class="sync-badge out-of-sync" title="Dates differ (Foundry date unreadable)."><i class="fa-solid fa-exclamation-triangle"></i> Out of Sync</span>
-            {{/if}}
-          {{else}}
-          <span class="sync-badge synced"><i class="fa-solid fa-check"></i> In Sync</span>
-          {{/if}}
-        </div>
-
-        <div class="calendar-actions">
-          <button type="button" data-action="pull-date" class="dashboard-btn">
-            <i class="fa-solid fa-download"></i> Pull Date from Chronicle
-          </button>
-          <button type="button" data-action="push-date" class="dashboard-btn">
-            <i class="fa-solid fa-upload"></i> Push Date to Chronicle
-          </button>
         </div>
 
         {{!-- FM-SYNC-SUBRESOURCES-P1: Chronicle world state. Weather, season,
               era and moon phases folded from the WebSocket stream this
-              session. Read-only — nothing here is written back into the
-              Foundry calendar. --}}
+              session. Read-only. --}}
         <div class="calendar-worldstate">
           <div class="worldstate-title">
             <i class="fa-solid fa-cloud-sun"></i>
@@ -1026,12 +933,6 @@
         {{else if calendar.noCampaignCalendar}}
         <i class="fa-solid fa-calendar-xmark fa-2x"></i>
         <p>No calendar configured for this campaign in Chronicle.</p>
-        {{else if calendar.enabled}}
-          {{#unless calendar.module}}
-          <i class="fa-solid fa-puzzle-piece fa-2x"></i>
-          <p>No calendar module detected.</p>
-          <p class="hint">Install <strong>Calendaria</strong> or <strong>Simple Calendar</strong> to enable calendar sync.</p>
-          {{/unless}}
         {{else}}
         <i class="fa-solid fa-toggle-off fa-2x"></i>
         <p>Calendar sync is disabled. Enable it in Module Settings.</p>
@@ -1278,15 +1179,6 @@
           <span class="debug-copy-result" data-debug-result></span>
         </div>
 
-        {{!-- Calendar Diagnostics Export --}}
-        <h3 class="section-heading">Calendar Diagnostics</h3>
-        <p class="config-hint">{{localize "CHRONICLE.Dashboard.StatusTab.CopyCalendarDiagnosticsHint"}}</p>
-        <div class="config-actions">
-          <button type="button" class="dashboard-btn btn-sm" data-action="copy-calendar-diagnostics">
-            <i class="fa-solid fa-stethoscope"></i> {{localize "CHRONICLE.Dashboard.StatusTab.CopyCalendarDiagnostics"}}
-          </button>
-          <span class="debug-copy-result" data-cal-diag-result></span>
-        </div>
       </div>
     </div>
 

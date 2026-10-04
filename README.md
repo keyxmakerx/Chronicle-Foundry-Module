@@ -12,7 +12,7 @@ Bidirectional real-time sync between [Chronicle](https://github.com/keyxmakerx/C
 
 - **Journal Sync** — Chronicle entities ↔ Foundry journal entries (with multi-page splitting); GM-only text and pictures in Chronicle pages sit in Foundry secret blocks, hidden from players who don't own the page; catches up on reconnect from Chronicle's change feed; nothing is deleted without asking
 - **Map Sync** — Chronicle maps render as Foundry journal pages (not Scenes) in Chronicle's own frame and pin shapes, with markers, drawings, tokens, layers and fog drawn as overlays; players get the smudged picture of a shadowed map; markers are editable, with Chronicle's icon picker ("Open in Chronicle web editor" for the full map editor); the GM can give a map to a character, who opens it from their sheet
-- **Calendar Sync** — Calendaria and Simple Calendar integration
+- **Calendar** — The dashboard's Calendar tab shows Chronicle's date, weather, season, era and moon phases; no Foundry calendar module is integrated
 - **Character Sync** — Actor ↔ character entity with system-aware field mapping (D&D 5e, Pathfinder 2e, or any system with annotated fields)
 - **Shop Rooms** — Chronicle shops open in Foundry as shop rooms; the GM can show a room to players, and players buy in it (charged to the character they pick) while the GM is in the game
 - **Stashes** — A Stashes window on linked character sheets to move items and money between characters and stashes; the GM approves players' requests from a chat card (needs Chronicle's Armory addon)
@@ -115,8 +115,6 @@ The module runs sync for the GM only. Players receive updates passively through 
 ## Optional Modules
 
 - [Monk's Enhanced Journal](https://foundryvtt.com/packages/monks-enhanced-journal) — Enhanced journal page support
-- [Calendaria](https://foundryvtt.com/packages/calendaria) — Calendar sync
-- [Simple Calendar](https://foundryvtt.com/packages/foundryvtt-simple-calendar) — Calendar sync (alternative)
 
 ## For Chronicle integrators
 

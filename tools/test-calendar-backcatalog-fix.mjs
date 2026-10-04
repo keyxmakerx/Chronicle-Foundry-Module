@@ -1,13 +1,12 @@
-// test-calendar-backcatalog-fix.mjs — regression tests for calendar-sync.mjs.
+// test-calendar-backcatalog-fix.mjs — off-DOM tests for CalendarSync's pull of
+// Chronicle's calendar events and date (scripts/calendar-sync.mjs).
 //
 // Run: node --test tools/test-calendar-backcatalog-fix.mjs
 //
-// Pins: back-catalog unwraps Chronicle's { data, total } envelope; the
-// Calendaria dateTimeChange push reads the raw 0-indexed components nested
-// under `.current` and corrects them +1, ignoring the day-of-YEAR `day`
-// sibling in game.time.components; the echo-suppression guard is a reentrant
-// depth counter so a WS event resolving mid-back-catalog can't unmask the
-// loop. Also covers two fixes to compareCalendarStructures.
+// Pins: the events fetch unwraps Chronicle's { data, total } envelope and
+// dedupes by id across month windows; the fetch coordinates are bounded to the
+// current year ±span; the cached date follows the initial pull and the
+// `calendar.date.advanced` broadcast.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,205 +23,122 @@ globalThis.game = globalThis.game || {
 };
 globalThis.Hooks = globalThis.Hooks || { on: () => {}, off: () => {} };
 
-const { compareCalendarStructures, CalendarSync } = await import('../scripts/calendar-sync.mjs');
+const { calendarEventFetchCoordinates, CalendarSync } = await import('../scripts/calendar-sync.mjs');
 
-// Build a CalendarSync WITHOUT running the constructor; seed _syncDepth: 0 to
-// mirror the reentrant-guard init.
+// Build a CalendarSync WITHOUT running the constructor.
 function makeCalendarSync(overrides) {
-  return Object.assign(
-    Object.create(CalendarSync.prototype),
-    { _hasModernCalendariaApi: true, _syncDepth: 0 },
-    overrides,
-  );
+  return Object.assign(Object.create(CalendarSync.prototype), overrides);
 }
 
-// ── Item 1: BLOCKER — envelope unwrap ────────────────────────────────────────
+// ── fetch coordinates ────────────────────────────────────────────────────────
 
-function makeBackcatalog(getImpl, overrides) {
-  const created = [];
-  const cs = makeCalendarSync(Object.assign({
+test('fetch coordinates enumerate every month across current year ±1', () => {
+  const cal = { current_year: 1492, months: new Array(12).fill({ days: 30 }) };
+  const coords = calendarEventFetchCoordinates(cal, 1);
+  assert.equal(coords.length, 36); // 3 years × 12 months
+  assert.deepEqual(coords[0], { year: 1491, month: 1 });
+  assert.deepEqual(coords[coords.length - 1], { year: 1493, month: 12 });
+});
+
+test('a 15-month calendar yields 45 coordinates over ±1 year', () => {
+  const cal = { current_year: 500, months: new Array(15).fill({ days: 24 }) };
+  assert.equal(calendarEventFetchCoordinates(cal, 1).length, 45);
+});
+
+test('yearSpan 0 fetches only the current year', () => {
+  const cal = { current_year: 1492, months: new Array(12).fill({ days: 30 }) };
+  const coords = calendarEventFetchCoordinates(cal, 0);
+  assert.equal(coords.length, 12);
+  assert.ok(coords.every((c) => c.year === 1492));
+});
+
+test('no calendar / no months yields no coordinates (caller falls back to a bare fetch)', () => {
+  assert.deepEqual(calendarEventFetchCoordinates(null), []);
+  assert.deepEqual(calendarEventFetchCoordinates({ current_year: 1492, months: [] }), []);
+  assert.deepEqual(calendarEventFetchCoordinates({ current_year: 1492 }), []);
+});
+
+// ── events fetch ─────────────────────────────────────────────────────────────
+
+function makeFetcher(getImpl) {
+  const paths = [];
+  const cs = makeCalendarSync({
     // 1 month × (current year ±1) = 3 fetch windows.
     _chronicleCalendar: { current_year: 1492, months: [{ days: 30 }] },
-    _api: { get: getImpl },
-    _getLocalEventId: () => null,
-    _createLocalEvent(e) { created.push(e); return Promise.resolve(); },
-  }, overrides));
-  return { cs, created };
+    _api: { get: async (path) => { paths.push(path); return getImpl(path); } },
+  });
+  return { cs, paths };
 }
 
-test('BLOCKER: { data, total } envelope with 2 distinct events across 2 windows → 2 notes', async () => {
+test('{ data, total } envelope with 2 distinct events across 2 windows → 2 events', async () => {
   let call = 0;
-  const { cs, created } = makeBackcatalog(async () => {
+  const { cs, paths } = makeFetcher(async () => {
     call += 1;
     if (call === 1) return { data: [{ id: 'a' }], total: 1 };
     if (call === 2) return { data: [{ id: 'b' }], total: 1 };
     return { data: [], total: 0 };
   });
-  await cs._syncChronicleEventsToCalendariaNotes();
-  assert.deepEqual(created.map((e) => e.id).sort(), ['a', 'b']);
+  const events = await cs.fetchEvents();
+  assert.deepEqual(events.map((e) => e.id).sort(), ['a', 'b']);
+  assert.deepEqual(paths, [
+    '/calendar/events?year=1491&month=1',
+    '/calendar/events?year=1492&month=1',
+    '/calendar/events?year=1493&month=1',
+  ]);
 });
 
-test('BLOCKER: a recurring event surfacing in every window is created ONCE (dedupe by id)', async () => {
-  const { cs, created } = makeBackcatalog(async () => ({ data: [{ id: 'recur' }], total: 1 }));
-  await cs._syncChronicleEventsToCalendariaNotes();
-  assert.equal(created.length, 1);
+test('a recurring event surfacing in every window is returned ONCE (dedupe by id)', async () => {
+  const { cs } = makeFetcher(async () => ({ data: [{ id: 'recur' }], total: 1 }));
+  assert.equal((await cs.fetchEvents()).length, 1);
 });
 
-test('BLOCKER: a bare-array response is still tolerated (back-compat)', async () => {
-  const { cs, created } = makeBackcatalog(async () => [{ id: 'x' }]);
-  await cs._syncChronicleEventsToCalendariaNotes();
-  assert.equal(created.length, 1);
+test('a bare-array response is still tolerated (back-compat)', async () => {
+  const { cs } = makeFetcher(async () => [{ id: 'x' }]);
+  assert.equal((await cs.fetchEvents()).length, 1);
 });
 
-test('BLOCKER: a non-array, non-envelope body skips the window without throwing', async () => {
+test('a non-array, non-envelope body skips the window without throwing', async () => {
   for (const body of [null, {}, { unexpected: true }, { data: 'nope' }, 42]) {
-    const { cs, created } = makeBackcatalog(async () => body);
-    await cs._syncChronicleEventsToCalendariaNotes();
-    assert.equal(created.length, 0, `body ${JSON.stringify(body)} must create nothing`);
+    const { cs } = makeFetcher(async () => body);
+    assert.equal((await cs.fetchEvents()).length, 0, `body ${JSON.stringify(body)} must yield nothing`);
   }
 });
 
-// ── Item 2: HIGH — dateTimeChange push (nested .current, raw 0-indexed) ───────
-
-function makeDatePush(overrides) {
-  const puts = [];
-  const cs = makeCalendarSync(Object.assign({
-    _calendarSyncDisabled: false,
-    _isActiveCalendarExcluded: () => false,
-    _api: { put: async (path, body) => { puts.push({ path, body }); return { id: 'ok' }; } },
-  }, overrides));
-  return { cs, puts };
-}
-
-test('HIGH: nested .current raw payload → 1-indexed wire date; day-of-YEAR `day` sibling ignored', async () => {
-  const { cs, puts } = makeDatePush();
-  // March 15 1492: raw month 2 / dayOfMonth 14, with a day-of-year `day` (=73)
-  // that MUST NOT be used as the day-of-month.
-  await cs._onCalendariaDateTimeChange({
-    current: { year: 1492, month: 2, dayOfMonth: 14, day: 73, hour: 9, minute: 30, second: 5 },
-    previous: {}, diff: 1,
+test('a failing window is skipped, the rest still fetch', async () => {
+  let call = 0;
+  const { cs } = makeFetcher(async () => {
+    call += 1;
+    if (call === 1) throw new Error('502');
+    return { data: [{ id: `e${call}` }], total: 1 };
   });
-  assert.equal(puts.length, 1);
-  assert.equal(puts[0].path, '/calendar/date');
-  assert.deepEqual(puts[0].body, { year: 1492, month: 3, day: 15, hour: 9, minute: 30 });
+  assert.deepEqual((await cs.fetchEvents()).map((e) => e.id), ['e2', 'e3']);
 });
 
-test('HIGH: the January-1 zero case → 1/1, never an invalid 0/0', async () => {
-  const { cs, puts } = makeDatePush();
-  await cs._onCalendariaDateTimeChange({ current: { year: 1492, month: 0, dayOfMonth: 0, day: 0, hour: 0, minute: 0 } });
-  assert.deepEqual(puts[0].body, { year: 1492, month: 1, day: 1, hour: 0, minute: 0 });
-});
-
-test('HIGH: flat payload (no .current) still works via the data.current ?? data fallback', async () => {
-  const { cs, puts } = makeDatePush();
-  await cs._onCalendariaDateTimeChange({ year: 1492, month: 5, dayOfMonth: 9, hour: 13, minute: 45 });
-  assert.deepEqual(puts[0].body, { year: 1492, month: 6, day: 10, hour: 13, minute: 45 });
-});
-
-test('HIGH: a genuinely public payload (has `day`, no `dayOfMonth`) passes through un-incremented', async () => {
-  const { cs, puts } = makeDatePush();
-  await cs._onCalendariaDateTimeChange({ current: { year: 1492, month: 3, day: 15, hour: 1, minute: 2 } });
-  assert.deepEqual(puts[0].body, { year: 1492, month: 3, day: 15, hour: 1, minute: 2 });
-});
-
-test('HIGH: missing hour/minute default to 0', async () => {
-  const { cs, puts } = makeDatePush();
-  await cs._onCalendariaDateTimeChange({ current: { year: 1492, month: 2, dayOfMonth: 14 } });
-  assert.deepEqual(puts[0].body, { year: 1492, month: 3, day: 15, hour: 0, minute: 0 });
-});
-
-test('HIGH: a payload with no usable date (year undefined) does NOT push', async () => {
-  const { cs, puts } = makeDatePush();
-  await cs._onCalendariaDateTimeChange({ current: { month: 2, dayOfMonth: 14 } });
-  assert.equal(puts.length, 0);
-});
-
-test('HIGH: guarded off — _syncing (depth>0), non-GM, and paused all suppress the push', async () => {
-  const payload = { current: { year: 1492, month: 2, dayOfMonth: 14 } };
-
-  const a = makeDatePush({ _syncDepth: 1 });
-  await a.cs._onCalendariaDateTimeChange(payload);
-  assert.equal(a.puts.length, 0, 'in-flight sync suppresses the push');
-
-  game.user.isGM = false;
-  const b = makeDatePush();
-  await b.cs._onCalendariaDateTimeChange(payload);
-  assert.equal(b.puts.length, 0, 'non-GM does not push');
-  game.user.isGM = true;
-
-  const c = makeDatePush({ _calendarSyncDisabled: true });
-  await c.cs._onCalendariaDateTimeChange(payload);
-  assert.equal(c.puts.length, 0, 'structure-mismatch pause suppresses the push');
-});
-
-// ── Item 3: MEDIUM — reentrant depth-counter guard ───────────────────────────
-
-test('MEDIUM: _syncDepth nests — the guard stays active until the OUTERMOST scope exits', () => {
-  const cs = makeCalendarSync({ _syncDepth: 0 });
-  assert.equal(cs._syncing, false);
-  cs._syncDepth += 1;                       // outer scope (e.g. back-catalog loop)
-  assert.equal(cs._syncing, true);
-  cs._syncDepth += 1;                       // inner scope (e.g. WS handler)
-  cs._syncDepth -= 1;                       // inner exits — must NOT unmask
-  assert.equal(cs._syncing, true, 'still held after the inner scope exits');
-  cs._syncDepth -= 1;                       // outer exits
-  assert.equal(cs._syncing, false);
-});
-
-test('MEDIUM: a WS _onChronicleEventCreated mid-back-catalog neither unmasks nor over-holds the guard', async () => {
-  const seen = [];
-  let injected = false;
+test('no cached structure falls back to one bare fetch', async () => {
+  const paths = [];
   const cs = makeCalendarSync({
-    _chronicleCalendar: { current_year: 1492, months: [{ days: 30 }] },
-    _api: { get: async () => ({ data: [{ id: 'e1', name: 'A', year: 1, month: 1, day: 1 }, { id: 'e2', name: 'B', year: 1, month: 1, day: 2 }], total: 2 }) },
-    _getLocalEventId: () => null,
-    async _createLocalEventUnguarded(data) {
-      seen.push(this._echoGuard.isEcho({ key: this._eventEchoKeys(data)[0] }));
-      if (!injected) {
-        injected = true;
-        // A Chronicle WS event lands mid-loop and finishes: its release must
-        // not clear the loop's still-held scope for the current event.
-        await CalendarSync.prototype._onChronicleEventCreated.call(this, { id: 'ws-1', name: 'A', year: 1, month: 1, day: 1 });
-        seen.push(this._echoGuard.isEcho({ key: this._eventEchoKeys(data)[0] }));
-      }
-    },
+    _chronicleCalendar: null,
+    _api: { get: async (path) => { paths.push(path); return []; } },
   });
-  await cs._syncChronicleEventsToCalendariaNotes();
-  assert.ok(seen.length >= 3);
-  assert.ok(seen.every((v) => v === true), 'each create stays guarded across the interleaved WS event');
-  assert.equal(cs._echoGuard.isEcho({ key: cs._eventEchoKeys({ name: 'A', year: 1, month: 1, day: 1 })[0] }), false,
-    'guard fully released after the loop');
+  await cs.fetchEvents();
+  assert.deepEqual(paths, ['/calendar/events']);
 });
 
-// ── Ride-alongs: compareCalendarStructures (RC-9) ────────────────────────────
+// ── cached date ──────────────────────────────────────────────────────────────
 
-const twelveMonths = new Array(12).fill({ days: 30 });
-const twelveMonthDays = new Array(12).fill(30);
-
-test('ride-along: an unreadable Foundry weekday list (count 0) does not pause when months match', () => {
-  const chronicle = { months: twelveMonths, weekdays: new Array(7).fill({}) };
-  const foundry = { name: 'X', monthDays: twelveMonthDays, weekdayCount: 0 };
-  assert.equal(compareCalendarStructures(chronicle, foundry).match, true);
+test('chronicleDate reads the cached calendar and follows calendar.date.advanced', () => {
+  const cs = makeCalendarSync({
+    _chronicleCalendar: { current_year: 1492, current_month: 3, current_day: 15, current_hour: 9, current_minute: 30 },
+  });
+  assert.deepEqual(cs.chronicleDate, { year: 1492, month: 3, day: 15, hour: 9, minute: 30 });
+  cs._onChronicleDateAdvanced({ year: 1492, month: 3, day: 16, hour: 0, minute: 0 });
+  assert.deepEqual(cs.chronicleDate, { year: 1492, month: 3, day: 16, hour: 0, minute: 0 });
 });
 
-test('ride-along: an unreadable Chronicle weekday list (0) also does not pause when months match', () => {
-  const chronicle = { months: twelveMonths, weekdays: [] };
-  const foundry = { name: 'X', monthDays: twelveMonthDays, weekdayCount: 7 };
-  assert.equal(compareCalendarStructures(chronicle, foundry).match, true);
-});
-
-test('ride-along: a REAL weekday difference (both > 0) still pauses', () => {
-  const chronicle = { months: twelveMonths, weekdays: new Array(7).fill({}) };
-  const foundry = { name: 'X', monthDays: twelveMonthDays, weekdayCount: 6 };
-  const r = compareCalendarStructures(chronicle, foundry);
-  assert.equal(r.match, false);
-  assert.match(r.detail, /weekday count/);
-});
-
-test('ride-along: a month mismatch still pauses even when weekdays are unreadable (fail-closed on months)', () => {
-  const chronicle = { months: twelveMonths, weekdays: new Array(7).fill({}) };
-  const foundry = { name: 'X', monthDays: new Array(15).fill(24), weekdayCount: 0 };
-  const r = compareCalendarStructures(chronicle, foundry);
-  assert.equal(r.match, false);
-  assert.match(r.detail, /month count/);
+test('chronicleDate is null before any calendar was pulled; an advance then is ignored', () => {
+  const cs = makeCalendarSync({ _chronicleCalendar: null });
+  assert.equal(cs.chronicleDate, null);
+  cs._onChronicleDateAdvanced({ year: 1, month: 1, day: 1 });
+  assert.equal(cs.chronicleDate, null);
+  cs._onChronicleDateAdvanced(null);
 });

@@ -7,7 +7,6 @@
 
 import { MODULE_ID } from './constants.mjs';
 import { UpdateInfoApplication } from './update-info.mjs';
-import { SyncCalendarApplication } from './sync-calendar.mjs';
 import { parseConnectLine } from './_connect-line.mjs';
 
 /**
@@ -224,16 +223,6 @@ export function registerSettings() {
     default: '{"excludedTypes":[],"excludedEntities":[]}',
   });
 
-  // Internal: per-calendar sync opt-out. JSON array of Calendaria calendar ids
-  // the operator has chosen NOT to sync to Chronicle (toggled from the Sync
-  // Calendar editor). Empty by default → every active calendar syncs as before.
-  game.settings.register(MODULE_ID, 'calendarSyncExclusions', {
-    scope: 'world',
-    config: false,
-    type: String,
-    default: '[]',
-  });
-
   // -----------------------------------------------------------------------
   // Sync Configuration settings (managed via Config tab in dashboard)
   // -----------------------------------------------------------------------
@@ -359,20 +348,6 @@ export function registerSettings() {
     type: UpdateInfoApplication,
     restricted: true,
   });
-
-  // "Sync Calendar" — GM-only view of the active Calendaria calendar with
-  // an always-on validation panel. i18n keys live under
-  // `CHRONICLE.Settings.SyncCalendarMenu.*`, distinct from
-  // `CHRONICLE.Settings.SyncCalendar.*` (the `syncCalendar` boolean
-  // toggle's own hint/name).
-  game.settings.registerMenu(MODULE_ID, 'syncCalendarMenu', {
-    name: game.i18n.localize('CHRONICLE.Settings.SyncCalendarMenu.Name'),
-    hint: game.i18n.localize('CHRONICLE.Settings.SyncCalendarMenu.Hint'),
-    label: game.i18n.localize('CHRONICLE.Settings.SyncCalendarMenu.Label'),
-    icon: 'fa-solid fa-calendar-days',
-    type: SyncCalendarApplication,
-    restricted: true,
-  });
 }
 
 /**
@@ -486,20 +461,6 @@ export function getSyncExclusions() {
  */
 export async function setSyncExclusions(exclusions) {
   await setSetting('syncExclusions', JSON.stringify(exclusions));
-}
-
-/**
- * Get the list of Calendaria calendar ids the operator has opted OUT of syncing
- * to Chronicle. Empty array (default) means every active calendar syncs.
- * @returns {string[]}
- */
-export function getCalendarSyncExclusions() {
-  try {
-    const parsed = JSON.parse(getSetting('calendarSyncExclusions'));
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
 }
 
 /**

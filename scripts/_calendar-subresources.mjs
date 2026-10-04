@@ -5,7 +5,7 @@
  * payload normalization, the one-liners the chat/dashboard surfaces render,
  * and the reducer that maintains the "last known sub-resource state"
  * snapshot the dashboard's Calendar tab reads. Everything touching Foundry
- * globals (ChatMessage, CALENDARIA.api, ui.notifications) stays in
+ * globals (ChatMessage, ui.notifications) stays in
  * `calendar-sync.mjs` so this file is unit-testable off-DOM.
  *
  * `calendar.season/structure/cycle/festival.changed` and

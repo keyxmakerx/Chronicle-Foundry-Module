@@ -400,24 +400,3 @@ for (const tplPath of partsTemplates) {
     assert.equal(r.min, 1, `${tplPath}: min=${r.min}, expected 1 (every branch must emit a root)`);
   });
 }
-
-// ---------------------------------------------------------------------
-// Regression pin for #26 — sync-calendar specifically. If somebody
-// removes the wrapper div in the future, this fails before the analyzer
-// would, with a clearer message.
-// ---------------------------------------------------------------------
-
-test('regression #26: sync-calendar.hbs has a single root wrapper', () => {
-  const src = readFileSync(resolve(TEMPLATES_DIR, 'sync-calendar.hbs'), 'utf8');
-  const stripped = stripComments(src).trim();
-  // First non-whitespace must be a single opening tag, last must close it.
-  const firstTagMatch = /^<\s*([a-zA-Z][\w-]*)/.exec(stripped);
-  assert.ok(firstTagMatch, 'sync-calendar.hbs does not start with an HTML element');
-  const rootTag = firstTagMatch[1].toLowerCase();
-  const lastCloseMatch = new RegExp(`</\\s*${rootTag}\\s*>\\s*$`).exec(stripped);
-  assert.ok(
-    lastCloseMatch,
-    `sync-calendar.hbs first tag is <${rootTag}> but does not close at the end of the file. ` +
-    `Wrap the entire body in one root element (e.g. <div class="sync-calendar-root">…</div>).`,
-  );
-});

@@ -2,10 +2,7 @@
 /**
  * `GET /calendar/date` carries `tracks_real_time` (the composed
  * `UsesRealTime()` predicate). This module pauses date-PUSH only
- * (pull/event sync untouched) across all four push sites:
- *   - calendar-sync.mjs: _onCalendariaDateTimeChange, _onLocalDateChange,
- *     _onSimpleCalendarDateChange
- *   - sync-dashboard.mjs: _onPushDate
+ * (pull/event sync untouched) at the one push site, `CalendarSync.pushDate`.
  *
  * Covers:
  *   1. Skip push when tracks_real_time === true (fetch-before-push).
@@ -13,15 +10,15 @@
  *      field at all — must not be treated as "blocked").
  *   3. A 422 backstop rejection sets the guard WITHOUT throwing/logging as a
  *      generic sync error.
- *   4. The GM notice fires exactly once per session, shared across both
- *      calendar-sync.mjs and sync-dashboard.mjs call sites.
+ *   4. The GM notice fires exactly once per session, shared across
+ *      CalendarSync instances.
  */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// Stub the Foundry globals calendar-sync.mjs / sync-dashboard.mjs touch at
-// module-load time (mirrors tools/test-calendar-backcatalog-fix.mjs).
+// Stub the Foundry globals calendar-sync.mjs touches at module-load time
+// (mirrors tools/test-calendar-backcatalog-fix.mjs).
 globalThis.foundry = globalThis.foundry || {
   applications: { api: { ApplicationV2: class {}, HandlebarsApplicationMixin: (base) => base } },
 };
@@ -41,18 +38,13 @@ const {
   _resetRealtimeDateGuardForTests,
 } = await import('../scripts/_realtime-date-guard.mjs');
 const { CalendarSync } = await import('../scripts/calendar-sync.mjs');
-const { SyncDashboard } = await import('../scripts/sync-dashboard.mjs');
 
 function makeCalendarSync(overrides) {
   return Object.assign(
     Object.create(CalendarSync.prototype),
-    { _hasModernCalendariaApi: true, _syncDepth: 0, _calendarSyncDisabled: false, _isActiveCalendarExcluded: () => false },
+    {},
     overrides,
   );
-}
-
-function makeDashboard({ api, ...overrides }) {
-  return Object.assign(Object.create(SyncDashboard.prototype), { _syncManager: { api } }, overrides);
 }
 
 // A fake ChronicleAPI: `get` answers the fetch-before-push probe, `put`
@@ -78,6 +70,7 @@ function makeApi({ getResult, getError, putImpl } = {}) {
 
 test.beforeEach(() => {
   _resetRealtimeDateGuardForTests();
+  globalThis.game.settings.get = () => true; // syncCalendar on
   globalThis.ui = { notifications: { warn: () => {} } };
 });
 
@@ -141,17 +134,15 @@ test('notifyRealTimePushPaused: fires the notification exactly once per session'
   assert.equal(warnCount, 1);
 });
 
-// ── calendar-sync.mjs: the three hook-triggered push sites ─────────────────
+// ── calendar-sync.mjs: the push site ───────────────────────────────────────
 
 for (const [label, method, payload] of [
-  ['_onCalendariaDateTimeChange', 'onCalendariaDateTimeChange', { current: { year: 1492, month: 2, dayOfMonth: 14, hour: 9, minute: 30 } }],
-  ['_onLocalDateChange', 'onLocalDateChange', { year: 1492, month: 3, day: 15, hour: 9, minute: 30 }],
-  ['_onSimpleCalendarDateChange', 'onSimpleCalendarDateChange', { date: { year: 1492, month: 2, day: 14, hour: 9, minute: 30 } }],
+  ['pushDate', 'pushDate', { year: 1492, month: 3, day: 15, hour: 9, minute: 30 }],
 ]) {
   test(`${label}: skips the push when GET /calendar/date reports tracks_real_time`, async () => {
     const api = makeApi({ getResult: { tracks_real_time: true } });
     const cs = makeCalendarSync({ _api: api });
-    await cs[`_${method}`](payload);
+    await cs[method](payload);
     assert.equal(api.puts.length, 0, 'must not PUT when the calendar tracks real time');
     assert.deepEqual(api.gets, ['/calendar/date'], 'must probe before deciding to skip');
   });
@@ -159,14 +150,14 @@ for (const [label, method, payload] of [
   test(`${label}: proceeds when tracks_real_time is false/absent`, async () => {
     const api = makeApi({ getResult: { tracks_real_time: false } });
     const cs = makeCalendarSync({ _api: api });
-    await cs[`_${method}`](payload);
+    await cs[method](payload);
     assert.equal(api.puts.length, 1, 'must still PUT when the flag is false');
   });
 
   test(`${label}: legacy Chronicle (field entirely absent) still proceeds`, async () => {
     const api = makeApi({ getResult: { year: 1492, month: 3, day: 15 } });
     const cs = makeCalendarSync({ _api: api });
-    await cs[`_${method}`](payload);
+    await cs[method](payload);
     assert.equal(api.puts.length, 1);
   });
 
@@ -176,7 +167,7 @@ for (const [label, method, payload] of [
       putImpl: () => { throw new Error('Chronicle API error 422: {"message":"real-time calendar is read-only for dates"}'); },
     });
     const cs = makeCalendarSync({ _api: api });
-    await assert.doesNotReject(cs[`_${method}`](payload));
+    await assert.doesNotReject(cs[method](payload));
   });
 
   test(`${label}: a genuine non-422 PUT failure still logs as an error (not swallowed as the guard)`, async () => {
@@ -189,7 +180,7 @@ for (const [label, method, payload] of [
     let loggedErr = null;
     console.error = (...args) => { loggedErr = args; };
     try {
-      await assert.doesNotReject(cs[`_${method}`](payload));
+      await assert.doesNotReject(cs[method](payload));
     } finally {
       console.error = originalError;
     }
@@ -197,78 +188,16 @@ for (const [label, method, payload] of [
   });
 }
 
-// ── sync-dashboard.mjs: the manual push button ──────────────────────────────
+// ── The notice is a shared, session-scoped singleton ───────────────────────
 
-test('SyncDashboard._onPushDate: skips the push and does not log activity when tracks_real_time', async () => {
-  const api = makeApi({ getResult: { tracks_real_time: true } });
-  const activities = [];
-  let rendered = false;
-  const dash = makeDashboard({
-    api,
-    _detectCalendarModule: () => 'calendaria',
-    _getLocalCalendarDate: () => ({ year: 1492, month: 3, day: 15, hour: 9, minute: 30 }),
-    _logActivity: (...args) => activities.push(args),
-    render: () => { rendered = true; },
-  });
-  await dash._onPushDate();
-  assert.equal(api.puts.length, 0);
-  assert.equal(activities.length, 0);
-  assert.equal(rendered, false);
-});
-
-test('SyncDashboard._onPushDate: proceeds and logs activity when not real-time', async () => {
-  const api = makeApi({ getResult: { tracks_real_time: false } });
-  const activities = [];
-  let rendered = false;
-  const dash = makeDashboard({
-    api,
-    _detectCalendarModule: () => 'calendaria',
-    _getLocalCalendarDate: () => ({ year: 1492, month: 3, day: 15, hour: 9, minute: 30 }),
-    _logActivity: (...args) => activities.push(args),
-    render: () => { rendered = true; },
-  });
-  await dash._onPushDate();
-  assert.equal(api.puts.length, 1);
-  assert.equal(activities.length, 1);
-  assert.equal(rendered, true);
-});
-
-test('SyncDashboard._onPushDate: a 422 backstop sets the guard without throwing or logging activity', async () => {
-  const api = makeApi({
-    getResult: { tracks_real_time: false },
-    putImpl: () => { throw new Error('Chronicle API error 422: real-time calendar'); },
-  });
-  const activities = [];
-  const dash = makeDashboard({
-    api,
-    _detectCalendarModule: () => 'calendaria',
-    _getLocalCalendarDate: () => ({ year: 1492, month: 3, day: 15, hour: 9, minute: 30 }),
-    _logActivity: (...args) => activities.push(args),
-    render: () => {},
-  });
-  await assert.doesNotReject(dash._onPushDate());
-  assert.equal(activities.length, 0, 'must not log a successful push that never happened');
-});
-
-// ── Cross-module: the notice is a shared, session-scoped singleton ─────────
-
-test('the one-time notice is shared across calendar-sync.mjs AND sync-dashboard.mjs call sites', async () => {
+test('the one-time notice is shared across CalendarSync instances', async () => {
   let warnCount = 0;
   globalThis.ui = { notifications: { warn: () => { warnCount += 1; } } };
 
-  const api1 = makeApi({ getResult: { tracks_real_time: true } });
-  const cs = makeCalendarSync({ _api: api1 });
-  await cs._onCalendariaDateTimeChange({ current: { year: 1492, month: 2, dayOfMonth: 14, hour: 9, minute: 30 } });
+  const date = { year: 1492, month: 3, day: 15, hour: 9, minute: 30 };
+  await makeCalendarSync({ _api: makeApi({ getResult: { tracks_real_time: true } }) }).pushDate(date);
   assert.equal(warnCount, 1, 'first blocked push notifies');
 
-  const api2 = makeApi({ getResult: { tracks_real_time: true } });
-  const dash = makeDashboard({
-    api: api2,
-    _detectCalendarModule: () => 'calendaria',
-    _getLocalCalendarDate: () => ({ year: 1492, month: 3, day: 15 }),
-    _logActivity: () => {},
-    render: () => {},
-  });
-  await dash._onPushDate();
-  assert.equal(warnCount, 1, 'the dashboard push reuses the same already-shown session notice');
+  await makeCalendarSync({ _api: makeApi({ getResult: { tracks_real_time: true } }) }).pushDate(date);
+  assert.equal(warnCount, 1, 'a second instance reuses the already-shown session notice');
 });

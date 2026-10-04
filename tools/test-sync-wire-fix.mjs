@@ -1,7 +1,6 @@
 // test-sync-wire-fix.mjs — behavioral pins for wire-contract fixes that can't
 // be exercised through the pure helpers:
 //   - sync.status listener revives initial sync (accepts both emit shapes)
-//   - SimpleCalendar structure reader, and the structure guard covering it
 //   - visibility toggle routes to POST /entities/:id/reveal, not a bare PUT
 //   - item relations use the flat /relations/:id routes + snake_case body
 //
@@ -27,7 +26,6 @@ globalThis.CONST = globalThis.CONST || { DOCUMENT_OWNERSHIP_LEVELS: { OBSERVER: 
 globalThis.Actor = globalThis.Actor || class {};
 
 const { SyncManager } = await import('../scripts/sync-manager.mjs');
-const { CalendarSync } = await import('../scripts/calendar-sync.mjs');
 const { ItemSync } = await import('../scripts/item-sync.mjs');
 const { SyncDashboard } = await import('../scripts/sync-dashboard.mjs');
 
@@ -71,101 +69,6 @@ test('fix1: a non-connected status never fires initial sync', async () => {
   await sm._onSyncStatus(null);
   assert.equal(calls(), 0);
   assert.equal(sm._initialSyncDone, false);
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Fix 2 — SimpleCalendar structure reader + guard now covers the SC path
-// ═══════════════════════════════════════════════════════════════════════════
-
-function makeCalendarSync(overrides) {
-  return Object.assign(
-    Object.create(CalendarSync.prototype),
-    { _hasModernCalendariaApi: false, _syncDepth: 0, _calendarSyncDisabled: false },
-    overrides,
-  );
-}
-
-test('fix2: _readActiveSimpleCalendarStructure reads getCurrentCalendar (numberOfDays + weekdays)', () => {
-  globalThis.SimpleCalendar = {
-    api: {
-      getCurrentCalendar: () => ({
-        name: 'Calendar of Harptos',
-        months: [{ numberOfDays: 30 }, { numberOfDays: 30 }, { numberOfDays: 31 }],
-        weekdays: [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}], // 10-day tenday
-      }),
-    },
-  };
-  const cs = makeCalendarSync({ _calendarModule: 'simple-calendar' });
-  const s = cs._readActiveSimpleCalendarStructure();
-  assert.equal(s.name, 'Calendar of Harptos');
-  assert.deepEqual(s.monthDays, [30, 30, 31]);
-  assert.equal(s.weekdayCount, 10);
-  delete globalThis.SimpleCalendar;
-});
-
-test('fix2: _readActiveSimpleCalendarStructure falls back to getAllMonths/getAllWeekdays', () => {
-  globalThis.SimpleCalendar = {
-    api: {
-      getAllMonths: () => [{ numberOfDays: 31 }, { numberOfDays: 28 }],
-      getAllWeekdays: () => [{}, {}, {}, {}, {}, {}, {}],
-    },
-  };
-  const cs = makeCalendarSync({ _calendarModule: 'simple-calendar' });
-  const s = cs._readActiveSimpleCalendarStructure();
-  assert.deepEqual(s.monthDays, [31, 28]);
-  assert.equal(s.weekdayCount, 7);
-  delete globalThis.SimpleCalendar;
-});
-
-test('fix2: an unreadable SimpleCalendar structure returns null (guard fails OPEN)', () => {
-  globalThis.SimpleCalendar = { api: {} }; // no readers at all
-  const cs = makeCalendarSync({ _calendarModule: 'simple-calendar' });
-  assert.equal(cs._readActiveSimpleCalendarStructure(), null);
-  delete globalThis.SimpleCalendar;
-});
-
-test('fix2: _readActiveFoundryStructure dispatches by module', () => {
-  globalThis.SimpleCalendar = { api: { getAllMonths: () => [{ numberOfDays: 20 }], getAllWeekdays: () => [{}] } };
-  const sc = makeCalendarSync({ _calendarModule: 'simple-calendar' });
-  assert.deepEqual(sc._readActiveFoundryStructure().monthDays, [20]);
-  const unknown = makeCalendarSync({ _calendarModule: null });
-  assert.equal(unknown._readActiveFoundryStructure(), null);
-  delete globalThis.SimpleCalendar;
-});
-
-test('fix2: onInitialSync PAUSES a SimpleCalendar world whose structure mismatches (was unguarded)', async () => {
-  game.settings.get = (_scope, key) => (key === 'syncCalendar' ? true : '');
-  globalThis.SimpleCalendar = {
-    api: { getCurrentCalendar: () => ({ name: 'SC 2mo', months: [{ numberOfDays: 30 }, { numberOfDays: 30 }], weekdays: [{}, {}, {}, {}, {}, {}, {}] }) },
-  };
-  let setLocalCalled = false;
-  const cs = makeCalendarSync({
-    _calendarModule: 'simple-calendar',
-    _api: { get: async () => ({ current_year: 1, current_month: 1, current_day: 1, months: new Array(12).fill({ days: 30 }), weekdays: new Array(7).fill({}) }) },
-    _setLocalDate: async () => { setLocalCalled = true; return false; },
-  });
-  await cs.onInitialSync();
-  assert.equal(cs._calendarSyncDisabled, true, 'SC structure mismatch pauses calendar sync');
-  assert.equal(setLocalCalled, false, 'no date was written into the incompatible SC calendar');
-  assert.match(cs._calendarMismatchDetail, /month count/);
-  delete globalThis.SimpleCalendar;
-});
-
-test('fix2: onInitialSync does NOT pause a matching SimpleCalendar world (writes the date)', async () => {
-  game.settings.get = (_scope, key) => (key === 'syncCalendar' ? true : '');
-  globalThis.SimpleCalendar = {
-    api: { getCurrentCalendar: () => ({ name: 'SC match', months: new Array(12).fill({ numberOfDays: 30 }), weekdays: new Array(7).fill({}) }) },
-  };
-  let setLocalCalled = false;
-  const cs = makeCalendarSync({
-    _calendarModule: 'simple-calendar',
-    _api: { get: async () => ({ current_year: 1, current_month: 1, current_day: 1, months: new Array(12).fill({ days: 30 }), weekdays: new Array(7).fill({}) }) },
-    _setLocalDate: async () => { setLocalCalled = true; return false; },
-  });
-  await cs.onInitialSync();
-  assert.equal(cs._calendarSyncDisabled, false, 'a compatible SC structure does not pause');
-  assert.equal(setLocalCalled, true, 'the date apply path runs when structures match');
-  delete globalThis.SimpleCalendar;
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

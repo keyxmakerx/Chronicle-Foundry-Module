@@ -24,7 +24,6 @@ const STEPS = Object.freeze([
   { key: 'types',      labelKey: 'CHRONICLE.Wizard.Steps.Types',      icon: 'fa-solid fa-layer-group' },
   { key: 'tags',       labelKey: 'CHRONICLE.Wizard.Steps.Tags',       icon: 'fa-solid fa-tags' },
   { key: 'characters', labelKey: 'CHRONICLE.Wizard.Steps.Characters', icon: 'fa-solid fa-users' },
-  { key: 'calendar',   labelKey: 'CHRONICLE.Wizard.Steps.Calendar',   icon: 'fa-solid fa-calendar' },
   { key: 'review',     labelKey: 'CHRONICLE.Wizard.Steps.Review',     icon: 'fa-solid fa-clipboard-check' },
 ]);
 
@@ -149,14 +148,11 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
     /** Step 5: character actor import plan. */
     this._characterPlan = [];
 
-    /** Step 6: calendar sync direction choice. */
-    this._calendarDirection = 'skip';
 
-
-    /** Step 7: aggregated import plan built from all previous steps. */
+    /** Step 6: aggregated import plan built from all previous steps. */
     this._importPlan = null;
 
-    /** Step 7: live import progress tracking. */
+    /** Step 6: live import progress tracking. */
     this._importProgress = { total: 0, done: 0, errors: 0, log: [] };
 
     /** Whether an import is currently running. */
@@ -189,13 +185,7 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
    * @returns {Array<{key: string, labelKey: string, icon: string, index: number, enabled: boolean}>}
    */
   _getSteps() {
-    const addons = this._connectionStatus?.addons ?? [];
-    const addonSlugs = new Set(addons.filter((a) => a.enabled).map((a) => a.slug));
     const hasSystemMatch = !!this._connectionStatus?.systemMatch;
-    const hasCalendarModule = !!(
-      game.modules.get('calendaria')?.active ||
-      game.modules.get('foundryvtt-simple-calendar')?.active
-    );
 
     return STEPS.map((step, index) => {
       let enabled = true;
@@ -207,11 +197,6 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
       // Characters step: only if a game system was matched.
       if (step.key === 'characters' && !hasSystemMatch) {
         enabled = false;
-      }
-      // Calendar step: only if calendar addon is enabled AND a calendar module is active.
-      if (step.key === 'calendar') {
-        const calendarAddon = addonSlugs.has('calendar') || addonSlugs.has('calendars');
-        enabled = calendarAddon && hasCalendarModule;
       }
       return { ...step, index, enabled };
     });
@@ -458,7 +443,7 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   // ---------------------------------------------------------------------------
-  // Step 7: Review & Import
+  // Step 6: Review & Import
   // ---------------------------------------------------------------------------
 
   /**
@@ -587,7 +572,6 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
       newTypeForm: this._newTypeForm,
       tagPlan: this._tagPlan,
       characterPlan: this._characterPlan,
-      calendarDirection: this._calendarDirection,
       importPlan: this._importPlan,
       importProgress: this._importProgress,
       importRunning: this._importRunning,
@@ -655,13 +639,6 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this._characterPlan[idx]) {
           this._characterPlan[idx].isPC = e.target.checked;
         }
-      });
-    }
-
-    // Step 6: calendar direction radio buttons.
-    for (const radio of el.querySelectorAll('input[name="calendar-direction"]')) {
-      radio.addEventListener('change', (e) => {
-        this._calendarDirection = e.target.value;
       });
     }
   }

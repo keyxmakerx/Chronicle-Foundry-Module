@@ -247,32 +247,9 @@
     </div>
 
     {{!-- ================================================================= --}}
-    {{!-- STEP 6: Calendar Sync                                            --}}
+    {{!-- STEP 6: Review & Import                                          --}}
     {{!-- ================================================================= --}}
     <div class="wizard-step" data-step="5">
-      <h2 class="wizard-step-title"><i class="fa-solid fa-calendar"></i> {{localize "CHRONICLE.Wizard.Steps.Calendar"}}</h2>
-      <p class="wizard-step-desc">{{localize "CHRONICLE.Wizard.CalendarDesc"}}</p>
-
-      <div class="wizard-radio-group">
-        <label class="wizard-radio-label">
-          <input type="radio" name="calendar-direction" value="pull" {{#if (eq calendarDirection "pull")}}checked{{/if}} />
-          <i class="fa-solid fa-download"></i> {{localize "CHRONICLE.Wizard.CalendarPull"}}
-        </label>
-        <label class="wizard-radio-label">
-          <input type="radio" name="calendar-direction" value="push" {{#if (eq calendarDirection "push")}}checked{{/if}} />
-          <i class="fa-solid fa-upload"></i> {{localize "CHRONICLE.Wizard.CalendarPush"}}
-        </label>
-        <label class="wizard-radio-label">
-          <input type="radio" name="calendar-direction" value="skip" {{#if (eq calendarDirection "skip")}}checked{{/if}} />
-          <i class="fa-solid fa-forward"></i> {{localize "CHRONICLE.Wizard.CalendarSkip"}}
-        </label>
-      </div>
-    </div>
-
-    {{!-- ================================================================= --}}
-    {{!-- STEP 7: Review & Import                                          --}}
-    {{!-- ================================================================= --}}
-    <div class="wizard-step" data-step="6">
       <h2 class="wizard-step-title"><i class="fa-solid fa-clipboard-check"></i> {{localize "CHRONICLE.Wizard.Steps.Review"}}</h2>
 
       {{#if importRunning}}

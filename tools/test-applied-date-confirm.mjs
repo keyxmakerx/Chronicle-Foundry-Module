@@ -4,14 +4,8 @@
  *   1. `_applied-date-confirm.mjs`'s pure helpers: 404/405 classification,
  *      the once-per-session debug-log tolerance, and confirmAppliedDate's
  *      request shape + non-throwing swallow behavior.
- *   2. `calendar-sync.mjs::_setLocalDate` reports whether it actually
- *      invoked a local calendar-module setter (Calendaria modern/legacy,
- *      SimpleCalendar) without throwing.
- *   3. Both apply call sites — the poll path (`onInitialSync`) and the
- *      WebSocket-driven path (`_onChronicaleDateAdvanced`) — confirm ONLY on
- *      real apply-success: never on a bare fetch, never on apply failure or
- *      a no-op (no calendar-module setter available).
- *   4. The confirm POST does not re-enter the `_syncDepth` reentrancy guard.
+ *   2. `calendar-sync.mjs` posts no confirmation: it applies no date to
+ *      Foundry, so there is nothing to confirm yet.
  */
 
 import test from 'node:test';
@@ -41,7 +35,7 @@ const { CalendarSync } = await import('../scripts/calendar-sync.mjs');
 function makeCalendarSync(overrides) {
   return Object.assign(
     Object.create(CalendarSync.prototype),
-    { _hasModernCalendariaApi: true, _syncDepth: 0, _calendarSyncDisabled: false, _isActiveCalendarExcluded: () => false },
+    {},
     overrides,
   );
 }
@@ -169,194 +163,57 @@ test('confirmAppliedDate: null api or date is a no-op, never throws', async () =
   await assert.doesNotReject(confirmAppliedDate(makeApi(), null));
 });
 
-// ── calendar-sync.mjs: _setLocalDate reports whether a real apply happened ──
+// ── calendar-sync.mjs: nothing is applied, so nothing is confirmed ─────────
+// TODO(#95): once the built-in calendar applies Chronicle's date, confirm it
+// here only after a real apply.
 
-test('_setLocalDate: Calendaria modern API — setDateTime invoked, resolves true', async () => {
-  let called = null;
-  globalThis.CALENDARIA = { api: { setDateTime: async (d) => { called = d; } } };
-  const cs = makeCalendarSync({ _calendarModule: 'calendaria', _hasModernCalendariaApi: true });
-  const applied = await cs._setLocalDate({ year: 1492, month: 3, day: 1, hour: 8, minute: 0 });
-  assert.equal(applied, true);
-  assert.deepEqual(called, { year: 1492, month: 3, day: 1, hour: 8, minute: 0 });
+function makeSync({ chronicleCalendar, api } = {}) {
+  return makeCalendarSync({
+    _api: api ?? makeApi({ getImpl: (path) => (path === '/calendar' ? chronicleCalendar : null) }),
+  });
+}
+
+test('onInitialSync: caches Chronicle’s calendar and posts no confirm (no apply happened)', async () => {
+  const chronicleCalendar = { current_year: 1492, current_month: 3, current_day: 1, current_hour: 8, current_minute: 0, months: [] };
+  const cs = makeSync({ chronicleCalendar });
+  globalThis.game.settings.get = () => true; // syncCalendar on
+  assert.equal(await cs.onInitialSync(), true);
+  assert.deepEqual(cs.chronicleDate, { year: 1492, month: 3, day: 1, hour: 8, minute: 0 });
+  assert.equal(cs._api.posts.length, 0);
 });
 
-test('_setLocalDate: Calendaria legacy API — setDate invoked, resolves true', async () => {
-  globalThis.game.Calendaria = { setDate: async () => {} };
-  const cs = makeCalendarSync({ _calendarModule: 'calendaria', _hasModernCalendariaApi: false });
-  const applied = await cs._setLocalDate({ year: 1492, month: 3, day: 1 });
-  assert.equal(applied, true);
-  delete globalThis.game.Calendaria;
+test('onInitialSync: no Chronicle calendar configured — resolves false, no confirm', async () => {
+  const cs = makeSync({ chronicleCalendar: null });
+  globalThis.game.settings.get = () => true;
+  assert.equal(await cs.onInitialSync(), false);
+  assert.equal(cs._api.posts.length, 0);
 });
 
-test('_setLocalDate: Calendaria detected but neither API surface present — no-op, resolves false', async () => {
-  globalThis.CALENDARIA = undefined;
-  delete globalThis.game.Calendaria;
-  const cs = makeCalendarSync({ _calendarModule: 'calendaria', _hasModernCalendariaApi: false });
-  const applied = await cs._setLocalDate({ year: 1492, month: 3, day: 1 });
-  assert.equal(applied, false);
-});
-
-test('_setLocalDate: Calendaria setDateTime throws — logs the error, resolves false', async () => {
-  globalThis.CALENDARIA = { api: { setDateTime: async () => { throw new Error('boom'); } } };
-  const cs = makeCalendarSync({ _calendarModule: 'calendaria', _hasModernCalendariaApi: true });
-  const original = console.error;
-  let logged = null;
-  console.error = (...args) => { logged = args; };
-  let applied;
-  try {
-    applied = await cs._setLocalDate({ year: 1492, month: 3, day: 1 });
-  } finally {
-    console.error = original;
-  }
-  assert.equal(applied, false);
-  assert.ok(logged);
-});
-
-test('_setLocalDate: SimpleCalendar — setDate invoked (and awaited), resolves true', async () => {
-  let called = null;
-  globalThis.SimpleCalendar = { api: { setDate: async (d) => { called = d; } } };
-  const cs = makeCalendarSync({ _calendarModule: 'simple-calendar' });
-  const applied = await cs._setLocalDate({ year: 1492, month: 3, day: 1, hour: 8, minute: 0 });
-  assert.equal(applied, true);
-  assert.deepEqual(called, { year: 1492, month: 2, day: 0, hour: 8, minute: 0, seconds: 0 });
-});
-
-test('_setLocalDate: SimpleCalendar detected but no setDate — no-op, resolves false', async () => {
-  globalThis.SimpleCalendar = { api: {} };
-  const cs = makeCalendarSync({ _calendarModule: 'simple-calendar' });
-  const applied = await cs._setLocalDate({ year: 1492, month: 3, day: 1 });
-  assert.equal(applied, false);
-});
-
-test('_setLocalDate: no calendar module detected at all — resolves false', async () => {
-  const cs = makeCalendarSync({ _calendarModule: null });
-  const applied = await cs._setLocalDate({ year: 1492, month: 3, day: 1 });
-  assert.equal(applied, false);
-});
-
-test('_setLocalDate: the _syncDepth reentrancy guard still wraps the call (increments then decrements)', async () => {
-  globalThis.CALENDARIA = {
-    api: {
-      setDateTime: async function () {
-        assert.equal(this === undefined ? cs._syncDepth : cs._syncDepth, 1, '_syncDepth is 1 while the setter runs');
-      },
-    },
-  };
-  const cs = makeCalendarSync({ _calendarModule: 'calendaria', _hasModernCalendariaApi: true, _syncDepth: 0 });
-  assert.equal(cs._syncDepth, 0);
-  await cs._setLocalDate({ year: 1492, month: 3, day: 1 });
-  assert.equal(cs._syncDepth, 0, '_syncDepth unwound after the call');
-});
-
-// ── _onChronicaleDateAdvanced (WebSocket-driven apply path) ────────────────
-
-test('_onChronicaleDateAdvanced: confirms ONLY after a real apply', async () => {
-  globalThis.CALENDARIA = { api: { setDateTime: async () => {} } };
-  const api = makeApi();
-  const cs = makeCalendarSync({ _calendarModule: 'calendaria', _hasModernCalendariaApi: true, _api: api });
-  await cs._onChronicaleDateAdvanced({ year: 1492, month: 3, day: 1, hour: 8, minute: 0 });
-  assert.deepEqual(api.posts, [
-    { path: '/calendar/date/confirm', body: { year: 1492, month: 3, day: 1 } },
-  ]);
-});
-
-test('_onChronicaleDateAdvanced: does NOT confirm when apply is a no-op (no calendar-module setter)', async () => {
-  globalThis.CALENDARIA = undefined;
-  delete globalThis.game.Calendaria;
-  const api = makeApi();
-  const cs = makeCalendarSync({ _calendarModule: 'calendaria', _hasModernCalendariaApi: false, _api: api });
-  await cs._onChronicaleDateAdvanced({ year: 1492, month: 3, day: 1 });
-  assert.equal(api.posts.length, 0);
-});
-
-test('_onChronicaleDateAdvanced: does NOT confirm when the local setter throws (apply failure)', async () => {
-  globalThis.CALENDARIA = { api: { setDateTime: async () => { throw new Error('boom'); } } };
-  const api = makeApi();
-  const cs = makeCalendarSync({ _calendarModule: 'calendaria', _hasModernCalendariaApi: true, _api: api });
+test('onInitialSync: a failed fetch resolves false without throwing', async () => {
+  const api = makeApi({ getImpl: () => { throw new Error('Chronicle API error 500: boom'); } });
+  const cs = makeSync({ api });
+  globalThis.game.settings.get = () => true;
   const original = console.error;
   console.error = () => {};
   try {
-    await cs._onChronicaleDateAdvanced({ year: 1492, month: 3, day: 1 });
+    assert.equal(await cs.onInitialSync(), false);
   } finally {
     console.error = original;
   }
-  assert.equal(api.posts.length, 0);
 });
 
-test('_onChronicaleDateAdvanced: null data is a no-op (no apply, no confirm)', async () => {
-  const api = makeApi();
-  const cs = makeCalendarSync({ _calendarModule: 'calendaria', _api: api });
-  await cs._onChronicaleDateAdvanced(null);
-  assert.equal(api.posts.length, 0);
+test('onInitialSync: syncCalendar off — no request at all', async () => {
+  const cs = makeSync({ chronicleCalendar: {} });
+  globalThis.game.settings.get = () => false;
+  assert.equal(await cs.onInitialSync(), false);
+  assert.equal(cs._api.gets.length, 0);
 });
 
-test('_onChronicaleDateAdvanced: confirm never re-enters the _syncDepth reentrancy guard', async () => {
-  globalThis.CALENDARIA = { api: { setDateTime: async () => {} } };
-  const depths = [];
-  const api = makeApi({
-    postImpl(path, body) {
-      // The confirm POST fires strictly after _setLocalDate's finally block
-      // has unwound the guard back to 0 — a confirm call that re-entered the
-      // guard (or ran DURING the apply) would observe a nonzero depth here.
-      depths.push(cs._syncDepth);
-      return null;
-    },
-  });
-  const cs = makeCalendarSync({ _calendarModule: 'calendaria', _hasModernCalendariaApi: true, _api: api, _syncDepth: 0 });
-  await cs._onChronicaleDateAdvanced({ year: 1492, month: 3, day: 1 });
-  assert.deepEqual(depths, [0]);
-  assert.equal(cs._syncDepth, 0);
-});
-
-// ── onInitialSync (poll apply path) ─────────────────────────────────────────
-// Uses the simple-calendar module so the Calendaria-only structure-mismatch
-// guard (B-R2) never engages — out of scope here, covered by
-// tools/test-calendar-sync-hotfix.mjs.
-
-function makeInitialSyncHarness({ chronicleCalendar, setDateImpl, postImpl } = {}) {
-  const api = makeApi({
-    getImpl: (path) => (path === '/calendar' ? chronicleCalendar : null),
-    postImpl,
-  });
-  globalThis.SimpleCalendar = { api: { setDate: setDateImpl ?? (async () => {}) } };
-  const cs = makeCalendarSync({
-    _calendarModule: 'simple-calendar',
-    _api: api,
-    getSetting: undefined,
-  });
-  return { cs, api };
-}
-
-test('onInitialSync: confirms the applied date after a successful poll-path apply', async () => {
-  const chronicleCalendar = {
-    current_year: 1492, current_month: 3, current_day: 1, current_hour: 8, current_minute: 0,
-    months: [],
-  };
-  const { cs, api } = makeInitialSyncHarness({ chronicleCalendar });
-  // getSetting('syncCalendar') is read at the top of onInitialSync via the
-  // module-level import; stub it through globalThis.game.settings.get.
+test('calendar.date.advanced: updates the cached date and posts no confirm', async () => {
+  const cs = makeSync({});
+  cs._chronicleCalendar = { current_year: 1492, current_month: 3, current_day: 1 };
   globalThis.game.settings.get = () => true;
-  await cs.onInitialSync();
-  assert.deepEqual(api.posts, [
-    { path: '/calendar/date/confirm', body: { year: 1492, month: 3, day: 1 } },
-  ]);
-});
-
-test('onInitialSync: does NOT confirm when the poll-path apply is a no-op', async () => {
-  const chronicleCalendar = {
-    current_year: 1492, current_month: 3, current_day: 1, current_hour: 8, current_minute: 0,
-    months: [],
-  };
-  const { cs, api } = makeInitialSyncHarness({ chronicleCalendar, setDateImpl: undefined });
-  globalThis.SimpleCalendar = { api: {} }; // no setDate — apply is a no-op
-  globalThis.game.settings.get = () => true;
-  await cs.onInitialSync();
-  assert.equal(api.posts.length, 0);
-});
-
-test('onInitialSync: no Chronicle calendar configured — no apply attempted, no confirm', async () => {
-  const { cs, api } = makeInitialSyncHarness({ chronicleCalendar: null });
-  globalThis.game.settings.get = () => true;
-  await cs.onInitialSync();
-  assert.equal(api.posts.length, 0);
+  await cs.onMessage({ type: 'calendar.date.advanced', payload: { year: 1492, month: 3, day: 2, hour: 8, minute: 0 } });
+  assert.equal(cs.chronicleDate.day, 2);
+  assert.equal(cs._api.posts.length, 0);
 });

@@ -27,7 +27,6 @@ import { registerNpcPresence, npcSpotlightRelay } from './npc-presence.mjs';
 import { negotiationMirror } from './negotiation-mirror.mjs';
 import { registerMapSheetItems } from './map-sheet-items.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
-import { openSyncCalendar } from './sync-calendar.mjs';
 import { registerShopRoomSocket } from './shop-room-window.mjs';
 import { notebookAvailable, openNotebook, registerPlayerNotebook } from './player-notebook.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
@@ -48,8 +47,7 @@ let _statusIndicatorEl = null;
  * Open the Sync Dashboard, recreating the singleton if it isn't currently
  * rendered. An ApplicationV2 instance can be left in a non-re-renderable state
  * after a close (notably when the close interrupts an in-flight render), which
- * made the dashboard intermittently fail to reopen. Mirrors the SyncCalendar
- * singleton helper: bring an already-open window to the front; otherwise build,
+ * made the dashboard intermittently fail to reopen. Bring an already-open window to the front; otherwise build,
  * (re)bind, and render a fresh instance. `bind()` only sets a reference, so
  * recreating leaks nothing.
  * @returns {SyncDashboard|null}
@@ -286,7 +284,7 @@ async function _runtimeValidateDescriptor() {
 
 /**
  * Add the Chronicle group to Foundry's scene controls toolbar: the Sync
- * Dashboard, Sync Calendar and DM Screen for GMs, the Notebook for everyone once the
+ * Dashboard and DM Screen for GMs, the Notebook for everyone once the
  * world is connected to Chronicle.
  */
 Hooks.on('getSceneControlButtons', (controls) => {
@@ -297,12 +295,10 @@ Hooks.on('getSceneControlButtons', (controls) => {
     notebook: notebookAvailable(),
     run: {
       dashboard: openDashboard,
-      syncCalendar: () => { openSyncCalendar(); },
       dmScreen: () => { openDMScreen(() => syncManager?.api ?? null); },
       notebook: () => { openNotebook(); },
     },
     titles: {
-      syncCalendar: game.i18n.localize('CHRONICLE.SceneControl.SyncCalendar'),
       dmScreen: game.i18n.localize('CHRONICLE.SceneControl.DMScreen'),
       notebook: game.i18n.localize('CHRONICLE.SceneControl.Notebook'),
     },

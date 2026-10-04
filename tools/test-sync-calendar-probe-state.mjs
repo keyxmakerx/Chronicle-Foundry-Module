@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 /**
- * Tests for `calendarStateFromError` (scripts/_calendar-probe-state.mjs) plus a
- * static pin for the 'auth' import-banner localization wiring.
+ * Tests for `calendarStateFromError` (scripts/_calendar-probe-state.mjs).
  *
  * A failed `GET /calendar` probe must map to an actionable banner state: 503
- * → 'rebuilding', 404 → 'absent' (import a calendar), 401/403 → 'auth' (fix
+ * → 'rebuilding', 404 → 'absent' (no calendar configured), 401/403 → 'auth' (fix
  * the token), else 'unreachable'. The classifier keys on the HTTP status
  * (numeric `err.status`, or the api-client's "Chronicle API error <status>:"
  * prefix), not on a bare digit run, so a response body that merely contains
@@ -15,12 +14,6 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = resolve(__dirname, '..');
 
 const { calendarStateFromError } = await import('../scripts/_calendar-probe-state.mjs');
 
@@ -72,20 +65,4 @@ test('body-keyword fallback when no numeric status is present', () => {
 test('null / undefined → unreachable', () => {
   assert.equal(calendarStateFromError(null), 'unreachable');
   assert.equal(calendarStateFromError(undefined), 'unreachable');
-});
-
-// --- static wiring pin: 'auth' banner localization key + template references ---
-
-test('lang/en.json defines CHRONICLE.SyncCalendar.Import.NotAuthorized', () => {
-  const lang = JSON.parse(readFileSync(resolve(REPO_ROOT, 'lang/en.json'), 'utf8'));
-  const v = lang?.CHRONICLE?.SyncCalendar?.Import?.NotAuthorized;
-  assert.equal(typeof v, 'string');
-  assert.ok(v.length > 0, 'NotAuthorized message must be non-empty');
-});
-
-test("sync-calendar.hbs renders the 'auth' banner branch in both banner copies", () => {
-  const tpl = readFileSync(resolve(REPO_ROOT, 'templates/sync-calendar.hbs'), 'utf8');
-  const branchCount = (tpl.match(/importBanner\.state "auth"/g) || []).length;
-  assert.equal(branchCount, 2, "expected the 'auth' branch in both the degraded and inline banners");
-  assert.ok(/CHRONICLE\.SyncCalendar\.Import\.NotAuthorized/.test(tpl), 'template must localize the NotAuthorized key');
 });

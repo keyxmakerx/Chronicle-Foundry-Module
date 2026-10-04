@@ -16,7 +16,7 @@ const hbs = await readFile(new URL('../templates/import-wizard.hbs', import.meta
 const stepKeys = [...src.matchAll(/\{\s*key:\s*'([a-z]+)',\s*labelKey:\s*'CHRONICLE\.Wizard\.Steps\./g)].map((m) => m[1]);
 
 test('step list has no maps step and ends with review', () => {
-  assert.deepEqual(stepKeys, ['connect', 'scan', 'types', 'tags', 'characters', 'calendar', 'review']);
+  assert.deepEqual(stepKeys, ['connect', 'scan', 'types', 'tags', 'characters', 'review']);
 });
 
 test('template has one panel per step, numbered 0..n-1', () => {
