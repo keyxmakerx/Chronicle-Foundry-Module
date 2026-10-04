@@ -61,16 +61,6 @@ image page, so no pixel conversion happens.
 | `"1"` | Player |
 | `"2"` | Scribe |
 
-## Calendar Indexing
-
-| Calendar Module | Month indexing | Day indexing |
-|----------------|---------------|-------------|
-| Chronicle API | 1-indexed | 1-indexed |
-| Calendaria | 1-indexed | 1-indexed |
-| SimpleCalendar | **0-indexed** | **0-indexed** |
-
-The module adds/subtracts 1 when converting between SimpleCalendar and Chronicle.
-
 ## System Matching
 
 System matching is API-driven: the `/systems` endpoint returns each system's

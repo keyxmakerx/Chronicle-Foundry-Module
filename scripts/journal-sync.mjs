@@ -946,14 +946,14 @@ export class JournalSync {
     // Skip if this journal was created by Chronicle sync.
     if (journal.getFlag(FLAG_SCOPE, 'entityId')) return;
 
-    // Skip journals owned by another sync domain: calendar modules and maps
-    // also persist as JournalEntries, and CalendarSync / MapSync mirror them
-    // to their own Chronicle resource. Pushed as pages they would fail (maps)
+    // Skip journals owned by another sync domain: a journal already mirrored
+    // to a calendar event and maps also persist as JournalEntries, and
+    // CalendarSync / MapSync own them. Pushed as pages they would fail (maps)
     // or be filed under an arbitrary type. The old Chronicle Notes folder is
     // set aside and must never become pages either. Mirrors
     // _isHandledByActorSync.
     if (isCalendarNoteJournal(journal)) {
-      console.debug(`Chronicle: Skipping journal "${journal.name}" — calendar note (owned by CalendarSync).`);
+      console.debug(`Chronicle: Skipping journal "${journal.name}" — calendar event link (owned by CalendarSync).`);
       return;
     }
     if (isOldNotesJournal(journal, FLAG_SCOPE)) {

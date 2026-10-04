@@ -12,7 +12,7 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
   (serving descriptor, schema v1) — cross-validated by
   `tools/check-package-descriptor.mjs`.
 - `scripts/*.mjs`: sync (`journal-sync`+`picture-store`, `map-sync`+`map-viewer`+`map-sheet-items`,
-  `calendar-sync`+`sync-calendar`+`sync-calendar-*`, `actor-sync`,
+  `calendar-sync`+`calendar-bar`, `actor-sync`,
   `item-sync`, `stash-sync`+`stash-client`), UI (`sync-dashboard`, `npc-presence`, `negotiation-mirror`, `_player-report` (the GM's client reports the world's players to Chronicle),
   `sync-diagnostic-bundle`, `update-info`, `gm-secret-view`, `character-claim-indicator`,
   `capability-inspector`, `import-wizard`, `shop-widget`+`shop-room-window`, `player-notebook`, `stash-window`+`stash-chat`), core (`module`,
@@ -45,12 +45,13 @@ Install/update flow: also `.ai.md` → "Chronicle Integration — Install & Upda
 
 - **ES modules** (`.mjs`), `export default class` pattern.
 - **Comments say why, briefly**, pointing at a test/issue for more — no incident stories, task IDs, dates or `file:line` (those go in the PR). Deferred work is `TODO(#issue)`.
-- `_syncing` guard against infinite loops: boolean, except `calendar-sync.mjs`'s reentrant `_syncDepth` counter (overlapping back-catalog loop and WebSocket handlers).
+- `_syncing` guard against infinite loops: a boolean.
 - Adapters implement `toChronicleFields()`/`fromChronicleFields()`; REST uses Bearer auth via `api-client.mjs`.
 - **API key is CLIENT-scoped, never world-scoped** (a world setting syncs to every client). `migrateApiKeyToClientScope()` migrates legacy values. `tools/test-api-key-scope.mjs`.
-- **List responses are bare array or `{"data":[…],"total":N}`** — unwrap defensively everywhere. Envelope: `/entities`, `/entity-types`, `/systems`, `/addons`, `/tags`, `/relations/types`, `/calendar/events`. Bare: `/maps`, `/maps/:id/*`, `/members`, `/entities/:id/relations`, `/notes`. `tools/test-envelope-audit.mjs`.
+- **List responses are bare array or `{"data":[…],"total":N}`** — unwrap defensively everywhere. Envelope: `/entities`, `/entity-types`, `/systems`, `/addons`, `/tags`, `/relations/types`, `/calendar/events`, `/calendar/weather/days`. Bare: `/maps`, `/maps/:id/*`, `/members`, `/entities/:id/relations`, `/notes`. `tools/test-envelope-audit.mjs`.
+- **Chronicle brings its own calendar; no Foundry calendar module is integrated.** `calendar-sync.mjs` pulls Chronicle's date, events and world state; `calendar-bar.mjs` draws the date bar and month view and writes dates and events back to Chronicle. Players have no key, so the GM's client publishes the `calendarSnapshot` world setting, built only from `?audience=players` reads that Chronicle echoes back (`buildPlayerSnapshot` in `_calendar-view-model.mjs`: copied by field, public events only). Day maths is Chronicle's own (`_chronicle-caldate.mjs`). `tools/test-calendar-view-model.mjs`, `tools/test-calendar-builtin.mjs`, `tools/test-chronicle-caldate.mjs`.
 - **Real-time calendars are read-only for dates**: `tracks_real_time` from `GET /calendar/date` pauses date-push only, via `scripts/_realtime-date-guard.mjs`. `tools/test-realtime-date-signal.mjs`.
-- **Calendar sub-resources are display-only** (dashboard + optional GM-whisper, never public); `structure.updated` badges mismatches, never auto-applies. `scripts/_calendar-subresources.mjs`, `tools/test-calendar-subresources.mjs`, `tools/test-calendar-subresource-routing.mjs`.
+- **Calendar sub-resources are display-only** (dashboard + optional GM-whisper, never public); `structure.updated` only refetches the calendar. `scripts/_calendar-subresources.mjs`, `tools/test-calendar-subresources.mjs`, `tools/test-calendar-subresource-routing.mjs`.
 - **Chronicle update endpoints are PARTIAL**: absent preserves, `null` clears, present replaces (API-CONTRACT.md → "partial-update contract"). Send only changed fields; never echo untouched ones back. `tools/test-partial-put-contract.mjs`. One deliberate exception: the marker dialog in `scripts/map-viewer.mjs` spreads the stored marker, harmless on current Chronicle and needed by older servers that replace the whole record. Actor field pushes do the same for `fields_data` (`ActorSync._putFieldsMerged`).
 - **GM-only content never goes into a saved Foundry document.** Every client receives every journal page, so a pulled page holds a placeholder secret block (id keyed by an HMAC under the GM's API key) where Chronicle has GM-only text or pictures; the GM's client fills it on screen (`scripts/gm-secret-view.mjs`) and puts the content back before a push, which leaves the text out rather than send it without a placeholder's content. Anything in a secret block goes back to Chronicle GM-only. `scripts/_gm-secrets.mjs`, `tools/test-gm-secrets.mjs`.
 - **Sync never deletes without asking.** A Chronicle-side removal sets the Foundry journal aside (unlinked, in a "Chronicle: removed" folder, `scripts/_set-aside.mjs`); an item whose "Has Item" relation is gone is only unlinked (`scripts/_inventory-plan.mjs`), unless a stash move the GM just applied took it off that character (`scripts/_stash-reconcile.mjs`); a Foundry-side delete of a linked actor or journal asks before deleting the Chronicle copy (`scripts/_remote-deletes.mjs`). `tools/test-set-aside.mjs`, `tools/test-remote-deletes.mjs`.
@@ -70,15 +71,12 @@ failed request retried next tick. The GM gets one notice when it arms; pushes
 pause for 30 s, then one is let through, and any good calendar answer clears it
 silently. `tools/test-calendar-blackout.mjs`.
 
-A structure-mismatch pause is re-checked on every pull (`onInitialSync`:
-reconnect and the dashboard's manual pull) and lifts when the calendars match;
-no world reload. A 400 (or non-real-time 422) on a date push means Chronicle's
-calendar cannot hold the date; a 403 means the key is not the campaign owner's.
-Either pauses date push, with one GM notice per session, until the next pull (reconnect or manual) or a lifted mismatch pause
-(`scripts/_date-push-rejection.mjs`). Note hooks (Calendaria and Simple
-Calendar) share the mismatch guard and per-calendar exclusions. Echo
-suppression for notes is per note id or name+date (`scripts/_apply-guard.mjs`),
-so GM edits during a pull still push. `tools/test-calendar-resilience.mjs`.
+A 400 (or non-real-time 422) on a date push means Chronicle's calendar cannot
+hold the date; a 403 means the key is not the campaign owner's. Either pauses
+date push (`CalendarSync.pushDate`), with one GM notice per session, until the
+next pull (reconnect) (`scripts/_date-push-rejection.mjs`). The per-note echo
+guard for the built-in calendar's writes is `scripts/_apply-guard.mjs`.
+`tools/test-calendar-resilience.mjs`.
 
 ## Working with this project
 

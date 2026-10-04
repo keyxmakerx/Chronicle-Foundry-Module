@@ -1,11 +1,11 @@
 /**
- * Chronicle Sync - Player notebook and jot notes
+ * Chronicle Sync - Player notebook, jot notes and calendar window
  *
- * Every user (players and GM) gets a Notebook button in the Chronicle
- * scene controls and a small "Jot notes" tab in the bottom-right corner;
- * the player can drag the tab and the jot panel anywhere.
- * Both show the player's own Chronicle notes in a frame of Chronicle's
- * own pages, so the notebook is the site's Journal with nothing copied
+ * Every user (players and GM) gets Notebook and Calendar buttons in the
+ * Chronicle scene controls and a small "Jot notes" tab in the bottom-right
+ * corner; the player can drag the tab and the jot panel anywhere. Each
+ * shows a frame of Chronicle's own pages as that player sees them (the
+ * Journal, the jots, the campaign calendar), with nothing copied
  * into Foundry documents.
  *
  * The first use opens Chronicle's Allow window; the token it hands back is
@@ -14,7 +14,7 @@
  */
 
 import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
-import { getSetting, getUserMappings } from './settings.mjs';
+import { getSetting, getUserMappings, setSetting } from './settings.mjs';
 import {
   allowUrl,
   checkGrantMessage,
@@ -41,6 +41,9 @@ const pages = new PageTracker();
 
 /** @type {NotebookApplication|null} */
 let notebook = null;
+
+/** @type {CalendarWindow|null} */
+let calendarWindow = null;
 
 /** @type {FrameHost|null} the jot panel's frame, made on first open */
 let jotHost = null;
@@ -127,7 +130,7 @@ function connect(ctx) {
  */
 class FrameHost {
   /**
-   * @param {'journal'|'jots'} mode
+   * @param {'journal'|'jots'|'calendar'} mode
    * @param {HTMLElement} container
    */
   constructor(mode, container) {
@@ -172,7 +175,7 @@ class FrameHost {
     const frame = document.createElement('iframe');
     frame.className = 'chronicle-notes-frame';
     frame.src = embedUrl(this.ctx.apiUrl, this.ctx.campaignId, this.mode);
-    frame.title = this.mode === 'jots' ? t('JotsTitle') : t('Title');
+    frame.title = t({ jots: 'JotsTitle', calendar: 'CalendarTitle' }[this.mode] || 'Title');
     this.container.replaceChildren(frame);
     this.frame = frame;
   }
@@ -273,6 +276,83 @@ export async function openNotebook(noteId = '') {
     await notebook.render({ force: true });
   }
   if (noteId) notebook.host?.openNote(noteId);
+}
+
+/**
+ * The calendar window: Chronicle's own calendar page, as this player sees
+ * it, filling a normal Foundry window. Its size and place are each
+ * player's own.
+ */
+class CalendarWindow extends ApplicationV2 {
+  static DEFAULT_OPTIONS = {
+    id: 'chronicle-calendar-window',
+    classes: ['chronicle-notebook', 'chronicle-calendar-window'],
+    window: { title: 'CHRONICLE.Notebook.CalendarTitle', icon: 'fa-solid fa-calendar-days', resizable: true },
+    position: { width: 760, height: 640 },
+  };
+
+  constructor(options = {}) {
+    super({ ...options, position: { ...CalendarWindow.DEFAULT_OPTIONS.position, ...savedWindowPlace() } });
+  }
+
+  /** @override */
+  async _renderHTML() {
+    return null;
+  }
+
+  /** @override Make the frame once; a re-render must not reload it. */
+  _replaceHTML(_result, content) {
+    if (this.host) return;
+    const box = document.createElement('div');
+    box.className = 'chronicle-notes-host';
+    content.replaceChildren(box);
+    this.host = new FrameHost('calendar', box);
+    this.host.start();
+  }
+
+  /** @override */
+  _onClose(options) {
+    const { left, top, width, height } = this.position ?? {};
+    setSetting('calendarWindowPlace', { left, top, width, height }).catch(() => {});
+    this.host?.destroy();
+    this.host = null;
+    super._onClose?.(options);
+  }
+}
+
+/** The player's last window size and place, kept only when it is sane. */
+function savedWindowPlace() {
+  const p = getSetting('calendarWindowPlace');
+  if (!p || typeof p !== 'object') return {};
+  const out = {};
+  for (const k of ['left', 'top', 'width', 'height']) {
+    if (Number.isFinite(p[k]) && p[k] >= 0) out[k] = Math.round(p[k]);
+  }
+  if (out.width < 320) delete out.width;
+  if (out.height < 280) delete out.height;
+  return out;
+}
+
+/**
+ * Open the calendar window, connecting first if needed. Called from a
+ * click. Resolves true when the window is showing.
+ * @returns {Promise<boolean>}
+ */
+export async function openCalendarWindow() {
+  const ctx = chronicle();
+  if (!ctx) {
+    ui.notifications.warn(t('NotSetUp'));
+    return false;
+  }
+  if (!storedGrant(ctx) && !(await connect(ctx))) return false;
+
+  if (calendarWindow?.rendered) {
+    calendarWindow.bringToFront?.();
+  } else {
+    calendarWindow = new CalendarWindow();
+    await calendarWindow.render({ force: true });
+  }
+  return true;
 }
 
 /** Where the player dragged the tab and panel, if anywhere. */

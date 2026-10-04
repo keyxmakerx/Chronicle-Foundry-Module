@@ -47,9 +47,9 @@ test('module not paused but structures differ → incompatible-structures with c
   assert.match(r.detail, /month count/);
 });
 
-test('incompatible-structures is reachable even when the fail-open module never paused (regression: SC path)', () => {
-  // The exact fail-open scenario fix 2 + fix 3 target: SimpleCalendar world, module
-  // read the structure too late to pause, but the dashboard can compare now.
+test('incompatible-structures is reachable even when the fail-open module never paused (regression: fail-open path)', () => {
+  // The fail-open scenario: the module read the structure too late to pause,
+  // but the dashboard can compare now.
   const r = classifyCalendarSyncState({
     paused: false,
     structureCmp: { match: false, detail: 'weekday count (Chronicle 7 vs Foundry 10)' },

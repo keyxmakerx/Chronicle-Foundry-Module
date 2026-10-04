@@ -144,7 +144,7 @@ test('THE STORM: 20 world-time ticks cost 1 request and 1 notice, not 40 and 20'
       put: async () => { requests++; throw apiError(503, REBUILD_BODY); },
     };
 
-    // Mirrors the shape of _onCalendariaDateTimeChange: check the session
+    // Mirrors the shape of CalendarSync.pushDate: check the session
     // guard, then probe, then push.
     for (let i = 0; i < 20; i++) {
       if (calendarBlackoutActive()) continue;

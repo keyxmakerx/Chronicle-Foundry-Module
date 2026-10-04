@@ -12,6 +12,7 @@ import { JournalSync } from './journal-sync.mjs';
 import { MapSync } from './map-sync.mjs';
 import { ShopWidget } from './shop-widget.mjs';
 import { CalendarSync } from './calendar-sync.mjs';
+import { registerCalendarBar } from './calendar-bar.mjs';
 import { ActorSync } from './actor-sync.mjs';
 import { ItemSync } from './item-sync.mjs';
 import { StashSync } from './stash-sync.mjs';
@@ -27,9 +28,8 @@ import { registerNpcPresence, npcSpotlightRelay } from './npc-presence.mjs';
 import { negotiationMirror } from './negotiation-mirror.mjs';
 import { registerMapSheetItems } from './map-sheet-items.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
-import { openSyncCalendar } from './sync-calendar.mjs';
 import { registerShopRoomSocket } from './shop-room-window.mjs';
-import { notebookAvailable, openNotebook, registerPlayerNotebook } from './player-notebook.mjs';
+import { notebookAvailable, openCalendarWindow, openNotebook, registerPlayerNotebook } from './player-notebook.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
 import { retireNotesFolder } from './_notes-folder.mjs';
 import { FLAG_SCOPE, SYNC_OPTIONS } from './constants.mjs';
@@ -48,8 +48,7 @@ let _statusIndicatorEl = null;
  * Open the Sync Dashboard, recreating the singleton if it isn't currently
  * rendered. An ApplicationV2 instance can be left in a non-re-renderable state
  * after a close (notably when the close interrupts an in-flight render), which
- * made the dashboard intermittently fail to reopen. Mirrors the SyncCalendar
- * singleton helper: bring an already-open window to the front; otherwise build,
+ * made the dashboard intermittently fail to reopen. Bring an already-open window to the front; otherwise build,
  * (re)bind, and render a fresh instance. `bind()` only sets a reference, so
  * recreating leaks nothing.
  * @returns {SyncDashboard|null}
@@ -117,7 +116,8 @@ Hooks.once('ready', async () => {
   syncManager.registerModule(new JournalSync());
   syncManager.registerModule(new MapSync());
   syncManager.registerModule(new ShopWidget());
-  syncManager.registerModule(new CalendarSync());
+  const calendarSync = new CalendarSync();
+  syncManager.registerModule(calendarSync);
   syncManager.registerModule(new ActorSync());
   syncManager.registerModule(new ItemSync());
   syncManager.registerModule(new StashSync());
@@ -144,6 +144,13 @@ Hooks.once('ready', async () => {
     registerDebugHub();
   } catch (err) {
     console.warn('Chronicle Sync | Problem reports unavailable', err);
+  }
+  try {
+    // Chronicle's own calendar: the GM's bar reads calendarSync, players
+    // draw the snapshot it publishes.
+    registerCalendarBar(calendarSync);
+  } catch (err) {
+    console.warn('Chronicle Sync | Calendar bar unavailable', err);
   }
   try {
     registerPlayerNotebook();
@@ -286,8 +293,8 @@ async function _runtimeValidateDescriptor() {
 
 /**
  * Add the Chronicle group to Foundry's scene controls toolbar: the Sync
- * Dashboard, Sync Calendar and DM Screen for GMs, the Notebook for everyone once the
- * world is connected to Chronicle.
+ * Dashboard and DM Screen for GMs, the Notebook and Calendar for everyone
+ * once the world is connected to Chronicle.
  */
 Hooks.on('getSceneControlButtons', (controls) => {
   // openDashboard() recreates the dashboard when a prior close left the
@@ -297,14 +304,14 @@ Hooks.on('getSceneControlButtons', (controls) => {
     notebook: notebookAvailable(),
     run: {
       dashboard: openDashboard,
-      syncCalendar: () => { openSyncCalendar(); },
       dmScreen: () => { openDMScreen(() => syncManager?.api ?? null); },
       notebook: () => { openNotebook(); },
+      calendar: () => { openCalendarWindow(); },
     },
     titles: {
-      syncCalendar: game.i18n.localize('CHRONICLE.SceneControl.SyncCalendar'),
       dmScreen: game.i18n.localize('CHRONICLE.SceneControl.DMScreen'),
       notebook: game.i18n.localize('CHRONICLE.SceneControl.Notebook'),
+      calendar: game.i18n.localize('CHRONICLE.SceneControl.Calendar'),
     },
   });
 });

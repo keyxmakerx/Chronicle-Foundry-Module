@@ -393,7 +393,7 @@ Lists all tags in the campaign.
 #### POST /tags
 Create a new tag.
 
-**Used by:** `import-wizard.mjs` → Step 7 (Review) tag creation during import
+**Used by:** `import-wizard.mjs` → Step 6 (Review) tag creation during import
 
 **Request:**
 ```json
@@ -845,7 +845,7 @@ moons, seasons, eras, event_categories, cycles, festivals.
 #### GET /calendar/date
 Returns current date/time with computed state: current season, moon phases, era, weather.
 
-**Used by:** `calendar-sync.mjs` → poll current state; `_realtime-date-guard.mjs` →
+**Used by:** `_realtime-date-guard.mjs` →
 fetch-before-push real-time check (see below)
 
 **Response:**
@@ -893,19 +893,16 @@ a retryable sync error.
 
 #### POST /calendar
 Creates the campaign's calendar. Answers `201 {"created": …, "warnings": […]}`;
-`409` when the campaign already has a calendar.
+`409` when the campaign already has a calendar. The module does not call it.
 
 #### POST /calendar/date/confirm
 **Optional** (newer Chronicle deployments only). Confirms Foundry *applied* a
-date pulled from Chronicle to the active local calendar module (Calendaria or
-SimpleCalendar), not merely fetched it — drives the sync chip's "SAW" vs.
+date pulled from Chronicle to a local calendar, not merely fetched it — drives the sync chip's "SAW" vs.
 "APPLIED" distinction (SAW = the `GET /calendar/date` beacon).
 
-**Used by:** `calendar-sync.mjs` → `_confirmAppliedDate` via
-`scripts/_applied-date-confirm.mjs`, from the poll path (`onInitialSync`) and
-the WebSocket path (`_onChronicaleDateAdvanced`, `calendar.date.advanced`) —
-only after the local setter (`_setLocalDate`) runs without throwing. Never
-sent on a bare fetch or an apply failure.
+**Used by:** `scripts/_applied-date-confirm.mjs`, for a caller that applied
+a date to a Foundry calendar; never sent on a bare fetch or an apply failure.
+No Foundry calendar is integrated, so nothing calls it yet (TODO(#95)).
 
 **Request:**
 ```json
@@ -948,8 +945,24 @@ Each resource has a `GET` (returns all definitions) and a `PUT` (bulk-replaces a
 #### GET /calendar/events
 Lists events for a month. Query: `?year=1492&month=3` or `?entity_id=uuid`.
 
+**Used by:** `calendar-sync.mjs` → `fetchEvents`, one request per month across the
+current year ±1, and the built-in calendar's month window (current month ±1).
+
+**Day weather.** `GET /calendar/weather/days?year=&month=` returns `{data,total}` of
+that month's day readings (`year`, `month`, `day`, `icon`, `preset_label`, …); below
+the Director only days up to today. **Used by:** the built-in calendar's month view.
+
+**Players' view.** `GET /calendar`, `GET /calendar/date`, `GET /calendar/events` and
+`GET /calendar/weather/days` take `?audience=players`: Chronicle filters the read for an anonymous player
+(hidden moons, secret eras, GM-only, per-player and unannounced events left out)
+whatever the key's role, and the date, events and day-weather answers carry
+`"audience": "players"`. An older Chronicle ignores the parameter and answers
+with the GM's view; without the echo the module leaves moons, era, events and
+day weather out of the players' snapshot. **Used by:** `CalendarSync.publishPlayerSnapshot`.
+Re-verify by: 2026-11-04 (Chronicle `internal/plugins/syncapi/calendar_api_handler.go` `readViewer`; lands with Chronicle #1084)
+
 #### POST /calendar/events
-Creates a calendar event.
+Creates a calendar event. **Used by:** the built-in calendar's Add event (GM), sending `name`, `year`, `month`, `day`, `all_day`, `start_hour`/`start_minute` when timed, and `visibility` (`everyone` or `gm-only`).
 
 **Request:**
 ```json
@@ -968,7 +981,7 @@ Creates a calendar event.
 }
 ```
 
-**Fields (Calendaria parity):** `color` (hex), `icon` (FontAwesome/custom id),
+**Fields:** `color` (hex), `icon` (FontAwesome/custom id),
 `all_day`, `recurrence_interval` (periods between recurrences),
 `recurrence_end_year/month/day`, `recurrence_max_occurrences`.
 
@@ -977,11 +990,9 @@ Updates a calendar event. Same fields as POST; **PARTIAL update** — absent
 preserves, an explicit `null` clears, a present value replaces (see "The
 partial-update contract" under `PUT /entities/:entityId`).
 
-`calendar-sync.mjs` pushes note edits here from three paths
-(`_onCalendariaNoteUpdated`, `_onLocalEventUpdate`,
-`_onSimpleCalendarNoteUpdate`), each with a five-key body. Keep bodies
-narrow: a Foundry note edit means the name, the date and the body, nothing
-else.
+The module does not call it. A future push of a Foundry note edit must keep
+the body narrow: the name, the date and the body, nothing else
+(`tools/test-partial-put-contract.mjs`).
 
 #### DELETE /calendar/events/:eventId
 Deletes a calendar event.
@@ -998,7 +1009,7 @@ Returns a single event by ID.
 | `PUT /calendar/settings` | Updates calendar name, time system, leap year, current date/time |
 | `PUT /calendar/months` | Replaces all month definitions |
 | `PUT /calendar/weekdays` | Replaces all weekday definitions |
-| `GET /calendar/structure` | Returns calendar structure in Calendaria-compatible format |
+| `GET /calendar/structure` | Returns the calendar structure |
 | `GET /calendar/weather` | Returns current weather state, or `{}` if none set |
 | `PUT /calendar/weather` | Sets current weather state (GM override) |
 | `GET /calendar/export` | Exports the full calendar as Chronicle JSON; `?events=true` includes events |
@@ -1374,7 +1385,7 @@ Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/stash_api_handler.
 ### Player notebook pages
 
 Not part of the REST API: the notebook (`scripts/player-notebook.mjs`,
-checks in `scripts/_notes-grant.mjs`) frames two Chronicle web pages and never
+checks in `scripts/_notes-grant.mjs`) frames Chronicle web pages and never
 uses the GM's sync key. Everything crosses `postMessage`, and each side checks
 the other's origin (Chronicle's, taken from `apiUrl`) before acting.
 
@@ -1383,6 +1394,7 @@ the other's origin (Chronicle's, taken from `apiUrl`) before acting.
 | Allow window | `/campaigns/:id/notes/allow-app?origin=<Foundry origin>` | A pop-up where the player presses Allow. Replies `{type:"chronicle:notes-grant", token, userId, campaignId}` (token starts `cnt_`) or `{type:"chronicle:notes-grant-declined"}`. |
 | Notebook frame | `/embed/campaigns/:id/notes/journal` | The player's Journal. |
 | Jot frame | `/embed/campaigns/:id/notes/jots` | Jot notes for the page in view. |
+| Calendar frame | `/embed/campaigns/:id/notes/calendar` | The campaign's default calendar, Chronicle's own page, as this player sees it (same grant; the frame reads `/api/notes-app/campaigns/:id/calendars/…`). An older Chronicle answers 404. |
 
 The module keeps a grant only when `campaignId` matches and the GM has matched
 the returned `userId` to this Foundry login (Members tab); an unmatched or
@@ -1392,7 +1404,7 @@ module answers `chronicle:notes-token` with the token and current `entityId`),
 with `noteId`. Module to frame: `chronicle:notes-token`, `chronicle:jots-page`
 with `entityId`, `chronicle:open-note`.
 
-Re-verify by: 2026-11-03 (Chronicle `internal/widgets/notes/app_grants_handler.go`, `allow_app.templ`, `static/js/notes_embed.js`)
+Re-verify by: 2026-11-04 (Chronicle `internal/widgets/notes/app_grants_handler.go`, `allow_app.templ`, `static/js/notes_embed.js`, `internal/plugins/calendar/routes.go` `RegisterAppRoutes`)
 
 ---
 
@@ -1553,22 +1565,22 @@ aside on the GM's world load (`scripts/_notes-folder.mjs`).
 ### What the module does with each `calendar.*` type
 
 Handled in `scripts/calendar-sync.mjs` `onMessage` + `scripts/_calendar-subresources.mjs`.
-**Display-level and non-destructive**: no branch writes a Chronicle value
-into the Foundry calendar's stored structure, and none creates a note. Chat
-announcements are **GM whispers only** — never public, so a DM-gated payload
-is never laundered into a player-visible one.
+**Display-level and non-destructive**: no Foundry calendar module is
+integrated, and no branch writes into Foundry. Chat announcements are **GM
+whispers only** — never public, so a DM-gated payload is never laundered into
+a player-visible one.
 
-| Type | Module behavior | Calendaria | Simple Calendar |
-|---|---|---|---|
-| `calendar.date.advanced` | Applies the date, confirms it back | `CALENDARIA.api.setDateTime` | `SimpleCalendar.api` date set |
-| `calendar.event.created/updated/deleted` | Mirrors to a calendar note | Full (notes API) | Full (journal-flag notes) |
-| `calendar.weather.changed` | Updates the dashboard world-state panel; applies to the calendar module if it exposes a weather **setter**, else whispers a GM chat line. `null` payload → one `GET /calendar/weather` refetch. | Probes `setWeather` / `setCurrentWeather` / `setWeatherForDate`, falls back to chat when absent (probe result in diagnostics bundle) | No weather surface → chat fallback |
-| `calendar.season.changed` | Panel + GM chat line (`calendarAnnounceSeasonEra`, default **on**) | Display only | Display only |
-| `calendar.era.changed` | Panel + GM chat line (`calendarAnnounceSeasonEra`, default **on**) | Display only | Display only |
-| `calendar.moon.phase_changed` | Panel + GM chat line (`calendarAnnounceMoon`, default **off** — moons change phase every few in-world days) | Display only | Display only |
-| `calendar.worldstate.changed` | Panel + GM chat line (`calendarAnnounceWorldstate`, default **on**). Wired and tested, unreachable during blackout. | Display only | Display only |
-| `calendar.structure.updated`, `calendar.cycle.changed`, `calendar.festival.changed` | Refetches `GET /calendar`, re-runs the structure comparison, sets the badge: pause if now incompatible, clear a prior pause if compatible, else raise advisory `structure-changed`. **Never auto-applies the structure** — rewriting months/weekdays would silently re-date every note. Runs even while sync is paused (the only recovery path). | Both | Both |
-| any other `calendar.*` | `default:` logs one `console.debug` line **per type per session** — no silent drops | — | — |
+| Type | Module behavior |
+|---|---|
+| `calendar.date.advanced` | Updates the cached date the dashboard shows. TODO(#95): apply it to the built-in calendar and confirm it back |
+| `calendar.event.created/updated/deleted` | Routed; no handler writes anywhere yet. TODO(#95) |
+| `calendar.weather.changed` | Updates the dashboard world-state panel and whispers a GM chat line (`calendarAnnounceWeather`). `null` payload → one `GET /calendar/weather` refetch |
+| `calendar.season.changed` | Panel + GM chat line (`calendarAnnounceSeasonEra`, default **on**) |
+| `calendar.era.changed` | Panel + GM chat line (`calendarAnnounceSeasonEra`, default **on**) |
+| `calendar.moon.phase_changed` | Panel + GM chat line (`calendarAnnounceMoon`, default **off** — moons change phase every few in-world days) |
+| `calendar.worldstate.changed` | Panel + GM chat line (`calendarAnnounceWorldstate`, default **on**). Wired and tested, unreachable during blackout |
+| `calendar.structure.updated`, `calendar.cycle.changed`, `calendar.festival.changed` | Refetches `GET /calendar` into the cache |
+| any other `calendar.*` | `default:` logs one `console.debug` line **per type per session** — no silent drops |
 
 Every cross-repo claim here carries a `Re-verify by:` line.
 

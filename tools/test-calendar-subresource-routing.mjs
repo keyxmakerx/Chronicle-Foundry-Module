@@ -8,8 +8,7 @@
  *   2. dm_only weather is NEVER exposed to players — announcements are GM
  *      whispers only.
  *   3. `calendar.structure.updated` (and its cycle/festival siblings)
- *      re-compares, pauses on a new mismatch, un-pauses on recovery, and
- *      NEVER writes the structure into Foundry.
+ *      refetches Chronicle's calendar into the cache.
  *   4. The `default:` branch logs an unhandled `calendar.*` type once per
  *      session and stays silent on non-calendar traffic.
  *
@@ -68,12 +67,6 @@ function makeSync(overrides = {}) {
   return Object.assign(
     Object.create(CalendarSync.prototype),
     {
-      _syncDepth: 0,
-      _calendarModule: 'calendaria',
-      _hasModernCalendariaApi: true,
-      _calendarSyncDisabled: false,
-      _calendarMismatchDetail: null,
-      _structureChangedDetail: null,
       _subresourceState: emptySubresourceState(),
       _loggedUnhandledTypes: new Set(),
       _chronicleCalendar: null,
@@ -93,30 +86,13 @@ function reset() {
   settingValues.calendarAnnounceMoon = false;
 }
 
-// A 12-month/7-weekday pair that compareCalendarStructures accepts.
-const CHRONICLE_12x7 = {
-  name: 'Harptos',
-  months: Array.from({ length: 12 }, () => ({ days: 30 })),
-  weekdays: Array.from({ length: 7 }, (_, i) => ({ name: `d${i}` })),
-};
-const FOUNDRY_12x7 = {
-  name: 'Harptos (Foundry)',
-  monthDays: Array.from({ length: 12 }, () => 30),
-  weekdayCount: 7,
-};
-const FOUNDRY_15x6 = {
-  name: 'Therin',
-  monthDays: Array.from({ length: 15 }, () => 24),
-  weekdayCount: 6,
-};
-
 // ── 1. Routing: each handled type reaches its handler ───────────────────────
 
 test('every handled calendar.* type routes to its handler', async () => {
   reset();
   const seen = [];
   const cs = makeSync({
-    _onChronicaleDateAdvanced: async () => seen.push('date'),
+    _onChronicleDateAdvanced: async () => seen.push('date'),
     _onChronicleEventCreated:  async () => seen.push('created'),
     _onChronicleEventUpdated:  async () => seen.push('updated'),
     _onChronicleEventDeleted:  async () => seen.push('deleted'),
@@ -147,30 +123,6 @@ test('every handled calendar.* type routes to its handler', async () => {
   ]);
 });
 
-test('sub-resource messages are suppressed while calendar sync is paused', async () => {
-  reset();
-  const seen = [];
-  const cs = makeSync({
-    _calendarSyncDisabled: true,
-    _onChronicleWeatherChanged: async () => seen.push('weather'),
-    _onChronicleSubresourceChanged: async (t) => seen.push(t),
-  });
-  await cs.onMessage({ type: 'calendar.weather.changed', payload: { preset_label: 'Clear' } });
-  await cs.onMessage({ type: 'calendar.season.changed', payload: { name: 'Spring' } });
-  assert.deepEqual(seen, [], 'a paused module must not apply sub-resource state');
-});
-
-test('structure signals are processed EVEN WHILE PAUSED — the only recovery path', async () => {
-  reset();
-  let called = 0;
-  const cs = makeSync({
-    _calendarSyncDisabled: true,
-    _onChronicleStructureUpdated: async () => { called += 1; },
-  });
-  await cs.onMessage({ type: 'calendar.structure.updated', payload: null });
-  assert.equal(called, 1, 'structure.updated must run ahead of the pause guard');
-});
-
 test('sub-resource routing is off entirely when syncCalendar is disabled', async () => {
   reset();
   settingValues.syncCalendar = false;
@@ -184,7 +136,7 @@ test('sub-resource routing is off entirely when syncCalendar is disabled', async
 
 test('SECURITY: weather announcements are GM whispers, never public chat', async () => {
   reset();
-  const cs = makeSync({ _calendarModule: 'simple-calendar' }); // no Calendaria setter
+  const cs = makeSync();
   await cs._onChronicleWeatherChanged({
     preset_label: 'Unnatural darkness',
     zone_name: 'The Sunken Ward',
@@ -201,7 +153,7 @@ test('SECURITY: weather announcements are GM whispers, never public chat', async
 
 test('SECURITY: no sub-resource branch ever posts an unwhispered ChatMessage', async () => {
   reset();
-  const cs = makeSync({ _calendarModule: 'simple-calendar' });
+  const cs = makeSync();
   settingValues.calendarAnnounceMoon = true; // turn every announcement on
 
   await cs._onChronicleWeatherChanged({ preset_label: 'Blood rain' });
@@ -223,7 +175,7 @@ test('SECURITY: no sub-resource branch ever posts an unwhispered ChatMessage', a
 
 test('SECURITY: chat content is HTML-escaped at the boundary', async () => {
   reset();
-  const cs = makeSync({ _calendarModule: 'simple-calendar' });
+  const cs = makeSync();
   await cs._onChronicleSubresourceChanged('calendar.season.changed', {
     name: '<img src=x onerror="alert(1)">',
   });
@@ -234,7 +186,7 @@ test('SECURITY: chat content is HTML-escaped at the boundary', async () => {
 
 test('each announcement respects its own world setting', async () => {
   reset();
-  const cs = makeSync({ _calendarModule: 'simple-calendar' });
+  const cs = makeSync();
 
   // Moon is OFF by default — state still updates, chat stays quiet.
   await cs._onChronicleSubresourceChanged('calendar.moon.phase_changed', {
@@ -254,48 +206,10 @@ test('each announcement respects its own world setting', async () => {
   assert.equal(cs._subresourceState.era.name, 'Fifth Age', 'panel updates regardless of the chat toggle');
 });
 
-// ── weather: Calendaria apply vs chat fallback ──────────────────────────────
-
-test('weather is applied via a Calendaria setter when one exists — no chat line', async () => {
-  reset();
-  const applied = [];
-  globalThis.CALENDARIA = { api: { setWeather: (d) => { applied.push(d); } } };
-  const cs = makeSync({ _calendarModule: 'calendaria' });
-  await cs._onChronicleWeatherChanged({ preset_label: 'Heavy snow', temperature_celsius: -8 });
-  delete globalThis.CALENDARIA;
-
-  assert.equal(applied.length, 1, 'handed to Calendaria');
-  assert.equal(applied[0].label, 'Heavy snow');
-  assert.equal(applied[0].temperature, -8);
-  assert.equal(chatCalls.length, 0, 'no duplicate chat line once applied to the module');
-});
-
-test('weather degrades to chat when Calendaria exposes no setter', async () => {
-  reset();
-  globalThis.CALENDARIA = { api: { getCurrentWeather: () => ({}) } }; // reads only
-  const cs = makeSync({ _calendarModule: 'calendaria' });
-  await cs._onChronicleWeatherChanged({ preset_label: 'Heavy snow' });
-  delete globalThis.CALENDARIA;
-
-  assert.equal(chatCalls.length, 1, 'read-only Calendaria falls back to chat');
-  assert.match(chatCalls[0].content, /Heavy snow/);
-});
-
-test('a failing Calendaria setter degrades to chat rather than losing the update', async () => {
-  reset();
-  globalThis.CALENDARIA = { api: { setWeather: () => { throw new Error('boom'); } } };
-  const cs = makeSync({ _calendarModule: 'calendaria' });
-  await cs._onChronicleWeatherChanged({ preset_label: 'Hail' });
-  delete globalThis.CALENDARIA;
-
-  assert.equal(chatCalls.length, 1, 'the update must survive an apply failure');
-});
-
 test('a null weather payload (zone-change ping) refetches GET /calendar/weather', async () => {
   reset();
   const gets = [];
   const cs = makeSync({
-    _calendarModule: 'simple-calendar',
     _api: {
       get: async (p) => {
         gets.push(p);
@@ -315,93 +229,38 @@ test('a null weather payload (zone-change ping) refetches GET /calendar/weather'
 test('a null weather payload with a failing refetch is a quiet no-op', async () => {
   reset();
   const cs = makeSync({
-    _calendarModule: 'simple-calendar',
     _api: { get: async () => { throw new Error('502'); } },
   });
   await cs._onChronicleWeatherChanged(null);
   assert.equal(chatCalls.length, 0);
-  assert.equal(cs._syncDepth, 0, 'the reentrant guard must unwind even on the error path');
 });
 
-// ── 3. structure.updated → re-compare, never auto-apply ─────────────────────
+// ── 3. structure.updated → refetch into the cache ───────────────────────────
 
-test('structure.updated re-runs the comparison and pauses on a NEW incompatibility', async () => {
+test('structure.updated refetches /calendar into the cache', async () => {
   reset();
-  let structureWrites = 0;
-  const cs = makeSync({
-    _api: { get: async () => CHRONICLE_12x7 },
-    _readActiveFoundryStructure: () => FOUNDRY_15x6,
-    // Any call to the date/structure writers would be an auto-apply.
-    _setLocalDate: async () => { structureWrites += 1; return true; },
-  });
+  const fresh = { name: 'Harptos', months: [{ days: 30 }] };
+  const cs = makeSync({ _api: { get: async () => fresh } });
   await cs._onChronicleStructureUpdated('calendar.structure.updated');
-
-  assert.equal(cs._calendarSyncDisabled, true, 'a now-incompatible structure must pause');
-  assert.match(cs._calendarMismatchDetail, /12mo\/7wd/);
-  assert.equal(cs._structureChangedDetail, null, 'the advisory does not co-exist with a pause');
-  assert.equal(structureWrites, 0, 'NO auto-apply — the Foundry calendar is never rewritten');
-  assert.ok(notices.some((n) => n.level === 'warn'), 'the operator is warned once');
+  assert.equal(cs._chronicleCalendar, fresh);
 });
 
-test('structure.updated sets the advisory badge when the re-compare stays compatible', async () => {
+test('structure.updated survives a /calendar fetch failure and keeps the cached calendar', async () => {
   reset();
+  const cached = { name: 'Harptos', months: [{ days: 30 }] };
   const cs = makeSync({
-    _api: { get: async () => CHRONICLE_12x7 },
-    _readActiveFoundryStructure: () => FOUNDRY_12x7,
-  });
-  await cs._onChronicleStructureUpdated('calendar.structure.updated');
-
-  assert.equal(cs._calendarSyncDisabled, false, 'a compatible structure must not pause');
-  assert.match(cs._structureChangedDetail, /still compatible/);
-  assert.match(cs._structureChangedDetail, /NOT modified/, 'the detail states no write happened');
-});
-
-test('structure.updated CLEARS a prior mismatch pause once the structures match again', async () => {
-  reset();
-  const cs = makeSync({
-    _calendarSyncDisabled: true,
-    _calendarMismatchDetail: 'Chronicle: Harptos 12mo/7wd · Foundry: Therin 15mo/6wd — month count',
-    _api: { get: async () => CHRONICLE_12x7 },
-    _readActiveFoundryStructure: () => FOUNDRY_12x7,
-  });
-  await cs._onChronicleStructureUpdated('calendar.structure.updated');
-
-  assert.equal(cs._calendarSyncDisabled, false, 'the pause must lift when its cause is gone');
-  assert.equal(cs._calendarMismatchDetail, null);
-  assert.ok(notices.some((n) => n.level === 'info' && /resumed/.test(n.m)), 'the GM is told sync resumed');
-});
-
-test('structure.updated fails OPEN when either structure is unreadable', async () => {
-  reset();
-  // Foundry side unreadable.
-  const a = makeSync({
-    _api: { get: async () => CHRONICLE_12x7 },
-    _readActiveFoundryStructure: () => null,
-  });
-  await a._onChronicleStructureUpdated('calendar.structure.updated');
-  assert.equal(a._calendarSyncDisabled, false, 'unreadable Foundry structure must not pause');
-  assert.equal(a._structureChangedDetail, null, 'and must not claim a verdict either');
-
-  // Chronicle side unreadable.
-  const b = makeSync({
-    _api: { get: async () => ({ name: 'degraded', months: [] }) },
-    _readActiveFoundryStructure: () => FOUNDRY_12x7,
-  });
-  await b._onChronicleStructureUpdated('calendar.structure.updated');
-  assert.equal(b._calendarSyncDisabled, false);
-  assert.equal(b._structureChangedDetail, null);
-});
-
-test('structure re-compare survives a /calendar fetch failure using the cached structure', async () => {
-  reset();
-  const cs = makeSync({
-    _chronicleCalendar: CHRONICLE_12x7,
+    _chronicleCalendar: cached,
     _api: { get: async () => { throw new Error('offline'); } },
-    _readActiveFoundryStructure: () => FOUNDRY_12x7,
   });
   await cs._onChronicleStructureUpdated('calendar.cycle.changed');
-  assert.match(cs._structureChangedDetail, /calendar\.cycle\.changed/);
-  assert.equal(cs._syncDepth, 0);
+  assert.equal(cs._chronicleCalendar, cached);
+});
+
+test('structure signals never write into Foundry or post chat', async () => {
+  reset();
+  const cs = makeSync({ _api: { get: async () => ({ months: [{ days: 30 }] }) } });
+  await cs.onMessage({ type: 'calendar.structure.updated', payload: null });
+  assert.equal(chatCalls.length, 0);
 });
 
 // ── 4. default: log-once for unhandled calendar.* types ─────────────────────
@@ -450,7 +309,7 @@ test('routed types never fall into the unhandled log', async () => {
       _onChronicleWeatherChanged: async () => {},
       _onChronicleSubresourceChanged: async () => {},
       _onChronicleStructureUpdated: async () => {},
-      _onChronicaleDateAdvanced: async () => {},
+      _onChronicleDateAdvanced: async () => {},
       _onChronicleEventCreated: async () => {},
       _onChronicleEventUpdated: async () => {},
       _onChronicleEventDeleted: async () => {},
@@ -466,16 +325,4 @@ test('routed types never fall into the unhandled log', async () => {
     console.debug = orig;
   }
   assert.deepEqual(logs.filter((l) => l.includes('unhandled calendar')), []);
-});
-
-// ── reentrancy discipline ───────────────────────────────────────────────────
-
-test('every sub-resource handler unwinds the reentrant _syncDepth guard', async () => {
-  reset();
-  const cs = makeSync({ _calendarModule: 'simple-calendar' });
-  await cs._onChronicleWeatherChanged({ preset_label: 'Clear' });
-  await cs._onChronicleSubresourceChanged('calendar.season.changed', { name: 'Spring' });
-  await cs._onChronicleStructureUpdated('calendar.structure.updated');
-  assert.equal(cs._syncDepth, 0, 'a leaked depth would mask every later local hook');
-  assert.equal(cs._syncing, false);
 });

@@ -12,8 +12,6 @@ import { getSetting, setSetting, getSyncDirections, setSyncDirections, getExclud
 import { SyncHistoryTab } from './sync-history-tab.mjs';
 import { FLAG_SCOPE, REPORT_STORE_FLAG } from './constants.mjs';
 import { confirmDialog, promptDialog } from './_dialogs.mjs';
-import { openSyncCalendar } from './sync-calendar.mjs';
-import { buildCalendarDiagnostics } from './sync-calendar-diagnostics.mjs';
 import { memberKey } from './sync-manager.mjs';
 import { buildMemberRows } from './_member-mapping.mjs';
 import {
@@ -26,16 +24,12 @@ import {
 import { buildDiagnosticBundle } from './sync-diagnostic-bundle.mjs';
 import { buildOverviewModel } from './_overview-model.mjs';
 import { log, getLogBuffer } from './logger.mjs';
-import { shouldSkipDatePush, isRealTimeRejection, notifyRealTimePushPaused } from './_realtime-date-guard.mjs';
 import { walkEntityPages } from './_entity-page-walk.mjs';
 import { mapThumbSrc } from './_map-look.mjs';
 import { _isAllowedImageHost } from './_url-validation.mjs';
 import { pickJournalCreateType } from './_journal-create.mjs';
-import { compareCalendarStructures } from './calendar-sync.mjs';
-import { classifyCalendarSyncState } from './_calendar-sync-state.mjs';
 import { projectSubresourcePanel } from './_calendar-subresources.mjs';
 import { calendarStateFromError } from './_calendar-probe-state.mjs';
-import { handleIfCalendarRebuilding } from './_calendar-blackout-guard.mjs';
 import {
   REPORTS_CHANGED_HOOK, collectModuleInfo, collectSyncLog, gatherSideBySide, getReports, markReportDone, submitReport,
 } from './debug-hub.mjs';
@@ -85,9 +79,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'resync-everything': SyncDashboard.#onResyncEverythingAction,
       'open-maps-folder': SyncDashboard.#onOpenMapsFolderAction,
       'dismiss-map-errors': SyncDashboard.#onDismissMapErrorsAction,
-      'pull-date': SyncDashboard.#onPullDateAction,
-      'push-date': SyncDashboard.#onPushDateAction,
-      'open-sync-calendar': SyncDashboard.#onOpenSyncCalendarAction,
       reconnect: SyncDashboard.#onReconnectAction,
       'clear-log': SyncDashboard.#onClearLogAction,
       'open-settings': SyncDashboard.#onOpenSettingsAction,
@@ -100,7 +91,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'copy-diagnostic-bundle': SyncDashboard.#onCopyDiagnosticBundleAction,
       'copy-capability': SyncDashboard.#onCopyCapabilityAction,
       'copy-capability-json': SyncDashboard.#onCopyCapabilityJsonAction,
-      'copy-calendar-diagnostics': SyncDashboard.#onCopyCalendarDiagnosticsAction,
       'open-wizard': SyncDashboard.#onOpenWizardAction,
       'bulk-set-public': SyncDashboard.#onBulkSetPublicAction,
       'bulk-set-private': SyncDashboard.#onBulkSetPrivateAction,
@@ -318,10 +308,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       characters: characterData.characters,
       issuesCount: issuesData.count,
       unmatchedMembers: membersData.unmatchedCount,
-      calendarAvailable: calendarData.available,
-      calendarInSync: calendarData.inSync,
-      calendarSyncPaused: !!(calendarData.isPaused || calendarData.isIncompatible),
-      calendarPausedText: calendarData.syncStateDetail || '',
       calendarRebuilding: !!calendarData.calendarRebuilding,
       errorCount: statusData.errorLog?.length ?? 0,
       matchedSystem: statusData.matchedSystem,
@@ -507,8 +493,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     for (const j of game.journal.contents) {
       if (j.getFlag(FLAG_SCOPE, 'entityId')) continue;
       if (j.getFlag(FLAG_SCOPE, REPORT_STORE_FLAG)) continue;
-      // Skip SimpleCalendar note journals.
-      if (j.flags?.['foundryvtt-simple-calendar'] || j.flags?.['simple-calendar']) continue;
 
       if (filter && !j.name.toLowerCase().includes(filter)) continue;
 
@@ -686,10 +670,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   async _buildCalendarData() {
     const calendarEnabled = getSetting('syncCalendar');
-    const calModule = this._detectCalendarModule();
 
-    if (!calendarEnabled || !calModule) {
-      return { available: false, enabled: calendarEnabled, module: calModule };
+    if (!calendarEnabled) {
+      return { available: false, enabled: calendarEnabled };
     }
 
     let chronicle = null;
@@ -713,7 +696,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         return {
           available: false,
           enabled: calendarEnabled,
-          module: calModule,
           calendarRebuilding: true,
           rebuildingDetail: typeof probeError?.serverMessage === 'string' && probeError.serverMessage
             ? probeError.serverMessage
@@ -724,7 +706,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         return {
           available: false,
           enabled: calendarEnabled,
-          module: calModule,
           calendarUnreachable: true,
           unreachableState: state,
         };
@@ -734,143 +715,39 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!chronicle) {
       // Reached only when the probe SUCCEEDED and returned nothing, or failed
       // with a genuine 404 — i.e. this campaign really has no calendar.
-      return { available: false, enabled: calendarEnabled, module: calModule, noCampaignCalendar: true };
+      return { available: false, enabled: calendarEnabled, noCampaignCalendar: true };
     }
-
-    // Get local Foundry calendar date.
-    const localDate = this._getLocalCalendarDate(calModule);
-
-    // Four-state badge, classified in priority order:
-    //   in-sync · date-drift (with direction) · incompatible-structures · paused
-    // `paused` comes from CalendarSync's `_calendarSyncDisabled` guard (set by
-    // both module paths). The dashboard also runs its own structure comparison
-    // so an incompatibility still surfaces when CalendarSync failed OPEN or
-    // isn't running; `structureCmp` stays null unless both structures were
-    // readable here.
-    const calSync = this._getCalendarSyncModule();
-    const paused = !!calSync?._calendarSyncDisabled;
-    const pausedDetail = calSync?._calendarMismatchDetail || null;
-    // Advisory 5th state: Chronicle's structure moved this session and
-    // CalendarSync's re-compare found it still compatible. Outranked by
-    // paused/incompatible in the classifier.
-    const structureChangedDetail = calSync?._structureChangedDetail || null;
-
-    const chronicleDate = {
-      year: chronicle.current_year,
-      month: chronicle.current_month,
-      day: chronicle.current_day,
-    };
-
-    let structureCmp = null;
-    let chronicleShape = null;
-    let foundryShape = null;
-    if (Array.isArray(chronicle.months) && chronicle.months.length > 0) {
-      const foundryStruct = calSync?._readActiveFoundryStructure?.() ?? null;
-      if (foundryStruct) {
-        structureCmp = compareCalendarStructures(chronicle, foundryStruct);
-        chronicleShape = `${(chronicle.months || []).length}mo/${(chronicle.weekdays || []).length}wd`;
-        foundryShape = `${(foundryStruct.monthDays || []).length}mo/${foundryStruct.weekdayCount ?? 0}wd`;
-      }
-    }
-
-    const cls = classifyCalendarSyncState({
-      paused,
-      pausedDetail,
-      structureCmp,
-      chronicleShape,
-      foundryShape,
-      chronicleDate,
-      foundryDate: localDate ? { year: localDate.year, month: localDate.month, day: localDate.day } : null,
-      structureChangedDetail,
-    });
 
     // Chronicle world-state panel (weather / season / era / moons) — the
-    // display surface for the sub-resource broadcasts CalendarSync now folds
-    // into `_subresourceState`. Read-only projection; the dashboard never
-    // writes any of it back into the Foundry calendar.
+    // display surface for the sub-resource broadcasts CalendarSync folds
+    // into `_subresourceState`. Read-only projection.
+    const calSync = this._getCalendarSyncModule();
     const worldState = projectSubresourcePanel(calSync?._subresourceState ?? null);
 
     return {
       available: true,
       enabled: calendarEnabled,
-      module: calModule,
       chronicleDate: {
-        ...chronicleDate,
+        year: chronicle.current_year,
+        month: chronicle.current_month,
+        day: chronicle.current_day,
         hour: chronicle.current_hour ?? 0,
         minute: chronicle.current_minute ?? 0,
         calendarName: chronicle.name || 'Campaign Calendar',
       },
-      localDate,
-      // Five-state model + supporting display fields.
-      syncState: cls.state,               // 'in-sync' | 'date-drift' | 'structure-changed' | 'incompatible-structures' | 'paused'
-      syncDirection: cls.direction,       // 'chronicle-ahead' | 'foundry-ahead' | null
-      syncStateDetail: cls.detail,        // reason string for paused / incompatible / structure-changed
-      // Convenience booleans for the template (derived from syncState).
-      inSync: cls.state === 'in-sync',
-      isPaused: cls.state === 'paused',
-      isIncompatible: cls.state === 'incompatible-structures',
-      isStructureChanged: cls.state === 'structure-changed',
-      isDrift: cls.state === 'date-drift',
       worldState,
     };
   }
 
   /**
-   * Resolve the live CalendarSync module instance from the SyncManager (for the
-   * structure-mismatch guard state). Mirrors the class-name lookup used
-   * elsewhere in the dashboard. Returns null when unavailable.
+   * Resolve the live CalendarSync module instance from the SyncManager (for its
+   * world-state snapshot). Mirrors the class-name lookup used elsewhere in the
+   * dashboard. Returns null when unavailable.
    * @returns {object|null}
    * @private
    */
   _getCalendarSyncModule() {
     return this._syncManager?._modules?.find((m) => m?.constructor?.name === 'CalendarSync') ?? null;
-  }
-
-  /**
-   * Detect which Foundry calendar module is active.
-   * @returns {string|null}
-   * @private
-   */
-  _detectCalendarModule() {
-    if (game.modules.get('calendaria')?.active) return 'Calendaria';
-    if (game.modules.get('foundryvtt-simple-calendar')?.active) return 'Simple Calendar';
-    return null;
-  }
-
-  /**
-   * Get the current date from the active Foundry calendar module.
-   * @param {string} calModule
-   * @returns {object|null}
-   * @private
-   */
-  _getLocalCalendarDate(calModule) {
-    try {
-      if (calModule === 'Calendaria') {
-        // Calendaria (1.x) exposes its API at globalThis.CALENDARIA.api — the
-        // same surface the Sync Calendar editor and calendar-sync use.
-        // getCurrentDateTime() returns { year, month, day, hour, minute, … }.
-        // game.Calendaria.getDate() is kept only as a fallback for old installs;
-        // it must not be the only path read, or old installs read as unsynced.
-        const calApi = globalThis.CALENDARIA?.api;
-        const d = calApi?.getCurrentDateTime?.() ?? calApi?.getCurrentDate?.() ?? game.Calendaria?.getDate?.();
-        if (d) return { year: d.year, month: d.month, day: d.day, hour: d.hour ?? 0, minute: d.minute ?? 0 };
-      }
-      if (calModule === 'Simple Calendar' && typeof SimpleCalendar !== 'undefined') {
-        const ts = SimpleCalendar.api?.currentDateTime?.();
-        if (ts) {
-          return {
-            year: ts.year,
-            month: (ts.month ?? 0) + 1, // SC is 0-indexed.
-            day: (ts.day ?? 0) + 1,
-            hour: ts.hour ?? 0,
-            minute: ts.minute ?? 0,
-          };
-        }
-      }
-    } catch {
-      // Calendar module API not available.
-    }
-    return null;
   }
 
   // ---------------------------------------------------------------------------
@@ -1630,16 +1507,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this.render({ force: true });
   }
 
-  /** Pull calendar date from Chronicle. */
-  static #onPullDateAction() {
-    this._onPullDate();
-  }
-
-  /** Push calendar date to Chronicle. */
-  static #onPushDateAction() {
-    this._onPushDate();
-  }
-
   /** Reconnect WebSocket. */
   static #onReconnectAction() {
     this.api?.connect();
@@ -1835,16 +1702,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this.render({ force: true });
   }
 
-  /**
-   * Open the Sync Calendar editor via the singleton helper from
-   * sync-calendar.mjs, which bringToFront's an existing instance or
-   * instantiates a new one, and is GM-only by contract (returns null for
-   * non-GMs).
-   */
-  static #onOpenSyncCalendarAction() {
-    openSyncCalendar();
-  }
-
   /** Open Foundry module settings. */
   static #onOpenSettingsAction() {
     const sheet = game.settings.sheet;
@@ -2004,11 +1861,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         resultEl.className = 'debug-copy-result test-error';
       }
     }
-  }
-
-  /** Copy calendar diagnostics to clipboard. */
-  static #onCopyCalendarDiagnosticsAction() {
-    this._onCopyCalendarDiagnostics();
   }
 
   static async #onOpenWizardAction() {
@@ -2304,59 +2156,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       this.render({ force: true });
     } catch (err) {
       console.error('Chronicle Dashboard: Visibility toggle failed', err);
-    }
-  }
-
-
-  /**
-   * Pull calendar date from Chronicle to Foundry.
-   * @private
-   */
-  async _onPullDate() {
-    const calSync = this._syncManager?._modules?.find(m => m.constructor?.name === 'CalendarSync');
-    if (calSync && typeof calSync.onInitialSync === 'function') {
-      // Log what actually happened, not what was attempted — onInitialSync
-      // can fail (e.g. a 503) without throwing.
-      const pulled = await calSync.onInitialSync();
-      if (pulled) {
-        this._logActivity('pull', 'Pulled calendar date from Chronicle');
-      } else {
-        this._logActivity('error', 'Calendar pull failed — no date was applied');
-      }
-      this.render({ force: true });
-    }
-  }
-
-  /**
-   * Push calendar date from Foundry to Chronicle.
-   * @private
-   */
-  async _onPushDate() {
-    const calModule = this._detectCalendarModule();
-    const localDate = this._getLocalCalendarDate(calModule);
-    if (!localDate) return;
-
-    try {
-      if (await shouldSkipDatePush(this.api)) return;
-      await this.api.put('/calendar/date', {
-        year: localDate.year,
-        month: localDate.month,
-        day: localDate.day,
-        hour: localDate.hour || 0,
-        minute: localDate.minute || 0,
-      });
-      this._logActivity('push', 'Pushed calendar date to Chronicle');
-      this.render({ force: true });
-    } catch (err) {
-      if (isRealTimeRejection(err)) { notifyRealTimePushPaused(); return; }
-      // A failure must be logged to the GM, not just to the console — a
-      // button that reports nothing reads as success.
-      if (handleIfCalendarRebuilding(err)) {
-        this._logActivity('error', 'Calendar push skipped — Chronicle’s calendar is being rebuilt');
-        return;
-      }
-      this._logActivity('error', 'Calendar push failed — see the Diagnostics tab');
-      console.error('Chronicle Dashboard: Push date failed', err);
     }
   }
 
@@ -3010,133 +2809,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       }
     }
     return result;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Calendar Diagnostics Export
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Copy a full Calendaria diagnostic report to the clipboard.
-   * Reuses buildCalendarDiagnostics from sync-calendar-diagnostics.mjs so the
-   * GM can get the same report from the Status tab without opening the editor.
-   * @private
-   */
-  async _onCopyCalendarDiagnostics() {
-    const el = this.element;
-    const resultEl = el?.querySelector('[data-cal-diag-result]');
-    try {
-      const input = this._buildCalendarDiagnosticsInput();
-      const text = buildCalendarDiagnostics(input);
-      await game.clipboard.copyPlainText(text);
-      if (resultEl) {
-        resultEl.textContent = game.i18n.localize('CHRONICLE.Dashboard.StatusTab.CalDiagCopied');
-        resultEl.className = 'debug-copy-result test-success';
-        setTimeout(() => { resultEl.textContent = ''; }, 3000);
-      }
-      ui.notifications.info(game.i18n.localize('CHRONICLE.Dashboard.StatusTab.CalDiagCopied'));
-    } catch (err) {
-      console.error('Chronicle Dashboard: Calendar diagnostics copy failed', err);
-      if (resultEl) {
-        resultEl.textContent = game.i18n.localize('CHRONICLE.Dashboard.StatusTab.CalDiagCopyFailed');
-        resultEl.className = 'debug-copy-result test-error';
-      }
-    }
-  }
-
-  /**
-   * Build the input snapshot for buildCalendarDiagnostics.
-   * Mirrors the shape built by the Sync Calendar editor but sourced entirely
-   * from dashboard-accessible globals so it works without opening the editor.
-   * @returns {object}
-   * @private
-   */
-  _buildCalendarDiagnosticsInput() {
-    const moduleVer = game.modules.get('chronicle-sync')?.version ?? '(unknown)';
-    const calendariaVer = game.modules.get('calendaria')?.version ?? null;
-    const calApi = (typeof CALENDARIA !== 'undefined' ? CALENDARIA?.api : null) ?? null;
-    let apiMethods = null;
-    if (calApi) {
-      // The trailing three are WRITE probes: Calendaria publishes weather
-      // reads but no documented setter, so `CalendarSync._applyWeatherToCalendaria`
-      // probes these names and falls back to a GM chat line when none exists.
-      // Reporting them here surfaces the real name on a build that does
-      // expose one. Keep this list in sync with CALENDARIA_WEATHER_SETTERS
-      // in calendar-sync.mjs.
-      const probeKeys = [
-        'getWeatherForDate', 'getCurrentWeather', 'getAllMoonPhases',
-        'getSelectedDay', 'createNote', 'updateNote', 'deleteNote',
-        'getCalendars', 'getActiveCalendar', 'getAllNotes',
-        'setWeather', 'setCurrentWeather', 'setWeatherForDate',
-      ];
-      apiMethods = {};
-      for (const k of probeKeys) apiMethods[k] = typeof calApi[k] === 'function';
-    }
-    let calendar = null;
-    let structureCounts = null;
-    let currentDateTime = null;
-    try {
-      const cal = calApi?.getActiveCalendar?.();
-      if (cal) {
-        calendar = { name: cal.name ?? cal.id, id: cal.id, version: cal.version ?? null };
-        structureCounts = {
-          months:       Array.isArray(cal.months)       ? cal.months.length        : undefined,
-          weekdays:     Array.isArray(cal.weekdays)     ? cal.weekdays.length      : undefined,
-          seasons:      Array.isArray(cal.seasons)      ? cal.seasons.length       : undefined,
-          moons:        Array.isArray(cal.moons)        ? cal.moons.length         : undefined,
-          eras:         Array.isArray(cal.eras)         ? cal.eras.length          : undefined,
-          festivals:    Array.isArray(cal.festivals)    ? cal.festivals.length     : undefined,
-          cycles:       Array.isArray(cal.cycles)       ? cal.cycles.length        : undefined,
-          weatherZones: Array.isArray(cal.weather_zones)? cal.weather_zones.length : undefined,
-        };
-      }
-      const dt = calApi?.getCurrentDate?.() ?? calApi?.getDate?.();
-      if (dt) {
-        currentDateTime = `${dt.year ?? '?'}/${dt.month ?? '?'}/${dt.day ?? '?'} ${dt.hour ?? 0}:${String(dt.minute ?? 0).padStart(2, '0')}`;
-      }
-    } catch { /* defensive */ }
-    const calendarModule = this._detectCalendarModule();
-    const calSync = this._getCalendarSyncModule();
-    const syncStatus = {
-      calendarModule: calendarModule ?? 'none',
-      calendarSyncEnabled: getSetting('syncCalendar'),
-      syncEnabled: getSetting('syncEnabled'),
-      thisCalendarExcluded: null,
-      // Structure-mismatch guard (B-R2) — surfaced in the bug-report block.
-      calendarSyncPaused: !!calSync?._calendarSyncDisabled,
-      mismatchDetail: calSync?._calendarMismatchDetail || null,
-    };
-    const errorLog = this.api?.getErrorLog() ?? [];
-    const recentErrors = errorLog.slice(0, 10).map((e) => ({
-      time: e.timeFormatted ?? e.time,
-      message: e.message,
-      endpoint: e.path ?? e.endpoint,
-      status: e.status,
-    }));
-    return {
-      generatedAt: new Date().toISOString(),
-      versions: {
-        module:    moduleVer,
-        calendaria: calendariaVer,
-        schema:    null,
-        foundry:   game.version,
-        system:    game.system?.title,
-        systemId:  game.system?.id,
-      },
-      calendar,
-      syncStatus,
-      structureCounts,
-      apiMethods,
-      currentDateTime,
-      settings: {
-        syncCalendar:       getSetting('syncCalendar'),
-        syncEnabled:        getSetting('syncEnabled'),
-        calendarModule:     calendarModule ?? 'none',
-        conflictResolution: getSetting('conflictResolution'),
-        autoSync:           getSetting('autoSync'),
-      },
-      recentErrors,
-    };
   }
 
   // ---------------------------------------------------------------------------

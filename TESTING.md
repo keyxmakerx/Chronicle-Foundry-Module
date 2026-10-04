@@ -168,23 +168,43 @@ module calls none of them). An older Chronicle answers those with
 `503 calendar_rebuilding`, which pauses date pushes for 30 seconds and shows one
 GM notice. See API-CONTRACT.md.
 
-### Chronicle -> Foundry
-- [ ] Advance date in Chronicle -> Calendaria/SimpleCalendar date updates
-- [ ] Create calendar event -> Event appears in calendar module
-- [ ] Update event -> Calendar module event updates
-- [ ] Delete event -> Calendar module event removed
+Chronicle brings its own calendar; no Foundry calendar module is used.
 
-### Foundry -> Chronicle
-- [ ] Change date in Calendaria/SimpleCalendar -> Chronicle date updates
-- [ ] A real-time Chronicle calendar is never overwritten by a Foundry date change
-- [ ] Create event in calendar module -> Chronicle event created
-- [ ] Update event -> Chronicle event updates
-- [ ] Delete event -> Chronicle event removed
+### Calendar window
+- [ ] Chronicle scene controls -> **Calendar** button (player and GM) -> first time, Chronicle's Allow window asks about "notes and calendar"; press Allow -> a Foundry window opens with Chronicle's own calendar page: the sky moving, day weather, moons, events
+- [ ] A player already connected for the notebook -> **Calendar** opens straight away, no Allow window
+- [ ] Player: GM-only events, hidden moons and secret eras never appear (compare with the same player signed in on the site)
+- [ ] GM: Chronicle's editing works in the window (add an event, open it, change it); the change shows on the site after a refresh
+- [ ] Resize the window from its corner -> the calendar redraws to fit (narrow: one-letter weekdays); close and reopen -> same size and place, per player
+- [ ] Click a link to a page inside the calendar -> it opens on the Chronicle site in a new tab, not inside the window
+- [ ] Disconnect the Foundry connection in Chronicle's Allow window list -> the calendar window says Chronicle turned it away; Connect brings it back
 
-### Adapter Compatibility
-- [ ] Test with Calendaria module active
-- [ ] Test with SimpleCalendar module active (note 0-indexed months/days)
-- [ ] Test with neither module -> Calendar sync gracefully disabled
+### Built-in calendar (strip)
+- [ ] With Calendar sync on and nothing else changed, no strip shows
+- [ ] Module Settings -> Show the calendar strip on -> a thin strip sits at the top centre: date, time and a weather icon over a small sky coloured for the hour; snow, rain or night stars move in it to match Chronicle
+- [ ] Hover the strip -> it widens to show season, temperature and moons
+- [ ] Drag the strip by its dots anywhere -> it stays there after a reload, and each player's spot is their own
+- [ ] Click the lock on the strip -> the dots disappear and the strip (or its clock) cannot be dragged; click it again -> dragging works. The lock survives a reload and is per player
+- [ ] Click the clock icon -> the strip shrinks to a round clock; click the clock -> the strip comes back with the month open
+- [ ] Leave the mouse still for 20 seconds -> the sky's motion stops; move it -> it starts again
+- [ ] Click the date -> the calendar window opens (as above). Not connected and "Not now" -> the small month opens under the strip instead; days up to today show their sky colour and weather icon, later days are plain; event days have a dot and the month's events are listed below; ‹ › flips months; click outside or Esc closes it
+- [ ] GM: the small ‹ › arrows move the time one hour; Chronicle's calendar page shows the new time after a refresh
+- [ ] GM: on a real-time calendar the arrows are greyed out and Set date is disabled
+- [ ] GM: **Set date…** in the month moves Chronicle's date; a date the calendar doesn't have is refused with a warning
+- [ ] GM: **Add event** creates the event in Chronicle (check the Chronicle calendar page); "GM only" makes it GM-only there and shows "(GM only)" in the list
+- [ ] Player client: the same strip and month, without arrows, Set date or Add event; GM-only events, hidden moons, secret eras and future days' weather never appear
+- [ ] Move the date in Chronicle -> the strip updates for the GM and every player
+- [ ] A calendar hidden from players in Chronicle -> players see no strip
+- [ ] Turn Calendar sync off in Module Settings -> the strip disappears for everyone without a reload
+- [ ] Module Settings -> Calendar temperature unit °F -> only your strip switches to °F
+
+### Dashboard
+- [ ] Calendar tab shows Chronicle's calendar name, date (day, month, year) and time
+- [ ] Advance the date in Chronicle -> the tab shows the new date after the next refresh
+- [ ] Change weather, season, era or a moon phase in Chronicle -> the world-state panel updates
+- [ ] With the announce settings on, a GM-only whisper appears for each change; players never see it
+- [ ] Calendar sync off in Module Settings -> the tab says it is disabled
+- [ ] A campaign with no calendar -> the tab says none is configured
 
 ## Shop Widget
 
@@ -321,8 +341,8 @@ Needs the Armory addon on in Chronicle, a character linked to an actor, and a pl
 
 ## Import Wizard
 
-- [ ] Dashboard Config tab -> **Setup Wizard** opens a seven-step wizard: Connect, Scan, Types, Tags, Characters, Calendar, Review; there is no maps step
-- [ ] Tags, Characters and Calendar steps are skipped when tags are unavailable, no game system matched, or no calendar addon and module are active
+- [ ] Dashboard Config tab -> **Setup Wizard** opens a six-step wizard: Connect, Scan, Types, Tags, Characters, Review; there are no maps or calendar steps
+- [ ] Tags and Characters steps are skipped when tags are unavailable or no game system matched
 - [ ] Review lists what will be created; running it creates the entities and marks the wizard completed
 
 ## Problem reports (privacy, module #94)
@@ -379,7 +399,7 @@ Library: Shops, Maps; Setup: Config, Members; Diagnostics: Status.
 - [ ] **Overview:** connection banner (green/yellow/red) with **Reconnect** when not connected; stat tiles for Entities Synced, Characters Synced (n/total) and Maps Linked, each jumps to its tab on click; "Needs Attention" lists only real problems (each row jumps to the fixing tab) or says "Everything's in sync"; **Sync Everything Now**, **Diagnostics** and **Refresh** work
 - [ ] **Entities:** entity list grouped by type with sync status dots, Pull/Push per row, Pull All / Push All, Resync All Journals, visibility toggle, search filter, bulk select (Make Public / Private / Delete / Change Type), **Create Type**
 - [ ] **Characters:** system badge, synced and unlinked actors, Push / Push All / Re-sync (see Character Sync)
-- [ ] **Calendar:** shows the Chronicle vs Foundry date with Pull Date / Push Date and the detected calendar module; **Open Sync Calendar** opens the Sync Calendar editor; the tab explains why when sync is disabled, no calendar module is active, or the calendar is rebuilding or unreachable
+- [ ] **Calendar:** shows Chronicle's date and time and the world-state panel (weather, season, era, moons); the tab explains why when sync is disabled, no calendar is configured, or the calendar is rebuilding or unreachable
 - [ ] **Issues:** badge shows the number of character actors that cannot be matched. Each row offers a "Match to existing…" dropdown with **Match**, and **Create new**. Resolving a row links it and removes it. With none, the tab says every character is linked
 - [ ] **Shops:** shop entities with type, keeper, private lock, "Synced" badge and an **Open** button that opens the Shop window; empty states say whether the "Shop" entity type is missing or just has no shops
 - [ ] **Maps:** per-map rows with the map's picture (a shadowed map shows the players' copy), marker / drawing / token counts, **Open in Foundry**, external-link icon; **Resync All Maps**, **Open Chronicle Maps Folder**; summary row and dismissible error list (see Map Sync)

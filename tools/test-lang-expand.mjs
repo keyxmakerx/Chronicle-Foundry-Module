@@ -125,36 +125,3 @@ test('lang/en.json has no duplicate-after-expansion paths', () => {
     );
   }
 });
-
-// Regression pins for specific keys prone to the dotted-vs-string
-// collision. If these fail, run the sweep above to find all instances.
-
-test('regression: Visibility field label remains a flat string', () => {
-  const obj = JSON.parse(readFileSync(LANG_PATH, 'utf8'));
-  const v = obj?.CHRONICLE?.SyncCalendar?.NoteForm?.Visibility;
-  assert.equal(typeof v, 'string', 'NoteForm.Visibility must stay a string label, not an object');
-});
-
-test('regression: VisibilityOption sub-object carries the three option labels', () => {
-  const obj = JSON.parse(readFileSync(LANG_PATH, 'utf8'));
-  const o = obj?.CHRONICLE?.SyncCalendar?.NoteForm?.VisibilityOption;
-  assert.equal(typeof o, 'object', 'NoteForm.VisibilityOption must be an object');
-  assert.ok(o.Visible, 'VisibilityOption.Visible label missing');
-  assert.ok(o.Hidden,  'VisibilityOption.Hidden label missing');
-  assert.ok(o.Secret,  'VisibilityOption.Secret label missing');
-});
-
-test('regression: DisplayStyle field label remains a flat string', () => {
-  const obj = JSON.parse(readFileSync(LANG_PATH, 'utf8'));
-  const v = obj?.CHRONICLE?.SyncCalendar?.NoteForm?.DisplayStyle;
-  assert.equal(typeof v, 'string', 'NoteForm.DisplayStyle must stay a string label, not an object');
-});
-
-test('regression: DisplayStyleOption sub-object carries the three option labels', () => {
-  const obj = JSON.parse(readFileSync(LANG_PATH, 'utf8'));
-  const o = obj?.CHRONICLE?.SyncCalendar?.NoteForm?.DisplayStyleOption;
-  assert.equal(typeof o, 'object', 'NoteForm.DisplayStyleOption must be an object');
-  assert.ok(o.Icon,   'DisplayStyleOption.Icon label missing');
-  assert.ok(o.Pip,    'DisplayStyleOption.Pip label missing');
-  assert.ok(o.Banner, 'DisplayStyleOption.Banner label missing');
-});

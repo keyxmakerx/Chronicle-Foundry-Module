@@ -27,7 +27,6 @@
     "styles/map-viewer.css",
     "styles/map-frames.css",
     "styles/stashes.css",
-    "styles/sync-calendar-pr3.css",
     "styles/dm-screen.css"
   ],
   "languages": [
@@ -45,18 +44,6 @@
         "type": "module",
         "compatibility": {},
         "reason": "Optional: Enhanced journal page support for Chronicle entity sync"
-      },
-      {
-        "id": "calendaria",
-        "type": "module",
-        "compatibility": {},
-        "reason": "Optional: Calendar sync between Chronicle and Calendaria"
-      },
-      {
-        "id": "foundryvtt-simple-calendar",
-        "type": "module",
-        "compatibility": {},
-        "reason": "Optional: Calendar sync between Chronicle and Simple Calendar"
       }
     ]
   }

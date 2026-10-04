@@ -93,41 +93,19 @@ test('actor-sync: the only other key on the rename push is the concurrency token
   );
 });
 
-test('calendar-sync: the Calendaria note payload stays six keys', () => {
+test('calendar-sync: sends no PUT to /calendar/events; the date PUT stays five keys', () => {
   const src = read('scripts/calendar-sync.mjs');
-  const idx = src.indexOf("name: name || 'Untitled Note',");
-  assert.notEqual(idx, -1, 'the Calendaria note payload moved');
-  const open = src.lastIndexOf('return {', idx);
+  // The module edits no event. A future event push must stay partial: only
+  // the fields a Foundry edit means, never an echo of the stored event.
+  assert.ok(!src.includes('this._api.put(`/calendar/events/'), 'an event update push appeared; pin its body here');
+  const marker = "this._api.put('/calendar/date', ";
+  const idx = src.indexOf(marker);
+  assert.notEqual(idx, -1, 'the date push moved');
   assert.deepEqual(
-    topLevelKeys(src, open),
-    ['day', 'description', 'month', 'name', 'visibility', 'year'].sort(),
-    'the Calendaria note payload grew or shrank. A Foundry note edit means the name, the date, ' +
-      'the body and the visibility — the server preserves everything absent, so echoing more is ' +
-      'stale data waiting to be written.'
+    topLevelKeys(src, idx + marker.length),
+    ['day', 'hour', 'minute', 'month', 'year'],
+    'the date push changed shape; it carries the date and nothing else.'
   );
-});
-
-test('calendar-sync: every inline PUT body to /calendar/events stays five keys', () => {
-  const src = read('scripts/calendar-sync.mjs');
-  // Find the PUT call sites by their URL, not by a field name — the create
-  // path uses the same field expressions and would otherwise be matched.
-  const marker = 'this._api.put(`/calendar/events/';
-  const bodies = [];
-  for (let i = src.indexOf(marker); i !== -1; i = src.indexOf(marker, i + 1)) {
-    const comma = src.indexOf(', ', src.indexOf('`,', i));
-    const after = src.slice(comma + 2, comma + 3);
-    if (after !== '{') continue; // e.g. the Calendaria path, which passes a variable
-    bodies.push(topLevelKeys(src, comma + 2));
-  }
-  assert.equal(bodies.length, 2, 'expected exactly two inline PUT bodies (legacy Calendaria + SimpleCalendar)');
-  for (const keys of bodies) {
-    assert.deepEqual(
-      keys,
-      ['day', 'description', 'month', 'name', 'year'],
-      'an update push changed shape; keep it to what a Foundry note edit means. The server ' +
-        'preserves every absent key now, so echoing more is stale data waiting to be written.'
-    );
-  }
 });
 
 test('the contract is documented where the endpoints are described', () => {

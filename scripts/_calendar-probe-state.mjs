@@ -1,6 +1,6 @@
 /**
  * Pure helper mapping a failed `GET /calendar` probe (thrown by api-client)
- * to the Sync Calendar editor's import-banner state.
+ * to the dashboard's calendar-banner state.
  *
  * Classification anchors on an explicit numeric `err.status` when present,
  * otherwise on the authoritative "Chronicle API error <status>:" prefix the
@@ -13,7 +13,7 @@
  * @param {{status?: number, message?: string}|null|undefined} err
  * @returns {'absent'|'auth'|'rebuilding'|'unreachable'}
  *   - `'absent'`      — 404 / `calendar_not_configured`: Chronicle has no
- *     calendar for this campaign (import one).
+ *     calendar for this campaign.
  *   - `'auth'`        — 401 / 403 / `invalid_token`: token/auth problem
  *     (re-check the API key, or reinstall from a fresh campaign URL).
  *   - `'rebuilding'`  — a 503 whose body says `calendar_rebuilding`: that

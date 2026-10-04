@@ -7,7 +7,6 @@
 
 import { MODULE_ID } from './constants.mjs';
 import { UpdateInfoApplication } from './update-info.mjs';
-import { SyncCalendarApplication } from './sync-calendar.mjs';
 import { parseConnectLine } from './_connect-line.mjs';
 
 /**
@@ -74,6 +73,8 @@ export function registerSettings() {
     config: true,
     type: Boolean,
     default: true,
+    // The built-in calendar shows or hides with sync, on every client.
+    onChange: () => Hooks.callAll('chronicleSyncCalendarSnapshot'),
   });
 
   // Per-feature toggles.
@@ -102,6 +103,8 @@ export function registerSettings() {
     config: true,
     type: Boolean,
     default: false,
+    // The built-in calendar shows or hides with sync, on every client.
+    onChange: () => Hooks.callAll('chronicleSyncCalendarSnapshot'),
   });
 
   // Character sync toggle (requires matching game system).
@@ -171,6 +174,58 @@ export function registerSettings() {
     default: false,
   });
 
+  // The built-in calendar as every player may see it, written by the GM's
+  // client from Chronicle's players-audience reads (players hold no key).
+  // World scope is deliberate: every client receives it, so it carries
+  // only what buildPlayerSnapshot keeps.
+  game.settings.register(MODULE_ID, 'calendarSnapshot', {
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
+    onChange: () => Hooks.callAll('chronicleSyncCalendarSnapshot'),
+  });
+
+  // The calendar strip is an extra each person turns on; nothing shows by default.
+  game.settings.register(MODULE_ID, 'calendarStrip', {
+    name: game.i18n.localize('CHRONICLE.Settings.CalendarStrip.Name'),
+    hint: game.i18n.localize('CHRONICLE.Settings.CalendarStrip.Hint'),
+    scope: 'client',
+    config: true,
+    type: Boolean,
+    default: false,
+    onChange: () => Hooks.callAll('chronicleSyncCalendarSnapshot'),
+  });
+
+  // Where this person dragged the calendar strip, and whether it is shrunk
+  // to the clock. Client scope: each player keeps their own spot.
+  game.settings.register(MODULE_ID, 'calendarBarPlace', {
+    scope: 'client',
+    config: false,
+    type: Object,
+    default: {},
+    onChange: () => Hooks.callAll('chronicleSyncCalendarSnapshot'),
+  });
+
+  // The calendar window's size and place, per player.
+  game.settings.register(MODULE_ID, 'calendarWindowPlace', {
+    scope: 'client',
+    config: false,
+    type: Object,
+    default: {},
+  });
+
+  game.settings.register(MODULE_ID, 'calendarTemperatureUnit', {
+    name: game.i18n.localize('CHRONICLE.Settings.CalendarTemperatureUnit.Name'),
+    hint: game.i18n.localize('CHRONICLE.Settings.CalendarTemperatureUnit.Hint'),
+    scope: 'client',
+    config: true,
+    type: String,
+    choices: { C: '°C', F: '°F' },
+    default: 'C',
+    onChange: () => Hooks.callAll('chronicleSyncCalendarSnapshot'),
+  });
+
   // Internal: detected Chronicle system ID matched from Foundry's game.system.id.
   game.settings.register(MODULE_ID, 'detectedSystem', {
     scope: 'world',
@@ -224,16 +279,6 @@ export function registerSettings() {
     config: false,
     type: String,
     default: '{"excludedTypes":[],"excludedEntities":[]}',
-  });
-
-  // Internal: per-calendar sync opt-out. JSON array of Calendaria calendar ids
-  // the operator has chosen NOT to sync to Chronicle (toggled from the Sync
-  // Calendar editor). Empty by default → every active calendar syncs as before.
-  game.settings.register(MODULE_ID, 'calendarSyncExclusions', {
-    scope: 'world',
-    config: false,
-    type: String,
-    default: '[]',
   });
 
   // -----------------------------------------------------------------------
@@ -369,20 +414,6 @@ export function registerSettings() {
     type: UpdateInfoApplication,
     restricted: true,
   });
-
-  // "Sync Calendar" — GM-only view of the active Calendaria calendar with
-  // an always-on validation panel. i18n keys live under
-  // `CHRONICLE.Settings.SyncCalendarMenu.*`, distinct from
-  // `CHRONICLE.Settings.SyncCalendar.*` (the `syncCalendar` boolean
-  // toggle's own hint/name).
-  game.settings.registerMenu(MODULE_ID, 'syncCalendarMenu', {
-    name: game.i18n.localize('CHRONICLE.Settings.SyncCalendarMenu.Name'),
-    hint: game.i18n.localize('CHRONICLE.Settings.SyncCalendarMenu.Hint'),
-    label: game.i18n.localize('CHRONICLE.Settings.SyncCalendarMenu.Label'),
-    icon: 'fa-solid fa-calendar-days',
-    type: SyncCalendarApplication,
-    restricted: true,
-  });
 }
 
 /**
@@ -496,20 +527,6 @@ export function getSyncExclusions() {
  */
 export async function setSyncExclusions(exclusions) {
   await setSetting('syncExclusions', JSON.stringify(exclusions));
-}
-
-/**
- * Get the list of Calendaria calendar ids the operator has opted OUT of syncing
- * to Chronicle. Empty array (default) means every active calendar syncs.
- * @returns {string[]}
- */
-export function getCalendarSyncExclusions() {
-  try {
-    const parsed = JSON.parse(getSetting('calendarSyncExclusions'));
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
 }
 
 /**
