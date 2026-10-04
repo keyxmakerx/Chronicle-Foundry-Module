@@ -568,9 +568,11 @@ export class ActorSync {
         });
 
         console.debug(`Chronicle: Pushed new actor "${actor.name}" to Chronicle`);
+        this._syncManager?.recordUserOutcome?.(userId);
       }
     } catch (err) {
       console.error('Chronicle: Failed to push new actor to Chronicle', err);
+      this._syncManager?.recordUserOutcome?.(userId, err);
     } finally {
       this._inFlightCreates.delete(actor.id);
     }
@@ -663,8 +665,11 @@ export class ActorSync {
       await this._setActorFlag(actor, 'lastSync', new Date().toISOString());
 
       console.debug(`Chronicle: Pushed actor "${actor.name}" changes to Chronicle`);
+      // The debounce has no hook userId; the hooks only schedule this for the local user's own edits.
+      this._syncManager?.recordUserOutcome?.(game.user.id);
     } catch (err) {
       console.error('Chronicle: Failed to push actor update to Chronicle', err);
+      this._syncManager?.recordUserOutcome?.(game.user.id, err);
     }
   }
 

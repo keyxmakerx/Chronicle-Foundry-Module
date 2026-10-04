@@ -3,8 +3,9 @@
  *
  * Every user (players and GM) gets Notebook and Calendar buttons in the
  * Chronicle scene controls and a small "Jot notes" tab in the bottom-right
- * corner. Each shows a frame of Chronicle's own pages as that player sees
- * them (the Journal, the jots, the campaign calendar), with nothing copied
+ * corner; the player can drag the tab and the jot panel anywhere. Each
+ * shows a frame of Chronicle's own pages as that player sees them (the
+ * Journal, the jots, the campaign calendar), with nothing copied
  * into Foundry documents.
  *
  * The first use opens Chronicle's Allow window; the token it hands back is
@@ -24,6 +25,13 @@ import {
   usableGrant,
   withGrant,
 } from './_notes-grant.mjs';
+import {
+  clampBox,
+  panelBesideTab,
+  parsePlacement,
+  pastThreshold,
+  withPlacement,
+} from './_jot-placement.mjs';
 
 const { ApplicationV2 } = foundry.applications.api;
 
@@ -347,14 +355,113 @@ export async function openCalendarWindow() {
   return true;
 }
 
-/** Keep the jot tab just left of the right-hand sidebar, wherever it is. */
+/** Where the player dragged the tab and panel, if anywhere. */
+function placement() {
+  return parsePlacement(getSetting('jotPlacement'));
+}
+
+function savePlacement(part, pos) {
+  const next = withPlacement(getSetting('jotPlacement'), part, pos);
+  Promise.resolve(game.settings.set(MODULE_ID, 'jotPlacement', next)).catch(() => {});
+}
+
+function viewport() {
+  return { width: window.innerWidth, height: window.innerHeight };
+}
+
+/** Pin a box at a spot, kept fully on screen. */
+function moveTo(el, pos) {
+  const rect = el.getBoundingClientRect();
+  const at = clampBox(pos, { width: rect.width, height: rect.height }, viewport());
+  el.style.left = `${at.left}px`;
+  el.style.top = `${at.top}px`;
+  el.style.right = 'auto';
+  el.style.bottom = 'auto';
+  return at;
+}
+
+/**
+ * Let a press on `handle` drag `box` around the screen. A press that barely
+ * moves stays a click. Pointer capture alone doesn't stop a frame from
+ * another site taking the pointer, so frames ignore it while dragging.
+ * @returns {() => boolean} whether the last press was a drag (to skip its click)
+ */
+function dragToMove(handle, box, onMoved) {
+  let start = null;
+  let dragged = false;
+  handle.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || event.target.closest('.chronicle-jot-close')) return;
+    const rect = box.getBoundingClientRect();
+    start = { x: event.clientX, y: event.clientY, left: rect.left, top: rect.top, id: event.pointerId };
+    dragged = false;
+    handle.setPointerCapture?.(event.pointerId);
+  });
+  handle.addEventListener('pointermove', (event) => {
+    if (!start || event.pointerId !== start.id) return;
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    if (!dragged && !pastThreshold(dx, dy)) return;
+    dragged = true;
+    document.body.classList.add('chronicle-jot-dragging');
+    moveTo(box, { left: start.left + dx, top: start.top + dy });
+  });
+  const end = (event) => {
+    if (!start || event.pointerId !== start.id) return;
+    start = null;
+    handle.releasePointerCapture?.(event.pointerId);
+    document.body.classList.remove('chronicle-jot-dragging');
+    if (dragged) {
+      const rect = box.getBoundingClientRect();
+      onMoved({ left: rect.left, top: rect.top });
+    }
+  };
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
+  return () => {
+    const was = dragged;
+    dragged = false;
+    return was;
+  };
+}
+
+/**
+ * Put the tab where the player left it, or just left of the right-hand
+ * sidebar until they move it; keep a moved panel on screen.
+ */
 function placeJotTab() {
   const tab = document.getElementById('chronicle-jot-tab');
   if (!tab) return;
-  const right = document.getElementById('ui-right') || document.getElementById('sidebar');
-  const rect = right?.getBoundingClientRect?.();
-  const gap = rect && rect.width ? Math.max(8, window.innerWidth - rect.left + 8) : 8;
-  document.documentElement.style.setProperty('--chronicle-jot-right', `${gap}px`);
+  const saved = placement();
+  if (saved.tab) {
+    moveTo(tab, saved.tab);
+  } else {
+    const right = document.getElementById('ui-right') || document.getElementById('sidebar');
+    const rect = right?.getBoundingClientRect?.();
+    const gap = rect && rect.width ? Math.max(8, window.innerWidth - rect.left + 8) : 8;
+    document.documentElement.style.setProperty('--chronicle-jot-right', `${gap}px`);
+  }
+  const panel = document.getElementById('chronicle-jot-panel');
+  if (panel && !panel.hidden && saved.panel) moveTo(panel, saved.panel);
+}
+
+/** Show the panel where it was left, or beside the tab when never moved. */
+function placeJotPanel(panel, tab) {
+  const saved = placement().panel;
+  if (saved) {
+    moveTo(panel, saved);
+    return;
+  }
+  const rect = panel.getBoundingClientRect();
+  const at = panelBesideTab(tab.getBoundingClientRect(), { width: rect.width, height: rect.height }, viewport());
+  moveTo(panel, at);
+}
+
+function closeJots() {
+  const panel = document.getElementById('chronicle-jot-panel');
+  const tab = document.getElementById('chronicle-jot-tab');
+  if (!panel || !tab) return;
+  panel.hidden = true;
+  tab.setAttribute('aria-expanded', 'false');
 }
 
 /** Open or close the jot panel. Called from a click on the tab. */
@@ -363,14 +470,14 @@ async function toggleJots() {
   const tab = document.getElementById('chronicle-jot-tab');
   if (!panel || !tab) return;
   if (!panel.hidden) {
-    panel.hidden = true;
-    tab.setAttribute('aria-expanded', 'false');
+    closeJots();
     return;
   }
   const ctx = chronicle();
   if (!ctx) return ui.notifications.warn(t('NotSetUp'));
   if (!storedGrant(ctx) && !(await connect(ctx))) return;
   panel.hidden = false;
+  placeJotPanel(panel, tab);
   tab.setAttribute('aria-expanded', 'true');
   if (!jotHost) {
     jotHost = new FrameHost('jots', panel.querySelector('.chronicle-notes-host'));
@@ -389,21 +496,48 @@ function buildJotTab() {
   panel.className = 'chronicle-jot-panel';
   panel.hidden = true;
   panel.setAttribute('aria-label', t('JotsTitle'));
+
+  // A slim bar to drag the panel by; the frame below already shows the
+  // "Jot notes" title, so this bar only carries a grip and the X.
+  const header = document.createElement('header');
+  header.className = 'chronicle-jot-header';
+  header.title = t('DragToMove');
+  const grip = document.createElement('i');
+  grip.className = 'fa-solid fa-grip-lines chronicle-jot-grip';
+  grip.setAttribute('aria-hidden', 'true');
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'chronicle-jot-close';
+  close.setAttribute('aria-label', t('Close'));
+  close.title = t('Close');
+  const closeIcon = document.createElement('i');
+  closeIcon.className = 'fa-solid fa-xmark';
+  closeIcon.setAttribute('aria-hidden', 'true');
+  close.append(closeIcon);
+  close.addEventListener('click', closeJots);
+  header.append(grip, close);
+
   const host = document.createElement('div');
   host.className = 'chronicle-notes-host';
-  panel.append(host);
+  panel.append(header, host);
+  dragToMove(header, panel, (pos) => savePlacement('panel', pos));
 
   const tab = document.createElement('button');
   tab.type = 'button';
   tab.id = 'chronicle-jot-tab';
   tab.className = 'chronicle-jot-tab';
+  tab.title = t('TabHint');
   tab.setAttribute('aria-expanded', 'false');
   tab.setAttribute('aria-controls', panel.id);
   const icon = document.createElement('i');
   icon.className = 'fa-solid fa-pen';
   icon.setAttribute('aria-hidden', 'true');
   tab.append(icon, ` ${t('JotsTitle')}`);
-  tab.addEventListener('click', () => { toggleJots(); });
+  const wasDrag = dragToMove(tab, tab, (pos) => savePlacement('tab', pos));
+  tab.addEventListener('click', () => {
+    if (wasDrag()) return;
+    toggleJots();
+  });
 
   document.body.append(panel, tab);
   placeJotTab();

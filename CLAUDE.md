@@ -13,7 +13,7 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
   `tools/check-package-descriptor.mjs`.
 - `scripts/*.mjs`: sync (`journal-sync`+`picture-store`, `map-sync`+`map-viewer`+`map-sheet-items`,
   `calendar-sync`+`calendar-bar`, `actor-sync`,
-  `item-sync`, `stash-sync`+`stash-client`), UI (`sync-dashboard`, `npc-presence`, `negotiation-mirror`,
+  `item-sync`, `stash-sync`+`stash-client`), UI (`sync-dashboard`, `npc-presence`, `negotiation-mirror`, `_player-report` (the GM's client reports the world's players to Chronicle),
   `sync-diagnostic-bundle`, `update-info`, `gm-secret-view`, `character-claim-indicator`,
   `capability-inspector`, `import-wizard`, `shop-widget`+`shop-room-window`, `player-notebook`, `stash-window`+`stash-chat`), core (`module`,
   `settings`, `constants`, `logger`, `sync-manager`, `api-client`),

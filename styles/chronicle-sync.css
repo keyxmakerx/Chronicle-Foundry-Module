@@ -2148,6 +2148,67 @@
   display: none;
 }
 
+/* The panel is a column: a title bar to drag it by, then the frame. */
+.chronicle-jot-panel:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+}
+
+.chronicle-jot-panel .chronicle-notes-host {
+  flex: 1;
+  min-height: 0;
+}
+
+.chronicle-jot-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 22px;
+  padding: 0 4px 0 28px;
+  border-bottom: 1px solid var(--color-border-dark, #3a3833);
+  background: rgba(28, 27, 25, 0.92);
+  color: var(--color-text-light-highlight, #f0e9d8);
+  font-size: var(--font-size-13, 13px);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.chronicle-jot-grip {
+  flex: 1;
+  text-align: center;
+  opacity: 0.6;
+}
+
+.chronicle-jot-close {
+  flex: none;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 2px 6px;
+  border: 0;
+  background: none;
+  color: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.chronicle-jot-tab {
+  touch-action: none;
+}
+
+body.chronicle-jot-dragging,
+body.chronicle-jot-dragging .chronicle-jot-header,
+body.chronicle-jot-dragging .chronicle-jot-tab {
+  cursor: grabbing;
+}
+
+/* While dragging, no frame may take the pointer (scripts/player-notebook.mjs). */
+body.chronicle-jot-dragging iframe {
+  pointer-events: none;
+}
+
 /* Debug tab */
 
 .debug-panel .debug-subheading {

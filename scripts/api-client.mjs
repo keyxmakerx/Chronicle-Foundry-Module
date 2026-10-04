@@ -324,6 +324,16 @@ export class ChronicleAPI {
   }
 
   /**
+   * Report the world's Foundry players (GM or owner key only; 403 or 404
+   * means the route is closed to this key or absent on an older Chronicle).
+   * @param {{players: Array<object>}} body
+   * @returns {Promise<{stored: number}|null>}
+   */
+  async reportPlayers(body) {
+    return this.post('/sync/players', body);
+  }
+
+  /**
    * PUT request to the Chronicle API.
    * @param {string} path
    * @param {object} body

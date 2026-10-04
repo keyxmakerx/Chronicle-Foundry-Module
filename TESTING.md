@@ -335,6 +335,7 @@ Needs the Armory addon on in Chronicle, a character linked to an actor, and a pl
 - [ ] First use: **Connect to Chronicle** opens Chronicle's Allow window; **Allow** closes it and the player's own Journal appears in the frame
 - [ ] A player whose Foundry user is not matched to a Chronicle member sees the "hasn't matched your Foundry login" message; one who allows with a different Chronicle account sees the "isn't the one your GM matched" message
 - [ ] Open a Chronicle-linked journal, then the Jot notes tab -> the jots follow the page in view; opening another linked journal moves them
+- [ ] Drag the Jot notes tab somewhere else -> it moves and stays closed or open as it was; a plain click still opens and closes it. Drag the open panel by the slim bar on its top edge -> it moves, even across the notebook window; the X closes it. Reload Foundry -> both are where you left them
 - [ ] Disconnect the player in Chronicle -> the frame shows "no longer accepts this connection" with a Connect button
 - [ ] The old "Chronicle Notes" journal folder, if the world had one, is moved into "Chronicle: removed" on the GM's world load and nothing in it is deleted
 

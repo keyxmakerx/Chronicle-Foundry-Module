@@ -224,8 +224,10 @@ export class StashSync {
     try {
       const data = await this.execute(plan.call);
       if (msg.action === 'move') this._afterMove(data);
+      this._syncManager?.recordUserOutcome?.(senderId);
       reply({ ok: true, data });
     } catch (err) {
+      this._syncManager?.recordUserOutcome?.(senderId, err);
       reply({ ok: false, error: relayErrorFrom(err) });
     }
   }

@@ -268,6 +268,8 @@ export function registerSettings() {
     config: false,
     type: String,
     default: '{}',
+    // The player report to Chronicle carries each user's linked member.
+    onChange: () => Hooks.callAll('chronicleUserMappingsChanged'),
   });
 
   // Internal: per-type and per-entity sync exclusions (not shown in settings UI).
@@ -371,6 +373,14 @@ export function registerSettings() {
   // API key: each is one player's own notes token and must never sync to
   // other clients. See _notes-grant.mjs.
   game.settings.register(MODULE_ID, 'notesGrants', {
+    scope: 'client',
+    config: false,
+    type: String,
+    default: '{}',
+  });
+
+  // Where this player dragged the jot tab and panel (scripts/_jot-placement.mjs).
+  game.settings.register(MODULE_ID, 'jotPlacement', {
     scope: 'client',
     config: false,
     type: String,
