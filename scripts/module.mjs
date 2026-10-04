@@ -28,7 +28,7 @@ import { registerNpcPresence, npcSpotlightRelay } from './npc-presence.mjs';
 import { negotiationMirror } from './negotiation-mirror.mjs';
 import { registerMapSheetItems } from './map-sheet-items.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
-import { registerShopRoomSocket } from './shop-room-window.mjs';
+import { registerShopRoomSocket, registerShopJournalButton } from './shop-room-window.mjs';
 import { notebookAvailable, openCalendarWindow, openNotebook, registerPlayerNotebook } from './player-notebook.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
 import { retireNotesFolder } from './_notes-folder.mjs';
@@ -115,7 +115,8 @@ Hooks.once('ready', async () => {
   // Register all sync modules.
   syncManager.registerModule(new JournalSync());
   syncManager.registerModule(new MapSync());
-  syncManager.registerModule(new ShopWidget());
+  const shopWidget = new ShopWidget();
+  syncManager.registerModule(shopWidget);
   const calendarSync = new CalendarSync();
   syncManager.registerModule(calendarSync);
   syncManager.registerModule(new ActorSync());
@@ -132,6 +133,8 @@ Hooks.once('ready', async () => {
   // Players open a shop room when the GM shows one (they have no API key);
   // the active GM answers their buying requests.
   registerShopRoomSocket();
+  // A shop's journal entry gets an "Open shop" button for anyone who can see it.
+  registerShopJournalButton((id, name) => shopWidget.openShop(id, name));
   try {
     registerStashSocket();
     registerStashChat();

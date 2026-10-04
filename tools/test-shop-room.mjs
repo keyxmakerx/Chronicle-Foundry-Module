@@ -21,7 +21,7 @@ import vm from 'node:vm';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const VENDOR = join(REPO_ROOT, 'vendor', 'chronicle');
 const {
-  createChronicleShim, describeSale, sanitizeShopBuyReply, sanitizeShopBuyRequest,
+  createChronicleShim, describeSale, MAX_ROOM_REPLY_CHARS, sanitizeShopBuyReply, sanitizeShopBuyRequest,
   sanitizeShopRoomMessage, shopEndpoints, SHOP_ROOM_MESSAGE,
 } = await import('../scripts/_shop-room-data.mjs');
 
@@ -98,6 +98,8 @@ test('buy request: keeps only shop, character and goods with quantities', () => 
   assert.deepEqual(r, { action: 'buy', requestId: 'r1', shopId: SHOP, publicKey: JWK, body: { buyerEntityId: 'char-1', items: [{ relationId: 7, quantity: 2 }] } },
     'no price and no acting member travel from a player');
   assert.deepEqual(sanitizeShopBuyRequest(buyReq({ action: 'buyers', body: undefined })), { action: 'buyers', requestId: 'r1', shopId: SHOP, publicKey: JWK });
+  assert.deepEqual(sanitizeShopBuyRequest(buyReq({ action: 'open', body: { anything: 1 } })), { action: 'open', requestId: 'r1', shopId: SHOP, publicKey: JWK },
+    'a journal open carries nothing but the shop');
 });
 
 test('buy request: rejects malformed requests', () => {
@@ -120,6 +122,15 @@ test('buy reply (decrypted): passes a good answer, rejects a malformed one', () 
     { body: { x: 'y'.repeat(70 * 1024) } }, { goods: 'all' }]) {
     assert.equal(sanitizeShopBuyReply({ ...ok, ...over }), null, JSON.stringify(over).slice(0, 60));
   }
+});
+
+test('buy reply: a room answer may be larger, but only up to the room cap', () => {
+  const ok = { type: SHOP_ROOM_MESSAGE, action: 'reply', requestId: 'r1', toUserId: 'p1', status: 200 };
+  const room = { ...ok, body: { layout: { x: 'y'.repeat(200 * 1024) } } };
+  assert.equal(sanitizeShopBuyReply(room), null, 'a buying answer keeps the small cap');
+  assert.ok(sanitizeShopBuyReply(room, MAX_ROOM_REPLY_CHARS), 'a room answer fits the room cap');
+  const huge = { ...ok, body: { x: 'y'.repeat(MAX_ROOM_REPLY_CHARS) } };
+  assert.equal(sanitizeShopBuyReply(huge, Infinity), null, 'no caller can lift the room cap');
 });
 
 test('sale line names the buyer, the goods and the cost', () => {

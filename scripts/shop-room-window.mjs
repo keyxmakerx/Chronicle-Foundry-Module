@@ -23,7 +23,7 @@ import { _isAllowedImageHost } from './_url-validation.mjs';
 import { decryptReply, encryptReply, generateRequestKeys } from './_stash-crypto.mjs';
 import {
   createChronicleShim, describeSale, sanitizeShopBuyReply, sanitizeShopBuyRequest,
-  sanitizeShopRoomMessage, shopEndpoints, SHOP_ROOM_MESSAGE,
+  sanitizeShopRoomMessage, shopEndpoints, MAX_ROOM_REPLY_CHARS, SHOP_ROOM_MESSAGE,
 } from './_shop-room-data.mjs';
 
 const SOCKET_CHANNEL = `module.${MODULE_ID}`;
@@ -32,7 +32,7 @@ const VENDOR = `modules/${MODULE_ID}/vendor/chronicle`;
 // How long a player waits for the GM's client to answer. The buyers read
 // holds up the room's first draw, so it gives up sooner (no basket) than a
 // purchase does.
-const REQUEST_TIMEOUT_MS = { buyers: 8000, buy: 20000 };
+const REQUEST_TIMEOUT_MS = { buyers: 8000, open: 10000, buy: 20000 };
 // After a sale the widget reloads its own goods and shows what was bought;
 // a room update arriving in this window updates the data without redrawing,
 // so that line stays on screen.
@@ -42,8 +42,10 @@ let shim = null;
 let widgetLoad = null;
 /** Player side: buying requests waiting for the GM's answer, by request id. */
 const pending = new Map();
-/** Player side: each waiting request's private key, by request id. */
+/** Player side: each waiting request's private key and answer size limit, by request id. */
 const replyKeys = new Map();
+/** Player side: open shop rooms, by shop id. */
+const playerRooms = new Map();
 /** Tells the sync manager how a player's relayed request went (userId, error?). */
 export const RELAY_OUTCOME_HOOK = 'chronicleRelayOutcome';
 /** GM side: answers players' buying requests; set by the shop widget. */
@@ -68,7 +70,7 @@ async function requestFromGM(shopId, action, body) {
   if (!game.users.activeGM) return { status: 503, body: { message: t('NoGM') } };
   const requestId = foundry.utils.randomID(16);
   const pair = await generateRequestKeys();
-  replyKeys.set(requestId, pair.privateKey);
+  replyKeys.set(requestId, { key: pair.privateKey, limit: action === 'open' ? MAX_ROOM_REPLY_CHARS : undefined });
   return new Promise((resolve) => {
     const finish = (reply) => {
       clearTimeout(timer);
@@ -157,15 +159,19 @@ export class ShopRoomWindow extends ApplicationV2 {
    * @param {string} opts.shopId
    * @param {string} opts.name
    * @param {object} [opts.room] - {layout, goods, image} when shown by the GM.
+   * @param {boolean} [opts.selfOpened] - A player opened it from the shop's journal, so the GM's "Stop showing" leaves it open.
+   * @param {boolean} [opts.closed] - No GM is online to serve the room; the window says the shop is closed.
    * @param {Function} [opts.onClose]
    */
-  constructor({ api, campaignId, shopId, name, room, onClose }) {
+  constructor({ api, campaignId, shopId, name, room, selfOpened, closed, onClose }) {
     super({ id: `chronicle-shop-room-${shopId}`, window: { title: name } });
     this._api = api;
     this._campaignId = campaignId;
     this._shopId = shopId;
     this._name = name;
     this._room = room || null;
+    this.selfOpened = !!selfOpened;
+    this._closed = !!closed;
     this._onCloseCallback = onClose;
     this._host = null;
     this._def = null;
@@ -219,6 +225,10 @@ export class ShopRoomWindow extends ApplicationV2 {
 
   /** Re-read the room (GM) and redraw it; a shown room is re-sent to players. */
   async refresh() {
+    if (this._closed) {
+      this._showClosed();
+      return;
+    }
     try {
       this._def = this._def || await loadShopRoomWidget();
       if (this._api) this._room = await this._fetchRoom();
@@ -298,7 +308,8 @@ export class ShopRoomWindow extends ApplicationV2 {
       try {
         this._room = await this._fetchRoom();
         goods = this._room.goods;
-        shim.setShop(this._campaignId, this._shopId, this._room, (k, b) => this._onAction(k, b));
+        // A room served only for a player's journal button has no widget here.
+        shim?.setShop(this._campaignId, this._shopId, this._room, (k, b) => this._onAction(k, b));
       } catch (err) {
         console.warn('Chronicle: could not re-read the shop after a sale', err);
       }
@@ -327,6 +338,17 @@ export class ShopRoomWindow extends ApplicationV2 {
     } catch (err) {
       console.debug('Chronicle: shop sale chat line failed', err?.message);
     }
+  }
+
+  /** No GM is online, so there is no room to draw. */
+  _showClosed() {
+    if (!this._host) return;
+    const p = document.createElement('p');
+    p.className = 'chronicle-shop-closed';
+    const b = document.createElement('b');
+    b.textContent = t('ClosedTitle');
+    p.append(b, t('ClosedNoGM'));
+    this._host.replaceChildren(p);
   }
 
   _showError(text) {
@@ -421,7 +443,7 @@ export class ShopRoomWindow extends ApplicationV2 {
  * message, so a player cannot buy as someone else.
  */
 export function registerShopRoomSocket() {
-  const open = new Map();
+  const open = playerRooms;
   game.socket.on(SOCKET_CHANNEL, (data, senderId) => {
     if (data?.type !== SHOP_ROOM_MESSAGE) return;
     if (game.user.isGM) {
@@ -438,7 +460,8 @@ export function registerShopRoomSocket() {
     if (!msg) return;
     const current = open.get(msg.shopId);
     if (msg.action === 'hide') {
-      current?.close();
+      // A room the player opened from the journal stays open.
+      if (!current?.selfOpened) current?.close();
       return;
     }
     if (current) {
@@ -460,12 +483,12 @@ export function registerShopRoomSocket() {
 /** Player side: open the GM's encrypted answer to one of this client's requests. */
 async function onBuyReply(data) {
   if (data.toUserId !== game.user.id || typeof data.requestId !== 'string') return;
-  const key = replyKeys.get(data.requestId);
+  const waiting = replyKeys.get(data.requestId);
   const done = pending.get(data.requestId);
-  if (!key || !done) return;
+  if (!waiting || !done) return;
   try {
-    const inner = await decryptReply(key, data.envelope);
-    const reply = sanitizeShopBuyReply({ ...inner, type: SHOP_ROOM_MESSAGE, action: 'reply', requestId: data.requestId, toUserId: data.toUserId });
+    const inner = await decryptReply(waiting.key, data.envelope);
+    const reply = sanitizeShopBuyReply({ ...inner, type: SHOP_ROOM_MESSAGE, action: 'reply', requestId: data.requestId, toUserId: data.toUserId }, waiting.limit);
     if (reply) done(reply);
   } catch (err) {
     console.warn('Chronicle: could not read the GM\'s shop answer', err);
@@ -518,4 +541,70 @@ async function onBuyRequest(data, senderId) {
 export function chronicleUserFor(foundryUserId) {
   const hit = Object.entries(getUserMappings()).find(([, fId]) => fId === foundryUserId);
   return hit ? hit[0] : null;
+}
+
+/**
+ * Player side: open a shop from its journal entry. The active GM's client
+ * serves the room (players have no API key) after checking this user can see
+ * that journal; with no GM online the window says the shop is closed.
+ */
+export async function openShopFromJournal(shopId, name) {
+  const existing = playerRooms.get(shopId);
+  if (existing) {
+    existing.bringToFront?.() ?? existing.bringToTop?.();
+    return;
+  }
+  const reply = await requestFromGM(shopId, 'open');
+  const closed = reply.status === 503;
+  const room = reply.status < 400
+    ? sanitizeShopRoomMessage({ ...reply.body, type: SHOP_ROOM_MESSAGE, action: 'show', shopId }, getSetting('apiUrl'))
+    : null;
+  if (!room && !closed) {
+    ui.notifications.warn(reply.body?.message || t('LoadFailed'));
+    return;
+  }
+  if (playerRooms.has(shopId)) return; // The GM showed it meanwhile.
+  const win = new ShopRoomWindow({
+    api: null, campaignId: room?.campaignId || '', shopId, name: room?.name || name, room,
+    selfOpened: true, closed, onClose: () => playerRooms.delete(shopId),
+  });
+  playerRooms.set(shopId, win);
+  win.render({ force: true });
+}
+
+/**
+ * An "Open shop" button in the title bar of every shop journal the user can
+ * see (players: Observer, not Owner). The GM opens the room as from the
+ * journal's menu; a player asks the GM's client for it.
+ * @param {(shopId: string, name: string) => void} openAsGM
+ */
+export function registerShopJournalButton(openAsGM) {
+  const add = (app, html) => {
+    const journal = app?.document;
+    if (journal?.documentName !== 'JournalEntry') return;
+    if (journal.getFlag(FLAG_SCOPE, 'entityType') !== 'Shop') return;
+    const shopId = journal.getFlag(FLAG_SCOPE, 'entityId');
+    if (!shopId || !journal.testUserPermission(game.user, 'OBSERVER')) return;
+    // The GM's client serves players only from entries they can't edit.
+    if (!game.user.isGM && journal.testUserPermission(game.user, 'OWNER')) return;
+    const root = app.element instanceof HTMLElement ? app.element : app.element?.[0] ?? (html instanceof HTMLElement ? html : html?.[0]);
+    const header = app.window?.header ?? root?.querySelector('.window-header');
+    if (!header || header.querySelector('.chronicle-shop-open')) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'header-control chronicle-shop-open';
+    btn.innerHTML = '<i class="fa-solid fa-cart-shopping"></i> ';
+    btn.append(t('OpenShopButton'));
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (game.user.isGM) openAsGM(shopId, journal.name);
+      else openShopFromJournal(shopId, journal.name);
+    });
+    const close = app.window?.close ?? header.querySelector('[data-action="close"], a.close, .header-button.close');
+    header.insertBefore(btn, close?.parentElement === header ? close : null);
+  };
+  // Foundry v13+ journal sheets, then v12's.
+  Hooks.on('renderJournalEntrySheet', add);
+  Hooks.on('renderJournalSheet', add);
 }
