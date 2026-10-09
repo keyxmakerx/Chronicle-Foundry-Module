@@ -7,7 +7,9 @@
  * `foundry_writable`, `type` for casting) or COLLECTION (`foundry_collection`:
  * actor collection name, `foundry_item_type` filter, `foundry_item_fields`
  * projection, `type` "json"/"string" for a serialized string vs raw array).
- * Collection fields are read-only (pull only); never in the Foundry update path.
+ * Collection fields are read-only in the Foundry update path; the single-item
+ * identity ones (ancestry, culture, career, kit) are applied separately as item
+ * swaps (`identityFields`, `_identity-item-plan.mjs`).
  *
  * Every extracted value passes through `normalizeFoundryValue` so live Foundry
  * structures `JSON.stringify` can't serialize (Sets, Collections of
@@ -15,6 +17,7 @@
  */
 
 import { touchedScalarKeys } from '../_actor-field-diff.mjs';
+import { identityFieldDefs } from '../_identity-item-plan.mjs';
 
 /**
  * Create a generic adapter instance by fetching field definitions from the API.
@@ -45,8 +48,8 @@ export async function createGenericAdapter(api, chronicleSystemId) {
     return null;
   }
 
-  // Only scalar (foundry_path) fields are writable back to Foundry — collection
-  // write-back is a future tier, so it is excluded from the update path here.
+  // Only scalar (foundry_path) fields go through actor.update; collection
+  // fields are excluded here (identity ones are swapped as items instead).
   const writableFields = mappedFields.filter((f) => f.foundry_path && f.foundry_writable !== false);
 
   console.debug(
@@ -57,6 +60,9 @@ export async function createGenericAdapter(api, chronicleSystemId) {
   return {
     /** Chronicle system ID. */
     systemId: chronicleSystemId,
+
+    /** Single-item collection fields Chronicle may change on the sheet (ancestry, culture, career, kit). */
+    identityFields: identityFieldDefs(mappedFields),
 
     /** Character entity type slug from the manifest. */
     characterTypeSlug: fieldDefs.preset_slug || `${chronicleSystemId}-character`,

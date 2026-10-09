@@ -97,3 +97,50 @@ test('a Foundry HP edit reaches Chronicle once and is not re-applied on reopen',
   assert.deepEqual(world.log.writes.slice(before).filter((w) => w.id === actor.id).map((w) => `${w.op} ${JSON.stringify(w.change || {})}`), [], 'own push not re-applied');
   assert.equal(actor.system.hp, 12);
 }, { settings: ON }));
+
+test('a Chronicle ancestry pick swaps the actor\'s ancestry item from a compendium, and a custom kit becomes a plain item, with nothing pushed back', () => scenario('chr-identity-items', async ({ seed, world }) => {
+  const modules = { modules: ['journals', 'actors', 'items'] };
+  // An installed system compendium holding Dwarf; "Homebrew Kit" is nowhere.
+  const dwarf = { name: 'Dwarf', type: 'ancestry', toObject: () => ({ _id: 'packDwarf', name: 'Dwarf', type: 'ancestry', system: { size: 'medium' } }) };
+  world.game.packs = [{
+    collection: 'bench.ancestries', documentName: 'Item', metadata: { packageType: 'system' },
+    getIndex: async () => [{ _id: 'packDwarf', name: 'Dwarf', type: 'ancestry' }],
+    getDocument: async () => dwarf,
+  }];
+  await openWorld(world, modules);
+  const e = await chronicleCharacter(seed, 'Hild', 10);
+  await waitFor(() => actorFor(world, e.id), 10000, 'actor created');
+  await settle();
+  const actor = actorFor(world, e.id);
+  await actor.createEmbeddedDocuments('Item', [{ name: 'Human', type: 'ancestry' }, { name: 'Censor', type: 'class' }], { chronicleSyncApply: true });
+  await settle();
+
+  const before = world.log.writes.length;
+  const reqs = await recordRequests(async () => {
+    await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: { ancestry: 'dwarf', kit: 'Homebrew Kit' } });
+    await waitFor(() => actor.items.find((i) => i.type === 'kit'), 10000, 'kit item made');
+    await settle();
+  });
+
+  const ancestry = actor.items.filter((i) => i.type === 'ancestry');
+  assert.deepEqual(ancestry.map((i) => i.name), ['Dwarf'], 'old ancestry replaced by the compendium one');
+  assert.equal(ancestry[0].system.size, 'medium', 'it is the compendium item\'s data');
+  assert.equal(actor.items.filter((i) => i.type === 'class').length, 1, 'class untouched');
+  const kit = actor.items.find((i) => i.type === 'kit');
+  assert.equal(kit.name, 'Homebrew Kit');
+  assert.equal(kit.getFlag(FLAG, 'chronicleMade'), true);
+  assert.deepEqual(
+    writes(reqs).filter((r) => !/^\/(sync|entities\/[^/]+\/fields)/.test(r.url)).map((r) => `${r.method} ${r.url}`),
+    [], 'nothing pushed back for the item changes',
+  );
+  assert.equal((await seed.chronicle.get(`/entities/${e.id}`)).fields_data?.ancestry, 'dwarf', 'Chronicle value untouched');
+  const itemWrites = world.log.writes.slice(before).filter((w) => w.type === 'Item');
+  assert.deepEqual(itemWrites.map((w) => w.op).sort(), ['create', 'create', 'delete']);
+
+  // The same pick arriving again changes nothing.
+  const again = world.log.writes.length;
+  await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: { ancestry: 'Dwarf' } });
+  await settle();
+  assert.deepEqual(world.log.writes.slice(again).filter((w) => w.type === 'Item'), [], 'no item churn on a repeat');
+  await closeWorld(world);
+}, { settings: ON }));

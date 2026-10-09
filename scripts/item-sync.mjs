@@ -17,13 +17,10 @@
  */
 
 import { getSetting } from './settings.mjs';
-import { FLAG_SCOPE } from './constants.mjs';
+import { FLAG_SCOPE, APPLY_OPTION } from './constants.mjs';
 import { collapseChanges } from './_change-feed.mjs';
 import { HAS_ITEM, planInventory, itemDataFor } from './_inventory-plan.mjs';
 import { itemsToRemove } from './_stash-reconcile.mjs';
-
-/** Write option marking an item change as applied from Chronicle, so its hook does not push it back. */
-const APPLY_OPTION = 'chronicleSyncApply';
 
 /** The actor linked to a Chronicle character, or null. */
 function linkedActor(entityId) {

@@ -23,6 +23,8 @@ import { walkEntityPages, unwrapEntityList } from './_entity-page-walk.mjs';
 import { JournalPushDebouncer } from './_journal-push-debounce.mjs';
 import { mergeChanges } from './_actor-field-diff.mjs';
 import { collapseChanges } from './_change-feed.mjs';
+import { planIdentityItems } from './_identity-item-plan.mjs';
+import { applyIdentityPlan } from './_identity-item-apply.mjs';
 
 /**
  * ActorSync handles character entity ↔ Actor synchronization.
@@ -358,6 +360,7 @@ export class ActorSync {
       }
 
       const actor = await Actor.create(actorData);
+      await this._applyIdentityItems(actor, entity);
 
       // Create sync mapping (idempotent — tolerates a pre-existing
       // Chronicle mapping pointing at a stale Foundry id, which is
@@ -390,6 +393,40 @@ export class ActorSync {
     if (!actor) return;
 
     await this._updateActorFromEntity(actor, entity);
+  }
+
+  /**
+   * Swap the actor's ancestry/culture/career/kit items to the ones Chronicle
+   * names. Runs inside the caller's `_syncing` guard; the writes also carry
+   * the apply options so the item hooks do not push them back. Only the GM's
+   * client does it, and a failure is one notice, never a thrown error.
+   * @param {Actor} actor
+   * @param {object} entity
+   * @private
+   */
+  async _applyIdentityItems(actor, entity) {
+    if (!game.user?.isGM) return;
+    try {
+      const plan = planIdentityItems({
+        items: (actor.items?.contents ?? Array.from(actor.items ?? [])),
+        fieldDefs: this._adapter.identityFields ?? [],
+        fieldsData: entity?.fields_data,
+      });
+      if (!plan.length) return;
+      const { failed } = await applyIdentityPlan(actor, plan, game);
+      if (failed.length) {
+        ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.IdentityItemFailed', {
+          actor: actor.name,
+          fields: failed.join(', '),
+        }));
+      }
+    } catch (err) {
+      console.error(`Chronicle: identity items failed for "${actor.name}"`, err);
+      ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.IdentityItemFailed', {
+        actor: actor.name,
+        fields: '',
+      }));
+    }
   }
 
   /**
@@ -427,6 +464,8 @@ export class ActorSync {
       if (fieldUpdate && Object.keys(fieldUpdate).length > 0) {
         await actor.update(fieldUpdate);
       }
+
+      await this._applyIdentityItems(actor, entity);
 
       // Sync visibility: Chronicle is_private → Foundry actor hidden.
       // A private entity means the NPC is hidden from players.

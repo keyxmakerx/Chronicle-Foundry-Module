@@ -264,6 +264,16 @@ Chronicle brings its own calendar; no Foundry calendar module is used.
 - [ ] Update character entity name -> Actor name updates
 - [ ] Delete character entity -> Actor unlinked (flags removed) but NOT deleted
 
+### Identity items (Draw Steel: ancestry, culture, career, kit)
+- [ ] In Chronicle, set an actor's linked character to an ancestry that exists in the system compendium (e.g. Dwarf) -> within a few seconds the Foundry sheet shows the Dwarf ancestry item in place of the old one (data from the compendium); the Chronicle value does not change
+- [ ] Same with an ancestry that exists as an Item in the world's Items sidebar -> the world item is used
+- [ ] Pick a name that exists nowhere (a campaign's own entry) -> a plain item with that name appears on the sheet
+- [ ] Culture, career and kit behave the same way
+- [ ] Clear the value in Chronicle -> the Foundry item stays
+- [ ] Class, subclass and level changed in Chronicle do not touch the Foundry sheet
+- [ ] Nothing in the Dashboard activity log or Chronicle's sync history shows the item swap coming back as a Foundry change
+- [ ] As a non-GM player nothing is swapped on their client (only the GM's client applies it)
+
 ### Foundry -> Chronicle
 - [ ] Create character Actor in Foundry -> Entity created in Chronicle with mapped fields
 - [ ] Update Actor ability scores -> Chronicle entity fields_data updates

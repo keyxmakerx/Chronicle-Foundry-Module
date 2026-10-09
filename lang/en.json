@@ -145,7 +145,8 @@
       "ConnectionRestored": "Connection to Chronicle restored"
     },
     "ActorSync": {
-      "EnableClaimingHint": "Chronicle: Enable the \"Player Character Claiming\" addon in your Chronicle campaign to sync which players own their characters."
+      "EnableClaimingHint": "Chronicle: Enable the \"Player Character Claiming\" addon in your Chronicle campaign to sync which players own their characters.",
+      "IdentityItemFailed": "Chronicle: Could not update {actor}'s ancestry, culture, career or kit item ({fields}). The sheet was left as it was; see the console for details."
     },
     "Dashboard": {
       "Title": "Chronicle Sync",

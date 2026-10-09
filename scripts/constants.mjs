@@ -20,3 +20,6 @@ export const REPORT_STORE_FLAG = 'problemReportsStore';
  * GM edit made while sync is writing something else still pushes.
  */
 export const SYNC_OPTIONS = Object.freeze({ chronicleSync: true });
+
+/** Write option marking an embedded-item change as applied from Chronicle, so the item hooks do not push it back. */
+export const APPLY_OPTION = 'chronicleSyncApply';
