@@ -822,6 +822,12 @@
         {{localize "CHRONICLE.Dashboard.Members.UnmatchedWarning" count=members.unmatchedCount}}
       </div>
       {{/if}}
+      {{#if members.hasClaimUnmapped}}
+      <div class="dashboard-load-errors member-unmatched-banner">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        {{localize "CHRONICLE.Dashboard.Members.ClaimUnmappedWarning" count=members.claimUnmappedCount}}
+      </div>
+      {{/if}}
 
       {{#if members.hasMembers}}
       <div class="member-list">
@@ -834,6 +840,9 @@
             <span class="member-badge matched"><i class="fa-solid fa-check"></i> {{localize "CHRONICLE.Dashboard.Members.Matched"}}</span>
             {{else}}
             <span class="member-badge unmatched"><i class="fa-solid fa-circle-exclamation"></i> {{localize "CHRONICLE.Dashboard.Members.Unmatched"}}</span>
+            {{/if}}
+            {{#if claimUnmapped}}
+            <span class="member-badge unmatched"><i class="fa-solid fa-user-lock"></i> {{localize "CHRONICLE.Dashboard.Members.ClaimUnmapped"}}</span>
             {{/if}}
           </div>
           <div class="member-actions">

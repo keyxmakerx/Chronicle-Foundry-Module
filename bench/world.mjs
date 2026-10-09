@@ -68,6 +68,10 @@ export const benchAdapter = {
   systemId: 'bench',
   actorType: 'character',
   characterTypeSlug: 'character',
+  // Same shape the generic adapter builds from a system's single-item fields.
+  identityFields: ['ancestry', 'kit'].map((key) => ({
+    key, type: 'string', foundry_collection: 'items', foundry_item_type: [key], foundry_item_single: true,
+  })),
   fromChronicleFields(entity) {
     const out = {};
     if (entity?.name) out.name = entity.name;

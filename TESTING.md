@@ -52,6 +52,12 @@ Needs a player client that can see the journal but does not own its page.
 - [ ] As GM, edit a normal sentence next to the secret block and save -> in Chronicle the secret text is still GM-only and the rest of the paragraph reads as one paragraph
 - [ ] As GM, wrap a new line in a Foundry secret block and save -> Chronicle shows it as GM-only text
 
+### Player avatars
+- [ ] A Chronicle member with a profile picture, matched to a Foundry user -> that user's avatar shows the picture after connect
+- [ ] Change the picture in Chronicle, then dashboard refresh -> the avatar follows
+- [ ] Set a different avatar in Foundry yourself -> a later Chronicle picture change leaves it alone
+- [ ] Remove the picture in Chronicle (avatar still ours) -> the user goes back to the default avatar
+
 ### Permission Sync
 - [ ] Private entity (is_private=true) creates journal with default ownership NONE
 - [ ] Public entity (is_private=false) creates journal with default ownership OBSERVER
@@ -258,6 +264,16 @@ Chronicle brings its own calendar; no Foundry calendar module is used.
 - [ ] Update character entity name -> Actor name updates
 - [ ] Delete character entity -> Actor unlinked (flags removed) but NOT deleted
 
+### Identity items (Draw Steel: ancestry, culture, career, kit)
+- [ ] In Chronicle, set an actor's linked character to an ancestry that exists in the system compendium (e.g. Dwarf) -> within a few seconds the Foundry sheet shows the Dwarf ancestry item in place of the old one (data from the compendium); the Chronicle value does not change
+- [ ] Same with an ancestry that exists as an Item in the world's Items sidebar -> the world item is used
+- [ ] Pick a name that exists nowhere (a campaign's own entry) -> a plain item with that name appears on the sheet
+- [ ] Culture, career and kit behave the same way
+- [ ] Clear the value in Chronicle -> the Foundry item stays
+- [ ] Class, subclass and level changed in Chronicle do not touch the Foundry sheet
+- [ ] Nothing in the Dashboard activity log or Chronicle's sync history shows the item swap coming back as a Foundry change
+- [ ] As a non-GM player nothing is swapped on their client (only the GM's client applies it)
+
 ### Foundry -> Chronicle
 - [ ] Create character Actor in Foundry -> Entity created in Chronicle with mapped fields
 - [ ] Update Actor ability scores -> Chronicle entity fields_data updates
@@ -321,6 +337,16 @@ GM only. Needs a Chronicle that serves the DM Screen.
 - [ ] The party leaf lists each hero on one line; a row expands for detail
 - [ ] Rules tab: **Find a condition** filters the list. Reveal tab: **Reveal** on a hidden character makes it visible to players in Chronicle
 - [ ] Against a Chronicle without the DM Screen, the window says to update Chronicle; with a wrong key it says the key was not accepted; **Try again** reloads
+
+## Character claims
+
+Needs the Player Character Claiming addon on in Chronicle, a character linked to an actor, and two players matched to Chronicle members (Members tab). Run as the GM.
+
+- [ ] In Chronicle, assign the character to player A -> within a few seconds A is **Owner** in the actor's Ownership settings, and A can open and edit the sheet; nothing about the ownership is sent back to Chronicle
+- [ ] Reassign it to player B -> B is Owner, A is still Owner, and the GM sees one notice saying A still owns it and can be changed in the actor's Ownership settings
+- [ ] Unassign it in Chronicle -> Foundry ownership is unchanged
+- [ ] Assign it to a member with no Foundry user mapped -> no ownership change, one GM notice that the player has no Foundry user, and the Members tab shows that member as "Owns a character, no Foundry user" with a banner; mapping them and pressing **Refresh Members**, then reconnecting, gives them Owner
+- [ ] Reconnect (or Pull All) with a claim that is already applied -> no notice and no ownership change
 
 ## Stashes
 

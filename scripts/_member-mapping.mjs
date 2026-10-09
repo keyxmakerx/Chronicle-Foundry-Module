@@ -17,6 +17,8 @@
  * @property {string|null} foundryUserId - Currently mapped Foundry user id, or null.
  * @property {string|null} foundryUserName - Currently mapped Foundry user name, or null.
  * @property {boolean} matched     - True when mapped to a live Foundry user.
+ * @property {boolean} claimsCharacter - True when the member owns a linked character in Chronicle.
+ * @property {boolean} claimUnmapped - claimsCharacter and not matched: their character's owner cannot be applied in Foundry.
  * @property {Array<{id: string, name: string, selected: boolean}>} options - Dropdown options.
  */
 
@@ -28,13 +30,16 @@
  * @param {Object<string,string>} params.mappings - `userMappings` (chronicleId → foundryId).
  * @param {Array<{id: string, name: string}>} params.foundryUsers - `game.users` (id + name).
  * @param {(member: object) => (string|null)} params.keyOf - Member-key resolver (`memberKey`).
- * @returns {{rows: MemberRow[], matchedCount: number, unmatchedCount: number}}
+ * @param {Iterable<string>} [params.claimantKeys] - Chronicle ids that own a linked character.
+ * @returns {{rows: MemberRow[], matchedCount: number, unmatchedCount: number, claimUnmappedCount: number}}
  */
-export function buildMemberRows({ members, mappings, foundryUsers, keyOf }) {
+export function buildMemberRows({ members, mappings, foundryUsers, keyOf, claimantKeys = [] }) {
+  const claimants = new Set(claimantKeys);
   const userList = Array.isArray(foundryUsers) ? foundryUsers : [];
   const map = mappings || {};
   const rows = [];
   let matchedCount = 0;
+  let claimUnmappedCount = 0;
 
   for (const member of members || []) {
     const key = keyOf(member);
@@ -47,6 +52,10 @@ export function buildMemberRows({ members, mappings, foundryUsers, keyOf }) {
     const mappedUser = mappedId ? userList.find((u) => u.id === mappedId) : null;
     const matched = !!mappedUser;
     if (matched) matchedCount++;
+
+    const claimsCharacter = claimants.has(key);
+    const claimUnmapped = claimsCharacter && !matched;
+    if (claimUnmapped) claimUnmappedCount++;
 
     const options = [
       { id: '', name: '— Unmapped —', selected: !matched },
@@ -64,6 +73,8 @@ export function buildMemberRows({ members, mappings, foundryUsers, keyOf }) {
       foundryUserId: mappedId,
       foundryUserName: mappedUser ? mappedUser.name : null,
       matched,
+      claimsCharacter,
+      claimUnmapped,
       options,
     });
   }
@@ -72,5 +83,6 @@ export function buildMemberRows({ members, mappings, foundryUsers, keyOf }) {
     rows,
     matchedCount,
     unmatchedCount: rows.length - matchedCount,
+    claimUnmappedCount,
   };
 }

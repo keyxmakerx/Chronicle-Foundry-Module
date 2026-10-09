@@ -8,6 +8,7 @@
 
 import { ChronicleAPI } from './api-client.mjs';
 import { PlayerActivity, PlayerReporter, buildPlayerReport, reasonFromError, REPORT_INTERVAL_MS, EVENT_DEBOUNCE_MS } from './_player-report.mjs';
+import { AvatarSync } from './avatar-sync.mjs';
 import { walkSyncPull, PULL_PAGE_SIZE } from './_sync-pull-walk.mjs';
 import { HistoryReporter, activityToEvent, describeMessage, resourceIdOf, resourceNameOf } from './_history-report.mjs';
 import { walkChangeFeed, cursorFor, feedForArea, FEED_PAGE_SIZE, FEED_SETTLE_MS } from './_change-feed.mjs';
@@ -52,6 +53,9 @@ export class SyncManager {
   constructor() {
     /** @type {ChronicleAPI} */
     this.api = new ChronicleAPI();
+
+    /** Shows members' Chronicle pictures as their Foundry avatars (GM only). */
+    this._avatars = new AvatarSync();
 
     /**
      * Reports what only this world sees to Chronicle's sync history. Every
@@ -314,17 +318,27 @@ export class SyncManager {
       const members = result?.data || result || [];
       this._members = Array.isArray(members) ? members : [];
 
-      // Auto-match by display_name → Foundry user name.
+      // Auto-match by display_name → Foundry user name. A mapping grants
+      // access (notes, stashes, a claimed character's actor), so only a name
+      // that is unique on both sides is matched; anything ambiguous is left
+      // for the GM to map on the Members tab.
       const mappings = getUserMappings();
       let newMappings = 0;
       const unmatched = [];
+      const lc = (v) => (v || '').toLowerCase();
+      const memberNameCount = new Map();
+      for (const m of this._members) {
+        const n = lc(m.display_name);
+        if (n) memberNameCount.set(n, (memberNameCount.get(n) || 0) + 1);
+      }
       for (const member of this._members) {
         const key = memberKey(member);
         if (!key) continue;
         if (mappings[key]) continue; // Already mapped (auto or manual).
-        const foundryUser = game.users.find(
-          (u) => u.name.toLowerCase() === (member.display_name || '').toLowerCase()
-        );
+        const name = lc(member.display_name);
+        const candidates = name ? game.users.filter((u) => lc(u.name) === name) : [];
+        const foundryUser = candidates.length === 1 && memberNameCount.get(name) === 1
+          ? candidates[0] : null;
         if (foundryUser) {
           mappings[key] = foundryUser.id;
           newMappings++;
@@ -339,6 +353,10 @@ export class SyncManager {
 
       this._unmatchedMembers = unmatched;
       this._reportUnmatchedMembers(unmatched);
+
+      // A cosmetic extra: never held up or failed by it.
+      this._avatars.apply(this._members, mappings, memberKey)
+        .catch((err) => console.warn('Chronicle: avatar sync failed', err));
 
       console.debug(`Chronicle: Fetched ${this._members.length} campaign members`);
     } catch (err) {
