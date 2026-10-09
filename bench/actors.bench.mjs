@@ -195,8 +195,8 @@ test('a Chronicle edit to one field updates the actor once, marked as applied, w
   assert.equal(dataWrites.length, 1, 'one actor data write');
   assert.deepEqual(dataWrites[0].change.system, { hp: 11 });
   assert.equal(dataWrites[0].options?.chronicleSyncApply, true, 'marked as an apply');
-  // The one PUT is this scenario's own Chronicle edit.
-  assert.equal(writes(reqs).filter((r) => /\/fields$/.test(r.url) && r.method === 'PUT').length, 1, 'no push-back');
+  // Only the module's own requests are recorded, so any fields PUT would be a push-back.
+  assert.equal(writes(reqs).filter((r) => /\/fields$/.test(r.url) && r.method === 'PUT').length, 0, 'no push-back');
 
   const again = world.log.writes.length;
   await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: { hp: 11 } });
