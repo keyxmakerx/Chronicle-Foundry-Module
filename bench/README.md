@@ -26,7 +26,7 @@ never left Foundry).
   character turned into a journal, both sides agree on names, no failed
   writes, no hook errors, no error pop-ups).
 - `*.bench.mjs` are the scenarios, one file per area (`journals`, `actors`,
-  `items`, `notes`); the area name is the argument to `run.sh`.
+  `items`, `maps`, `notes`); the area name is the argument to `run.sh`.
 
 ## Running it
 
