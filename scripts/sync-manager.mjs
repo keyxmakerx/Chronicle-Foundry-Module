@@ -318,17 +318,27 @@ export class SyncManager {
       const members = result?.data || result || [];
       this._members = Array.isArray(members) ? members : [];
 
-      // Auto-match by display_name → Foundry user name.
+      // Auto-match by display_name → Foundry user name. A mapping grants
+      // access (notes, stashes, a claimed character's actor), so only a name
+      // that is unique on both sides is matched; anything ambiguous is left
+      // for the GM to map on the Members tab.
       const mappings = getUserMappings();
       let newMappings = 0;
       const unmatched = [];
+      const lc = (v) => (v || '').toLowerCase();
+      const memberNameCount = new Map();
+      for (const m of this._members) {
+        const n = lc(m.display_name);
+        if (n) memberNameCount.set(n, (memberNameCount.get(n) || 0) + 1);
+      }
       for (const member of this._members) {
         const key = memberKey(member);
         if (!key) continue;
         if (mappings[key]) continue; // Already mapped (auto or manual).
-        const foundryUser = game.users.find(
-          (u) => u.name.toLowerCase() === (member.display_name || '').toLowerCase()
-        );
+        const name = lc(member.display_name);
+        const candidates = name ? game.users.filter((u) => lc(u.name) === name) : [];
+        const foundryUser = candidates.length === 1 && memberNameCount.get(name) === 1
+          ? candidates[0] : null;
         if (foundryUser) {
           mappings[key] = foundryUser.id;
           newMappings++;
