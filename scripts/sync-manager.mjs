@@ -8,6 +8,7 @@
 
 import { ChronicleAPI } from './api-client.mjs';
 import { PlayerActivity, PlayerReporter, buildPlayerReport, reasonFromError, REPORT_INTERVAL_MS, EVENT_DEBOUNCE_MS } from './_player-report.mjs';
+import { AvatarSync } from './avatar-sync.mjs';
 import { walkSyncPull, PULL_PAGE_SIZE } from './_sync-pull-walk.mjs';
 import { HistoryReporter, activityToEvent, describeMessage, resourceIdOf, resourceNameOf } from './_history-report.mjs';
 import { walkChangeFeed, cursorFor, feedForArea, FEED_PAGE_SIZE, FEED_SETTLE_MS } from './_change-feed.mjs';
@@ -52,6 +53,9 @@ export class SyncManager {
   constructor() {
     /** @type {ChronicleAPI} */
     this.api = new ChronicleAPI();
+
+    /** Shows members' Chronicle pictures as their Foundry avatars (GM only). */
+    this._avatars = new AvatarSync();
 
     /**
      * Reports what only this world sees to Chronicle's sync history. Every
@@ -339,6 +343,10 @@ export class SyncManager {
 
       this._unmatchedMembers = unmatched;
       this._reportUnmatchedMembers(unmatched);
+
+      // A cosmetic extra: never held up or failed by it.
+      this._avatars.apply(this._members, mappings, memberKey)
+        .catch((err) => console.warn('Chronicle: avatar sync failed', err));
 
       console.debug(`Chronicle: Fetched ${this._members.length} campaign members`);
     } catch (err) {

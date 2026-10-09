@@ -52,6 +52,12 @@ Needs a player client that can see the journal but does not own its page.
 - [ ] As GM, edit a normal sentence next to the secret block and save -> in Chronicle the secret text is still GM-only and the rest of the paragraph reads as one paragraph
 - [ ] As GM, wrap a new line in a Foundry secret block and save -> Chronicle shows it as GM-only text
 
+### Player avatars
+- [ ] A Chronicle member with a profile picture, matched to a Foundry user -> that user's avatar shows the picture after connect
+- [ ] Change the picture in Chronicle, then dashboard refresh -> the avatar follows
+- [ ] Set a different avatar in Foundry yourself -> a later Chronicle picture change leaves it alone
+- [ ] Remove the picture in Chronicle (avatar still ours) -> the user goes back to the default avatar
+
 ### Permission Sync
 - [ ] Private entity (is_private=true) creates journal with default ownership NONE
 - [ ] Public entity (is_private=false) creates journal with default ownership OBSERVER
