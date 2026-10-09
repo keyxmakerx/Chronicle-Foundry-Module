@@ -51,14 +51,14 @@ test('an empty, missing or non-string value does nothing', () => {
   assert.deepEqual(planIdentityItems({ items, fieldDefs: DEFS, fieldsData: null }), []);
 });
 
-test('an actor with no item of the type plans an add; two items are both removed', () => {
+test('an actor with no item of the type plans an add; with two items only the first is replaced', () => {
   const none = planIdentityItems({ items: [], fieldDefs: DEFS, fieldsData: { career: 'Soldier' } });
   assert.deepEqual(none, [{ fieldKey: 'career', itemType: 'career', wantName: 'Soldier', removeIds: [] }]);
   const two = planIdentityItems({
     items: [{ id: 'x', name: 'Old', type: 'culture' }, { id: 'y', name: 'Older', type: 'culture' }],
     fieldDefs: DEFS, fieldsData: { culture: 'Urban' },
   });
-  assert.deepEqual(two[0].removeIds, ['x', 'y']);
+  assert.deepEqual(two[0].removeIds, ['x']);
 });
 
 test('class, subclass, level and heroic_resource_name are never planned', () => {

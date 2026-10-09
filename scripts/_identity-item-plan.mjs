@@ -53,7 +53,9 @@ export function planIdentityItems({ items, fieldDefs, fieldsData }) {
     const current = list.filter((it) => it && it.type === itemType);
     // The adapter reads the first item of the type, so that is the one compared.
     if (current.length && norm(current[0].name) === norm(wantName)) continue;
-    plan.push({ fieldKey: def.key, itemType, wantName, removeIds: current.map((it) => it.id) });
+    // Only that first item is replaced; any others of the type (a second kit)
+    // are the GM's and stay, since sync never deletes without asking.
+    plan.push({ fieldKey: def.key, itemType, wantName, removeIds: current.length ? [current[0].id] : [] });
   }
   return plan;
 }
