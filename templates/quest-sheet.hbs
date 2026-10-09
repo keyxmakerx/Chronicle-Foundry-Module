@@ -1,0 +1,90 @@
+<div class="cqs" data-cqs-root>
+{{#if error}}
+  <div class="cqb-msg"><p>{{error}}</p><button type="button" data-action="retry">{{localize "CHRONICLE.Quests.Retry"}}</button></div>
+{{else if loading}}
+  <div class="cqb-msg"><p>{{localize "CHRONICLE.Quests.Loading"}}</p></div>
+{{else}}
+  <article class="cqs-sheet chronicle-paper chronicle-paper-stack">
+    <div class="cqs-kind">{{#if sheet.kicker}}{{sheet.kicker}} · {{/if}}{{sheet.status}}{{#if sheet.handedOut}} · {{localize "CHRONICLE.Quests.HandedOutShort"}}{{/if}}</div>
+    <h2 class="cqs-title">{{sheet.title}}</h2>
+    {{#if sheet.blurb}}<p>{{sheet.blurb}}</p>{{/if}}
+    {{#each sheet.body}}<p>{{this}}</p>{{/each}}
+    {{#if sheet.postedBy}}<p class="cqs-by">{{sheet.postedBy}}</p>{{/if}}
+    {{#if sheet.steps.length}}
+      <h3>{{localize "CHRONICLE.Quests.Steps"}}</h3>
+      <ul class="cqs-steps">
+        {{#each sheet.steps}}<li class="{{#if done}}done{{/if}}{{#if ../isGM}}{{#unless shown}} unseen{{/unless}}{{/if}}"><span class="cqs-bx"></span><span>{{text}}</span></li>{{/each}}
+        {{#if sheet.hiddenSteps}}<li class="more"><span class="cqs-bx"></span><span>{{localize "CHRONICLE.Quests.MoreSteps"}}</span></li>{{/if}}
+      </ul>
+    {{/if}}
+    {{#if sheet.reward}}<h3>{{localize "CHRONICLE.Quests.Reward"}}</h3><p>{{sheet.reward}}</p>{{/if}}
+    {{#if sheet.due}}
+      <div class="cqs-due"><span>{{localize "CHRONICLE.Quests.Due"}} <b>{{sheet.due.label}}</b></span>{{#if sheet.due.left}}<span class="cqs-left{{#if sheet.due.late}} late{{/if}}">{{sheet.due.left}}</span>{{/if}}</div>
+    {{/if}}
+  </article>
+
+  {{#if isGM}}
+  <section class="cqs-ledger" aria-label="{{localize "CHRONICLE.Quests.Ledger"}}">
+    <header class="cqs-lh">
+      <b>{{localize "CHRONICLE.Quests.Ledger"}}</b><span class="cqs-gm"><i class="fa-solid fa-lock"></i> {{localize "CHRONICLE.Quests.GMOnly"}}</span>
+      <span class="cqb-sp"></span>
+      <select data-cqs-status aria-label="{{localize "CHRONICLE.Quests.Status"}}" {{#if busy}}disabled{{/if}}>
+        {{#each statuses}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+      </select>
+    </header>
+    {{#if sheet.steps.length}}
+    <div class="cqs-ls">
+      <div class="cqs-sh">{{localize "CHRONICLE.Quests.StepsHint"}}</div>
+      {{#each sheet.steps}}
+        <div class="cqs-row">
+          <input type="checkbox" id="cqs-st-{{../appId}}-{{index}}" data-cqs-step="{{index}}" {{#if done}}checked{{/if}} {{#if ../busy}}disabled{{/if}}>
+          <label class="cqs-grow" for="cqs-st-{{../appId}}-{{index}}">{{text}}</label>
+          <button type="button" class="cqs-eye{{#if shown}} on{{/if}}" data-action="toggleShown" data-index="{{index}}" aria-pressed="{{#if shown}}true{{else}}false{{/if}}" title="{{#if shown}}{{localize "CHRONICLE.Quests.ShownToPlayers"}}{{else}}{{localize "CHRONICLE.Quests.HiddenFromPlayers"}}{{/if}}" {{#if ../busy}}disabled{{/if}}><i class="fa-solid {{#if shown}}fa-eye{{else}}fa-eye-slash{{/if}}"></i></button>
+        </div>
+      {{/each}}
+    </div>
+    {{/if}}
+    <div class="cqs-ls">
+      <div class="cqs-sh">{{localize "CHRONICLE.Quests.Rewards"}}</div>
+      {{#each sheet.rewards}}<div class="cqs-row"><span class="cqs-grow">{{text}}</span></div>{{/each}}
+      <div class="cqs-row">
+        <span class="cqs-grow cqs-sub">{{#if sheet.handedOut}}<span class="cqs-ok">{{localize "CHRONICLE.Quests.HandedOut"}}</span>{{else}}{{localize "CHRONICLE.Quests.CoinsHint"}}{{/if}}</span>
+        {{#unless give}}<button type="button" class="cqs-pri" data-action="openGive" {{#unless canHandOut}}disabled{{/unless}}>{{localize "CHRONICLE.Quests.HandOut"}}</button>{{/unless}}
+      </div>
+    </div>
+    {{#if give}}
+    <div class="cqs-give" role="dialog" aria-label="{{localize "CHRONICLE.Quests.HandOutTitle"}}">
+      <div class="cqs-lh"><b>{{localize "CHRONICLE.Quests.HandOutTitle"}}</b></div>
+      {{#if give.loading}}<p class="cqs-pad">{{localize "CHRONICLE.Quests.Loading"}}</p>
+      {{else}}
+        {{#unless give.party.length}}<p class="cqs-pad">{{localize "CHRONICLE.Quests.NoParty"}}</p>{{/unless}}
+        {{#if give.coins}}<div class="cqs-sh cqs-pad">{{give.coinLine}}</div>{{/if}}
+        {{#each give.party}}
+          <div class="cqs-row cqs-pad">
+            {{#if ../give.coins}}<input type="checkbox" id="cqs-gv-{{../appId}}-{{@index}}" data-cqs-coin="{{id}}" {{#if picked}}checked{{/if}} {{#if ../give.sending}}disabled{{/if}}>{{/if}}
+            <label class="cqs-grow" for="cqs-gv-{{../appId}}-{{@index}}">{{name}}{{#if player}} <span class="cqs-sub">{{player}}</span>{{/if}}</label>
+            <span class="cqs-sub {{stateClass}}">{{state}}</span>
+          </div>
+        {{/each}}
+        {{#each give.items}}
+          <div class="cqs-row cqs-pad">
+            <span class="cqs-grow">{{label}}</span>
+            <select data-cqs-item="{{id}}" aria-label="{{label}}" {{#if ../give.sending}}disabled{{/if}}>
+              <option value="">{{localize "CHRONICLE.Quests.Nobody"}}</option>
+              {{#each ../give.party}}<option value="{{id}}" {{#if (eq id ../to)}}selected{{/if}}>{{name}}</option>{{/each}}
+            </select>
+          </div>
+        {{/each}}
+        <label class="cqs-row cqs-pad"><input type="checkbox" data-cqs-markdone {{#if give.markDone}}checked{{/if}} {{#if give.sending}}disabled{{/if}}><span class="cqs-grow">{{localize "CHRONICLE.Quests.MarkDone"}}</span></label>
+        {{#if give.note}}<p class="cqs-pad cqs-note {{give.noteClass}}" role="status">{{give.note}}</p>{{/if}}
+        <div class="cqs-gf">
+          <button type="button" data-action="closeGive" {{#if give.sending}}disabled{{/if}}>{{localize "CHRONICLE.Quests.Cancel"}}</button>
+          <button type="button" class="cqs-pri" data-action="runGive" {{#if give.sending}}disabled{{/if}}>{{give.okLabel}}</button>
+        </div>
+      {{/if}}
+    </div>
+    {{/if}}
+  </section>
+  {{/if}}
+{{/if}}
+</div>

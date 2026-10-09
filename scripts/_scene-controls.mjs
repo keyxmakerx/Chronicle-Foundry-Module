@@ -1,8 +1,8 @@
 /**
  * Pure builder for the Chronicle group in Foundry's scene controls.
  *
- * GMs get the Sync Dashboard and DM Screen; the Notebook and Calendar are
- * for every user once the world is connected to Chronicle. The GM tools must never
+ * GMs get the Sync Dashboard and DM Screen; the Notebook, Calendar and
+ * Quest board are for every user once the world is connected to Chronicle. The GM tools must never
  * reach a player: tools/test-scene-controls.mjs pins that.
  */
 
@@ -14,8 +14,8 @@
  * @param {object} opts
  * @param {boolean} opts.isGM
  * @param {boolean} opts.notebook - the world is connected to Chronicle
- * @param {{dashboard: Function, dmScreen: Function, notebook: Function, calendar?: Function}} opts.run
- * @param {{dmScreen: string, notebook: string, calendar?: string}} opts.titles - localized
+ * @param {{dashboard: Function, dmScreen: Function, notebook: Function, calendar?: Function, quests?: Function}} opts.run
+ * @param {{dmScreen: string, notebook: string, calendar?: string, quests?: string}} opts.titles - localized
  */
 export function addChronicleControls(controls, { isGM, notebook, run, titles }) {
   const tools = [];
@@ -50,6 +50,15 @@ export function addChronicleControls(controls, { isGM, notebook, run, titles }) 
         icon: 'fa-solid fa-calendar-days',
         button: true,
         run: run.calendar,
+      });
+    }
+    if (run.quests) {
+      tools.push({
+        name: 'quests',
+        title: titles.quests,
+        icon: 'fa-solid fa-thumbtack',
+        button: true,
+        run: run.quests,
       });
     }
   }
