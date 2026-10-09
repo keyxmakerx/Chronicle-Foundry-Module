@@ -804,17 +804,17 @@ Deletes a map marker.
 
 ### Calendar
 
-> ### CALENDAR BLACKOUT — every route in this section answers 503
+> ### Calendar routes: live, retired, and older servers
 >
-> Chronicle deleted its calendar plugin for a ground-up rebuild (V5). All 34
-> routes stay REGISTERED and answer `503
-> {"error":"calendar_rebuilding","message":"…"}` — 503, not 404, so the module
-> doesn't fall back to old-build compatibility and hide the reason from the
-> GM. Maps, actors, items, notes, media and entities are unaffected. See
-> CLAUDE.md → "Calendar blackout".
+> Chronicle's date and event routes are live. Current Chronicle answers the
+> retired routes (old structure, settings, import, export, advance) with
+> `410 {"error":"calendar_route_retired"}`; the module calls none of them. An
+> older Chronicle, mid-rebuild, answers calendar routes with `503
+> {"error":"calendar_rebuilding"}`, which arms the module's push pause. See
+> CLAUDE.md → "Calendar blackout and date-push pauses". A route marked
+> Retired below answers 410.
 >
-> **The specs below are the pre-blackout contract, kept as the V5 starting
-> point, not today's behavior. Re-verify by: when calendar V5 ships.**
+> **Re-verify by: when calendar V5 ships.**
 
 All calendar endpoints require the calendar addon to be enabled.
 
@@ -1019,18 +1019,15 @@ Returns a single event by ID.
 
 ### Media
 
-#### POST /media/upload
-Uploads a media file (image, etc.).
+#### POST /campaigns/:id/media
+Uploads a media file (image, etc.). Full path
+`/api/v1/campaigns/:id/media`.
 
-**Used by:** `api-client.mjs` for image sync
+**Used by:** `api-client.mjs` (`uploadMedia`)
 
 **Request:** Multipart form data with `file` field.
 
-**Response:**
-```json
-{ "id": "media-uuid", "url": "/media/media-uuid.png", "filename": "map-background.png",
-  "content_type": "image/png", "size": 1048576 }
-```
+**Response:** `201` with the same media object `GET /media/:mediaId` returns.
 
 #### GET /media/:mediaId
 Returns media metadata: `mime_type`, `file_size`, and `url`, a signed
