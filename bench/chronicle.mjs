@@ -127,7 +127,31 @@ export async function seedCampaign(label = 'bench') {
     if (r.status >= 300) throw new Error(`map create failed: HTTP ${r.status} ${text.slice(0, 200)}`);
     return JSON.parse(text);
   };
-  return { campaignId, moduleKey, displayName, createMap, chronicle: apiClient(campaignId, otherKey), module: apiClient(campaignId, moduleKey) };
+  // Owner reassignment is a web route (Scribe and up) and needs the claiming
+  // add-on on; null clears it. Switch the add-on on before the world opens,
+  // since the module reads add-on state when it connects.
+  const enableClaiming = async () => {
+    const list = await (await web.get(`/campaigns/${campaignId}/addons`)).json();
+    const claim = list.find((a) => a.addon_slug === 'player-character-claiming');
+    if (!claim) throw new Error('no claiming add-on');
+    if (!claim.enabled) {
+      const r = await fetch(`${CHRONICLE_URL}/campaigns/${campaignId}/addons/${claim.addon_id}/toggle`, {
+        method: 'PUT', redirect: 'manual',
+        headers: { cookie: web.cookie(), 'content-type': 'application/x-www-form-urlencoded', 'x-csrf-token': web.csrf() },
+        body: 'action=enable',
+      });
+      if (r.status >= 400) throw new Error(`claiming add-on not enabled: HTTP ${r.status}`);
+    }
+  };
+  const assignOwner = async (entityId, ownerUserId) => {
+    const r = await fetch(`${CHRONICLE_URL}/campaigns/${campaignId}/entities/${entityId}/owner`, {
+      method: 'PUT', redirect: 'manual',
+      headers: { cookie: web.cookie(), 'content-type': 'application/json', 'x-csrf-token': web.csrf() },
+      body: JSON.stringify({ owner_user_id: ownerUserId }),
+    });
+    if (r.status >= 300) throw new Error(`owner assign failed: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
+  };
+  return { campaignId, moduleKey, displayName, createMap, enableClaiming, assignOwner, chronicle: apiClient(campaignId, otherKey), module: apiClient(campaignId, moduleKey) };
 }
 
 /** A REST client scoped to one campaign, for scenario setup and assertions. */

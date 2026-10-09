@@ -824,11 +824,19 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const mappings = getUserMappings();
     const foundryUsers = (game.users?.contents ?? []).map((u) => ({ id: u.id, name: u.name }));
 
-    const { rows, matchedCount, unmatchedCount } = buildMemberRows({
+    // Players who own a linked character in Chronicle, from the owner each
+    // actor last applied.
+    const claimantKeys = (game.actors?.contents ?? [])
+      .filter((a) => a.getFlag?.(FLAG_SCOPE, 'entityId'))
+      .map((a) => a.getFlag(FLAG_SCOPE, 'chronicleOwnerUserId'))
+      .filter(Boolean);
+
+    const { rows, matchedCount, unmatchedCount, claimUnmappedCount } = buildMemberRows({
       members,
       mappings,
       foundryUsers,
       keyOf: memberKey,
+      claimantKeys,
     });
 
     return {
@@ -836,6 +844,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       matchedCount,
       unmatchedCount,
       hasUnmatched: unmatchedCount > 0,
+      claimUnmappedCount,
+      hasClaimUnmapped: claimUnmappedCount > 0,
       hasMembers: rows.length > 0,
     };
   }

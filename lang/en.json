@@ -146,6 +146,8 @@
     },
     "ActorSync": {
       "EnableClaimingHint": "Chronicle: Enable the \"Player Character Claiming\" addon in your Chronicle campaign to sync which players own their characters.",
+      "PreviousOwnerKept": "Chronicle: {player} is no longer the owner of {actor} in Chronicle, but still owns the actor in Foundry. Change this in the actor's Ownership settings if you want.",
+      "ClaimantUnmapped": "Chronicle: a player owns {actor} in Chronicle but has no Foundry user mapped, so Foundry ownership was not changed. Map them in the sync dashboard, Members tab.",
       "IdentityItemFailed": "Chronicle: Could not update {actor}'s ancestry, culture, career or kit item ({fields}). The sheet was left as it was; see the console for details."
     },
     "Dashboard": {
@@ -255,6 +257,8 @@
         "Unmatched": "UNMATCHED",
         "Refresh": "Refresh Members",
         "RefreshHint": "Re-fetch campaign members from Chronicle and re-run auto-match",
+        "ClaimUnmapped": "Owns a character, no Foundry user",
+        "ClaimUnmappedWarning": "{count} player(s) own a character in Chronicle but have no Foundry user mapped, so they cannot play it in Foundry until you map them below.",
         "UnmatchedWarning": "{count} Chronicle member(s) are not mapped to a Foundry user. Their per-player permissions will NOT sync until you map them below.",
         "NoMembers": "No campaign members loaded.",
         "NoMembersHint": "Members load when sync connects. Use Refresh Members to fetch them now."

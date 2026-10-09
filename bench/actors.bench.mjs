@@ -144,3 +144,35 @@ test('a Chronicle ancestry pick swaps the actor\'s ancestry item from a compendi
   assert.deepEqual(world.log.writes.slice(again).filter((w) => w.type === 'Item'), [], 'no item churn on a repeat');
   await closeWorld(world);
 }, { settings: ON }));
+
+test('a character claimed in Chronicle gives the mapped Foundry player Owner on the actor, unclaiming changes nothing, and nothing is sent back', () => scenario('chr-claim-owner', async ({ seed, world }) => {
+  // The campaign's only member is the GM who made it; the mapping table
+  // points that member at a separate Foundry player (the GM user already
+  // carries the same name, so auto-match would pick the GM).
+  await seed.enableClaiming();
+  world.game.users.set('benchPlayer00001', { id: 'benchPlayer00001', name: 'Bench Player', isGM: false, role: 1, flags: {} });
+  await openWorld(world, MODULES);
+  const members = await seed.chronicle.get('/members');
+  const list = Array.isArray(members) ? members : members.data;
+  const member = list.find((m) => m.display_name === seed.displayName);
+  assert.ok(member, 'the campaign creator is a member');
+  const memberId = String(member.user_id ?? member.id);
+  await world.game.settings.set('chronicle-sync', 'userMappings', JSON.stringify({ [memberId]: 'benchPlayer00001' }));
+
+  const e = await chronicleCharacter(seed, 'Claimed One', 7);
+  await waitFor(() => actorFor(world, e.id), 10000, 'actor created');
+  await settle();
+  const actor = actorFor(world, e.id);
+  assert.equal(actor.ownership.benchPlayer00001, undefined, 'unclaimed: no player owns it');
+
+  const reqs = await recordRequests(async () => {
+    await seed.assignOwner(e.id, memberId);
+    await waitFor(() => actor.ownership.benchPlayer00001 === 3, 10000, 'claimant became Owner');
+    await settle();
+  });
+  assert.deepEqual(writes(reqs).map((r) => `${r.method} ${r.url}`), [], 'the ownership change was not sent back to Chronicle');
+
+  await seed.assignOwner(e.id, null);
+  await settle();
+  assert.equal(actor.ownership.benchPlayer00001, 3, 'unclaim leaves Foundry ownership alone');
+}, { settings: ON }));

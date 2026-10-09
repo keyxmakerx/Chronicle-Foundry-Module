@@ -338,6 +338,16 @@ GM only. Needs a Chronicle that serves the DM Screen.
 - [ ] Rules tab: **Find a condition** filters the list. Reveal tab: **Reveal** on a hidden character makes it visible to players in Chronicle
 - [ ] Against a Chronicle without the DM Screen, the window says to update Chronicle; with a wrong key it says the key was not accepted; **Try again** reloads
 
+## Character claims
+
+Needs the Player Character Claiming addon on in Chronicle, a character linked to an actor, and two players matched to Chronicle members (Members tab). Run as the GM.
+
+- [ ] In Chronicle, assign the character to player A -> within a few seconds A is **Owner** in the actor's Ownership settings, and A can open and edit the sheet; nothing about the ownership is sent back to Chronicle
+- [ ] Reassign it to player B -> B is Owner, A is still Owner, and the GM sees one notice saying A still owns it and can be changed in the actor's Ownership settings
+- [ ] Unassign it in Chronicle -> Foundry ownership is unchanged
+- [ ] Assign it to a member with no Foundry user mapped -> no ownership change, one GM notice that the player has no Foundry user, and the Members tab shows that member as "Owns a character, no Foundry user" with a banner; mapping them and pressing **Refresh Members**, then reconnecting, gives them Owner
+- [ ] Reconnect (or Pull All) with a claim that is already applied -> no notice and no ownership change
+
 ## Stashes
 
 Needs the Armory addon on in Chronicle, a character linked to an actor, and a player matched to a Chronicle member (Members tab).
