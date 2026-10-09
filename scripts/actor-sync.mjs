@@ -24,6 +24,7 @@ import { walkEntityPages, unwrapEntityList } from './_entity-page-walk.mjs';
 import { JournalPushDebouncer } from './_journal-push-debounce.mjs';
 import { mergeChanges } from './_actor-field-diff.mjs';
 import { collapseChanges } from './_change-feed.mjs';
+import { planActorApply } from './_actor-apply-plan.mjs';
 import { planIdentityItems } from './_identity-item-plan.mjs';
 import { applyIdentityPlan } from './_identity-item-apply.mjs';
 
@@ -459,7 +460,6 @@ export class ActorSync {
       (a) => a.getFlag(FLAG_SCOPE, 'entityId') === entity.id
     );
     if (!actor) return;
-
     await this._updateActorFromEntity(actor, entity);
   }
 
@@ -528,9 +528,14 @@ export class ActorSync {
     try {
       this._syncing = true;
 
-      const fieldUpdate = this._adapter.fromChronicleFields(entity);
-      if (fieldUpdate && Object.keys(fieldUpdate).length > 0) {
-        await actor.update(fieldUpdate);
+      // Only values that differ are written, marked as ours so the update
+      // hook does not push them back.
+      const changes = planActorApply({
+        update: this._adapter.fromChronicleFields(entity),
+        actor,
+      });
+      if (Object.keys(changes).length > 0) {
+        await actor.update(changes, { ...SYNC_OPTIONS, [APPLY_OPTION]: true });
       }
 
       await this._applyIdentityItems(actor, entity);
@@ -698,7 +703,7 @@ export class ActorSync {
    * @private
    */
   async _handleUpdateActor(actor, change, options, userId) {
-    if (this._syncing) return;
+    if (this._syncing || options?.[APPLY_OPTION]) return;
     if (userId !== game.user.id) return;
     if (actor.type !== this._actorType) return;
     if (!this._adapter) return;

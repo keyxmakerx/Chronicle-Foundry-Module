@@ -176,3 +176,31 @@ test('a character claimed in Chronicle gives the mapped Foundry player Owner on 
   await settle();
   assert.equal(actor.ownership.benchPlayer00001, 3, 'unclaim leaves Foundry ownership alone');
 }, { settings: ON }));
+
+test('a Chronicle edit to one field updates the actor once, marked as applied, with nothing pushed back; a repeat writes nothing', () => scenario('chr-field-apply', async ({ seed, world }) => {
+  await openWorld(world, MODULES);
+  const e = await chronicleCharacter(seed, 'Dara', 20);
+  await waitFor(() => actorFor(world, e.id), 10000, 'actor created');
+  await settle();
+  const actor = actorFor(world, e.id);
+
+  const before = world.log.writes.length;
+  const reqs = await recordRequests(async () => {
+    await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: { hp: 11 } });
+    await waitFor(() => actor.system.hp === 11, 10000, 'hp applied');
+    await settle();
+  });
+  const dataWrites = world.log.writes.slice(before)
+    .filter((w) => w.id === actor.id && w.change?.system);
+  assert.equal(dataWrites.length, 1, 'one actor data write');
+  assert.deepEqual(dataWrites[0].change.system, { hp: 11 });
+  assert.equal(dataWrites[0].options?.chronicleSyncApply, true, 'marked as an apply');
+  // The one PUT is this scenario's own Chronicle edit.
+  assert.equal(writes(reqs).filter((r) => /\/fields$/.test(r.url) && r.method === 'PUT').length, 1, 'no push-back');
+
+  const again = world.log.writes.length;
+  await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: { hp: 11 } });
+  await settle();
+  assert.deepEqual(world.log.writes.slice(again).filter((w) => w.id === actor.id && w.change?.system), [], 'same value writes nothing');
+  await closeWorld(world);
+}, { settings: ON }));

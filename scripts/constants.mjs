@@ -21,5 +21,5 @@ export const REPORT_STORE_FLAG = 'problemReportsStore';
  */
 export const SYNC_OPTIONS = Object.freeze({ chronicleSync: true });
 
-/** Write option marking an embedded-item change as applied from Chronicle, so the item hooks do not push it back. */
+/** Write option marking an actor or embedded-item change as applied from Chronicle, so the update hooks do not push it back. */
 export const APPLY_OPTION = 'chronicleSyncApply';
