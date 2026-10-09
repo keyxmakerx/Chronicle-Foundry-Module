@@ -14,6 +14,8 @@
  * The pure layers are unit-testable without Foundry (see tools/).
  */
 
+import { identityFieldDefs } from './_identity-item-plan.mjs';
+
 // Cap recursion so a deep/cyclic system object can't run away. Draw Steel's
 // hero.system is shallow; 4 covers it with headroom.
 const DEFAULT_MAX_DEPTH = 4;
@@ -208,7 +210,8 @@ export function buildCapabilityReport(snapshot, fieldDefs) {
           key: f.key,
           foundry_path: desc,
           type: f.type || null,
-          writable: f.foundry_writable !== false,
+          // Ancestry, culture, career and kit are swapped as items when Chronicle changes them.
+          writable: identityFieldDefs([f]).length > 0,
           sample: undefined,
         });
         continue;
@@ -256,7 +259,7 @@ export function buildCapabilityReport(snapshot, fieldDefs) {
       source: 'actor.items',
       count: snapshot.items.count,
       types: snapshot.items.types,
-      note: 'Embedded items. Pullable via a collection mapping (foundry_collection + foundry_item_type[, foundry_item_single]); per-type schemas below show the projectable fields.',
+      note: 'Embedded items. Pullable via a collection mapping (foundry_collection + foundry_item_type[, foundry_item_single]); a single-item mapping for ancestry, culture, career or kit is also Chronicle → Foundry (the item is swapped); per-type schemas below show the projectable fields.',
       sample: snapshot.items.sample,
       samples: snapshot.items.samples || [],
     });

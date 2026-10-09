@@ -504,14 +504,26 @@ Lists campaign members with their display names and roles.
 
 **Used by:** `sync-manager.mjs` → auto-match Chronicle users to Foundry users by display name
 
-**Response:**
+**Response:** a bare array. The sync API sends no email address.
 ```json
-{
-  "data": [
-    { "id": "uuid", "display_name": "Alice", "role": "player" }
-  ]
-}
+[
+  {
+    "campaign_id": "uuid", "user_id": "uuid", "role": 1, "display_name": "Alice",
+    "joined_at": "2026-01-01T00:00:00Z",
+    "avatar_url": "/media/<uuid>/thumb/300?expires=...&sig=...&campaign=<campaign id>"
+  }
+]
 ```
+`avatar_url` is a signed 300px thumbnail path of the member's profile picture,
+valid for 15 minutes and only while that member belongs to the key's campaign;
+absent when the member has no picture. The path holds the picture's media id,
+which changes whenever the picture does. Fetch it cookieless, without
+redirects, on the `apiUrl` host.
+
+**Used by (avatar):** `avatar-sync.mjs` → copies the picture into the world's
+files and sets it as the matched Foundry user's avatar.
+
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/api_handler.go` `ListMembers`, `plugins/media/handler.go` `avatarLinkAllowed`)
 
 ---
 

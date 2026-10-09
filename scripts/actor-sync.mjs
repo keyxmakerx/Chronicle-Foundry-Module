@@ -14,15 +14,18 @@
  * determines which Foundry actor type to sync.
  */
 
-import { getSetting } from './settings.mjs';
+import { getSetting, getUserMappings } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
 import { createGenericAdapter } from './adapters/generic-adapter.mjs';
-import { FLAG_SCOPE } from './constants.mjs';
+import { FLAG_SCOPE, SYNC_OPTIONS, APPLY_OPTION } from './constants.mjs';
+import { planClaimOwnership } from './_claim-ownership-plan.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { walkEntityPages, unwrapEntityList } from './_entity-page-walk.mjs';
 import { JournalPushDebouncer } from './_journal-push-debounce.mjs';
 import { mergeChanges } from './_actor-field-diff.mjs';
 import { collapseChanges } from './_change-feed.mjs';
+import { planIdentityItems } from './_identity-item-plan.mjs';
+import { applyIdentityPlan } from './_identity-item-apply.mjs';
 
 /**
  * ActorSync handles character entity ↔ Actor synchronization.
@@ -37,6 +40,8 @@ export class ActorSync {
 
     /** @type {boolean} Suppress hook processing during sync-initiated changes. */
     this._syncing = false;
+    /** Chronicle claimants already reported as having no Foundry user, so the GM hears once a session. */
+    this._unmappedNoticed = new Set();
 
     /**
      * Tracks Foundry-originated creates whose POST is in flight.
@@ -222,6 +227,8 @@ export class ActorSync {
       }
     }
 
+    await this._reconcileClaimOwnership();
+
     // Surface unresolved character links (broken / missing) so the GM can
     // fix them in the dashboard's Issues tab rather than silently desyncing.
     try {
@@ -264,6 +271,68 @@ export class ActorSync {
       if (!(await this._updateActorFromEntity(actor, entity))) errors++;
     }
     return errors;
+  }
+
+  /**
+   * Give the Foundry user mapped to a character's Chronicle owner OWNER on
+   * the actor. Runs inside the caller's `_syncing` guard on the GM's client
+   * only; the write carries the sync options so no hook reports it back. It
+   * only ever adds access (see `planClaimOwnership`), and never throws.
+   * @param {Actor} actor
+   * @param {string|null} ownerId - Chronicle's owner_user_id now.
+   * @param {string|null} previousOwnerId - the owner this client last applied.
+   * @private
+   */
+  async _applyClaimOwnership(actor, ownerId, previousOwnerId) {
+    if (!game.user?.isGM || !ownerId) return;
+    try {
+      const users = game.users?.contents ?? Array.from(game.users ?? []);
+      const plan = planClaimOwnership({
+        ownership: actor.ownership ?? {},
+        chronicleOwnerId: ownerId,
+        previousOwnerId,
+        mappings: getUserMappings(),
+        foundryUserIds: users.map((u) => u.id),
+        gmUserIds: users.filter((u) => u.isGM).map((u) => u.id),
+        ownerLevel: CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3,
+      });
+      if (plan.grantUserId) {
+        await actor.update(
+          { ownership: { [plan.grantUserId]: CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3 } },
+          { ...SYNC_OPTIONS, [APPLY_OPTION]: true }
+        );
+      }
+      for (const staleId of plan.staleOwnerUserIds) {
+        ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.PreviousOwnerKept', {
+          actor: actor.name,
+          player: game.users?.get?.(staleId)?.name ?? staleId,
+        }));
+      }
+      if (plan.unmapped && !this._unmappedNoticed.has(ownerId)) {
+        this._unmappedNoticed.add(ownerId);
+        ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.ClaimantUnmapped', { actor: actor.name }));
+      }
+    } catch (err) {
+      console.error(`Chronicle: could not apply the owner of "${actor.name}"`, err);
+    }
+  }
+
+  /**
+   * Honour the claims already cached on linked actors (flag), so a claim made
+   * before this client first ran, or while it was closed, takes effect once.
+   * Idempotent: a user who already has OWNER is left alone.
+   * @private
+   */
+  async _reconcileClaimOwnership() {
+    if (!game.user?.isGM) return;
+    for (const actor of game.actors?.contents ?? []) {
+      if (actor.type !== this._actorType || !actor.getFlag(FLAG_SCOPE, 'entityId')) continue;
+      const owner = actor.getFlag(FLAG_SCOPE, 'chronicleOwnerUserId') ?? null;
+      if (!owner) continue;
+      this._syncing = true;
+      try { await this._applyClaimOwnership(actor, owner, owner); }
+      finally { this._syncing = false; }
+    }
   }
 
   /** The actor linked to a Chronicle entity, or undefined. @private */
@@ -358,6 +427,8 @@ export class ActorSync {
       }
 
       const actor = await Actor.create(actorData);
+      await this._applyIdentityItems(actor, entity);
+      await this._applyClaimOwnership(actor, entity.owner_user_id ?? null, null);
 
       // Create sync mapping (idempotent — tolerates a pre-existing
       // Chronicle mapping pointing at a stale Foundry id, which is
@@ -390,6 +461,40 @@ export class ActorSync {
     if (!actor) return;
 
     await this._updateActorFromEntity(actor, entity);
+  }
+
+  /**
+   * Swap the actor's ancestry/culture/career/kit items to the ones Chronicle
+   * names. Runs inside the caller's `_syncing` guard; the writes also carry
+   * the apply options so the item hooks do not push them back. Only the GM's
+   * client does it, and a failure is one notice, never a thrown error.
+   * @param {Actor} actor
+   * @param {object} entity
+   * @private
+   */
+  async _applyIdentityItems(actor, entity) {
+    if (!game.user?.isGM) return;
+    try {
+      const plan = planIdentityItems({
+        items: (actor.items?.contents ?? Array.from(actor.items ?? [])),
+        fieldDefs: this._adapter.identityFields ?? [],
+        fieldsData: entity?.fields_data,
+      });
+      if (!plan.length) return;
+      const { failed } = await applyIdentityPlan(actor, plan, game);
+      if (failed.length) {
+        ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.IdentityItemFailed', {
+          actor: actor.name,
+          fields: failed.join(', '),
+        }));
+      }
+    } catch (err) {
+      console.error(`Chronicle: identity items failed for "${actor.name}"`, err);
+      ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.IdentityItemFailed', {
+        actor: actor.name,
+        fields: '',
+      }));
+    }
   }
 
   /**
@@ -428,6 +533,8 @@ export class ActorSync {
         await actor.update(fieldUpdate);
       }
 
+      await this._applyIdentityItems(actor, entity);
+
       // Sync visibility: Chronicle is_private → Foundry actor hidden.
       // A private entity means the NPC is hidden from players.
       const shouldBeHidden = entity.is_private === true;
@@ -448,7 +555,10 @@ export class ActorSync {
       // `null` when unclaimed so the indicator shows "Unclaimed" rather
       // than stale data.
       if (Object.prototype.hasOwnProperty.call(entity, 'owner_user_id')) {
-        await actor.setFlag(FLAG_SCOPE, 'chronicleOwnerUserId', entity.owner_user_id ?? null);
+        const previousOwner = actor.getFlag(FLAG_SCOPE, 'chronicleOwnerUserId') ?? null;
+        const nextOwner = entity.owner_user_id ?? null;
+        await actor.setFlag(FLAG_SCOPE, 'chronicleOwnerUserId', nextOwner);
+        await this._applyClaimOwnership(actor, nextOwner, previousOwner);
       }
 
       console.debug(`Chronicle: Updated actor "${actor.name}" from entity`);
