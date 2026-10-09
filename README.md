@@ -28,50 +28,51 @@ Bidirectional real-time sync between [Chronicle](https://github.com/keyxmakerx/C
 | Foundry VTT | Status |
 |-------------|--------|
 | v12         | Minimum supported |
-| v13         | Verified |
+| v13         | Supported |
 | v14         | Verified |
 
 ## Installation
 
 Module releases are served from your Chronicle instance, not from GitHub.
-The install URL is **per-campaign**, signed, and pinned to the version
-your campaign owner selected.
+The install URL is **per-campaign** and signed, and it follows the update
+choice your campaign owner made.
 
 **To install:**
 
-1. In Chronicle, open your campaign → **Settings → Integrations**.
-2. Copy the **install URL** shown on that page.
+1. In Chronicle, open your campaign → **Manage → Foundry** (the row appears
+   once the campaign's Foundry sync is turned on).
+2. Under **Install in Foundry**, copy the **Module Install URL**.
 3. In Foundry VTT, go to **Add-on Modules → Install Module**, paste the
    URL, and click **Install**.
 
 After install, Foundry remembers that URL and re-uses it on every update
-check — so you'll receive whichever module version your campaign owner
-pins, without further configuration.
+check — so you get whichever module version your campaign's update choice
+gives, without further configuration.
 
 > **For Chronicle admins:** Chronicle picks up new versions from this repo's
 > GitHub releases. In Chronicle, open **Admin → Packages**, click **Check now**
-> on this module's Settings tab, and install the new version. Campaign owners then
-> pin it per campaign under **Settings → Integrations**.
+> on this module's Settings tab, and install the new version. Each campaign owner
+> chooses how their world takes new versions on **Manage → Foundry → Module version**.
 >
 > GitHub releases are Chronicle's upstream source, not the install channel for
 > Foundry users — the install URL to hand out is the per-campaign Chronicle
-> URL above, since that's what makes per-campaign version pinning work. An
-> install still pointed at GitHub keeps running but won't receive the
-> campaign's pinned version; check **Game Settings → Module Settings →
+> URL above, since that's what makes the per-campaign update choice work. An
+> install still pointed at GitHub keeps running but won't follow the
+> campaign's update choice; check **Game Settings → Module Settings →
 > Chronicle Sync → Update Source** to see whether an install needs re-pointing.
 
 ## Updating in Foundry
 
 Once installed via your Chronicle install URL, Foundry stores that URL
 and uses it for every future update check — updates always come from
-Chronicle, reflecting whichever version your campaign owner has pinned.
+Chronicle, following your campaign's update choice.
 
 Foundry's central Package Repository also lists this module with its
 GitHub manifest URL. On an update check, Foundry may detect the
 mismatch and prompt you to switch the locally-stored manifest URL to
 one from the Package Repository. **If you see this prompt, decline it
 to keep your install on Chronicle.** Switching to the Package
-Repository's URL bypasses your campaign owner's pinned version and
+Repository's URL bypasses your campaign's update choice and
 sends update traffic to GitHub instead of Chronicle.
 
 ### Updating the module (for the operator)
@@ -88,26 +89,28 @@ Do these in order whenever you ship a new module version:
 3. **Pick it up in Chronicle.** Open **Admin → Packages**, open this module,
    press **Check now** on its Settings tab, then install the new version from
    its version list.
-4. **Roll it out per campaign.** A campaign set to "auto: latest" follows the
-   newest installed version. A pinned campaign stays on its pin until its owner
-   picks the new version under **Settings → Integrations → Pin to Version**
-   and presses **Save Pin**.
+4. **Roll it out per campaign.** Each campaign follows its owner's choice on
+   **Manage → Foundry → Module version**: "Update automatically" takes the new
+   version at once, "Ask me first" waits until the owner presses **Update**,
+   and "Stay on one version" changes nothing until the owner picks another
+   version.
 5. **Update in Foundry.** The GM (whoever hosts the world) opens **Add-on
    Modules**, updates Chronicle Sync, and reloads the world. Decline Foundry's offer to
    switch to the Package Repository's URL.
 
-Working: the campaign's **Manage → Apps & game system** page shows the new
-module version on the Foundry VTT row after the GM's Foundry reconnects, and Foundry's
+Working: the campaign's **Manage → Foundry** page shows the new version under
+**Module version** after the GM's Foundry reconnects, and Foundry's
 **Update Source & Manual Check** (Game Settings → Module Settings → Chronicle
 Sync) shows a Chronicle address. Broken: the version stays old after a reload
-(the campaign is still pinned, or Foundry is on the GitHub address), or Update
+(the campaign waits on "Ask me first" or "Stay on one version", or Foundry
+is on the GitHub address), or Update
 Source shows a message in red (follow the "What to do" line in it).
 
 ## Configuration
 
 1. Enable the module in your world's **Module Management**
 2. Open **Game Settings → Module Settings → Chronicle Sync**
-3. Paste the **Connect line** from Chronicle (your campaign → **Manage → Apps & game system**, Foundry VTT row → **Make a connect line**) and save; it fills in the URL, API key and campaign ID, then reload Foundry. Or enter the **API URL**, **API Key**, and **Campaign ID** by hand
+3. Paste the **Connect line** from Chronicle (your campaign → **Manage → Foundry**, **Connection** card → **Make a connect line**) and save; it fills in the URL, API key and campaign ID, then reload Foundry. Or enter the **API URL**, **API Key**, and **Campaign ID** by hand
 4. Enable the sync categories you want (Journals, Maps, Calendar, Characters)
 
 The module runs sync for the GM only. Players receive updates passively through Foundry.

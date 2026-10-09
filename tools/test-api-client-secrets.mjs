@@ -21,7 +21,7 @@ import { dirname, resolve } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
 
-// Stub Foundry globals before importing api-client.mjs (per F-PR2-3 — the
+// Stub Foundry globals before importing api-client.mjs (see the test-bootstrap footgun in .ai.md: the
 // module reads getSetting at module top level via the settings.mjs import
 // chain). The scrub helper itself doesn't touch Foundry; the stubs only
 // satisfy the transitive imports.

@@ -44,7 +44,7 @@ Install/update flow: also `.ai.md` → "Chronicle Integration — Install & Upda
 ## Code Conventions
 
 - **ES modules** (`.mjs`), `export default class` pattern.
-- **Comments say why, briefly**, pointing at a test/issue for more — no incident stories, task IDs, dates or `file:line` (those go in the PR). Deferred work is `TODO(#issue)`.
+- **Comments say why, briefly**, pointing at a test/issue for more — no incident stories, task IDs, dates or `file:line` (those go in the PR). Deferred work is `TODO(#issue)`. CI checks new comments with `tools/check-comment-clutter.sh` (self-test `tools/test-comment-clutter.sh`).
 - `_syncing` guard against infinite loops: a boolean.
 - Adapters implement `toChronicleFields()`/`fromChronicleFields()`; REST uses Bearer auth via `api-client.mjs`.
 - **API key is CLIENT-scoped, never world-scoped** (a world setting syncs to every client). `migrateApiKeyToClientScope()` migrates legacy values. `tools/test-api-key-scope.mjs`.
