@@ -1,11 +1,12 @@
-/* DM Screen (scripts/dm-screen.mjs): three parchment leaves joined by
-   hinges, like a paper GM screen, matching Chronicle's own panel. Foundry's
-   global button and input styles are reset inside .dms so the leaves look
-   the same in v12, v13 and v14. The opening runs on the Web Animations API;
-   the script checks prefers-reduced-motion itself. */
+/* DM Screen (scripts/dm-screen.mjs): three panels side by side, like a GM
+   screen, in the module's shared colours (styles/tokens.css) so it follows
+   Foundry's light and dark themes. Foundry's global button and input styles
+   are reset inside .dms so the panels look the same in v12, v13 and v14. The
+   opening runs on the Web Animations API; the script checks
+   prefers-reduced-motion itself. */
 .chronicle-dm-screen {
-  --dms-leaf: #fbf7ee; --dms-leaf-edge: #c9b998; --dms-ink: #2b2418; --dms-ink-muted: #6e624c;
-  --dms-hinge: #8a7650; --dms-ok: #16a34a; --dms-ok-soft: rgba(22, 163, 74, .15); --dms-warn: #b45309;
+  --dms-leaf: var(--cs-surface); --dms-leaf-edge: var(--cs-line); --dms-ink: var(--cs-text); --dms-ink-muted: var(--cs-text-muted);
+  --dms-hinge: var(--cs-accent); --dms-ok: var(--cs-ok); --dms-ok-soft: color-mix(in srgb, var(--cs-ok) 15%, transparent); --dms-warn: var(--cs-warn);
   --dms-die: #6366f1;
 }
 .chronicle-dm-screen .window-content { padding: .5rem; container-type: inline-size; overflow-y: auto; }
@@ -31,7 +32,7 @@
   box-shadow: 0 12px 30px rgba(0, 0, 0, .28); backface-visibility: hidden;
 }
 .chronicle-dm-screen .dms-leaf-l { border-radius: .6rem 0 0 .6rem; transform-origin: right center; }
-.chronicle-dm-screen .dms-leaf-m { transform-origin: center bottom; border-left: 3px double var(--dms-hinge); border-right: 3px double var(--dms-hinge); }
+.chronicle-dm-screen .dms-leaf-m { transform-origin: center bottom; border-left: 1px solid var(--dms-leaf-edge); border-right: 1px solid var(--dms-leaf-edge); }
 .chronicle-dm-screen .dms-leaf-r { border-radius: 0 .6rem .6rem 0; transform-origin: left center; }
 .chronicle-dm-screen .dms-leaf h3 {
   margin: 0; font-size: 1em; font-weight: 700; letter-spacing: .04em; color: var(--dms-ink);
@@ -49,7 +50,7 @@
 .chronicle-dm-screen .dms-confirm p { margin: 0; }
 .chronicle-dm-screen .dms-confirm-btns { display: flex; gap: .4rem; flex-wrap: wrap; }
 .chronicle-dm-screen .dms-confirm-btns button { border: 1px solid var(--dms-leaf-edge); border-radius: .35rem; padding: .15rem .6rem; font-size: .9em; }
-.chronicle-dm-screen .dms .dms-confirm-yes { background: var(--dms-warn); border-color: var(--dms-warn); color: #fff; font-weight: 700; }
+.chronicle-dm-screen .dms .dms-confirm-yes { background: var(--dms-warn); border-color: var(--dms-warn); color: var(--cs-on-status); font-weight: 700; }
 .chronicle-dm-screen .dms-partywrap { position: relative; }
 .chronicle-dm-screen .dms-party {
   position: relative; max-height: 17rem; overflow-y: auto; display: grid; gap: .1rem; padding: .1rem .1rem .4rem; scrollbar-width: thin;
@@ -105,7 +106,7 @@
   .chronicle-dm-screen .dms-leaves { flex-direction: column; }
   .chronicle-dm-screen .dms-leaf { flex: none; min-height: 0; }
   .chronicle-dm-screen .dms-leaf-l { border-radius: .6rem .6rem 0 0; transform-origin: center bottom; }
-  .chronicle-dm-screen .dms-leaf-m { border-left: 1px solid var(--dms-leaf-edge); border-right: 1px solid var(--dms-leaf-edge); border-top: 3px double var(--dms-hinge); border-bottom: 3px double var(--dms-hinge); }
+  .chronicle-dm-screen .dms-leaf-m { border-left: 1px solid var(--dms-leaf-edge); border-right: 1px solid var(--dms-leaf-edge); border-top: 1px solid var(--dms-leaf-edge); border-bottom: 1px solid var(--dms-leaf-edge); }
   .chronicle-dm-screen .dms-leaf-r { border-radius: 0 0 .6rem .6rem; transform-origin: center top; }
 }
 @media (prefers-reduced-motion: reduce) {

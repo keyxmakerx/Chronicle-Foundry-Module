@@ -26,11 +26,11 @@
   border-radius: 10px;
   font-size: 12px;
   border: 1px solid currentColor;
-  color: #94a3b8;
+  color: var(--cs-text-muted);
 }
 
 .chronicle-stashes .cs-pill-open {
-  color: #4ade80;
+  color: var(--cs-ok);
 }
 
 .chronicle-stashes .cs-tabs {
@@ -53,8 +53,8 @@
   margin: 0;
   padding: 6px 8px;
   border-radius: 4px;
-  color: #fff;
-  background: #b91c1c;
+  color: var(--cs-on-status);
+  background: var(--cs-bad);
 }
 
 .chronicle-stashes .cs-note,
@@ -219,12 +219,12 @@
 }
 
 .chronicle-stash-approved {
-  color: #15803d;
+  color: var(--cs-ok);
 }
 
 .chronicle-stash-declined,
 .chronicle-stash-failed {
-  color: #b91c1c;
+  color: var(--cs-bad);
 }
 
 }
