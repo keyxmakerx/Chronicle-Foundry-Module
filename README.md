@@ -1,37 +1,34 @@
-# Chronicle Sync — Foundry VTT Module
+<h1 align="center">Chronicle Sync</h1>
 
-Bidirectional real-time sync between [Chronicle](https://github.com/keyxmakerx/Chronicle) and Foundry VTT.
+<p align="center">
+  <b>Your <a href="https://github.com/keyxmakerx/Chronicle">Chronicle</a> campaign and your Foundry VTT world, kept in step both ways.</b><br>
+  Journals, maps, characters, items, shops and the calendar, live while you play.
+</p>
 
-## Features
+<p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-6366f1"></a>
+  <img alt="Foundry VTT v12 to v14" src="https://img.shields.io/badge/foundry-v12%E2%80%93v14-f97316">
+</p>
 
-> **Older Chronicle servers and the calendar.** Chronicle's calendar is rebuilt
-> around new date and event routes, which the module uses. A Chronicle that still
-> answers calendar routes with `503 calendar_rebuilding` makes the module pause
-> calendar pushes for the session rather than report an error — nothing is
-> wrong on your side. Journals, maps, characters and items sync as usual.
+Write in Chronicle between sessions and run the game in Foundry. Chronicle Sync runs in the GM's Foundry client and keeps the two in step: a change on either side shows up on the other, and journals, characters, inventories and map items catch up on what changed while Foundry was closed. Players never need a key of their own.
 
-- **Journal Sync** — Chronicle entities ↔ Foundry journal entries (with multi-page splitting); GM-only text and pictures in Chronicle pages sit in Foundry secret blocks, hidden from players who don't own the page; catches up on reconnect from Chronicle's change feed; nothing is deleted without asking
-- **Map Sync** — Chronicle maps render as Foundry journal pages (not Scenes) in Chronicle's own frame and pin shapes, with markers, drawings, tokens, layers and fog drawn as overlays; players get the smudged picture of a shadowed map; markers are editable, with Chronicle's icon picker ("Open in Chronicle web editor" for the full map editor); the GM can give a map to a character, who opens it from their sheet
-- **Calendar** — The dashboard's Calendar tab shows Chronicle's date, weather, season, era and moon phases; no Foundry calendar module is integrated
-- **Character Sync** — Actor ↔ character entity with system-aware field mapping (D&D 5e, Pathfinder 2e, or any system with annotated fields)
-- **Shop Rooms** — Chronicle shops open in Foundry as shop rooms; the GM can show a room to players, and players buy in it (charged to the character they pick) while the GM is in the game
-- **Stashes** — A Stashes window on linked character sheets to move items and money between characters and stashes; the GM approves players' requests from a chat card (needs Chronicle's Armory addon)
-- **DM Screen** — The GM's DM Screen from Chronicle in a Foundry window: world and downtime switch, the party, rules and reveals
-- **Player Notebook** — Every player's own Chronicle journal and jot notes in a Foundry window, with jots that follow the page in view
-- **NPC Tokens** — GM token tools for Chronicle NPCs: spotlight, talking glow and open page; "Show in Foundry" on an NPC page spotlights its token
-- **Sync Dashboard** — management UI with diagnostics, error logs, health metrics, a copyable diagnostic bundle and a Setup Wizard for a first import
-- **Permission Mapping** — Chronicle visibility ↔ Foundry ownership levels
-- **Sync History** — a History tab in the Sync Dashboard showing Chronicle's sync history in both directions, the same list the owner sees in Chronicle
+## What it syncs
 
-## Compatibility
+- **Journals**: Chronicle pages become Foundry journal entries. GM-only text and pictures stay hidden from players who don't own the page, and nothing is deleted without asking.
+- **Maps**: Chronicle maps open as Foundry journal pages with their markers, drawings, tokens, layers and fog. Players see the smudged picture of a shadowed map, and the GM can hand a map to a character.
+- **Characters and items**: actors and character pages map field by field for D&D 5e, Pathfinder 2e, or any system whose fields are annotated.
+- **Calendar**: Chronicle's date, weather, season, era and moon phases, with no Foundry calendar module needed.
+- **Shops and stashes**: Chronicle's shop rooms open in Foundry, and players buy with the character they pick. Stashes move items and money between characters, with the GM approving players' requests from a chat card.
+- **DM Screen and notebook**: the GM's DM Screen from Chronicle in a Foundry window, and each player's own Chronicle journal and jot notes.
+- **NPC tokens**: spotlight, talking glow and open page for Chronicle NPCs. "Show in Foundry" on an NPC page spotlights its token.
+- **Sync dashboard**: diagnostics, error logs, a copyable diagnostic bundle, a setup wizard for the first import, and the same sync history the owner sees in Chronicle.
 
-| Foundry VTT | Status |
-|-------------|--------|
-| v12         | Minimum supported |
-| v13         | Supported |
-| v14         | Verified |
+> **Older Chronicle servers and the calendar.** A Chronicle that still answers
+> calendar routes with `503 calendar_rebuilding` makes the module pause calendar
+> pushes for the session rather than report an error. Nothing is wrong on your
+> side, and journals, maps, characters and items sync as usual.
 
-## Installation
+## Install
 
 Module releases are served from your Chronicle instance, not from GitHub.
 The install URL is **per-campaign** and signed, and it follows the update
@@ -61,7 +58,16 @@ gives, without further configuration.
 > campaign's update choice; check **Game Settings → Module Settings →
 > Chronicle Sync → Update Source** to see whether an install needs re-pointing.
 
-## Updating in Foundry
+## Configuration
+
+1. Enable the module in your world's **Module Management**
+2. Open **Game Settings → Module Settings → Chronicle Sync**
+3. Paste the **Connect line** from Chronicle (your campaign → **Manage → Foundry**, **Connection** card → **Make a connect line**) and save; it fills in the URL, API key and campaign ID, then reload Foundry. Or enter the **API URL**, **API Key**, and **Campaign ID** by hand
+4. Enable the sync categories you want (Journals, Maps, Calendar, Characters)
+
+The module runs sync for the GM only. Players receive updates passively through Foundry.
+
+## Updating
 
 Once installed via your Chronicle install URL, Foundry stores that URL
 and uses it for every future update check — updates always come from
@@ -75,9 +81,25 @@ to keep your install on Chronicle.** Switching to the Package
 Repository's URL bypasses your campaign's update choice and
 sends update traffic to GitHub instead of Chronicle.
 
-### Updating the module (for the operator)
+## Compatibility
+
+| Foundry VTT | Status |
+|-------------|--------|
+| v12         | Minimum supported |
+| v13         | Supported |
+| v14         | Verified |
+
+## Optional Modules
+
+- [Monk's Enhanced Journal](https://foundryvtt.com/packages/monks-enhanced-journal) — Enhanced journal page support
+
+## For the Chronicle operator
+
+<details>
+<summary><b>Shipping a new module version</b></summary>
 
 Do these in order whenever you ship a new module version:
+
 
 1. **Deploy Chronicle first**, with your usual backup. The module keeps
    working against an older Chronicle, but newer features (the DM Screen,
@@ -106,20 +128,10 @@ Sync) shows a Chronicle address. Broken: the version stays old after a reload
 is on the GitHub address), or Update
 Source shows a message in red (follow the "What to do" line in it).
 
-## Configuration
+</details>
 
-1. Enable the module in your world's **Module Management**
-2. Open **Game Settings → Module Settings → Chronicle Sync**
-3. Paste the **Connect line** from Chronicle (your campaign → **Manage → Foundry**, **Connection** card → **Make a connect line**) and save; it fills in the URL, API key and campaign ID, then reload Foundry. Or enter the **API URL**, **API Key**, and **Campaign ID** by hand
-4. Enable the sync categories you want (Journals, Maps, Calendar, Characters)
-
-The module runs sync for the GM only. Players receive updates passively through Foundry.
-
-## Optional Modules
-
-- [Monk's Enhanced Journal](https://foundryvtt.com/packages/monks-enhanced-journal) — Enhanced journal page support
-
-## For Chronicle integrators
+<details>
+<summary><b>The package descriptor, for Chronicle integrators</b></summary>
 
 This module ships a [`chronicle-package.json`](chronicle-package.json)
 descriptor at the repo root. Chronicle reads it during admin install to
@@ -147,6 +159,12 @@ The check enforces:
 Bumping `module.json#/id` (rare) requires updating
 `chronicle-package.json#/package/id` in the same commit.
 
+</details>
+
+## Contributing
+
+Bug reports and ideas are welcome as [issues](https://github.com/keyxmakerx/Chronicle-Foundry-Module/issues). How the module works is in [`.ai.md`](.ai.md), the Chronicle API it relies on is in [`API-CONTRACT.md`](API-CONTRACT.md), and [`TESTING.md`](TESTING.md) covers the tests and the two-sided sync bench.
+
 ## License
 
-MIT
+[MIT](LICENSE).
