@@ -180,6 +180,7 @@ export class ShopRoomWindow extends ApplicationV2 {
     this._mountedLayout = undefined;
     /** Character names from the last buyers answers, for the GM's sale line. */
     this._buyerNames = new Map();
+    this._buyerMoneyKeys = new Map();
   }
 
   get shopId() { return this._shopId; }
@@ -292,7 +293,10 @@ export class ShopRoomWindow extends ApplicationV2 {
       if (kind === 'buyers') {
         const q = actingUserId ? `?actingUserId=${encodeURIComponent(actingUserId)}` : '';
         const view = await this._api.get(`${base}/buyers${q}`);
-        for (const b of view?.buyers || []) this._buyerNames.set(b.id, b.name);
+        for (const b of view?.buyers || []) {
+          this._buyerNames.set(b.id, b.name);
+          this._buyerMoneyKeys.set(b.id, b.moneyKey);
+        }
         return { status: 200, body: view || {} };
       }
       // Hold redraws while the GM's own basket is in flight, as for a player.
@@ -318,6 +322,8 @@ export class ShopRoomWindow extends ApplicationV2 {
       if (result?.status === 'bought') this._announceSale(describeSale({
         who, character: this._buyerNames.get(body?.buyerEntityId) || t('SomeCharacter'),
         shop: this._name, items: body?.items, goods: goodsBefore, result,
+        moneyKey: this._buyerMoneyKeys.get(body?.buyerEntityId),
+        format: (k, d) => game.i18n.format(`CHRONICLE.ShopRoom.${k}`, d),
       }));
       return { status: 200, body: result || {}, goods };
     } catch (err) {

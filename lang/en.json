@@ -21,7 +21,10 @@
       "OpenShopButton": "Open shop",
       "ClosedTitle": "The shop is closed",
       "ClosedNoGM": "No GM is online right now. Try again when your GM joins.",
-      "NoAccess": "You can't see this shop's journal entry."
+      "NoAccess": "You can't see this shop's journal entry.",
+      "SaleLeft": "{character} has {amount} left.",
+      "SaleWealth": "{character}'s Wealth stays at {amount}.",
+      "SaleChange": "Change: {change}."
     },
     "CalendarBar": {
       "Label": "Chronicle calendar",
