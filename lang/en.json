@@ -682,7 +682,8 @@
     },
     "CalendarDatePush": {
       "Rejected": "Chronicle won't accept this date: its calendar has different months or leap days. Date sync is paused.",
-      "Forbidden": "Only the campaign owner's key can change Chronicle's date. Date sync is paused."
+      "Forbidden": "Only the campaign owner's key can change Chronicle's date. Date sync is paused.",
+      "Disabled": "This campaign's calendar is switched off in Chronicle. Date sync is paused."
     },
     "Debug": {
       "TabLabel": "Debug",

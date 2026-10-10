@@ -3,7 +3,8 @@
  *
  * A 400/422 means Chronicle's calendar cannot hold the date Foundry sent
  * (different months or leap days); a 403 means the API key is not the
- * campaign owner's. Retrying on every world-time tick can never succeed and
+ * campaign owner's, or, with `addon_disabled` in the body, that the campaign
+ * has its calendar switched off. Retrying on every world-time tick can never succeed and
  * flooded the console, so the first refusal pauses date push for the session
  * and tells the GM once. Pulls and event sync are unaffected.
  */
@@ -11,10 +12,12 @@
 const FALLBACK = {
   rejected: 'Chronicle won\'t accept this date: its calendar has different months or leap days. Date sync is paused.',
   forbidden: 'Only the campaign owner\'s key can change Chronicle\'s date. Date sync is paused.',
+  disabled: 'This campaign\'s calendar is switched off in Chronicle. Date sync is paused.',
 };
 const KEYS = {
   rejected: 'CHRONICLE.CalendarDatePush.Rejected',
   forbidden: 'CHRONICLE.CalendarDatePush.Forbidden',
+  disabled: 'CHRONICLE.CalendarDatePush.Disabled',
 };
 
 /** @type {{paused: boolean, shown: Set<string>}} */
@@ -39,11 +42,11 @@ function text(kind) {
  * Classify a failed date push. A 422 whose body names real-time tracking is
  * the real-time guard's, not a calendar-shape rejection.
  * @param {*} err
- * @returns {'rejected'|'forbidden'|null}
+ * @returns {'rejected'|'forbidden'|'disabled'|null}
  */
 export function classifyDatePushRefusal(err) {
   const status = statusOf(err);
-  if (status === 403) return 'forbidden';
+  if (status === 403) return /addon_disabled/.test(String(err?.message || '')) ? 'disabled' : 'forbidden';
   if (status === 400) return 'rejected';
   if (status === 422 && !/real.?time/i.test(String(err?.message || ''))) return 'rejected';
   return null;

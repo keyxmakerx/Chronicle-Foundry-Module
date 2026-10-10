@@ -138,6 +138,11 @@ test('a 422 about real-time tracking keeps the real-time notice, not the calenda
   assert.equal(refusal.handleDatePushRefusal(apiError(422, '{"message":"real-time calendar is read-only"}')), false);
 });
 
+test('a 403 addon_disabled says the calendar is switched off, not that the key is wrong', () => {
+  assert.equal(refusal.classifyDatePushRefusal(apiError(403, '{"error":"addon_disabled","message":"calendar add-on is switched off"}')), 'disabled');
+  assert.equal(refusal.classifyDatePushRefusal(apiError(403, '{"error":"forbidden"}')), 'forbidden');
+});
+
 test('a 500 is not a refusal and still logs as an error', async () => {
   const api = { get: async () => ({}), put: async () => { throw apiError(500, 'boom'); } };
   const cs = makeCS({ _api: api });
