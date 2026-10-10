@@ -5,6 +5,7 @@
  * Settings are stored per-world and only editable by GMs.
  */
 
+import { noticeText } from './_escape-html.mjs';
 import { MODULE_ID } from './constants.mjs';
 import { UpdateInfoApplication } from './update-info.mjs';
 import { parseConnectLine } from './_connect-line.mjs';
@@ -483,7 +484,7 @@ export async function applyConnectLine(raw) {
     }
     const parsed = parseConnectLine(raw);
     if (!parsed.ok) {
-      ui.notifications.warn(game.i18n.format('CHRONICLE.Settings.ConnectLine.Invalid', { reason: parsed.reason }));
+      ui.notifications.warn(game.i18n.format('CHRONICLE.Settings.ConnectLine.Invalid', { reason: noticeText(parsed.reason) }));
       return false;
     }
     await game.settings.set(MODULE_ID, 'apiUrl', parsed.baseUrl);

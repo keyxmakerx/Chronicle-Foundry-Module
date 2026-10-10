@@ -14,6 +14,7 @@
  * determines which Foundry actor type to sync.
  */
 
+import { noticeText } from './_escape-html.mjs';
 import { getSetting, getUserMappings } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
 import { createGenericAdapter } from './adapters/generic-adapter.mjs';
@@ -305,13 +306,13 @@ export class ActorSync {
       }
       for (const staleId of plan.staleOwnerUserIds) {
         ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.PreviousOwnerKept', {
-          actor: actor.name,
-          player: game.users?.get?.(staleId)?.name ?? staleId,
+          actor: noticeText(actor.name),
+          player: noticeText(game.users?.get?.(staleId)?.name ?? staleId),
         }));
       }
       if (plan.unmapped && !this._unmappedNoticed.has(ownerId)) {
         this._unmappedNoticed.add(ownerId);
-        ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.ClaimantUnmapped', { actor: actor.name }));
+        ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.ClaimantUnmapped', { actor: noticeText(actor.name) }));
       }
     } catch (err) {
       console.error(`Chronicle: could not apply the owner of "${actor.name}"`, err);
@@ -484,14 +485,14 @@ export class ActorSync {
       const { failed } = await applyIdentityPlan(actor, plan, game);
       if (failed.length) {
         ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.IdentityItemFailed', {
-          actor: actor.name,
-          fields: failed.join(', '),
+          actor: noticeText(actor.name),
+          fields: noticeText(failed.join(', ')),
         }));
       }
     } catch (err) {
       console.error(`Chronicle: identity items failed for "${actor.name}"`, err);
       ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.IdentityItemFailed', {
-        actor: actor.name,
+        actor: noticeText(actor.name),
         fields: '',
       }));
     }
@@ -835,7 +836,7 @@ export class ActorSync {
         // Re-pull from Chronicle.
         const entity = await this._api.get(`/entities/${entityId}`);
         if (entity) await this._updateActorFromEntity(actor, entity);
-        ui.notifications.warn(`Chronicle: Conflict on "${actor.name}" — kept Chronicle version.`);
+        ui.notifications.warn(`Chronicle: Conflict on "${noticeText(actor.name)}" — kept Chronicle version.`);
         return false;
       }
       // Force push.
@@ -844,7 +845,7 @@ export class ActorSync {
       if (forced?.updated_at) {
         await this._setActorFlag(actor, 'chronicleUpdatedAt', forced.updated_at);
       }
-      ui.notifications.warn(`Chronicle: Conflict on "${actor.name}" — kept Foundry version.`);
+      ui.notifications.warn(`Chronicle: Conflict on "${noticeText(actor.name)}" — kept Foundry version.`);
       return true;
     }
   }

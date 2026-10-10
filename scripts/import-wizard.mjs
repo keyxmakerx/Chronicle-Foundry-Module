@@ -8,6 +8,7 @@
  * Launched from the "Setup Wizard" button in the sync dashboard Config tab.
  */
 
+import { noticeText } from './_escape-html.mjs';
 import { getSetting, setSetting } from './settings.mjs';
 import { FLAG_SCOPE, REPORT_STORE_FLAG } from './constants.mjs';
 import { DEFAULT_ICON, toIconName } from './_icon-name.mjs';
@@ -778,7 +779,7 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
         this._typeMappings[mappingIndex].isNew = true;
       }
     } catch (err) {
-      ui.notifications.error(`Failed to create entity type: ${err.message}`);
+      ui.notifications.error(`Failed to create entity type: ${noticeText(err.message)}`);
     }
 
     this._newTypeForm = null;

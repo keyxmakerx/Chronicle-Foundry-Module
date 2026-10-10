@@ -24,6 +24,7 @@
  * player's machine reads only the page flags the GM client wrote.
  */
 
+import { noticeText } from './_escape-html.mjs';
 import { getSetting } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
@@ -388,7 +389,7 @@ export class MapSync {
       this._toastOnce(
         'ws_event_error',
         'warn',
-        `Chronicle: a real-time map update failed to apply (${msg.type}). See the sync dashboard for details.`
+        `Chronicle: a real-time map update failed to apply (${noticeText(msg.type)}). See the sync dashboard for details.`
       );
     }
   }
@@ -700,7 +701,7 @@ export class MapSync {
       this._toastOnce(
         `player_image:${mapData.id}`,
         'warn',
-        `Chronicle: could not fetch the player picture for map "${mapData.name || mapData.id}". Players see no picture until the next sync brings it.`
+        `Chronicle: could not fetch the player picture for map "${noticeText(mapData.name || mapData.id)}". Players see no picture until the next sync brings it.`
       );
       return '';
     };
@@ -838,14 +839,14 @@ export class MapSync {
       const mapData = await this._api.get(`/maps/${mapId}`);
       const map = mapData?.data || mapData;
       if (!map?.id) {
-        ui.notifications.warn(`Chronicle: map ${mapId} not found.`);
+        ui.notifications.warn(`Chronicle: map ${noticeText(mapId)} not found.`);
         return false;
       }
       await this._materializeMap(map);
       await this._refreshSubResources(mapId);
       this._lastSyncAt = Date.now();
       this._notifyViewers(mapId);
-      ui.notifications.info(`Chronicle: resynced "${map.name || mapId}".`);
+      ui.notifications.info(`Chronicle: resynced "${noticeText(map.name || mapId)}".`);
       return true;
     } catch (err) {
       const status = err?.status || null;
@@ -1026,7 +1027,7 @@ export class MapSync {
       this._toastOnce(
         `image_url:${mapData.id}`,
         'warn',
-        `Chronicle: map "${mapData.name || mapData.id}" has no image — check apiUrl setting and that the map has an uploaded image in Chronicle.`
+        `Chronicle: map "${noticeText(mapData.name || mapData.id)}" has no image — check apiUrl setting and that the map has an uploaded image in Chronicle.`
       );
     }
 
@@ -1395,7 +1396,7 @@ export class MapSync {
 
       const archivedName = entry?.name || page.name || 'map';
       ui.notifications.info(
-        game.i18n.format('CHRONICLE.MapViewer.MapArchivedNotice', { name: archivedName })
+        game.i18n.format('CHRONICLE.MapViewer.MapArchivedNotice', { name: noticeText(archivedName) })
       );
       console.debug(`Chronicle: Archived map ${mapId} (local pins preserved)`);
     } else if (entry) {

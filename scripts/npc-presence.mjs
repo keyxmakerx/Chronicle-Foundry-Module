@@ -18,6 +18,7 @@
  * or page on its own. Pure rules live in _npc-presence.mjs.
  */
 
+import { noticeText } from './_escape-html.mjs';
 import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
 import { confirmDialog } from './_dialogs.mjs';
 import {
@@ -137,7 +138,7 @@ function _spotlight(token) {
     isGM: true, sameScene: true, tokenFound: true, tokenHidden: !!doc.hidden, visibleToMe: true,
   });
   if (action === 'note-hidden') {
-    ui.notifications.info(game.i18n.format('CHRONICLE.Npc.SpotlightHidden', { name: doc.name }));
+    ui.notifications.info(game.i18n.format('CHRONICLE.Npc.SpotlightHidden', { name: noticeText(doc.name) }));
     return;
   }
   // Players get the name only when they could already know it: their page
@@ -179,7 +180,7 @@ function _spotlightFromChronicle(entityId) {
   if (!token) {
     const name = pages.find((p) => p.entityId === entityId)?.name;
     ui.notifications.info(name
-      ? game.i18n.format('CHRONICLE.Npc.SpotlightNotHere', { name })
+      ? game.i18n.format('CHRONICLE.Npc.SpotlightNotHere', { name: noticeText(name) })
       : game.i18n.localize('CHRONICLE.Npc.SpotlightUnknown'));
     return;
   }
@@ -435,7 +436,7 @@ async function _askReveal(doc) {
     const api = state.getApi();
     if (!api) throw new Error('not connected');
     await api.post(`/entities/${page.entityId}/reveal`, { is_private: false });
-    ui.notifications.info(game.i18n.format('CHRONICLE.Npc.Revealed', { name: page.journal.name }));
+    ui.notifications.info(game.i18n.format('CHRONICLE.Npc.Revealed', { name: noticeText(page.journal.name) }));
   } catch (err) {
     console.error('Chronicle: revealing NPC page failed', err);
     ui.notifications.error(game.i18n.localize('CHRONICLE.Npc.RevealFailed'));
@@ -459,12 +460,12 @@ function _onDropCanvasData(_canvas, data) {
   const actor = _baseActor(token.document);
   if (!actor) return;
   if (actor.getFlag(FLAG_SCOPE, 'entityId')) {
-    ui.notifications.warn(game.i18n.format('CHRONICLE.Npc.LinkHero', { name: actor.name }));
+    ui.notifications.warn(game.i18n.format('CHRONICLE.Npc.LinkHero', { name: noticeText(actor.name) }));
     return false;
   }
   actor.setFlag(FLAG_SCOPE, LINK_FLAG, entityId)
     .then(() => {
-      ui.notifications.info(game.i18n.format('CHRONICLE.Npc.Linked', { name: token.document.name, page: journal.name }));
+      ui.notifications.info(game.i18n.format('CHRONICLE.Npc.Linked', { name: noticeText(token.document.name), page: noticeText(journal.name) }));
       for (const fn of linkListeners) fn(entityId);
     })
     .catch((err) => {

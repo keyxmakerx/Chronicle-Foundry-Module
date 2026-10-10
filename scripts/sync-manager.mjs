@@ -6,6 +6,7 @@
  * conflict resolution.
  */
 
+import { noticeText } from './_escape-html.mjs';
 import { ChronicleAPI } from './api-client.mjs';
 import { PlayerActivity, PlayerReporter, buildPlayerReport, reasonFromError, REPORT_INTERVAL_MS, EVENT_DEBOUNCE_MS } from './_player-report.mjs';
 import { AvatarSync } from './avatar-sync.mjs';
@@ -384,7 +385,7 @@ export class SyncManager {
     const extra = names.length > 8 ? ` (+${names.length - 8} more)` : '';
     const summary = `${unmatched.length} Chronicle member${unmatched.length === 1 ? '' : 's'} could not be matched to a Foundry user: ${shown}${extra}`;
     this.logActivity('warning', `${summary}. Map them in the dashboard Members tab — their per-player permissions won't sync until mapped.`);
-    ui.notifications?.warn?.(`Chronicle: ${summary}. Open the sync dashboard → Members to map them.`);
+    ui.notifications?.warn?.(`Chronicle: ${noticeText(summary)}. Open the sync dashboard → Members to map them.`);
   }
 
   /**
