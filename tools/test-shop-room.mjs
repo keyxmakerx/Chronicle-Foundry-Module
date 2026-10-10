@@ -133,13 +133,29 @@ test('buy reply: a room answer may be larger, but only up to the room cap', () =
   assert.equal(sanitizeShopBuyReply(huge, Infinity), null, 'no caller can lift the room cap');
 });
 
+const SALE_STRINGS = JSON.parse(readFileSync(new URL('../lang/en.json', import.meta.url), 'utf8')).CHRONICLE.ShopRoom;
+const format = (key, data) => SALE_STRINGS[key].replace(/\{(\w+)\}/g, (_, k) => data[k]);
+const SALE_GOODS = [{ id: 7, targetEntityName: 'Rope' }, { id: 8, metadata: { custom_name: 'Lantern' } }];
+const SALE_ITEMS = [{ relationId: 7, quantity: 2 }, { relationId: '8', quantity: 1 }];
+
 test('sale line names the buyer, the goods and the cost', () => {
-  const goods = [{ id: 7, targetEntityName: 'Rope' }, { id: 8, metadata: { custom_name: 'Lantern' } }];
   const result = { status: 'bought', spent: 12, currency: 'gp', moneyLeft: 30 };
-  assert.equal(describeSale({ who: 'Sam', character: 'Brin', shop: 'The Anvil', items: [{ relationId: 7, quantity: 2 }, { relationId: '8', quantity: 1 }], goods, result }),
+  assert.equal(describeSale({ who: 'Sam', character: 'Brin', shop: 'The Anvil', items: SALE_ITEMS, goods: SALE_GOODS, result, moneyKey: 'gp', format }),
     'Brin (Sam) bought 2× Rope, 1× Lantern at The Anvil for 12 gp. Brin has 30 gp left.');
-  assert.equal(describeSale({ who: 'Brin', character: 'Brin', shop: 'S', items: [{ relationId: 9, quantity: 1 }], goods, result: {} }),
+  assert.equal(describeSale({ who: 'Brin', character: 'Brin', shop: 'S', items: [{ relationId: 9, quantity: 1 }], goods: SALE_GOODS, result: {}, format }),
     'Brin bought 1× item at S.');
+});
+
+test('sale line labels the money left from the sheet, not the listing coin', () => {
+  const sale = (result, moneyKey) => describeSale({ who: 'Brin', character: 'Brin', shop: 'S', items: [{ relationId: 7, quantity: 1 }], goods: SALE_GOODS, result, moneyKey, format });
+  const cases = [
+    ['5e gp sheet, listing in silver', { status: 'bought', spent: 5, currency: 'sp', moneyLeft: 29.5 }, 'gp', 'Brin bought 1× Rope at S for 5 sp. Brin has 29.5 gp left.'],
+    ['purse text wins', { status: 'bought', spent: 5, currency: 'sp', moneyLeft: 9.73, purseLeft: '9 gp 7 sp 3 cp' }, 'gp', 'Brin bought 1× Rope at S for 5 sp. Brin has 9 gp 7 sp 3 cp left.'],
+    ['change is shown', { status: 'bought', spent: 5, currency: 'sp', moneyLeft: 9.73, purseLeft: '9 gp 7 sp 3 cp', change: '7 sp 3 cp' }, 'gp', 'Brin bought 1× Rope at S for 5 sp. Brin has 9 gp 7 sp 3 cp left. Change: 7 sp 3 cp.'],
+    ['single non-gp field uses the charged coin', { status: 'bought', spent: 5, currency: 'sp', moneyLeft: 20 }, 'silver', 'Brin bought 1× Rope at S for 5 sp. Brin has 20 sp left.'],
+    ['Draw Steel Wealth is not spent', { status: 'bought', moneyLeft: 3 }, 'wealth', 'Brin bought 1× Rope at S. Brin\'s Wealth stays at 3.'],
+  ];
+  for (const [name, result, moneyKey, want] of cases) assert.equal(sale(result, moneyKey), want, name);
 });
 
 const show = (over = {}) => ({

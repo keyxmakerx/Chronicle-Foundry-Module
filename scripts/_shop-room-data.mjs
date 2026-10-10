@@ -170,12 +170,31 @@ export function sanitizeShopBuyReply(msg, maxChars = MAX_REPLY_CHARS) {
 /**
  * The GM's chat line for one sale: who bought what, where, and what it cost.
  * Plain text; the caller escapes it.
+ *
+ * `moneyLeft` is the character's money in the sheet's own field, not the
+ * listing's coin, so it is labelled from the sheet: the purse text when
+ * Chronicle sent one, gp when the sheet's money field is gp, and for a sale
+ * with no `spent` (Draw Steel's Wealth, which is never charged) as Wealth. A
+ * single-field sheet with another key is charged in the listing's coin, so
+ * that coin labels it. `format(key, data)` resolves the CHRONICLE.ShopRoom
+ * sale strings.
  */
-export function describeSale({ who, character, shop, items, goods, result }) {
+export function describeSale({ who, character, shop, items, goods, result, moneyKey, format }) {
   const names = new Map((goods || []).map((g) => [String(g.id), g.targetEntityName || g.metadata?.custom_name || 'item']));
   const list = (items || []).map((it) => `${it.quantity}× ${names.get(String(it.relationId)) || 'item'}`).join(', ');
   const cost = result?.spent != null ? ` for ${result.spent} ${result.currency || ''}`.trimEnd() : '';
-  const left = result?.moneyLeft != null ? ` ${character} has ${result.moneyLeft} ${result.currency || ''}`.trimEnd() + ' left.' : '';
+  let left = '';
+  if (result?.purseLeft) {
+    left = ` ${format('SaleLeft', { character, amount: result.purseLeft })}`;
+  } else if (result?.moneyLeft != null) {
+    if (result.spent == null) {
+      left = ` ${format('SaleWealth', { character, amount: result.moneyLeft })}`;
+    } else {
+      const coin = moneyKey === 'gp' ? 'gp' : (result.currency || '');
+      left = ` ${format('SaleLeft', { character, amount: `${result.moneyLeft} ${coin}`.trimEnd() })}`;
+    }
+  }
+  if (left && result?.change) left += ` ${format('SaleChange', { change: result.change })}`;
   const by = who && who !== character ? ` (${who})` : '';
   return `${character}${by} bought ${list || 'goods'} at ${shop}${cost}.${left}`;
 }

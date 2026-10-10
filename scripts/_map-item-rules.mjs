@@ -43,6 +43,31 @@ export function journalAccessForActorOwners(actorOwnership, journalOwnership, gm
 }
 
 /**
+ * The journal ownership changes for every map journal an actor carries, once
+ * the actor's owners have changed. Same rule as the give: only raises to
+ * OBSERVER, never lowers, never touches GMs or the default level. A journal
+ * listed twice (two items, one map) is handled once.
+ * @param {Record<string, number>} actorOwnership the actor's `ownership`
+ * @param {{ id: string, ownership: Record<string, number> }[]} journals the
+ *   journal entries the actor's map items point at
+ * @param {Set<string>} gmIds user ids that are GMs
+ * @param {{ OWNER: number, OBSERVER: number }} levels
+ * @returns {Map<string, Record<string, number>>} journal id → user id → new
+ *   level; journals that need nothing are left out
+ */
+export function journalAccessForCarriedMaps(actorOwnership, journals, gmIds, levels) {
+  const out = new Map();
+  const seen = new Set();
+  for (const j of journals || []) {
+    if (!j?.id || seen.has(j.id)) continue;
+    seen.add(j.id);
+    const access = journalAccessForActorOwners(actorOwnership, j.ownership, gmIds, levels);
+    if (Object.keys(access).length) out.set(j.id, access);
+  }
+  return out;
+}
+
+/**
  * The map an item carries, or null. Accepts only a JournalEntryPage UUID.
  * @param {object} flags the item's module flags
  * @returns {string|null}

@@ -250,3 +250,22 @@ export function userCanSeeMarker(marker, isGM, chronicleUserId) {
   }
   return true;
 }
+
+/**
+ * Which page-flag lists a refresh may overwrite. A list whose fetch failed is
+ * unknown, not empty, so its stored player copy stays as it was. Markers also
+ * need the drawings (shadow areas hide pins), so they are rewritten only when
+ * both arrived.
+ * @param {{ markers?: boolean, drawings?: boolean, tokens?: boolean, layers?: boolean }} known
+ *   true for each list that was fetched (default true)
+ * @returns {{ markers: boolean, drawings: boolean, tokens: boolean, layers: boolean }}
+ */
+export function flagListsToWrite(known = {}) {
+  const k = (name) => known[name] !== false;
+  return {
+    markers: k('markers') && k('drawings'),
+    drawings: k('drawings'),
+    tokens: k('tokens'),
+    layers: k('layers'),
+  };
+}

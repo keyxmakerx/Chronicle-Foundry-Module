@@ -21,7 +21,10 @@
       "OpenShopButton": "Open shop",
       "ClosedTitle": "The shop is closed",
       "ClosedNoGM": "No GM is online right now. Try again when your GM joins.",
-      "NoAccess": "You can't see this shop's journal entry."
+      "NoAccess": "You can't see this shop's journal entry.",
+      "SaleLeft": "{character} has {amount} left.",
+      "SaleWealth": "{character}'s Wealth stays at {amount}.",
+      "SaleChange": "Change: {change}."
     },
     "CalendarBar": {
       "Label": "Chronicle calendar",
@@ -679,7 +682,8 @@
     },
     "CalendarDatePush": {
       "Rejected": "Chronicle won't accept this date: its calendar has different months or leap days. Date sync is paused.",
-      "Forbidden": "Only the campaign owner's key can change Chronicle's date. Date sync is paused."
+      "Forbidden": "Only the campaign owner's key can change Chronicle's date. Date sync is paused.",
+      "Disabled": "This campaign's calendar is switched off in Chronicle. Date sync is paused."
     },
     "Debug": {
       "TabLabel": "Debug",
