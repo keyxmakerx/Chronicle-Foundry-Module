@@ -96,7 +96,7 @@ function loadShopRoomWidget() {
     }
     shim = shim || createChronicleShim();
     globalThis.Chronicle = shim;
-    for (const file of ['shop_room_icons.js', 'shop_room.js']) {
+    for (const file of ['shop_room_icons.js', 'shop_room_paper.js', 'shop_room.js']) {
       await new Promise((resolve, reject) => {
         const s = document.createElement('script');
         s.src = `${VENDOR}/${file}`;
