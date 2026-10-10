@@ -1,0 +1,56 @@
+<div class="cqb" data-cqb-root data-look="{{look}}">
+  <div class="cqb-bar">
+    {{#if options.length}}
+      <label for="cqb-home-{{appId}}">{{localize "CHRONICLE.Quests.BoardsOf"}}</label>
+      <select id="cqb-home-{{appId}}" data-cqb-home>
+        {{#each options}}<option value="{{key}}" {{#if (eq key ../homeKey)}}selected{{/if}}>{{label}}</option>{{/each}}
+      </select>
+    {{/if}}
+    <span class="cqb-sp"></span>
+    <span class="cqb-live" title="{{localize "CHRONICLE.Quests.LiveHint"}}"><i></i>{{localize "CHRONICLE.Quests.Live"}}</span>
+    {{#if editUrl}}<a class="cqb-btn" href="{{editUrl}}" target="_blank" rel="noopener" title="{{localize "CHRONICLE.Quests.EditHint"}}">{{localize "CHRONICLE.Quests.Edit"}}</a>{{/if}}
+  </div>
+  {{#if error}}
+    <div class="cqb-msg"><p>{{error}}</p><button type="button" data-action="retry">{{localize "CHRONICLE.Quests.Retry"}}</button></div>
+  {{else if loading}}
+    <div class="cqb-msg"><p>{{localize "CHRONICLE.Quests.Loading"}}</p></div>
+  {{else if noHomes}}
+    <div class="cqb-msg"><p>{{localize "CHRONICLE.Quests.NoBoards"}}</p></div>
+  {{else}}
+    <div class="cqb-frame">
+      <div class="cqb-cork" data-cqb-cork>
+        <div class="cqb-plate">
+          {{#if many}}<button type="button" data-action="prevBoard" aria-label="{{localize "CHRONICLE.Quests.PrevBoard"}}">‹</button>{{/if}}
+          <span>{{board.name}}</span>
+          {{#if many}}<button type="button" data-action="nextBoard" aria-label="{{localize "CHRONICLE.Quests.NextBoard"}}">›</button>{{/if}}
+        </div>
+        <svg class="cqb-strings" data-cqb-strings aria-hidden="true"></svg>
+        {{#each board.pins}}
+          {{#if isNotice}}
+            <button type="button" class="cqb-pin cqb-notice{{#if hidden}} cqb-veiled{{/if}}" style="{{style}}" data-id="{{id}}" data-action="openQuest" data-quest="{{questId}}" aria-label="{{title}}">
+              <span class="cqb-tack"></span>
+              <span class="cqb-paper"><span class="cqb-k">{{kicker}}</span><span class="cqb-t">{{title}}</span>{{#if blurb}}<span class="cqb-x">{{blurb}}</span>{{/if}}{{#if reward}}<span class="cqb-rw">{{reward}}</span>{{/if}}</span>
+              {{#if stamp}}<span class="cqb-stamp">{{stamp}}</span>{{/if}}
+              {{#if days}}<span class="cqb-days{{#if late}} late{{else if soon}} soon{{/if}}">{{days}}</span>{{/if}}
+              {{#if hidden}}<span class="cqb-hiddenmark">{{localize "CHRONICLE.Quests.HiddenFromPlayers"}}</span>{{/if}}
+            </button>
+          {{else if isNote}}
+            <div class="cqb-pin cqb-note{{#if hidden}} cqb-veiled{{/if}}" style="{{style}}" data-id="{{id}}">
+              <span class="cqb-tack brass"></span>
+              <span class="cqb-sticky">{{text}}{{#if by}}<small>{{by}}</small>{{/if}}</span>
+              {{#if hidden}}<span class="cqb-hiddenmark">{{localize "CHRONICLE.Quests.HiddenFromPlayers"}}</span>{{/if}}
+            </div>
+          {{else if isPage}}
+            <div class="cqb-pin cqb-page{{#if hidden}} cqb-veiled{{/if}}" style="{{style}}" data-id="{{id}}">
+              <span class="cqb-tack"></span>
+              <span class="cqb-photo">{{#if image}}<img src="{{image}}" alt="" loading="lazy" data-cqb-img>{{/if}}<span class="cqb-initial"{{#if image}} hidden{{/if}}>{{initial}}</span><span class="cqb-cap">{{name}}</span></span>
+              {{#if hidden}}<span class="cqb-hiddenmark">{{localize "CHRONICLE.Quests.HiddenFromPlayers"}}</span>{{/if}}
+            </div>
+          {{/if}}
+        {{/each}}
+        {{#if board.empty}}<p class="cqb-empty">{{localize "CHRONICLE.Quests.EmptyBoard"}}</p>{{/if}}
+      </div>
+      {{#if many}}<div class="cqb-dots">{{#each dots}}<i class="{{#if this}}on{{/if}}"></i>{{/each}}</div>{{/if}}
+    </div>
+  {{/if}}
+</div>

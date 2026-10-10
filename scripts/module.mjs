@@ -31,6 +31,7 @@ import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { registerShopRoomSocket, registerShopJournalButton } from './shop-room-window.mjs';
 import { notebookAvailable, openCalendarWindow, openNotebook, registerPlayerNotebook } from './player-notebook.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
+import { openQuestBoard, questLive, registerQuestBoard } from './quest-board.mjs';
 import { retireNotesFolder } from './_notes-folder.mjs';
 import { FLAG_SCOPE, SYNC_OPTIONS } from './constants.mjs';
 import { removedFolder } from './_set-aside.mjs';
@@ -124,6 +125,7 @@ Hooks.once('ready', async () => {
   syncManager.registerModule(new StashSync());
   syncManager.registerModule(npcSpotlightRelay);
   syncManager.registerModule(negotiationMirror);
+  syncManager.registerModule(questLive);
 
   // Create UI first so it's always available, even if start() fails.
   dashboard = new SyncDashboard();
@@ -159,6 +161,12 @@ Hooks.once('ready', async () => {
     registerPlayerNotebook();
   } catch (err) {
     console.warn('Chronicle Sync | Player notebook unavailable', err);
+  }
+  try {
+    // Players' boards ask the GM's client, which reads Chronicle.
+    registerQuestBoard(() => syncManager?.api ?? null);
+  } catch (err) {
+    console.warn('Chronicle Sync | Quest board unavailable', err);
   }
   try {
     registerMapSheetItems();
@@ -296,7 +304,7 @@ async function _runtimeValidateDescriptor() {
 
 /**
  * Add the Chronicle group to Foundry's scene controls toolbar: the Sync
- * Dashboard and DM Screen for GMs, the Notebook and Calendar for everyone
+ * Dashboard and DM Screen for GMs, the Notebook, Calendar and Quest board for everyone
  * once the world is connected to Chronicle.
  */
 Hooks.on('getSceneControlButtons', (controls) => {
@@ -310,11 +318,13 @@ Hooks.on('getSceneControlButtons', (controls) => {
       dmScreen: () => { openDMScreen(() => syncManager?.api ?? null); },
       notebook: () => { openNotebook(); },
       calendar: () => { openCalendarWindow(); },
+      quests: () => { openQuestBoard(); },
     },
     titles: {
       dmScreen: game.i18n.localize('CHRONICLE.SceneControl.DMScreen'),
       notebook: game.i18n.localize('CHRONICLE.SceneControl.Notebook'),
       calendar: game.i18n.localize('CHRONICLE.SceneControl.Calendar'),
+      quests: game.i18n.localize('CHRONICLE.SceneControl.Quests'),
     },
   });
 });

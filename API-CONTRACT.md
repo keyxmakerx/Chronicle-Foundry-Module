@@ -1391,6 +1391,30 @@ array): `scripts/_stash-model.mjs`.
 
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/stash_api_handler.go`, `internal/plugins/armory/stash_api.go`, `docs/api/openapi.yaml` Stashes tag; the routes are on Chronicle PR #1022 and unreleased as of 2026-10-03)
 
+### Quests
+
+Chronicle's quest boards and quest sheets. Every route needs a key of the
+campaign owner or a co-DM (403 otherwise). Players have no key: the active GM's
+client reads for them and always adds `?audience=players`, which answers as a
+plain player would see it. Pay and give also need the Armory addon (404 when
+it is off).
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/quests/homes` | `[{kind:"category"\|"page", id, name?}]`, the places with boards; categories first. `id` is the entity type id (as a string) for a category, the page id for a page; only pages carry `name`. With `?audience=players`, pages a player may not open are left out. |
+| GET | `/quests/boards?category=<typeId>` or `?page=<entityId>` | `{canManage, me, looks:{board, ledger}, boards:[{id, name, who, canChange, items:[…]}], mapsOn}`. An item has `id, kind (notice\|note\|page\|map\|string), x, y, w, r` (percentages and degrees) plus, by kind: notice `questId, title, kicker, blurb, reward, status, daysLeft?`; note `text, ownerName`; page or map `entityId\|mapId, name, typeName, concealed, imageUrl` (a Chronicle-relative link, signed for the API key so Foundry can load it without a session); string `from, to`. `hidden` appears only in the DM view. Exactly one of `category`, `page` (400 otherwise). |
+| GET | `/quests/:entityID` | DM view `{version, notice, status, handedOut, steps:[{id,text,done,shown}], rewards:[{id,kind,text,amount,entityId,name}], foes, links, layout, looks, due?}`; players' view `{notice (null when hidden), status, handedOut, steps (shown ones), hiddenSteps, due?:{label, daysLeft}, …}`. `status` is `not_started`, `active`, `done` or `failed`. |
+| PUT | `/quests/:entityID` | Partial: `{version, …changed fields}`; `steps` is sent whole. 409 when `version` is stale (the module reloads). Answers the DM view. Body at most 256 KiB. |
+| GET | `/quests/party` | `[{id, name, player?, imageUrl?}]`, the characters rewards can go to. DM only: `?audience=players` is refused (403), and the module never relays it. |
+| POST | `/quests/pay` | `{characterId, amount, reason}`, `amount` in the sheet's main unit (two decimals). One call per character; the module splits coin rewards itself. |
+| POST | `/quests/give` | `{characterId, itemId}`, one reward item to one character. Answers `{itemName, characterName}`. |
+
+The module sends hand-out steps one at a time and remembers the ones that
+worked, so a retry after a failure never pays or gives twice; the quest is then
+saved with `handedOut: true` (and `status: "done"` when asked).
+
+Re-verify by: 2026-11-09 (Chronicle `internal/plugins/syncapi/quest_api_handler.go`, `internal/app/quests_api_adapter.go`, `internal/plugins/quests/model.go`)
+
 ### Player notebook pages
 
 Not part of the REST API: the notebook (`scripts/player-notebook.mjs`,
@@ -1485,6 +1509,8 @@ If the token is invalid, the server rejects the upgrade.
 | `downtime.changed` | `{ open }` | Downtime was opened or closed; relayed to players' open windows |
 | `npc.spotlight` | none; `resourceId` is the NPC's entity id | "Show in Foundry" pressed on a Chronicle NPC page |
 | `system_state.updated` | `{ systemId, key }`; `resourceId` is the page's entity id; DM-equivalent sockets only | A system widget saved a page's per-system state (Draw Steel negotiation tracker: `systemId` `drawsteel`, `key` `negotiation`) |
+| `quest.updated` | `{ version }`; `resourceId` is the quest page's id. Sent only to DM sockets when the change is DM-only | A quest sheet was saved; open quest windows refetch |
+| `notice_boards.updated` | `{ home }` (`page` or `category`); `resourceId` is the page id or the type id | A home's boards changed; open board windows refetch |
 | `sync.status` | `{ connected: bool }` | Connection state change |
 | `sync.error` | `{ message }` | Synchronization error |
 | `sync.conflict` | Conflict details | Data conflict detected |

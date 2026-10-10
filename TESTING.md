@@ -360,6 +360,19 @@ Needs the Armory addon on in Chronicle, a character linked to an actor, and a pl
 - [ ] An item moved away from a character in Chronicle disappears from the Foundry sheet; a relation removed any other way only unlinks the Foundry item
 - [ ] With no GM connected, a player's move says stashes need the GM to be connected
 
+## Quest Board
+
+Needs a Chronicle with quest boards (a category or a place page with at least one board and a pinned notice) and the GM connected.
+
+- [ ] The Chronicle tool group in the scene controls has **Open the quest board** (thumbtack); it opens the boards of the first place with boards, and the drop-down switches places
+- [ ] Notices, sticky notes, pinned pages and red strings sit where they do on Chronicle's board; a notice due soon or late says so under it; with more than one board, the arrows turn boards
+- [ ] Click a notice -> its quest opens as a paper sheet; the GM also sees the ledger under it
+- [ ] As GM, tick a step, toggle its eye, change the status -> Chronicle's page shows the same after a refresh; an edit made in Chronicle shows in the open Foundry window without reopening it
+- [ ] As GM, **Hand out** with a coin reward and two characters -> each sheet gets its share, with "as a reward for <quest>" in its money history; with an item reward -> the item lands on the chosen character; the ledger reads "Handed out to the party"
+- [ ] As a player, the board shows only what Chronicle shows a player: no hidden notices, no hidden steps (a "More steps the party has yet to learn" line instead), no ledger
+- [ ] A journal synced from a Chronicle quest page has an **Open quest** button in its header
+- [ ] With no GM connected, a player's board says it needs the GM to be connected
+
 ## Player Notebook
 
 - [ ] Every user (GM and players) has an **Open my Chronicle notebook** button in the Chronicle scene controls and a **Jot notes** tab in the bottom-right corner while the world is connected to Chronicle
