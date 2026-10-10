@@ -15,7 +15,7 @@
 
 import { FLAG_SCOPE } from './constants.mjs';
 import {
-  pickMapItemType, journalAccessForActorOwners, mapPageUuidOf,
+  pickMapItemType, journalAccessForActorOwners, journalAccessForCarriedMaps, mapPageUuidOf,
 } from './_map-item-rules.mjs';
 
 const OPEN_CLASS = 'cs-open-map';
@@ -30,6 +30,7 @@ export function registerMapSheetItems() {
   Hooks.on('renderItemSheet', _onRenderItemSheet);
   Hooks.on('renderItemSheetV2', _onRenderItemSheet);
   Hooks.on('dropActorSheetData', _onDropActorSheetData);
+  Hooks.on('updateActor', _onUpdateActor);
 }
 
 /**
@@ -52,6 +53,34 @@ function _onDropActorSheetData(actor, _sheet, data) {
     ui.notifications.error(game.i18n.localize('CHRONICLE.MapItems.GiveFailed'));
   });
   return false;
+}
+
+/**
+ * A later owner of a character gets the same journal access the owners had
+ * when the map was given, so the item they now see opens. GM client only,
+ * so the grant is written once.
+ */
+async function _onUpdateActor(actor, changes) {
+  if (!game.user.isGM || !changes || !('ownership' in changes || '==ownership' in changes)) return;
+  try {
+    const journals = new Map();
+    for (const item of actor.items ?? []) {
+      const uuid = mapPageUuidOf(item.flags?.[FLAG_SCOPE]);
+      const entry = uuid ? fromUuidSync(uuid)?.parent : null;
+      if (entry) journals.set(entry.id, entry);
+    }
+    if (!journals.size) return;
+    const gmIds = new Set(game.users.filter((u) => u.isGM).map((u) => u.id));
+    const grants = journalAccessForCarriedMaps(
+      actor.ownership, [...journals.values()], gmIds, CONST.DOCUMENT_OWNERSHIP_LEVELS,
+    );
+    for (const [id, access] of grants) {
+      const entry = journals.get(id);
+      await entry.update({ ownership: { ...entry.ownership, ...access } });
+    }
+  } catch (err) {
+    console.warn('Chronicle: could not share a carried map with the actor\'s new owners', err);
+  }
 }
 
 /** The Chronicle map page of a journal entry, if it is one. */
