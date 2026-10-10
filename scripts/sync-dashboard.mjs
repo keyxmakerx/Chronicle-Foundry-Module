@@ -2500,9 +2500,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     // Static icon-class map — values are constant CSS class strings (no
     // user input). Safe to assign to a Foundry-icon `<i>` element via class.
     const iconClasses = {
-      check: { classes: ['fa-solid', 'fa-check-circle'], color: '#4ade80' },
-      xmark: { classes: ['fa-solid', 'fa-circle-xmark'], color: '#f87171' },
-      warn:  { classes: ['fa-solid', 'fa-triangle-exclamation'], color: '#fbbf24' },
+      check: { classes: ['fa-solid', 'fa-check-circle'], color: 'var(--cs-ok)' },
+      xmark: { classes: ['fa-solid', 'fa-circle-xmark'], color: 'var(--cs-bad)' },
+      warn:  { classes: ['fa-solid', 'fa-triangle-exclamation'], color: 'var(--cs-warn)' },
     };
     // Clear via replaceChildren — accepts a list of Node|string args; strings
     // become text nodes, NEVER parsed as HTML. Resets the element atomically.

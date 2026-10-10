@@ -29,7 +29,7 @@
   min-height: 70vh;
   height: 100%;
   overflow: hidden;
-  background: #1a1a2e;
+  background: var(--cs-surface);
   position: relative;
 }
 
@@ -40,8 +40,8 @@
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
-  background: #1e1e30;
-  border-bottom: 1px solid #333;
+  background: var(--cs-surface-2);
+  border-bottom: 1px solid var(--cs-line);
   flex-shrink: 0;
   z-index: 10;
 }
@@ -55,7 +55,7 @@
 .chronicle-map-viewer .toolbar-separator {
   width: 1px;
   height: 24px;
-  background: #444;
+  background: var(--cs-line);
   margin: 0 6px;
 }
 
@@ -69,7 +69,7 @@
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
-  color: #ccc;
+  color: var(--cs-text-2);
   cursor: pointer;
   font-size: 14px;
   transition: background 0.15s, border-color 0.15s;
@@ -77,19 +77,19 @@
 
 .chronicle-map-viewer .pin-tool-btn:hover,
 .chronicle-map-viewer .view-tool-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: #555;
+  background: color-mix(in srgb, var(--cs-text) 8%, transparent);
+  border-color: var(--cs-line);
 }
 
 .chronicle-map-viewer .pin-tool-btn.active {
-  background: rgba(96, 165, 250, 0.15);
-  border-color: #60a5fa;
-  box-shadow: 0 0 4px rgba(96, 165, 250, 0.3);
+  background: color-mix(in srgb, var(--cs-info) 15%, transparent);
+  border-color: var(--cs-info);
+  box-shadow: 0 0 4px color-mix(in srgb, var(--cs-info) 30%, transparent);
 }
 
 .chronicle-map-viewer .view-tool-btn.active {
-  background: rgba(96, 165, 250, 0.15);
-  border-color: #60a5fa;
+  background: color-mix(in srgb, var(--cs-info) 15%, transparent);
+  border-color: var(--cs-info);
 }
 
 /* ---- Viewport ---- */
@@ -266,7 +266,7 @@
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
-  color: #ccc;
+  color: var(--cs-text-2);
   cursor: pointer;
   font-size: 14px;
   text-decoration: none;
@@ -274,15 +274,15 @@
 }
 
 .chronicle-map-viewer .chronicle-tool-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: #555;
+  background: color-mix(in srgb, var(--cs-text) 8%, transparent);
+  border-color: var(--cs-line);
   color: #fff;
 }
 
 .chronicle-map-viewer .chronicle-tool-btn.active {
-  background: rgba(96, 165, 250, 0.15);
-  border-color: #60a5fa;
-  box-shadow: 0 0 4px rgba(96, 165, 250, 0.3);
+  background: color-mix(in srgb, var(--cs-info) 15%, transparent);
+  border-color: var(--cs-info);
+  box-shadow: 0 0 4px color-mix(in srgb, var(--cs-info) 30%, transparent);
 }
 
 /* ============================================================
@@ -472,17 +472,17 @@
 .chronicle-marker-config-form .form-group label {
   font-size: 12px;
   font-weight: 600;
-  color: #ccc;
+  color: var(--cs-text-2);
 }
 
 .chronicle-marker-config-form .form-group input[type="text"],
 .chronicle-marker-config-form .form-group select,
 .chronicle-marker-config-form .form-group textarea {
   padding: 6px 8px;
-  border: 1px solid #444;
+  border: 1px solid var(--cs-line);
   border-radius: 4px;
-  background: #2a2a3e;
-  color: #e2e8f0;
+  background: var(--cs-surface);
+  color: var(--cs-text);
   font-size: 13px;
 }
 
@@ -490,8 +490,8 @@
 .chronicle-marker-config-form .form-group select:focus,
 .chronicle-marker-config-form .form-group textarea:focus {
   outline: none;
-  border-color: #60a5fa;
-  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.3);
+  border-color: var(--cs-info);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--cs-info) 30%, transparent);
 }
 
 .chronicle-marker-config-form .form-group textarea {
@@ -505,7 +505,7 @@
   gap: 8px;
   margin-top: 4px;
   padding-top: 10px;
-  border-top: 1px solid #333;
+  border-top: 1px solid var(--cs-line);
 }
 
 .chronicle-marker-config-form .form-actions .dashboard-btn {
@@ -536,17 +536,17 @@
 .chronicle-pin-config-form .form-group label {
   font-size: 12px;
   font-weight: 600;
-  color: #ccc;
+  color: var(--cs-text-2);
 }
 
 .chronicle-pin-config-form .form-group input[type="text"],
 .chronicle-pin-config-form .form-group select,
 .chronicle-pin-config-form .form-group textarea {
   padding: 6px 8px;
-  border: 1px solid #444;
+  border: 1px solid var(--cs-line);
   border-radius: 4px;
-  background: #2a2a3e;
-  color: #e2e8f0;
+  background: var(--cs-surface);
+  color: var(--cs-text);
   font-size: 13px;
 }
 
@@ -554,8 +554,8 @@
 .chronicle-pin-config-form .form-group select:focus,
 .chronicle-pin-config-form .form-group textarea:focus {
   outline: none;
-  border-color: #60a5fa;
-  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.3);
+  border-color: var(--cs-info);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--cs-info) 30%, transparent);
 }
 
 .chronicle-pin-config-form .form-group textarea {
@@ -584,7 +584,7 @@
   gap: 8px;
   margin-top: 4px;
   padding-top: 10px;
-  border-top: 1px solid #333;
+  border-top: 1px solid var(--cs-line);
 }
 
 .chronicle-pin-config-form .form-actions .dashboard-btn {

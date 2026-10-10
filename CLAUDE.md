@@ -45,6 +45,7 @@ Install/update flow: also `.ai.md` → "Chronicle Integration — Install & Upda
 
 - **ES modules** (`.mjs`), `export default class` pattern.
 - **Comments say why, briefly**, pointing at a test/issue for more — no incident stories, task IDs, dates or `file:line` (those go in the PR). Deferred work is `TODO(#issue)`. CI checks new comments with `tools/check-comment-clutter.sh` (self-test `tools/test-comment-clutter.sh`).
+- **Tool windows take colours from `styles/tokens.css`** (`--cs-*`, a light and a dark set that follow Foundry's theme), never dark-only literals. Paper is a player-facing touch, not the default: only the quest notices and sheet, the player notebook and the shop room keep their own palettes. `tools/test-colour-tokens.mjs`.
 - `_syncing` guard against infinite loops: a boolean.
 - Adapters implement `toChronicleFields()`/`fromChronicleFields()`; REST uses Bearer auth via `api-client.mjs`.
 - **API key is CLIENT-scoped, never world-scoped** (a world setting syncs to every client). `migrateApiKeyToClientScope()` migrates legacy values. `tools/test-api-key-scope.mjs`.

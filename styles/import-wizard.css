@@ -23,7 +23,7 @@
   gap: 2px;
   padding: 8px 12px;
   background: rgba(0, 0, 0, 0.15);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid color-mix(in srgb, var(--cs-text) 10%, transparent);
   overflow-x: auto;
 }
 
@@ -57,28 +57,28 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  border: 2px solid color-mix(in srgb, var(--cs-text) 20%, transparent);
   font-size: 12px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.6);
+  color: color-mix(in srgb, var(--cs-text) 60%, transparent);
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 
 .wizard-step-indicator.current .step-circle {
-  border-color: #60a5fa;
-  color: #60a5fa;
-  background: rgba(96, 165, 250, 0.1);
+  border-color: var(--cs-info);
+  color: var(--cs-info);
+  background: color-mix(in srgb, var(--cs-info) 10%, transparent);
 }
 
 .wizard-step-indicator.completed .step-circle {
-  border-color: #4ade80;
-  color: #4ade80;
-  background: rgba(74, 222, 128, 0.1);
+  border-color: var(--cs-ok);
+  color: var(--cs-ok);
+  background: color-mix(in srgb, var(--cs-ok) 10%, transparent);
 }
 
 .step-label {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
+  color: color-mix(in srgb, var(--cs-text) 50%, transparent);
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -87,7 +87,7 @@
 }
 
 .wizard-step-indicator.current .step-label {
-  color: rgba(255, 255, 255, 0.9);
+  color: color-mix(in srgb, var(--cs-text) 90%, transparent);
 }
 
 /* --- Step content area --- */
@@ -110,25 +110,25 @@
   margin: 0 0 6px;
   font-size: 16px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: color-mix(in srgb, var(--cs-text) 90%, transparent);
 }
 
 .wizard-step-title i {
   margin-right: 6px;
-  color: #60a5fa;
+  color: var(--cs-info);
 }
 
 .wizard-step-desc {
   margin: 0 0 16px;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.5);
+  color: color-mix(in srgb, var(--cs-text) 50%, transparent);
 }
 
 .wizard-subheading {
   margin: 16px 0 8px;
   font-size: 13px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
+  color: color-mix(in srgb, var(--cs-text) 70%, transparent);
 }
 
 /* --- Detection results (Step 1) --- */
@@ -150,16 +150,16 @@
 }
 
 .detect-label {
-  color: rgba(255, 255, 255, 0.6);
+  color: color-mix(in srgb, var(--cs-text) 60%, transparent);
   font-weight: 500;
 }
 
 .detect-value {
-  color: rgba(255, 255, 255, 0.8);
+  color: color-mix(in srgb, var(--cs-text) 80%, transparent);
 }
 
 .detect-ok {
-  color: #4ade80;
+  color: var(--cs-ok);
 }
 
 .detect-ok i {
@@ -167,7 +167,7 @@
 }
 
 .detect-warn {
-  color: #fbbf24;
+  color: var(--cs-warn);
 }
 
 .detect-warn i {
@@ -175,7 +175,7 @@
 }
 
 .detect-error {
-  color: #f87171;
+  color: var(--cs-bad);
 }
 
 .detect-error i {
@@ -183,7 +183,7 @@
 }
 
 .detect-muted {
-  color: rgba(255, 255, 255, 0.35);
+  color: color-mix(in srgb, var(--cs-text) 35%, transparent);
 }
 
 .wizard-addon-badge {
@@ -195,15 +195,15 @@
 }
 
 .wizard-addon-badge.addon-on {
-  background: rgba(74, 222, 128, 0.12);
-  color: #4ade80;
-  border: 1px solid rgba(74, 222, 128, 0.2);
+  background: color-mix(in srgb, var(--cs-ok) 12%, transparent);
+  color: var(--cs-ok);
+  border: 1px solid color-mix(in srgb, var(--cs-ok) 20%, transparent);
 }
 
 .wizard-addon-badge.addon-off {
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--cs-text) 4%, transparent);
+  color: color-mix(in srgb, var(--cs-text) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cs-text) 8%, transparent);
 }
 
 /* --- Scan summary (Step 2) --- */
@@ -222,18 +222,18 @@
   padding: 12px 8px;
   background: rgba(0, 0, 0, 0.15);
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid color-mix(in srgb, var(--cs-text) 6%, transparent);
 }
 
 .wizard-stat-value {
   font-size: 24px;
   font-weight: 700;
-  color: #60a5fa;
+  color: var(--cs-info);
 }
 
 .wizard-stat-label {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
+  color: color-mix(in srgb, var(--cs-text) 50%, transparent);
   margin-top: 2px;
 }
 
@@ -253,20 +253,20 @@
 }
 
 .wizard-folder-row:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--cs-text) 3%, transparent);
 }
 
 .wizard-folder-row i {
-  color: rgba(255, 255, 255, 0.3);
+  color: color-mix(in srgb, var(--cs-text) 30%, transparent);
 }
 
 .folder-name {
   flex: 1;
-  color: rgba(255, 255, 255, 0.8);
+  color: color-mix(in srgb, var(--cs-text) 80%, transparent);
 }
 
 .folder-count {
-  color: rgba(255, 255, 255, 0.4);
+  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
   font-size: 12px;
 }
 
@@ -283,28 +283,28 @@
   padding: 6px 8px;
   font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
+  color: color-mix(in srgb, var(--cs-text) 50%, transparent);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid color-mix(in srgb, var(--cs-text) 8%, transparent);
 }
 
 .wizard-mapping-table tbody tr {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid color-mix(in srgb, var(--cs-text) 4%, transparent);
 }
 
 .wizard-mapping-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: color-mix(in srgb, var(--cs-text) 2%, transparent);
 }
 
 .wizard-mapping-table td {
   padding: 6px 8px;
-  color: rgba(255, 255, 255, 0.8);
+  color: color-mix(in srgb, var(--cs-text) 80%, transparent);
 }
 
 .wizard-mapping-table td i {
   margin-right: 4px;
-  color: rgba(255, 255, 255, 0.3);
+  color: color-mix(in srgb, var(--cs-text) 30%, transparent);
 }
 
 .text-center {
@@ -315,21 +315,21 @@
   width: 100%;
   padding: 4px 6px;
   font-size: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid color-mix(in srgb, var(--cs-text) 15%, transparent);
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.2);
   color: inherit;
 }
 
 .wizard-type-select:focus {
-  border-color: #60a5fa;
+  border-color: var(--cs-info);
   outline: none;
 }
 
 /* Inline create-new-type form */
 
 .wizard-new-type-row {
-  background: rgba(96, 165, 250, 0.05);
+  background: color-mix(in srgb, var(--cs-info) 5%, transparent);
 }
 
 .wizard-inline-form {
@@ -343,14 +343,14 @@
   flex: 1;
   padding: 4px 8px;
   font-size: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid color-mix(in srgb, var(--cs-text) 15%, transparent);
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.2);
   color: inherit;
 }
 
 .wizard-input:focus {
-  border-color: #60a5fa;
+  border-color: var(--cs-info);
   outline: none;
 }
 
@@ -358,7 +358,7 @@
   width: 32px;
   height: 28px;
   padding: 1px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid color-mix(in srgb, var(--cs-text) 15%, transparent);
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.2);
   cursor: pointer;
@@ -381,7 +381,7 @@
 }
 
 .wizard-tag-row:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--cs-text) 3%, transparent);
 }
 
 .wizard-tag-chip {
@@ -395,7 +395,7 @@
 
 .tag-source {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.3);
+  color: color-mix(in srgb, var(--cs-text) 30%, transparent);
   margin-left: auto;
 }
 
@@ -406,7 +406,7 @@
   height: 28px;
   border-radius: 50%;
   object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid color-mix(in srgb, var(--cs-text) 10%, transparent);
 }
 
 /* --- Radio group (Step 6) --- */
@@ -423,21 +423,21 @@
   gap: 8px;
   padding: 10px 12px;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid color-mix(in srgb, var(--cs-text) 8%, transparent);
   background: rgba(0, 0, 0, 0.1);
   cursor: pointer;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.8);
+  color: color-mix(in srgb, var(--cs-text) 80%, transparent);
   transition: border-color 0.15s, background 0.15s;
 }
 
 .wizard-radio-label:hover {
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: color-mix(in srgb, var(--cs-text) 15%, transparent);
   background: rgba(0, 0, 0, 0.15);
 }
 
 .wizard-radio-label i {
-  color: rgba(255, 255, 255, 0.4);
+  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
 }
 
 /* --- Progress bar (Step 8) --- */
@@ -457,14 +457,14 @@
 
 .wizard-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #60a5fa, #4ade80);
+  background: linear-gradient(90deg, var(--cs-info), var(--cs-ok));
   border-radius: 4px;
   transition: width 0.3s ease;
 }
 
 .wizard-progress-text {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.6);
+  color: color-mix(in srgb, var(--cs-text) 60%, transparent);
   margin-bottom: 12px;
 }
 
@@ -484,7 +484,7 @@
   gap: 8px;
   padding: 4px 8px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
+  color: color-mix(in srgb, var(--cs-text) 70%, transparent);
   border-radius: 3px;
 }
 
@@ -492,11 +492,11 @@
   background: rgba(0, 0, 0, 0.05);
 }
 
-.wizard-plan-item.status-done .plan-status-icon { color: #4ade80; }
-.wizard-plan-item.status-error .plan-status-icon { color: #f87171; }
-.wizard-plan-item.status-pending .plan-status-icon { color: rgba(255, 255, 255, 0.3); }
-.wizard-plan-item.status-skipped .plan-status-icon { color: #fbbf24; }
-.wizard-plan-item.status-importing .plan-status-icon { color: #60a5fa; }
+.wizard-plan-item.status-done .plan-status-icon { color: var(--cs-ok); }
+.wizard-plan-item.status-error .plan-status-icon { color: var(--cs-bad); }
+.wizard-plan-item.status-pending .plan-status-icon { color: color-mix(in srgb, var(--cs-text) 30%, transparent); }
+.wizard-plan-item.status-skipped .plan-status-icon { color: var(--cs-warn); }
+.wizard-plan-item.status-importing .plan-status-icon { color: var(--cs-info); }
 
 /* Activity log */
 
@@ -504,7 +504,7 @@
   margin-top: 16px;
   max-height: 200px;
   overflow-y: auto;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid color-mix(in srgb, var(--cs-text) 6%, transparent);
   border-radius: 4px;
   padding: 8px;
   background: rgba(0, 0, 0, 0.1);
@@ -517,11 +517,11 @@
 }
 
 .wizard-log-entry.log-success {
-  color: #4ade80;
+  color: var(--cs-ok);
 }
 
 .wizard-log-entry.log-error {
-  color: #f87171;
+  color: var(--cs-bad);
 }
 
 .wizard-log-entry i {
@@ -535,14 +535,14 @@
 .wizard-empty {
   text-align: center;
   padding: 32px 16px;
-  color: rgba(255, 255, 255, 0.35);
+  color: color-mix(in srgb, var(--cs-text) 35%, transparent);
   font-size: 13px;
 }
 
 .wizard-loading {
   text-align: center;
   padding: 32px 16px;
-  color: rgba(255, 255, 255, 0.5);
+  color: color-mix(in srgb, var(--cs-text) 50%, transparent);
   font-size: 13px;
 }
 
@@ -557,24 +557,24 @@
   justify-content: space-between;
   align-items: center;
   padding: 10px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid color-mix(in srgb, var(--cs-text) 10%, transparent);
   background: rgba(0, 0, 0, 0.1);
 }
 
 .wizard-step-counter {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
+  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
 }
 
 .btn-import {
-  border-color: rgba(74, 222, 128, 0.4);
-  color: #4ade80;
+  border-color: color-mix(in srgb, var(--cs-ok) 40%, transparent);
+  color: var(--cs-ok);
   font-weight: 600;
 }
 
 .btn-import:hover {
-  background: rgba(74, 222, 128, 0.1);
-  border-color: rgba(74, 222, 128, 0.6);
+  background: color-mix(in srgb, var(--cs-ok) 10%, transparent);
+  border-color: color-mix(in srgb, var(--cs-ok) 60%, transparent);
 }
 
 } /* end @layer chronicle-sync */
