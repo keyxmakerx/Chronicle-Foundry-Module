@@ -13,6 +13,7 @@
  * writes to Chronicle or to an actor.
  */
 
+import { noticeText } from './_escape-html.mjs';
 import { FLAG_SCOPE, MODULE_ID, REPORT_STORE_FLAG, SYNC_OPTIONS } from './constants.mjs';
 import { getSetting } from './settings.mjs';
 import { SOCKET_CHANNEL, getStashSync } from './stash-sync.mjs';
@@ -300,7 +301,7 @@ export async function receiveReport(msg, senderId, ack = () => {}) {
     if (res.code === 'store_failed') log.error('Debug: could not store a problem report');
     return { ok: false, code: res.code };
   }
-  ui.notifications.info(game.i18n.format('CHRONICLE.Debug.ReportedNotice', { name: esc(res.report.fromName) }));
+  ui.notifications.info(game.i18n.format('CHRONICLE.Debug.ReportedNotice', { name: noticeText(res.report.fromName) }));
   return { ok: true };
 }
 

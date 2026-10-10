@@ -12,6 +12,7 @@
  * Foundry document.
  */
 
+import { noticeText } from './_escape-html.mjs';
 import { getSetting, setSetting } from './settings.mjs';
 import { promptDialog } from './_dialogs.mjs';
 import { openCalendarWindow } from './player-notebook.mjs';
@@ -426,7 +427,7 @@ async function addEventDialog(v) {
   if (!res) return;
   if (!res.name.trim()) { ui.notifications.warn(t('NameNeeded')); return; }
   const ok = await source.addEvent({ ...res, hour: Number.isFinite(res.hour) ? res.hour : undefined });
-  if (ok) ui.notifications.info(t('EventAdded', { name: res.name.trim() }));
+  if (ok) ui.notifications.info(t('EventAdded', { name: noticeText(res.name.trim()) }));
   else ui.notifications.warn(t('AddRefused'));
 }
 

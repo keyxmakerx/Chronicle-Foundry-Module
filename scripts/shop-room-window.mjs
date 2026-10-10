@@ -17,6 +17,7 @@
  * The GM sees each sale as a whispered chat line.
  */
 
+import { noticeText } from './_escape-html.mjs';
 import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
 import { getSetting, getUserMappings } from './settings.mjs';
 import { _isAllowedImageHost } from './_url-validation.mjs';
@@ -566,7 +567,7 @@ export async function openShopFromJournal(shopId, name) {
     ? sanitizeShopRoomMessage({ ...reply.body, type: SHOP_ROOM_MESSAGE, action: 'show', shopId }, getSetting('apiUrl'))
     : null;
   if (!room && !closed) {
-    ui.notifications.warn(reply.body?.message || t('LoadFailed'));
+    ui.notifications.warn(reply.body?.message ? noticeText(reply.body.message) : t('LoadFailed'));
     return;
   }
   if (playerRooms.has(shopId)) return; // The GM showed it meanwhile.

@@ -16,6 +16,7 @@
  * Nothing here is copied into Foundry documents.
  */
 
+import { noticeText } from './_escape-html.mjs';
 import { getSetting } from './settings.mjs';
 import { MODULE_ID, FLAG_SCOPE } from './constants.mjs';
 import {
@@ -520,7 +521,7 @@ class QuestSheetWindow extends HandlebarsApplicationMixin(ApplicationV2) {
     const patch = { handedOut: true };
     if (g.markDone) patch.status = 'done';
     await this._save(patch);
-    ui.notifications.info(given.length ? tf('HandedOutList', { list: given.join(', ') }) : t('MarkedHandedOut'));
+    ui.notifications.info(given.length ? tf('HandedOutList', { list: noticeText(given.join(', ')) }) : t('MarkedHandedOut'));
   }
 
   static async _onRetry() {

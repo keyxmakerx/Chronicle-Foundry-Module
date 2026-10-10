@@ -8,6 +8,7 @@
  * Accessed via the sidebar status indicator or scene controls button (GM only).
  */
 
+import { noticeText } from './_escape-html.mjs';
 import { getSetting, setSetting, getSyncDirections, setSyncDirections, getExcludedTags, setExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
 import { SyncHistoryTab } from './sync-history-tab.mjs';
 import { FLAG_SCOPE, REPORT_STORE_FLAG } from './constants.mjs';
@@ -1939,12 +1940,12 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     try {
       await this.api.createEntityType(result);
-      ui.notifications.info(`Entity type "${result.name}" created.`);
+      ui.notifications.info(`Entity type "${noticeText(result.name)}" created.`);
       this._cache.entityTypes = null;
       this._cache.entities = null;
       this.render({ force: true });
     } catch (err) {
-      ui.notifications.error(`Failed to create entity type: ${err.message}`);
+      ui.notifications.error(`Failed to create entity type: ${noticeText(err.message)}`);
     }
   }
 
@@ -2007,7 +2008,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       this.render({ force: true });
     } catch (err) {
       console.error('Chronicle Dashboard: Pull failed', err);
-      ui.notifications.error(`Failed to pull entity: ${err.message}`);
+      ui.notifications.error(`Failed to pull entity: ${noticeText(err.message)}`);
     }
   }
 
@@ -2050,7 +2051,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       this.render({ force: true });
     } catch (err) {
       console.error('Chronicle Dashboard: Push failed', err);
-      ui.notifications.error(`Failed to push journal: ${err.message}`);
+      ui.notifications.error(`Failed to push journal: ${noticeText(err.message)}`);
     }
   }
 
@@ -2195,7 +2196,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       this.render({ force: true });
     } catch (err) {
       console.error('Chronicle Dashboard: Push actor failed', err);
-      ui.notifications.error(`Failed to push actor: ${err.message}`);
+      ui.notifications.error(`Failed to push actor: ${noticeText(err.message)}`);
     }
   }
 
@@ -2603,7 +2604,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       this.render({ force: true });
     } catch (err) {
       console.error('Chronicle Dashboard: Save config failed', err);
-      ui.notifications.error(`Failed to save config: ${err.message}`);
+      ui.notifications.error(`Failed to save config: ${noticeText(err.message)}`);
     }
   }
 
@@ -2854,7 +2855,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       this.render({ force: true });
     } catch (err) {
       console.error('Chronicle Dashboard: Bulk change type failed', err);
-      ui.notifications.error(`Bulk type change failed: ${err.message}`);
+      ui.notifications.error(`Bulk type change failed: ${noticeText(err.message)}`);
     }
   }
 

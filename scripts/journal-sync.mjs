@@ -9,6 +9,7 @@
  * - Foundry → Chronicle: JournalEntry changes detected via Hooks, push to Chronicle API.
  */
 
+import { noticeText } from './_escape-html.mjs';
 import { getSetting, getSyncExclusions } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
 import { FLAG_SCOPE, SYNC_OPTIONS } from './constants.mjs';
@@ -392,7 +393,7 @@ export class JournalSync {
     await this._queue.run(eid, async () => {
       this._journalPushDebouncer.cancel(journal.id);
       await setAside(journal, FLAG_SCOPE, SYNC_OPTIONS);
-      ui.notifications?.info?.(game.i18n.format('CHRONICLE.Removed.Entity', { name: journal.name }));
+      ui.notifications?.info?.(game.i18n.format('CHRONICLE.Removed.Entity', { name: noticeText(journal.name) }));
     });
   }
 
@@ -735,7 +736,7 @@ export class JournalSync {
     // would only push at a page that no longer exists.
     this._journalPushDebouncer.cancel(journal.id);
     await setAside(journal, FLAG_SCOPE, SYNC_OPTIONS);
-    ui.notifications?.info?.(game.i18n.format('CHRONICLE.Removed.Entity', { name: journal.name }));
+    ui.notifications?.info?.(game.i18n.format('CHRONICLE.Removed.Entity', { name: noticeText(journal.name) }));
     console.debug(`Chronicle: Set aside journal for deleted entity ${data.id}`);
   }
 
@@ -1024,7 +1025,7 @@ export class JournalSync {
       // REST error itself is already in the dashboard's error log.
       console.error('Chronicle: Failed to push journal to Chronicle', err);
       this._syncManager?.recordUserOutcome?.(userId, err);
-      ui.notifications?.warn?.(`Chronicle: Failed to push journal "${journal.name}". Check the sync dashboard for details.`);
+      ui.notifications?.warn?.(`Chronicle: Failed to push journal "${noticeText(journal.name)}". Check the sync dashboard for details.`);
     } finally {
       this._inFlightCreates.delete(journal.id);
     }
@@ -1166,7 +1167,7 @@ export class JournalSync {
       const entry = await this._entryForPush(journal, entityId, { fetch: false }).catch(() => undefined);
       if (entry !== undefined) retry.entry = entry;
       this._api.queueForRetry?.('PUT', `/entities/${entityId}`, retry);
-      ui.notifications?.warn?.(`Chronicle: Failed to push update for "${journal.name}" — queued for retry. See the sync dashboard.`);
+      ui.notifications?.warn?.(`Chronicle: Failed to push update for "${noticeText(journal.name)}" — queued for retry. See the sync dashboard.`);
     }
   }
 
@@ -1340,7 +1341,7 @@ export class JournalSync {
         `Permissions fetch failed for "${entity.name || entity.id}" — locked to GM-only (fail-closed) until it succeeds.`
       );
       ui.notifications?.warn?.(
-        `Chronicle: Could not read permissions for "${entity.name || entity.id}" — kept GM-only. See the sync dashboard.`
+        `Chronicle: Could not read permissions for "${noticeText(entity.name || entity.id)}" — kept GM-only. See the sync dashboard.`
       );
       return { default: L.NONE };
     }
@@ -1497,7 +1498,7 @@ export class JournalSync {
         `Permission push${who}: ${unmapped.length} player grant(s) not sent — no Chronicle mapping for ${named}. Map them in the dashboard Members tab.`
       );
       ui.notifications?.warn?.(
-        `Chronicle: ${unmapped.length} player permission grant(s)${who} were not sent — unmapped Foundry user(s): ${named}. Map them in the sync dashboard → Members.`
+        `Chronicle: ${unmapped.length} player permission grant(s)${label ? ` on "${noticeText(label)}"` : ''} were not sent — unmapped Foundry user(s): ${noticeText(named)}. Map them in the sync dashboard → Members.`
       );
     }
 
@@ -1527,7 +1528,7 @@ export class JournalSync {
         `Failed to push permissions${label ? ` for "${label}"` : ''} — ${err?.message || 'unknown error'}`
       );
       ui.notifications?.warn?.(
-        `Chronicle: Failed to push permissions${label ? ` for "${label}"` : ''}. See the sync dashboard for details.`
+        `Chronicle: Failed to push permissions${label ? ` for "${noticeText(label)}"` : ''}. See the sync dashboard for details.`
       );
     }
   }
@@ -1664,7 +1665,7 @@ export class JournalSync {
     if (r.missing.length) {
       if (!this._warnedUnrestored.has(journal.id)) {
         this._warnedUnrestored.add(journal.id);
-        ui.notifications?.warn?.(game.i18n.format('CHRONICLE.Secrets.NotSent', { name: journal.name }));
+        ui.notifications?.warn?.(game.i18n.format('CHRONICLE.Secrets.NotSent', { name: noticeText(journal.name) }));
       }
       console.warn(`Chronicle: did not send the text of "${journal.name}": its GM-only parts changed in Chronicle`);
       return undefined;
@@ -1855,7 +1856,7 @@ export class JournalSync {
         if (entity) {
           await this._onEntityUpdated(entity);
         }
-        ui.notifications.warn(`Chronicle: Conflict on "${journal.name}" — kept Chronicle version.`);
+        ui.notifications.warn(`Chronicle: Conflict on "${noticeText(journal.name)}" — kept Chronicle version.`);
         break;
       }
       case 'foundry': {
@@ -1864,7 +1865,7 @@ export class JournalSync {
         const result = await this._api.put(`/entities/${entityId}`, body);
         await this._recordPush(journal, result);
         await this._hidePushedSecrets(journal, result);
-        ui.notifications.warn(`Chronicle: Conflict on "${journal.name}" — kept Foundry version.`);
+        ui.notifications.warn(`Chronicle: Conflict on "${noticeText(journal.name)}" — kept Foundry version.`);
         break;
       }
       case 'newest':
@@ -1878,11 +1879,11 @@ export class JournalSync {
           const result = await this._api.put(`/entities/${entityId}`, body);
           await this._recordPush(journal, result);
           await this._hidePushedSecrets(journal, result);
-          ui.notifications.info(`Chronicle: Conflict on "${journal.name}" — Foundry version was newer.`);
+          ui.notifications.info(`Chronicle: Conflict on "${noticeText(journal.name)}" — Foundry version was newer.`);
         } else if (remote) {
           // Remote is newer — re-pull.
           await this._onEntityUpdated(remote);
-          ui.notifications.info(`Chronicle: Conflict on "${journal.name}" — Chronicle version was newer.`);
+          ui.notifications.info(`Chronicle: Conflict on "${noticeText(journal.name)}" — Chronicle version was newer.`);
         }
         break;
       }

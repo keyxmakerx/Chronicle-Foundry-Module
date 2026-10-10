@@ -14,6 +14,7 @@
  */
 
 import { getSetting } from './settings.mjs';
+import { noticeText } from './_escape-html.mjs';
 import { downtimeNotice, errorKey, screenContext } from './_dm-screen-view.mjs';
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -428,7 +429,7 @@ class DMScreenWindow extends HandlebarsApplicationMixin(ApplicationV2) {
       const res = await api.post('/dm-screen/downtime', { open });
       ui.notifications.info(downtimeNotice(open, res));
     } catch (err) {
-      ui.notifications.warn(err?.serverMessage || t('Error.Action'));
+      ui.notifications.warn(err?.serverMessage ? noticeText(err.serverMessage) : t('Error.Action'));
     }
     await this._load();
     await this.render();
@@ -446,7 +447,7 @@ class DMScreenWindow extends HandlebarsApplicationMixin(ApplicationV2) {
       await this.render();
     } catch (err) {
       target.disabled = false;
-      ui.notifications.warn(err?.serverMessage || t('Error.Action'));
+      ui.notifications.warn(err?.serverMessage ? noticeText(err.serverMessage) : t('Error.Action'));
     }
   }
 }
