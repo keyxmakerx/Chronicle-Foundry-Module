@@ -243,7 +243,7 @@ test('vendored drawing engine runs and draws a room', () => {
 const chronicleDir = process.env.CHRONICLE_DIR;
 const chronicleWidgets = chronicleDir && join(resolve(chronicleDir), 'static', 'js', 'widgets');
 test('vendored files match Chronicle (needs CHRONICLE_DIR)', { skip: !(chronicleWidgets && existsSync(chronicleWidgets)) && 'CHRONICLE_DIR not set' }, () => {
-  for (const f of ['shop_room.js', 'shop_room_icons.js']) {
+  for (const f of ['shop_room.js', 'shop_room_icons.js', 'shop_room_paper.js']) {
     assert.equal(readFileSync(join(VENDOR, f), 'utf8'), readFileSync(join(chronicleWidgets, f), 'utf8'),
       `vendor/chronicle/${f} differs from Chronicle's; copy it again from static/js/widgets/`);
   }
