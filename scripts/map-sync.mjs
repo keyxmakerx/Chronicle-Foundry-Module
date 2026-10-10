@@ -36,6 +36,7 @@ import { mapsToRefresh } from './_map-feed.mjs';
 import {
   playerSafeMapItems,
   shadowAreasOf,
+  flagListsToWrite,
   isTokenSafeForPlayerFlags,
 } from './_map-flag-filter.mjs';
 
@@ -1208,14 +1209,18 @@ export class MapSync {
     // list; only a failed fetch leaves the drawings, and so the shadows,
     // unknown.
     const drawingsKnown = drawingsR !== FETCH_FAILED;
-    const got = (r) => (r === FETCH_FAILED ? null : r);
-    const markers = this._coerceArray(got(markersR));
-    const drawings = this._coerceArray(got(drawingsR));
-    const tokens = this._coerceArray(got(tokensR));
-    const layers = this._coerceArray(got(layersR));
-    const fog = (got(fogR) && !Array.isArray(fogR)) ? fogR : null;
-
     const cached = this._cache.get(mapId) || {};
+    // A failed list keeps the GM cache's last copy; the player copy is left
+    // alone below.
+    const list = (r, kind) => (r === FETCH_FAILED
+      ? (Array.isArray(cached[kind]) ? cached[kind] : [])
+      : this._coerceArray(r));
+    const markers = list(markersR, 'markers');
+    const drawings = list(drawingsR, 'drawings');
+    const tokens = list(tokensR, 'tokens');
+    const layers = list(layersR, 'layers');
+    const fog = (fogR !== FETCH_FAILED && fogR && !Array.isArray(fogR)) ? fogR : (fogR === FETCH_FAILED ? (cached.fog ?? null) : null);
+
     this._cache.set(mapId, {
       meta: cached.meta || null,
       markers,
@@ -1232,6 +1237,9 @@ export class MapSync {
     // rewritten from data that might sit under a shadow.
     await this._refreshPageFlags(mapId, {
       markers, drawings, tokens, layers, drawingsKnown,
+      markersKnown: markersR !== FETCH_FAILED,
+      tokensKnown: tokensR !== FETCH_FAILED,
+      layersKnown: layersR !== FETCH_FAILED,
     });
     if (drawingsKnown) await this._noteShadows(mapId, drawings);
     return { complete: failures === 0 };
@@ -1247,22 +1255,26 @@ export class MapSync {
    * @param {{ markers: object[], drawings: object[], tokens: object[], layers: object[], drawingsKnown?: boolean }} data
    *   `drawingsKnown: false` (the drawing fetch failed) leaves the stored
    *   markers and drawings untouched, since shadows can't be applied.
+   *   `markersKnown`/`tokensKnown`/`layersKnown: false` likewise leave that
+   *   stored list untouched.
    * @private
    */
-  async _refreshPageFlags(mapId, { markers, drawings, tokens, layers, drawingsKnown = true }) {
+  async _refreshPageFlags(mapId, { markers, drawings, tokens, layers, drawingsKnown = true, markersKnown = true, tokensKnown = true, layersKnown = true }) {
     const page = this.findPageByMapId(mapId);
     if (!page) return;
 
-    const updates = {
-      [`flags.${FLAG_SCOPE}.chronicleTokens`]: (tokens || []).filter(isTokenSafeForPlayerFlags),
-      [`flags.${FLAG_SCOPE}.chronicleLayers`]: layers || [],
-    };
-    if (drawingsKnown) {
+    const write = flagListsToWrite({
+      markers: markersKnown, drawings: drawingsKnown, tokens: tokensKnown, layers: layersKnown,
+    });
+    const updates = {};
+    if (write.tokens) updates[`flags.${FLAG_SCOPE}.chronicleTokens`] = (tokens || []).filter(isTokenSafeForPlayerFlags);
+    if (write.layers) updates[`flags.${FLAG_SCOPE}.chronicleLayers`] = layers || [];
+    if (write.markers || write.drawings) {
       const safe = playerSafeMapItems(markers, drawings);
-      updates[`flags.${FLAG_SCOPE}.chronicleMarkers`] = safe.markers;
-      updates[`flags.${FLAG_SCOPE}.chronicleDrawings`] = safe.drawings;
+      if (write.markers) updates[`flags.${FLAG_SCOPE}.chronicleMarkers`] = safe.markers;
+      if (write.drawings) updates[`flags.${FLAG_SCOPE}.chronicleDrawings`] = safe.drawings;
     }
-    await page.update(updates);
+    if (Object.keys(updates).length) await page.update(updates);
   }
 
   /**
