@@ -5,10 +5,12 @@
  * live in _settings-form.mjs; this file only reads the form and writes.
  */
 
-import { MODULE_ID } from './constants.mjs';
+import { MODULE_ID, FLAG_SCOPE } from './constants.mjs';
 import { planSettingsSave, settingsView, SETTINGS_KEYS, SYNC_PARTS } from './_settings-form.mjs';
 import { runConnectionTest, stepText } from './_connection-test.mjs';
 import { noticeText } from './_escape-html.mjs';
+import { buildMemberRows, memberKey } from './_member-mapping.mjs';
+import { pickJournalCreateType } from './_journal-create.mjs';
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -42,7 +44,8 @@ export class ChronicleSettingsWindow extends HandlebarsApplicationMixin(Applicat
     },
     actions: {
       testConnection: ChronicleSettingsWindow.#onTestConnection,
-      openMembers: ChronicleSettingsWindow.#onOpenMembers,
+      refreshMembers: ChronicleSettingsWindow.#onRefreshMembers,
+      startImport: ChronicleSettingsWindow.#onStartImport,
     },
   };
 
@@ -50,19 +53,37 @@ export class ChronicleSettingsWindow extends HandlebarsApplicationMixin(Applicat
     body: { template: 'modules/chronicle-sync/templates/chronicle-settings.hbs' },
   };
 
+  /** @param {{tab?: string}} [options] - tab to open on */
+  constructor(options = {}) {
+    super(options);
+    if (TABS.some((t) => t.id === options.tab)) this._activeTab = options.tab;
+  }
+
   /** @type {string} */
   _activeTab = 'connection';
+
+  /** Chronicle's page types, fetched once per window; null until loaded or when the fetch failed. */
+  _pageTypes = null;
 
   /** @override */
   async _prepareContext() {
     const current = readCurrent();
     const view = settingsView(current);
+    const syncManager = game.modules.get(MODULE_ID)?.api?.syncManager;
+    if (!this._pageTypes && syncManager?.api) {
+      try { this._pageTypes = unwrapList(await syncManager.api.get('/entity-types')); } catch { this._pageTypes = null; }
+    }
+    const typeId = this._pageTypes ? pickJournalCreateType(this._pageTypes, current.journalCreateTypeId) : null;
     const dirLabels = { both: t('Both'), pull: t('Pull'), push: t('Push') };
     return {
       activeTab: this._activeTab,
       tabs: TABS.map((tab) => ({ ...tab, label: t(`Tabs.${tab.label}`), active: tab.id === this._activeTab })),
       view,
-      connected: !!game.modules.get(MODULE_ID)?.api?.syncManager?._connectedAt,
+      connected: !!syncManager?._connectedAt,
+      pageTypes: (this._pageTypes ?? [])
+        .filter((t) => t && Number(t.id) > 0 && t.enabled !== false)
+        .map((t) => ({ id: t.id, name: t.name_plural || t.name, selected: Number(t.id) === typeId })),
+      members: memberRows(syncManager),
       labels: { direction: t('Direction') },
       parts: view.parts.map((p) => ({
         ...p,
@@ -100,6 +121,11 @@ export class ChronicleSettingsWindow extends HandlebarsApplicationMixin(Applicat
     el.querySelectorAll('.cs-part input[type="checkbox"]').forEach((box) => {
       box.addEventListener('change', () => box.closest('.cs-part')?.classList.toggle('is-off', !box.checked));
     });
+  }
+
+  /** @param {string} id - a tab id; unknown ids are ignored */
+  showTab(id) {
+    if (TABS.some((t) => t.id === id)) this.#showTab(id);
   }
 
   #showTab(id) {
@@ -140,10 +166,22 @@ export class ChronicleSettingsWindow extends HandlebarsApplicationMixin(Applicat
     }
   }
 
-  static async #onOpenMembers() {
-    // A fresh dashboard opens on the saved tab; an open one switches to it.
-    await game.settings.set(MODULE_ID, 'dashboardActiveTab', 'members');
-    game.modules.get(MODULE_ID)?.api?.openDashboard?.()?._switchTab?.('members');
+  static async #onRefreshMembers(_event, button) {
+    button.disabled = true;
+    try {
+      await game.modules.get(MODULE_ID)?.api?.syncManager?.fetchAndCacheMembers?.();
+    } finally {
+      button.disabled = false;
+    }
+    this.render();
+  }
+
+  static async #onStartImport() {
+    const { ImportWizard } = await import('./import-wizard.mjs');
+    // The wizard reaches Chronicle through the sync manager it is bound to.
+    const wizard = ImportWizard.instance;
+    wizard.bind(game.modules.get(MODULE_ID)?.api?.syncManager);
+    wizard.render({ force: true });
   }
 
   static async #onSubmit(_event, _form, formData) {
@@ -157,6 +195,8 @@ export class ChronicleSettingsWindow extends HandlebarsApplicationMixin(Applicat
       parts,
       defaultOwnership: data.defaultOwnership, conflictResolution: data.conflictResolution,
       excludedTags: data.excludedTags, excludedNamePattern: data.excludedNamePattern,
+      journalCreateTypeId: data.journalCreateTypeId,
+      members: changedMemberLinks(this.element),
     };
     for (const key of ['syncEnabled', 'dmOnlyHidden', 'syncPermissions', 'autoSync', 'skipIncomingSanitization',
       'calendarAnnounceWeather', 'calendarAnnounceWorldstate', 'calendarAnnounceSeasonEra', 'calendarAnnounceMoon']) {
@@ -165,6 +205,9 @@ export class ChronicleSettingsWindow extends HandlebarsApplicationMixin(Applicat
     try {
       const plan = planSettingsSave(form, readCurrent());
       for (const [key, value] of plan.writes) await game.settings.set(MODULE_ID, key, value);
+      if (plan.writes.some(([key]) => key === 'userMappings')) {
+        game.modules.get(MODULE_ID)?.api?.syncManager?.logActivity?.('link', 'Player links changed in Chronicle settings');
+      }
       let reconnect = plan.connectionChanged;
       if (plan.connectLine) {
         const { applyConnectLine } = await import('./settings.mjs');
@@ -177,6 +220,55 @@ export class ChronicleSettingsWindow extends HandlebarsApplicationMixin(Applicat
       ui.notifications.error(game.i18n.format('CHRONICLE.SettingsWindow.SaveFailed', { message: noticeText(err?.message ?? '') }));
     }
   }
+}
+
+/**
+ * Open the window, or bring it forward and switch tab if it is already open.
+ * @param {string} [tab] - connection, sync, calendar, players or advanced
+ */
+export function openChronicleSettings(tab) {
+  const open = foundry.applications.instances?.get?.('chronicle-settings');
+  if (open?.rendered) {
+    open.bringToFront?.();
+    if (tab) open.showTab(tab);
+    return open;
+  }
+  const win = new ChronicleSettingsWindow({ tab });
+  win.render({ force: true });
+  return win;
+}
+
+/**
+ * Only the member dropdowns the GM changed, so opening and saving the
+ * window never rewrites a link nobody touched.
+ * @param {HTMLElement} el
+ */
+function changedMemberLinks(el) {
+  const changed = {};
+  for (const select of el?.querySelectorAll?.('select[data-member-key]') ?? []) {
+    const initial = [...select.options].find((o) => o.defaultSelected)?.value ?? '';
+    if (select.value !== initial) changed[select.dataset.memberKey] = select.value;
+  }
+  return changed;
+}
+
+/** A list answer is a bare array or `{data: [...]}`. */
+function unwrapList(raw) {
+  if (Array.isArray(raw)) return raw;
+  return Array.isArray(raw?.data) ? raw.data : [];
+}
+
+/** The Players tab's rows: one per Chronicle member, with its Foundry player. */
+function memberRows(syncManager) {
+  const members = syncManager?.getMembers?.() ?? [];
+  let mappings = {};
+  try { mappings = JSON.parse(game.settings.get(MODULE_ID, 'userMappings')) || {}; } catch { /* unreadable: show unlinked */ }
+  const foundryUsers = (game.users?.contents ?? []).map((u) => ({ id: u.id, name: u.name }));
+  const claimantKeys = (game.actors?.contents ?? [])
+    .filter((a) => a.getFlag?.(FLAG_SCOPE, 'entityId'))
+    .map((a) => a.getFlag(FLAG_SCOPE, 'chronicleOwnerUserId'))
+    .filter(Boolean);
+  return buildMemberRows({ members, mappings, foundryUsers, keyOf: memberKey, claimantKeys }).rows;
 }
 
 function readCurrent() {

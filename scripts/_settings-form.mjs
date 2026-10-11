@@ -5,6 +5,8 @@
  *   - a blank API key field keeps the saved key, so the key is never shown;
  *   - a part switched off is stored as direction "off", and the older
  *     per-part toggles follow the directions, as the dashboard has always done;
+ *   - member links come from the Players tab's dropdowns: a blank choice
+ *     unlinks, and a member the form didn't list keeps its link;
  *   - only values that changed are written.
  */
 
@@ -69,6 +71,26 @@ export function planSettingsSave(form, current) {
   }
   if (typeof form.excludedNamePattern === 'string') put('excludedNamePattern', form.excludedNamePattern.trim());
 
+  // Absent when Chronicle's page types didn't load, so a failed load never
+  // resets the chosen type.
+  const typeId = Math.trunc(Number(form.journalCreateTypeId));
+  if (form.journalCreateTypeId !== undefined && form.journalCreateTypeId !== '' && typeId > 0) {
+    put('journalCreateTypeId', typeId);
+  }
+
+  if (form.members && typeof form.members === 'object') {
+    const saved = parseJson(current.userMappings, {});
+    const mappings = saved && typeof saved === 'object' && !Array.isArray(saved) ? { ...saved } : {};
+    for (const [key, userId] of Object.entries(form.members)) {
+      if (!key) continue;
+      const id = String(userId ?? '').trim();
+      if (id) mappings[key] = id;
+      else delete mappings[key];
+    }
+    const next = JSON.stringify(mappings);
+    if (next !== JSON.stringify(saved)) writes.push(['userMappings', next]);
+  }
+
   return { writes, connectLine, connectionChanged };
 }
 
@@ -103,7 +125,7 @@ export function settingsView(current) {
 /** Keys the window reads; the caller fetches each with game.settings.get. */
 export const SETTINGS_KEYS = [
   'apiUrl', 'apiKey', 'campaignId', 'syncDirections', 'defaultOwnership', 'conflictResolution',
-  'excludedTags', 'excludedNamePattern', ...FLAGS, ...Object.values(PART_TOGGLES),
+  'excludedTags', 'excludedNamePattern', 'journalCreateTypeId', 'userMappings', ...FLAGS, ...Object.values(PART_TOGGLES),
 ];
 
 function parseJson(raw, fallback) {

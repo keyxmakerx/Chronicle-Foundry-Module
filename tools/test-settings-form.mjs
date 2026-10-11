@@ -19,6 +19,7 @@ const saved = {
   defaultOwnership: 2, dmOnlyHidden: true, syncPermissions: true, conflictResolution: 'chronicle',
   autoSync: true, excludedTags: '["draft"]', excludedNamePattern: '', skipIncomingSanitization: false,
   calendarAnnounceWeather: true, calendarAnnounceWorldstate: false, calendarAnnounceSeasonEra: true, calendarAnnounceMoon: false,
+  journalCreateTypeId: 4, userMappings: '{"u1":"fa","u2":"fb"}',
 };
 const keys = (plan) => plan.writes.map(([k]) => k);
 
@@ -33,6 +34,7 @@ test('an unchanged form writes nothing', () => {
     conflictResolution: v.conflictResolution, autoSync: v.autoSync,
     excludedTags: v.excludedTags, excludedNamePattern: v.excludedNamePattern,
     skipIncomingSanitization: v.skipIncomingSanitization,
+    journalCreateTypeId: String(saved.journalCreateTypeId), members: {},
   };
   const plan = planSettingsSave(form, saved);
   assert.deepEqual(plan.writes, []);
@@ -78,6 +80,25 @@ test('out-of-range and unknown values are ignored', () => {
 test('tags are trimmed into a JSON list', () => {
   const plan = planSettingsSave({ excludedTags: ' draft , spoiler ,, ' }, saved);
   assert.deepEqual(plan.writes, [['excludedTags', '["draft","spoiler"]']]);
+});
+
+test('member links: a choice links, a blank unlinks, an unlisted member keeps its link', () => {
+  const plan = planSettingsSave({ members: { u1: '', u3: 'fc' } }, saved);
+  const written = plan.writes.find(([k]) => k === 'userMappings');
+  assert.deepEqual(JSON.parse(written[1]), { u2: 'fb', u3: 'fc' });
+});
+
+test('member links that match what is saved write nothing', () => {
+  const plan = planSettingsSave({ members: { u1: 'fa' } }, saved);
+  assert.ok(!keys(plan).includes('userMappings'));
+  assert.ok(!keys(planSettingsSave({ members: {} }, saved)).includes('userMappings'));
+});
+
+test('the new-journal page type is written only when the list loaded and it changed', () => {
+  assert.deepEqual(planSettingsSave({ journalCreateTypeId: '7' }, saved).writes, [['journalCreateTypeId', 7]]);
+  assert.deepEqual(planSettingsSave({ journalCreateTypeId: '4' }, saved).writes, []);
+  assert.deepEqual(planSettingsSave({ journalCreateTypeId: undefined }, saved).writes, []);
+  assert.deepEqual(planSettingsSave({ journalCreateTypeId: 'x' }, saved).writes, []);
 });
 
 function fakeFetch(routes) {
@@ -154,4 +175,30 @@ test('the window never puts the saved API key into the page', async () => {
   const key = hbs.match(/<input id="cs-api-key"[^>]*>/)[0];
   assert.doesNotMatch(key, /value=/);
   assert.match(key, /type="password"/);
+});
+
+test('the dashboard no longer carries its own Config and Members tabs', async () => {
+  const { readFileSync } = await import('node:fs');
+  const hbs = readFileSync(new URL('../templates/sync-dashboard.hbs', import.meta.url), 'utf8');
+  assert.doesNotMatch(hbs, /data-tab="config"|data-tab="members"/);
+  // The old Config tab put the saved key into the page.
+  assert.doesNotMatch(hbs, /config\.apiKey/);
+  const win = readFileSync(new URL('../templates/chronicle-settings.hbs', import.meta.url), 'utf8');
+  assert.match(win, /data-member-key=/);
+  assert.match(win, /name="journalCreateTypeId"/);
+});
+
+test('only member dropdowns the GM changed are saved', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../scripts/chronicle-settings.mjs', import.meta.url), 'utf8');
+  assert.match(src, /defaultSelected/);
+  assert.match(src, /members: changedMemberLinks\(this\.element\)/);
+});
+
+test('the Setup Wizard button hands the wizard the sync manager', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../scripts/chronicle-settings.mjs', import.meta.url), 'utf8');
+  const body = src.slice(src.indexOf('static async #onStartImport'), src.indexOf('static async #onSubmit'));
+  assert.match(body, /ImportWizard\.instance/);
+  assert.match(body, /\.bind\(game\.modules\.get\(MODULE_ID\)\?\.api\?\.syncManager\)/);
 });

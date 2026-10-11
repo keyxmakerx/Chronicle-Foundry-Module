@@ -68,7 +68,7 @@ test('each problem routes to the tab that fixes it', () => {
   });
   const tabFor = (needle) => m.attention.find((a) => a.text.includes(needle))?.tab;
   assert.equal(tabFor("couldn't be matched"), 'issues');
-  assert.equal(tabFor('not mapped'), 'members');
+  assert.equal(tabFor('not mapped'), 'settings:players');
   assert.equal(tabFor('out of sync'), 'calendar');
   assert.equal(tabFor('No matching game system'), 'status');
   assert.equal(tabFor('recent sync error'), 'status');

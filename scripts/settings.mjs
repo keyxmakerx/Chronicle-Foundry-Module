@@ -295,7 +295,7 @@ export function registerSettings() {
   });
 
   // -----------------------------------------------------------------------
-  // Sync Configuration settings (managed via Config tab in dashboard)
+  // Sync configuration, edited in the Chronicle settings window.
   // -----------------------------------------------------------------------
 
   // Per-type sync direction: JSON map of sync type → direction.

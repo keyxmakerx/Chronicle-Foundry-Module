@@ -10,8 +10,8 @@ repo root. There is no `package.json`.
 
 - [ ] Chronicle running with API key created for target campaign
 - [ ] Foundry VTT world with chronicle-sync module enabled
-- [ ] Module settings configured: API URL, API key, campaign ID
-- [ ] Sync enabled in module settings
+- [ ] Chronicle settings → Connection filled in: address, API key, campaign
+- [ ] Chronicle settings → What syncs: Sync is on
 
 ## Connection & Status
 
@@ -72,7 +72,7 @@ Needs a player client that can see the journal but does not own its page.
       `/permissions` endpoint) while a custom-visibility entity syncs; confirm players
       cannot see it.
 
-### Visibility Settings (Config tab → Permissions)
+### Visibility Settings (Chronicle settings → Players)
 These controls drive journal ownership:
 - [ ] **dmOnlyHidden ON (default):** a DM-only / private Chronicle entity → players have NO
       access to the journal (ownership NONE). Confirm as a player: the journal is hidden.
@@ -82,7 +82,7 @@ These controls drive journal ownership:
 - [ ] **defaultOwnership = Owner:** a player-visible entity → journal default ownership is OWNER
       (players can edit). Set it to **None** → public entities sync as GM-only.
 - [ ] Per-user Chronicle grant: an entity shared with a specific
-      Chronicle user (mapped to a Foundry user on the dashboard Members tab) → that Foundry
+      Chronicle user (linked to a Foundry user in Chronicle settings → Players) → that Foundry
       user gets per-user OWNER/OBSERVER ownership; unmapped Chronicle users are dropped (the
       entity under-shares — no leak to the wrong player).
 
@@ -187,7 +187,7 @@ Chronicle brings its own calendar; no Foundry calendar module is used.
 
 ### Built-in calendar (strip)
 - [ ] With Calendar sync on and nothing else changed, no strip shows
-- [ ] Module Settings -> Show the calendar strip on -> a thin strip sits at the top centre: date, time and a weather icon over a small sky coloured for the hour; snow, rain or night stars move in it to match Chronicle
+- [ ] Configure Settings -> Show the calendar strip on -> a thin strip sits at the top centre: date, time and a weather icon over a small sky coloured for the hour; snow, rain or night stars move in it to match Chronicle
 - [ ] Hover the strip -> it widens to show season, temperature and moons
 - [ ] Drag the strip by its dots anywhere -> it stays there after a reload, and each player's spot is their own
 - [ ] Click the lock on the strip -> the dots disappear and the strip (or its clock) cannot be dragged; click it again -> dragging works. The lock survives a reload and is per player
@@ -201,15 +201,15 @@ Chronicle brings its own calendar; no Foundry calendar module is used.
 - [ ] Player client: the same strip and month, without arrows, Set date or Add event; GM-only events, hidden moons, secret eras and future days' weather never appear
 - [ ] Move the date in Chronicle -> the strip updates for the GM and every player
 - [ ] A calendar hidden from players in Chronicle -> players see no strip
-- [ ] Turn Calendar sync off in Module Settings -> the strip disappears for everyone without a reload
-- [ ] Module Settings -> Calendar temperature unit °F -> only your strip switches to °F
+- [ ] Turn Calendar off in Chronicle settings → What syncs -> the strip disappears for everyone without a reload
+- [ ] Configure Settings -> Calendar temperature unit °F -> only your strip switches to °F
 
 ### Dashboard
 - [ ] Calendar tab shows Chronicle's calendar name, date (day, month, year) and time
 - [ ] Advance the date in Chronicle -> the tab shows the new date after the next refresh
 - [ ] Change weather, season, era or a moon phase in Chronicle -> the world-state panel updates
 - [ ] With the announce settings on, a GM-only whisper appears for each change; players never see it
-- [ ] Calendar sync off in Module Settings -> the tab says it is disabled
+- [ ] Calendar off in Chronicle settings → What syncs -> the tab says it is off
 - [ ] A campaign with no calendar -> the tab says none is configured
 
 ## Shop Widget
@@ -255,7 +255,7 @@ Chronicle brings its own calendar; no Foundry calendar module is used.
 
 ### Prerequisites
 - [ ] Game system matches a Chronicle system (built-in or custom with foundry_path annotations)
-- [ ] "Sync Characters" enabled in module settings
+- [ ] Characters switched on in Chronicle settings → What syncs
 - [ ] Character entity type exists in Chronicle campaign
 
 ### Chronicle -> Foundry
@@ -340,17 +340,17 @@ GM only. Needs a Chronicle that serves the DM Screen.
 
 ## Character claims
 
-Needs the Player Character Claiming addon on in Chronicle, a character linked to an actor, and two players matched to Chronicle members (Members tab). Run as the GM.
+Needs the Player Character Claiming addon on in Chronicle, a character linked to an actor, and two players linked to Chronicle members (Chronicle settings → Players). Run as the GM.
 
 - [ ] In Chronicle, assign the character to player A -> within a few seconds A is **Owner** in the actor's Ownership settings, and A can open and edit the sheet; nothing about the ownership is sent back to Chronicle
 - [ ] Reassign it to player B -> B is Owner, A is still Owner, and the GM sees one notice saying A still owns it and can be changed in the actor's Ownership settings
 - [ ] Unassign it in Chronicle -> Foundry ownership is unchanged
-- [ ] Assign it to a member with no Foundry user mapped -> no ownership change, one GM notice that the player has no Foundry user, and the Members tab shows that member as "Owns a character, no Foundry user" with a banner; mapping them and pressing **Refresh Members**, then reconnecting, gives them Owner
+- [ ] Assign it to a member with no Foundry user mapped -> no ownership change, one GM notice that the player has no Foundry user, and Chronicle settings → Players shows that member as "Owns a character, not linked"; linking them, pressing **Save**, then reconnecting, gives them Owner
 - [ ] Reconnect (or Pull All) with a claim that is already applied -> no notice and no ownership change
 
 ## Stashes
 
-Needs the Armory addon on in Chronicle, a character linked to an actor, and a player matched to a Chronicle member (Members tab).
+Needs the Armory addon on in Chronicle, a character linked to an actor, and a player linked to a Chronicle member (Chronicle settings → Players).
 
 - [ ] A **Stashes** button is in the title bar of a linked character sheet (players on characters they own, the GM on all); with the Armory off, or on a Chronicle without stash routes, it is absent
 - [ ] The window shows the character on the left and a destination on the right, a downtime badge, and Move / History tabs
@@ -385,7 +385,7 @@ Needs a Chronicle with quest boards (a category or a place page with at least on
 
 ## Import Wizard
 
-- [ ] Dashboard Config tab -> **Setup Wizard** opens a six-step wizard: Connect, Scan, Types, Tags, Characters, Review; there are no maps or calendar steps
+- [ ] Chronicle settings → Connection -> **Setup Wizard** opens a six-step wizard: Connect, Scan, Types, Tags, Characters, Review; there are no maps or calendar steps
 - [ ] Tags and Characters steps are skipped when tags are unavailable or no game system matched
 - [ ] Review lists what will be created; running it creates the entities and marks the wizard completed
 
@@ -447,8 +447,6 @@ Library: Shops, Maps; Setup: Config, Members; Diagnostics: Status.
 - [ ] **Issues:** badge shows the number of character actors that cannot be matched. Each row offers a "Match to existing…" dropdown with **Match**, and **Create new**. Resolving a row links it and removes it. With none, the tab says every character is linked
 - [ ] **Shops:** shop entities with type, keeper, private lock, "Synced" badge and an **Open** button that opens the Shop window; empty states say whether the "Shop" entity type is missing or just has no shops
 - [ ] **Maps:** per-map rows with the map's picture (a shadowed map shows the players' copy), marker / drawing / token counts, **Open in Foundry**, external-link icon; **Resync All Maps**, **Open Chronicle Maps Folder**; summary row and dismissible error list (see Map Sync)
-- [ ] **Config:** Connection (URL, API key as password field, campaign ID, **Test Connection**), **Setup Wizard** button, Sync Scope, Permissions, Behavior (conflict resolution), Exclusion Rules (tags, name) and **Save**; unsaved checkbox/select changes are marked until saved
-- [ ] **Members:** one row per Chronicle campaign member with Matched / Unmatched badge and a Foundry-user dropdown; changing the dropdown saves the mapping; the rail badge counts unmatched members; **Refresh** re-fetches
 - [ ] **Status:** Game System (Foundry and Chronicle system, Character Sync), Diagnostics, Field Mapping, Sync Capability (pick an actor to inspect; **Copy** report and JSON), Error Log, Recent Activity, Diagnostic Bundle copy and System Debug Export copy
 
 ### Layout Persistence
@@ -463,7 +461,15 @@ Library: Shops, Maps; Setup: Config, Members; Diagnostics: Status.
 - [ ] New type appears in bulk "Change Type" dropdown
 - [ ] Cancel/close without name -> no API call, no errors
 
-### Test Connection (Multi-step)
+### Chronicle settings
+- [ ] Configure Settings shows Chronicle's button and only the calendar strip and temperature unit; the button opens Chronicle settings with tabs Connection, What syncs, Calendar, Players and Advanced (GM only)
+- [ ] **Players:** one row per Chronicle member with a Linked / Not linked badge and a Foundry player dropdown; change one, press **Save**, reopen -> the change stuck and the other links are unchanged; **Fetch members again** re-reads the list
+- [ ] **What syncs:** the new-journal page type lists Chronicle's page types; pick one, **Save**, then make a journal in Foundry -> the Chronicle page has that type
+- [ ] **Connection:** **Setup Wizard** opens the import wizard; the API key field is always empty, with "Saved in this browser" when a key exists
+- [ ] Dashboard Overview -> "campaign member(s) not mapped" opens Chronicle settings on Players
+- [ ] A dashboard last left on the old Config or Members tab opens on Overview
+
+### Test Connection (Multi-step, Chronicle settings → Connection)
 - [ ] Test with valid config -> Shows: API reachable ✓, Auth OK ✓, Campaign ✓, System match ✓
 - [ ] Test with wrong URL -> "Unreachable: Chronicle not responding at {url}"
 - [ ] Test with wrong API key -> "Auth failed: API key invalid or revoked"

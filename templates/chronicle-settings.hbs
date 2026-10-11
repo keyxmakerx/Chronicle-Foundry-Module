@@ -54,6 +54,14 @@
           <ul class="cs-steps" data-steps aria-live="polite"></ul>
         </div>
       </div>
+
+      <div class="cs-field">
+        <span class="cs-lab">{{localize "CHRONICLE.SettingsWindow.StartImport"}}</span>
+        <div class="cs-ctl">
+          <div><button type="button" data-action="startImport"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>{{localize "CHRONICLE.Wizard.OpenWizard"}}</button></div>
+          <p class="cs-hint">{{localize "CHRONICLE.Wizard.Hint"}}</p>
+        </div>
+      </div>
     </section>
 
     <section class="cs-panel" id="cs-panel-sync" data-panel="sync" role="tabpanel" aria-labelledby="cs-tab-sync" {{#unless (eq activeTab "sync")}}hidden{{/unless}}>
@@ -78,6 +86,17 @@
         </fieldset>
       </div>
       {{/each}}
+      {{#if pageTypes.length}}
+      <div class="cs-field">
+        <label for="cs-page-type">{{localize "CHRONICLE.SettingsWindow.NewPageType"}}</label>
+        <div class="cs-ctl">
+          <select id="cs-page-type" name="journalCreateTypeId">
+            {{#each pageTypes}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}
+          </select>
+          <p class="cs-hint">{{localize "CHRONICLE.SettingsWindow.NewPageTypeHint"}}</p>
+        </div>
+      </div>
+      {{/if}}
     </section>
 
     <section class="cs-panel" id="cs-panel-calendar" data-panel="calendar" role="tabpanel" aria-labelledby="cs-tab-calendar" {{#unless (eq activeTab "calendar")}}hidden{{/unless}}>
@@ -117,12 +136,33 @@
         </div>
       </div>
       <h3 class="cs-group">{{localize "CHRONICLE.SettingsWindow.LinkPlayers"}}</h3>
-      <div class="cs-field">
-        <span class="cs-lab"></span>
-        <div class="cs-ctl">
-          <p class="cs-hint">{{localize "CHRONICLE.SettingsWindow.LinkPlayersHint"}}</p>
-          <div><button type="button" data-action="openMembers"><i class="fa-solid fa-user-plus" aria-hidden="true"></i>{{localize "CHRONICLE.SettingsWindow.OpenMembers"}}</button></div>
-        </div>
+      <p class="cs-hint cs-group-hint">{{localize "CHRONICLE.SettingsWindow.LinkPlayersHint"}}</p>
+      {{#if members.length}}
+      <ul class="cs-members">
+        {{#each members}}
+        <li class="cs-member {{#unless matched}}is-unlinked{{/unless}}">
+          <span class="cs-member-who">
+            <b>{{name}}</b>
+            {{#if role}}<small>{{role}}</small>{{/if}}
+          </span>
+          {{#if claimUnmapped}}
+          <span class="cs-pill warn"><i class="fa-solid fa-user-lock" aria-hidden="true"></i>{{localize "CHRONICLE.SettingsWindow.MemberOwnsCharacter"}}</span>
+          {{else if matched}}
+          <span class="cs-pill ok"><span class="cs-dot"></span>{{localize "CHRONICLE.SettingsWindow.MemberLinked"}}</span>
+          {{else}}
+          <span class="cs-pill warn"><span class="cs-dot"></span>{{localize "CHRONICLE.SettingsWindow.MemberNotLinked"}}</span>
+          {{/if}}
+          <select data-member-key="{{key}}" aria-label="{{localize "CHRONICLE.SettingsWindow.MemberFoundryUser" name=name}}">
+            {{#each options}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{#if id}}{{name}}{{else}}{{localize "CHRONICLE.SettingsWindow.MemberNotLinked"}}{{/if}}</option>{{/each}}
+          </select>
+        </li>
+        {{/each}}
+      </ul>
+      {{else}}
+      <p class="cs-empty">{{localize "CHRONICLE.SettingsWindow.NoMembers"}}</p>
+      {{/if}}
+      <div class="cs-row-end">
+        <button type="button" data-action="refreshMembers"><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>{{localize "CHRONICLE.SettingsWindow.RefreshMembers"}}</button>
       </div>
     </section>
 
