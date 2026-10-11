@@ -12,7 +12,8 @@
 import { noticeText } from './_escape-html.mjs';
 import { getSetting, getSyncExclusions } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
-import { FLAG_SCOPE, SYNC_OPTIONS } from './constants.mjs';
+import { FLAG_SCOPE, syncOptions } from './constants.mjs';
+import { TYPE_SLUG_FLAG } from './_shop-journal.mjs';
 import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
 import {
   toFoundrySecrets, toChronicleSecrets, secretBlockRanges, PART_ATTR,
@@ -124,7 +125,7 @@ export class JournalSync {
     this._syncManager = null;
 
     // Incoming Chronicle changes apply per entity, in arrival order. Writes
-    // sync makes carry SYNC_OPTIONS, which the Foundry hooks use to ignore
+    // sync makes carry syncOptions(), which the Foundry hooks use to ignore
     // only sync's own echoes (a GM edit made meanwhile still pushes).
     /** @type {KeyedQueue} */
     this._queue = new KeyedQueue();
@@ -392,7 +393,7 @@ export class JournalSync {
     if (!gone) return;
     await this._queue.run(eid, async () => {
       this._journalPushDebouncer.cancel(journal.id);
-      await setAside(journal, FLAG_SCOPE, SYNC_OPTIONS);
+      await setAside(journal, FLAG_SCOPE, syncOptions());
       ui.notifications?.info?.(game.i18n.format('CHRONICLE.Removed.Entity', { name: noticeText(journal.name) }));
     });
   }
@@ -684,7 +685,7 @@ export class JournalSync {
       if (entity.updated_at && !this._olderThanRecorded(journal, entity.updated_at)) {
         await journal.update(
           { [`flags.${FLAG_SCOPE}.chronicleUpdatedAt`]: entity.updated_at },
-          SYNC_OPTIONS,
+          syncOptions(),
         );
       }
       console.warn(`Chronicle: kept unsent Foundry edit of "${journal.name}" over an incoming Chronicle change`);
@@ -698,6 +699,7 @@ export class JournalSync {
       name: entity.name,
       ownership,
       [`flags.${FLAG_SCOPE}.entityType`]: entity.type_name || '',
+      [`flags.${FLAG_SCOPE}.${TYPE_SLUG_FLAG}`]: entity.type_slug || '',
       // Field values are not kept on the journal: every client receives its
       // flags, and the Owner key's copy includes GM-only fields. Removes the
       // copy older versions stored.
@@ -705,7 +707,7 @@ export class JournalSync {
       [`flags.${FLAG_SCOPE}.tags`]: entity.tags || [],
       [`flags.${FLAG_SCOPE}.lastSync`]: new Date().toISOString(),
       [`flags.${FLAG_SCOPE}.chronicleUpdatedAt`]: entity.updated_at || '',
-    }, SYNC_OPTIONS);
+    }, syncOptions());
 
     // Split entity content into pages and sync them.
     await this._syncPagesToJournal(journal, await this._pullHtml(entity.id, entity.entry_html));
@@ -735,7 +737,7 @@ export class JournalSync {
     // The journal is going away from sync; an edit still pending for it
     // would only push at a page that no longer exists.
     this._journalPushDebouncer.cancel(journal.id);
-    await setAside(journal, FLAG_SCOPE, SYNC_OPTIONS);
+    await setAside(journal, FLAG_SCOPE, syncOptions());
     ui.notifications?.info?.(game.i18n.format('CHRONICLE.Removed.Entity', { name: noticeText(journal.name) }));
     console.debug(`Chronicle: Set aside journal for deleted entity ${data.id}`);
   }
@@ -759,7 +761,7 @@ export class JournalSync {
     if (folder.name !== entityType.name) updates.name = entityType.name;
     if (entityType.color && folder.color !== entityType.color) updates.color = entityType.color;
     if (Object.keys(updates).length > 0) {
-      await folder.update(updates, SYNC_OPTIONS);
+      await folder.update(updates, syncOptions());
       console.debug(`Chronicle: Updated folder "${entityType.name}" from entity type`);
     }
   }
@@ -802,7 +804,7 @@ export class JournalSync {
     };
     if (entity.type_color) folderData.color = entity.type_color;
 
-    return Folder.create(folderData, { ...SYNC_OPTIONS });
+    return Folder.create(folderData, syncOptions());
   }
 
   /**
@@ -893,6 +895,7 @@ export class JournalSync {
         [FLAG_SCOPE]: {
           entityId: entity.id,
           entityType: entity.type_name || '',
+          [TYPE_SLUG_FLAG]: entity.type_slug || '',
           tags: entity.tags || [],
           lastSync: new Date().toISOString(),
           chronicleUpdatedAt: entity.updated_at || '',
@@ -904,7 +907,7 @@ export class JournalSync {
       journalData._id = forceId;
     }
 
-    const journal = await JournalEntry.create(journalData, { ...SYNC_OPTIONS });
+    const journal = await JournalEntry.create(journalData, syncOptions());
 
     // Create sync mapping on Chronicle server (idempotent — tolerates
     // a pre-existing Chronicle mapping pointing at a stale Foundry id,
@@ -995,7 +998,7 @@ export class JournalSync {
           [`flags.${FLAG_SCOPE}.entityId`]: entity.id,
           [`flags.${FLAG_SCOPE}.lastSync`]: new Date().toISOString(),
           [`flags.${FLAG_SCOPE}.chronicleUpdatedAt`]: entity.updated_at || '',
-        }, SYNC_OPTIONS);
+        }, syncOptions());
 
         const entryHtml = await this._entryForPush(journal, entity.id);
         if (entryHtml) {
@@ -1075,7 +1078,7 @@ export class JournalSync {
   /**
    * A page was created, edited or deleted in Foundry: push its journal like
    * any other journal edit (same guards, same debounce). Page writes made by
-   * sync itself carry SYNC_OPTIONS and are skipped.
+   * sync itself carry syncOptions() and are skipped.
    * @param {JournalEntryPage} page
    * @param {object} options
    * @param {string} userId
@@ -1194,7 +1197,7 @@ export class JournalSync {
     if (result?.updated_at && !this._olderThanRecorded(journal, result.updated_at)) {
       update[`flags.${FLAG_SCOPE}.chronicleUpdatedAt`] = result.updated_at;
     }
-    await journal.update(update, SYNC_OPTIONS);
+    await journal.update(update, syncOptions());
   }
 
   /**
@@ -1277,7 +1280,7 @@ export class JournalSync {
       const eid = journal.getFlag(FLAG_SCOPE, 'entityId');
       if (!eid || !actorEntityIds.has(eid)) continue;
       try {
-        await setAside(journal, FLAG_SCOPE, SYNC_OPTIONS);
+        await setAside(journal, FLAG_SCOPE, syncOptions());
         moved++;
       } catch (err) {
         console.warn(`Chronicle: Failed to set aside duplicate journal ${journal.id}`, err);
@@ -1517,7 +1520,7 @@ export class JournalSync {
           if (fresh?.updated_at && !this._olderThanRecorded(journal, fresh.updated_at)) {
             update[`flags.${FLAG_SCOPE}.chronicleUpdatedAt`] = fresh.updated_at;
           }
-          await journal.update(update, SYNC_OPTIONS);
+          await journal.update(update, syncOptions());
         }
       }
     } catch (err) {
@@ -1787,7 +1790,7 @@ export class JournalSync {
       if (!entityId) continue;
       try {
         if (journal.flags?.[FLAG_SCOPE]?.fields !== undefined) {
-          await journal.update({ [`flags.${FLAG_SCOPE}.-=fields`]: null }, SYNC_OPTIONS);
+          await journal.update({ [`flags.${FLAG_SCOPE}.-=fields`]: null }, syncOptions());
         }
         const clear = journal.pages.some((p) => p.type === 'text'
           && hasClearSecrets(p.text?.content || '', { chronicleOnly: true }));
@@ -1816,7 +1819,7 @@ export class JournalSync {
     if (playerNotesHtml) {
       if (existingPage) {
         // Update existing player notes page.
-        await existingPage.update({ 'text.content': playerNotesHtml }, SYNC_OPTIONS);
+        await existingPage.update({ 'text.content': playerNotesHtml }, syncOptions());
       } else {
         // Create new player notes page.
         const maxSort = Math.max(0, ...journal.pages.map((p) => p.sort || 0));
@@ -1829,11 +1832,11 @@ export class JournalSync {
             ownership: { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER },
             flags: { [FLAG_SCOPE]: { isPlayerNotes: true } },
           },
-        ], SYNC_OPTIONS);
+        ], syncOptions());
       }
     } else if (existingPage) {
       // Remove player notes page if entity no longer has player notes.
-      await journal.deleteEmbeddedDocuments('JournalEntryPage', [existingPage.id], SYNC_OPTIONS);
+      await journal.deleteEmbeddedDocuments('JournalEntryPage', [existingPage.id], syncOptions());
     }
   }
 
@@ -1930,7 +1933,7 @@ export class JournalSync {
         if (page.name !== section.title) {
           updates.name = section.title;
         }
-        await page.update(updates, SYNC_OPTIONS);
+        await page.update(updates, syncOptions());
       } else {
         // Create new page.
         await journal.createEmbeddedDocuments('JournalEntryPage', [
@@ -1940,7 +1943,7 @@ export class JournalSync {
             text: { content: section.content },
             sort: (existingTextPages.length + i) * 100,
           },
-        ], SYNC_OPTIONS);
+        ], syncOptions());
       }
     }
 
@@ -1950,7 +1953,7 @@ export class JournalSync {
         .slice(sections.length)
         .map((p) => p.id);
       if (pagesToDelete.length > 0) {
-        await journal.deleteEmbeddedDocuments('JournalEntryPage', pagesToDelete, SYNC_OPTIONS);
+        await journal.deleteEmbeddedDocuments('JournalEntryPage', pagesToDelete, syncOptions());
       }
     }
   }

@@ -9,6 +9,7 @@
 
 import { getSetting } from './settings.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
+import { isShopJournal, journalFromRow } from './_shop-journal.mjs';
 import { ShopRoomWindow, chronicleUserFor, setShopBuyRelay } from './shop-room-window.mjs';
 
 /**
@@ -37,24 +38,25 @@ export class ShopWidget {
   async init(api) {
     this._api = api;
 
-    // Add context menu option to JournalEntries linked to shop entities.
-    Hooks.on('getJournalEntryContext', (html, options) => {
+    // "Open shop" on a shop's row in the journal directory. Foundry 12 names
+    // the hook per document, 13 and later per directory; add the option once.
+    const addOpenShop = (_app, options) => {
+      if (!Array.isArray(options)) return;
+      const name = game.i18n.localize('CHRONICLE.ShopRoom.OpenShop');
+      if (options.some((o) => o?.name === name)) return;
       options.push({
-        name: game.i18n.localize('CHRONICLE.ShopRoom.OpenShop'),
+        name,
         icon: '<i class="fas fa-store"></i>',
-        condition: (li) => {
-          const id = li instanceof HTMLElement ? li.dataset.documentId : li.data('documentId');
-          const journal = game.journal.get(id);
-          return journal?.getFlag(FLAG_SCOPE, 'entityType') === 'Shop';
-        },
+        condition: (li) => game.user.isGM && isShopJournal(journalFromRow(li), FLAG_SCOPE),
         callback: async (li) => {
-          const id = li instanceof HTMLElement ? li.dataset.documentId : li.data('documentId');
-          const journal = game.journal.get(id);
+          const journal = journalFromRow(li);
           const entityId = journal?.getFlag(FLAG_SCOPE, 'entityId');
           if (entityId) await this.openShop(entityId, journal.name);
         },
       });
-    });
+    };
+    Hooks.on('getJournalEntryContext', addOpenShop);
+    Hooks.on('getJournalEntryContextOptions', addOpenShop);
 
     // Players' baskets reach Chronicle through this client, for a shop the
     // GM is showing, as the Chronicle member the player is matched to.
@@ -120,7 +122,7 @@ export class ShopWidget {
     const win = this._openWindows.get(req.shopId);
     // A player who owns an entry could have written its shop link
     // themselves, so only an entry they can see but not edit counts.
-    const journal = game.journal.find((j) => j.getFlag(FLAG_SCOPE, 'entityType') === 'Shop'
+    const journal = game.journal.find((j) => isShopJournal(j, FLAG_SCOPE)
       && j.getFlag(FLAG_SCOPE, 'entityId') === req.shopId
       && j.testUserPermission(user, 'OBSERVER') && !j.testUserPermission(user, 'OWNER'));
     const canSee = !!journal;

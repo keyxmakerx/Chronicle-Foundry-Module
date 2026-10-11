@@ -18,7 +18,7 @@ import { noticeText } from './_escape-html.mjs';
 import { getSetting, getUserMappings } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
 import { createGenericAdapter } from './adapters/generic-adapter.mjs';
-import { FLAG_SCOPE, SYNC_OPTIONS, APPLY_OPTION } from './constants.mjs';
+import { FLAG_SCOPE, syncOptions, APPLY_OPTION } from './constants.mjs';
 import { planClaimOwnership } from './_claim-ownership-plan.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { walkEntityPages, unwrapEntityList } from './_entity-page-walk.mjs';
@@ -301,7 +301,7 @@ export class ActorSync {
       if (plan.grantUserId) {
         await actor.update(
           { ownership: { [plan.grantUserId]: CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3 } },
-          { ...SYNC_OPTIONS, [APPLY_OPTION]: true }
+          syncOptions({ [APPLY_OPTION]: true })
         );
       }
       for (const staleId of plan.staleOwnerUserIds) {
@@ -536,7 +536,7 @@ export class ActorSync {
         actor,
       });
       if (Object.keys(changes).length > 0) {
-        await actor.update(changes, { ...SYNC_OPTIONS, [APPLY_OPTION]: true });
+        await actor.update(changes, syncOptions({ [APPLY_OPTION]: true }));
       }
 
       await this._applyIdentityItems(actor, entity);

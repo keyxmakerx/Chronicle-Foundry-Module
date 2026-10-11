@@ -11,7 +11,7 @@
 export const REMOVED_FOLDER_FLAG = 'removedFolder';
 
 /** The flags that tie a journal to a Chronicle page or note. */
-export const LINK_FLAGS = ['entityId', 'noteId', 'isNote', 'entityType', 'fields', 'tags', 'lastSync', 'chronicleUpdatedAt'];
+export const LINK_FLAGS = ['entityId', 'noteId', 'isNote', 'entityType', 'entityTypeSlug', 'fields', 'tags', 'lastSync', 'chronicleUpdatedAt'];
 
 /**
  * The update that unlinks a journal and files it in the removed folder.
@@ -51,9 +51,9 @@ export async function removedFolder(scope) {
  * Unlinks a journal and moves it into the removed folder.
  * @param {JournalEntry} journal
  * @param {string} scope
- * @param {object} [options] - Passed to `journal.update` (the sync marker, so the update hooks ignore it).
+ * @param {object} [options] - Copied into `journal.update` (the sync marker, so the update hooks ignore it); Foundry writes into the options it gets.
  */
 export async function setAside(journal, scope, options) {
   const folder = await removedFolder(scope);
-  await journal.update(setAsideUpdate(scope, folder?.id ?? null), options);
+  await journal.update(setAsideUpdate(scope, folder?.id ?? null), { ...options });
 }

@@ -80,7 +80,7 @@ export function unlinkNoteUpdate(journal, scope) {
  * @param {string} deps.scope - The module's flag scope.
  * @param {(scope: string) => Promise<Folder|null>} deps.removedFolder
  * @param {number} [deps.maxDepth] - Foundry's folder nesting limit.
- * @param {object} [deps.options] - Passed to every update (the sync marker).
+ * @param {object} [deps.options] - Copied into every update (the sync marker); Foundry writes into the options it gets.
  * @returns {Promise<{unlinked: number, moved: number}>}
  */
 export async function retireNotesFolder({ game, scope, removedFolder, maxDepth = DEFAULT_MAX_DEPTH, options = {} }) {
@@ -96,7 +96,7 @@ export async function retireNotesFolder({ game, scope, removedFolder, maxDepth =
     if (!isNote) continue;
     const update = unlinkNoteUpdate(journal, scope);
     if (!update) continue;
-    await journal.update(update, options);
+    await journal.update(update, { ...options });
     unlinked += 1;
   }
 
@@ -107,7 +107,7 @@ export async function retireNotesFolder({ game, scope, removedFolder, maxDepth =
     if (treeHeight(root, folders) + 1 > maxDepth) continue;
     const removed = await removedFolder(scope);
     if (!removed || removed.id === root.id) continue;
-    await root.update({ folder: removed.id }, options);
+    await root.update({ folder: removed.id }, { ...options });
     moved += 1;
   }
   return { unlinked, moved };

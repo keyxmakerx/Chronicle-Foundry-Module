@@ -160,3 +160,38 @@ test('renderers produce a titled markdown report and valid JSON; bad input toler
   assert.match(renderCapabilityMarkdown({ ok: false, error: 'x' }), /Could not build report/);
   assert.equal(buildCapabilityReport({ ok: false }, FIELD_DEFS).ok, false);
 });
+
+// The stored source lacks what the game system derives and anything outside
+// `system`; sync reads the live actor, so the report must too.
+test('a mapped path sync can read off the live actor is not reported missing', () => {
+  const actor = makeActor();
+  // Live, prepared data: a DataModel's own fields plus derived values.
+  Object.assign(actor.system, {
+    stamina: { value: 33, max: 40, winded: 20 },
+    movement: { value: 6 },
+    damage: { immunities: { fire: 5, cold: 0 } },
+  });
+  actor.prototypeToken = { texture: { src: 'tokens/orrin.webp' } };
+  actor.statuses = new Set(['slowed']);
+  const defs = {
+    fields: [
+      { key: 'stamina_max', foundry_path: 'system.stamina.max', type: 'number' },
+      { key: 'winded', foundry_path: 'system.stamina.winded', type: 'number' },
+      { key: 'speed', foundry_path: 'system.movement.value', type: 'number' },
+      { key: 'immunities', foundry_path: 'system.damage.immunities', type: 'string' },
+      { key: 'portrait_url', foundry_path: 'prototypeToken.texture.src', type: 'string' },
+      { key: 'conditions_json', foundry_path: 'statuses', type: 'string' },
+      { key: 'missing', foundry_path: 'system.nope.value', type: 'number' },
+    ],
+  };
+  const report = buildCapabilityReport(captureActorSnapshot(actor, defs), defs);
+  const byKey = Object.fromEntries(report.fields.filter((r) => r.key).map((r) => [r.key, r]));
+  for (const k of ['stamina_max', 'winded', 'speed', 'immunities', 'portrait_url', 'conditions_json']) {
+    assert.equal(byKey[k].status, CAP_STATUS.SYNCED, k);
+  }
+  assert.equal(byKey.stamina_max.sample, 40, 'the derived value, not the stored one');
+  assert.equal(byKey.speed.sample, 6);
+  assert.equal(byKey.portrait_url.sample, 'tokens/orrin.webp');
+  assert.equal(byKey.conditions_json.sample, '[1]');
+  assert.equal(byKey.missing.status, CAP_STATUS.MAPPED_MISSING);
+});

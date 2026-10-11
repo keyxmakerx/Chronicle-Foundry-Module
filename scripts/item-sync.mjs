@@ -234,15 +234,16 @@ export class ItemSync {
     // Tagged per write rather than behind `_syncing`: a GM edit to another
     // item while this runs must still push, and a reconcile on another
     // actor must not lift this one's guard.
-    const opts = { [APPLY_OPTION]: true };
+    // A fresh options object per write: Foundry writes into the one it gets.
+    const opts = () => ({ [APPLY_OPTION]: true });
     for (const { id, relationId } of plan.adopt) {
-      await actor.items.get(id)?.update({ [`flags.${FLAG_SCOPE}.relationId`]: relationId, [`flags.${FLAG_SCOPE}.-=unlinkedRelationId`]: null }, opts);
+      await actor.items.get(id)?.update({ [`flags.${FLAG_SCOPE}.relationId`]: relationId, [`flags.${FLAG_SCOPE}.-=unlinkedRelationId`]: null }, opts());
     }
     for (const { id, change } of plan.update) {
-      await actor.items.get(id)?.update(change, opts);
+      await actor.items.get(id)?.update(change, opts());
     }
     if (plan.create.length) {
-      await actor.createEmbeddedDocuments('Item', plan.create.map((r) => itemDataFor(r)), opts);
+      await actor.createEmbeddedDocuments('Item', plan.create.map((r) => itemDataFor(r)), opts());
     }
     // Never deleted: the item stays in Foundry, only its link is dropped.
     for (const id of unlink) {
@@ -250,10 +251,10 @@ export class ItemSync {
       await item?.update({
         [`flags.${FLAG_SCOPE}.-=relationId`]: null,
         [`flags.${FLAG_SCOPE}.unlinkedRelationId`]: item.getFlag(FLAG_SCOPE, 'relationId'),
-      }, opts);
+      }, opts());
     }
     if (moved.size) {
-      await actor.deleteEmbeddedDocuments('Item', [...moved], opts);
+      await actor.deleteEmbeddedDocuments('Item', [...moved], opts());
     }
   }
 

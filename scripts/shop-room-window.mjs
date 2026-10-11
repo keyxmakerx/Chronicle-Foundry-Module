@@ -19,6 +19,7 @@
 
 import { noticeText } from './_escape-html.mjs';
 import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
+import { isShopJournal } from './_shop-journal.mjs';
 import { getSetting, getUserMappings } from './settings.mjs';
 import { _isAllowedImageHost } from './_url-validation.mjs';
 import { decryptReply, encryptReply, generateRequestKeys } from './_stash-crypto.mjs';
@@ -589,7 +590,7 @@ export function registerShopJournalButton(openAsGM) {
   const add = (app, html) => {
     const journal = app?.document;
     if (journal?.documentName !== 'JournalEntry') return;
-    if (journal.getFlag(FLAG_SCOPE, 'entityType') !== 'Shop') return;
+    if (!isShopJournal(journal, FLAG_SCOPE)) return;
     const shopId = journal.getFlag(FLAG_SCOPE, 'entityId');
     if (!shopId || !journal.testUserPermission(game.user, 'OBSERVER')) return;
     // The GM's client serves players only from entries they can't edit.

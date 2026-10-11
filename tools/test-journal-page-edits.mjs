@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { makeJournal } from './_journal-test-env.mjs';
 
 const { JournalSync } = await import('../scripts/journal-sync.mjs');
-const { SYNC_OPTIONS } = await import('../scripts/constants.mjs');
+const { syncOptions } = await import('../scripts/constants.mjs');
 
 function make() {
   const js = new JournalSync();
@@ -29,7 +29,7 @@ test('a GM page edit on a linked journal schedules a push of that journal', () =
 test('sync writes, other users and unlinked journals do not push', () => {
   const { js, scheduled } = make();
   const linked = makeJournal({ id: 'j1', flags: { entityId: 'e1' } });
-  js._onPageUpdate({ parent: linked }, {}, { ...SYNC_OPTIONS }, 'gm');
+  js._onPageUpdate({ parent: linked }, {}, syncOptions(), 'gm');
   js._onPageUpdate({ parent: linked }, {}, {}, 'someone-else');
   js._onPageUpdate({ parent: makeJournal({ id: 'j2' }) }, {}, {}, 'gm');
   js._onPageChange({}, {}, 'gm');
