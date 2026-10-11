@@ -22,6 +22,7 @@
     "scripts/module.mjs"
   ],
   "styles": [
+    "styles/tokens.css",
     "styles/chronicle-sync.css",
     "styles/import-wizard.css",
     "styles/map-viewer.css",

@@ -1,0 +1,47 @@
+/* The module's shared colours. Every tool window takes its accent, status,
+   text, surface and line colours from these, so it follows Foundry's light
+   and dark themes instead of assuming a dark window. The light set is the
+   default because Foundry v12 windows are light; v13+ puts .theme-dark or
+   .theme-light on the body and on themed windows, and custom properties
+   inherit from the nearest of those, so a light window inside a dark
+   interface still gets the light set. Paper windows (quest notices, the
+   player notebook, the shop room) keep their own palettes on top. */
+:root,
+.theme-light {
+  --cs-accent: #4f52d6;
+  --cs-accent-strong: #3f42c4;
+  --cs-accent-soft: rgba(79, 82, 214, 0.12);
+  --cs-on-accent: #ffffff;
+  --cs-on-status: #ffffff;
+  --cs-ok: #237a3b;
+  --cs-warn: #9a5b00;
+  --cs-attention: #b4530f;
+  --cs-bad: #b4302a;
+  --cs-info: #1f5fae;
+  --cs-text: #1f1c17;
+  --cs-text-2: #4a453c;
+  --cs-text-muted: #6f695e;
+  --cs-surface: #f7f4ee;
+  --cs-surface-2: #e8e3d8;
+  --cs-line: #c3bcae;
+}
+
+.theme-dark,
+body:not(.theme-dark):not(.theme-light) #sidebar {
+  --cs-accent: #8b8ff8;
+  --cs-accent-strong: #6d71ef;
+  --cs-accent-soft: rgba(139, 143, 248, 0.16);
+  --cs-on-accent: #0e0d14;
+  --cs-on-status: #0e0d14;
+  --cs-ok: #6fd18c;
+  --cs-warn: #f0b84a;
+  --cs-attention: #f59a5b;
+  --cs-bad: #f07a72;
+  --cs-info: #7fb3f5;
+  --cs-text: #ece6da;
+  --cs-text-2: #c9c2b5;
+  --cs-text-muted: #9a9387;
+  --cs-surface: #1b1a22;
+  --cs-surface-2: #26242f;
+  --cs-line: #3a3644;
+}
