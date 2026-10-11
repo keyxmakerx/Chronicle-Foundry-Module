@@ -14,6 +14,7 @@ import { ShopWidget } from './shop-widget.mjs';
 import { CalendarSync } from './calendar-sync.mjs';
 import { registerCalendarBar } from './calendar-bar.mjs';
 import { ActorSync } from './actor-sync.mjs';
+import { CreatureSync } from './creature-sync.mjs';
 import { ItemSync } from './item-sync.mjs';
 import { StashSync } from './stash-sync.mjs';
 import { registerStashSocket } from './stash-client.mjs';
@@ -121,6 +122,7 @@ Hooks.once('ready', async () => {
   const calendarSync = new CalendarSync();
   syncManager.registerModule(calendarSync);
   syncManager.registerModule(new ActorSync());
+  syncManager.registerModule(new CreatureSync());
   syncManager.registerModule(new ItemSync());
   syncManager.registerModule(new StashSync());
   syncManager.registerModule(npcSpotlightRelay);

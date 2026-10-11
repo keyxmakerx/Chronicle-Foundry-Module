@@ -152,39 +152,55 @@ Returns character preset field definitions with Foundry annotations.
 - `foundry_path` — Dot-notation path on `actor.system` (e.g., "system.abilities.str.value")
 - `foundry_writable` — Whether this field can be written back to Foundry (false = read-only from Foundry)
 
-##### Multi-Preset Systems (e.g., Draw Steel Creatures)
+#### GET /systems/:systemId/creature-fields
+Returns the system's creature preset (the first preset with category
+`creature`) in the character-fields shape, plus `foundry_pull_fields`. A
+system with no creature preset answers `{ "system_id", "fields": [] }`; an
+older Chronicle has no route (404). Both leave creature sync off.
 
-A system can expose multiple entity presets, each with its own
-`foundry_actor_type` and field mappings. Draw Steel: **hero** preset
-(`drawsteel-character`, type `"hero"`), **creature** preset
-(`drawsteel-creature`, type `"npc"`).
+**Used by:** `creature-sync.mjs` (with `_creature-fields.mjs`)
 
-**Expected creature preset response:**
+**Response (Draw Steel, trimmed):**
 ```json
 {
   "system_id": "drawsteel", "preset_slug": "drawsteel-creature",
   "preset_name": "Draw Steel Creature", "foundry_system_id": "draw-steel",
   "foundry_actor_type": "npc",
+  "foundry_pull_fields": ["stamina_current", "conditions_json"],
   "fields": [
-    { "key": "stamina_max", "label": "Stamina (Max)", "type": "number", "foundry_path": "system.stamina.max", "foundry_writable": false },
-    { "key": "stamina_value", "label": "Stamina (Current)", "type": "number", "foundry_path": "system.stamina.value", "foundry_writable": true },
-    { "key": "might", "label": "Might", "type": "number", "foundry_path": "system.characteristics.might.value", "foundry_writable": true },
-    { "key": "agility", "label": "Agility", "type": "number", "foundry_path": "system.characteristics.agility.value", "foundry_writable": true },
-    { "key": "reason", "label": "Reason", "type": "number", "foundry_path": "system.characteristics.reason.value", "foundry_writable": true },
-    { "key": "intuition", "label": "Intuition", "type": "number", "foundry_path": "system.characteristics.intuition.value", "foundry_writable": true },
-    { "key": "presence", "label": "Presence", "type": "number", "foundry_path": "system.characteristics.presence.value", "foundry_writable": true },
-    { "key": "speed", "label": "Speed", "type": "number", "foundry_path": "system.speed.value", "foundry_writable": true },
-    { "key": "stability", "label": "Stability", "type": "number", "foundry_path": "system.stability.value", "foundry_writable": true },
-    { "key": "level", "label": "Level", "type": "number", "foundry_path": "system.level", "foundry_writable": false },
-    { "key": "ev", "label": "EV", "type": "number", "foundry_path": "system.ev", "foundry_writable": false }
+    { "key": "organization", "label": "Organization", "type": "string",
+      "foundry_path": "system.monster.organization",
+      "foundry_choices": "DRAW_STEEL.monsters.organizations" },
+    { "key": "keywords", "label": "Keywords", "type": "string",
+      "foundry_path": "system.monster.keywords", "foundry_format": "set",
+      "foundry_choices": "DRAW_STEEL.monsters.keywords" },
+    { "key": "size", "label": "Size", "type": "string",
+      "foundry_path": "system.combat.size", "foundry_format": "size" },
+    { "key": "free_strike", "label": "Free Strike", "type": "string",
+      "foundry_path": "system.monster.freeStrike", "foundry_format": "integer" },
+    { "key": "stamina_current", "label": "Current Stamina", "type": "number",
+      "foundry_path": "system.stamina.value" },
+    { "key": "conditions_json", "label": "Conditions Data", "type": "string",
+      "foundry_path": "statuses" }
   ]
 }
 ```
 
-> **Current limitation:** the generic adapter (`generic-adapter.mjs`) and
-> `actor-sync.mjs` support only **one preset per system** — with primary
-> preset `drawsteel-character`, entities of slug `drawsteel-creature` won't
-> sync. Needs the adapter to load multiple presets and route by `type_slug`.
+**Creature-only keys:**
+- `foundry_choices` — a path in Foundry's `CONFIG`; the page's value (a key
+  or a label) is stored as that list's key. No match leaves the field unset.
+- `foundry_format` — `set` (comma list to a Set, each entry through
+  `foundry_choices`), `integer` (first whole number: "5 damage" is 5),
+  `size` ("1S" is `{value: 1, letter: "S"}`). An unknown format is skipped.
+- `foundry_pull_fields` — the only fields Foundry owns. They are written
+  to Foundry only when the actor is made and when someone edits them in
+  Chronicle, and they are the only ones sent back (just the ones that
+  changed), through
+  `PUT /entities/:id/fields`, and only while the page's `foundry` system
+  state has `gm.sendBack === true` (see "What the module does with
+  `system_state.updated`").
+
+Re-verify by: 2026-11-11 (Chronicle `internal/systems/manifest.go` `CreatureFieldsForAPI`, `internal/plugins/syncapi/api_handler.go` `GetCreatureFields`; keyxmakerx/Chronicle#1311)
 
 #### GET /systems/:systemId/item-fields
 Returns item preset field definitions. Same shape as character-fields.
@@ -1587,6 +1603,12 @@ to that page (actor flag `npcEntityId`, else a unique NPC name match; heroes
 never). It runs once more when a GM links a page by dropping its journal on a
 token. Nothing is written back: edits on the Foundry sheet don't sync to
 Chronicle yet. `tools/test-negotiation-mirror.mjs`.
+
+`scripts/creature-sync.mjs` acts on `key` `foundry` for any system: it
+forgets its cached answer for that page, and reads
+`GET /entities/:entityId/system-state/<detectedSystem>/foundry` again before
+the next send-back. Only `gm.sendBack === true` lets a creature's
+`foundry_pull_fields` go back to Chronicle; no state (404) means off.
 
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/systemstate`, `internal/plugins/syncapi/system_state_api.go`; keyxmakerx/Chronicle#1051)
 
