@@ -47,9 +47,41 @@ globalThis.game = globalThis.game || {
   users: { get: (id) => usersStore[id] ?? null },
 };
 
-const { _findPcSubtypeId, _pickEntityTypeId, ActorSync } =
+const { _findPcSubtypeId, _pickCharacterType, _pickEntityTypeId, ActorSync } =
   await import('../scripts/actor-sync.mjs');
 const { SyncManager } = await import('../scripts/sync-manager.mjs');
+
+// ---------------------------------------------------------------------------
+// _pickCharacterType
+// ---------------------------------------------------------------------------
+
+const characters = { id: 1, slug: 'character', name: 'Character', enabled: true };
+const heroes = { id: 2, slug: 'drawsteel-character', name: 'Hero', preset_category: 'character', enabled: true, parent_type_id: 1 };
+
+test('_pickCharacterType: the type with the character preset wins over list order', () => {
+  assert.equal(_pickCharacterType([characters, heroes], 'drawsteel-character').id, 2);
+});
+
+test('_pickCharacterType: after Chronicle moves the sheet onto Characters, the disabled twin is skipped', () => {
+  const moved = [
+    { ...characters, preset_category: 'character' },
+    { ...heroes, preset_category: undefined, enabled: false },
+  ];
+  assert.equal(_pickCharacterType(moved, 'drawsteel-character').id, 1);
+  assert.equal(_pickCharacterType([moved[1], moved[0]], 'drawsteel-character').id, 1);
+});
+
+test('_pickCharacterType: no preset falls back to slug, then name', () => {
+  const bySlug = { id: 3, slug: 'dnd5e-character', name: 'PC', enabled: true };
+  assert.equal(_pickCharacterType([characters, bySlug], 'dnd5e-character').id, 3);
+  assert.equal(_pickCharacterType([characters], 'dnd5e-character').id, 1);
+});
+
+test('_pickCharacterType: only disabled matches still resolve; nothing → null', () => {
+  assert.equal(_pickCharacterType([{ ...characters, enabled: false }], 'x').id, 1);
+  assert.equal(_pickCharacterType([{ id: 9, slug: 'npc', name: 'NPC' }], 'x'), null);
+  assert.equal(_pickCharacterType(null, 'x'), null);
+});
 
 // ---------------------------------------------------------------------------
 // _findPcSubtypeId
