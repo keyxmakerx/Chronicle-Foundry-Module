@@ -71,7 +71,7 @@ test('reports live in a journal entry nobody but GMs can see, found by flag', ()
   const ensure = body(hub, 'export function ensureStore');
   assert.match(ensure, /ownership:\s*\{\s*default:\s*CONST\.DOCUMENT_OWNERSHIP_LEVELS\.NONE\s*\}/);
   assert.match(ensure, /isAnsweringGM\(game\.user,\s*game\.users\.activeGM\)/);
-  assert.match(ensure, /SYNC_OPTIONS/);
+  assert.match(ensure, /syncOptions\(\)/);
   // No world setting carries reports.
   assert.equal(/problemReports['"]/.test(hub + settings), false);
   assert.match(hub, /renderJournalDirectory/);

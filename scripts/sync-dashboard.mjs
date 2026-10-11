@@ -1093,7 +1093,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       log.warn('Dashboard: capability — failed to load character-fields', err);
     }
 
-    const snapshot = captureActorSnapshot(sample);
+    const snapshot = captureActorSnapshot(sample, fieldDefs);
     const report = buildCapabilityReport(snapshot, fieldDefs);
     this._capabilityReport = report; // stashed for the copy actions
 

@@ -14,7 +14,7 @@
  */
 
 import { noticeText } from './_escape-html.mjs';
-import { FLAG_SCOPE, MODULE_ID, REPORT_STORE_FLAG, SYNC_OPTIONS } from './constants.mjs';
+import { FLAG_SCOPE, MODULE_ID, REPORT_STORE_FLAG, syncOptions } from './constants.mjs';
 import { getSetting } from './settings.mjs';
 import { SOCKET_CHANNEL, getStashSync } from './stash-sync.mjs';
 import { isAnsweringGM, PendingRequests } from './_stash-relay.mjs';
@@ -92,7 +92,7 @@ export function ensureStore() {
         name: STORE_NAME,
         ownership: { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.NONE },
         flags: { [FLAG_SCOPE]: { [REPORT_STORE_FLAG]: true, [REPORTS_FLAG]: [] } },
-      }, { ...SYNC_OPTIONS });
+      }, syncOptions());
     }
     return store;
   });
@@ -120,7 +120,7 @@ function writeReports(update) {
       const store = findStore() ?? await ensureStore();
       if (!store) throw new Error('no report store');
       const next = pruneReports(update(getReports()), Date.now());
-      await store.update({ [`flags.${FLAG_SCOPE}.${REPORTS_FLAG}`]: next }, { ...SYNC_OPTIONS });
+      await store.update({ [`flags.${FLAG_SCOPE}.${REPORTS_FLAG}`]: next }, syncOptions());
     });
   return writeChain;
 }

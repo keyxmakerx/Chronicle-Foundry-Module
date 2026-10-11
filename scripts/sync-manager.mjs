@@ -8,7 +8,7 @@
 
 import { noticeText } from './_escape-html.mjs';
 import { ChronicleAPI } from './api-client.mjs';
-import { PlayerActivity, PlayerReporter, buildPlayerReport, reasonFromError, REPORT_INTERVAL_MS, EVENT_DEBOUNCE_MS } from './_player-report.mjs';
+import { PlayerActivity, PlayerReporter, buildPlayerReport, reasonFromError, WORLD_APPLY_FAILED, REPORT_INTERVAL_MS, EVENT_DEBOUNCE_MS } from './_player-report.mjs';
 import { AvatarSync } from './avatar-sync.mjs';
 import { walkSyncPull, PULL_PAGE_SIZE } from './_sync-pull-walk.mjs';
 import { HistoryReporter, activityToEvent, describeMessage, resourceIdOf, resourceNameOf } from './_history-report.mjs';
@@ -460,6 +460,20 @@ export class SyncManager {
   }
 
   /**
+   * Note the outcome of applying Chronicle's changes in this world, against
+   * the GM user this client runs as: that sync goes through their world, so
+   * Chronicle's Players in Foundry table shows it on their row. Never throws.
+   * @param {boolean} ok
+   */
+  recordWorldOutcome(ok) {
+    try {
+      const gmId = game.user?.id;
+      if (ok) this.playerActivity.recordChange(gmId);
+      else this.playerActivity.recordFailure(gmId, WORLD_APPLY_FAILED);
+    } catch { /* never block a sync */ }
+  }
+
+  /**
    * Start telling Chronicle about the world's players. A login or logout, a
    * user edit or a mapping change reports soon after; otherwise a report
    * goes out every few minutes, and only when something changed.
@@ -727,6 +741,7 @@ export class SyncManager {
             if (area) feedFailed = true;
             console.warn(`Chronicle: ${mod.constructor.name}.onInitialSync failed`, err);
             this.logActivity('error', `${mod.constructor.name} initial sync failed`);
+            this.recordWorldOutcome(false);
           }
         }
       }
@@ -813,6 +828,7 @@ export class SyncManager {
     if (!what) return;
     const id = resourceIdOf(msg);
     if (this._history.isEcho(id)) return;
+    this.recordWorldOutcome(!failed);
     const reason = failed ? (failed.reason?.message || String(failed.reason)) : '';
     this._history.add({
       at: new Date(started).toISOString(),

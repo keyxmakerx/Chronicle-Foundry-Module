@@ -33,7 +33,7 @@ import { notebookAvailable, openCalendarWindow, openNotebook, registerPlayerNote
 import { addChronicleControls } from './_scene-controls.mjs';
 import { openQuestBoard, questLive, registerQuestBoard } from './quest-board.mjs';
 import { retireNotesFolder } from './_notes-folder.mjs';
-import { FLAG_SCOPE, SYNC_OPTIONS } from './constants.mjs';
+import { FLAG_SCOPE, syncOptions } from './constants.mjs';
 import { removedFolder } from './_set-aside.mjs';
 
 /** @type {SyncManager|null} */
@@ -193,7 +193,7 @@ Hooks.once('ready', async () => {
     try {
       await retireNotesFolder({
         game, scope: FLAG_SCOPE, removedFolder,
-        maxDepth: CONST.FOLDER_MAX_DEPTH, options: SYNC_OPTIONS,
+        maxDepth: CONST.FOLDER_MAX_DEPTH, options: syncOptions(),
       });
     } catch (err) {
       console.warn('Chronicle Sync | Setting the old notes folder aside failed', err);

@@ -117,6 +117,14 @@ export function makeHooks(log) {
 
 /* ------------------------------------------------------------- Documents */
 
+/**
+ * Foundry 14 writes into the options a document write is given, so a frozen
+ * options object throws there; doing the same here keeps the bench honest.
+ */
+function stampOperation(options, parent) {
+  options.parent = parent;
+}
+
 class Collection {
   constructor() { this._map = new Map(); }
   get contents() { return [...this._map.values()]; }
@@ -180,6 +188,8 @@ class BenchDocument {
   }
 
   async update(data, options = {}) {
+
+    stampOperation(options, this._parent ?? null);
     if (!this._world.collectionFor(this.documentName).get(this.id) && !this._parent) return undefined;
     const change = diff(this._source, expandObject(data));
     if (!Object.keys(change).length) return this;
@@ -192,6 +202,8 @@ class BenchDocument {
   }
 
   async delete(options = {}) {
+
+    stampOperation(options, this._parent ?? null);
     const coll = this._world.collectionFor(this.documentName);
     if (!coll.get(this.id)) return undefined;
     coll.delete(this.id);
@@ -210,6 +222,8 @@ class BenchPage extends BenchDocument {
   }
 
   async update(data, options = {}) {
+
+    stampOperation(options, this._parent ?? null);
     const change = diff(this._source, expandObject(data));
     if (!Object.keys(change).length) return this;
     mergeInto(this._source, change);
@@ -221,6 +235,8 @@ class BenchPage extends BenchDocument {
   }
 
   async delete(options = {}) {
+
+    stampOperation(options, this._parent ?? null);
     return (await this.parent.deleteEmbeddedDocuments('JournalEntryPage', [this.id], options))[0];
   }
 }
@@ -241,6 +257,8 @@ class BenchJournal extends BenchDocument {
   }
 
   async createEmbeddedDocuments(type, list, options = {}) {
+
+    stampOperation(options, this);
     const made = [];
     for (const data of list) {
       const page = new BenchPage(this._world, this, data);
@@ -253,6 +271,8 @@ class BenchJournal extends BenchDocument {
   }
 
   async updateEmbeddedDocuments(type, list, options = {}) {
+
+    stampOperation(options, this);
     const out = [];
     for (const data of list) {
       const page = this.pages.get(data._id);
@@ -262,6 +282,8 @@ class BenchJournal extends BenchDocument {
   }
 
   async deleteEmbeddedDocuments(type, ids, options = {}) {
+
+    stampOperation(options, this);
     const out = [];
     for (const id of ids) {
       const page = this.pages.get(id);
@@ -284,6 +306,8 @@ class BenchItem extends BenchDocument {
   }
 
   async update(data, options = {}) {
+
+    stampOperation(options, this._parent ?? null);
     const change = diff(this._source, expandObject(data));
     if (!Object.keys(change).length) return this;
     mergeInto(this._source, change);
@@ -295,6 +319,8 @@ class BenchItem extends BenchDocument {
   }
 
   async delete(options = {}) {
+
+    stampOperation(options, this._parent ?? null);
     return (await this.parent.deleteEmbeddedDocuments('Item', [this.id], options))[0];
   }
 }
@@ -315,6 +341,8 @@ class BenchActor extends BenchDocument {
   }
 
   async createEmbeddedDocuments(type, list, options = {}) {
+
+    stampOperation(options, this);
     const made = [];
     for (const data of list) {
       const item = new BenchItem(this._world, this, data);
@@ -327,6 +355,8 @@ class BenchActor extends BenchDocument {
   }
 
   async updateEmbeddedDocuments(type, list, options = {}) {
+
+    stampOperation(options, this);
     const out = [];
     for (const data of list) {
       const item = this.items.get(data._id);
@@ -336,6 +366,8 @@ class BenchActor extends BenchDocument {
   }
 
   async deleteEmbeddedDocuments(type, ids, options = {}) {
+
+    stampOperation(options, this);
     const out = [];
     for (const id of ids) {
       const item = this.items.get(id);
@@ -455,6 +487,7 @@ export function installFoundry({ settings = {}, systemId = 'dnd5e' } = {}) {
       // `item.parent instanceof Actor` must hold for the documents this makes.
       static [Symbol.hasInstance](doc) { return doc instanceof Impl; }
       static async create(data, options = {}) {
+        stampOperation(options, null);
         const list = Array.isArray(data) ? data : [data];
         const out = [];
         for (const d of list) {

@@ -4,12 +4,12 @@
  * the actor's old item of that type. Takes `game` as a parameter so tests can
  * pass a fake world.
  */
-import { FLAG_SCOPE, SYNC_OPTIONS, APPLY_OPTION } from './constants.mjs';
+import { FLAG_SCOPE, syncOptions, APPLY_OPTION } from './constants.mjs';
 
 const norm = (s) => String(s ?? '').trim().toLowerCase();
 
 /** Marks these writes as sync's own so no item or actor hook pushes them back. */
-const WRITE_OPTIONS = Object.freeze({ ...SYNC_OPTIONS, [APPLY_OPTION]: true });
+const writeOptions = () => syncOptions({ [APPLY_OPTION]: true });
 
 /** Item compendiums, the game system's own first. */
 function itemPacks(game) {
@@ -68,9 +68,9 @@ export async function applyIdentityItem(actor, step, game) {
     // A campaign's own entry has no Foundry item to copy; the flag marks it as made here.
     data = { name: step.wantName, type: step.itemType, flags: { [FLAG_SCOPE]: { chronicleMade: true } } };
   }
-  await actor.createEmbeddedDocuments('Item', [data], { ...WRITE_OPTIONS });
+  await actor.createEmbeddedDocuments('Item', [data], writeOptions());
   if (step.removeIds.length) {
-    await actor.deleteEmbeddedDocuments('Item', step.removeIds, { ...WRITE_OPTIONS });
+    await actor.deleteEmbeddedDocuments('Item', step.removeIds, writeOptions());
   }
   return source ? 'found' : 'made';
 }
