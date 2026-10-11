@@ -1,8 +1,8 @@
 /* Foundry-host CSS arrives unlayered (effectively the highest-priority layer).
  * Naming it here forces it BELOW chronicle-sync, so any rule in the
  * chronicle-sync layer wins over Foundry's .window-app cascade without
- * specificity hacks. Declare only once — chronicle-sync.css loads first
- * per module.json#/styles, so this is the right home for it.
+ * specificity hacks. Declare only once, here: tokens.css loads before this
+ * file but names no layer, so this is the first stylesheet to set the order.
  */
 @layer foundry-host, chronicle-sync;
 
@@ -1803,6 +1803,89 @@
   height: 30px;
   padding: 2px;
 }
+
+/* ================================================================= */
+/* CHRONICLE SETTINGS WINDOW                                          */
+/* ================================================================= */
+
+.chronicle-settings .window-content { padding: 0; container-type: inline-size; }
+.cs-settings { display: flex; flex-direction: column; min-height: 420px; color: var(--cs-text); }
+.cs-tabs { display: flex; gap: 2px; padding: 0 10px; border-bottom: 1px solid var(--cs-line); background: var(--cs-surface-2); overflow-x: auto; }
+.cs-tabs [role="tab"] {
+  display: inline-flex; align-items: center; gap: 6px; width: auto; margin: 0; padding: 9px 11px 8px;
+  border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; box-shadow: none;
+  color: var(--cs-text-2); font: inherit; white-space: nowrap; cursor: pointer;
+}
+.cs-tabs [role="tab"]:hover { color: var(--cs-text); }
+.cs-tabs [role="tab"][aria-selected="true"] { color: var(--cs-text); border-bottom-color: var(--cs-accent); font-weight: 600; }
+.cs-tabs [role="tab"]:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
+.cs-panels { flex: 1; padding: 6px 16px 12px; overflow-y: auto; }
+.cs-panel[hidden] { display: none; }
+.cs-settle { animation: cs-settle 280ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes cs-settle { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .cs-settle { animation-name: cs-fade; } }
+@keyframes cs-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.cs-group { margin: 14px 0 2px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--cs-text-muted); border: 0; }
+.cs-field { display: grid; grid-template-columns: minmax(130px, 34%) 1fr; gap: 4px 14px; align-items: start; padding: 10px 0; border-top: 1px solid color-mix(in srgb, var(--cs-line) 60%, transparent); }
+.cs-group + .cs-field, .cs-panel > .cs-field:first-child, .cs-conn + .cs-field { border-top: 0; }
+.cs-field > label, .cs-field > .cs-lab { padding-top: 4px; font-weight: 600; }
+.cs-ctl { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.cs-ctl.cs-row { flex-direction: row; align-items: center; gap: 10px; }
+.cs-hint { margin: 0; font-size: 12.5px; line-height: 1.4; color: var(--cs-text-muted); }
+
+.cs-conn { display: flex; align-items: center; gap: 10px; margin: 8px 0 4px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--cs-line) 60%, transparent); border-radius: 6px; background: var(--cs-surface-2); }
+.cs-conn > i { font-size: 20px; color: var(--cs-accent); }
+.cs-conn-who { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cs-pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.cs-pill.ok { color: var(--cs-ok); background: color-mix(in srgb, var(--cs-ok) 14%, transparent); }
+.cs-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+.cs-by-hand > summary { display: inline-flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer; list-style: none; color: var(--cs-text-2); }
+.cs-by-hand > summary::-webkit-details-marker { display: none; }
+.cs-by-hand > summary i { font-size: 11px; transition: transform 120ms ease-out; }
+.cs-by-hand[open] > summary i { transform: rotate(90deg); }
+
+.cs-switch { position: relative; flex-shrink: 0; width: 36px; height: 20px; }
+.cs-switch input { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.cs-switch i { position: absolute; inset: 0; border: 1px solid var(--cs-line); border-radius: 999px; background: var(--cs-surface-2); transition: background 120ms ease-out; }
+.cs-switch i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--cs-text-muted); transition: transform 120ms ease-out, background 120ms ease-out; }
+.cs-switch input:checked + i { border-color: var(--cs-accent-strong); background: var(--cs-accent); }
+.cs-switch input:checked + i::after { transform: translateX(16px); background: var(--cs-on-accent); }
+.cs-switch input:focus-visible + i { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .cs-switch i, .cs-switch i::after, .cs-by-hand > summary i { transition: none; } }
+
+.cs-part { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 12px; align-items: center; padding: 10px 0; border-top: 1px solid color-mix(in srgb, var(--cs-line) 60%, transparent); }
+.cs-group + .cs-part { border-top: 0; }
+.cs-part-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 7px; background: var(--cs-accent-soft); color: var(--cs-accent); }
+.cs-part-name { display: flex; flex-direction: column; font-weight: 600; }
+.cs-part-name small { font-size: 12.5px; font-weight: 400; color: var(--cs-text-muted); }
+.cs-dir { grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 0; margin: 0; padding: 0; border: 0; }
+.cs-dir legend { float: left; margin-right: 8px; padding: 0; font-size: 12.5px; color: var(--cs-text-muted); }
+.cs-dir-opt { position: relative; }
+.cs-dir-opt input { position: absolute; opacity: 0; }
+.cs-dir-opt span { display: inline-block; padding: 3px 9px; border: 1px solid var(--cs-line); background: var(--cs-surface); font-size: 12px; color: var(--cs-text-2); cursor: pointer; }
+.cs-dir-opt + .cs-dir-opt span { border-left: 0; }
+.cs-dir-opt:first-of-type span { border-radius: 5px 0 0 5px; }
+.cs-dir-opt:last-of-type span { border-radius: 0 5px 5px 0; }
+.cs-dir-opt input:checked + span { background: var(--cs-accent-soft); color: var(--cs-accent); font-weight: 600; }
+.cs-dir-opt input:focus-visible + span { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
+.cs-part.is-off .cs-part-icon { background: var(--cs-surface-2); color: var(--cs-text-muted); }
+.cs-part.is-off .cs-dir { opacity: 0.45; pointer-events: none; }
+
+.cs-steps { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.cs-step { display: flex; align-items: baseline; gap: 7px; color: var(--cs-text-2); }
+.cs-step-check i { color: var(--cs-ok); }
+.cs-step-xmark i { color: var(--cs-bad); }
+.cs-step-warn i { color: var(--cs-warn); }
+
+.cs-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--cs-line); background: var(--cs-surface-2); }
+.cs-foot button { flex: 0 0 auto; width: auto; }
+.cs-foot .cs-primary { border-color: var(--cs-accent-strong); background: var(--cs-accent); color: var(--cs-on-accent); font-weight: 600; }
+.cs-foot .cs-primary:hover { background: var(--cs-accent-strong); }
+.cs-settings button i { margin-right: 4px; }
+
+@container (max-width: 460px) { .cs-field { grid-template-columns: 1fr; } }
 
 /* ============================================================
    Update Source Info dialog

@@ -162,7 +162,7 @@ export class SyncManager {
 
     if (!isConfigured()) {
       console.warn('Chronicle: Module not configured. Set URL, API key, and campaign ID in settings.');
-      ui.notifications.warn('Chronicle Sync is not configured. Go to Module Settings to set up.');
+      ui.notifications.warn('Chronicle Sync is not set up yet. Open Chronicle settings to connect.');
       return;
     }
 

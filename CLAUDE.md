@@ -14,7 +14,7 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
 - `scripts/*.mjs`: sync (`journal-sync`+`picture-store`, `map-sync`+`map-viewer`+`map-sheet-items`,
   `calendar-sync`+`calendar-bar`, `actor-sync`,
   `item-sync`, `stash-sync`+`stash-client`), UI (`sync-dashboard`, `npc-presence`, `negotiation-mirror`, `_player-report` (the GM's client reports the world's players to Chronicle),
-  `sync-diagnostic-bundle`, `update-info`, `gm-secret-view`, `character-claim-indicator`,
+  `sync-diagnostic-bundle`, `update-info`, `chronicle-settings` (the GM's tabbed settings window), `gm-secret-view`, `character-claim-indicator`,
   `capability-inspector`, `import-wizard`, `shop-widget`+`shop-room-window`, `player-notebook`, `stash-window`+`stash-chat`, `quest-board` (Chronicle's quest boards and sheets; the GM's client reads for players)), core (`module`,
   `settings`, `constants`, `logger`, `sync-manager`, `api-client`),
   `adapters/generic-adapter.mjs`. `.ai.md` has what each does. `_*.mjs` are

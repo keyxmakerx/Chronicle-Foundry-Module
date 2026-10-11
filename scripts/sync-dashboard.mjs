@@ -9,6 +9,7 @@
  */
 
 import { noticeText } from './_escape-html.mjs';
+import { ChronicleSettingsWindow } from './chronicle-settings.mjs';
 import { getSetting, setSetting, getSyncDirections, setSyncDirections, getExcludedTags, setExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
 import { SyncHistoryTab } from './sync-history-tab.mjs';
 import { FLAG_SCOPE, REPORT_STORE_FLAG } from './constants.mjs';
@@ -1713,15 +1714,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this.render({ force: true });
   }
 
-  /** Open Foundry module settings. */
+  /** Open the Chronicle settings window, or bring it forward if open. */
   static #onOpenSettingsAction() {
-    const sheet = game.settings.sheet;
-    // v13 ApplicationV2 uses render({force}) instead of render(true).
-    if (sheet.render?.length === 0 || sheet.constructor?.DEFAULT_OPTIONS) {
-      sheet.render({ force: true });
-    } else {
-      sheet.render({ force: true });
-    }
+    const open = foundry.applications.instances?.get?.('chronicle-settings');
+    if (open?.rendered) open.bringToFront?.();
+    else new ChronicleSettingsWindow().render({ force: true });
   }
 
   /** Open a shop window via the ShopWidget module. */

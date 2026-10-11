@@ -1,0 +1,170 @@
+<div class="cs-settings">
+  <nav class="cs-tabs" role="tablist" aria-label="{{localize "CHRONICLE.SettingsWindow.Title"}}">
+    {{#each tabs}}
+    <button type="button" role="tab" id="cs-tab-{{id}}" data-tab="{{id}}" aria-controls="cs-panel-{{id}}"
+      aria-selected="{{#if active}}true{{else}}false{{/if}}" tabindex="{{#if active}}0{{else}}-1{{/if}}">
+      <i class="fa-solid {{icon}}" aria-hidden="true"></i>{{label}}
+    </button>
+    {{/each}}
+  </nav>
+
+  <div class="cs-panels">
+    <section class="cs-panel" id="cs-panel-connection" data-panel="connection" role="tabpanel" aria-labelledby="cs-tab-connection" {{#unless (eq activeTab "connection")}}hidden{{/unless}}>
+      <div class="cs-conn">
+        <i class="fa-solid fa-globe" aria-hidden="true"></i>
+        <div class="cs-conn-who">
+          {{#if view.apiUrl}}<b>{{view.apiUrl}}</b>{{else}}<b>{{localize "CHRONICLE.SettingsWindow.NotSetUp"}}</b>{{/if}}
+        </div>
+        {{#if connected}}
+        <span class="cs-pill ok"><span class="cs-dot"></span>{{localize "CHRONICLE.SettingsWindow.Connected"}}</span>
+        {{/if}}
+      </div>
+
+      <div class="cs-field">
+        <label for="cs-connect-line">{{localize "CHRONICLE.SettingsWindow.ConnectLine"}}</label>
+        <div class="cs-ctl">
+          <input id="cs-connect-line" name="connectLine" type="password" autocomplete="off" spellcheck="false">
+          <p class="cs-hint">{{localize "CHRONICLE.SettingsWindow.ConnectLineHint"}}</p>
+        </div>
+      </div>
+
+      <details class="cs-by-hand">
+        <summary><i class="fa-solid fa-chevron-right" aria-hidden="true"></i>{{localize "CHRONICLE.SettingsWindow.ByHand"}}</summary>
+        <div class="cs-field">
+          <label for="cs-api-url">{{localize "CHRONICLE.SettingsWindow.Address"}}</label>
+          <div class="cs-ctl"><input id="cs-api-url" name="apiUrl" type="url" value="{{view.apiUrl}}" placeholder="https://chronicle.example.com" spellcheck="false"></div>
+        </div>
+        <div class="cs-field">
+          <label for="cs-api-key">{{localize "CHRONICLE.SettingsWindow.ApiKey"}}</label>
+          <div class="cs-ctl">
+            <input id="cs-api-key" name="apiKey" type="password" autocomplete="off" spellcheck="false">
+            <p class="cs-hint">{{#if view.hasKey}}{{localize "CHRONICLE.SettingsWindow.ApiKeySaved"}} {{/if}}{{localize "CHRONICLE.SettingsWindow.ApiKeyHint"}}</p>
+          </div>
+        </div>
+        <div class="cs-field">
+          <label for="cs-campaign">{{localize "CHRONICLE.SettingsWindow.Campaign"}}</label>
+          <div class="cs-ctl"><input id="cs-campaign" name="campaignId" type="text" value="{{view.campaignId}}" spellcheck="false"></div>
+        </div>
+      </details>
+
+      <div class="cs-field">
+        <span class="cs-lab">{{localize "CHRONICLE.SettingsWindow.CheckItWorks"}}</span>
+        <div class="cs-ctl">
+          <div><button type="button" data-action="testConnection"><i class="fa-solid fa-plug-circle-check" aria-hidden="true"></i>{{localize "CHRONICLE.SettingsWindow.TestConnection"}}</button></div>
+          <ul class="cs-steps" data-steps aria-live="polite"></ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="cs-panel" id="cs-panel-sync" data-panel="sync" role="tabpanel" aria-labelledby="cs-tab-sync" {{#unless (eq activeTab "sync")}}hidden{{/unless}}>
+      <div class="cs-field cs-inline">
+        <label for="cs-sync-enabled">{{localize "CHRONICLE.SettingsWindow.SyncOn"}}</label>
+        <div class="cs-ctl cs-row">
+          <span class="cs-switch"><input id="cs-sync-enabled" name="syncEnabled" type="checkbox" {{#if view.syncEnabled}}checked{{/if}}><i aria-hidden="true"></i></span>
+          <p class="cs-hint">{{localize "CHRONICLE.SettingsWindow.SyncOnHint"}}</p>
+        </div>
+      </div>
+      <h3 class="cs-group">{{localize "CHRONICLE.SettingsWindow.WhatComesAcross"}}</h3>
+      {{#each parts}}
+      <div class="cs-part {{#unless on}}is-off{{/unless}}" data-part="{{part}}">
+        <span class="cs-part-icon"><i class="fa-solid {{icon}}" aria-hidden="true"></i></span>
+        <label class="cs-part-name" for="cs-part-{{part}}">{{name}}<small>{{hint}}</small></label>
+        <span class="cs-switch"><input id="cs-part-{{part}}" name="part.{{part}}.on" type="checkbox" {{#if on}}checked{{/if}}><i aria-hidden="true"></i></span>
+        <fieldset class="cs-dir">
+          <legend>{{../labels.direction}}</legend>
+          {{#each directions}}
+          <label class="cs-dir-opt"><input type="radio" name="part.{{../part}}.direction" value="{{value}}" {{#if checked}}checked{{/if}}><span>{{label}}</span></label>
+          {{/each}}
+        </fieldset>
+      </div>
+      {{/each}}
+    </section>
+
+    <section class="cs-panel" id="cs-panel-calendar" data-panel="calendar" role="tabpanel" aria-labelledby="cs-tab-calendar" {{#unless (eq activeTab "calendar")}}hidden{{/unless}}>
+      <h3 class="cs-group">{{localize "CHRONICLE.SettingsWindow.TellMe"}}</h3>
+      {{#each announce}}
+      <div class="cs-field cs-inline">
+        <label for="cs-{{key}}">{{label}}</label>
+        <div class="cs-ctl cs-row">
+          <span class="cs-switch"><input id="cs-{{key}}" name="{{key}}" type="checkbox" {{#if on}}checked{{/if}}><i aria-hidden="true"></i></span>
+          <p class="cs-hint">{{hint}}</p>
+        </div>
+      </div>
+      {{/each}}
+    </section>
+
+    <section class="cs-panel" id="cs-panel-players" data-panel="players" role="tabpanel" aria-labelledby="cs-tab-players" {{#unless (eq activeTab "players")}}hidden{{/unless}}>
+      <h3 class="cs-group">{{localize "CHRONICLE.SettingsWindow.NewJournals"}}</h3>
+      <div class="cs-field">
+        <label for="cs-ownership">{{localize "CHRONICLE.SettingsWindow.PlayersCan"}}</label>
+        <div class="cs-ctl">
+          <select id="cs-ownership" name="defaultOwnership">
+            {{#each ownership}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+          </select>
+        </div>
+      </div>
+      <div class="cs-field cs-inline">
+        <label for="cs-sync-permissions">{{localize "CHRONICLE.SettingsWindow.SyncPermissions"}}</label>
+        <div class="cs-ctl cs-row">
+          <span class="cs-switch"><input id="cs-sync-permissions" name="syncPermissions" type="checkbox" {{#if view.syncPermissions}}checked{{/if}}><i aria-hidden="true"></i></span>
+          <p class="cs-hint">{{localize "CHRONICLE.SettingsWindow.SyncPermissionsHint"}}</p>
+        </div>
+      </div>
+      <div class="cs-field cs-inline">
+        <label for="cs-dm-only">{{localize "CHRONICLE.SettingsWindow.DmOnlyHidden"}}</label>
+        <div class="cs-ctl cs-row">
+          <span class="cs-switch"><input id="cs-dm-only" name="dmOnlyHidden" type="checkbox" {{#if view.dmOnlyHidden}}checked{{/if}}><i aria-hidden="true"></i></span>
+        </div>
+      </div>
+      <h3 class="cs-group">{{localize "CHRONICLE.SettingsWindow.LinkPlayers"}}</h3>
+      <div class="cs-field">
+        <span class="cs-lab"></span>
+        <div class="cs-ctl">
+          <p class="cs-hint">{{localize "CHRONICLE.SettingsWindow.LinkPlayersHint"}}</p>
+          <div><button type="button" data-action="openMembers"><i class="fa-solid fa-user-plus" aria-hidden="true"></i>{{localize "CHRONICLE.SettingsWindow.OpenMembers"}}</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cs-panel" id="cs-panel-advanced" data-panel="advanced" role="tabpanel" aria-labelledby="cs-tab-advanced" {{#unless (eq activeTab "advanced")}}hidden{{/unless}}>
+      <div class="cs-field">
+        <label for="cs-conflict">{{localize "CHRONICLE.SettingsWindow.WhenBoth"}}</label>
+        <div class="cs-ctl">
+          <select id="cs-conflict" name="conflictResolution">
+            {{#each conflict}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+          </select>
+        </div>
+      </div>
+      <div class="cs-field cs-inline">
+        <label for="cs-auto-sync">{{localize "CHRONICLE.SettingsWindow.AutoSync"}}</label>
+        <div class="cs-ctl cs-row">
+          <span class="cs-switch"><input id="cs-auto-sync" name="autoSync" type="checkbox" {{#if view.autoSync}}checked{{/if}}><i aria-hidden="true"></i></span>
+          <p class="cs-hint">{{localize "CHRONICLE.SettingsWindow.AutoSyncHint"}}</p>
+        </div>
+      </div>
+      <div class="cs-field">
+        <label for="cs-excluded-tags">{{localize "CHRONICLE.SettingsWindow.ExcludeTags"}}</label>
+        <div class="cs-ctl">
+          <input id="cs-excluded-tags" name="excludedTags" type="text" value="{{view.excludedTags}}" placeholder="{{localize "CHRONICLE.SettingsWindow.NothingLeftOut"}}">
+          <p class="cs-hint">{{localize "CHRONICLE.SettingsWindow.ExcludeTagsHint"}}</p>
+        </div>
+      </div>
+      <div class="cs-field">
+        <label for="cs-excluded-names">{{localize "CHRONICLE.SettingsWindow.ExcludeNames"}}</label>
+        <div class="cs-ctl"><input id="cs-excluded-names" name="excludedNamePattern" type="text" value="{{view.excludedNamePattern}}" placeholder="{{localize "CHRONICLE.SettingsWindow.NothingLeftOut"}}"></div>
+      </div>
+      <div class="cs-field cs-inline">
+        <label for="cs-skip-sanitize">{{localize "CHRONICLE.SettingsWindow.SkipSanitize"}}</label>
+        <div class="cs-ctl cs-row">
+          <span class="cs-switch"><input id="cs-skip-sanitize" name="skipIncomingSanitization" type="checkbox" {{#if view.skipIncomingSanitization}}checked{{/if}}><i aria-hidden="true"></i></span>
+          <p class="cs-hint">{{localize "CHRONICLE.SettingsWindow.SkipSanitizeHint"}}</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="cs-foot">
+    <button type="button" data-action="close">{{localize "CHRONICLE.SettingsWindow.Cancel"}}</button>
+    <button type="submit" class="cs-primary"><i class="fa-solid fa-check" aria-hidden="true"></i>{{localize "CHRONICLE.SettingsWindow.Save"}}</button>
+  </footer>
+</div>

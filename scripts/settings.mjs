@@ -8,6 +8,7 @@
 import { noticeText } from './_escape-html.mjs';
 import { MODULE_ID } from './constants.mjs';
 import { UpdateInfoApplication } from './update-info.mjs';
+import { ChronicleSettingsWindow } from './chronicle-settings.mjs';
 import { parseConnectLine } from './_connect-line.mjs';
 
 /**
@@ -15,12 +16,23 @@ import { parseConnectLine } from './_connect-line.mjs';
  * Called once during the 'init' hook.
  */
 export function registerSettings() {
+  // Everything a GM sets up lives in one tabbed window; Foundry's own list
+  // keeps only this button and each person's own choices.
+  game.settings.registerMenu(MODULE_ID, 'chronicleSettings', {
+    name: game.i18n.localize('CHRONICLE.SettingsWindow.MenuName'),
+    hint: game.i18n.localize('CHRONICLE.SettingsWindow.MenuHint'),
+    label: game.i18n.localize('CHRONICLE.SettingsWindow.MenuLabel'),
+    icon: 'fa-solid fa-book-open',
+    type: ChronicleSettingsWindow,
+    restricted: true,
+  });
+
   // Chronicle instance URL.
   game.settings.register(MODULE_ID, 'apiUrl', {
     name: game.i18n.localize('CHRONICLE.Settings.ApiUrl.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.ApiUrl.Hint'),
     scope: 'world',
-    config: true,
+    config: false,
     type: String,
     default: '',
     requiresReload: true,
@@ -36,7 +48,7 @@ export function registerSettings() {
     name: game.i18n.localize('CHRONICLE.Settings.ApiKey.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.ApiKey.Hint'),
     scope: 'client',
-    config: true,
+    config: false,
     type: String,
     default: '',
     requiresReload: true,
@@ -49,7 +61,7 @@ export function registerSettings() {
     name: game.i18n.localize('CHRONICLE.Settings.ConnectLine.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.ConnectLine.Hint'),
     scope: 'client',
-    config: true,
+    config: false,
     type: String,
     default: '',
     onChange: (value) => { applyConnectLine(value); },
@@ -60,7 +72,7 @@ export function registerSettings() {
     name: game.i18n.localize('CHRONICLE.Settings.CampaignId.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.CampaignId.Hint'),
     scope: 'world',
-    config: true,
+    config: false,
     type: String,
     default: '',
     requiresReload: true,
@@ -71,7 +83,7 @@ export function registerSettings() {
     name: game.i18n.localize('CHRONICLE.Settings.SyncEnabled.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.SyncEnabled.Hint'),
     scope: 'world',
-    config: true,
+    config: false,
     type: Boolean,
     default: true,
     // The built-in calendar shows or hides with sync, on every client.
@@ -83,7 +95,7 @@ export function registerSettings() {
     name: game.i18n.localize('CHRONICLE.Settings.SyncJournals.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.SyncJournals.Hint'),
     scope: 'world',
-    config: true,
+    config: false,
     type: Boolean,
     default: true,
   });
@@ -92,7 +104,7 @@ export function registerSettings() {
     name: game.i18n.localize('CHRONICLE.Settings.SyncMaps.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.SyncMaps.Hint'),
     scope: 'world',
-    config: true,
+    config: false,
     type: Boolean,
     default: true,
   });
@@ -101,7 +113,7 @@ export function registerSettings() {
     name: game.i18n.localize('CHRONICLE.Settings.SyncCalendar.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.SyncCalendar.Hint'),
     scope: 'world',
-    config: true,
+    config: false,
     type: Boolean,
     default: false,
     // The built-in calendar shows or hides with sync, on every client.
@@ -113,7 +125,7 @@ export function registerSettings() {
     name: game.i18n.localize('CHRONICLE.Settings.SyncCharacters.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.SyncCharacters.Hint'),
     scope: 'world',
-    config: true,
+    config: false,
     type: Boolean,
     default: false,
   });
@@ -126,7 +138,7 @@ export function registerSettings() {
     name: game.i18n.localize('CHRONICLE.Settings.SkipIncomingSanitization.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.SkipIncomingSanitization.Hint'),
     scope: 'world',
-    config: true,
+    config: false,
     type: Boolean,
     default: false,
   });
@@ -143,7 +155,7 @@ export function registerSettings() {
     name: game.i18n.localize('CHRONICLE.Settings.CalendarAnnounceWeather.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.CalendarAnnounceWeather.Hint'),
     scope: 'world',
-    config: true,
+    config: false,
     type: Boolean,
     default: true,
   });
@@ -152,7 +164,7 @@ export function registerSettings() {
     name: game.i18n.localize('CHRONICLE.Settings.CalendarAnnounceWorldstate.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.CalendarAnnounceWorldstate.Hint'),
     scope: 'world',
-    config: true,
+    config: false,
     type: Boolean,
     default: true,
   });
@@ -161,7 +173,7 @@ export function registerSettings() {
     name: game.i18n.localize('CHRONICLE.Settings.CalendarAnnounceSeasonEra.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.CalendarAnnounceSeasonEra.Hint'),
     scope: 'world',
-    config: true,
+    config: false,
     type: Boolean,
     default: true,
   });
@@ -170,7 +182,7 @@ export function registerSettings() {
     name: game.i18n.localize('CHRONICLE.Settings.CalendarAnnounceMoon.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.CalendarAnnounceMoon.Hint'),
     scope: 'world',
-    config: true,
+    config: false,
     type: Boolean,
     default: false,
   });
@@ -457,7 +469,7 @@ export async function migrateApiKeyToClientScope() {
   console.info('Chronicle Sync | API key moved out of world settings (which every player could read) into this browser only.');
   ui?.notifications?.warn?.(
     'Chronicle Sync: your API key now lives in THIS browser only, not in the world. '
-    + 'Other GMs (or this GM on another machine) must re-enter it in Module Settings. '
+    + 'Other GMs (or this GM on another machine) must re-enter it in Chronicle settings. '
     + 'Consider rotating the key in Chronicle: it was readable by every player until now.',
     { permanent: true }
   );
@@ -607,23 +619,3 @@ export function getUserMappings() {
 export async function setUserMappings(mappings) {
   await setSetting('userMappings', JSON.stringify(mappings));
 }
-
-/**
- * Mask the API key input in the module settings dialog.
- * Foundry doesn't have a native password input type for settings,
- * so we convert it after the settings form renders.
- */
-Hooks.on('renderSettingsConfig', (app, html) => {
-  // v13: html is an HTMLElement; v12: html is a jQuery object.
-  const root = html instanceof HTMLElement ? html : html[0] ?? html;
-  const keyInput = root?.querySelector?.(`input[name="${MODULE_ID}.apiKey"]`);
-  if (keyInput) {
-    keyInput.type = 'password';
-    keyInput.autocomplete = 'off';
-  }
-  const lineInput = root?.querySelector?.(`input[name="${MODULE_ID}.connectLine"]`);
-  if (lineInput) {
-    lineInput.type = 'password';
-    lineInput.autocomplete = 'off';
-  }
-});

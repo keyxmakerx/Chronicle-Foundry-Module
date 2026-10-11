@@ -457,7 +457,7 @@ export class JournalSync {
       const status = err?.status || null;
       console.warn(`Chronicle JournalSync.resyncAll: GET /entities failed (${status || 'network'})`, err);
       ui.notifications.error(
-        `Chronicle: could not fetch entities from Chronicle${status ? ` (HTTP ${status})` : ''}. Verify apiUrl, apiKey, and campaignId in Module Settings.`
+        `Chronicle: could not fetch entities from Chronicle${status ? ` (HTTP ${status})` : ''}. Check the connection in Chronicle settings.`
       );
       return { updated: 0, created: 0, skipped: 0, errors: 1 };
     }
