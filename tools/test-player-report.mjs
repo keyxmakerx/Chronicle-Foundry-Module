@@ -2,6 +2,7 @@
 /** Player report: body shape and caps, activity tracker, send/stop rules. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   buildPlayerReport, PlayerActivity, PlayerReporter, reasonFromError,
   MAX_PLAYERS, MAX_NAME_CHARS, MAX_FAILURE_CHARS, FAILURE_WINDOW_MS,
@@ -202,4 +203,18 @@ test('overlapping reports do not double-send', async () => {
   release();
   assert.equal(await first, 'sent');
   assert.equal(sent.length, 1);
+});
+
+// Applying Chronicle's changes runs on the GM's client, so its outcome lands
+// on the GM's row; a failure there must show even with no HTTP status.
+test('sync manager records applied changes and failures against the GM', () => {
+  const src = readFileSync(new URL('../scripts/sync-manager.mjs', import.meta.url), 'utf8');
+  const body = src.slice(src.indexOf('  recordWorldOutcome(ok)'), src.indexOf('  _startPlayerReporting()'));
+  assert.match(body, /recordChange\(gmId\)/);
+  assert.match(body, /recordFailure\(gmId, WORLD_APPLY_FAILED\)/);
+  const applied = src.slice(src.indexOf('async _recordApplied('), src.indexOf('  logActivity(type, message)'));
+  assert.match(applied, /this\.recordWorldOutcome\(!failed\)/);
+  assert.match(src, /initial sync failed`\);\n\s*this\.recordWorldOutcome\(false\);/);
+  const journal = readFileSync(new URL('../scripts/journal-sync.mjs', import.meta.url), 'utf8');
+  assert.match(journal, /resyncAll failed for entity[^\n]*\n\s*this\._syncManager\?\.recordWorldOutcome\?\.\(false\);/);
 });

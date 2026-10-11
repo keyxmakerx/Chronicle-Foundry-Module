@@ -12,6 +12,9 @@ export const MAX_PLAYERS = 100;
 export const MAX_NAME_CHARS = 100;
 export const MAX_FAILURE_CHARS = 200;
 
+/** Reason shown when Chronicle's change failed to apply in Foundry; says nothing of the content. */
+export const WORLD_APPLY_FAILED = 'a Chronicle change could not be applied in Foundry';
+
 /** Failures older than this stop counting. */
 export const FAILURE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 

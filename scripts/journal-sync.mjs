@@ -542,6 +542,7 @@ export class JournalSync {
       } catch (err) {
         errors++;
         console.warn(`Chronicle: resyncAll failed for entity "${entity.name || entity.id}":`, err);
+        this._syncManager?.recordWorldOutcome?.(false);
       }
     }
 
