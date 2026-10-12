@@ -29,8 +29,12 @@ html[data-cs-motion="off"] :is([class*="chronicle-"], [id^="chronicle-"]) *,
 html[data-cs-motion="off"] :is([class*="chronicle-"], [id^="chronicle-"]) ::before,
 html[data-cs-motion="off"] :is([class*="chronicle-"], [id^="chronicle-"]) ::after,
 html[data-cs-motion="off"] :is(.cs-grow, .cs-settle, .cs-peek) {
-  animation: none !important;
-  transition: none !important;
+  /* Near-zero rather than none, so animationend and transitionend still fire. */
+  animation-duration: 0.01ms !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  transition-delay: 0s !important;
   scroll-behavior: auto !important;
 }
 

@@ -176,7 +176,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /**
    * A gear in the title bar opens Chronicle settings. Foundry's own header
-   * controls sit in a menu on v13 and later; the gear stays in sight.
+   * controls sit in a menu; the gear stays in sight.
    * @override
    */
   async _renderFrame(options) {
@@ -191,7 +191,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       gear.dataset.tooltip = label;
       gear.setAttribute('aria-label', label);
       const close = header.querySelector('[data-action="close"]');
-      header.insertBefore(gear, close ?? null);
+      header.insertBefore(gear, close?.parentElement === header ? close : null);
     }
     return frame;
   }
@@ -298,7 +298,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       capabilityData = await this._buildCapabilityData();
     } catch (err) {
       log.error('Dashboard: Failed to build sync capability', err);
-      loadErrors.push({ tab: 'status', message: err.message || 'Failed to build sync capability' });
+      loadErrors.push({ tab: 'diagnostics', message: err.message || 'Failed to build sync capability' });
     }
 
     // Build characters tab data.
@@ -312,7 +312,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       issuesData = await this._buildIssuesData();
     } catch (err) {
       console.error('Chronicle Dashboard: Failed to load sync issues', err);
-      loadErrors.push({ tab: 'issues', message: err.message || 'Failed to load issues' });
+      loadErrors.push({ tab: 'characters', message: err.message || 'Failed to load issues' });
     }
 
     // Build the Overview cockpit from the pieces already computed above — a
@@ -339,7 +339,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       loading: false,
       searchFilter: this._searchFilter,
       activeTab: this._activeTab,
-      loadErrors,
+      // Named as the rail names them, so the GM can find what didn't load.
+      loadErrors: loadErrors.map((e) => ({
+        ...e,
+        label: game.i18n.localize(`CHRONICLE.Dashboard.Rail.${e.tab.charAt(0).toUpperCase()}${e.tab.slice(1)}`),
+      })),
       hasLoadErrors: loadErrors.length > 0,
 
       // Overview (landing cockpit) tab.

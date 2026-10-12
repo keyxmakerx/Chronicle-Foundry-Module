@@ -19,6 +19,7 @@
  */
 
 import { noticeText } from './_escape-html.mjs';
+import { currentMotion } from './motion.mjs';
 import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
 import { confirmDialog } from './_dialogs.mjs';
 import {
@@ -406,7 +407,7 @@ function _drawDots(g, r, t, amp) {
 }
 
 function _reducedMotion() {
-  return !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  return currentMotion() !== 'full';
 }
 
 /* ---------------- Token updates, drops and reveal ---------------- */

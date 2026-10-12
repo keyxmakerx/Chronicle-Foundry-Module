@@ -14,6 +14,7 @@
  */
 
 import { noticeText } from './_escape-html.mjs';
+import { currentMotion } from './motion.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import {
   pickMapItemType, journalAccessForActorOwners, journalAccessForCarriedMaps, mapPageUuidOf,
@@ -211,8 +212,9 @@ export async function openMapPage(pageUuid, fromEl = null) {
 /** The unfold: from the clicked row to the window, sideways then down. */
 function _unfold(win, fromEl) {
   if (typeof win.animate !== 'function') return;
-  const reduce = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  if (reduce || !fromEl) {
+  const level = currentMotion();
+  if (level === 'off') return;
+  if (level === 'calm' || !fromEl) {
     win.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150 });
     return;
   }

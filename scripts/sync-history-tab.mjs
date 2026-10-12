@@ -95,12 +95,12 @@ export class SyncHistoryTab {
     const list = this._root?.querySelector('[data-history-rows]');
     if (!list || !list.isConnected) return;
     if (this.events === null) {
-      list.replaceChildren(toDom(loadingNode()));
+      list.replaceChildren(toDom(loadingNode(game.i18n.localize('CHRONICLE.States.Loading'))));
       return;
     }
     const filtered = !!(this.filter.q || this.filter.direction || this.filter.failed);
     const nodes = [];
-    if (this.error) nodes.push(stateNode('cloud-bolt', 'Can’t reach Chronicle', this.error, { error: true }));
+    if (this.error) nodes.push(stateNode('cloud-bolt', game.i18n.localize('CHRONICLE.States.CantReach'), this.error, { error: true }));
     if (!this.error || this.events.length) nodes.push(...buildHistoryRows(this.events, { filtered }));
     if (this.nextBefore && !this.error) {
       const attrs = { type: 'button', 'data-history-older': '' };

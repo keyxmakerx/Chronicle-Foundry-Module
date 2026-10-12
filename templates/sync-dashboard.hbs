@@ -20,8 +20,8 @@
   {{#if hasLoadErrors}}
   <div class="cs-state is-error dashboard-load-errors" role="alert">
     <i class="fa-solid fa-cloud-bolt" aria-hidden="true"></i>
-    <b>{{localize "CHRONICLE.States.CantReach"}}</b>
-    <p>{{localize "CHRONICLE.Dashboard.Common.LoadFailed"}} {{#each loadErrors}}{{tab}}{{#unless @last}}, {{/unless}}{{/each}}</p>
+    <b>{{localize "CHRONICLE.States.LoadFailed"}}</b>
+    <p>{{localize "CHRONICLE.Dashboard.Common.LoadFailed"}} {{#each loadErrors}}{{label}}{{#unless @last}}, {{/unless}}{{/each}}</p>
     <button type="button" data-action="refresh" class="dashboard-btn btn-sm">
       <i class="fa-solid fa-arrows-rotate"></i> {{localize "CHRONICLE.States.TryAgain"}}
     </button>

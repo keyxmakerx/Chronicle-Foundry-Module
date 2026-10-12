@@ -73,7 +73,7 @@ test('every error state names the failure and sits in an alert', () => {
   for (const f of TEMPLATES) {
     for (const block of stateBlocks(read(`templates/${f}`)).filter((b) => b.includes('is-error'))) {
       assert.match(block, /role="alert"/, `${f}: is-error without role=alert`);
-      assert.match(block, /CHRONICLE\.States\.CantReach/, `${f}: is-error without the shared title`);
+      assert.match(block, /CHRONICLE\.States\.(CantReach|LoadFailed)/, `${f}: is-error without a shared title`);
     }
   }
 });

@@ -7,7 +7,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { defaultMotion, growOrigin, motionLevel } from '../scripts/_motion.mjs';
+import { defaultMotion, effectiveMotion, growOrigin, motionLevel } from '../scripts/_motion.mjs';
 
 const css = readFileSync(new URL('../styles/chronicle-sync.css', import.meta.url), 'utf8');
 
@@ -39,4 +39,19 @@ test('Calm swaps every move for a fade and Off stops them', () => {
 
 test('the reduced-motion rule reaches only Chronicle\'s own windows', () => {
   assert.doesNotMatch(css, /prefers-reduced-motion: reduce\)\s*\{\s*\*,/);
+});
+
+test('the level in force is the applied one, else what the system asks for', () => {
+  assert.equal(effectiveMotion('off', false), 'off');
+  assert.equal(effectiveMotion('full', true), 'full');
+  assert.equal(effectiveMotion(undefined, true), 'calm');
+  assert.equal(effectiveMotion('', false), 'full');
+});
+
+test('script-played moves follow the motion level, not only the system setting', () => {
+  for (const f of ['dm-screen', 'map-sheet-items', 'npc-presence']) {
+    const src = readFileSync(new URL(`../scripts/${f}.mjs`, import.meta.url), 'utf8');
+    assert.doesNotMatch(src, /prefers-reduced-motion/, f);
+    assert.match(src, /currentMotion\(\)/, f);
+  }
 });

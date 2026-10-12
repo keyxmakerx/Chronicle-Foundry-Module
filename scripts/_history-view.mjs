@@ -32,8 +32,8 @@ export function stateNode(icon, title, text, { error = false } = {}) {
 }
 
 /** The shared loading skeleton. */
-export function loadingNode() {
-  return h('div', 'cs-loading', { role: 'status', 'aria-label': 'Loading' },
+export function loadingNode(label = 'Loading') {
+  return h('div', 'cs-loading', { role: 'status', 'aria-label': label },
     [h('div', 'cs-skel'), h('div', 'cs-skel'), h('div', 'cs-skel')]);
 }
 

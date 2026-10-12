@@ -14,6 +14,16 @@ export function defaultMotion(prefersReduced) {
   return prefersReduced ? 'calm' : 'full';
 }
 
+/**
+ * The level in force: the one applied to the page, or before that is set
+ * (or outside Foundry), what the system asks for.
+ * @param {string|undefined} applied - the page's data-cs-motion
+ * @param {boolean} prefersReduced
+ */
+export function effectiveMotion(applied, prefersReduced) {
+  return MOTION_LEVELS.includes(applied) ? applied : defaultMotion(prefersReduced);
+}
+
 /** A saved level, or Full for anything unknown. */
 export function motionLevel(saved) {
   return MOTION_LEVELS.includes(saved) ? saved : 'full';

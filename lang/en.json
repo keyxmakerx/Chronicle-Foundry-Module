@@ -615,6 +615,7 @@
     "States": {
       "Loading": "Loading",
       "CantReach": "Can't reach Chronicle",
+      "LoadFailed": "Some of it didn't load",
       "TryAgain": "Try again"
     },
     "Keybindings": {
