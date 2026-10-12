@@ -11,11 +11,20 @@
     {{#if editUrl}}<a class="cqb-btn" href="{{editUrl}}" target="_blank" rel="noopener" title="{{localize "CHRONICLE.Quests.EditHint"}}">{{localize "CHRONICLE.Quests.Edit"}}</a>{{/if}}
   </div>
   {{#if error}}
-    <div class="cqb-msg"><p>{{error}}</p><button type="button" data-action="retry">{{localize "CHRONICLE.Quests.Retry"}}</button></div>
+    <div class="cs-state is-error" role="alert">
+      <i class="fa-solid fa-cloud-bolt" aria-hidden="true"></i>
+      <b>{{localize "CHRONICLE.States.CantReach"}}</b>
+      <p>{{error}}</p>
+      <button type="button" data-action="retry">{{localize "CHRONICLE.States.TryAgain"}}</button>
+    </div>
   {{else if loading}}
-    <div class="cqb-msg"><p>{{localize "CHRONICLE.Quests.Loading"}}</p></div>
+    <div class="cs-loading" role="status" aria-label="{{localize 'CHRONICLE.States.Loading'}}"><div class="cs-skel"></div><div class="cs-skel"></div><div class="cs-skel"></div></div>
   {{else if noHomes}}
-    <div class="cqb-msg"><p>{{localize "CHRONICLE.Quests.NoBoards"}}</p></div>
+    <div class="cs-state">
+      <i class="fa-solid fa-thumbtack" aria-hidden="true"></i>
+      <b>{{localize "CHRONICLE.Quests.NoBoardsTitle"}}</b>
+      <p>{{localize "CHRONICLE.Quests.NoBoards"}}</p>
+    </div>
   {{else}}
     <div class="cqb-frame">
       <div class="cqb-cork" data-cqb-cork>
@@ -48,7 +57,13 @@
             </div>
           {{/if}}
         {{/each}}
-        {{#if board.empty}}<p class="cqb-empty">{{localize "CHRONICLE.Quests.EmptyBoard"}}</p>{{/if}}
+        {{#if board.empty}}
+        <div class="cs-state cqb-empty">
+          <i class="fa-solid fa-thumbtack" aria-hidden="true"></i>
+          <b>{{localize "CHRONICLE.Quests.EmptyBoardTitle"}}</b>
+          <p>{{localize "CHRONICLE.Quests.EmptyBoard"}}</p>
+        </div>
+        {{/if}}
       </div>
       {{#if many}}<div class="cqb-dots">{{#each dots}}<i class="{{#if this}}on{{/if}}"></i>{{/each}}</div>{{/if}}
     </div>

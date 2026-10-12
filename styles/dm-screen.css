@@ -19,8 +19,6 @@
 .chronicle-dm-screen .dms a:focus-visible,
 .chronicle-dm-screen .dms summary:focus-visible { outline: 2px solid var(--dms-hinge); outline-offset: 2px; }
 .chronicle-dm-screen .dms [hidden] { display: none; }
-.chronicle-dm-screen .dms-error { display: grid; gap: .6rem; justify-items: start; padding: 1rem; color: var(--color-text-primary, inherit); }
-.chronicle-dm-screen .dms-error button { border: 1px solid currentColor; border-radius: .4rem; padding: .2rem .7rem; color: inherit; }
 .chronicle-dm-screen .dms-strip {
   display: flex; flex-wrap: wrap; gap: .3rem 1rem; align-items: center; background: rgba(0, 0, 0, .55);
   color: #fff; border-radius: .5rem; padding: .35rem .75rem; margin-bottom: .45rem; font-size: .9em;

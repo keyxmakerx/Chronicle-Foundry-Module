@@ -1,8 +1,13 @@
 <div class="cqs" data-cqs-root>
 {{#if error}}
-  <div class="cqb-msg"><p>{{error}}</p><button type="button" data-action="retry">{{localize "CHRONICLE.Quests.Retry"}}</button></div>
+  <div class="cs-state is-error" role="alert">
+    <i class="fa-solid fa-cloud-bolt" aria-hidden="true"></i>
+    <b>{{localize "CHRONICLE.States.CantReach"}}</b>
+    <p>{{error}}</p>
+    <button type="button" data-action="retry">{{localize "CHRONICLE.States.TryAgain"}}</button>
+  </div>
 {{else if loading}}
-  <div class="cqb-msg"><p>{{localize "CHRONICLE.Quests.Loading"}}</p></div>
+  <div class="cs-loading" role="status" aria-label="{{localize 'CHRONICLE.States.Loading'}}"><div class="cs-skel"></div><div class="cs-skel"></div><div class="cs-skel"></div></div>
 {{else}}
   <article class="cqs-sheet chronicle-paper chronicle-paper-stack">
     <div class="cqs-kind">{{#if sheet.kicker}}{{sheet.kicker}} · {{/if}}{{sheet.status}}{{#if sheet.handedOut}} · {{localize "CHRONICLE.Quests.HandedOutShort"}}{{/if}}</div>
@@ -55,7 +60,7 @@
     {{#if give}}
     <div class="cqs-give" role="dialog" aria-label="{{localize "CHRONICLE.Quests.HandOutTitle"}}">
       <div class="cqs-lh"><b>{{localize "CHRONICLE.Quests.HandOutTitle"}}</b></div>
-      {{#if give.loading}}<p class="cqs-pad">{{localize "CHRONICLE.Quests.Loading"}}</p>
+      {{#if give.loading}}<div class="cs-loading" role="status" aria-label="{{localize 'CHRONICLE.States.Loading'}}"><div class="cs-skel"></div><div class="cs-skel"></div><div class="cs-skel"></div></div>
       {{else}}
         {{#unless give.party.length}}<p class="cqs-pad">{{localize "CHRONICLE.Quests.NoParty"}}</p>{{/unless}}
         {{#if give.coins}}<div class="cqs-sh cqs-pad">{{give.coinLine}}</div>{{/if}}

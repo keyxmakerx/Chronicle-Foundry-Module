@@ -70,9 +70,8 @@
         {{/if}}
       </div>
       {{else}}
-      <div class="wizard-loading">
-        <i class="fa-solid fa-spinner fa-spin"></i> {{localize "CHRONICLE.Wizard.Detecting"}}
-      </div>
+      <div class="cs-loading" role="status" aria-label="{{localize 'CHRONICLE.States.Loading'}}"><div class="cs-skel"></div><div class="cs-skel"></div><div class="cs-skel"></div></div>
+      <p class="wizard-progress">{{localize "CHRONICLE.Wizard.Detecting"}}</p>
       {{/if}}
     </div>
 
@@ -118,9 +117,8 @@
         {{/if}}
       </div>
       {{else}}
-      <div class="wizard-loading">
-        <i class="fa-solid fa-spinner fa-spin"></i> {{localize "CHRONICLE.Wizard.Scanning"}}
-      </div>
+      <div class="cs-loading" role="status" aria-label="{{localize 'CHRONICLE.States.Loading'}}"><div class="cs-skel"></div><div class="cs-skel"></div><div class="cs-skel"></div></div>
+      <p class="wizard-progress">{{localize "CHRONICLE.Wizard.Scanning"}}</p>
       {{/if}}
     </div>
 
@@ -178,7 +176,10 @@
         </tbody>
       </table>
       {{else}}
-      <div class="wizard-empty">{{localize "CHRONICLE.Wizard.NoFolders"}}</div>
+      <div class="cs-state">
+        <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+        <b>{{localize "CHRONICLE.Wizard.NoFolders"}}</b>
+      </div>
       {{/if}}
     </div>
 
@@ -205,7 +206,10 @@
         {{/each}}
       </div>
       {{else}}
-      <div class="wizard-empty">{{localize "CHRONICLE.Wizard.NoTags"}}</div>
+      <div class="cs-state">
+        <i class="fa-solid fa-tags" aria-hidden="true"></i>
+        <b>{{localize "CHRONICLE.Wizard.NoTags"}}</b>
+      </div>
       {{/if}}
     </div>
 
@@ -242,7 +246,10 @@
         </tbody>
       </table>
       {{else}}
-      <div class="wizard-empty">{{localize "CHRONICLE.Wizard.NoActors"}}</div>
+      <div class="cs-state">
+        <i class="fa-solid fa-users" aria-hidden="true"></i>
+        <b>{{localize "CHRONICLE.Wizard.NoActors"}}</b>
+      </div>
       {{/if}}
     </div>
 
@@ -282,7 +289,10 @@
         </ul>
       </div>
       {{else}}
-      <div class="wizard-empty">{{localize "CHRONICLE.Wizard.NoPlan"}}</div>
+      <div class="cs-state">
+        <i class="fa-solid fa-list-check" aria-hidden="true"></i>
+        <b>{{localize "CHRONICLE.Wizard.NoPlan"}}</b>
+      </div>
       {{/if}}
 
       {{!-- Import activity log --}}

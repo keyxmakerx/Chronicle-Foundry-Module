@@ -6,7 +6,7 @@
  * here and redraws them into the fresh panel after each render.
  */
 
-import { buildHistoryRows, historyQuery, h, toDom } from './_history-view.mjs';
+import { buildHistoryRows, historyQuery, h, loadingNode, stateNode, toDom } from './_history-view.mjs';
 
 export class SyncHistoryTab {
   /** @param {() => import('./api-client.mjs').ChronicleAPI|null} getApi */
@@ -95,12 +95,12 @@ export class SyncHistoryTab {
     const list = this._root?.querySelector('[data-history-rows]');
     if (!list || !list.isConnected) return;
     if (this.events === null) {
-      list.replaceChildren(toDom(h('p', 'sh-empty', null, 'Loading…')));
+      list.replaceChildren(toDom(loadingNode()));
       return;
     }
     const filtered = !!(this.filter.q || this.filter.direction || this.filter.failed);
     const nodes = [];
-    if (this.error) nodes.push(h('p', 'sh-empty sh-error', null, this.error));
+    if (this.error) nodes.push(stateNode('cloud-bolt', 'Can’t reach Chronicle', this.error, { error: true }));
     if (!this.error || this.events.length) nodes.push(...buildHistoryRows(this.events, { filtered }));
     if (this.nextBefore && !this.error) {
       const attrs = { type: 'button', 'data-history-older': '' };

@@ -165,7 +165,10 @@
         {{/each}}
       </ul>
       {{else}}
-      <p class="cs-empty">{{localize "CHRONICLE.SettingsWindow.NoMembers"}}</p>
+      <div class="cs-state">
+        <i class="fa-solid fa-users-slash" aria-hidden="true"></i>
+        <b>{{localize "CHRONICLE.SettingsWindow.NoMembers"}}</b>
+      </div>
       {{/if}}
       <div class="cs-row-end">
         <button type="button" data-action="refreshMembers"><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>{{localize "CHRONICLE.SettingsWindow.RefreshMembers"}}</button>

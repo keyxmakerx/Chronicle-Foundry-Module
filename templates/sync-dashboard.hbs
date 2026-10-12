@@ -160,7 +160,7 @@
             <span class="log-message">{{message}}</span>
           </div>
           {{else}}
-          <div class="log-empty">{{localize "CHRONICLE.Dashboard.StatusTab.NoActivity"}}</div>
+          <div class="cs-state"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><b>{{localize "CHRONICLE.Dashboard.StatusTab.NoActivity"}}</b></div>
           {{/each}}
         </div>
 
@@ -327,10 +327,11 @@
         {{#unless foundryOnlyJournals.length}}
         <div class="cs-state dashboard-empty-tab">
           {{#if searchFilter}}
-          <i class="fa-solid fa-search fa-2x"></i>
-          <p>{{localize "CHRONICLE.Dashboard.Entities.NoMatch" search=searchFilter}}</p>
+          <i class="fa-solid fa-search" aria-hidden="true"></i>
+          <b>{{localize "CHRONICLE.Dashboard.Entities.NoMatch" search=searchFilter}}</b>
           {{else}}
-          <p>{{localize "CHRONICLE.Dashboard.Entities.EmptyState"}}</p>
+          <i class="fa-solid fa-book-open" aria-hidden="true"></i>
+          <b>{{localize "CHRONICLE.Dashboard.Entities.EmptyState"}}</b>
           {{/if}}
         </div>
         {{/unless}}
@@ -384,13 +385,13 @@
       {{else}}
       <div class="cs-state dashboard-empty-tab">
         {{#if shopTypeExists}}
-        <i class="fa-solid fa-store fa-2x"></i>
-        <p>{{localize "CHRONICLE.Dashboard.Shops.NoShops"}}</p>
-        <p class="hint">{{localize "CHRONICLE.Dashboard.Shops.NoShopsHint"}}</p>
+        <i class="fa-solid fa-store" aria-hidden="true"></i>
+        <b>{{localize "CHRONICLE.Dashboard.Shops.NoShops"}}</b>
+        <p>{{localize "CHRONICLE.Dashboard.Shops.NoShopsHint"}}</p>
         {{else}}
-        <i class="fa-solid fa-store fa-2x"></i>
-        <p>{{localize "CHRONICLE.Dashboard.Shops.NoShopType"}}</p>
-        <p class="hint">{{localize "CHRONICLE.Dashboard.Shops.NoShopTypeHint"}}</p>
+        <i class="fa-solid fa-store" aria-hidden="true"></i>
+        <b>{{localize "CHRONICLE.Dashboard.Shops.NoShopType"}}</b>
+        <p>{{localize "CHRONICLE.Dashboard.Shops.NoShopTypeHint"}}</p>
         {{/if}}
       </div>
       {{/if}}
@@ -498,7 +499,8 @@
         {{/each}}
         {{else}}
         <div class="cs-state dashboard-empty-tab">
-          <p>{{localize "CHRONICLE.Dashboard.Maps.NoMaps"}}</p>
+          <i class="fa-solid fa-map" aria-hidden="true"></i>
+          <b>{{localize "CHRONICLE.Dashboard.Maps.NoMaps"}}</b>
         </div>
         {{/if}}
       </div>
@@ -621,27 +623,27 @@
         </div>
         {{else}}
         <div class="cs-state dashboard-empty-tab">
-          <i class="fa-solid fa-users fa-2x"></i>
-          <p>{{localize "CHRONICLE.Dashboard.Characters.NoActors"}}</p>
-          <p class="hint">{{localize "CHRONICLE.Dashboard.Characters.NoActorsHint"}}</p>
+          <i class="fa-solid fa-users" aria-hidden="true"></i>
+          <b>{{localize "CHRONICLE.Dashboard.Characters.NoActors"}}</b>
+          <p>{{localize "CHRONICLE.Dashboard.Characters.NoActorsHint"}}</p>
         </div>
         {{/if}}
 
         {{else}}
         <div class="cs-state dashboard-empty-tab">
-          <i class="fa-solid fa-toggle-off fa-2x"></i>
-          <p>{{localize "CHRONICLE.Dashboard.Characters.Disabled"}}</p>
-          <p class="hint">{{localize "CHRONICLE.Dashboard.Characters.DisabledHint"}}</p>
+          <i class="fa-solid fa-toggle-off" aria-hidden="true"></i>
+          <b>{{localize "CHRONICLE.Dashboard.Characters.Disabled"}}</b>
+          <p>{{localize "CHRONICLE.Dashboard.Characters.DisabledHint"}}</p>
           <button type="button" data-action="open-settings" class="dashboard-btn">
-            <i class="fa-solid fa-gear"></i> {{localize "CHRONICLE.Dashboard.OpenSettings"}}
+            <i class="fa-solid fa-gear" aria-hidden="true"></i> {{localize "CHRONICLE.Dashboard.OpenSettings"}}
           </button>
         </div>
         {{/if}}
       {{else}}
       <div class="cs-state dashboard-empty-tab">
-        <i class="fa-solid fa-puzzle-piece fa-2x"></i>
-        <p>{{localize "CHRONICLE.Dashboard.Characters.NoMatchingSystem"}}{{#if foundrySystem}} (<code>{{foundrySystem}}</code>){{/if}}.</p>
-        <ul class="hint" style="text-align: left; margin-top: 0.5rem;">
+        <i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i>
+        <b>{{localize "CHRONICLE.Dashboard.Characters.NoMatchingSystem"}}{{#if foundrySystem}} (<code>{{foundrySystem}}</code>){{/if}}.</b>
+        <ul>
           <li>{{localize "CHRONICLE.Dashboard.Characters.PackageHint"}}</li>
           <li>{{localize "CHRONICLE.Dashboard.Characters.EnabledHint"}}</li>
           <li>{{localize "CHRONICLE.Dashboard.Characters.ConsoleHint"}}</li>
@@ -714,21 +716,21 @@
       {{else}}
       <div class="cs-state dashboard-empty-tab">
         {{#if calendar.calendarRebuilding}}
-        <i class="fa-solid fa-screwdriver-wrench fa-2x"></i>
-        <p>{{calendar.rebuildingDetail}}</p>
-        <p class="hint">{{localize "CHRONICLE.Dashboard.Calendar.RebuildingHint"}}</p>
+        <i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i>
+        <b>{{calendar.rebuildingDetail}}</b>
+        <p>{{localize "CHRONICLE.Dashboard.Calendar.RebuildingHint"}}</p>
         {{else if calendar.calendarUnreachable}}
-        <i class="fa-solid fa-plug-circle-exclamation fa-2x"></i>
-        <p>{{localize "CHRONICLE.Dashboard.Calendar.UnreachableTitle"}}</p>
-        <p class="hint">{{localize "CHRONICLE.Dashboard.Calendar.UnreachableHint"}}</p>
+        <i class="fa-solid fa-plug-circle-exclamation" aria-hidden="true"></i>
+        <b>{{localize "CHRONICLE.Dashboard.Calendar.UnreachableTitle"}}</b>
+        <p>{{localize "CHRONICLE.Dashboard.Calendar.UnreachableHint"}}</p>
         {{else if calendar.noCampaignCalendar}}
-        <i class="fa-solid fa-calendar-xmark fa-2x"></i>
-        <p>{{localize "CHRONICLE.Dashboard.Calendar.NoCalendar"}}</p>
+        <i class="fa-solid fa-calendar-xmark" aria-hidden="true"></i>
+        <b>{{localize "CHRONICLE.Dashboard.Calendar.NoCalendar"}}</b>
         {{else}}
-        <i class="fa-solid fa-toggle-off fa-2x"></i>
-        <p>{{localize "CHRONICLE.Dashboard.Calendar.Disabled"}}</p>
+        <i class="fa-solid fa-toggle-off" aria-hidden="true"></i>
+        <b>{{localize "CHRONICLE.Dashboard.Calendar.Disabled"}}</b>
         <button type="button" data-action="open-settings" class="dashboard-btn">
-          <i class="fa-solid fa-gear"></i> {{localize "CHRONICLE.Dashboard.OpenSettings"}}
+          <i class="fa-solid fa-gear" aria-hidden="true"></i> {{localize "CHRONICLE.Dashboard.OpenSettings"}}
         </button>
         {{/if}}
       </div>
@@ -1024,7 +1026,7 @@
             <span class="log-message">{{text}}</span>
           </div>
           {{else}}
-          <div class="log-empty">{{localize "CHRONICLE.Debug.NoLog"}}</div>
+          <div class="cs-state"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><b>{{localize "CHRONICLE.Debug.NoLog"}}</b></div>
           {{/each}}
         </div>
 

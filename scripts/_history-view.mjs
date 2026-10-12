@@ -22,6 +22,21 @@ export function h(tag, cls, attrs, children) {
   return node;
 }
 
+/** The shared empty / can't-reach block (see "SHARED STATES" in the stylesheet). */
+export function stateNode(icon, title, text, { error = false } = {}) {
+  return h('div', error ? 'cs-state is-error' : 'cs-state', error ? { role: 'alert' } : null, [
+    h('i', `fa-solid fa-${icon}`, { 'aria-hidden': 'true' }),
+    h('b', '', null, title),
+    h('p', '', null, text),
+  ]);
+}
+
+/** The shared loading skeleton. */
+export function loadingNode() {
+  return h('div', 'cs-loading', { role: 'status', 'aria-label': 'Loading' },
+    [h('div', 'cs-skel'), h('div', 'cs-skel'), h('div', 'cs-skel')]);
+}
+
 /** Build DOM from node descriptions. */
 export function toDom(nodes, doc = globalThis.document) {
   const frag = doc.createDocumentFragment();
@@ -121,9 +136,9 @@ function row(ev, child) {
  */
 export function buildHistoryRows(events, { filtered = false, now = new Date() } = {}) {
   if (!events.length) {
-    return [h('p', 'sh-empty', null, filtered
-      ? 'Nothing matches. Clear the search or the filters to see everything.'
-      : 'Nothing has synced yet. Changes appear here as soon as they sync.')];
+    return [filtered
+      ? stateNode('magnifying-glass', 'Nothing matches', 'Clear the search or the filters to see everything.')
+      : stateNode('clock-rotate-left', 'Nothing has synced yet', 'Changes appear here as soon as they sync.')];
   }
   let last = '';
   const out = [];

@@ -656,6 +656,8 @@
       "Retry": "Try again",
       "Loading": "Loading…",
       "NoBoards": "No quest boards yet. Add a Notice boards block to the Quests category or a place page in Chronicle.",
+      "NoBoardsTitle": "No quest boards yet",
+      "EmptyBoardTitle": "Nothing pinned yet",
       "EmptyBoard": "Nothing is pinned to this board yet.",
       "PrevBoard": "Previous board",
       "NextBoard": "Next board",
@@ -720,6 +722,8 @@
     },
     "DMScreen": {
       "Title": "DM Screen",
+      "WorldEmptyTitle": "No world state yet",
+      "WorldEmpty": "Add a calendar or turn on the Armory to see the world's date and game state here.",
       "Skip": "Click anywhere to skip",
       "Retry": "Try again",
       "Error": {
