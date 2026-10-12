@@ -1292,7 +1292,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const el = this.element;
     if (!el) return;
     this._applyActiveTab(el);
-    if (moved || pane) el.querySelector('.dashboard-content')?.scrollTo?.({ top: 0 });
+    if (moved || pane) {
+      el.querySelector('.dashboard-content')?.scrollTo?.({ top: 0 });
+      const shown = el.querySelector(tab === 'diagnostics' ? '[data-diag-pane].active' : '.dashboard-content .tab.active');
+      if (shown) { shown.classList.remove('cs-settle'); void shown.offsetWidth; shown.classList.add('cs-settle'); }
+    }
     if (this._historyShown()) this._historyTab.shown();
   }
 

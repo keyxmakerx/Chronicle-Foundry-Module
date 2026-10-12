@@ -8,6 +8,8 @@
 import { noticeText } from './_escape-html.mjs';
 import { MODULE_ID } from './constants.mjs';
 import { UpdateInfoApplication } from './update-info.mjs';
+import { defaultMotion } from './_motion.mjs';
+import { applyMotion } from './motion.mjs';
 import { ChronicleSettingsWindow } from './chronicle-settings.mjs';
 import { parseConnectLine } from './_connect-line.mjs';
 
@@ -235,6 +237,22 @@ export function registerSettings() {
     config: false,
     type: Object,
     default: {},
+  });
+
+  // Each person's own, so a GM's choice never changes a player's screen.
+  game.settings.register(MODULE_ID, 'motion', {
+    name: 'CHRONICLE.Settings.Motion.Name',
+    hint: 'CHRONICLE.Settings.Motion.Hint',
+    scope: 'client',
+    config: true,
+    type: String,
+    choices: {
+      full: 'CHRONICLE.Settings.Motion.Full',
+      calm: 'CHRONICLE.Settings.Motion.Calm',
+      off: 'CHRONICLE.Settings.Motion.Off',
+    },
+    default: defaultMotion(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false),
+    onChange: (value) => applyMotion(value),
   });
 
   game.settings.register(MODULE_ID, 'calendarTemperatureUnit', {

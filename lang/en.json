@@ -106,6 +106,13 @@
         "Name": "Show the calendar strip",
         "Hint": "A thin strip with Chronicle's date, time and weather over a small sky, which you can drag anywhere. For you only."
       },
+      "Motion": {
+        "Name": "Motion",
+        "Hint": "Full, Calm or Off for Chronicle's windows. Just for you.",
+        "Full": "Full",
+        "Calm": "Calm",
+        "Off": "Off"
+      },
       "CalendarTemperatureUnit": {
         "Name": "Calendar temperature unit",
         "Hint": "How the date bar shows Chronicle's temperature, for you only."

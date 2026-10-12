@@ -21,6 +21,13 @@ repo root. There is no `package.json`.
 - [ ] WebSocket auto-reconnects after network interruption (wait 30s)
 - [ ] Message queue drains after reconnection
 
+## Motion
+
+- [ ] Configure Settings → Chronicle Sync shows Motion (Full, Calm, Off) beside the calendar strip and temperature unit; on a computer set to reduce motion, a new client starts on Calm
+- [ ] Full: the dashboard grows out of the scene-control button that opened it; switching dashboard sections and settings tabs settles the new panel in; Test connection's checks appear one after another
+- [ ] Calm: each of those is a short fade in place. Off: windows, panels and checks appear at once, and nothing in a Chronicle window animates
+- [ ] With reduce motion on and Motion left on Calm, Foundry's own windows and other modules animate as they did before Chronicle
+
 ## Keyboard shortcuts
 
 - [ ] Configure Controls lists a Chronicle Sync group with five shortcuts (dashboard, DM Screen, notebook, quest board, calendar), all with no key bound

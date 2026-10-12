@@ -163,7 +163,7 @@ test('Foundry\'s own list keeps only personal choices; the rest is behind the GM
   const src = readFileSync(new URL('../scripts/settings.mjs', import.meta.url), 'utf8');
   const shown = [...src.matchAll(/register\(MODULE_ID, '([A-Za-z]+)', \{([\s\S]*?)\n {2}\}\);/g)]
     .filter((m) => /config: true/.test(m[2])).map((m) => m[1]);
-  assert.deepEqual(shown.sort(), ['calendarStrip', 'calendarTemperatureUnit']);
+  assert.deepEqual(shown.sort(), ['calendarStrip', 'calendarTemperatureUnit', 'motion']);
   const menu = src.slice(src.indexOf("registerMenu(MODULE_ID, 'chronicleSettings'"));
   assert.match(menu.slice(0, 500), /restricted: true/);
   assert.match(menu.slice(0, 500), /type: ChronicleSettingsWindow/);

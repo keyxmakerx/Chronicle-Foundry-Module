@@ -160,7 +160,7 @@ export class ChronicleSettingsWindow extends HandlebarsApplicationMixin(Applicat
         fetchImpl: (...args) => fetch(...args),
       });
       const format = (key, data) => game.i18n.format(key, data);
-      list.replaceChildren(...steps.map((s) => stepItem(s.icon, stepText(s, format))));
+      list.replaceChildren(...steps.map((s, n) => stepItem(s.icon, stepText(s, format), n)));
     } finally {
       button.disabled = false;
     }
@@ -276,9 +276,11 @@ function readCurrent() {
 }
 
 /** One test step as a list item; the text goes in as text, never markup. */
-function stepItem(icon, text) {
+function stepItem(icon, text, order = 0) {
   const li = document.createElement('li');
-  li.className = `cs-step cs-step-${icon}`;
+  li.className = `cs-step cs-step-${icon} cs-peek`;
+  // The results land together; a small stagger reads them in as one by one.
+  li.style.animationDelay = `${order * 70}ms`;
   const i = document.createElement('i');
   i.className = `fa-solid ${STEP_ICONS[icon] ?? 'fa-spinner fa-spin'}`;
   i.setAttribute('aria-hidden', 'true');
