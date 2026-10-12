@@ -328,3 +328,30 @@ export function mixWeather(a, b, t) {
   }
   return out;
 }
+
+/** The most drops the glass carries at once, in the heaviest rain. */
+export const GLASS_DROPS = 9;
+
+function hash(i, k) { const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x); }
+
+/**
+ * Raindrops landing on the globe's glass at time `t` (seconds): each lands,
+ * lingers, slides a little and fades, then lands somewhere else. Positions
+ * are fractions of the globe (0.5, 0.5 is its centre) and keep to the outer
+ * ring, so a drop never sits over the day figure. `wet` is the rain and
+ * storm together; none fall below a drizzle's worth.
+ */
+export function glassDrops(wet, t) {
+  const n = Math.round(GLASS_DROPS * Math.min(1, Math.max(0, (Number(wet) || 0) - 0.15) / 1.1));
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const life = 3.5 + hash(i, 500) * 4; const c = t / life + hash(i, 501); const cycle = Math.floor(c); const age = c - cycle;
+    const ang = (0.08 + hash(cycle, 502 + i) * 0.84) * Math.PI * 2; const rad = 0.36 + hash(cycle, 520 + i) * 0.1;
+    const r = 0.011 + hash(cycle, 540 + i) * 0.012;
+    // Bigger drops run a short way down the glass before they go.
+    const slide = r > 0.017 ? age * age * 0.06 : 0;
+    const a = Math.min(1, age / 0.06) * (1 - Math.max(0, (age - 0.7) / 0.3));
+    out.push({ x: 0.5 + Math.cos(ang) * rad, y: 0.5 + Math.sin(ang) * rad + slide, r, a, trail: slide });
+  }
+  return out;
+}
