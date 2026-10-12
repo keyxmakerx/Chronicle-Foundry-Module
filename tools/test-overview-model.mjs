@@ -42,7 +42,7 @@ test('stats format counts and the synced/total character ratio', () => {
   assert.equal(byTab.characters, '2/3');
 });
 
-test('disconnected surfaces a blocking error routed to status', () => {
+test('disconnected surfaces a blocking error routed to diagnostics', () => {
   const m = buildOverviewModel({
     connectionState: 'disconnected',
     connectionLabel: 'Disconnected',
@@ -51,7 +51,7 @@ test('disconnected surfaces a blocking error routed to status', () => {
   assert.equal(m.connection.ok, false);
   const err = m.attention.find((a) => a.severity === 'error');
   assert.ok(err, 'expected a blocking error');
-  assert.equal(err.tab, 'status');
+  assert.equal(err.tab, 'diagnostics:health');
   // Error must be first (highest priority).
   assert.equal(m.attention[0].severity, 'error');
 });
@@ -67,11 +67,11 @@ test('each problem routes to the tab that fixes it', () => {
     matchedSystem: null,
   });
   const tabFor = (needle) => m.attention.find((a) => a.text.includes(needle))?.tab;
-  assert.equal(tabFor("couldn't be matched"), 'issues');
-  assert.equal(tabFor('not mapped'), 'members');
+  assert.equal(tabFor("couldn't be matched"), 'characters');
+  assert.equal(tabFor('not mapped'), 'settings:players');
   assert.equal(tabFor('out of sync'), 'calendar');
-  assert.equal(tabFor('No matching game system'), 'status');
-  assert.equal(tabFor('recent sync error'), 'status');
+  assert.equal(tabFor('No matching game system'), 'diagnostics:health');
+  assert.equal(tabFor('recent sync error'), 'diagnostics:health');
   assert.equal(m.allClear, false);
 });
 

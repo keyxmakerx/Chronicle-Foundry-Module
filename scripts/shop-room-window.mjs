@@ -17,17 +17,20 @@
  * The GM sees each sale as a whispered chat line.
  */
 
+import { noticeText } from './_escape-html.mjs';
+import { stateBlock } from './_state-block.mjs';
 import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
+import { isShopJournal } from './_shop-journal.mjs';
 import { getSetting, getUserMappings } from './settings.mjs';
 import { _isAllowedImageHost } from './_url-validation.mjs';
 import { decryptReply, encryptReply, generateRequestKeys } from './_stash-crypto.mjs';
+import { loadVendored } from './vendor-chronicle.mjs';
 import {
-  createChronicleShim, describeSale, sanitizeShopBuyReply, sanitizeShopBuyRequest,
+  describeSale, sanitizeShopBuyReply, sanitizeShopBuyRequest,
   sanitizeShopRoomMessage, shopEndpoints, MAX_ROOM_REPLY_CHARS, SHOP_ROOM_MESSAGE,
 } from './_shop-room-data.mjs';
 
 const SOCKET_CHANNEL = `module.${MODULE_ID}`;
-const VENDOR = `modules/${MODULE_ID}/vendor/chronicle`;
 
 // How long a player waits for the GM's client to answer. The buyers read
 // holds up the room's first draw, so it gives up sooner (no basket) than a
@@ -93,23 +96,7 @@ async function requestFromGM(shopId, action, body) {
 function loadShopRoomWidget() {
   if (widgetLoad) return widgetLoad;
   widgetLoad = (async () => {
-    // The widget registers itself on a page global named Chronicle. Never
-    // replace one that something else put there.
-    if (globalThis.Chronicle && globalThis.Chronicle !== shim) {
-      throw new Error('another script already defines window.Chronicle');
-    }
-    shim = shim || createChronicleShim();
-    globalThis.Chronicle = shim;
-    for (const file of ['shop_room_icons.js', 'shop_room.js']) {
-      await new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = `${VENDOR}/${file}`;
-        s.charset = 'utf-8';
-        s.onload = resolve;
-        s.onerror = () => reject(new Error(`could not load ${file}`));
-        document.head.appendChild(s);
-      });
-    }
+    shim = await loadVendored(['shop_room_icons.js', 'shop_room_paper.js', 'shop_room.js']);
     const def = shim.widgets.get('shop_room');
     if (!def) throw new Error('shop room widget did not register');
     return def;
@@ -349,20 +336,12 @@ export class ShopRoomWindow extends ApplicationV2 {
   /** No GM is online, so there is no room to draw. */
   _showClosed() {
     if (!this._host) return;
-    const p = document.createElement('p');
-    p.className = 'chronicle-shop-closed';
-    const b = document.createElement('b');
-    b.textContent = t('ClosedTitle');
-    p.append(b, t('ClosedNoGM'));
-    this._host.replaceChildren(p);
+    this._host.replaceChildren(stateBlock('door-closed', t('ClosedTitle'), t('ClosedNoGM')));
   }
 
   _showError(text) {
     if (!this._host) return;
-    const p = document.createElement('p');
-    p.className = 'notification error';
-    p.textContent = text;
-    this._host.replaceChildren(p);
+    this._host.replaceChildren(stateBlock('cloud-bolt', game.i18n.localize('CHRONICLE.States.CantReach'), text, true));
   }
 
   /** Item names link to Chronicle pages; in Foundry they open the synced journal instead. */
@@ -566,7 +545,7 @@ export async function openShopFromJournal(shopId, name) {
     ? sanitizeShopRoomMessage({ ...reply.body, type: SHOP_ROOM_MESSAGE, action: 'show', shopId }, getSetting('apiUrl'))
     : null;
   if (!room && !closed) {
-    ui.notifications.warn(reply.body?.message || t('LoadFailed'));
+    ui.notifications.warn(reply.body?.message ? noticeText(reply.body.message) : t('LoadFailed'));
     return;
   }
   if (playerRooms.has(shopId)) return; // The GM showed it meanwhile.
@@ -588,7 +567,7 @@ export function registerShopJournalButton(openAsGM) {
   const add = (app, html) => {
     const journal = app?.document;
     if (journal?.documentName !== 'JournalEntry') return;
-    if (journal.getFlag(FLAG_SCOPE, 'entityType') !== 'Shop') return;
+    if (!isShopJournal(journal, FLAG_SCOPE)) return;
     const shopId = journal.getFlag(FLAG_SCOPE, 'entityId');
     if (!shopId || !journal.testUserPermission(game.user, 'OBSERVER')) return;
     // The GM's client serves players only from entries they can't edit.

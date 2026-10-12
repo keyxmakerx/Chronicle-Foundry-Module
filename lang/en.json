@@ -35,8 +35,7 @@
       "Drag": "Drag to move",
       "Lock": "Lock in place",
       "Unlock": "Unlock to move",
-      "Shrink": "Shrink to a clock",
-      "Clock": "Chronicle calendar: {date}, {time}. Click to open; drag to move",
+      "Shrink": "Shrink to a small globe",
       "RealTime": "This calendar follows real time, so its date can't be moved here.",
       "StepRefused": "Chronicle didn't take the new time. The Calendar tab of the Chronicle dashboard says why.",
       "SetRefused": "Chronicle didn't take that date. Check that it exists in the calendar.",
@@ -52,6 +51,22 @@
       "NameNeeded": "Give the event a name.",
       "EventAdded": "Added \"{name}\" to Chronicle's calendar.",
       "AddRefused": "Chronicle didn't take the event. Check the date and your key's role."
+    },
+    "SkyClock": {
+      "Shrink": "Make it smaller",
+      "Lock": "Lock in its corner",
+      "Unlock": "Unlock to move",
+      "MiniLabel": "{date}. Click to make it bigger.",
+      "GmLabel": "{date}. Click to change Chronicle's time; drag to move.",
+      "CradleLabel": "Change Chronicle's time",
+      "BackDay": "Back a day",
+      "BackHour": "Back an hour",
+      "ForwardHour": "Forward an hour",
+      "ForwardDay": "Forward a day",
+      "Saving": "Saving to Chronicle",
+      "Saved": "Saved in Chronicle, {time}",
+      "RealTime": "This calendar follows real time, so Chronicle keeps the time.",
+      "StepRefused": "Chronicle didn't take the new time. The Calendar tab of the Chronicle dashboard says why."
     },
     "Settings": {
       "ApiUrl": {
@@ -103,8 +118,21 @@
         "Hint": "Whisper a GM-only chat line when the Chronicle calendar crosses a season or era boundary. Never posted to players."
       },
       "CalendarStrip": {
-        "Name": "Show the calendar strip",
-        "Hint": "A thin strip with Chronicle's date, time and weather over a small sky, which you can drag anywhere. For you only."
+        "Name": "Show Chronicle's calendar",
+        "Hint": "Chronicle's date and weather on the table, as a strip or a Sky Clock (pick below). For you only."
+      },
+      "CalendarLook": {
+        "Name": "Calendar look",
+        "Hint": "The strip: a thin bar with the date, time and weather that you can drag anywhere. The Sky Clock: a small glass globe with the day carved in stone under Chronicle's sky, which sits in a corner. For you only.",
+        "Strip": "Strip",
+        "Globe": "Sky Clock"
+      },
+      "Motion": {
+        "Name": "Motion",
+        "Hint": "Full, Calm or Off for Chronicle's windows. Just for you.",
+        "Full": "Full",
+        "Calm": "Calm",
+        "Off": "Off"
       },
       "CalendarTemperatureUnit": {
         "Name": "Calendar temperature unit",
@@ -117,6 +145,10 @@
       "SyncCharacters": {
         "Name": "Sync Characters",
         "Hint": "Sync Foundry actors with Chronicle character entities (requires matching game system)"
+      },
+      "SyncCreatures": {
+        "Name": "Sync Creatures",
+        "Hint": "Make each Chronicle creature page an NPC actor in the \"Chronicle: Creatures\" folder and keep it matching the page. Stamina and conditions go back to Chronicle only for creatures whose page allows it. Needs a game system whose Chronicle package maps creatures (Draw Steel)."
       },
       "SkipIncomingSanitization": {
         "Name": "Skip incoming HTML sanitization (advanced)",
@@ -147,27 +179,133 @@
       "ConnectionLost": "Lost connection to Chronicle. Retrying...",
       "ConnectionRestored": "Connection to Chronicle restored"
     },
+    "Creatures": {
+      "Folder": "Chronicle: Creatures"
+    },
     "ActorSync": {
       "EnableClaimingHint": "Chronicle: Enable the \"Player Character Claiming\" addon in your Chronicle campaign to sync which players own their characters.",
       "PreviousOwnerKept": "Chronicle: {player} is no longer the owner of {actor} in Chronicle, but still owns the actor in Foundry. Change this in the actor's Ownership settings if you want.",
-      "ClaimantUnmapped": "Chronicle: a player owns {actor} in Chronicle but has no Foundry user mapped, so Foundry ownership was not changed. Map them in the sync dashboard, Members tab.",
+      "ClaimantUnmapped": "Chronicle: a player owns {actor} in Chronicle but has no Foundry user mapped, so Foundry ownership was not changed. Link them in Chronicle settings, under Players.",
       "IdentityItemFailed": "Chronicle: Could not update {actor}'s ancestry, culture, career or kit item ({fields}). The sheet was left as it was; see the console for details."
     },
     "Dashboard": {
       "Title": "Chronicle Sync",
       "OpenSettings": "Open Settings",
       "NotConfigured": "Chronicle Sync is not configured.",
-      "NotConfiguredHint": "Go to Module Settings to enter your Chronicle URL, API key, and Campaign ID.",
-      "Tabs": {
+      "NotConfiguredHint": "Open Chronicle settings and paste a connect line from Chronicle.",
+      "Common": {
+        "Loading": "Loading...",
+        "LoadFailed": "Some data failed to load from Chronicle:",
+        "Retry": "Retry",
+        "Refresh": "Refresh"
+      },
+      "Overview": {
+        "OpenStat": "Open {label}",
+        "NeedsAttention": "Needs Attention",
+        "AllClear": "Everything's in sync — nothing needs your attention.",
+        "QuickActions": "Quick Actions",
+        "SyncEverything": "Sync Everything Now",
+        "StatEntities": "Entities Synced",
+        "StatCharacters": "Characters Synced",
+        "StatMaps": "Maps Linked",
+        "Disconnected": "Disconnected",
+        "Never": "Never",
+        "LastSync": "Last sync: {time}",
+        "Paused": "Sync is paused until the connection is restored.",
+        "NotConnected": "Not connected to Chronicle. Reconnect above, or open Diagnostics to see why.",
+        "CharactersUnmatchedOne": "{count} character couldn't be matched to Chronicle.",
+        "CharactersUnmatchedMany": "{count} characters couldn't be matched to Chronicle.",
+        "MembersUnmappedOne": "{count} campaign member not mapped to a Foundry user.",
+        "MembersUnmappedMany": "{count} campaign members not mapped to a Foundry user.",
+        "CalendarRebuilding": "Chronicle’s calendar is being rebuilt — calendar sync is paused. Other sync is unaffected.",
+        "CalendarPausedReason": "Calendar sync paused — {reason}",
+        "CalendarPaused": "Calendar sync paused — see the Calendar tab.",
+        "CalendarOutOfSync": "Calendar date is out of sync with Chronicle.",
+        "NoSystem": "No matching game system — character fields may not sync.",
+        "ErrorsOne": "{count} recent sync error — see Diagnostics.",
+        "ErrorsMany": "{count} recent sync errors — see Diagnostics."
+      },
+      "Health": {
+        "NoneValue": "None",
+        "MatchedLine": "{system} — Matched",
+        "NoMatchLine": "No match — check Packages & Campaign Settings",
+        "Uptime": "Uptime",
+        "ApiOk": "API OK",
+        "ApiErrors": "API Errors",
+        "Reconnects": "Reconnects",
+        "LastSuccess": "Last Success",
+        "LastError": "Last Error",
+        "PendingRetries": "Pending Retries",
+        "OperationsQueued": "{count} operations queued",
+        "FieldMapping": "Field Mapping",
+        "Adapter": "Adapter",
+        "CharacterType": "Character Type",
+        "SyncCapability": "Sync Capability",
+        "CapabilityIntro": "Compares what a Foundry actor exposes against what Chronicle currently syncs.",
+        "AutoPickedLead": "Auto-picked",
+        "AutoPickedMid": "(the first",
+        "AutoPickedTail": "actor) — pick a different one below to inspect it.",
+        "InspectingLead": "Inspecting",
+        "InspectingMid": "(type",
+        "InspectingTail": ").",
+        "InspectActor": "Inspect actor",
+        "SyncedMark": "✓ synced",
+        "Synced": "Synced",
+        "SyncedOfDeclared": "{synced} / {total} declared",
+        "CollectionMapped": "Collection-mapped (items)",
+        "DeclaredUnmapped": "Declared, unmapped",
+        "MappedMissing": "Mapped, missing on actor",
+        "AvailableUnmapped": "Available, not mapped",
+        "Collections": "Collections (items/effects)",
+        "GapWithDetail": "{label} — {detail}",
+        "CopyCapability": "Copy Capability Report",
+        "CopyJson": "Copy JSON",
+        "NoRepresentative": "No representative actor available to sample.",
+        "NoRepresentativeError": "No representative actor available to sample ({error}).",
+        "ErrorLog": "Error Log",
+        "DiagnosticBundle": "Diagnostic Bundle",
+        "DiagnosticBundleHint": "One copy-paste troubleshooting report — versions, connection health, sync status, capability, and recent activity/errors. Paste into a bug report or the admin AI.",
+        "CopyDiagnosticBundle": "Copy Diagnostic Bundle",
+        "SystemDebugExport": "System Debug Export",
+        "SystemDebugExportHint": "Copy a snapshot of your Foundry system data to the clipboard. Paste this into Claude AI to help build a Chronicle system adapter for your game system.",
+        "CopySystemDebug": "Copy System Debug to Clipboard"
+      },
+      "History": {
+        "SearchPlaceholder": "Search names, people, calls",
+        "SearchLabel": "Search history",
+        "Direction": "Direction",
+        "Both": "Both ways",
+        "ToFoundry": "→ To Foundry",
+        "ToChronicle": "→ To Chronicle",
+        "Connects": "Connects",
+        "FailuresOnly": "Failures only"
+      },
+      "Rail": {
+        "Overview": "Overview",
+        "Everyday": "Everyday",
         "Entities": "Entities",
-        "Shops": "Shops",
-        "Maps": "Maps",
         "Characters": "Characters",
-        "Members": "Members",
         "Calendar": "Calendar",
-        "Status": "Status"
+        "Library": "Library",
+        "Maps": "Maps",
+        "Shops": "Shops",
+        "Diagnostics": "Diagnostics",
+        "IssuesBadge": "{count} character(s) need a match"
+      },
+      "Diagnostics": {
+        "Health": "Health",
+        "Reports": "Player reports",
+        "History": "History",
+        "Connection": "Connection"
       },
       "Entities": {
+        "PullAllHint": "Pull all Chronicle-only entities",
+        "PushAllHint": "Push all Foundry-only journals",
+        "RefreshData": "Refresh data",
+        "SyncedCount": "{count} synced",
+        "ChronicleOnlyCount": ", {count} Chronicle-only",
+        "FoundryOnlyStatus": "Foundry-only",
+        "NoMatch": "No entities match \"{search}\".",
         "PullAll": "Pull All",
         "PushAll": "Push All",
         "Refresh": "Refresh",
@@ -202,6 +340,7 @@
         "ConfirmDelete": "Permanently delete {count} selected entities from Chronicle? This cannot be undone."
       },
       "Maps": {
+        "CountsTitle": "{markers} markers / {drawings} drawings / {tokens} tokens",
         "ChronicleMaps": "Chronicle Maps",
         "OpenInFoundry": "Open in Foundry",
         "OpenInFoundryHint": "Open the materialized journal entry for this map",
@@ -226,6 +365,7 @@
         "DismissErrorsHint": "Clear the recent map-sync error log"
       },
       "Shops": {
+        "PrivateDmOnly": "Private (DM only)",
         "Open": "Open",
         "Synced": "Synced",
         "NoShops": "No shops found in this campaign.",
@@ -234,39 +374,48 @@
         "NoShopTypeHint": "Add a \"Shop\" entity type to your campaign in Chronicle."
       },
       "Calendar": {
+        "DayMonth": "Day {day}, Month {month}",
+        "Year": "Year {year}",
+        "Weather": "Weather",
+        "Season": "Season",
+        "Era": "Era",
+        "PhaseChanged": "phase changed",
+        "RebuildingHint": "Calendar sync is paused for this session. Journals, maps, characters and items are unaffected.",
+        "UnreachableTitle": "Chronicle's calendar API did not respond.",
+        "UnreachableHint": "Other sync is unaffected. Check the Diagnostics tab for the failing request.",
         "Chronicle": "Chronicle",
         "NoCalendar": "No calendar configured for this campaign in Chronicle.",
-        "Disabled": "Calendar sync is disabled. Enable it in Module Settings.",
+        "Disabled": "Calendar sync is off. Turn it on in Chronicle settings, under What syncs.",
         "WorldStateTitle": "Chronicle world state",
         "WorldStateHint": "Latest weather, season, era and moon phases received from Chronicle this session. Display only.",
         "WorldStateEmpty": "No world-state broadcasts received yet this session."
       },
       "Characters": {
+        "MatchSelectTitle": "Match to an existing Chronicle character",
+        "MatchOption": "— Match to existing… —",
+        "Match": "Match",
+        "MatchHint": "Link to the selected character and push this actor's data",
+        "CreateNew": "Create new",
+        "CreateNewHint": "Create a new Chronicle character of the correct type and link it",
+        "ClaimingHint": "Enable <strong>Player Character Claiming</strong> in Chronicle to sync player claims.",
+        "PushAllHint": "Push all unlinked actors to Chronicle",
+        "Resync": "Re-sync",
+        "ResyncHint": "Re-push this actor's current data to Chronicle",
+        "NoMatchingSystem": "No Chronicle system matches your Foundry game system",
+        "PackageHint": "Is the game system package installed in Chronicle? (Admin → Packages)",
+        "EnabledHint": "Is it enabled for this campaign? (Campaign Settings → Game System)",
+        "ConsoleHint": "Check the browser console for detailed diagnostics.",
         "Synced": "Synced",
         "NotLinked": "Not linked",
         "Push": "Push",
         "NoActors": "No character actors found.",
         "NoActorsHint": "Create character actors in Foundry or character entities in Chronicle.",
         "Disabled": "Character sync is disabled.",
-        "DisabledHint": "Enable \"Sync Characters\" in Module Settings to sync actors with Chronicle.",
+        "DisabledHint": "Turn on Characters in Chronicle settings, under What syncs, to sync actors with Chronicle.",
         "NoSystem": "Character sync requires a matching game system.",
-        "NoSystemHint": "Your Foundry system must match a Chronicle game system with character field templates."
+        "NoSystemHint": "Your Foundry system must match a Chronicle game system with character field templates.",
+        "NeedMatch": "Needs a match"
       },
-      "Members": {
-        "Title": "Permission Mapping",
-        "Intro": "Map each Chronicle campaign member to a Foundry user so per-player permissions sync. Unmatched members are skipped — their per-player grants won't sync in either direction until mapped.",
-        "FoundryUser": "Foundry user",
-        "Matched": "Matched",
-        "Unmatched": "UNMATCHED",
-        "Refresh": "Refresh Members",
-        "RefreshHint": "Re-fetch campaign members from Chronicle and re-run auto-match",
-        "ClaimUnmapped": "Owns a character, no Foundry user",
-        "ClaimUnmappedWarning": "{count} player(s) own a character in Chronicle but have no Foundry user mapped, so they cannot play it in Foundry until you map them below.",
-        "UnmatchedWarning": "{count} Chronicle member(s) are not mapped to a Foundry user. Their per-player permissions will NOT sync until you map them below.",
-        "NoMembers": "No campaign members loaded.",
-        "NoMembersHint": "Members load when sync connects. Use Refresh Members to fetch them now."
-      },
-      "OfflineWarning": "Sync messages are queued while disconnected, but the queue is limited. Extended offline periods may cause missed updates — use Pull All after reconnecting to ensure consistency.",
       "StatusTab": {
         "Connection": "Connection",
         "EntitiesSynced": "Entities Synced",
@@ -455,7 +604,7 @@
           "Tried": "Fetched the campaign manifest from {url}.",
           "Happened": "The fetch failed before reaching Chronicle: {error}.",
           "Cause": "Foundry could not reach Chronicle at all — typically a DNS, TLS, CORS, or firewall problem.",
-          "Action": "Verify your Chronicle URL in the module settings, then open the install URL in a browser to confirm it is reachable from this host."
+          "Action": "Verify your Chronicle address in Chronicle settings, then open the install URL in a browser to confirm it is reachable from this host."
         },
         "Parse": {
           "Tried": "Fetched the campaign manifest from {url}.",
@@ -484,6 +633,34 @@
         "Message": "Your install URL is no longer valid. Copy the current Module Install URL from Chronicle's Campaign Settings → Integrations and reinstall this module to recover."
       }
     },
+    "States": {
+      "Loading": "Loading",
+      "CantReach": "Can't reach Chronicle",
+      "LoadFailed": "Some of it didn't load",
+      "TryAgain": "Try again"
+    },
+    "Keybindings": {
+      "OpenDashboard": {
+        "Name": "Open the Chronicle Sync dashboard",
+        "Hint": "GM only."
+      },
+      "OpenDMScreen": {
+        "Name": "Open the DM Screen",
+        "Hint": "GM only. Works once the world is connected to Chronicle."
+      },
+      "OpenNotebook": {
+        "Name": "Open my Chronicle notebook",
+        "Hint": "Works once the world is connected to Chronicle."
+      },
+      "OpenCalendar": {
+        "Name": "Open the Chronicle calendar",
+        "Hint": "Works once the world is connected to Chronicle."
+      },
+      "OpenQuests": {
+        "Name": "Open the quest board",
+        "Hint": "Works once the world is connected to Chronicle."
+      }
+    },
     "SceneControl": {
       "Notebook": "Open my Chronicle notebook",
       "Calendar": "Open the Chronicle calendar",
@@ -501,6 +678,8 @@
       "Retry": "Try again",
       "Loading": "Loading…",
       "NoBoards": "No quest boards yet. Add a Notice boards block to the Quests category or a place page in Chronicle.",
+      "NoBoardsTitle": "No quest boards yet",
+      "EmptyBoardTitle": "Nothing pinned yet",
       "EmptyBoard": "Nothing is pinned to this board yet.",
       "PrevBoard": "Previous board",
       "NextBoard": "Next board",
@@ -565,6 +744,8 @@
     },
     "DMScreen": {
       "Title": "DM Screen",
+      "WorldEmptyTitle": "No world state yet",
+      "WorldEmpty": "Add a calendar or turn on the Armory to see the world's date and game state here.",
       "Skip": "Click anywhere to skip",
       "Retry": "Try again",
       "Error": {
@@ -676,10 +857,6 @@
       "Deleted": "Deleted {count} item(s) in Chronicle.",
       "Kept": "Kept {count} item(s) in Chronicle."
     },
-    "JournalPush": {
-      "TypeLabel": "Page type for journals made in Foundry",
-      "TypeHint": "A journal you create in Foundry becomes a Chronicle page of this type."
-    },
     "CalendarDatePush": {
       "Rejected": "Chronicle won't accept this date: its calendar has different months or leap days. Date sync is paused.",
       "Forbidden": "Only the campaign owner's key can change Chronicle's date. Date sync is paused.",
@@ -770,6 +947,132 @@
       "Linked": "Chronicle: {name} is now linked to the page \"{page}\".",
       "LinkHero": "{name} is a hero kept in step by character sync, so it stays linked to its own page.",
       "LinkFailed": "Chronicle: couldn't link the token to that page."
+    },
+    "ConnectionTest": {
+      "Missing": "Fill in the Chronicle address, API key and campaign first, or paste a connect line.",
+      "Cors": "Chronicle is refusing requests from this Foundry address. Ask your Chronicle admin to allow {origin}.",
+      "Unreachable": "Chronicle isn't answering at {url}. Check the address and that Chronicle is running.",
+      "Reachable": "Chronicle answers",
+      "AuthOk": "Key accepted",
+      "AuthFailed": "The API key was refused. Make a new connect line in Chronicle.",
+      "Forbidden": "The API key is missing a permission. It needs Read, Write and Sync.",
+      "CampaignMissing": "No campaign with the id {campaignId}.",
+      "RateLimited": "Chronicle is limiting requests right now. Try again in a moment.",
+      "HttpError": "Chronicle answered {status} {statusText}.",
+      "CampaignOk": "Campaign found",
+      "SystemMatched": "Game system matched: {name}",
+      "SystemDisabled": "Game system \"{name}\" is in Chronicle but not turned on for this campaign.",
+      "SystemNoMatch": "No Chronicle game system matches Foundry's \"{foundryId}\". Chronicle has: {available}",
+      "NoSystems": "No game systems are installed in Chronicle.",
+      "Testing": "Testing…"
+    },
+    "SettingsWindow": {
+      "Title": "Chronicle settings",
+      "MenuName": "Chronicle settings",
+      "MenuLabel": "Open Chronicle settings",
+      "MenuHint": "Connection, what syncs, calendar messages, players and advanced options.",
+      "Tabs": {
+        "Connection": "Connection",
+        "Sync": "What syncs",
+        "Calendar": "Calendar",
+        "Players": "Players",
+        "Advanced": "Advanced"
+      },
+      "Connected": "Connected",
+      "NotSetUp": "Not set up yet",
+      "ConnectLine": "Connect line",
+      "ConnectLineHint": "In Chronicle: your campaign, then Manage, Apps and game system, Foundry VTT, Make a connect line. Kept in this browser only.",
+      "ByHand": "Enter details by hand",
+      "Address": "Chronicle address",
+      "ApiKey": "API key",
+      "ApiKeySaved": "Saved in this browser. Type a new key to replace it.",
+      "ApiKeyHint": "Needs Read, Write and Sync. Kept in this browser only.",
+      "Campaign": "Campaign",
+      "CheckItWorks": "Check it works",
+      "TestConnection": "Test connection",
+      "SyncOn": "Sync is on",
+      "SyncOnHint": "Turning this off pauses everything below without losing your choices.",
+      "WhatComesAcross": "What comes across",
+      "Direction": "Direction",
+      "Both": "Both ways",
+      "Pull": "From Chronicle",
+      "Push": "From Foundry",
+      "Parts": {
+        "journals": {
+          "Name": "Journals",
+          "Hint": "Chronicle pages become Foundry journals"
+        },
+        "maps": {
+          "Name": "Maps",
+          "Hint": "Chronicle maps open in an interactive viewer"
+        },
+        "calendar": {
+          "Name": "Calendar",
+          "Hint": "Date, weather, season and era"
+        },
+        "characters": {
+          "Name": "Characters",
+          "Hint": "Actors and their Chronicle characters"
+        },
+        "shops": {
+          "Name": "Shops",
+          "Hint": "Shop rooms and stock"
+        }
+      },
+      "Creatures": {
+        "Name": "Creatures",
+        "Hint": "Creature pages become NPC actors, for game systems whose Chronicle package maps creatures"
+      },
+      "TellMe": "Tell me in chat when",
+      "AnnounceHint": "A whisper to you only. Players never see it.",
+      "Announce": {
+        "calendarAnnounceWeather": "The weather changes",
+        "calendarAnnounceWorldstate": "The world's mood changes",
+        "calendarAnnounceSeasonEra": "A season or era turns",
+        "calendarAnnounceMoon": "A moon changes phase"
+      },
+      "MoonHint": "Off by default: with several moons this can be often.",
+      "NewJournals": "New journals",
+      "PlayersCan": "Players can",
+      "Ownership": {
+        "0": "Not see them",
+        "1": "See only the title",
+        "2": "See them",
+        "3": "Edit them"
+      },
+      "DmOnlyHidden": "Hide GM-only pages from players",
+      "SyncPermissions": "Follow Chronicle's visibility",
+      "SyncPermissionsHint": "Who can see a page in Foundry follows who can see it in Chronicle.",
+      "LinkPlayers": "Link players to Chronicle",
+      "LinkPlayersHint": "Match each Chronicle member to their Foundry player, so who can see a page and who owns a character carry across.",
+      "RefreshMembers": "Fetch members again",
+      "MemberNotLinked": "Not linked",
+      "MemberLinked": "Linked",
+      "MemberOwnsCharacter": "Owns a character, not linked",
+      "MemberFoundryUser": "Foundry player for {name}",
+      "NoMembers": "No members yet. Connect, then fetch members again.",
+      "NewPageType": "New Foundry journals go to Chronicle as",
+      "NewPageTypeHint": "The page type a journal made in Foundry becomes in Chronicle.",
+      "StartImport": "Bring this world into Chronicle",
+      "WhenBoth": "When both sides changed",
+      "Conflict": {
+        "chronicle": "Chronicle wins",
+        "foundry": "Foundry wins",
+        "newest": "Newest wins"
+      },
+      "AutoSync": "Sync changes as they happen",
+      "AutoSyncHint": "Off means changes wait until you press Sync now in the dashboard.",
+      "ExcludeTags": "Leave out pages tagged",
+      "ExcludeTagsHint": "Separate tags with commas.",
+      "ExcludeNames": "Leave out names containing",
+      "NothingLeftOut": "Nothing left out",
+      "SkipSanitize": "Skip HTML clean-up",
+      "SkipSanitizeHint": "Chronicle already cleans pages. Leave this off unless asked to turn it on.",
+      "Cancel": "Cancel",
+      "Save": "Save",
+      "Saved": "Chronicle settings saved.",
+      "SaveFailed": "Chronicle settings weren't saved: {message}",
+      "ReloadToConnect": "Connection changed. Reload Foundry to connect with it."
     }
   }
 }

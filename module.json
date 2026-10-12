@@ -22,13 +22,15 @@
     "scripts/module.mjs"
   ],
   "styles": [
+    "styles/tokens.css",
     "styles/chronicle-sync.css",
     "styles/import-wizard.css",
     "styles/map-viewer.css",
     "styles/map-frames.css",
     "styles/stashes.css",
     "styles/dm-screen.css",
-    "styles/quests.css"
+    "styles/quests.css",
+    "styles/sky-clock.css"
   ],
   "languages": [
     {

@@ -12,18 +12,18 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
   (serving descriptor, schema v1) — cross-validated by
   `tools/check-package-descriptor.mjs`.
 - `scripts/*.mjs`: sync (`journal-sync`+`picture-store`, `map-sync`+`map-viewer`+`map-sheet-items`,
-  `calendar-sync`+`calendar-bar`, `actor-sync`,
+  `calendar-sync`+`calendar-bar`+`sky-clock`, `actor-sync`, `creature-sync`,
   `item-sync`, `stash-sync`+`stash-client`), UI (`sync-dashboard`, `npc-presence`, `negotiation-mirror`, `_player-report` (the GM's client reports the world's players to Chronicle),
-  `sync-diagnostic-bundle`, `update-info`, `gm-secret-view`, `character-claim-indicator`,
+  `sync-diagnostic-bundle`, `avatar-sync`, `sync-history-tab`, `update-info`, `chronicle-settings` (the GM's tabbed settings window), `gm-secret-view`, `character-claim-indicator`,
   `capability-inspector`, `import-wizard`, `shop-widget`+`shop-room-window`, `player-notebook`, `stash-window`+`stash-chat`, `quest-board` (Chronicle's quest boards and sheets; the GM's client reads for players)), core (`module`,
-  `settings`, `constants`, `logger`, `sync-manager`, `api-client`),
+  `settings`, `motion`, `vendor-chronicle`, `constants`, `logger`, `sync-manager`, `api-client`),
   `adapters/generic-adapter.mjs`. `.ai.md` has what each does. `_*.mjs` are
   pure helpers, each unit-tested by its own `tools/test-*.mjs`.
 - `vendor/chronicle/`: Chronicle's shop room widget, copied unchanged; a
   Chronicle change to it means copying it again (`tools/test-shop-room.mjs`).
 - `scripts/dm-screen.mjs` (UI): the GM's DM Screen window, drawn from
   Chronicle's `GET /dm-screen`.
-- `scripts/debug-hub.mjs` (UI): the dashboard's Debug tab and player
+- `scripts/debug-hub.mjs` (UI): the dashboard's player reports (under Diagnostics) and player
   problem reports.
 - `templates/` Handlebars, `styles/` CSS, `lang/en.json` strings,
   `tools/test-*.mjs` (Node's test runner, see TESTING.md).
@@ -45,6 +45,7 @@ Install/update flow: also `.ai.md` → "Chronicle Integration — Install & Upda
 
 - **ES modules** (`.mjs`), `export default class` pattern.
 - **Comments say why, briefly**, pointing at a test/issue for more — no incident stories, task IDs, dates or `file:line` (those go in the PR). Deferred work is `TODO(#issue)`. CI checks new comments with `tools/check-comment-clutter.sh` (self-test `tools/test-comment-clutter.sh`).
+- **Tool windows take colours from `styles/tokens.css`** (`--cs-*`, a light and a dark set that follow Foundry's theme), never dark-only literals. Paper is a player-facing touch, not the default: only the quest notices and sheet, the player notebook and the shop room keep their own palettes. `tools/test-colour-tokens.mjs`.
 - `_syncing` guard against infinite loops: a boolean.
 - Adapters implement `toChronicleFields()`/`fromChronicleFields()`; REST uses Bearer auth via `api-client.mjs`.
 - **API key is CLIENT-scoped, never world-scoped** (a world setting syncs to every client). `migrateApiKeyToClientScope()` migrates legacy values. `tools/test-api-key-scope.mjs`.

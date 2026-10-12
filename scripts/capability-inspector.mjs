@@ -15,6 +15,7 @@
  */
 
 import { identityFieldDefs } from './_identity-item-plan.mjs';
+import { getNestedValue, normalizeFoundryValue } from './adapters/generic-adapter.mjs';
 
 // Cap recursion so a deep/cyclic system object can't run away. Draw Steel's
 // hero.system is shallow; 4 covers it with headroom.
@@ -66,9 +67,11 @@ export function walkSchema(obj, prefix = '', maxDepth = DEFAULT_MAX_DEPTH) {
  * the inspector panel degrades gracefully instead of throwing.
  *
  * @param {object} actor - a Foundry Actor (or test double exposing the same shape)
+ * @param {object} [fieldDefs] - the character-field manifest; each mapped
+ *   foundry_path is read off the live actor exactly as sync reads it
  * @returns {object} snapshot
  */
-export function captureActorSnapshot(actor) {
+export function captureActorSnapshot(actor, fieldDefs) {
   try {
     if (!actor) return { ok: false, error: 'no actor available to sample' };
 
@@ -96,6 +99,7 @@ export function captureActorSnapshot(actor) {
 
     return {
       ok: true,
+      mapped: readMappedPaths(actor, fieldDefs),
       actorId: actor.id ?? null,
       actorName: actor.name ?? '(unnamed)',
       actorType: actor.type ?? null,
@@ -107,6 +111,32 @@ export function captureActorSnapshot(actor) {
   } catch (err) {
     return { ok: false, error: (err && err.message) || String(err) };
   }
+}
+
+/**
+ * Reads each mapped foundry_path off the live actor the way sync does. The
+ * schema walk sees only the stored source, so it misses values the game system
+ * derives (Draw Steel's stamina.max, winded, potency), paths outside `system`
+ * (prototypeToken, statuses) and paths that hold a whole object; sync sends
+ * all of those.
+ * @returns {Object<string, {type: string, sample: *}>}
+ */
+function readMappedPaths(actor, fieldDefs) {
+  const out = {};
+  const defs = (fieldDefs && Array.isArray(fieldDefs.fields)) ? fieldDefs.fields : [];
+  for (const f of defs) {
+    if (!f || !f.foundry_path || out[f.foundry_path]) continue;
+    try {
+      const value = normalizeFoundryValue(getNestedValue(actor, f.foundry_path));
+      if (value === undefined) continue;
+      const row = walkSchema({ v: value }, '', 2)[0];
+      if (row && row.path === 'v') out[f.foundry_path] = { type: row.type, sample: row.sample };
+      else if (value && typeof value === 'object') out[f.foundry_path] = { type: 'object', sample: `{${Object.keys(value).length}}` };
+    } catch (err) {
+      // An unreadable path stays missing.
+    }
+  }
+  return out;
 }
 
 /**
@@ -227,7 +257,8 @@ export function buildCapabilityReport(snapshot, fieldDefs) {
       continue;
     }
     mappedPaths.add(f.foundry_path);
-    const avail = availByPath.get(f.foundry_path);
+    // What sync actually reads wins over the stored source.
+    const avail = (snapshot.mapped && snapshot.mapped[f.foundry_path]) || availByPath.get(f.foundry_path);
     rows.push({
       status: avail ? CAP_STATUS.SYNCED : CAP_STATUS.MAPPED_MISSING,
       key: f.key,

@@ -1,5 +1,5 @@
 /**
- * The History tab's rows: Chronicle's sync history (`GET /sync/history`)
+ * The History pane's rows: Chronicle's sync history (`GET /sync/history`)
  * drawn in the same Trace look as Chronicle's Manage › Sync history page.
  * Built as plain node descriptions, so it is testable without a DOM.
  * `tools/test-history-view.mjs`.
@@ -20,6 +20,21 @@ export function h(tag, cls, attrs, children) {
     node.children.push(typeof c === 'object' ? c : { text: String(c) });
   }
   return node;
+}
+
+/** The shared empty / can't-reach block (see "SHARED STATES" in the stylesheet). */
+export function stateNode(icon, title, text, { error = false } = {}) {
+  return h('div', error ? 'cs-state is-error' : 'cs-state', error ? { role: 'alert' } : null, [
+    h('i', `fa-solid fa-${icon}`, { 'aria-hidden': 'true' }),
+    h('b', '', null, title),
+    h('p', '', null, text),
+  ]);
+}
+
+/** The shared loading skeleton. */
+export function loadingNode(label = 'Loading') {
+  return h('div', 'cs-loading', { role: 'status', 'aria-label': label },
+    [h('div', 'cs-skel'), h('div', 'cs-skel'), h('div', 'cs-skel')]);
 }
 
 /** Build DOM from node descriptions. */
@@ -121,9 +136,9 @@ function row(ev, child) {
  */
 export function buildHistoryRows(events, { filtered = false, now = new Date() } = {}) {
   if (!events.length) {
-    return [h('p', 'sh-empty', null, filtered
-      ? 'Nothing matches. Clear the search or the filters to see everything.'
-      : 'Nothing has synced yet. Changes appear here as soon as they sync.')];
+    return [filtered
+      ? stateNode('magnifying-glass', 'Nothing matches', 'Clear the search or the filters to see everything.')
+      : stateNode('clock-rotate-left', 'Nothing has synced yet', 'Changes appear here as soon as they sync.')];
   }
   let last = '';
   const out = [];

@@ -5,9 +5,10 @@
  * Helps users scan their Foundry world, map content to Chronicle entity types,
  * assign tags, configure character mapping, and execute a bulk import.
  *
- * Launched from the "Setup Wizard" button in the sync dashboard Config tab.
+ * Launched from the "Setup Wizard" button in Chronicle settings, under Connection.
  */
 
+import { noticeText } from './_escape-html.mjs';
 import { getSetting, setSetting } from './settings.mjs';
 import { FLAG_SCOPE, REPORT_STORE_FLAG } from './constants.mjs';
 import { DEFAULT_ICON, toIconName } from './_icon-name.mjs';
@@ -778,7 +779,7 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
         this._typeMappings[mappingIndex].isNew = true;
       }
     } catch (err) {
-      ui.notifications.error(`Failed to create entity type: ${err.message}`);
+      ui.notifications.error(`Failed to create entity type: ${noticeText(err.message)}`);
     }
 
     this._newTypeForm = null;

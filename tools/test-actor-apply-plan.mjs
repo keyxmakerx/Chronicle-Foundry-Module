@@ -55,6 +55,6 @@ test('ActorSync applies through the plan, with the apply option', () => {
   const apply = src.slice(src.indexOf('async _updateActorFromEntity'), src.indexOf('async _onCharacterDeleted'));
   // A stale copy still returns before anything is planned or written.
   assert.ok(apply.indexOf('_olderThanRecorded') < apply.indexOf('planActorApply'));
-  assert.match(apply, /actor\.update\(changes, \{ \.\.\.SYNC_OPTIONS, \[APPLY_OPTION\]: true \}\)/);
+  assert.match(apply, /actor\.update\(changes, syncOptions\(\{ \[APPLY_OPTION\]: true \}\)\)/);
   assert.match(src, /if \(this\._syncing \|\| options\?\.\[APPLY_OPTION\]\) return;/);
 });

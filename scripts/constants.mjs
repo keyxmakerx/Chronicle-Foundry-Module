@@ -15,11 +15,18 @@ export const MODULE_ID = 'chronicle-sync';
 export const REPORT_STORE_FLAG = 'problemReportsStore';
 
 /**
- * Option marker on every document write sync itself makes. The Foundry hooks
- * ignore a write that carries it, so only sync's own echoes are dropped and a
- * GM edit made while sync is writing something else still pushes.
+ * Options for every document write sync itself makes, marked so the Foundry
+ * hooks ignore it: only sync's own echoes are dropped, and a GM edit made
+ * while sync is writing something else still pushes. A fresh object each
+ * call, because Foundry 14 writes into the options it is given (`parent`,
+ * `action`), which throws on a frozen object and would leak between writes
+ * on a shared one. `tools/test-sync-options.mjs`.
+ * @param {object} [extra] - More options for this one write.
+ * @returns {object}
  */
-export const SYNC_OPTIONS = Object.freeze({ chronicleSync: true });
+export function syncOptions(extra) {
+  return { chronicleSync: true, ...extra };
+}
 
 /** Write option marking an actor or embedded-item change as applied from Chronicle, so the update hooks do not push it back. */
 export const APPLY_OPTION = 'chronicleSyncApply';

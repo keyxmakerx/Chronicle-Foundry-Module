@@ -114,7 +114,7 @@ test('describeCampaignIdError messages distinguish empty, whitespace, non-UUID, 
 
   // All point to the same operator-resolution path.
   for (const m of [empty, whitespace, nonUuid, nonString]) {
-    assert.ok(m.includes('Module Settings'), `error message must direct operator to Module Settings: ${m}`);
+    assert.ok(m.includes('Chronicle settings'), `error message must direct operator to Chronicle settings: ${m}`);
   }
 });
 

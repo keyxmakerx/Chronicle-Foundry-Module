@@ -14,10 +14,11 @@
  * determines which Foundry actor type to sync.
  */
 
+import { noticeText } from './_escape-html.mjs';
 import { getSetting, getUserMappings } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
 import { createGenericAdapter } from './adapters/generic-adapter.mjs';
-import { FLAG_SCOPE, SYNC_OPTIONS, APPLY_OPTION } from './constants.mjs';
+import { FLAG_SCOPE, syncOptions, APPLY_OPTION } from './constants.mjs';
 import { planClaimOwnership } from './_claim-ownership-plan.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { walkEntityPages, unwrapEntityList } from './_entity-page-walk.mjs';
@@ -231,7 +232,7 @@ export class ActorSync {
     await this._reconcileClaimOwnership();
 
     // Surface unresolved character links (broken / missing) so the GM can
-    // fix them in the dashboard's Issues tab rather than silently desyncing.
+    // fix them in the dashboard's Characters section rather than silently desyncing.
     try {
       await this._notifySyncIssues({ quick: feed?.mode === 'delta' });
     } catch (err) {
@@ -300,18 +301,18 @@ export class ActorSync {
       if (plan.grantUserId) {
         await actor.update(
           { ownership: { [plan.grantUserId]: CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3 } },
-          { ...SYNC_OPTIONS, [APPLY_OPTION]: true }
+          syncOptions({ [APPLY_OPTION]: true })
         );
       }
       for (const staleId of plan.staleOwnerUserIds) {
         ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.PreviousOwnerKept', {
-          actor: actor.name,
-          player: game.users?.get?.(staleId)?.name ?? staleId,
+          actor: noticeText(actor.name),
+          player: noticeText(game.users?.get?.(staleId)?.name ?? staleId),
         }));
       }
       if (plan.unmapped && !this._unmappedNoticed.has(ownerId)) {
         this._unmappedNoticed.add(ownerId);
-        ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.ClaimantUnmapped', { actor: actor.name }));
+        ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.ClaimantUnmapped', { actor: noticeText(actor.name) }));
       }
     } catch (err) {
       console.error(`Chronicle: could not apply the owner of "${actor.name}"`, err);
@@ -484,14 +485,14 @@ export class ActorSync {
       const { failed } = await applyIdentityPlan(actor, plan, game);
       if (failed.length) {
         ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.IdentityItemFailed', {
-          actor: actor.name,
-          fields: failed.join(', '),
+          actor: noticeText(actor.name),
+          fields: noticeText(failed.join(', ')),
         }));
       }
     } catch (err) {
       console.error(`Chronicle: identity items failed for "${actor.name}"`, err);
       ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.IdentityItemFailed', {
-        actor: actor.name,
+        actor: noticeText(actor.name),
         fields: '',
       }));
     }
@@ -535,7 +536,7 @@ export class ActorSync {
         actor,
       });
       if (Object.keys(changes).length > 0) {
-        await actor.update(changes, { ...SYNC_OPTIONS, [APPLY_OPTION]: true });
+        await actor.update(changes, syncOptions({ [APPLY_OPTION]: true }));
       }
 
       await this._applyIdentityItems(actor, entity);
@@ -835,7 +836,7 @@ export class ActorSync {
         // Re-pull from Chronicle.
         const entity = await this._api.get(`/entities/${entityId}`);
         if (entity) await this._updateActorFromEntity(actor, entity);
-        ui.notifications.warn(`Chronicle: Conflict on "${actor.name}" — kept Chronicle version.`);
+        ui.notifications.warn(`Chronicle: Conflict on "${noticeText(actor.name)}" — kept Chronicle version.`);
         return false;
       }
       // Force push.
@@ -844,7 +845,7 @@ export class ActorSync {
       if (forced?.updated_at) {
         await this._setActorFlag(actor, 'chronicleUpdatedAt', forced.updated_at);
       }
-      ui.notifications.warn(`Chronicle: Conflict on "${actor.name}" — kept Foundry version.`);
+      ui.notifications.warn(`Chronicle: Conflict on "${noticeText(actor.name)}" — kept Foundry version.`);
       return true;
     }
   }
@@ -943,10 +944,7 @@ export class ActorSync {
     try {
       const result = await this._api.get('/entity-types');
       const types = result?.data || result || [];
-      const match = types.find(
-        (t) => t.slug === this._adapter.characterTypeSlug
-          || t.name?.toLowerCase().includes('character')
-      );
+      const match = _pickCharacterType(types, this._adapter.characterTypeSlug);
       if (match) {
         this._characterTypeId = match.id;
         console.debug(`Chronicle: Character type resolved — "${match.name}" (ID: ${match.id})`);
@@ -1193,7 +1191,7 @@ export class ActorSync {
 
   /**
    * If any character actors can't be matched to Chronicle (broken / missing
-   * links), nudge the GM toward the dashboard's Issues tab. Quiet when all clear.
+   * links), nudge the GM toward the dashboard's Characters section. Quiet when all clear.
    *
    * `quick` (after a change-feed catch-up) counts unlinked character actors
    * without listing Chronicle: the catch-up has just unlinked any actor whose
@@ -1209,7 +1207,7 @@ export class ActorSync {
       if (!issues.length) return;
       const n = issues.length;
       ui.notifications?.warn(
-        `Chronicle Sync: ${n} character${n === 1 ? '' : 's'} need attention — open the Chronicle dashboard (Issues) to match or create.`
+        `Chronicle Sync: ${n} character${n === 1 ? '' : 's'} need attention — open the Chronicle dashboard (Characters) to match or create.`
       );
       console.warn(`Chronicle: ${n} character sync issue(s) detected`, issues);
     } catch (err) {
@@ -1341,6 +1339,32 @@ function _setNestedValue(obj, path, value) {
  * @param {number|string} parentTypeId
  * @returns {number|string|null}
  */
+/**
+ * Pick the Chronicle entity type that holds this world's characters.
+ *
+ * The type carrying the system's "character" preset owns the sheet, so it wins;
+ * Chronicle can move that preset from a system type onto "Characters" and turn
+ * the old type off, so a disabled type is never picked while an enabled one
+ * matches. Then the adapter's slug, then a name containing "character".
+ *
+ * Exported for unit tests.
+ *
+ * @param {object[]} types - Chronicle entity types (GET /entity-types).
+ * @param {string} slug    - The adapter's character type slug.
+ * @returns {object|null}
+ */
+export function _pickCharacterType(types, slug) {
+  if (!Array.isArray(types)) return null;
+  const enabled = types.filter((t) => t.enabled !== false);
+  for (const pool of [enabled, types]) {
+    const match = pool.find((t) => t.preset_category === 'character')
+      || pool.find((t) => t.slug === slug)
+      || pool.find((t) => t.name?.toLowerCase().includes('character'));
+    if (match) return match;
+  }
+  return null;
+}
+
 export function _findPcSubtypeId(types, parentTypeId) {
   if (!parentTypeId || !Array.isArray(types)) return null;
   const match = types.find((t) => {

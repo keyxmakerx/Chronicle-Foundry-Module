@@ -1,9 +1,11 @@
 /**
  * Chronicle Sync - Built-in calendar
  *
- * Chronicle's own calendar inside Foundry: a thin strip with the date, time
- * and weather over a tiny live sky, which anyone can drag anywhere or shrink
- * to a round clock (the spot is kept per person). Clicking the date opens the
+ * Chronicle's own calendar inside Foundry, in the look each person picks: a
+ * thin strip with the date, time and weather over a tiny live sky, which
+ * anyone can drag anywhere, or the Sky Clock (`sky-clock.mjs`), a glass globe
+ * in a corner. Either shrinks to a small globe (the spot, look and size are
+ * kept per person). Clicking the date opens the
  * month, where each day up to today shows its sky and weather. The GM's strip
  * has small arrows that step an hour, and the month has Set date and Add
  * event; all of it writes to Chronicle through CalendarSync. Players draw
@@ -12,9 +14,12 @@
  * Foundry document.
  */
 
+import { noticeText } from './_escape-html.mjs';
 import { getSetting, setSetting } from './settings.mjs';
 import { promptDialog } from './_dialogs.mjs';
 import { openCalendarWindow } from './player-notebook.mjs';
+import { currentMotion } from './motion.mjs';
+import { SkyClock } from './sky-clock.mjs';
 import {
   clampPlace, daySky, eventsOn, formatDate, formatTemperature, formatTime, isUsableSnapshot,
   monthGrid, monthName, moonIconClass, shiftMonth, skyGradient, skyParticles, weatherIconClass,
@@ -39,6 +44,8 @@ let source = null;
 let wid = null;
 /** @type {HTMLElement|null} */
 let popover = null;
+/** @type {SkyClock|null} the globe, while the calendar shows as one. */
+let globe = null;
 /** Month the open month view shows. */
 let shown = null;
 /** GM: events and day weather fetched for months outside the nearby window, keyed "y-m". */
@@ -60,7 +67,10 @@ function currentView() {
         calendar: v.calendar,
         date: v.date,
         season: info.current_season || null,
-        weather: w ? { label: w.preset_label || w.description, icon: w.icon, temperature_celsius: w.temperature_celsius } : null,
+        weather: w ? {
+          label: w.preset_label || w.description, icon: w.icon, temperature_celsius: w.temperature_celsius,
+          preset_id: w.preset_id, preset_label: w.preset_label, precipitation: w.precipitation,
+        } : null,
         moons: (info.current_moon_phases || []).map((m) => ({ name: m.moon_name, phase_name: m.phase_name, phase_icon: m.phase_icon })),
         events: v.events,
         dayWeather: v.dayWeather,
@@ -117,11 +127,6 @@ function stripHtml(v) {
     <button type="button" class="ccal-shrink" title="${esc(t('Shrink'))}" aria-label="${esc(t('Shrink'))}"><i class="fa-regular fa-clock"></i></button>`;
 }
 
-function dotHtml(v) {
-  const label = t('Clock', { date: formatDate(v.calendar, v.date), time: formatTime(v.calendar, v.date) });
-  return `<button type="button" class="ccal-dot" title="${esc(label)}" aria-label="${esc(label)}"><span class="ccal-sky"></span><i class="fa-regular fa-clock"></i></button>`;
-}
-
 /** The person's saved spot and size; per client so each player keeps their own. */
 function savedPlace() {
   const p = getSetting('calendarBarPlace');
@@ -144,13 +149,43 @@ function savePlace(patch) {
   });
 }
 
+/** The Sky Clock shows for the globe look, and for either look while shrunk. */
+function showsGlobe(place) {
+  return !!place.mini || getSetting('calendarLook') === 'globe';
+}
+
+function renderGlobe(v, place) {
+  wid?.remove(); wid = null; closeMonth();
+  if (!globe) {
+    globe = new SkyClock({
+      t: (key, data) => (data ? game.i18n.format(`CHRONICLE.SkyClock.${key}`, data) : game.i18n.localize(`CHRONICLE.SkyClock.${key}`)),
+      source,
+      savePlace,
+      motion: currentMotion,
+      // A shrunk calendar grows back to the person's look; the strip comes back with its month open.
+      grow: async () => {
+        await setSetting('calendarBarPlace', { ...savedPlace(), mini: false }).catch((err) => {
+          console.debug('Chronicle: saving the calendar size failed', err?.message);
+        });
+        renderCalendarBar();
+        if (getSetting('calendarLook') !== 'globe') openMonth();
+      },
+    });
+  }
+  globe.show(v, place);
+}
+
 /** Draw (or remove) the calendar for the current view. */
 export function renderCalendarBar() {
   const v = currentView();
   if (!v) {
     wid?.remove(); wid = null; closeMonth();
+    globe?.destroy(); globe = null;
     return;
   }
+  const place = savedPlace();
+  if (showsGlobe(place)) { renderGlobe(v, place); return; }
+  globe?.destroy(); globe = null;
   if (!wid) {
     wid = document.createElement('div');
     wid.id = 'chronicle-calendar-bar';
@@ -160,14 +195,11 @@ export function renderCalendarBar() {
     wid.addEventListener('click', onClick);
     wid.addEventListener('pointerdown', onDragStart);
   }
-  const place = savedPlace();
-  const mini = !!place.mini;
   v.locked = !!place.locked;
-  wid.classList.toggle('ccal-mini', mini);
   wid.classList.toggle('ccal-locked', v.locked);
   wid.classList.toggle('ccal-gm', v.gm);
   wid.style.setProperty('--ccal-sky', skyGradient(v.calendar, v.date.hour));
-  wid.innerHTML = mini ? dotHtml(v) : stripHtml(v);
+  wid.innerHTML = stripHtml(v);
   const sky = wid.querySelector('.ccal-sky');
   if (sky) sky.innerHTML = particlesHtml(skyParticles(v.calendar, v.date.hour, v.weather?.icon));
   applyPlace();
@@ -177,8 +209,8 @@ export function renderCalendarBar() {
 let drag = null;
 
 function onDragStart(ev) {
-  if (!ev.target.closest('.ccal-grip, .ccal-dot') || ev.button !== 0) return;
-  // Locked means it stays put; the clock still restores the strip on click.
+  if (!ev.target.closest('.ccal-grip') || ev.button !== 0) return;
+  // Locked means it stays put.
   if (savedPlace().locked) return;
   const box = wid.getBoundingClientRect();
   drag = { dx: ev.clientX - box.left, dy: ev.clientY - box.top, x0: ev.clientX, y0: ev.clientY, moved: false };
@@ -226,12 +258,6 @@ async function onClick(ev) {
   if (ev.target.closest('.ccal-shrink')) {
     closeMonth();
     savePlace({ mini: true });
-    return;
-  }
-  if (ev.target.closest('.ccal-dot')) {
-    // One click on the clock brings the strip back with the month open.
-    savePlace({ mini: false });
-    setTimeout(openMonth, 0);
     return;
   }
   if (ev.target.closest('.ccal-open')) {
@@ -426,7 +452,7 @@ async function addEventDialog(v) {
   if (!res) return;
   if (!res.name.trim()) { ui.notifications.warn(t('NameNeeded')); return; }
   const ok = await source.addEvent({ ...res, hour: Number.isFinite(res.hour) ? res.hour : undefined });
-  if (ok) ui.notifications.info(t('EventAdded', { name: res.name.trim() }));
+  if (ok) ui.notifications.info(t('EventAdded', { name: noticeText(res.name.trim()) }));
   else ui.notifications.warn(t('AddRefused'));
 }
 

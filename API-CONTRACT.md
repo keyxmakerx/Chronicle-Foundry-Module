@@ -152,39 +152,55 @@ Returns character preset field definitions with Foundry annotations.
 - `foundry_path` — Dot-notation path on `actor.system` (e.g., "system.abilities.str.value")
 - `foundry_writable` — Whether this field can be written back to Foundry (false = read-only from Foundry)
 
-##### Multi-Preset Systems (e.g., Draw Steel Creatures)
+#### GET /systems/:systemId/creature-fields
+Returns the system's creature preset (the first preset with category
+`creature`) in the character-fields shape, plus `foundry_pull_fields`. A
+system with no creature preset answers `{ "system_id", "fields": [] }`; an
+older Chronicle has no route (404). Both leave creature sync off.
 
-A system can expose multiple entity presets, each with its own
-`foundry_actor_type` and field mappings. Draw Steel: **hero** preset
-(`drawsteel-character`, type `"hero"`), **creature** preset
-(`drawsteel-creature`, type `"npc"`).
+**Used by:** `creature-sync.mjs` (with `_creature-fields.mjs`)
 
-**Expected creature preset response:**
+**Response (Draw Steel, trimmed):**
 ```json
 {
   "system_id": "drawsteel", "preset_slug": "drawsteel-creature",
   "preset_name": "Draw Steel Creature", "foundry_system_id": "draw-steel",
   "foundry_actor_type": "npc",
+  "foundry_pull_fields": ["stamina_current", "conditions_json"],
   "fields": [
-    { "key": "stamina_max", "label": "Stamina (Max)", "type": "number", "foundry_path": "system.stamina.max", "foundry_writable": false },
-    { "key": "stamina_value", "label": "Stamina (Current)", "type": "number", "foundry_path": "system.stamina.value", "foundry_writable": true },
-    { "key": "might", "label": "Might", "type": "number", "foundry_path": "system.characteristics.might.value", "foundry_writable": true },
-    { "key": "agility", "label": "Agility", "type": "number", "foundry_path": "system.characteristics.agility.value", "foundry_writable": true },
-    { "key": "reason", "label": "Reason", "type": "number", "foundry_path": "system.characteristics.reason.value", "foundry_writable": true },
-    { "key": "intuition", "label": "Intuition", "type": "number", "foundry_path": "system.characteristics.intuition.value", "foundry_writable": true },
-    { "key": "presence", "label": "Presence", "type": "number", "foundry_path": "system.characteristics.presence.value", "foundry_writable": true },
-    { "key": "speed", "label": "Speed", "type": "number", "foundry_path": "system.speed.value", "foundry_writable": true },
-    { "key": "stability", "label": "Stability", "type": "number", "foundry_path": "system.stability.value", "foundry_writable": true },
-    { "key": "level", "label": "Level", "type": "number", "foundry_path": "system.level", "foundry_writable": false },
-    { "key": "ev", "label": "EV", "type": "number", "foundry_path": "system.ev", "foundry_writable": false }
+    { "key": "organization", "label": "Organization", "type": "string",
+      "foundry_path": "system.monster.organization",
+      "foundry_choices": "DRAW_STEEL.monsters.organizations" },
+    { "key": "keywords", "label": "Keywords", "type": "string",
+      "foundry_path": "system.monster.keywords", "foundry_format": "set",
+      "foundry_choices": "DRAW_STEEL.monsters.keywords" },
+    { "key": "size", "label": "Size", "type": "string",
+      "foundry_path": "system.combat.size", "foundry_format": "size" },
+    { "key": "free_strike", "label": "Free Strike", "type": "string",
+      "foundry_path": "system.monster.freeStrike", "foundry_format": "integer" },
+    { "key": "stamina_current", "label": "Current Stamina", "type": "number",
+      "foundry_path": "system.stamina.value" },
+    { "key": "conditions_json", "label": "Conditions Data", "type": "string",
+      "foundry_path": "statuses" }
   ]
 }
 ```
 
-> **Current limitation:** the generic adapter (`generic-adapter.mjs`) and
-> `actor-sync.mjs` support only **one preset per system** — with primary
-> preset `drawsteel-character`, entities of slug `drawsteel-creature` won't
-> sync. Needs the adapter to load multiple presets and route by `type_slug`.
+**Creature-only keys:**
+- `foundry_choices` — a path in Foundry's `CONFIG`; the page's value (a key
+  or a label) is stored as that list's key. No match leaves the field unset.
+- `foundry_format` — `set` (comma list to a Set, each entry through
+  `foundry_choices`), `integer` (first whole number: "5 damage" is 5),
+  `size` ("1S" is `{value: 1, letter: "S"}`). An unknown format is skipped.
+- `foundry_pull_fields` — the only fields Foundry owns. They are written
+  to Foundry only when the actor is made and when someone edits them in
+  Chronicle, and they are the only ones sent back (just the ones that
+  changed), through
+  `PUT /entities/:id/fields`, and only while the page's `foundry` system
+  state has `gm.sendBack === true` (see "What the module does with
+  `system_state.updated`").
+
+Re-verify by: 2026-11-11 (Chronicle `internal/systems/manifest.go` `CreatureFieldsForAPI`, `internal/plugins/syncapi/api_handler.go` `GetCreatureFields`; keyxmakerx/Chronicle#1311)
 
 #### GET /systems/:systemId/item-fields
 Returns item preset field definitions. Same shape as character-fields.
@@ -645,7 +661,7 @@ The campaign's sync history, both directions, newest first. Owner keys and
 keys of members with DM access only (403 otherwise); absent on older
 Chronicle (404).
 
-**Used by:** `sync-history-tab.mjs` → the dashboard's History tab
+**Used by:** `sync-history-tab.mjs` → the dashboard's History pane, under Diagnostics
 
 **Query:** `?limit=50&before=<id>&direction=to_chronicle|to_foundry|link&failed=1&q=<text>` (limit default 50, max 200; a filter matches a run when any of its steps does)
 
@@ -1430,7 +1446,7 @@ the other's origin (Chronicle's, taken from `apiUrl`) before acting.
 | Calendar frame | `/embed/campaigns/:id/notes/calendar` | The campaign's default calendar, Chronicle's own page, as this player sees it (same grant; the frame reads `/api/notes-app/campaigns/:id/calendars/…`). An older Chronicle answers 404. |
 
 The module keeps a grant only when `campaignId` matches and the GM has matched
-the returned `userId` to this Foundry login (Members tab); an unmatched or
+the returned `userId` to this Foundry login (Chronicle settings → Players); an unmatched or
 mismatched account is refused. Frame to module: `chronicle:embed-ready` (the
 module answers `chronicle:notes-token` with the token and current `entityId`),
 `chronicle:grant-rejected` (the stored grant is dropped), `chronicle:open-note`
@@ -1515,6 +1531,8 @@ If the token is invalid, the server rejects the upgrade.
 | `sync.error` | `{ message }` | Synchronization error |
 | `sync.conflict` | Conflict details | Data conflict detected |
 
+Every `calendar.*` message goes to DM-equivalent sockets only (the GM's key). An event Chronicle stores as `dm_only` goes out with `visibility: "gm-only"`; other values pass through as stored, and the module treats anything but `"gm-only"` as public. Players get the calendar from the GM client's republished snapshot.
+
 `relation.*` messages go to the owner's socket and sockets of members the owner has
 given DM access only (a relation can
 name a private entity). Item sync treats any of them for a linked character
@@ -1588,6 +1606,12 @@ never). It runs once more when a GM links a page by dropping its journal on a
 token. Nothing is written back: edits on the Foundry sheet don't sync to
 Chronicle yet. `tools/test-negotiation-mirror.mjs`.
 
+`scripts/creature-sync.mjs` acts on `key` `foundry` for any system: it
+forgets its cached answer for that page, and reads
+`GET /entities/:entityId/system-state/<detectedSystem>/foundry` again before
+the next send-back. Only `gm.sendBack === true` lets a creature's
+`foundry_pull_fields` go back to Chronicle; no state (404) means off.
+
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/systemstate`, `internal/plugins/syncapi/system_state_api.go`; keyxmakerx/Chronicle#1051)
 
 ### What the module does with `note.*`
@@ -1607,8 +1631,8 @@ a player-visible one.
 
 | Type | Module behavior |
 |---|---|
-| `calendar.date.advanced` | Updates the cached date the dashboard shows. TODO(#95): apply it to the built-in calendar and confirm it back |
-| `calendar.event.created/updated/deleted` | Routed; no handler writes anywhere yet. TODO(#95) |
+| `calendar.date.advanced` | Updates the cached date the dashboard shows and re-reads the month window. TODO(#95): apply it to the built-in calendar and confirm it back |
+| `calendar.event.created/updated/deleted` | Re-reads the month window (`scheduleRefresh`); nothing is written into Foundry documents |
 | `calendar.weather.changed` | Updates the dashboard world-state panel and whispers a GM chat line (`calendarAnnounceWeather`). `null` payload → one `GET /calendar/weather` refetch |
 | `calendar.season.changed` | Panel + GM chat line (`calendarAnnounceSeasonEra`, default **on**) |
 | `calendar.era.changed` | Panel + GM chat line (`calendarAnnounceSeasonEra`, default **on**) |

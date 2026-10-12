@@ -13,6 +13,8 @@
  * found the map is still an ordinary item, never an error.
  */
 
+import { noticeText } from './_escape-html.mjs';
+import { currentMotion } from './motion.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import {
   pickMapItemType, journalAccessForActorOwners, journalAccessForCarriedMaps, mapPageUuidOf,
@@ -154,7 +156,7 @@ export async function giveMapToActor(page, actor) {
   if (!game.user.isGM) return;
   const already = actor.items.find((i) => i.getFlag(FLAG_SCOPE, 'mapPageUuid') === page.uuid);
   if (already) {
-    ui.notifications.info(game.i18n.format('CHRONICLE.MapItems.AlreadyHas', { actor: actor.name }));
+    ui.notifications.info(game.i18n.format('CHRONICLE.MapItems.AlreadyHas', { actor: noticeText(actor.name) }));
     return;
   }
   const type = pickMapItemType(game.documentTypes?.Item ?? Object.keys(CONFIG.Item?.dataModels ?? {}));
@@ -183,7 +185,7 @@ export async function giveMapToActor(page, actor) {
       },
     },
   }]);
-  ui.notifications.info(game.i18n.format('CHRONICLE.MapItems.Given', { name: entry.name, actor: actor.name }));
+  ui.notifications.info(game.i18n.format('CHRONICLE.MapItems.Given', { name: noticeText(entry.name), actor: noticeText(actor.name) }));
 }
 
 /**
@@ -210,8 +212,9 @@ export async function openMapPage(pageUuid, fromEl = null) {
 /** The unfold: from the clicked row to the window, sideways then down. */
 function _unfold(win, fromEl) {
   if (typeof win.animate !== 'function') return;
-  const reduce = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  if (reduce || !fromEl) {
+  const level = currentMotion();
+  if (level === 'off') return;
+  if (level === 'calm' || !fromEl) {
     win.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150 });
     return;
   }

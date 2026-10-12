@@ -1,5 +1,5 @@
 /**
- * Pure builder for the dashboard Members tab: given campaign members, the
+ * Pure builder for the Players tab of Chronicle settings: given campaign members, the
  * `userMappings` table, the available Foundry users, and a member-key
  * resolver, produces one row per member showing the current mapping and
  * whether it is matched or UNMATCHED.
@@ -8,6 +8,26 @@
  * dropped on both push and pull, so the `matched=false` badge is the
  * operator's only signal that access is being widened or narrowed unseen.
  */
+
+/**
+ * Resolve the stable Chronicle user-id key for a campaign member. The
+ * user-mapping table (`userMappings`) is keyed by this value, and
+ * `getFoundryUserId` / `getChronicleUserId` look it up. Different Chronicle
+ * builds surface the member's user id as `user_id` (the historical field this
+ * module keyed on) or `id` (the field the API contract documents for
+ * `GET /members`), so prefer `user_id` then fall back to `id`.
+ *
+ * Exported as a pure helper so the auto-match + manual-mapping paths can't
+ * drift on which field identifies a member, and so it's unit-testable.
+ *
+ * @param {object} member - A campaign member from `GET /members`.
+ * @returns {string|null} The Chronicle user-id key, or null if absent.
+ */
+export function memberKey(member) {
+  if (!member || typeof member !== 'object') return null;
+  const id = member.user_id ?? member.id;
+  return id === null || id === undefined || id === '' ? null : String(id);
+}
 
 /**
  * @typedef {object} MemberRow

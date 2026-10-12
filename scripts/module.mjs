@@ -14,6 +14,7 @@ import { ShopWidget } from './shop-widget.mjs';
 import { CalendarSync } from './calendar-sync.mjs';
 import { registerCalendarBar } from './calendar-bar.mjs';
 import { ActorSync } from './actor-sync.mjs';
+import { CreatureSync } from './creature-sync.mjs';
 import { ItemSync } from './item-sync.mjs';
 import { StashSync } from './stash-sync.mjs';
 import { registerStashSocket } from './stash-client.mjs';
@@ -31,9 +32,11 @@ import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { registerShopRoomSocket, registerShopJournalButton } from './shop-room-window.mjs';
 import { notebookAvailable, openCalendarWindow, openNotebook, registerPlayerNotebook } from './player-notebook.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
+import { registerShortcuts } from './_keybindings.mjs';
+import { registerMotion } from './motion.mjs';
 import { openQuestBoard, questLive, registerQuestBoard } from './quest-board.mjs';
 import { retireNotesFolder } from './_notes-folder.mjs';
-import { FLAG_SCOPE, SYNC_OPTIONS } from './constants.mjs';
+import { FLAG_SCOPE, MODULE_ID, syncOptions } from './constants.mjs';
 import { removedFolder } from './_set-aside.mjs';
 
 /** @type {SyncManager|null} */
@@ -72,6 +75,17 @@ function openDashboard() {
 Hooks.once('init', () => {
   console.debug('Chronicle Sync | Initializing');
   registerSettings();
+  registerMotion();
+  registerShortcuts(game.keybindings, MODULE_ID, {
+    run: {
+      openDashboard,
+      openDMScreen: () => { openDMScreen(() => syncManager?.api ?? null); },
+      openNotebook: () => { openNotebook(); },
+      openCalendar: () => { openCalendarWindow(); },
+      openQuests: () => { openQuestBoard(); },
+    },
+    connected: notebookAvailable,
+  });
 
   // Register Chronicle Map Viewer as an alternate sheet for image journal pages.
   DocumentSheetConfig.registerSheet(JournalEntryPage, 'chronicle-sync', MapViewerSheet, {
@@ -121,6 +135,7 @@ Hooks.once('ready', async () => {
   const calendarSync = new CalendarSync();
   syncManager.registerModule(calendarSync);
   syncManager.registerModule(new ActorSync());
+  syncManager.registerModule(new CreatureSync());
   syncManager.registerModule(new ItemSync());
   syncManager.registerModule(new StashSync());
   syncManager.registerModule(npcSpotlightRelay);
@@ -193,7 +208,7 @@ Hooks.once('ready', async () => {
     try {
       await retireNotesFolder({
         game, scope: FLAG_SCOPE, removedFolder,
-        maxDepth: CONST.FOLDER_MAX_DEPTH, options: SYNC_OPTIONS,
+        maxDepth: CONST.FOLDER_MAX_DEPTH, options: syncOptions(),
       });
     } catch (err) {
       console.warn('Chronicle Sync | Setting the old notes folder aside failed', err);

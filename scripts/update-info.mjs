@@ -16,6 +16,7 @@
  * Updates" and `API-CONTRACT.md`.
  */
 
+import { noticeText } from './_escape-html.mjs';
 import { MODULE_ID } from './constants.mjs';
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -191,7 +192,7 @@ export async function surfaceManifestRecoveryIfNeeded() {
   const fallback = game.i18n.localize('CHRONICLE.Recovery.AuthFailure.Message');
   const prefix   = game.i18n.localize('CHRONICLE.Recovery.AuthFailure.Prefix');
   const detail   = result.message && result.message.trim() ? result.message : fallback;
-  const text     = `${prefix} ${detail}`;
+  const text     = `${prefix} ${noticeText(detail)}`;
 
   // Sticky banner so the GM can't miss it between sessions.
   ui.notifications.error(text, { permanent: true, console: false });

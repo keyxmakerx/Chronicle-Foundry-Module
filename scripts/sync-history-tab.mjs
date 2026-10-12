@@ -1,12 +1,12 @@
 /**
- * The dashboard's History tab: the same sync history as Chronicle's
+ * The dashboard's History pane, under Diagnostics: the same sync history as Chronicle's
  * Manage › Sync history page, read from `GET /sync/history`.
  *
  * The dashboard re-renders often, so the tab keeps its rows and filters
  * here and redraws them into the fresh panel after each render.
  */
 
-import { buildHistoryRows, historyQuery, h, toDom } from './_history-view.mjs';
+import { buildHistoryRows, historyQuery, h, loadingNode, stateNode, toDom } from './_history-view.mjs';
 
 export class SyncHistoryTab {
   /** @param {() => import('./api-client.mjs').ChronicleAPI|null} getApi */
@@ -25,7 +25,7 @@ export class SyncHistoryTab {
    * Attach to the panel after a dashboard render. Loads the first page the
    * first time the tab is shown.
    * @param {HTMLElement} el - the dashboard element
-   * @param {boolean} active - whether the History tab is showing
+   * @param {boolean} active - whether the History pane is showing
    */
   mount(el, active) {
     const root = el.querySelector('[data-history-root]');
@@ -48,7 +48,7 @@ export class SyncHistoryTab {
     if (active && this.events === null) this.load();
   }
 
-  /** The History tab was opened. */
+  /** The History pane was opened. */
   shown() {
     if (this.events === null) this.load();
   }
@@ -95,12 +95,12 @@ export class SyncHistoryTab {
     const list = this._root?.querySelector('[data-history-rows]');
     if (!list || !list.isConnected) return;
     if (this.events === null) {
-      list.replaceChildren(toDom(h('p', 'sh-empty', null, 'Loading…')));
+      list.replaceChildren(toDom(loadingNode(game.i18n.localize('CHRONICLE.States.Loading'))));
       return;
     }
     const filtered = !!(this.filter.q || this.filter.direction || this.filter.failed);
     const nodes = [];
-    if (this.error) nodes.push(h('p', 'sh-empty sh-error', null, this.error));
+    if (this.error) nodes.push(stateNode('cloud-bolt', game.i18n.localize('CHRONICLE.States.CantReach'), this.error, { error: true }));
     if (!this.error || this.events.length) nodes.push(...buildHistoryRows(this.events, { filtered }));
     if (this.nextBefore && !this.error) {
       const attrs = { type: 'button', 'data-history-older': '' };

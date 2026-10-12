@@ -11,24 +11,24 @@ import { seedCampaign } from './chronicle.mjs';
 import { newWorld, openWorld, closeWorld, settle, traffic, recordRequests } from './world.mjs';
 import { retireNotesFolder } from '../scripts/_notes-folder.mjs';
 import { removedFolder } from '../scripts/_set-aside.mjs';
-import { SYNC_OPTIONS } from '../scripts/constants.mjs';
+import { syncOptions } from '../scripts/constants.mjs';
 import { writes } from './scenario.mjs';
 
 const FLAG = 'chronicle-sync';
 
 /** What the retired note sync left in a world: a folder tree of note copies. */
 async function oldNotesFolder() {
-  const root = await Folder.create({ name: 'Chronicle Notes', type: 'JournalEntry', flags: { [FLAG]: { isNotesRoot: true } } }, SYNC_OPTIONS);
-  const sub = await Folder.create({ name: 'Session notes', type: 'JournalEntry', folder: root.id, flags: { [FLAG]: { noteFolderId: 'nf-1' } } }, SYNC_OPTIONS);
+  const root = await Folder.create({ name: 'Chronicle Notes', type: 'JournalEntry', flags: { [FLAG]: { isNotesRoot: true } } }, syncOptions());
+  const sub = await Folder.create({ name: 'Session notes', type: 'JournalEntry', folder: root.id, flags: { [FLAG]: { noteFolderId: 'nf-1' } } }, syncOptions());
   const page = (t) => [{ name: 'Content', type: 'text', text: { content: `<p>${t}</p>` } }];
-  await JournalEntry.create({ name: 'Lady Vess', folder: root.id, pages: page('Runs the guild.'), flags: { [FLAG]: { noteId: 'old-note-1', isNote: true } } }, SYNC_OPTIONS);
-  await JournalEntry.create({ name: 'Session 3', folder: sub.id, pages: page('We met Corrin.'), flags: { [FLAG]: { noteId: 'old-note-2', isNote: true } } }, SYNC_OPTIONS);
+  await JournalEntry.create({ name: 'Lady Vess', folder: root.id, pages: page('Runs the guild.'), flags: { [FLAG]: { noteId: 'old-note-1', isNote: true } } }, syncOptions());
+  await JournalEntry.create({ name: 'Session 3', folder: sub.id, pages: page('We met Corrin.'), flags: { [FLAG]: { noteId: 'old-note-2', isNote: true } } }, syncOptions());
   return root;
 }
 
 /** The GM loads the world: the set-aside step, then sync. */
 async function load(world) {
-  await retireNotesFolder({ game, scope: FLAG, removedFolder, maxDepth: 4, options: SYNC_OPTIONS });
+  await retireNotesFolder({ game, scope: FLAG, removedFolder, maxDepth: 4, options: syncOptions() });
   await openWorld(world);
 }
 
