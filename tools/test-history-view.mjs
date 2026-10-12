@@ -103,6 +103,18 @@ test('SyncManager adds a row once modules applied a change, skipping echoes', as
   assert.equal(added[1].message, 'folder missing');
 });
 
+test('SyncManager skips the echo of a create whose response arrives after the change', async () => {
+  const sm = new SyncManager();
+  const added = [];
+  sm._history.add = (ev) => added.push(ev);
+  const end = sm.api.onWrite('/entities');
+  const recorded = sm._recordApplied({ type: 'entity.created', resourceId: 'eel-1', payload: { name: 'The Gilded Eel' } }, Date.now(), []);
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  end({ id: 'eel-1', name: 'The Gilded Eel' });
+  await recorded;
+  assert.equal(added.length, 0);
+});
+
 test('activity log entries are reported, pushes are not', () => {
   const sm = new SyncManager();
   const added = [];

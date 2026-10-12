@@ -219,15 +219,28 @@ export class ChronicleAPI {
    */
   async fetch(path, options = {}) {
     const baseUrl = getSetting('apiUrl').replace(/\/+$/, '');
-    const apiKey = getSetting('apiKey');
     const campaignId = _validateCampaignIdOrThrow(getSetting('campaignId'));
-
     const url = `${baseUrl}/api/v1/campaigns/${campaignId}${path}`;
     const method = options.method || 'GET';
-    // Lets the sync history tell this world's own writes from new changes.
+    // Lets the sync history tell this world's own writes from new changes;
+    // `onWrite` may return a function that takes the response when it ends.
+    let ended = null;
     if (method !== 'GET' && typeof this.onWrite === 'function') {
-      try { this.onWrite(path); } catch { /* never block a request */ }
+      try { ended = this.onWrite(path); } catch { /* never block a request */ }
     }
+    if (typeof ended !== 'function') return this._request(url, method, path, options);
+    let data;
+    try {
+      data = await this._request(url, method, path, options);
+      return data;
+    } finally {
+      try { ended(data); } catch { /* never block a request */ }
+    }
+  }
+
+  /** One request to Chronicle; `fetch` wraps it. @private */
+  async _request(url, method, path, options) {
+    const apiKey = getSetting('apiKey');
 
     const headers = {
       'Authorization': `Bearer ${apiKey}`,
