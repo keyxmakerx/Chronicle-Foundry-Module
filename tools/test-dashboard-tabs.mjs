@@ -48,3 +48,21 @@ test('every overview jump target resolves to a real section', () => {
     assert.equal(resolveDashboardTab(tab).tab, tab.split(':')[0], tab);
   }
 });
+
+test('every localize key in the dashboard template resolves in lang/en.json', () => {
+  const hbs = read('templates/sync-dashboard.hbs');
+  const lang = JSON.parse(read('lang/en.json'));
+  const keys = [...hbs.matchAll(/localize\s+(["'])([^"']+)\1/g)].map((m) => m[2]);
+  assert.ok(keys.length > 100, 'expected the template to localize its labels');
+  for (const key of keys) {
+    const value = key.split('.').reduce((o, part) => (o == null ? o : o[part]), lang);
+    assert.equal(typeof value, 'string', `${key} is missing from lang/en.json`);
+  }
+});
+
+test('the overview model\'s built-in English matches lang/en.json', async () => {
+  const { DEFAULT_STRINGS } = await import('../scripts/_overview-model.mjs');
+  const lang = JSON.parse(read('lang/en.json'));
+  assert.deepEqual(DEFAULT_STRINGS, Object.fromEntries(
+    Object.keys(DEFAULT_STRINGS).map((k) => [k, lang.CHRONICLE.Dashboard.Overview[k]])));
+});

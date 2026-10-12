@@ -5,9 +5,38 @@
  * unit-testable headlessly.
  */
 
-/** Pluralize helper: "" for 1, "s" otherwise. */
-function s(n) {
-  return n === 1 ? '' : 's';
+const PREFIX = 'CHRONICLE.Dashboard.Overview.';
+
+/**
+ * English fallback for every string this model builds, keyed like lang/en.json
+ * so headless callers (tests) get readable text without Foundry's i18n.
+ */
+export const DEFAULT_STRINGS = {
+  StatEntities: 'Entities Synced',
+  StatCharacters: 'Characters Synced',
+  StatMaps: 'Maps Linked',
+  Disconnected: 'Disconnected',
+  Never: 'Never',
+  LastSync: 'Last sync: {time}',
+  Paused: 'Sync is paused until the connection is restored.',
+  NotConnected: 'Not connected to Chronicle. Reconnect above, or open Diagnostics to see why.',
+  CharactersUnmatchedOne: "{count} character couldn't be matched to Chronicle.",
+  CharactersUnmatchedMany: "{count} characters couldn't be matched to Chronicle.",
+  MembersUnmappedOne: '{count} campaign member not mapped to a Foundry user.',
+  MembersUnmappedMany: '{count} campaign members not mapped to a Foundry user.',
+  CalendarRebuilding: 'Chronicle’s calendar is being rebuilt — calendar sync is paused. Other sync is unaffected.',
+  CalendarPausedReason: 'Calendar sync paused — {reason}',
+  CalendarPaused: 'Calendar sync paused — see the Calendar tab.',
+  CalendarOutOfSync: 'Calendar date is out of sync with Chronicle.',
+  NoSystem: 'No matching game system — character fields may not sync.',
+  ErrorsOne: '{count} recent sync error — see Diagnostics.',
+  ErrorsMany: '{count} recent sync errors — see Diagnostics.',
+};
+
+/** Default translator: the English map above with `{name}` substitution. */
+function defaultT(key, data) {
+  const text = DEFAULT_STRINGS[key.slice(PREFIX.length)] ?? key;
+  return data ? text.replace(/\{(\w+)\}/g, (m, k) => (k in data ? String(data[k]) : m)) : text;
 }
 
 /**
@@ -26,12 +55,14 @@ function s(n) {
  * @param {number} [p.errorCount]    - recent REST/sync errors
  * @param {string|null} [p.matchedSystem] - matched Chronicle system slug, or null
  * @param {string} [p.lastSyncTime]  - last successful sync, human string
+ * @param {(key:string, data?:object)=>string} [p.t] - translator for full
+ *   `CHRONICLE.Dashboard.Overview.*` keys; defaults to the English map
  * @returns {{connection:object, stats:Array, attention:Array, allClear:boolean}}
  */
 export function buildOverviewModel(p = {}) {
   const {
     connectionState = 'disconnected',
-    connectionLabel = 'Disconnected',
+    connectionLabel,
     syncedEntities = 0,
     linkedScenes = 0,
     characters = [],
@@ -44,8 +75,10 @@ export function buildOverviewModel(p = {}) {
     calendarRebuilding = false,
     errorCount = 0,
     matchedSystem = null,
-    lastSyncTime = 'Never',
+    lastSyncTime,
+    t = defaultT,
   } = p;
+  const tr = (k, d) => t(PREFIX + k, d);
 
   const ok = connectionState === 'connected';
   const charList = Array.isArray(characters) ? characters : [];
@@ -53,15 +86,15 @@ export function buildOverviewModel(p = {}) {
 
   const connection = {
     state: connectionState,
-    label: connectionLabel,
+    label: connectionLabel ?? tr('Disconnected'),
     ok,
-    detail: ok ? `Last sync: ${lastSyncTime}` : 'Sync is paused until the connection is restored.',
+    detail: ok ? tr('LastSync', { time: lastSyncTime ?? tr('Never') }) : tr('Paused'),
   };
 
   const stats = [
-    { label: `Entities Synced`, value: String(syncedEntities), tab: 'entities' },
-    { label: `Characters Synced`, value: `${charsSynced}/${charList.length}`, tab: 'characters' },
-    { label: `Maps Linked`, value: String(linkedScenes), tab: 'maps' },
+    { label: tr('StatEntities'), value: String(syncedEntities), tab: 'entities' },
+    { label: tr('StatCharacters'), value: `${charsSynced}/${charList.length}`, tab: 'characters' },
+    { label: tr('StatMaps'), value: String(linkedScenes), tab: 'maps' },
   ];
 
   // Prioritized problems only — an empty list renders the calm "all clear" state.
@@ -72,7 +105,7 @@ export function buildOverviewModel(p = {}) {
     attention.push({
       severity: 'error',
       icon: 'fa-plug-circle-xmark',
-      text: 'Not connected to Chronicle. Reconnect above, or open Diagnostics to see why.',
+      text: tr('NotConnected'),
       tab: 'diagnostics:health',
     });
   }
@@ -80,7 +113,7 @@ export function buildOverviewModel(p = {}) {
     attention.push({
       severity: 'warn',
       icon: 'fa-link-slash',
-      text: `${issuesCount} character${s(issuesCount)} couldn't be matched to Chronicle.`,
+      text: tr(issuesCount === 1 ? 'CharactersUnmatchedOne' : 'CharactersUnmatchedMany', { count: issuesCount }),
       tab: 'characters',
     });
   }
@@ -88,7 +121,7 @@ export function buildOverviewModel(p = {}) {
     attention.push({
       severity: 'warn',
       icon: 'fa-user-shield',
-      text: `${unmatchedMembers} campaign member${s(unmatchedMembers)} not mapped to a Foundry user.`,
+      text: tr(unmatchedMembers === 1 ? 'MembersUnmappedOne' : 'MembersUnmappedMany', { count: unmatchedMembers }),
       tab: 'settings:players',
     });
   }
@@ -98,7 +131,7 @@ export function buildOverviewModel(p = {}) {
     attention.push({
       severity: 'info',
       icon: 'fa-screwdriver-wrench',
-      text: 'Chronicle’s calendar is being rebuilt — calendar sync is paused. Other sync is unaffected.',
+      text: tr('CalendarRebuilding'),
       tab: 'calendar',
     });
   } else if (calendarAvailable && calendarSyncPaused) {
@@ -108,15 +141,15 @@ export function buildOverviewModel(p = {}) {
       severity: 'error',
       icon: 'fa-calendar-xmark',
       text: calendarPausedText
-        ? `Calendar sync paused — ${calendarPausedText}`
-        : 'Calendar sync paused — see the Calendar tab.',
+        ? tr('CalendarPausedReason', { reason: calendarPausedText })
+        : tr('CalendarPaused'),
       tab: 'calendar',
     });
   } else if (calendarAvailable && !calendarInSync) {
     attention.push({
       severity: 'warn',
       icon: 'fa-calendar-xmark',
-      text: 'Calendar date is out of sync with Chronicle.',
+      text: tr('CalendarOutOfSync'),
       tab: 'calendar',
     });
   }
@@ -124,7 +157,7 @@ export function buildOverviewModel(p = {}) {
     attention.push({
       severity: 'info',
       icon: 'fa-circle-question',
-      text: 'No matching game system — character fields may not sync.',
+      text: tr('NoSystem'),
       tab: 'diagnostics:health',
     });
   }
@@ -132,7 +165,7 @@ export function buildOverviewModel(p = {}) {
     attention.push({
       severity: 'info',
       icon: 'fa-triangle-exclamation',
-      text: `${errorCount} recent sync error${s(errorCount)} — see Diagnostics.`,
+      text: tr(errorCount === 1 ? 'ErrorsOne' : 'ErrorsMany', { count: errorCount }),
       tab: 'diagnostics:health',
     });
   }

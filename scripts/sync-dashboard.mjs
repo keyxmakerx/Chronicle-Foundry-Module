@@ -329,6 +329,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       errorCount: statusData.errorLog?.length ?? 0,
       matchedSystem: statusData.matchedSystem,
       lastSyncTime: statusData.lastSyncTime,
+      t: (k, d) => (d ? game.i18n.format(k, d) : game.i18n.localize(k)),
     });
 
     this._loading = false;
