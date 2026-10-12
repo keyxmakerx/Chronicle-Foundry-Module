@@ -243,6 +243,21 @@ test('a change of weather rolls across the stone', () => {
   assert.equal(SC.mixWeather(b, a, 1).dust, null, 'and is gone once the change is through');
 });
 
+test('rain lands on the glass round its rim, more as it rains harder, none when dry', () => {
+  assert.equal(SC.glassDrops(0, 5).length, 0);
+  assert.equal(SC.glassDrops(0.1, 5).length, 0, 'mist and spray leave the glass dry');
+  const light = SC.glassDrops(0.5, 5).length; const heavy = SC.glassDrops(2, 5).length;
+  assert.ok(light > 0 && heavy > light && heavy <= SC.GLASS_DROPS);
+  for (let t = 0; t < 40; t += 0.37) {
+    for (const d of SC.glassDrops(1.4, t)) {
+      const off = Math.hypot(d.x - 0.5, d.y - 0.5);
+      assert.ok(off > 0.3 && off < 0.5, 'a drop keeps to the rim, off the day figure and on the glass');
+      assert.ok(d.a >= 0 && d.a <= 1 && d.r > 0 && d.r < 0.03);
+    }
+  }
+  assert.deepEqual(SC.glassDrops(1, 3), SC.glassDrops(1, 3), 'the same moment draws the same drops');
+});
+
 const chronicle = process.env.CHRONICLE_DIR && join(process.env.CHRONICLE_DIR, 'static', 'js', 'widgets');
 test('vendored sky files match Chronicle (needs CHRONICLE_DIR)', { skip: !(chronicle && existsSync(chronicle)) && 'CHRONICLE_DIR not set' }, () => {
   for (const f of SKY_FILES) {

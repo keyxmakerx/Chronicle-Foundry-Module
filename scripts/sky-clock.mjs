@@ -18,7 +18,7 @@ import { loadVendored } from './vendor-chronicle.mjs';
 import { formatDate, formatTime, skyGradient } from './_calendar-view-model.mjs';
 import {
   GLOBE, MINI, clearOf, cornerByKey, cornerOf, cornerSpots, cradleLayout, figureLight,
-  framesPerSecond, frontOf, frontWeather, mixWeather, nearestCorner, plainRecipe, skyCalendar, skyEvents, skyWeather, stoneWeather,
+  framesPerSecond, frontOf, frontWeather, glassDrops, mixWeather, nearestCorner, plainRecipe, skyCalendar, skyEvents, skyWeather, stoneWeather,
 } from './_sky-clock.mjs';
 
 /** Chronicle's sky, in the order its files depend on each other. */
@@ -881,6 +881,7 @@ export class SkyClock {
         }
         g.stroke();
       }
+      this.drawGlassDrops(g, D, wet, F.tint, t);
     }
     const sn = Math.min(1, F.snow);
     if (sn > 0.01) {
@@ -913,6 +914,28 @@ export class SkyClock {
         g.fillStyle = `rgba(255,226,150,${(this.glitter * (0.55 + 0.45 * Math.sin(t * 6 + k))).toFixed(3)})`;
         g.beginPath(); g.arc(p.x * D, p.y * D, p.r, 0, TAU); g.fill();
       });
+    }
+  }
+
+  /**
+   * Rain landing on the glass itself: a few small drops round the rim, faint,
+   * coloured by the rain (red in blood rain, green in acid rain) so an
+   * unusual rain reads at a glance. Still motion leaves them where they are.
+   */
+  drawGlassDrops(g, D, wet, tint, t) {
+    const water = tint ? mixC([214, 226, 255], tint, 0.85) : [214, 226, 255];
+    for (const d of glassDrops(wet, this.rm ? 0 : t)) {
+      if (d.a <= 0.01) continue;
+      const x = d.x * D; const y = d.y * D; const r = Math.max(1, d.r * D);
+      if (d.trail > 0) {
+        g.strokeStyle = rgb(water, (0.14 * d.a).toFixed(3)); g.lineWidth = r * 0.7; g.lineCap = 'round';
+        g.beginPath(); g.moveTo(x, y - d.trail * D); g.lineTo(x, y); g.stroke();
+      }
+      g.fillStyle = rgb(water, (0.22 * d.a).toFixed(3)); g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+      // A darker lower rim and a pin of light up top: a lens of water, not a dot.
+      g.strokeStyle = `rgba(16,20,28,${(0.3 * d.a).toFixed(3)})`; g.lineWidth = 0.6;
+      g.beginPath(); g.arc(x, y, r, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
+      g.fillStyle = `rgba(255,255,255,${(0.6 * d.a).toFixed(3)})`; g.beginPath(); g.arc(x - r * 0.35, y - r * 0.4, Math.max(0.35, r * 0.3), 0, TAU); g.fill();
     }
   }
 
