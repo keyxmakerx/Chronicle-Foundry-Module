@@ -66,6 +66,15 @@ function reducedMotion() {
 
 function grainCanvas() {
   const cv = document.createElement('canvas'); cv.width = cv.height = 160; const g = cv.getContext('2d');
+  // Mottling at two scales, smoothed up from coarse noise: real stone varies in tone across its face, not only in specks.
+  for (const [n, a, salt] of [[10, 0.26, 290], [40, 0.16, 295]]) {
+    const m = document.createElement('canvas'); m.width = m.height = n; const mg = m.getContext('2d');
+    for (let i = 0; i < n * n; i++) {
+      const v = rnd(i, salt) > 0.85 ? 255 : 0;
+      mg.fillStyle = `rgba(${v},${v},${v},${(rnd(i, salt + 1) * a).toFixed(3)})`; mg.fillRect(i % n, Math.floor(i / n), 1, 1);
+    }
+    g.imageSmoothingEnabled = true; g.drawImage(m, 0, 0, 160, 160);
+  }
   for (let i = 0; i < 2600; i++) {
     const v = rnd(i, 300) > 0.5 ? 255 : 0;
     g.fillStyle = `rgba(${v},${v},${v},${(0.06 + rnd(i, 301) * 0.16).toFixed(3)})`;
@@ -83,8 +92,8 @@ function grainCanvas() {
 /** Rain-streaked grime, pitting and a few lichen spots: old stone left out on the hill. */
 function weatherCanvas() {
   const cv = document.createElement('canvas'); cv.width = cv.height = 160; const g = cv.getContext('2d');
-  for (let i = 0; i < 40; i++) {
-    const x = rnd(i, 320) * 160; const y = rnd(i, 321) * 160; const r = 4 + rnd(i, 322) * 12;
+  for (let i = 0; i < 70; i++) {
+    const x = rnd(i, 320) * 160; const y = rnd(i, 321) * 160; const r = 2 + rnd(i, 322) * 6;
     const gd = g.createRadialGradient(x, y, 0, x, y, r);
     gd.addColorStop(0, `rgba(28,24,20,${(0.12 + rnd(i, 323) * 0.18).toFixed(3)})`); gd.addColorStop(1, 'rgba(28,24,20,0)');
     g.fillStyle = gd; g.fillRect(x - r, y - r, r * 2, r * 2);
@@ -137,7 +146,14 @@ function shapeOf(txt, font, fs) {
   }
   const seed = Number(txt) || 0;
   const pick = (list, n, salt) => (list.length ? Array.from({ length: n }, (_, i) => list[Math.floor(rnd(i + seed * 7, salt) * list.length)]) : []);
-  const shape = { chips: pick(rim, 30, 400), cracks: pick(rim, 5, 401), crumbs: pick(body, 240, 402), tops: pick(tops, 16, 403) };
+  // Each chip carries which way is out of the stone, so its bite is a notch in the outline, not a hole in the face.
+  const outward = (p) => {
+    const x = Math.round(p[0] + W / 2); const y = Math.round(p[1] + H * 0.9); let nx = 0; let ny = 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) if (!on(x + dx * step, y + dy * step)) { nx += dx; ny += dy; }
+    const n = Math.hypot(nx, ny) || 1;
+    return [p[0], p[1], nx / n, ny / n];
+  };
+  const shape = { chips: pick(rim, 30, 400).map(outward), cracks: pick(rim, 5, 401), crumbs: pick(body, 240, 402), tops: pick(tops, 16, 403) };
   SHAPES.set(key, shape);
   return shape;
 }
@@ -154,24 +170,33 @@ function crackLines(sh, bx, by, fs) {
 }
 
 /**
- * Worn stone: bites out of the edges and a few hairline cracks running in
- * from them. A bite is a shadowed hollow in the stone with only a small nick
- * through its outline, so the sky never shows through it as a pale patch.
+ * Worn stone: notches broken out of the outline and a few hairline cracks
+ * running in from them. A notch is centred outside the edge so it bites into
+ * the outline without opening a hole in the face, and a soft shadow round it
+ * gives it depth instead of a flat dark spot.
  */
-function crumble(F, sh, bx, by, fs, seed) {
+function crumble(F, sh, bx, by, fs, seed, ext) {
   const u = fs / 60;
-  const bite = (p, i, scale) => {
-    const r = (0.8 + rnd(i + seed * 3, 410) * 2.2) * u * scale; const x = bx + p[0]; const y = by + p[1]; const a0 = rnd(i, 411) * 6.28;
-    F.beginPath();
-    for (let j = 0; j < 5; j++) { const a = a0 + j * 1.256; const rr = r * (0.55 + rnd(i * 5 + j, 412) * 0.6); F.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
-    F.fill();
+  // Cut along the figure's depth as well (ext is the step of each layer behind the face), so a notch goes clean through.
+  const notch = (p, i) => {
+    const r = (1 + rnd(i + seed * 3, 410) * 1.2) * u; const x = bx + p[0] + p[2] * r * 0.55; const y = by + p[1] + p[3] * r * 0.55; const a0 = rnd(i, 411) * 6.28;
+    for (let k = 0; k <= ext.n; k++) {
+      F.beginPath();
+      for (let j = 0; j < 5; j++) { const a = a0 + j * 1.257 + (rnd(i * 5 + j, 413) - 0.5) * 0.7; const rr = r * (0.35 + rnd(i * 5 + j, 412) * 0.85); F.lineTo(x + ext.x * k + Math.cos(a) * rr * (1 - k / (ext.n + 1)), y + ext.y * k + Math.sin(a) * rr * (1 - k / (ext.n + 1))); }
+      F.fill();
+    }
+    return [x, y, r];
   };
   F.save();
-  F.globalCompositeOperation = 'source-atop'; F.fillStyle = 'rgba(12,10,9,0.62)';
-  sh.chips.forEach((p, i) => bite(p, i, 1));
   F.globalCompositeOperation = 'destination-out'; F.fillStyle = '#000';
-  sh.chips.forEach((p, i) => { if (i % 3 === 0) bite(p, i, 0.45); });
-  F.globalCompositeOperation = 'source-atop'; F.strokeStyle = 'rgba(8,6,5,0.55)'; F.lineWidth = Math.max(0.6, 0.5 * u);
+  // The foot stays whole: it sits in the ground, where nothing breaks off it.
+  const cut = sh.chips.filter((p, i) => i % 5 < 2 && p[3] < 0.5 && p[1] < -fs * 0.08).map((p, i) => notch(p, i));
+  F.globalCompositeOperation = 'source-atop';
+  for (const [x, y, r] of cut) {
+    const sg = F.createRadialGradient(x, y, r * 0.6, x, y, r * 1.8);
+    sg.addColorStop(0, 'rgba(10,8,7,0.32)'); sg.addColorStop(1, 'rgba(10,8,7,0)');
+    F.fillStyle = sg; F.fillRect(x - r * 1.8, y - r * 1.8, r * 3.6, r * 3.6);
+  } F.strokeStyle = 'rgba(8,6,5,0.55)'; F.lineWidth = Math.max(0.6, 0.5 * u);
   for (const line of crackLines(sh, bx, by, fs)) {
     F.beginPath(); line.forEach(([x, y], j) => (j ? F.lineTo(x, y) : F.moveTo(x, y))); F.stroke();
   }
@@ -255,6 +280,7 @@ export class SkyClock {
     this.grain = grainCanvas(); this.weathering = weatherCanvas();
     this.FIG = document.createElement('canvas'); this.FG = this.FIG.getContext('2d');
     this.FIG2 = document.createElement('canvas'); this.F2 = this.FIG2.getContext('2d');
+    this.MASK = document.createElement('canvas'); this.MK = this.MASK.getContext('2d');
     this.build();
     this._wake = () => this.wake();
     this._vis = () => this.pace();
@@ -709,11 +735,12 @@ export class SkyClock {
 
     // The figure itself, drawn apart so its edge light and snow land only on it.
     const FIG = this.FIG; const FG = this.FG; const F2 = this.F2;
-    for (const cv of [FIG, this.FIG2]) { if (cv.width !== this.back.width) { cv.width = this.back.width; cv.height = this.back.height; } }
+    for (const cv of [FIG, this.FIG2, this.MASK]) { if (cv.width !== this.back.width) { cv.width = this.back.width; cv.height = this.back.height; } }
     FG.setTransform(dpr, 0, 0, dpr, 0, 0); FG.clearRect(0, 0, D, D);
     FG.font = font; FG.textAlign = 'center'; FG.textBaseline = 'alphabetic';
     const depth = D > 60 ? 4 : 2;
-    for (let i = depth; i >= 1; i--) { FG.fillStyle = rgb(side); FG.fillText(txt, bx - lx * i * 0.55, by - ly * i * 0.45 + i * 0.25); }
+    const ext = { x: -lx * 0.55, y: -ly * 0.45 + 0.25, n: depth };
+    for (let i = depth; i >= 1; i--) { FG.fillStyle = rgb(side); FG.fillText(txt, bx + ext.x * i, by + ext.y * i); }
     const gr = FG.createLinearGradient(0, by - fs * 0.75, 0, by);
     gr.addColorStop(0, rgb(face)); gr.addColorStop(1, rgb(under));
     FG.fillStyle = gr; FG.fillText(txt, bx, by);
@@ -721,14 +748,15 @@ export class SkyClock {
     FG.save(); FG.globalCompositeOperation = 'source-atop'; FG.globalAlpha = 0.9; FG.drawImage(this.grain, (seed * 37) % 40 - 40, -20, 200, 200); FG.restore();
     FG.save(); FG.globalCompositeOperation = 'source-atop'; FG.drawImage(this.weathering, (seed * 53) % 50 - 50, by - fs * 0.95, 220, 220 * fs / 160); FG.restore();
     const shape = shapeOf(txt, font, fs);
-    crumble(FG, shape, bx, by, fs, seed);
+    crumble(FG, shape, bx, by, fs, seed, ext);
+    // The worn outline, kept so the edge light and what settles follow the notches too.
+    const MK = this.MK; MK.setTransform(1, 0, 0, 1, 0, 0); MK.clearRect(0, 0, this.MASK.width, this.MASK.height); MK.drawImage(FIG, 0, 0);
     this.stoneMarks(FG, S, shape, bx, by, fs, t);
     const edge = (dx, dy, col) => {
-      F2.setTransform(dpr, 0, 0, dpr, 0, 0); F2.globalCompositeOperation = 'source-over'; F2.clearRect(0, 0, D, D);
-      F2.font = font; F2.textAlign = 'center'; F2.textBaseline = 'alphabetic';
-      F2.fillStyle = '#fff'; F2.fillText(txt, bx, by);
-      F2.globalCompositeOperation = 'destination-out'; F2.fillText(txt, bx + dx, by + dy);
-      F2.globalCompositeOperation = 'source-in'; F2.fillStyle = col; F2.fillRect(0, 0, D, D);
+      F2.setTransform(1, 0, 0, 1, 0, 0); F2.globalCompositeOperation = 'source-over'; F2.clearRect(0, 0, this.FIG2.width, this.FIG2.height);
+      F2.drawImage(this.MASK, 0, 0);
+      F2.globalCompositeOperation = 'destination-out'; F2.drawImage(this.MASK, dx * dpr, dy * dpr);
+      F2.globalCompositeOperation = 'source-in'; F2.fillStyle = col; F2.fillRect(0, 0, this.FIG2.width, this.FIG2.height);
       FG.setTransform(1, 0, 0, 1, 0, 0); FG.drawImage(this.FIG2, 0, 0); FG.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
     // Matte stone: a soft chiselled edge toward the light, a shaded one away from it. Wet stone shines there.
@@ -773,15 +801,20 @@ export class SkyClock {
     F.save(); F.globalCompositeOperation = 'source-atop';
     if (S.dust?.k > 0.05) { F.fillStyle = rgb(S.dust.c, (0.16 * S.dust.k).toFixed(3)); F.fillRect(0, 0, this.D, this.D); }
     if (S.wet > 0.05) {
+      // Wet stone mirrors a little sky near its top.
+      const sheen = F.createLinearGradient(0, by - fs * 0.75, 0, by - fs * 0.3);
+      sheen.addColorStop(0, rgb(S.drip || [200, 214, 238], (0.1 * S.wet).toFixed(3))); sheen.addColorStop(1, 'rgba(0,0,0,0)');
+      F.fillStyle = sheen; F.fillRect(0, by - fs, this.D, fs * 0.7);
+      // Water running down: a thin dark run that fades behind a pinpoint of light, never a bead.
       const n = Math.round(shape.tops.length * Math.min(1, S.wet));
       for (let i = 0; i < n; i++) {
-        const p = shape.tops[i]; const x = bx + p[0]; const y0 = by + p[1];
+        const p = shape.tops[i]; const x = bx + p[0] + (rnd(i, 443) - 0.5) * 2 * u; const y0 = by + p[1];
         const run = (8 + rnd(i, 440) * 16) * u; const k = (t * 0.3 * (0.6 + rnd(i, 441)) + rnd(i, 442)) % 1; const y = y0 + run * k;
         const trail = F.createLinearGradient(0, y0, 0, y);
-        trail.addColorStop(0, 'rgba(10,12,16,0)'); trail.addColorStop(1, `rgba(10,12,16,${(0.42 * S.wet).toFixed(3)})`);
-        F.fillStyle = trail; F.fillRect(x - 0.5 * u, y0, 1.1 * u, y - y0);
-        F.fillStyle = rgb(S.drip || [200, 214, 238], (0.75 * S.wet * (1 - k * 0.4)).toFixed(3));
-        F.beginPath(); F.arc(x, y, 1.05 * u + 0.35, 0, TAU); F.fill();
+        trail.addColorStop(0, 'rgba(10,12,16,0)'); trail.addColorStop(1, `rgba(10,12,16,${(0.34 * S.wet).toFixed(3)})`);
+        F.fillStyle = trail; F.fillRect(x - 0.3 * u, y0, 0.6 * u, y - y0);
+        F.fillStyle = rgb(S.drip || [200, 214, 238], (0.5 * S.wet * (1 - k)).toFixed(3));
+        F.fillRect(x - 0.25 * u, y - 0.5 * u, 0.5 * u, 0.7 * u);
       }
     }
     if (S.dew > 0.05) {
@@ -836,14 +869,18 @@ export class SkyClock {
     if (wet > 0.01) {
       const n = Math.min(DROPS.length, Math.round(42 * rain + 40 * storm)); const wind = (0.14 * rain + 0.32 * storm) / wet;
       const tint = F.tint ? mixC([214, 226, 255], F.tint, 0.7) : [214, 226, 255];
-      g.strokeStyle = rgb(tint, (0.55 * Math.min(1, wet)).toFixed(3)); g.lineWidth = 1; g.lineCap = 'round'; g.beginPath();
-      for (let k = 0; k < n; k++) {
-        const d = DROPS[k];
-        const y = ((d.y * (D + 20) + t * 130 * d.v) % (D + 20)) - 10;
-        const x = ((d.x * (D + 30) + y * wind) % (D + 30)) - 10;
-        g.moveTo(x, y); g.lineTo(x - d.l * wind, y - d.l);
+      // Fine, faint streaks in two depths: far drops thinner and dimmer than near ones, so rain reads as rain, not dashes.
+      g.lineCap = 'butt';
+      for (const near of [false, true]) {
+        g.strokeStyle = rgb(tint, ((near ? 0.42 : 0.24) * Math.min(1, wet)).toFixed(3)); g.lineWidth = near ? 0.8 : 0.55; g.beginPath();
+        for (let k = near ? 0 : 1; k < n; k += 2) {
+          const d = DROPS[k]; const sp = near ? 1.25 : 1; const len = d.l * (near ? 1.5 : 1);
+          const y = ((d.y * (D + 20) + t * 130 * d.v * sp) % (D + 20)) - 10;
+          const x = ((d.x * (D + 30) + y * wind) % (D + 30)) - 10;
+          g.moveTo(x, y); g.lineTo(x - len * wind, y - len);
+        }
+        g.stroke();
       }
-      g.stroke();
     }
     const sn = Math.min(1, F.snow);
     if (sn > 0.01) {
