@@ -6,7 +6,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { planSettingsSave, settingsView } from '../scripts/_settings-form.mjs';
+import { planSettingsSave, settingsView, SETTINGS_KEYS } from '../scripts/_settings-form.mjs';
 import { runConnectionTest, stepText } from '../scripts/_connection-test.mjs';
 
 const saved = {
@@ -201,4 +201,12 @@ test('the Setup Wizard button hands the wizard the sync manager', async () => {
   const body = src.slice(src.indexOf('static async #onStartImport'), src.indexOf('static async #onSubmit'));
   assert.match(body, /ImportWizard\.instance/);
   assert.match(body, /\.bind\(game\.modules\.get\(MODULE_ID\)\?\.api\?\.syncManager\)/);
+});
+
+test('the creatures switch is a plain on/off saved to syncCreatures', () => {
+  assert.equal(settingsView({}).syncCreatures, false);
+  assert.equal(settingsView({ syncCreatures: true }).syncCreatures, true);
+  const plan = planSettingsSave({ syncCreatures: true }, { syncCreatures: false });
+  assert.deepEqual(plan.writes.filter(([k]) => k === 'syncCreatures'), [['syncCreatures', true]]);
+  assert.ok(SETTINGS_KEYS.includes('syncCreatures'));
 });

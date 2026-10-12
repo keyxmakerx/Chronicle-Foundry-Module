@@ -74,6 +74,15 @@ export function getProperty(obj, path) {
   return String(path).split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
 }
 
+export function setProperty(obj, path, value) {
+  const keys = String(path).split('.');
+  const last = keys.pop();
+  let o = obj;
+  for (const k of keys) o = (o[k] ??= {});
+  o[last] = value;
+  return true;
+}
+
 /* ----------------------------------------------------------------- Hooks */
 
 export function makeHooks(log) {
@@ -413,6 +422,8 @@ export function installFoundry({ settings = {}, systemId = 'dnd5e' } = {}) {
   };
   const users = new Collection();
   users.set(gmUser.id, gmUser);
+  // One GM, so it is the active one.
+  users.activeGM = gmUser;
 
   const registered = new Map();
   const values = { ...settings };
@@ -529,6 +540,7 @@ export function installFoundry({ settings = {}, systemId = 'dnd5e' } = {}) {
         randomID,
         expandObject,
         getProperty,
+        setProperty,
         deepClone: clone,
         mergeObject: (a, b) => mergeInto(clone(a) || {}, expandObject(b)),
         escapeHTML: (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),

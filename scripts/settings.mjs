@@ -130,6 +130,15 @@ export function registerSettings() {
     default: false,
   });
 
+  game.settings.register(MODULE_ID, 'syncCreatures', {
+    name: game.i18n.localize('CHRONICLE.Settings.SyncCreatures.Name'),
+    hint: game.i18n.localize('CHRONICLE.Settings.SyncCreatures.Hint'),
+    scope: 'world',
+    config: false,
+    type: Boolean,
+    default: false,
+  });
+
   // Defense-in-depth layer on top of Chronicle's server-side sanitization
   // and Foundry's render-time sanitization: see _html-sanitizer.mjs.
   // Default false = sanitization ON; an operator can set true for

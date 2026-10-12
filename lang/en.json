@@ -118,6 +118,10 @@
         "Name": "Sync Characters",
         "Hint": "Sync Foundry actors with Chronicle character entities (requires matching game system)"
       },
+      "SyncCreatures": {
+        "Name": "Sync Creatures",
+        "Hint": "Make each Chronicle creature page an NPC actor in the \"Chronicle: Creatures\" folder and keep it matching the page. Stamina and conditions go back to Chronicle only for creatures whose page allows it. Needs a game system whose Chronicle package maps creatures (Draw Steel)."
+      },
       "SkipIncomingSanitization": {
         "Name": "Skip incoming HTML sanitization (advanced)",
         "Hint": "Disable Foundry-side HTML sanitization of Chronicle content at ingress. Chronicle already sanitizes server-side; Foundry sanitizes at render. This is a defense-in-depth middle layer. Turn ON only if you find legitimate inline styling from Chronicle is being stripped."
@@ -146,6 +150,9 @@
       "MembersMatched": "Auto-matched {count} Chronicle members to Foundry users.",
       "ConnectionLost": "Lost connection to Chronicle. Retrying...",
       "ConnectionRestored": "Connection to Chronicle restored"
+    },
+    "Creatures": {
+      "Folder": "Chronicle: Creatures"
     },
     "ActorSync": {
       "EnableClaimingHint": "Chronicle: Enable the \"Player Character Claiming\" addon in your Chronicle campaign to sync which players own their characters.",
@@ -822,6 +829,10 @@
           "Name": "Shops",
           "Hint": "Shop rooms and stock"
         }
+      },
+      "Creatures": {
+        "Name": "Creatures",
+        "Hint": "Creature pages become NPC actors, for game systems whose Chronicle package maps creatures"
       },
       "TellMe": "Tell me in chat when",
       "AnnounceHint": "A whisper to you only. Players never see it.",

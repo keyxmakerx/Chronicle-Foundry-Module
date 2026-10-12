@@ -198,7 +198,7 @@ export class ChronicleSettingsWindow extends HandlebarsApplicationMixin(Applicat
       journalCreateTypeId: data.journalCreateTypeId,
       members: changedMemberLinks(this.element),
     };
-    for (const key of ['syncEnabled', 'dmOnlyHidden', 'syncPermissions', 'autoSync', 'skipIncomingSanitization',
+    for (const key of ['syncEnabled', 'syncCreatures', 'dmOnlyHidden', 'syncPermissions', 'autoSync', 'skipIncomingSanitization',
       'calendarAnnounceWeather', 'calendarAnnounceWorldstate', 'calendarAnnounceSeasonEra', 'calendarAnnounceMoon']) {
       form[key] = !!data[key];
     }

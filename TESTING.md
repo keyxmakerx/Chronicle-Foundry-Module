@@ -309,6 +309,16 @@ that reads each field's `foundry_path` from the matched Chronicle system's manif
 - [ ] Only current user's changes pushed (other users' changes ignored)
 - [ ] Pre-existing actors can be manually pushed via dashboard Push button
 
+## Creature Sync (Draw Steel creature pages → NPC actors)
+
+Needs Draw Steel in both Chronicle and Foundry, and Creatures switched on in
+Chronicle settings, under What syncs.
+- [ ] A creature page made in Chronicle appears as one NPC actor in the "Chronicle: Creatures" folder, with level, organization, role, keywords, EV, size, Stamina, speed, stability, characteristics and free strike filled in
+- [ ] Editing the page in Chronicle updates the actor; editing the stat block on the actor sheet is not sent to Chronicle
+- [ ] A keyword Foundry doesn't know, or the Swarm organization, is left blank rather than guessed
+- [ ] Damage and conditions on the token stay in Foundry until the page allows sending them back; then they show on the page
+- [ ] Deleting the page in Chronicle (live or while Foundry is closed) keeps the actor, only unlinked
+
 ## NPC Tokens (Spotlight, Talking)
 
 Needs a GM and a player client on the same scene, and an NPC page synced as a journal.

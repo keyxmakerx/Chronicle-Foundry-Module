@@ -33,7 +33,7 @@ jobs:
         ports:
           - 6379:6379
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Pick the Chronicle branch
         id: ref
@@ -46,7 +46,7 @@ jobs:
             echo "ref=main" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: keyxmakerx/Chronicle
           ref: ${{ steps.ref.outputs.ref }}

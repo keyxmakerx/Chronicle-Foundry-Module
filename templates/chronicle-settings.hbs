@@ -86,6 +86,12 @@
         </fieldset>
       </div>
       {{/each}}
+      {{!-- Creatures come from Chronicle only, so there is no direction to pick. --}}
+      <div class="cs-part {{#unless view.syncCreatures}}is-off{{/unless}}" data-part="creatures">
+        <span class="cs-part-icon"><i class="fa-solid fa-dragon" aria-hidden="true"></i></span>
+        <label class="cs-part-name" for="cs-part-creatures">{{localize "CHRONICLE.SettingsWindow.Creatures.Name"}}<small>{{localize "CHRONICLE.SettingsWindow.Creatures.Hint"}}</small></label>
+        <span class="cs-switch"><input id="cs-part-creatures" name="syncCreatures" type="checkbox" {{#if view.syncCreatures}}checked{{/if}}><i aria-hidden="true"></i></span>
+      </div>
       {{#if pageTypes.length}}
       <div class="cs-field">
         <label for="cs-page-type">{{localize "CHRONICLE.SettingsWindow.NewPageType"}}</label>

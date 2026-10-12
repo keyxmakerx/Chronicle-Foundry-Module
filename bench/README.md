@@ -17,7 +17,9 @@ never left Foundry).
   sync modules), records the module's requests, and waits until it is quiet.
   Its `benchAdapter` is the one stand-in: a game system's field mapping
   (Chronicle `fields_data.hp` ↔ Foundry `system.hp`), because a fresh
-  Chronicle has no system package installed.
+  Chronicle has no system package installed. `benchCreatureFields` stands
+  in the same way for a system's creature fields (the campaign's own
+  Creature type, `challenge_rating` ↔ `system.cr`, Foundry-owned `hp`).
 - `chronicle.mjs` also makes maps (`seed.createMap`), through the owner's
   web route with the campaign's maps add-on switched on, since the sync API
   only reads maps.
@@ -26,7 +28,7 @@ never left Foundry).
   character turned into a journal, both sides agree on names, no failed
   writes, no hook errors, no error pop-ups).
 - `*.bench.mjs` are the scenarios, one file per area (`journals`, `actors`,
-  `items`, `maps`, `notes`); the area name is the argument to `run.sh`.
+  `creatures`, `items`, `maps`, `notes`); the area name is the argument to `run.sh`.
 
 ## Running it
 

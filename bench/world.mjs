@@ -49,13 +49,15 @@ async function loadModule() {
     import('../scripts/actor-sync.mjs'),
     import('../scripts/item-sync.mjs'),
     import('../scripts/map-sync.mjs'),
-  ]).then(([settings, sm, js, as, is, ms]) => ({
+    import('../scripts/creature-sync.mjs'),
+  ]).then(([settings, sm, js, as, is, ms, cs]) => ({
     registerSettings: settings.registerSettings,
     SyncManager: sm.SyncManager,
     JournalSync: js.JournalSync,
     ActorSync: as.ActorSync,
     ItemSync: is.ItemSync,
     MapSync: ms.MapSync,
+    CreatureSync: cs.CreatureSync,
   }));
   return modulesLoaded;
 }
@@ -85,6 +87,23 @@ export const benchAdapter = {
   toChronicleFieldsChanged(actor, change) {
     return change?.system?.hp === undefined ? null : { hp: change.system.hp };
   },
+};
+
+/**
+ * A system's creature fields, standing in for an installed package the same
+ * way `benchAdapter` does: the fantasy campaign's own Creature type, its
+ * `challenge_rating` as `system.cr`, and `hp` as Foundry-owned current
+ * Stamina.
+ */
+export const benchCreatureFields = {
+  system_id: 'bench',
+  preset_slug: 'creature',
+  foundry_actor_type: 'npc',
+  foundry_pull_fields: ['hp'],
+  fields: [
+    { key: 'challenge_rating', label: 'Challenge Rating', type: 'string', foundry_path: 'system.cr' },
+    { key: 'hp', label: 'HP', type: 'number', foundry_path: 'system.hp' },
+  ],
 };
 
 /** A new, empty Foundry world wired to `seed`'s campaign. */
@@ -132,6 +151,11 @@ export async function openWorld(world, { modules = ['journals'] } = {}) {
     const actors = new m.ActorSync();
     actors._loadAdapter = async () => benchAdapter;
     sm.registerModule(actors);
+  }
+  if (modules.includes('creatures')) {
+    const creatures = new m.CreatureSync();
+    creatures._loadDefs = async () => benchCreatureFields;
+    sm.registerModule(creatures);
   }
   if (modules.includes('items')) sm.registerModule(new m.ItemSync());
   if (modules.includes('maps')) sm.registerModule(new m.MapSync());
