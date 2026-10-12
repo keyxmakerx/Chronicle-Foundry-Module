@@ -210,3 +210,121 @@ export function clearOf(spot, size, rects, corner) {
   }
   return { x: spot.x, y: Math.round(y) };
 }
+
+/* ── The weather on the stone ── */
+
+const clamp01 = (x) => Math.max(0, Math.min(1, Number(x) || 0));
+
+/** '#rrggbb' as [r, g, b] (0..255), or null. */
+export function hexRgb(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** Magic weathers that glow out of the stone's cracks, and the colour each glows. */
+const GLOWS = {
+  aurora: (R) => R.aurora[0]?.c0, aether: (R) => R.air[0]?.c, divine: (R) => R.air[0]?.c,
+  arcane: (R) => R.parts[0]?.c, 'arcane-wind': (R) => R.air[0]?.c, // Ley light is white motes in many colours; on stone it reads as violet.
+  'ley-surge': () => '#9d8cff',
+  spectral: (R) => R.parts[0]?.c, veil: (R) => R.air[0]?.c, void: (R) => R.air[0]?.c,
+  sigils: (R) => R.sigils[0]?.c, motes: (R) => R.parts[0]?.c, sparks: (R) => R.parts[0]?.c2,
+  embers: (R) => R.parts[0]?.c, meteors: (R) => R.fire[0]?.c, miasma: (R) => R.air[0]?.c,
+  spores: (R) => R.parts[0]?.c,
+};
+
+/** Particles that settle on the stone's tops as dust, and ones that come to rest on it whole. */
+const DUSTS = { grain: 1, ash: 1, debris: 0.8 };
+const LITTER = { leaf: 1, petal: 1 };
+
+/**
+ * How a weather marks the stone figure, read from the sky's own recipe for it
+ * (`SkyLooks.resolve`), so every weather Chronicle's sky can draw (its
+ * built-ins and a campaign's own) leaves its mark, and none is left over when
+ * it clears. Each number is 0..1; colours are [r, g, b].
+ *   wet: darker stone with a sheen, and drops running down it (drip: their colour)
+ *   snow / hail: settled on the tops; rime: frost along every edge
+ *   dew: beads that catch the light, in fog and mist
+ *   dust: sand, ash or grit settled on the tops; soot: smoke-darkened stone
+ *   litter: leaves or petals resting on the tops
+ *   glow: magic glowing out of the cracks; heat: sun-bleached, dry stone
+ *   grey: colour drained out
+ */
+export function stoneWeather(R) {
+  const S = {
+    wet: 0, drip: null, snow: 0, hail: 0, rime: 0, dew: 0, dust: null, soot: 0,
+    litter: null, glow: null, heat: 0, grey: 0,
+  };
+  if (!R) return S;
+  const fx = Array.isArray(R.effects) ? R.effects : [];
+  const parts = Array.isArray(R.parts) ? R.parts : [];
+  const has = (id) => fx.includes(id);
+  S.wet = clamp01(0.8 * (R.rain || 0) + 0.3 * (R.hail || 0) + 0.2 * (R.storm || 0));
+  if (S.wet > 0) S.drip = hexRgb(R.rainTint?.[0]) || [200, 214, 238];
+  S.snow = clamp01(R.snow);
+  S.hail = clamp01(R.hail);
+  S.rime = clamp01((has('ice') ? 0.9 : 0) + (has('snow-heavy') ? 0.4 : 0));
+  for (const p of parts) {
+    if (DUSTS[p.p] && !S.dust) S.dust = { c: hexRgb(p.c) || [150, 140, 120], k: clamp01((p.a ?? 1) * DUSTS[p.p] * (p.mode === 'blow' && p.n < 60 ? 0.45 : 1)) };
+    if (LITTER[p.p] && !S.litter) S.litter = { kind: p.p, c: hexRgb(p.c) || [190, 110, 50], c2: hexRgb(p.c2) || hexRgb(p.c) || [220, 160, 60], k: clamp01(p.a ?? 1) };
+  }
+  S.soot = clamp01((has('smoke') ? 0.6 : 0) + (has('ashfall') ? 0.35 : 0) + (has('embers') ? 0.25 : 0));
+  for (const id of fx) {
+    const pick = GLOWS[id];
+    const c = pick && hexRgb(pick({ aurora: [], air: [], parts: [], sigils: [], fire: [], ...R }));
+    if (c) { S.glow = { c, k: id === 'void' ? 0.55 : 0.8 }; break; }
+  }
+  S.heat = has('haze') ? 1 : 0;
+  S.grey = clamp01(R.grey);
+  // Dew only from wet air: dust, smoke and heat haze thicken the air too, but leave the stone dry.
+  S.dew = S.dust || S.soot || S.heat ? 0 : clamp01((R.fog || 0) * (1 - S.wet) * (1 - S.snow) * 0.9);
+  return S;
+}
+
+/** What falls in front of the figure, from the same recipe: rain (tinted), snow, hail, storm and fog. */
+export function frontOf(R) {
+  if (!R) return { rain: 0, snow: 0, hail: 0, storm: 0, fog: 0, tint: null };
+  return {
+    rain: Math.max(0, Math.min(1.6, R.rain || 0)),
+    snow: Math.max(0, Math.min(1.6, R.snow || 0)),
+    hail: clamp01(R.hail),
+    storm: clamp01(R.storm),
+    fog: clamp01(R.fog),
+    tint: hexRgb(R.rainTint?.[0]),
+  };
+}
+
+/**
+ * A stand-in recipe for when Chronicle's sky has not loaded: the five front
+ * weathers `frontWeather` tells apart, as the dials the sky would give them.
+ */
+export function plainRecipe(kind) {
+  const R = { rain: 0, snow: 0, hail: 0, storm: 0, fog: 0, grey: 0, effects: [], parts: [], air: [], aurora: [], sigils: [], fire: [], rainTint: null, sky: null };
+  if (kind === 'rain') { R.rain = 1; R.effects = ['rain']; }
+  if (kind === 'storm') { R.rain = 1.25; R.storm = 1; R.effects = ['lightning']; }
+  if (kind === 'snow') { R.snow = 1; R.effects = ['snow']; }
+  if (kind === 'fog') { R.fog = 1; R.effects = ['fog']; }
+  return R;
+}
+
+/**
+ * Two weathers part of the way from one to the other, so a change rolls
+ * across the stone as it does in the sky. Numbers ease across; a colour
+ * comes from whichever side shows more.
+ */
+export function mixWeather(a, b, t) {
+  if (!a) return b; if (!b) return a;
+  const k = clamp01(t);
+  if (k <= 0) return a; if (k >= 1) return b;
+  const out = {};
+  for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    const x = a[key]; const y = b[key];
+    if (typeof x === 'number' || typeof y === 'number') out[key] = (x || 0) * (1 - k) + (y || 0) * k;
+    else if (x && y && typeof x === 'object' && !Array.isArray(x)) out[key] = { ...(k < 0.5 ? x : y), k: (x.k || 0) * (1 - k) + (y.k || 0) * k };
+    else if (x && !y && typeof x === 'object' && !Array.isArray(x)) out[key] = { ...x, k: (x.k || 0) * (1 - k) };
+    else if (y && !x && typeof y === 'object' && !Array.isArray(y)) out[key] = { ...y, k: (y.k || 0) * k };
+    else out[key] = k < 0.5 ? (x ?? y ?? null) : (y ?? x ?? null);
+  }
+  return out;
+}

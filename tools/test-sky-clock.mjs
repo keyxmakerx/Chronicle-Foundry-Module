@@ -3,8 +3,8 @@
  * The Sky Clock (scripts/sky-clock.mjs) draws the calendar as a globe with
  * Chronicle's own sky inside. These pin its pure decisions (_sky-clock.mjs):
  * corners and the cradle, the calendar and weather handed to the sky, what
- * falls in front of the figure, the frame rate, and where the figure's light
- * comes from. They also run the vendored sky code on a calendar built here,
+ * falls in front of the figure and the marks each weather leaves on its
+ * stone, the frame rate, and where the figure's light comes from. They also run the vendored sky code on a calendar built here,
  * and, with CHRONICLE_DIR set, check the vendored copies match Chronicle's.
  */
 
@@ -164,6 +164,83 @@ test('the vendored sky runs on the calendar the globe builds', () => {
   for (const k of ['zen', 'hor', 'h3']) assert.equal(st.P[k].length, 3, `palette ${k}`);
   const light = SC.figureLight(st);
   assert.ok(light.k > 0 && light.k <= 1);
+});
+
+function loadLooks() {
+  const win = { console, performance, devicePixelRatio: 1, matchMedia: () => ({ matches: false }), sessionStorage: { getItem: () => null, setItem() {} } };
+  win.window = win;
+  win.Chronicle = { register() {} };
+  win.document = { documentElement: { classList: { contains: () => false } }, createElement: () => ({ getContext: () => null }), addEventListener() {}, hidden: false };
+  const ctx = vm.createContext(win);
+  for (const f of ['sky_world.js', 'sky_looks.js']) vm.runInContext(readFileSync(join(VENDOR, f), 'utf8'), ctx, { filename: f });
+  return win.SkyLooks;
+}
+
+test('every weather Chronicle\'s sky draws marks the stone in range, and none is left when it clears', () => {
+  const L = loadLooks();
+  const ids = Object.keys(L.PHYS);
+  assert.ok(ids.length >= 40, 'the sky\'s built-in weathers');
+  const marked = (S) => Object.entries(S).some(([, v]) => (typeof v === 'number' ? v > 0.02 : !!v));
+  for (const id of ids) {
+    const S = SC.stoneWeather(L.resolve(L.spec({ preset_id: id })));
+    for (const [k, v] of Object.entries(S)) {
+      if (typeof v === 'number') assert.ok(v >= 0 && v <= 1, `${id}.${k} = ${v}`);
+      else if (v && v.k != null) assert.ok(v.k >= 0 && v.k <= 1 && v.c.every((c) => c >= 0 && c <= 255), `${id}.${k}`);
+    }
+    if (!['clear', 'partly-cloudy', 'cloudy', 'overcast'].includes(id)) assert.ok(marked(S), `${id} leaves no mark on the stone`);
+  }
+  assert.equal(marked(SC.stoneWeather(L.resolve(L.spec({ preset_id: 'clear' })))), false, 'clear stone is dry');
+  // A campaign's own weather draws like the built-in its icon and precipitation are closest to.
+  const own = SC.stoneWeather(L.resolve(L.spec({ preset_id: 'my-drizzle', icon: 'cloud-rain', precipitation: { type: 'rain', intensity: 0.4 } })));
+  assert.ok(own.wet > 0.5);
+});
+
+test('each kind of weather leaves its own mark', () => {
+  const L = loadLooks();
+  const of = (id) => SC.stoneWeather(L.resolve(L.spec({ preset_id: id })));
+  assert.ok(of('rain').wet > 0.7 && of('rain').snow === 0);
+  assert.ok(of('snow').snow > 0.8 && of('snow').wet === 0);
+  assert.ok(of('blizzard').rime > 0);
+  assert.ok(of('hail').hail > 0.9);
+  assert.ok(of('ice-storm').rime > 0.8);
+  assert.ok(of('fog').dew > 0.5);
+  assert.deepEqual(of('sandstorm').dust.c, [184, 137, 74]);
+  assert.equal(of('sandstorm').dew, 0, 'dust leaves the stone dry');
+  assert.equal(of('heat-wave').heat, 1);
+  assert.equal(of('heat-wave').dew, 0);
+  assert.ok(of('wildfire-smoke').soot > 0.5);
+  assert.equal(of('autumn-leaves').litter.kind, 'leaf');
+  assert.equal(of('sakura-bloom').litter.kind, 'petal');
+  const acid = of('acid-rain').drip;
+  assert.ok(acid[1] > acid[0] && acid[1] > acid[2], 'acid rain runs green');
+  const blood = of('blood-rain').drip;
+  assert.ok(blood[0] > blood[1] && blood[0] > blood[2], 'blood rain runs red');
+  assert.ok(of('luminous-sky').glow.k > 0.5);
+  assert.ok(of('divine-light').glow);
+  assert.ok(of('nullfront').grey > 0.5);
+  assert.equal(SC.frontOf(L.resolve(L.spec({ preset_id: 'hail' }))).hail > 0.9, true);
+  assert.deepEqual(SC.frontOf(L.resolve(L.spec({ preset_id: 'acid-rain' }))).tint, [126, 224, 90]);
+});
+
+test('without Chronicle\'s sky, the plain weathers still mark the stone', () => {
+  assert.ok(SC.stoneWeather(SC.plainRecipe('rain')).wet > 0.7);
+  assert.ok(SC.stoneWeather(SC.plainRecipe('snow')).snow > 0.9);
+  assert.ok(SC.stoneWeather(SC.plainRecipe('fog')).dew > 0.5);
+  assert.equal(SC.frontOf(SC.plainRecipe('storm')).storm, 1);
+  assert.equal(SC.stoneWeather(SC.plainRecipe('clear')).wet, 0);
+  assert.equal(SC.stoneWeather(null).snow, 0);
+});
+
+test('a change of weather rolls across the stone', () => {
+  const a = SC.stoneWeather(SC.plainRecipe('snow'));
+  const b = { ...SC.stoneWeather(SC.plainRecipe('rain')), dust: { c: [1, 2, 3], k: 1 } };
+  const half = SC.mixWeather(a, b, 0.5);
+  assert.ok(Math.abs(half.snow - a.snow / 2) < 1e-9);
+  assert.ok(Math.abs(half.wet - b.wet / 2) < 1e-9);
+  assert.equal(half.dust.k, 0.5, 'a mark arriving comes in by degrees');
+  assert.equal(SC.mixWeather(a, b, 0), a);
+  assert.equal(SC.mixWeather(a, b, 1), b);
+  assert.equal(SC.mixWeather(b, a, 1).dust, null, 'and is gone once the change is through');
 });
 
 const chronicle = process.env.CHRONICLE_DIR && join(process.env.CHRONICLE_DIR, 'static', 'js', 'widgets');
