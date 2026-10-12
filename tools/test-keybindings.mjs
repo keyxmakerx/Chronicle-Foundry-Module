@@ -31,7 +31,7 @@ test('every shortcut ships with no key bound', () => {
 test('GM windows are restricted to GMs; player windows are not', () => {
   const { calls } = register();
   const restricted = calls.filter((c) => c.opts.restricted).map((c) => c.action);
-  assert.deepEqual(restricted, ['openDashboard', 'openSettings', 'openDMScreen']);
+  assert.deepEqual(restricted, ['openDashboard', 'openDMScreen']);
 });
 
 test('each shortcut names keys found in en.json', () => {

@@ -610,10 +610,6 @@
         "Name": "Open the Chronicle Sync dashboard",
         "Hint": "GM only."
       },
-      "OpenSettings": {
-        "Name": "Open Chronicle settings",
-        "Hint": "GM only."
-      },
       "OpenDMScreen": {
         "Name": "Open the DM Screen",
         "Hint": "GM only. Works once the world is connected to Chronicle."

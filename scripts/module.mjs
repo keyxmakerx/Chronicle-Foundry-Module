@@ -33,7 +33,6 @@ import { registerShopRoomSocket, registerShopJournalButton } from './shop-room-w
 import { notebookAvailable, openCalendarWindow, openNotebook, registerPlayerNotebook } from './player-notebook.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
 import { registerShortcuts } from './_keybindings.mjs';
-import { openChronicleSettings } from './chronicle-settings.mjs';
 import { openQuestBoard, questLive, registerQuestBoard } from './quest-board.mjs';
 import { retireNotesFolder } from './_notes-folder.mjs';
 import { FLAG_SCOPE, MODULE_ID, syncOptions } from './constants.mjs';
@@ -78,7 +77,6 @@ Hooks.once('init', () => {
   registerShortcuts(game.keybindings, MODULE_ID, {
     run: {
       openDashboard,
-      openSettings: () => { openChronicleSettings(); },
       openDMScreen: () => { openDMScreen(() => syncManager?.api ?? null); },
       openNotebook: () => { openNotebook(); },
       openCalendar: () => { openCalendarWindow(); },
