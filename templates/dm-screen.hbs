@@ -108,6 +108,7 @@
           <button type="button" role="tab" aria-selected="true" data-action="tab" data-tab="rules">Rules</button>
         {{/if}}
         <button type="button" role="tab" aria-selected="{{#if hasRules}}false{{else}}true{{/if}}" data-action="tab" data-tab="reveal">Reveal</button>
+        <button type="button" role="tab" aria-selected="false" data-action="tab" data-tab="encounters">{{localize "CHRONICLE.Encounters.Tab"}}</button>
       </div>
       {{#if hasRules}}
         <div class="dms-blk" data-dms-pane="rules">
@@ -135,6 +136,7 @@
           <p class="dms-small">Nothing hidden right now.</p>
         {{/each}}
       </div>
+      <div class="dms-blk" data-dms-pane="encounters" data-dms-enc hidden></div>
     </section>
   </div>
 {{/if}}
