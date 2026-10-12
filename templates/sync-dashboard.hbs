@@ -2,10 +2,10 @@
 <div class="chronicle-dashboard-inner">
 
   {{#unless configured}}
-  <div class="dashboard-empty">
-    <i class="fa-solid fa-plug fa-2x"></i>
-    <p>{{localize "CHRONICLE.Dashboard.NotConfigured"}}</p>
-    <p class="hint">{{localize "CHRONICLE.Dashboard.NotConfiguredHint"}}</p>
+  <div class="cs-state dashboard-empty">
+    <i class="fa-solid fa-plug" aria-hidden="true"></i>
+    <b>{{localize "CHRONICLE.Dashboard.NotConfigured"}}</b>
+    <p>{{localize "CHRONICLE.Dashboard.NotConfiguredHint"}}</p>
     <button type="button" data-action="open-settings" class="dashboard-btn">
       <i class="fa-solid fa-gear"></i> {{localize "CHRONICLE.Dashboard.OpenSettings"}}
     </button>
@@ -13,21 +13,17 @@
   {{else}}
 
   {{#if loading}}
-  <div class="dashboard-loading">
-    <i class="fa-solid fa-spinner fa-spin"></i> {{localize "CHRONICLE.Dashboard.Common.Loading"}}
-  </div>
+  <div class="cs-loading dashboard-loading" role="status" aria-label="{{localize 'CHRONICLE.Dashboard.Common.Loading'}}"><div class="cs-skel"></div><div class="cs-skel"></div><div class="cs-skel"></div></div>
   {{/if}}
 
-  {{!-- Load error banner (full width, above the body) --}}
+  {{!-- What failed to load, above the body; the rest of the dashboard still works. --}}
   {{#if hasLoadErrors}}
-  <div class="dashboard-load-errors">
-    <i class="fa-solid fa-triangle-exclamation"></i>
-    {{localize "CHRONICLE.Dashboard.Common.LoadFailed"}}
-    {{#each loadErrors}}
-    <span class="load-error-item">{{tab}}{{#unless @last}},{{/unless}}</span>
-    {{/each}}
-    <button type="button" data-action="refresh" class="dashboard-btn btn-xs" title="{{localize 'CHRONICLE.Dashboard.Common.Retry'}}">
-      <i class="fa-solid fa-arrows-rotate"></i> {{localize "CHRONICLE.Dashboard.Common.Retry"}}
+  <div class="cs-state is-error dashboard-load-errors" role="alert">
+    <i class="fa-solid fa-cloud-bolt" aria-hidden="true"></i>
+    <b>{{localize "CHRONICLE.States.CantReach"}}</b>
+    <p>{{localize "CHRONICLE.Dashboard.Common.LoadFailed"}} {{#each loadErrors}}{{tab}}{{#unless @last}}, {{/unless}}{{/each}}</p>
+    <button type="button" data-action="refresh" class="dashboard-btn btn-sm">
+      <i class="fa-solid fa-arrows-rotate"></i> {{localize "CHRONICLE.States.TryAgain"}}
     </button>
   </div>
   {{/if}}
@@ -329,7 +325,7 @@
         {{!-- Empty / no results states --}}
         {{#unless entityGroups.length}}
         {{#unless foundryOnlyJournals.length}}
-        <div class="dashboard-empty-tab">
+        <div class="cs-state dashboard-empty-tab">
           {{#if searchFilter}}
           <i class="fa-solid fa-search fa-2x"></i>
           <p>{{localize "CHRONICLE.Dashboard.Entities.NoMatch" search=searchFilter}}</p>
@@ -386,7 +382,7 @@
         {{/each}}
       </div>
       {{else}}
-      <div class="dashboard-empty-tab">
+      <div class="cs-state dashboard-empty-tab">
         {{#if shopTypeExists}}
         <i class="fa-solid fa-store fa-2x"></i>
         <p>{{localize "CHRONICLE.Dashboard.Shops.NoShops"}}</p>
@@ -501,7 +497,7 @@
         </div>
         {{/each}}
         {{else}}
-        <div class="dashboard-empty-tab">
+        <div class="cs-state dashboard-empty-tab">
           <p>{{localize "CHRONICLE.Dashboard.Maps.NoMaps"}}</p>
         </div>
         {{/if}}
@@ -624,7 +620,7 @@
           {{/each}}
         </div>
         {{else}}
-        <div class="dashboard-empty-tab">
+        <div class="cs-state dashboard-empty-tab">
           <i class="fa-solid fa-users fa-2x"></i>
           <p>{{localize "CHRONICLE.Dashboard.Characters.NoActors"}}</p>
           <p class="hint">{{localize "CHRONICLE.Dashboard.Characters.NoActorsHint"}}</p>
@@ -632,7 +628,7 @@
         {{/if}}
 
         {{else}}
-        <div class="dashboard-empty-tab">
+        <div class="cs-state dashboard-empty-tab">
           <i class="fa-solid fa-toggle-off fa-2x"></i>
           <p>{{localize "CHRONICLE.Dashboard.Characters.Disabled"}}</p>
           <p class="hint">{{localize "CHRONICLE.Dashboard.Characters.DisabledHint"}}</p>
@@ -642,7 +638,7 @@
         </div>
         {{/if}}
       {{else}}
-      <div class="dashboard-empty-tab">
+      <div class="cs-state dashboard-empty-tab">
         <i class="fa-solid fa-puzzle-piece fa-2x"></i>
         <p>{{localize "CHRONICLE.Dashboard.Characters.NoMatchingSystem"}}{{#if foundrySystem}} (<code>{{foundrySystem}}</code>){{/if}}.</p>
         <ul class="hint" style="text-align: left; margin-top: 0.5rem;">
@@ -716,7 +712,7 @@
       </div>
 
       {{else}}
-      <div class="dashboard-empty-tab">
+      <div class="cs-state dashboard-empty-tab">
         {{#if calendar.calendarRebuilding}}
         <i class="fa-solid fa-screwdriver-wrench fa-2x"></i>
         <p>{{calendar.rebuildingDetail}}</p>

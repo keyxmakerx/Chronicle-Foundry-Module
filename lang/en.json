@@ -612,6 +612,11 @@
         "Message": "Your install URL is no longer valid. Copy the current Module Install URL from Chronicle's Campaign Settings → Integrations and reinstall this module to recover."
       }
     },
+    "States": {
+      "Loading": "Loading",
+      "CantReach": "Can't reach Chronicle",
+      "TryAgain": "Try again"
+    },
     "Keybindings": {
       "OpenDashboard": {
         "Name": "Open the Chronicle Sync dashboard",
