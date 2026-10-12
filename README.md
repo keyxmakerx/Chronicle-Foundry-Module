@@ -12,16 +12,49 @@
 
 Write in Chronicle between sessions and run the game in Foundry. Chronicle Sync runs in the GM's Foundry client and keeps the two in step: a change on either side shows up on the other, and journals, characters, inventories and map items catch up on what changed while Foundry was closed. Players never need a key of their own.
 
+```mermaid
+flowchart LR
+  C["Chronicle campaign"] <-->|"live, both ways"| G["GM's Foundry + Chronicle Sync"]
+  G -->|"journals, actors, maps, calendar"| W["Foundry world"]
+  W --> P["Players"]
+```
+
 ## What it syncs
 
-- **Journals**: Chronicle pages become Foundry journal entries. GM-only text and pictures stay hidden from players who don't own the page, and nothing is deleted without asking.
-- **Maps**: Chronicle maps open as Foundry journal pages with their markers, drawings, tokens, layers and fog. Players see the smudged picture of a shadowed map, and the GM can hand a map to a character.
-- **Characters and items**: actors and character pages map field by field for D&D 5e, Pathfinder 2e, or any system whose fields are annotated.
-- **Calendar**: Chronicle's date, weather, season, era and moon phases, with no Foundry calendar module needed.
-- **Shops and stashes**: Chronicle's shop rooms open in Foundry, and players buy with the character they pick. Stashes move items and money between characters, with the GM approving players' requests from a chat card.
-- **DM Screen and notebook**: the GM's DM Screen from Chronicle in a Foundry window, and each player's own Chronicle journal and jot notes.
-- **NPC tokens**: spotlight, talking glow and open page for Chronicle NPCs. "Show in Foundry" on an NPC page spotlights its token.
-- **Sync dashboard**: diagnostics, error logs, a copyable diagnostic bundle, a setup wizard for the first import, and the same sync history the owner sees in Chronicle.
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <b>Journals</b><br>
+      Chronicle pages become Foundry journal entries. GM-only text and pictures stay hidden from players who don't own the page, and nothing is deleted without asking.
+    </td>
+    <td width="50%" valign="top">
+      <b>Maps</b><br>
+      Chronicle maps open in Foundry with their markers, drawings, tokens, layers and fog. Players see the smudged picture of a shadowed map, and the GM can hand a map to a character.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <b>Characters, creatures and items</b><br>
+      Actors and character pages map field by field for D&amp;D 5e, Pathfinder 2e, Draw Steel, or any system whose fields are annotated. Draw Steel creatures arrive as NPC actors.
+    </td>
+    <td width="50%" valign="top">
+      <b>Calendar and the Sky Clock</b><br>
+      Chronicle's date, weather, season, era and moons, with no Foundry calendar module needed. Show it as a thin strip or as the Sky Clock, a glass globe holding the world's sky.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <b>Shops and stashes</b><br>
+      Chronicle's shop rooms open in Foundry, and players buy with the character they pick. Stashes move items and money between characters, with the GM approving requests from a chat card.
+    </td>
+    <td width="50%" valign="top">
+      <b>DM Screen, notebook and NPCs</b><br>
+      The GM's DM Screen in a Foundry window, each player's own journal and jot notes, and spotlight, talking glow and open page for NPC tokens.
+    </td>
+  </tr>
+</table>
+
+The **sync dashboard** shows what synced, what needs attention, and the same sync history the owner sees in Chronicle, with a copyable diagnostic bundle. Each person picks how much the windows move (Full, Calm or Off) and can bind keyboard shortcuts under Configure Controls.
 
 > **Older Chronicle servers and the calendar.** A Chronicle that still answers
 > calendar routes with `503 calendar_rebuilding` makes the module pause calendar
@@ -61,9 +94,9 @@ gives, without further configuration.
 ## Configuration
 
 1. Enable the module in your world's **Module Management**
-2. Open **Game Settings → Module Settings → Chronicle Sync**
-3. Paste the **Connect line** from Chronicle (your campaign → **Manage → Foundry**, **Connection** card → **Make a connect line**) and save; it fills in the URL, API key and campaign ID, then reload Foundry. Or enter the **API URL**, **API Key**, and **Campaign ID** by hand
-4. Enable the sync categories you want (Journals, Maps, Calendar, Characters)
+2. Open **Game Settings → Configure Settings → Chronicle Sync → Chronicle settings**
+3. On **Connection**, paste the **Connect line** from Chronicle (your campaign → **Manage → Foundry**, **Connection** card → **Make a connect line**) and save; it fills in the URL, API key and campaign ID, then reload Foundry. Or open **Enter details by hand**
+4. On **What syncs**, switch on the parts you want (Journals, Maps, Calendar, Characters, Shops) and pick a direction for each
 
 The module runs sync for the GM only. Players receive updates passively through Foundry.
 
