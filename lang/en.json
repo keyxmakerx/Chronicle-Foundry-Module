@@ -757,6 +757,72 @@
         "Action": "Chronicle didn't accept that change. Try again in a moment."
       }
     },
+    "Encounters": {
+      "Tab": "Encounters",
+      "SearchPlaceholder": "Search planned encounters",
+      "ReadyHeading": "Ready for game night",
+      "NoneReady": "No fights are marked ready. Search to find one.",
+      "More": "{n} more planned encounters. Type a page or creature name to find one.",
+      "NoMatch": "No encounters match.",
+      "Loading": "Loading…",
+      "CreatureOne": "1 creature",
+      "CreatureMany": "{n} creatures",
+      "Back": "Back",
+      "Reload": "Reload from Chronicle",
+      "NoScene": "Open a scene to place creatures.",
+      "SetUp": "Set up the start",
+      "ShowAll": "Show all hidden ({n})",
+      "ShowAllAsk": "Show {n} hidden creatures to the players? Every token this fight placed as hidden becomes visible.",
+      "ShowAllYes": "Show them",
+      "ShowAllDone": "Showed {n} to the players.",
+      "Cancel": "Cancel",
+      "Undo": "Undo placing",
+      "UndoAsk": "Remove the {n} tokens this fight placed on this scene? No other token is touched.",
+      "Undone": "Removed {n} tokens this fight placed.",
+      "Place": "Place",
+      "ClickScene": "Click the scene",
+      "Show": "Show",
+      "Hide": "Hide",
+      "ArmedStart": "Click the scene where the fight starts.",
+      "ArmedRow": "Click the scene where {name} should stand.",
+      "Group": "Group {g}",
+      "NoCreatures": "This encounter has no creatures.",
+      "NoActor": "Not in Foundry yet",
+      "NoActorTip": "This creature has no actor in Foundry yet. Turn on creature sync or add an actor with its name.",
+      "NothingToPlace": "Nothing to place: everything is already on the scene.",
+      "Placed": "Placed {n}. {hidden} of them hidden from the players.",
+      "SkippedNoActor": "Not in Foundry yet, so left off: {names}.",
+      "NoRoom": "No room near that spot for {n}; they were left off.",
+      "State": {
+        "out": "Not placed",
+        "seen": "Seen",
+        "hidden": "Hidden"
+      },
+      "Start": {
+        "seen": "Starts seen",
+        "hidden": "Starts hidden",
+        "later": "Arrives later"
+      },
+      "Tracker": {
+        "add": "Add who's here to the tracker",
+        "in": "In the tracker",
+        "notIn": "Not in the tracker",
+        "pending": "Pending",
+        "RunningAsk": "A fight is already running on this scene. Add this one's creatures to it?",
+        "Added": "Added {n} to the tracker.",
+        "AddedPending": "Added {n} to the tracker. {m} wait in Pending and join when placed.",
+        "AlreadyIn": "Everyone who is here is already in the tracker.",
+        "Nobody": "Nobody from this fight is on the scene yet."
+      },
+      "Error": {
+        "NeedsUpdate": "This Chronicle doesn't have planned encounters yet. Update Chronicle to use them here.",
+        "BadKey": "Chronicle didn't accept this world's sync key. Check it in the Chronicle Sync settings.",
+        "NotAllowed": "Encounters are for the campaign owner or a co-DM. Check that this world's sync key belongs to one of them.",
+        "Failed": "Encounters couldn't load from Chronicle. Try again in a moment.",
+        "Action": "That didn't work. Nothing was changed.",
+        "Place": "Couldn't place the creatures. Try again."
+      }
+    },
     "Stashes": {
       "Title": "Stashes",
       "ButtonTitle": "Open Stashes",

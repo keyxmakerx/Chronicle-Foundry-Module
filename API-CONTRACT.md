@@ -1168,6 +1168,45 @@ Used by: `dm-screen.mjs`. Scope: write. Body `{ "open": true }` or `{ "open": fa
 
 ---
 
+### Encounters
+
+The DM Screen's Encounters tab (`encounters.mjs`, parsed by
+`_encounter-list.mjs` and `_encounter-roster.mjs`). Read-only: the module never
+writes an encounter. Both routes are for the campaign owner or a co-DM; any
+other key gets 403. A Chronicle without them answers 404 and the tab says to
+update Chronicle. Re-verify by: 2026-11-12 (Chronicle `internal/plugins/syncapi/encounter_api_handler.go`, `internal/plugins/encounters/model.go`; added in Chronicle PR #1386)
+
+#### GET /encounters
+Used by: `encounters.mjs`. Scope: read. Query: `q` (matches the encounter or its page name), `limit` (default 50, max 100).
+
+**Response:** envelope `{"data":[...],"total":N}`, ready encounters first, then the most recently changed. The module also accepts a bare array.
+```json
+{
+  "data": [
+    { "id": "uuid", "page": { "id": "uuid", "name": "The Siege of Harrowmere" }, "name": "Ramparts fight",
+      "ready": true, "creatureCount": 7, "updatedAt": "2026-10-12T20:00:00Z" }
+  ],
+  "total": 1
+}
+```
+
+#### GET /encounters/:encounterID
+Used by: `encounters.mjs`. Scope: read.
+
+**Response:** `entityId` is the creature's page, `""` for a creature typed by name with no page. `group` is `A` to `H` (or empty). `start` is `seen`, `hidden` or `later`; the module treats anything else as `later`, which places nothing. `count` is how many copies the row stands for.
+```json
+{
+  "id": "uuid", "page": { "id": "uuid", "name": "The Siege of Harrowmere" }, "name": "Ramparts fight", "ready": true,
+  "heroes": [ { "id": "uuid", "name": "Vex" } ],
+  "creatures": [
+    { "id": "uuid", "entityId": "uuid", "name": "Hobgoblin Soldier", "count": 2, "group": "B", "start": "seen" }
+  ],
+  "version": 4, "updatedAt": "2026-10-12T20:00:00Z"
+}
+```
+
+---
+
 ## Chronicle-served Module Distribution
 
 The install/update contract: the URLs Foundry hits to fetch the module's

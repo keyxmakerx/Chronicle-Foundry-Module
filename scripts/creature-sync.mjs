@@ -25,7 +25,8 @@ import { log } from './logger.mjs';
 /** Actor flag holding the creature page this actor follows. */
 export const CREATURE_FLAG = 'creatureEntityId';
 const VERSION_FLAG = 'creatureUpdatedAt';
-const FOLDER_FLAG = 'creatureFolder';
+/** Folder flag marking the "Chronicle: Creatures" folder. */
+export const FOLDER_FLAG = 'creatureFolder';
 const STATE_KEY = 'foundry';
 const PULL_DELAY_MS = 750;
 

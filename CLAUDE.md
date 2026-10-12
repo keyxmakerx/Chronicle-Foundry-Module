@@ -23,6 +23,9 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
   Chronicle change to it means copying it again (`tools/test-shop-room.mjs`).
 - `scripts/dm-screen.mjs` (UI): the GM's DM Screen window, drawn from
   Chronicle's `GET /dm-screen`.
+- `scripts/encounters.mjs` (UI): the DM Screen's Encounters tab, which loads a
+  fight planned in Chronicle as a roster for the current scene (pure logic in
+  `_encounter-roster.mjs` and `_encounter-list.mjs`; Chronicle is read-only here).
 - `scripts/debug-hub.mjs` (UI): the dashboard's player reports (under Diagnostics) and player
   problem reports.
 - `templates/` Handlebars, `styles/` CSS, `lang/en.json` strings,

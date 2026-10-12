@@ -10,13 +10,15 @@
  * Opening it plays the site's opening: a d20 rolls out of the toolbar
  * button, lands on 20, and the screen unfolds out of it while the faces fall
  * and settle. One click or Escape skips it; reduced motion gets a fade.
- * Nothing loops. GM only; the key is the GM's own sync key.
+ * Nothing loops. GM only; the key is the GM's own sync key. Its Encounters
+ * tab (encounters.mjs) loads a planned fight as a roster for the scene.
  */
 
 import { getSetting } from './settings.mjs';
 import { currentMotion } from './motion.mjs';
 import { noticeText } from './_escape-html.mjs';
 import { downtimeNotice, errorKey, screenContext } from './_dm-screen-view.mjs';
+import { EncountersPane } from './encounters.mjs';
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -98,6 +100,7 @@ class DMScreenWindow extends HandlebarsApplicationMixin(ApplicationV2) {
     /** Hero ids folded open, kept across re-renders. */
     this._openHeroes = new Set();
     this._tab = '';
+    this._encounters = new EncountersPane(getApi);
     this._fx = { anims: [], nodes: [], raf: 0, playing: false, onKey: null };
   }
 
@@ -131,6 +134,8 @@ class DMScreenWindow extends HandlebarsApplicationMixin(ApplicationV2) {
     this._restoreState(root);
     root.querySelector('[data-dms-filter]')?.addEventListener('input', (e) => this._filter(e.target));
     root.querySelector('[data-dms-party]')?.addEventListener('scroll', (e) => partyEdges(e.target));
+    const encounters = root.querySelector('[data-dms-enc]');
+    if (encounters) this._encounters.mount(encounters);
     if (options.isFirstRender && !this._error) this._playOpening(root);
     else this._refreshParty();
   }
@@ -359,6 +364,12 @@ class DMScreenWindow extends HandlebarsApplicationMixin(ApplicationV2) {
     this._setPlaying(false);
   }
 
+  /** @override */
+  _onClose(options) {
+    this._encounters.destroy();
+    super._onClose?.(options);
+  }
+
   /** @override Fold back into the toolbar button, as the site does. */
   async close(options = {}) {
     this._stopAll();
@@ -461,6 +472,8 @@ function selectTab(root, tab) {
   root.querySelectorAll('[data-dms-pane]').forEach((p) => {
     p.hidden = p.dataset.dmsPane !== name;
   });
+  // The roster needs room, so the tab's panel widens while it is open.
+  root.querySelector('.dms-leaves')?.classList.toggle('dms-enc-open', name === 'encounters');
 }
 
 // The list grows past its usual height when one open hero alone wouldn't
