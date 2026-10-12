@@ -10,7 +10,8 @@ need rather than the whole file.
 ## Layout
 
 `scripts/*.mjs` module code (`_*.mjs` are pure helpers, each tested by its own
-`tools/test-*.mjs`); `templates/`, `styles/`, `lang/en.json`;
+`tools/test-*.mjs`); `templates/`, `styles/`, `lang/en.json`; `assets/` holds
+the generic monster token;
 `vendor/chronicle/` is Chronicle's shop room widget copied unchanged;
 `bench/` is the two-sided sync bench (`CHRONICLE_DIR=../Chronicle bench/run.sh`),
 and a sync change is not ready until its bench scenarios pass. Tests: Node's
