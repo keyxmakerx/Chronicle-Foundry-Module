@@ -21,6 +21,12 @@ repo root. There is no `package.json`.
 - [ ] WebSocket auto-reconnects after network interruption (wait 30s)
 - [ ] Message queue drains after reconnection
 
+## Keyboard shortcuts
+
+- [ ] Configure Controls lists a Chronicle Sync group with six shortcuts (dashboard, Chronicle settings, DM Screen, notebook, calendar, quest board), all with no key bound
+- [ ] Bind a key to "Open the Chronicle Sync dashboard", press it as the GM: the dashboard opens; as a player the GM-only three are not listed
+- [ ] With the world not connected, a key bound to the notebook does nothing and Foundry's own use of that key still works
+
 ## Journal Sync (Entities)
 
 ### Chronicle -> Foundry

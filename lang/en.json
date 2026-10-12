@@ -605,6 +605,32 @@
         "Message": "Your install URL is no longer valid. Copy the current Module Install URL from Chronicle's Campaign Settings → Integrations and reinstall this module to recover."
       }
     },
+    "Keybindings": {
+      "OpenDashboard": {
+        "Name": "Open the Chronicle Sync dashboard",
+        "Hint": "GM only."
+      },
+      "OpenSettings": {
+        "Name": "Open Chronicle settings",
+        "Hint": "GM only."
+      },
+      "OpenDMScreen": {
+        "Name": "Open the DM Screen",
+        "Hint": "GM only. Works once the world is connected to Chronicle."
+      },
+      "OpenNotebook": {
+        "Name": "Open my Chronicle notebook",
+        "Hint": "Works once the world is connected to Chronicle."
+      },
+      "OpenCalendar": {
+        "Name": "Open the Chronicle calendar",
+        "Hint": "Works once the world is connected to Chronicle."
+      },
+      "OpenQuests": {
+        "Name": "Open the quest board",
+        "Hint": "Works once the world is connected to Chronicle."
+      }
+    },
     "SceneControl": {
       "Notebook": "Open my Chronicle notebook",
       "Calendar": "Open the Chronicle calendar",
