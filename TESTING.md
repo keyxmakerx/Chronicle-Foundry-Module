@@ -486,7 +486,7 @@ opened by the gear in the dashboard's title bar.
 - [ ] Cancel/close without name -> no API call, no errors
 
 ### Chronicle settings
-- [ ] Configure Settings shows Chronicle's button and only the calendar strip and temperature unit; the button opens Chronicle settings with tabs Connection, What syncs, Calendar, Players and Advanced (GM only)
+- [ ] Configure Settings shows Chronicle's button and only the calendar strip, Motion and temperature unit; the button opens Chronicle settings with tabs Connection, What syncs, Calendar, Players and Advanced (GM only)
 - [ ] **Players:** one row per Chronicle member with a Linked / Not linked badge and a Foundry player dropdown; change one, press **Save**, reopen -> the change stuck and the other links are unchanged; **Fetch members again** re-reads the list
 - [ ] **What syncs:** the new-journal page type lists Chronicle's page types; pick one, **Save**, then make a journal in Foundry -> the Chronicle page has that type
 - [ ] **Connection:** **Setup Wizard** opens the import wizard; the API key field is always empty, with "Saved in this browser" when a key exists
