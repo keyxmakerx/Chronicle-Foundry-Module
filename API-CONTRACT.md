@@ -1531,6 +1531,8 @@ If the token is invalid, the server rejects the upgrade.
 | `sync.error` | `{ message }` | Synchronization error |
 | `sync.conflict` | Conflict details | Data conflict detected |
 
+Every `calendar.*` message goes to DM-equivalent sockets only (the GM's key). An event Chronicle stores as `dm_only` goes out with `visibility: "gm-only"`; other values pass through as stored, and the module treats anything but `"gm-only"` as public. Players get the calendar from the GM client's republished snapshot.
+
 `relation.*` messages go to the owner's socket and sockets of members the owner has
 given DM access only (a relation can
 name a private entity). Item sync treats any of them for a linked character
@@ -1629,8 +1631,8 @@ a player-visible one.
 
 | Type | Module behavior |
 |---|---|
-| `calendar.date.advanced` | Updates the cached date the dashboard shows. TODO(#95): apply it to the built-in calendar and confirm it back |
-| `calendar.event.created/updated/deleted` | Routed; no handler writes anywhere yet. TODO(#95) |
+| `calendar.date.advanced` | Updates the cached date the dashboard shows and re-reads the month window. TODO(#95): apply it to the built-in calendar and confirm it back |
+| `calendar.event.created/updated/deleted` | Re-reads the month window (`scheduleRefresh`); nothing is written into Foundry documents |
 | `calendar.weather.changed` | Updates the dashboard world-state panel and whispers a GM chat line (`calendarAnnounceWeather`). `null` payload → one `GET /calendar/weather` refetch |
 | `calendar.season.changed` | Panel + GM chat line (`calendarAnnounceSeasonEra`, default **on**) |
 | `calendar.era.changed` | Panel + GM chat line (`calendarAnnounceSeasonEra`, default **on**) |
