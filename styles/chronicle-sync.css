@@ -288,6 +288,45 @@
   margin-left: auto;
 }
 
+/* Diagnostics sits apart at the foot of the rail: it is for when something is wrong. */
+.dashboard-rail .item-diagnostics {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid color-mix(in srgb, var(--cs-text) 10%, transparent);
+}
+
+/* Diagnostics panes: a segmented switch, one pane shown at a time */
+.cs-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  margin: 0 0 10px;
+  border-radius: 8px;
+  background: var(--cs-surface-2);
+  border: 1px solid var(--cs-line);
+}
+.cs-seg [role="tab"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  margin: 0;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--cs-text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+.cs-seg [role="tab"]:hover { color: var(--cs-text); }
+.cs-seg [role="tab"].active { background: var(--cs-surface); color: var(--cs-text); font-weight: 600; box-shadow: 0 1px 2px color-mix(in srgb, var(--cs-text) 18%, transparent); }
+.cs-seg [role="tab"]:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
+.diag-pane { display: none; }
+.diag-pane.active { display: block; }
+.overview-more { margin-top: 12px; }
+
 /* ---------------------------------------------------------------------------
    Overview cockpit (landing tab)
    --------------------------------------------------------------------------- */
@@ -1125,7 +1164,7 @@
 }
 
 /* ================================================================= */
-/* STATUS TAB                                                         */
+/* CONNECTION, HEALTH AND ACTIVITY                                    */
 /* ================================================================= */
 
 .status-panel {
@@ -1478,6 +1517,20 @@
   color: var(--cs-on-status);
   background: var(--cs-bad);
   border-radius: 8px;
+}
+
+.dashboard-hint {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  border-radius: 6px;
+  border: 1px solid var(--cs-line);
+  background: var(--cs-surface-2);
+  color: var(--cs-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .dm-only-hint {

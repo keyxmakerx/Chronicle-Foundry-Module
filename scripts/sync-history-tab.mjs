@@ -1,5 +1,5 @@
 /**
- * The dashboard's History tab: the same sync history as Chronicle's
+ * The dashboard's History pane, under Diagnostics: the same sync history as Chronicle's
  * Manage › Sync history page, read from `GET /sync/history`.
  *
  * The dashboard re-renders often, so the tab keeps its rows and filters
@@ -25,7 +25,7 @@ export class SyncHistoryTab {
    * Attach to the panel after a dashboard render. Loads the first page the
    * first time the tab is shown.
    * @param {HTMLElement} el - the dashboard element
-   * @param {boolean} active - whether the History tab is showing
+   * @param {boolean} active - whether the History pane is showing
    */
   mount(el, active) {
     const root = el.querySelector('[data-history-root]');
@@ -48,7 +48,7 @@ export class SyncHistoryTab {
     if (active && this.events === null) this.load();
   }
 
-  /** The History tab was opened. */
+  /** The History pane was opened. */
   shown() {
     if (this.events === null) this.load();
   }

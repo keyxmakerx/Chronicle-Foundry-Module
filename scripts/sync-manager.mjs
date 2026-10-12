@@ -98,7 +98,7 @@ export class SyncManager {
     /**
      * @type {number} Count of DM-only / private entities synced this session
      * that landed hidden-from-players (ownership.default = NONE) because the
-     * `dmOnlyHidden` setting is on. Surfaced on the Status tab so a correctly-
+     * `dmOnlyHidden` setting is on. Surfaced on the Overview so a correctly-
      * hidden private entity isn't mistaken for "didn't sync".
      */
     this._dmOnlyHiddenCount = 0;

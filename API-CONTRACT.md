@@ -661,7 +661,7 @@ The campaign's sync history, both directions, newest first. Owner keys and
 keys of members with DM access only (403 otherwise); absent on older
 Chronicle (404).
 
-**Used by:** `sync-history-tab.mjs` → the dashboard's History tab
+**Used by:** `sync-history-tab.mjs` → the dashboard's History pane, under Diagnostics
 
 **Query:** `?limit=50&before=<id>&direction=to_chronicle|to_foundry|link&failed=1&q=<text>` (limit default 50, max 200; a filter matches a run when any of its steps does)
 

@@ -165,14 +165,23 @@
       "OpenSettings": "Open Settings",
       "NotConfigured": "Chronicle Sync is not configured.",
       "NotConfiguredHint": "Open Chronicle settings and paste a connect line from Chronicle.",
-      "Tabs": {
+      "Rail": {
+        "Overview": "Overview",
+        "Everyday": "Everyday",
         "Entities": "Entities",
-        "Shops": "Shops",
-        "Maps": "Maps",
         "Characters": "Characters",
-        "Members": "Members",
         "Calendar": "Calendar",
-        "Status": "Status"
+        "Library": "Library",
+        "Maps": "Maps",
+        "Shops": "Shops",
+        "Diagnostics": "Diagnostics",
+        "IssuesBadge": "{count} character(s) need a match"
+      },
+      "Diagnostics": {
+        "Health": "Health",
+        "Reports": "Player reports",
+        "History": "History",
+        "Connection": "Connection"
       },
       "Entities": {
         "PullAll": "Pull All",
@@ -257,7 +266,8 @@
         "Disabled": "Character sync is disabled.",
         "DisabledHint": "Turn on Characters in Chronicle settings, under What syncs, to sync actors with Chronicle.",
         "NoSystem": "Character sync requires a matching game system.",
-        "NoSystemHint": "Your Foundry system must match a Chronicle game system with character field templates."
+        "NoSystemHint": "Your Foundry system must match a Chronicle game system with character field templates.",
+        "NeedMatch": "Needs a match"
       },
       "StatusTab": {
         "Connection": "Connection",

@@ -232,7 +232,7 @@ export class ActorSync {
     await this._reconcileClaimOwnership();
 
     // Surface unresolved character links (broken / missing) so the GM can
-    // fix them in the dashboard's Issues tab rather than silently desyncing.
+    // fix them in the dashboard's Characters section rather than silently desyncing.
     try {
       await this._notifySyncIssues({ quick: feed?.mode === 'delta' });
     } catch (err) {
@@ -1191,7 +1191,7 @@ export class ActorSync {
 
   /**
    * If any character actors can't be matched to Chronicle (broken / missing
-   * links), nudge the GM toward the dashboard's Issues tab. Quiet when all clear.
+   * links), nudge the GM toward the dashboard's Characters section. Quiet when all clear.
    *
    * `quick` (after a change-feed catch-up) counts unlinked character actors
    * without listing Chronicle: the catch-up has just unlinked any actor whose
@@ -1207,7 +1207,7 @@ export class ActorSync {
       if (!issues.length) return;
       const n = issues.length;
       ui.notifications?.warn(
-        `Chronicle Sync: ${n} character${n === 1 ? '' : 's'} need attention — open the Chronicle dashboard (Issues) to match or create.`
+        `Chronicle Sync: ${n} character${n === 1 ? '' : 's'} need attention — open the Chronicle dashboard (Characters) to match or create.`
       );
       console.warn(`Chronicle: ${n} character sync issue(s) detected`, issues);
     } catch (err) {

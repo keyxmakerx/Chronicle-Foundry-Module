@@ -294,12 +294,12 @@ Chronicle brings its own calendar; no Foundry calendar module is used.
 ### Generic Adapter (all systems)
 Character sync uses one API-driven adapter (`scripts/adapters/generic-adapter.mjs`)
 that reads each field's `foundry_path` from the matched Chronicle system's manifest.
-- [ ] A game system with a Chronicle package that declares `foundry_path` fields (e.g. D&D 5e, PF2e, Draw Steel) -> Dashboard Status tab → Field Mapping shows Adapter loaded and a Character Type
+- [ ] A game system with a Chronicle package that declares `foundry_path` fields (e.g. D&D 5e, PF2e, Draw Steel) -> Dashboard Diagnostics → Health → Field Mapping shows Adapter loaded and a Character Type
 - [ ] Mapped fields sync Chronicle -> Foundry and Foundry -> Chronicle (change one number field each way)
 - [ ] Fields with `foundry_writable: false` push to Chronicle only and are not written back to the actor
 - [ ] Number fields are cast to numbers; string fields pass through
-- [ ] System package with no `foundry_path` on any field -> character sync is off (Characters tab shows no adapter, Status tab shows Adapter none)
-- [ ] The game system is matched by the Chronicle system's `foundry_system_id` and the system must be enabled for the campaign (Status tab → Game System shows both ids); a system that is installed but not enabled shows the "not enabled" message in the activity log
+- [ ] System package with no `foundry_path` on any field -> character sync is off (Characters tab shows no adapter, Diagnostics → Health shows Adapter none)
+- [ ] The game system is matched by the Chronicle system's `foundry_system_id` and the system must be enabled for the campaign (Diagnostics → Health → Game System shows both ids); a system that is installed but not enabled shows the "not enabled" message in the activity log
 - [ ] When Chronicle is unreachable at load, the last matched system is reused
 
 ### Edge Cases
@@ -403,7 +403,7 @@ Needs a Chronicle with quest boards (a category or a place page with at least on
 
 Needs a GM client and a player client, on each of Foundry v12, v13 and v14.
 
-- [ ] As a player, open a character's Stashes window, click "Report a problem", send text: "Sent to your GM"; the GM sees "{name} reported a problem" and the Debug tab badge goes up
+- [ ] As a player, open a character's Stashes window, click "Report a problem", send text: "Sent to your GM"; the GM sees "{name} reported a problem" and the Diagnostics badge goes up
 - [ ] In the GM's Journal sidebar there is no "Chronicle: problem reports" entry
 - [ ] In the player's browser console, `game.journal.find(j => j.getFlag("chronicle-sync", "problemReportsStore"))` returns `undefined`, and `game.journal.contents.some(j => j.name.includes("problem reports"))` is `false`
 - [ ] As the GM, the same first console line returns the entry, and its `flags["chronicle-sync"].reports` lists the report
@@ -439,25 +439,26 @@ Edits made on Chronicle while Foundry was disconnected arrive after reconnect, w
 
 ## Sync Dashboard
 
-The dashboard is a left rail of 10 tabs in four labelled groups. Rail order:
-Overview (top, ungrouped); Everyday: Entities, Characters, Calendar, Issues;
-Library: Shops, Maps; Setup: Config, Members; Diagnostics: Status.
+The dashboard is a left rail of seven sections. Rail order: Overview (top);
+Everyday: Entities, Characters, Calendar; Library: Maps, Shops; Diagnostics
+(at the foot, set apart). Settings live in the Chronicle settings window,
+opened by the gear in the dashboard's title bar.
 
 ### Access
 - [ ] Click the sidebar status indicator (when connected) or the Chronicle Sync button in the scene controls → dashboard opens (GM only); right-click on the indicator opens it even when disconnected; clicking while disconnected tries to reconnect
 - [ ] Dashboard shows "Chronicle Sync is not configured" with an **Open Settings** button when URL, key or campaign ID is missing
-- [ ] Dashboard opens to the last-active tab; an unknown saved tab falls back to Overview
+- [ ] Dashboard opens to the last-active section; an unknown saved tab falls back to Overview, and a tab saved by an older version opens where its content now lives (Status → Diagnostics, Health; Issues → Characters)
+- [ ] The gear in the title bar, next to the close button, opens Chronicle settings
 - [ ] A tab that fails to load shows a "Some data failed to load" banner naming the tab, with **Retry**
 
 ### Tabs
-- [ ] **Overview:** connection banner (green/yellow/red) with **Reconnect** when not connected; stat tiles for Entities Synced, Characters Synced (n/total) and Maps Linked, each jumps to its tab on click; "Needs Attention" lists only real problems (each row jumps to the fixing tab) or says "Everything's in sync"; **Sync Everything Now**, **Diagnostics** and **Refresh** work
+- [ ] **Overview:** connection banner (green/yellow/red) with **Reconnect** when not connected; stat tiles for Entities Synced, Characters Synced (n/total) and Maps Linked, each jumps to its tab on click; "Needs Attention" lists only real problems (each row jumps to the fixing tab) or says "Everything's in sync"; **Sync Everything Now**, **Diagnostics** and **Refresh** work; below them, the DM-only note when any were hidden, the last sync time, Recent Activity and **Clear Log**
 - [ ] **Entities:** entity list grouped by type with sync status dots, Pull/Push per row, Pull All / Push All, Resync All Journals, visibility toggle, search filter, bulk select (Make Public / Private / Delete / Change Type), **Create Type**
-- [ ] **Characters:** system badge, synced and unlinked actors, Push / Push All / Re-sync (see Character Sync)
+- [ ] **Characters:** when any character can't be matched, a "Needs a match" list comes first and the rail shows its count; each row offers a "Match to existing…" dropdown with **Match**, and **Create new**, and resolving a row links it and removes it. Below: system badge, synced and unlinked actors, Push / Push All / Re-sync (see Character Sync)
 - [ ] **Calendar:** shows Chronicle's date and time and the world-state panel (weather, season, era, moons); the tab explains why when sync is disabled, no calendar is configured, or the calendar is rebuilding or unreachable
-- [ ] **Issues:** badge shows the number of character actors that cannot be matched. Each row offers a "Match to existing…" dropdown with **Match**, and **Create new**. Resolving a row links it and removes it. With none, the tab says every character is linked
 - [ ] **Shops:** shop entities with type, keeper, private lock, "Synced" badge and an **Open** button that opens the Shop window; empty states say whether the "Shop" entity type is missing or just has no shops
 - [ ] **Maps:** per-map rows with the map's picture (a shadowed map shows the players' copy), marker / drawing / token counts, **Open in Foundry**, external-link icon; **Resync All Maps**, **Open Chronicle Maps Folder**; summary row and dismissible error list (see Map Sync)
-- [ ] **Status:** Game System (Foundry and Chronicle system, Character Sync), Diagnostics, Field Mapping, Sync Capability (pick an actor to inspect; **Copy** report and JSON), Error Log, Recent Activity, Diagnostic Bundle copy and System Debug Export copy
+- [ ] **Diagnostics:** a Health / Player reports / History switch; the badge counts new player reports. Health: Game System (Foundry and Chronicle system, Character Sync), Connection, Field Mapping, Sync Capability (pick an actor to inspect; **Copy** report and JSON), Error Log, Diagnostic Bundle copy and System Debug Export copy. Player reports and History as below
 
 ### Layout Persistence
 - [ ] Switch to Maps tab, close dashboard, reopen -> Maps tab still active (a different tab than Overview)
@@ -490,8 +491,8 @@ Library: Shops, Maps; Setup: Config, Members; Diagnostics: Status.
 ### Diagnostics
 - [ ] Health metrics: Uptime, API OK, API Errors, Reconnects, Last Success, Last Error
 - [ ] Error log: recent errors (up to 50) with timestamp, method, path, status
-- [ ] Retry queue: failed writes queued and processed on reconnect (Status tab → Pending Retries drains to 0)
+- [ ] Retry queue: failed writes queued and processed on reconnect (Diagnostics → Health → Pending Retries drains to 0)
 - [ ] Activity log: recent sync actions (up to 100 kept, newest first) with color-coded type icons
-- [ ] Status tab -> **Copy Diagnostic Bundle** puts a Markdown report (versions, connection health, sync state, field mapping, recent activity and errors) on the clipboard; it contains no API key
-- [ ] Clear log button resets activity log (Status tab)
-- [ ] Reconnect button (Status tab, and Overview when disconnected) triggers manual WebSocket reconnection
+- [ ] Diagnostics → Health → **Copy Diagnostic Bundle** puts a Markdown report (versions, connection health, sync state, field mapping, recent activity and errors) on the clipboard; it contains no API key
+- [ ] Clear log button resets the Overview's recent activity
+- [ ] Reconnect button (Overview, when disconnected) triggers manual WebSocket reconnection

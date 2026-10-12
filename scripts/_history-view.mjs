@@ -1,5 +1,5 @@
 /**
- * The History tab's rows: Chronicle's sync history (`GET /sync/history`)
+ * The History pane's rows: Chronicle's sync history (`GET /sync/history`)
  * drawn in the same Trace look as Chronicle's Manage › Sync history page.
  * Built as plain node descriptions, so it is testable without a DOM.
  * `tools/test-history-view.mjs`.

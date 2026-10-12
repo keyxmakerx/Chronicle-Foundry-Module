@@ -38,42 +38,32 @@
   {{!-- Left rail: vertical nav grouped by how often a GM needs each section --}}
   <nav class="dashboard-tabs dashboard-rail" data-group="primary">
     <a class="item item-overview" data-tab="overview">
-      <i class="fa-solid fa-gauge-high"></i> Overview
+      <i class="fa-solid fa-gauge-high"></i> {{localize "CHRONICLE.Dashboard.Rail.Overview"}}
     </a>
 
-    <div class="rail-group-label">Everyday</div>
+    <div class="rail-group-label">{{localize "CHRONICLE.Dashboard.Rail.Everyday"}}</div>
     <a class="item" data-tab="entities">
-      <i class="fa-solid fa-book"></i> Entities
+      <i class="fa-solid fa-book"></i> {{localize "CHRONICLE.Dashboard.Rail.Entities"}}
     </a>
     <a class="item" data-tab="characters">
-      <i class="fa-solid fa-users"></i> Characters
+      <i class="fa-solid fa-users"></i> {{localize "CHRONICLE.Dashboard.Rail.Characters"}}
+      {{#if issues.hasIssues}}<span class="member-tab-badge" title="{{localize 'CHRONICLE.Dashboard.Rail.IssuesBadge' count=issues.count}}">{{issues.count}}</span>{{/if}}
     </a>
     <a class="item" data-tab="calendar">
-      <i class="fa-solid fa-calendar"></i> Calendar
-    </a>
-    <a class="item" data-tab="issues">
-      <i class="fa-solid fa-link-slash"></i> Issues
-      {{#if issues.hasIssues}}<span class="member-tab-badge" title="{{issues.count}} character(s) need attention">{{issues.count}}</span>{{/if}}
+      <i class="fa-solid fa-calendar"></i> {{localize "CHRONICLE.Dashboard.Rail.Calendar"}}
     </a>
 
-    <div class="rail-group-label">Library</div>
-    <a class="item" data-tab="shops">
-      <i class="fa-solid fa-store"></i> Shops
-    </a>
+    <div class="rail-group-label">{{localize "CHRONICLE.Dashboard.Rail.Library"}}</div>
     <a class="item" data-tab="maps">
-      <i class="fa-solid fa-map"></i> Maps
+      <i class="fa-solid fa-map"></i> {{localize "CHRONICLE.Dashboard.Rail.Maps"}}
+    </a>
+    <a class="item" data-tab="shops">
+      <i class="fa-solid fa-store"></i> {{localize "CHRONICLE.Dashboard.Rail.Shops"}}
     </a>
 
-    <div class="rail-group-label">Diagnostics</div>
-    <a class="item" data-tab="status">
-      <i class="fa-solid fa-signal"></i> Status
-    </a>
-    <a class="item" data-tab="debug">
-      <i class="fa-solid fa-bug"></i> {{localize "CHRONICLE.Debug.TabLabel"}}
+    <a class="item item-diagnostics" data-tab="diagnostics">
+      <i class="fa-solid fa-stethoscope"></i> {{localize "CHRONICLE.Dashboard.Rail.Diagnostics"}}
       {{#if debug.unread}}<span class="member-tab-badge" title="{{localize 'CHRONICLE.Debug.NewBadge' count=debug.unread}}">{{debug.unread}}</span>{{/if}}
-    </a>
-    <a class="item" data-tab="history">
-      <i class="fa-solid fa-clock-rotate-left"></i> History
     </a>
   </nav>
 
@@ -136,7 +126,7 @@
           <button type="button" class="dashboard-btn btn-sm" data-action="resync-everything">
             <i class="fa-solid fa-rotate"></i> Sync Everything Now
           </button>
-          <button type="button" class="dashboard-btn btn-sm" data-jump-tab="status">
+          <button type="button" class="dashboard-btn btn-sm" data-jump-tab="diagnostics:health">
             <i class="fa-solid fa-stethoscope"></i> Diagnostics
           </button>
           <button type="button" class="dashboard-btn btn-sm" data-action="refresh">
@@ -145,6 +135,46 @@
         </div>
       </div>
       {{/with}}
+      <div class="overview-panel overview-more">
+        {{#if dmOnlyHiddenCount}}
+        <div class="dashboard-hint dm-only-hint">
+          <i class="fa-solid fa-user-secret"></i>
+          {{localize "CHRONICLE.Dashboard.StatusTab.DmOnlyHiddenNote" count=dmOnlyHiddenCount}}
+        </div>
+        {{/if}}
+
+        <div class="last-sync-info">
+          Last sync: <span>{{lastSyncTime}}</span>
+        </div>
+
+        <h3 class="section-heading">Recent Activity</h3>
+        <div class="activity-log">
+          {{#each activityLog}}
+          <div class="log-entry log-{{type}}">
+            <span class="log-time">{{this.timeFormatted}}</span>
+            <span class="log-icon">
+              {{#if (eq type "pull")}}<i class="fa-solid fa-download"></i>{{/if}}
+              {{#if (eq type "push")}}<i class="fa-solid fa-upload"></i>{{/if}}
+              {{#if (eq type "update")}}<i class="fa-solid fa-pen"></i>{{/if}}
+              {{#if (eq type "link")}}<i class="fa-solid fa-link"></i>{{/if}}
+              {{#if (eq type "unlink")}}<i class="fa-solid fa-unlink"></i>{{/if}}
+              {{#if (eq type "connect")}}<i class="fa-solid fa-bolt"></i>{{/if}}
+              {{#if (eq type "error")}}<i class="fa-solid fa-triangle-exclamation"></i>{{/if}}
+            </span>
+            <span class="log-message">{{message}}</span>
+          </div>
+          {{else}}
+          <div class="log-empty">No recent activity.</div>
+          {{/each}}
+        </div>
+
+        <div class="status-actions">
+          <button type="button" data-action="clear-log" class="dashboard-btn btn-sm">
+            <i class="fa-solid fa-trash"></i> Clear Log
+          </button>
+        </div>
+
+      </div>
     </div>
 
 
@@ -482,6 +512,48 @@
     {{!-- CHARACTERS TAB                                                    --}}
     {{!-- ================================================================= --}}
     <div class="tab" data-tab="characters" data-group="primary">
+      {{!-- Characters that couldn't be matched come first: they need the GM. --}}
+      {{#if issues.hasIssues}}
+      <section class="character-issues">
+      <h3 class="section-heading">{{localize "CHRONICLE.Dashboard.Characters.NeedMatch"}}</h3>
+      <p class="config-hint">{{issues.headline}}</p>
+      <div class="character-list">
+        {{#each issues.issues}}
+        <div class="character-row issue-row" data-actor-id="{{actorId}}">
+          <div class="character-info">
+            {{#if img}}
+            <img class="character-portrait" src="{{img}}" alt="{{name}}" />
+            {{else}}
+            <span class="character-portrait-placeholder"><i class="fa-solid fa-user"></i></span>
+            {{/if}}
+            <div class="character-details">
+              <span class="character-name">{{name}}</span>
+              <span class="character-sync-status unlinked"><i class="fa-solid fa-link-slash"></i> {{label}}</span>
+            </div>
+          </div>
+          <div class="character-actions issue-actions">
+            <select class="issue-match-select" title="Match to an existing Chronicle character">
+              <option value="">— Match to existing… —</option>
+              {{#each options}}
+              <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>
+              {{/each}}
+            </select>
+            <button type="button" class="dashboard-btn btn-xs btn-push"
+                    data-action="resolve-match" data-actor-id="{{actorId}}"
+                    title="Link to the selected character and push this actor's data">
+              <i class="fa-solid fa-link"></i> Match
+            </button>
+            <button type="button" class="dashboard-btn btn-xs"
+                    data-action="resolve-create" data-actor-id="{{actorId}}"
+                    title="Create a new Chronicle character of the correct type and link it">
+              <i class="fa-solid fa-plus"></i> Create new
+            </button>
+          </div>
+        </div>
+        {{/each}}
+      </div>
+      </section>
+      {{/if}}
       {{#if characterSyncAvailable}}
         {{#if syncCharacters}}
         {{#if pcClaimingHint}}
@@ -583,58 +655,6 @@
     </div>
 
     {{!-- ================================================================= --}}
-    {{!-- ISSUES TAB (character link resolver)                              --}}
-    {{!-- ================================================================= --}}
-    <div class="tab" data-tab="issues" data-group="primary">
-      {{#if issues.hasIssues}}
-      <div class="dashboard-hint">
-        <i class="fa-solid fa-triangle-exclamation"></i> {{issues.headline}}
-      </div>
-      <div class="character-list">
-        {{#each issues.issues}}
-        <div class="character-row issue-row" data-actor-id="{{actorId}}">
-          <div class="character-info">
-            {{#if img}}
-            <img class="character-portrait" src="{{img}}" alt="{{name}}" />
-            {{else}}
-            <span class="character-portrait-placeholder"><i class="fa-solid fa-user"></i></span>
-            {{/if}}
-            <div class="character-details">
-              <span class="character-name">{{name}}</span>
-              <span class="character-sync-status unlinked"><i class="fa-solid fa-link-slash"></i> {{label}}</span>
-            </div>
-          </div>
-          <div class="character-actions issue-actions">
-            <select class="issue-match-select" title="Match to an existing Chronicle character">
-              <option value="">— Match to existing… —</option>
-              {{#each options}}
-              <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>
-              {{/each}}
-            </select>
-            <button type="button" class="dashboard-btn btn-xs btn-push"
-                    data-action="resolve-match" data-actor-id="{{actorId}}"
-                    title="Link to the selected character and push this actor's data">
-              <i class="fa-solid fa-link"></i> Match
-            </button>
-            <button type="button" class="dashboard-btn btn-xs"
-                    data-action="resolve-create" data-actor-id="{{actorId}}"
-                    title="Create a new Chronicle character of the correct type and link it">
-              <i class="fa-solid fa-plus"></i> Create new
-            </button>
-          </div>
-        </div>
-        {{/each}}
-      </div>
-      {{else}}
-      <div class="dashboard-empty-tab">
-        <i class="fa-solid fa-circle-check fa-2x"></i>
-        <p>No character sync issues.</p>
-        <p class="hint">Every character actor is linked to a Chronicle entity. If a linked character's data looks stale, use the <strong>Re-sync</strong> button on the Characters tab.</p>
-      </div>
-      {{/if}}
-    </div>
-
-    {{!-- ================================================================= --}}
     {{!-- CALENDAR TAB                                                      --}}
     {{!-- ================================================================= --}}
     <div class="tab" data-tab="calendar" data-group="primary">
@@ -720,35 +740,17 @@
     </div>
 
     {{!-- ================================================================= --}}
-    {{!-- STATUS TAB                                                        --}}
+    {{!-- DIAGNOSTICS TAB: health, player reports and sync history          --}}
     {{!-- ================================================================= --}}
-    <div class="tab" data-tab="status" data-group="primary">
+    <div class="tab" data-tab="diagnostics" data-group="primary">
+      <div class="cs-seg" role="tablist" aria-label="{{localize "CHRONICLE.Dashboard.Rail.Diagnostics"}}">
+        <button type="button" role="tab" data-diag="health">{{localize "CHRONICLE.Dashboard.Diagnostics.Health"}}</button>
+        <button type="button" role="tab" data-diag="reports">{{localize "CHRONICLE.Dashboard.Diagnostics.Reports"}}{{#if debug.unread}} <span class="member-tab-badge">{{debug.unread}}</span>{{/if}}</button>
+        <button type="button" role="tab" data-diag="history">{{localize "CHRONICLE.Dashboard.Diagnostics.History"}}</button>
+      </div>
+
+      <div class="diag-pane" role="tabpanel" data-diag-pane="health">
       <div class="status-panel">
-        <div class="connection-status state-{{connectionState}}">
-          <span class="status-dot"></span>
-          <span>Connection: <strong>{{connectionLabel}}</strong></span>
-        </div>
-
-        <div class="sync-stats">
-          <div class="stat-box">
-            <div class="stat-value">{{syncedEntities}}</div>
-            <div class="stat-label">Entities Synced</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-value">{{linkedScenes}}</div>
-            <div class="stat-label">Maps Linked</div>
-          </div>
-        </div>
-
-        {{!-- DM-only clarification (audit §1A): a private entity that correctly
-              lands hidden-from-players is not "didn't sync" — it reached the GM. --}}
-        {{#if dmOnlyHiddenCount}}
-        <div class="dashboard-hint dm-only-hint">
-          <i class="fa-solid fa-user-secret"></i>
-          {{localize "CHRONICLE.Dashboard.StatusTab.DmOnlyHiddenNote" count=dmOnlyHiddenCount}}
-        </div>
-        {{/if}}
-
         {{!-- Game system detection --}}
         <div class="system-detection">
           <h3 class="section-heading">Game System</h3>
@@ -761,11 +763,11 @@
               <span class="system-label">Chronicle System:</span>
               {{#if systemMatched}}
               <span class="system-value system-matched">
-                <i class="fa-solid fa-check-circle" style="color: #4ade80"></i> {{matchedSystem}} — Matched
+                <i class="fa-solid fa-check-circle"></i> {{matchedSystem}} — Matched
               </span>
               {{else}}
               <span class="system-value system-no-match">
-                <i class="fa-solid fa-circle-xmark" style="color: #f87171"></i> No match &mdash; check Packages &amp; Campaign Settings
+                <i class="fa-solid fa-circle-xmark"></i> No match &mdash; check Packages &amp; Campaign Settings
               </span>
               {{/if}}
             </div>
@@ -773,7 +775,7 @@
               <span class="system-label">Character Sync:</span>
               {{#if characterSyncAvailable}}
                 {{#if syncCharacters}}
-                <span class="system-value"><i class="fa-solid fa-toggle-on" style="color: #4ade80"></i> Enabled</span>
+                <span class="system-value system-matched"><i class="fa-solid fa-toggle-on"></i> Enabled</span>
                 {{else}}
                 <span class="system-value"><i class="fa-solid fa-toggle-off"></i> Disabled</span>
                 {{/if}}
@@ -784,12 +786,8 @@
           </div>
         </div>
 
-        <div class="last-sync-info">
-          Last sync: <span>{{lastSyncTime}}</span>
-        </div>
-
         {{!-- Diagnostics section (F-QoL) --}}
-        <h3 class="section-heading">Diagnostics</h3>
+        <h3 class="section-heading">{{localize "CHRONICLE.Dashboard.Diagnostics.Connection"}}</h3>
         <div class="diagnostics-grid">
           <div class="stat-box">
             <div class="stat-value">{{healthMetrics.uptimePercent}}%</div>
@@ -899,41 +897,6 @@
         </div>
         {{/if}}
 
-        <h3 class="section-heading">Recent Activity</h3>
-        <div class="activity-log">
-          {{#each activityLog}}
-          <div class="log-entry log-{{type}}">
-            <span class="log-time">{{this.timeFormatted}}</span>
-            <span class="log-icon">
-              {{#if (eq type "pull")}}<i class="fa-solid fa-download"></i>{{/if}}
-              {{#if (eq type "push")}}<i class="fa-solid fa-upload"></i>{{/if}}
-              {{#if (eq type "update")}}<i class="fa-solid fa-pen"></i>{{/if}}
-              {{#if (eq type "link")}}<i class="fa-solid fa-link"></i>{{/if}}
-              {{#if (eq type "unlink")}}<i class="fa-solid fa-unlink"></i>{{/if}}
-              {{#if (eq type "connect")}}<i class="fa-solid fa-bolt"></i>{{/if}}
-              {{#if (eq type "error")}}<i class="fa-solid fa-triangle-exclamation"></i>{{/if}}
-            </span>
-            <span class="log-message">{{message}}</span>
-          </div>
-          {{else}}
-          <div class="log-empty">No recent activity.</div>
-          {{/each}}
-        </div>
-
-        <div class="status-actions">
-          <button type="button" data-action="clear-log" class="dashboard-btn btn-sm">
-            <i class="fa-solid fa-trash"></i> Clear Log
-          </button>
-          <button type="button" data-action="open-settings" class="dashboard-btn btn-sm">
-            <i class="fa-solid fa-gear"></i> Settings
-          </button>
-          {{#if (eq connectionState "disconnected")}}
-          <button type="button" data-action="reconnect" class="dashboard-btn btn-sm">
-            <i class="fa-solid fa-plug"></i> Reconnect
-          </button>
-          {{/if}}
-        </div>
-
         {{!-- Diagnostic Bundle (troubleshooting — versions, health, logs, capability) --}}
         <h3 class="section-heading">Diagnostic Bundle</h3>
         <p class="config-hint">One copy-paste troubleshooting report — versions, connection health, sync status, capability, and recent activity/errors. Paste into a bug report or the admin AI.</p>
@@ -955,12 +918,9 @@
         </div>
 
       </div>
-    </div>
+      </div>
 
-    {{!-- ================================================================= --}}
-    {{!-- DEBUG TAB                                                         --}}
-    {{!-- ================================================================= --}}
-    <div class="tab" data-tab="debug" data-group="primary">
+      <div class="diag-pane" role="tabpanel" data-diag-pane="reports">
       <div class="debug-panel">
 
         <h3 class="section-heading">{{localize "CHRONICLE.Debug.Reported" count=debug.unread}}</h3>
@@ -1080,10 +1040,10 @@
         </div>
 
       </div>
-    </div>
+      </div>
 
-    {{!-- History: Chronicle's sync history, both directions (sync-history-tab.mjs) --}}
-    <div class="tab" data-tab="history" data-group="primary">
+      {{!-- Chronicle's sync history, both directions (sync-history-tab.mjs) --}}
+      <div class="diag-pane" role="tabpanel" data-diag-pane="history">
       <div class="sync-history" data-history-root>
         <form class="sh-bar" data-history-filters>
           <label class="sh-search">
@@ -1102,6 +1062,7 @@
           </button>
         </form>
         <div class="sh-list" data-history-rows></div>
+      </div>
       </div>
     </div>
 

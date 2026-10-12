@@ -72,8 +72,8 @@ export function buildOverviewModel(p = {}) {
     attention.push({
       severity: 'error',
       icon: 'fa-plug-circle-xmark',
-      text: 'Not connected to Chronicle — open Status to reconnect.',
-      tab: 'status',
+      text: 'Not connected to Chronicle. Reconnect above, or open Diagnostics to see why.',
+      tab: 'diagnostics:health',
     });
   }
   if (issuesCount > 0) {
@@ -81,7 +81,7 @@ export function buildOverviewModel(p = {}) {
       severity: 'warn',
       icon: 'fa-link-slash',
       text: `${issuesCount} character${s(issuesCount)} couldn't be matched to Chronicle.`,
-      tab: 'issues',
+      tab: 'characters',
     });
   }
   if (unmatchedMembers > 0) {
@@ -125,15 +125,15 @@ export function buildOverviewModel(p = {}) {
       severity: 'info',
       icon: 'fa-circle-question',
       text: 'No matching game system — character fields may not sync.',
-      tab: 'status',
+      tab: 'diagnostics:health',
     });
   }
   if (errorCount > 0) {
     attention.push({
       severity: 'info',
       icon: 'fa-triangle-exclamation',
-      text: `${errorCount} recent sync error${s(errorCount)} — see Status.`,
-      tab: 'status',
+      text: `${errorCount} recent sync error${s(errorCount)} — see Diagnostics.`,
+      tab: 'diagnostics:health',
     });
   }
 
