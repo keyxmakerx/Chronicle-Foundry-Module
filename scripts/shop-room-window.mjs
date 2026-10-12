@@ -18,6 +18,7 @@
  */
 
 import { noticeText } from './_escape-html.mjs';
+import { stateBlock } from './_state-block.mjs';
 import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
 import { isShopJournal } from './_shop-journal.mjs';
 import { getSetting, getUserMappings } from './settings.mjs';
@@ -351,20 +352,12 @@ export class ShopRoomWindow extends ApplicationV2 {
   /** No GM is online, so there is no room to draw. */
   _showClosed() {
     if (!this._host) return;
-    const p = document.createElement('p');
-    p.className = 'chronicle-shop-closed';
-    const b = document.createElement('b');
-    b.textContent = t('ClosedTitle');
-    p.append(b, t('ClosedNoGM'));
-    this._host.replaceChildren(p);
+    this._host.replaceChildren(stateBlock('door-closed', t('ClosedTitle'), t('ClosedNoGM')));
   }
 
   _showError(text) {
     if (!this._host) return;
-    const p = document.createElement('p');
-    p.className = 'notification error';
-    p.textContent = text;
-    this._host.replaceChildren(p);
+    this._host.replaceChildren(stateBlock('cloud-bolt', game.i18n.localize('CHRONICLE.States.CantReach'), text, true));
   }
 
   /** Item names link to Chronicle pages; in Foundry they open the synced journal instead. */

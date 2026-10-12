@@ -1,6 +1,8 @@
 <div class="dms" data-dms-root>
 {{#if error}}
-  <div class="dms-error">
+  <div class="cs-state is-error" role="alert">
+    <i class="fa-solid fa-cloud-bolt" aria-hidden="true"></i>
+    <b>{{localize "CHRONICLE.States.CantReach"}}</b>
     <p>{{error}}</p>
     <button type="button" data-action="retry">{{retryLabel}}</button>
   </div>
@@ -48,7 +50,11 @@
         </div>
       {{/if}}
       {{#if worldEmpty}}
-        <p class="dms-small">Add a calendar or turn on the Armory to see the world's date and game state here.</p>
+        <div class="cs-state">
+          <i class="fa-solid fa-hourglass-half" aria-hidden="true"></i>
+          <b>{{localize "CHRONICLE.DMScreen.WorldEmptyTitle"}}</b>
+          <p>{{localize "CHRONICLE.DMScreen.WorldEmpty"}}</p>
+        </div>
       {{/if}}
     </section>
     <section class="dms-leaf dms-leaf-m" data-dms-leaf="m" aria-label="The party">

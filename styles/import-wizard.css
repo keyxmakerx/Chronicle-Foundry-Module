@@ -530,24 +530,13 @@
   text-align: center;
 }
 
-/* --- Empty / loading states --- */
+/* --- Progress text under the shared loading skeleton --- */
 
-.wizard-empty {
+.wizard-progress {
+  margin: 0;
   text-align: center;
-  padding: 32px 16px;
-  color: color-mix(in srgb, var(--cs-text) 35%, transparent);
   font-size: 13px;
-}
-
-.wizard-loading {
-  text-align: center;
-  padding: 32px 16px;
   color: color-mix(in srgb, var(--cs-text) 50%, transparent);
-  font-size: 13px;
-}
-
-.wizard-loading i {
-  margin-right: 6px;
 }
 
 /* --- Footer navigation --- */

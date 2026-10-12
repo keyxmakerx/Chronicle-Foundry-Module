@@ -33,6 +33,7 @@ import { calendarStateFromError } from './_calendar-probe-state.mjs';
 import {
   REPORTS_CHANGED_HOOK, collectModuleInfo, collectSyncLog, gatherSideBySide, getReports, markReportDone, submitReport,
 } from './debug-hub.mjs';
+import { resolveDashboardTab } from './_dashboard-tabs.mjs';
 import { MAX_TEXT, relativeAge, splitReports, unreadCount } from './_debug-reports.mjs';
 import { reportToMarkdown } from './_debug-markdown.mjs';
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -134,24 +135,28 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this._searchFilter = '';
 
     /**
-     * @type {string|null} Actor id the GM chose to inspect in the Status tab's
+     * @type {string|null} Actor id the GM chose to inspect in Diagnostics' Health pane
      * Capability Inspector. Null = auto-pick (first linked, else first of type).
      * Per-session instance state (like _searchFilter): survives re-renders,
      * resets when the dashboard window is closed.
      */
     this._capabilityActorId = null;
 
-    /** @type {string} Currently active tab (persisted per-client). Defaults to
-     * the Overview cockpit so the GM lands on a calm summary, not a dense list. */
-    this._activeTab = getSetting('dashboardActiveTab') || 'overview';
+    // The saved tab may be a name an older version used; it opens where that
+    // content lives now. Defaults to the Overview, a calm summary.
+    const saved = resolveDashboardTab(getSetting('dashboardActiveTab') || 'overview');
+    /** @type {string} Currently active rail section (persisted per-client). */
+    this._activeTab = saved.tab;
+    /** @type {string} The open Diagnostics pane. */
+    this._diagPane = saved.pane || 'health';
 
-    /** The History tab's rows and filters, kept across re-renders. */
+    /** The History pane's rows and filters, kept across re-renders. */
     this._historyTab = new SyncHistoryTab(() => this.api);
 
     /** @type {Set<string>} Currently selected entity IDs for bulk operations. */
     this._selectedEntities = new Set();
 
-    // Debug tab state (per window, like _capabilityActorId).
+    // Player reports state (per window, like _capabilityActorId).
     /** @type {string|null} Actor id picked for the side by side. */
     this._debugActorId = null;
     /** @type {{loading: boolean, result: object|null, error: string}} */
@@ -167,6 +172,28 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   _onFirstRender(context, options) {
     super._onFirstRender?.(context, options);
     Hooks.on(REPORTS_CHANGED_HOOK, this._onReportsChanged);
+  }
+
+  /**
+   * A gear in the title bar opens Chronicle settings. Foundry's own header
+   * controls sit in a menu; the gear stays in sight.
+   * @override
+   */
+  async _renderFrame(options) {
+    const frame = await super._renderFrame(options);
+    const header = frame.querySelector('.window-header');
+    if (header && !header.querySelector('[data-action="open-settings"]')) {
+      const gear = document.createElement('button');
+      gear.type = 'button';
+      gear.className = 'header-control icon fa-solid fa-gear';
+      gear.dataset.action = 'open-settings';
+      const label = game.i18n.localize('CHRONICLE.Dashboard.OpenSettings');
+      gear.dataset.tooltip = label;
+      gear.setAttribute('aria-label', label);
+      const close = header.querySelector('[data-action="close"]');
+      header.insertBefore(gear, close?.parentElement === header ? close : null);
+    }
+    return frame;
   }
 
   /** @override */
@@ -271,7 +298,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       capabilityData = await this._buildCapabilityData();
     } catch (err) {
       log.error('Dashboard: Failed to build sync capability', err);
-      loadErrors.push({ tab: 'status', message: err.message || 'Failed to build sync capability' });
+      loadErrors.push({ tab: 'diagnostics', message: err.message || 'Failed to build sync capability' });
     }
 
     // Build characters tab data.
@@ -285,7 +312,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       issuesData = await this._buildIssuesData();
     } catch (err) {
       console.error('Chronicle Dashboard: Failed to load sync issues', err);
-      loadErrors.push({ tab: 'issues', message: err.message || 'Failed to load issues' });
+      loadErrors.push({ tab: 'characters', message: err.message || 'Failed to load issues' });
     }
 
     // Build the Overview cockpit from the pieces already computed above — a
@@ -302,6 +329,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       errorCount: statusData.errorLog?.length ?? 0,
       matchedSystem: statusData.matchedSystem,
       lastSyncTime: statusData.lastSyncTime,
+      t: (k, d) => (d ? game.i18n.format(k, d) : game.i18n.localize(k)),
     });
 
     this._loading = false;
@@ -311,7 +339,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       loading: false,
       searchFilter: this._searchFilter,
       activeTab: this._activeTab,
-      loadErrors,
+      // Named as the rail names them, so the GM can find what didn't load.
+      loadErrors: loadErrors.map((e) => ({
+        ...e,
+        label: game.i18n.localize(`CHRONICLE.Dashboard.Rail.${e.tab.charAt(0).toUpperCase()}${e.tab.slice(1)}`),
+      })),
       hasLoadErrors: loadErrors.length > 0,
 
       // Overview (landing cockpit) tab.
@@ -346,13 +378,13 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       // Calendar tab.
       calendar: calendarData,
 
-      // Status tab.
+      // Diagnostics, Health pane.
       ...statusData,
 
       // Sync Capability (status tab panel).
       capability: capabilityData,
 
-      // Debug tab.
+      // Diagnostics, Player reports pane.
       debug: debugData,
     };
   }
@@ -1075,7 +1107,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // --- Tab navigation ---
     this._initTabs(el);
-    this._historyTab.mount(el, this._activeTab === 'history');
+    this._historyTab.mount(el, this._historyShown());
 
     // --- Search input ---
     const search = el.querySelector('.dashboard-search');
@@ -1168,7 +1200,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       });
     });
 
-    // --- Status tab: Capability Inspector actor picker ---
+    // --- Health pane: Capability Inspector actor picker ---
     // ApplicationV2 `actions` only delegate `click`, so the `<select>` change is
     // wired here directly. Picking an actor re-renders the panel against it.
     const capActorSelect = el.querySelector('.capability-actor-select');
@@ -1179,7 +1211,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       });
     }
 
-    // --- Debug tab: character picker and the GM's own report box ---
+    // --- Player reports pane: character picker and the GM's own report box ---
     el.querySelector('[data-debug-actor]')?.addEventListener('change', (e) => {
       this._debugActorId = e.currentTarget.value || null;
       this._debugSbs = { loading: false, result: null, error: '' };
@@ -1202,25 +1234,15 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    * @private
    */
   _initTabs(el) {
-    const tabs = el.querySelectorAll('.dashboard-tabs .item');
-
-    // If the persisted tab no longer exists in the DOM (renamed/removed), fall
-    // back to the Overview cockpit (or the first available tab) so the window
-    // never opens to a blank panel.
-    const known = new Set([...tabs].map((t) => t.dataset.tab));
-    if (!known.has(this._activeTab)) {
-      this._activeTab = known.has('overview') ? 'overview' : (tabs[0]?.dataset.tab || this._activeTab);
-    }
-
-    // Apply the stored active tab.
     this._applyActiveTab(el);
-
-    // Listen for rail clicks.
-    tabs.forEach((tab) => {
+    el.querySelectorAll('.dashboard-tabs .item').forEach((tab) => {
       tab.addEventListener('click', (e) => {
         e.preventDefault();
         this._switchTab(tab.dataset.tab);
       });
+    });
+    el.querySelectorAll('[data-diag]').forEach((btn) => {
+      btn.addEventListener('click', () => this._switchTab(`diagnostics:${btn.dataset.diag}`));
     });
   }
 
@@ -1231,7 +1253,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    * @private
    */
   _applyActiveTab(el) {
-    // A tab saved by an older version may no longer exist.
     if (!el.querySelector(`.dashboard-content .tab[data-tab="${CSS.escape(this._activeTab)}"]`)) {
       this._activeTab = 'overview';
     }
@@ -1239,6 +1260,18 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       t.classList.toggle('active', t.dataset.tab === this._activeTab));
     el.querySelectorAll('.dashboard-content .tab').forEach((p) =>
       p.classList.toggle('active', p.dataset.tab === this._activeTab));
+    el.querySelectorAll('[data-diag]').forEach((btn) => {
+      const on = btn.dataset.diag === this._diagPane;
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-selected', String(on));
+    });
+    el.querySelectorAll('[data-diag-pane]').forEach((p) =>
+      p.classList.toggle('active', p.dataset.diagPane === this._diagPane));
+  }
+
+  /** Whether the sync history pane is the one on screen. */
+  _historyShown() {
+    return this._activeTab === 'diagnostics' && this._diagPane === 'history';
   }
 
   /**
@@ -1255,14 +1288,22 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       openChronicleSettings(tabName.slice('settings:'.length));
       return;
     }
-    this._activeTab = tabName;
-    setSetting('dashboardActiveTab', tabName);
+    const { tab, pane } = resolveDashboardTab(tabName);
+    const moved = tab !== this._activeTab;
+    this._activeTab = tab;
+    if (pane) this._diagPane = pane;
+    setSetting('dashboardActiveTab', tab === 'diagnostics' ? `diagnostics:${this._diagPane}` : tab);
     const el = this.element;
     if (!el) return;
     this._applyActiveTab(el);
-    el.querySelector('.dashboard-content')?.scrollTo?.({ top: 0 });
-    if (tabName === 'history') this._historyTab.shown();
+    if (moved || pane) {
+      el.querySelector('.dashboard-content')?.scrollTo?.({ top: 0 });
+      const shown = el.querySelector(tab === 'diagnostics' ? '[data-diag-pane].active' : '.dashboard-content .tab.active');
+      if (shown) { shown.classList.remove('cs-settle'); void shown.offsetWidth; shown.classList.add('cs-settle'); }
+    }
+    if (this._historyShown()) this._historyTab.shown();
   }
+
 
   // ---------------------------------------------------------------------------
   // Action handlers (ApplicationV2 actions pattern)
@@ -1376,7 +1417,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   // ---------------------------------------------------------------------------
-  // Debug tab
+  // Player reports
   // ---------------------------------------------------------------------------
 
   /** Localized "5m ago" style age. @private */
@@ -1405,7 +1446,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     ];
   }
 
-  /** Everything the Debug tab shows. Reads only what is already in memory. @private */
+  /** Everything the Player reports pane shows. Reads only what is already in memory. @private */
   _buildDebugData() {
     const labels = this._debugStatusLabels();
     const reports = getReports();

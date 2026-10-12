@@ -32,9 +32,11 @@ import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { registerShopRoomSocket, registerShopJournalButton } from './shop-room-window.mjs';
 import { notebookAvailable, openCalendarWindow, openNotebook, registerPlayerNotebook } from './player-notebook.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
+import { registerShortcuts } from './_keybindings.mjs';
+import { registerMotion } from './motion.mjs';
 import { openQuestBoard, questLive, registerQuestBoard } from './quest-board.mjs';
 import { retireNotesFolder } from './_notes-folder.mjs';
-import { FLAG_SCOPE, syncOptions } from './constants.mjs';
+import { FLAG_SCOPE, MODULE_ID, syncOptions } from './constants.mjs';
 import { removedFolder } from './_set-aside.mjs';
 
 /** @type {SyncManager|null} */
@@ -73,6 +75,17 @@ function openDashboard() {
 Hooks.once('init', () => {
   console.debug('Chronicle Sync | Initializing');
   registerSettings();
+  registerMotion();
+  registerShortcuts(game.keybindings, MODULE_ID, {
+    run: {
+      openDashboard,
+      openDMScreen: () => { openDMScreen(() => syncManager?.api ?? null); },
+      openNotebook: () => { openNotebook(); },
+      openCalendar: () => { openCalendarWindow(); },
+      openQuests: () => { openQuestBoard(); },
+    },
+    connected: notebookAvailable,
+  });
 
   // Register Chronicle Map Viewer as an alternate sheet for image journal pages.
   DocumentSheetConfig.registerSheet(JournalEntryPage, 'chronicle-sync', MapViewerSheet, {

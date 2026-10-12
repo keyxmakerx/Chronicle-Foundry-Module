@@ -14,6 +14,7 @@
  */
 
 import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
+import { stateBlock } from './_state-block.mjs';
 import { getSetting, getUserMappings, setSetting } from './settings.mjs';
 import {
   allowUrl,
@@ -184,9 +185,8 @@ class FrameHost {
     this.frame = null;
     const box = document.createElement('div');
     box.className = 'chronicle-notes-message';
-    const p = document.createElement('p');
-    p.textContent = text;
-    box.append(p);
+    const block = stateBlock(offerConnect ? 'plug' : 'book', text);
+    box.append(block);
     if (offerConnect) {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -197,7 +197,7 @@ class FrameHost {
         btn.disabled = false;
         if (grant) this._showFrame();
       });
-      box.append(btn);
+      block.append(btn);
     }
     this.container.replaceChildren(box);
   }

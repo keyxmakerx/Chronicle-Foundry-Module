@@ -9,7 +9,7 @@
   </header>
 
   {{#if error}}<p class="cs-error" role="alert">{{error}}</p>{{/if}}
-  {{#if loading}}<p class="cs-note">{{localize "CHRONICLE.Stashes.Loading"}}</p>{{/if}}
+  {{#if loading}}<div class="cs-loading" role="status" aria-label="{{localize 'CHRONICLE.States.Loading'}}"><div class="cs-skel"></div><div class="cs-skel"></div><div class="cs-skel"></div></div>{{/if}}
 
   {{#if hasView}}
     {{#if isMove}}
@@ -50,7 +50,7 @@
             {{/each}}
           </select>
           {{#if dest}}
-            {{#if dest.loading}}<p class="cs-note">{{localize "CHRONICLE.Stashes.Loading"}}</p>{{/if}}
+            {{#if dest.loading}}<div class="cs-loading" role="status" aria-label="{{localize 'CHRONICLE.States.Loading'}}"><div class="cs-skel"></div><div class="cs-skel"></div><div class="cs-skel"></div></div>{{/if}}
             {{#if dest.hidden}}<p class="cs-note">{{localize "CHRONICLE.Stashes.CantSee"}}</p>{{/if}}
             {{#if dest.showContents}}
               <div class="cs-row cs-money{{#if dest.moneySelected}} selected{{/if}}" {{#if dest.canTake}}draggable="true"{{/if}} data-cs-pick="right" data-cs-kind="money">

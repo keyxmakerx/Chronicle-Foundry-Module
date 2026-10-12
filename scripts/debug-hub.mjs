@@ -1,7 +1,7 @@
 /**
  * Chronicle Sync - Debug hub
  *
- * Everything the Debug tab and the "Report a problem" box share:
+ * Everything the Player reports pane and the "Report a problem" box share:
  *  - the read-only side-by-side of a linked character (Chronicle vs Foundry);
  *  - the stored player reports (flags of one journal entry nobody but GMs can
  *    see, written by the GM only);
