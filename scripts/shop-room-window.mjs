@@ -24,13 +24,13 @@ import { isShopJournal } from './_shop-journal.mjs';
 import { getSetting, getUserMappings } from './settings.mjs';
 import { _isAllowedImageHost } from './_url-validation.mjs';
 import { decryptReply, encryptReply, generateRequestKeys } from './_stash-crypto.mjs';
+import { loadVendored } from './vendor-chronicle.mjs';
 import {
-  createChronicleShim, describeSale, sanitizeShopBuyReply, sanitizeShopBuyRequest,
+  describeSale, sanitizeShopBuyReply, sanitizeShopBuyRequest,
   sanitizeShopRoomMessage, shopEndpoints, MAX_ROOM_REPLY_CHARS, SHOP_ROOM_MESSAGE,
 } from './_shop-room-data.mjs';
 
 const SOCKET_CHANNEL = `module.${MODULE_ID}`;
-const VENDOR = `modules/${MODULE_ID}/vendor/chronicle`;
 
 // How long a player waits for the GM's client to answer. The buyers read
 // holds up the room's first draw, so it gives up sooner (no basket) than a
@@ -96,23 +96,7 @@ async function requestFromGM(shopId, action, body) {
 function loadShopRoomWidget() {
   if (widgetLoad) return widgetLoad;
   widgetLoad = (async () => {
-    // The widget registers itself on a page global named Chronicle. Never
-    // replace one that something else put there.
-    if (globalThis.Chronicle && globalThis.Chronicle !== shim) {
-      throw new Error('another script already defines window.Chronicle');
-    }
-    shim = shim || createChronicleShim();
-    globalThis.Chronicle = shim;
-    for (const file of ['shop_room_icons.js', 'shop_room_paper.js', 'shop_room.js']) {
-      await new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = `${VENDOR}/${file}`;
-        s.charset = 'utf-8';
-        s.onload = resolve;
-        s.onerror = () => reject(new Error(`could not load ${file}`));
-        document.head.appendChild(s);
-      });
-    }
+    shim = await loadVendored(['shop_room_icons.js', 'shop_room_paper.js', 'shop_room.js']);
     const def = shim.widgets.get('shop_room');
     if (!def) throw new Error('shop room widget did not register');
     return def;

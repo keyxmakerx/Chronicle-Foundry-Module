@@ -107,9 +107,9 @@ test('player snapshot copies only named fields and only public events', () => {
     isPublic,
   });
   assert.ok(VM.isUsableSnapshot(s));
-  assert.deepEqual(Object.keys(s.calendar).sort(), ['hours_per_day', 'leap_year_every', 'leap_year_offset', 'minutes_per_hour', 'mode', 'month_starts_new_week', 'months', 'tracks_real_time', 'weekdays']);
+  assert.deepEqual(Object.keys(s.calendar).sort(), ['hemisphere', 'hours_per_day', 'leap_year_every', 'leap_year_offset', 'minutes_per_hour', 'mode', 'month_starts_new_week', 'months', 'tracks_real_time', 'weekdays']);
   assert.deepEqual(s.events.map((e) => e.id), ['a']);
-  assert.deepEqual(Object.keys(s.events[0]).sort(), ['all_day', 'color', 'day', 'id', 'month', 'name', 'start_hour', 'start_minute', 'year']);
+  assert.deepEqual(Object.keys(s.events[0]).sort(), ['all_day', 'color', 'day', 'id', 'month', 'name', 'sky', 'start_hour', 'start_minute', 'year']);
   assert.equal(s.weather.color, null, 'unsafe colours are dropped');
   assert.equal('zone_name' in s.weather, false);
   assert.deepEqual(s.moons, [{ name: 'Selûne', phase_name: 'Full', phase_icon: 'moon' }]);
@@ -148,6 +148,7 @@ test('an older Chronicle that ignored the players audience gets no moons, era or
   assert.equal(s.era, null);
   assert.deepEqual(s.moons, []);
   assert.deepEqual(s.events, []);
+  assert.deepEqual(s.skyMoons, [], 'no moons for the sky without the players echo either');
   assert.equal(s.season.name, 'Spring', 'season and weather are the same for everyone');
 });
 
@@ -178,7 +179,7 @@ test('day weather reaches the snapshot only when confirmed, and never after toda
   ];
   const s = VM.buildPlayerSnapshot({ calendar: cal, dateInfo, isPublic, dayWeather: days, dayWeatherConfirmed: true });
   assert.deepEqual(s.dayWeather.map((d) => `${d.year}-${d.month}-${d.day}`), ['1492-2-9', '1492-2-10', '1491-4-30']);
-  assert.deepEqual(Object.keys(s.dayWeather[0]).sort(), ['day', 'icon', 'label', 'month', 'year']);
+  assert.deepEqual(Object.keys(s.dayWeather[0]).sort(), ['day', 'icon', 'label', 'month', 'precipitation', 'preset_id', 'year']);
   const old = VM.buildPlayerSnapshot({ calendar: cal, dateInfo, isPublic, dayWeather: days, dayWeatherConfirmed: false });
   assert.deepEqual(old.dayWeather, []);
 });
@@ -197,4 +198,47 @@ test('clampPlace keeps the strip on screen', () => {
   assert.deepEqual(VM.clampPlace({ x: -5, y: 900 }, box, vp), { x: 0, y: 576 });
   assert.deepEqual(VM.clampPlace({ x: 950, y: 10 }, box, vp), { x: 800, y: 10 });
   assert.deepEqual(VM.clampPlace(null, box, vp), { x: 0, y: 0 });
+});
+
+test('the players\' sky gets the moons a players read sent, without hidden ones or lore links', () => {
+  const s = VM.buildPlayerSnapshot({
+    calendar: {
+      ...cal,
+      moons: [
+        { id: 1, name: 'Selûne', cycle_days: 30, phase_offset: 2, color: '#c0c0ff', base_design: 'moon-realistic-selene', tint: '0.5', size: 1.2, lore_entity_id: 'e9', lore_entity_name: 'Secret' },
+        { id: 2, name: 'Hidden', cycle_days: 9, hidden_from_players: true },
+        { id: 3, name: 'Bad colour', cycle_days: 9, color: 'red;x' },
+      ],
+    },
+    dateInfo: { year: 1, month: 1, day: 1, audience: 'players' },
+    isPublic,
+  });
+  assert.deepEqual(s.skyMoons.map((m) => m.id), [1, 3]);
+  assert.deepEqual(s.skyMoons[0], { id: 1, name: 'Selûne', cycle_days: 30, phase_offset: 2, color: '#c0c0ff', base_design: 'moon-realistic-selene', tint: 0.5, size: 1.2 });
+  assert.equal(s.skyMoons[1].color, null);
+});
+
+test('an event keeps only its moon night for the sky', () => {
+  assert.deepEqual(VM.skyNight('{"type":"blood","moons":[1,"2",null],"secret":"x"}'), { type: 'blood', moons: [1, 2] });
+  assert.deepEqual(VM.skyNight({ type: 'eclipse', moons: [4] }), { type: 'eclipse', moons: [4] });
+  assert.equal(VM.skyNight('{"type":"party"}'), null);
+  assert.equal(VM.skyNight('not json'), null);
+  assert.equal(VM.skyNight(undefined), null);
+  const e = VM.snapshotEvent({ id: 1, name: 'Red night', year: 1, month: 1, day: 1, payload: '{"type":"blood","moons":[1]}' });
+  assert.deepEqual(e.sky, { type: 'blood', moons: [1] });
+  assert.equal('payload' in e, false);
+});
+
+test('the players\' weather carries what the sky reads, and no more', () => {
+  const s = VM.buildPlayerSnapshot({
+    calendar: cal,
+    dateInfo: {
+      year: 1, month: 1, day: 1, audience: 'players',
+      current_weather: { preset_id: 'blizzard', preset_label: 'Blizzard', icon: 'snow', precipitation: { type: 'snow', intensity: 0.9, secret: 1 }, wind: { speed_kph: 80 } },
+    },
+    isPublic,
+  });
+  assert.equal(s.weather.preset_id, 'blizzard');
+  assert.deepEqual(s.weather.precipitation, { type: 'snow', intensity: 0.9 });
+  assert.equal('wind' in s.weather, false);
 });

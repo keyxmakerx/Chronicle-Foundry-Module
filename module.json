@@ -29,7 +29,8 @@
     "styles/map-frames.css",
     "styles/stashes.css",
     "styles/dm-screen.css",
-    "styles/quests.css"
+    "styles/quests.css",
+    "styles/sky-clock.css"
   ],
   "languages": [
     {

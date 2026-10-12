@@ -23,7 +23,7 @@ repo root. There is no `package.json`.
 
 ## Motion
 
-- [ ] Configure Settings → Chronicle Sync shows Motion (Full, Calm, Off) beside the calendar strip and temperature unit; on a computer set to reduce motion, a new client starts on Calm
+- [ ] Configure Settings → Chronicle Sync shows Motion (Full, Calm, Off) beside the calendar, calendar look and temperature unit; on a computer set to reduce motion, a new client starts on Calm
 - [ ] Full: the dashboard grows out of the scene-control button that opened it; switching dashboard sections and settings tabs settles the new panel in; Test connection's checks appear one after another
 - [ ] Calm: each of those is a short fade in place, and the DM Screen fades in instead of rolling its die. Off: windows, panels and checks appear at once, the DM Screen opens and closes without its die or fold, and nothing in a Chronicle window animates
 - [ ] With reduce motion on and Motion left on Calm, Foundry's own windows and other modules animate as they did before Chronicle
@@ -200,11 +200,11 @@ Chronicle brings its own calendar; no Foundry calendar module is used.
 
 ### Built-in calendar (strip)
 - [ ] With Calendar sync on and nothing else changed, no strip shows
-- [ ] Configure Settings -> Show the calendar strip on -> a thin strip sits at the top centre: date, time and a weather icon over a small sky coloured for the hour; snow, rain or night stars move in it to match Chronicle
+- [ ] Configure Settings -> Show Chronicle's calendar on (Calendar look: Strip) -> a thin strip sits at the top centre: date, time and a weather icon over a small sky coloured for the hour; snow, rain or night stars move in it to match Chronicle
 - [ ] Hover the strip -> it widens to show season, temperature and moons
 - [ ] Drag the strip by its dots anywhere -> it stays there after a reload, and each player's spot is their own
-- [ ] Click the lock on the strip -> the dots disappear and the strip (or its clock) cannot be dragged; click it again -> dragging works. The lock survives a reload and is per player
-- [ ] Click the clock icon -> the strip shrinks to a round clock; click the clock -> the strip comes back with the month open
+- [ ] Click the lock on the strip -> the dots disappear and the strip (or its small globe) cannot be dragged; click it again -> dragging works. The lock survives a reload and is per player
+- [ ] Click the shrink button -> the strip shrinks to a small still globe showing the day; click the globe -> the strip comes back with the month open
 - [ ] Leave the mouse still for 20 seconds -> the sky's motion stops; move it -> it starts again
 - [ ] Click the date -> the calendar window opens (as above). Not connected and "Not now" -> the small month opens under the strip instead; days up to today show their sky colour and weather icon, later days are plain; event days have a dot and the month's events are listed below; ‹ › flips months; click outside or Esc closes it
 - [ ] GM: the small ‹ › arrows move the time one hour; Chronicle's calendar page shows the new time after a refresh
@@ -216,6 +216,22 @@ Chronicle brings its own calendar; no Foundry calendar module is used.
 - [ ] A calendar hidden from players in Chronicle -> players see no strip
 - [ ] Turn Calendar off in Chronicle settings → What syncs -> the strip disappears for everyone without a reload
 - [ ] Configure Settings -> Calendar temperature unit °F -> only your strip switches to °F
+
+### Built-in calendar (Sky Clock)
+- [ ] Configure Settings -> Calendar look -> **Sky Clock** -> the strip is replaced by a round glass globe in the top-right corner, left of the sidebar: Chronicle's sky for the hour inside it, the day of the month as a dark weathered stone number on the hill, the month name under it. The other players still see whatever look they picked
+- [ ] The sky in the globe matches Chronicle's calendar page at the same hour: sun or stars, moons and their phases, the day's weather. A blood moon or eclipse day in Chronicle shows it
+- [ ] Snow or rain in Chronicle -> it falls in front of the stone number; fog drifts over it; a storm flashes now and then
+- [ ] Weather on the stone: clear -> plain dry stone with no pale spots; rain -> darker, shiny stone with drops running down; snow -> snow on the tops; fog -> glinting dew; a sandstorm -> sand on the tops; autumn leaves -> a few leaves resting on it; a magic weather (Luminous sky) -> its colour glowing in the cracks. Change the weather in Chronicle -> the old marks fade out as the new ones arrive
+- [ ] Drag the globe and let go anywhere -> it swirls and slides into the nearest corner, never under the sidebar, scene controls, player list, hotbar or scene tabs. It is in the same corner after a reload; each player's corner is their own
+- [ ] Hover the globe -> a lock and a shrink button appear. Lock -> it can no longer be dragged. Shrink -> it becomes a small still globe; click that -> the full globe comes back
+- [ ] Tab to the globe -> arrow keys move it to another corner; Space swirls it
+- [ ] Leave the mouse still for 20 seconds -> the globe stops moving; move the mouse -> it starts again
+- [ ] GM: click the globe -> a dark cradle slides out under it (over it in a bottom corner) with −1d, −1h, +1h, +1d and the time. +1d -> the stone number crumbles and rebuilds as the next day, and Chronicle's calendar page shows the new date after a refresh. +1h -> the sky glides to the new hour. Click outside or Esc closes the cradle
+- [ ] GM: on a real-time calendar the cradle's four buttons are greyed out; the time still shows
+- [ ] Player: clicking the globe only swirls it; no cradle
+- [ ] Configure Settings -> Motion -> Calm or Off -> the globe is a still picture (weather included) and the day changes without crumbling
+- [ ] Move the date in Chronicle -> the globe updates for the GM and every player who picked it
+- [ ] Open a shop room after the globe has shown -> the shop still works (both use the same Chronicle scripts)
 
 ### Dashboard
 - [ ] Calendar tab shows Chronicle's calendar name, date (day, month, year) and time
