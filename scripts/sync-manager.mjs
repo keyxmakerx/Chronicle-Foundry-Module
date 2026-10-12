@@ -14,6 +14,7 @@ import { walkSyncPull, PULL_PAGE_SIZE } from './_sync-pull-walk.mjs';
 import { HistoryReporter, activityToEvent, describeMessage, resourceIdOf, resourceNameOf } from './_history-report.mjs';
 import { walkChangeFeed, cursorFor, feedForArea, FEED_PAGE_SIZE, FEED_SETTLE_MS } from './_change-feed.mjs';
 import { getSetting, setSetting, isConfigured, getSyncDirections, getExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
+import { memberKey } from './_member-mapping.mjs';
 
 /**
  * How long the connection must stay continuously connected after a reconnect
@@ -26,25 +27,7 @@ const RECONNECT_RESYNC_DEBOUNCE_MS = 3000;
 /** How often queued sync-history events are sent to Chronicle. */
 const HISTORY_FLUSH_MS = 15_000;
 
-/**
- * Resolve the stable Chronicle user-id key for a campaign member. The
- * user-mapping table (`userMappings`) is keyed by this value, and
- * `getFoundryUserId` / `getChronicleUserId` look it up. Different Chronicle
- * builds surface the member's user id as `user_id` (the historical field this
- * module keyed on) or `id` (the field the API contract documents for
- * `GET /members`), so prefer `user_id` then fall back to `id`.
- *
- * Exported as a pure helper so the auto-match + manual-mapping paths can't
- * drift on which field identifies a member, and so it's unit-testable.
- *
- * @param {object} member - A campaign member from `GET /members`.
- * @returns {string|null} The Chronicle user-id key, or null if absent.
- */
-export function memberKey(member) {
-  if (!member || typeof member !== 'object') return null;
-  const id = member.user_id ?? member.id;
-  return id === null || id === undefined || id === '' ? null : String(id);
-}
+export { memberKey };
 
 /**
  * SyncManager coordinates all Chronicle sync operations.
@@ -107,7 +90,7 @@ export class SyncManager {
     /**
      * @type {Array<object>} Chronicle members that could NOT be auto-matched to
      * a Foundry user on the last `fetchAndCacheMembers`. Surfaced in the
-     * dashboard Members tab so the operator can map them manually — a
+     * Players tab of Chronicle settings so the operator can link them by hand — a
      * per-player grant on an unmatched member is silently dropped otherwise.
      */
     this._unmatchedMembers = [];
@@ -162,7 +145,7 @@ export class SyncManager {
 
     if (!isConfigured()) {
       console.warn('Chronicle: Module not configured. Set URL, API key, and campaign ID in settings.');
-      ui.notifications.warn('Chronicle Sync is not configured. Go to Module Settings to set up.');
+      ui.notifications.warn('Chronicle Sync is not set up yet. Open Chronicle settings to connect.');
       return;
     }
 
@@ -308,7 +291,7 @@ export class SyncManager {
    * After the auto-match, any Chronicle member that could NOT be linked to a
    * Foundry user is surfaced — a `ui.notifications.warn` + a dashboard
    * `warning` activity entry listing each unmatched member — and cached on
-   * `_unmatchedMembers` for the dashboard Members tab. This must stay visible:
+   * `_unmatchedMembers` for Chronicle settings (Players). This must stay visible:
    * an unmatched member's per-user permission grants are silently dropped on
    * both push and pull. Members already mapped by hand are not reported as
    * unmatched.
@@ -322,7 +305,7 @@ export class SyncManager {
       // Auto-match by display_name → Foundry user name. A mapping grants
       // access (notes, stashes, a claimed character's actor), so only a name
       // that is unique on both sides is matched; anything ambiguous is left
-      // for the GM to map on the Members tab.
+      // for the GM to link under Players in Chronicle settings.
       const mappings = getUserMappings();
       let newMappings = 0;
       const unmatched = [];
@@ -384,13 +367,13 @@ export class SyncManager {
     const shown = names.slice(0, 8).join(', ');
     const extra = names.length > 8 ? ` (+${names.length - 8} more)` : '';
     const summary = `${unmatched.length} Chronicle member${unmatched.length === 1 ? '' : 's'} could not be matched to a Foundry user: ${shown}${extra}`;
-    this.logActivity('warning', `${summary}. Map them in the dashboard Members tab — their per-player permissions won't sync until mapped.`);
-    ui.notifications?.warn?.(`Chronicle: ${noticeText(summary)}. Open the sync dashboard → Members to map them.`);
+    this.logActivity('warning', `${summary}. Link them in Chronicle settings, under Players — their per-player permissions won't sync until mapped.`);
+    ui.notifications?.warn?.(`Chronicle: ${noticeText(summary)}. Link them in Chronicle settings, under Players.`);
   }
 
   /**
    * Chronicle members that could not be auto-matched to a Foundry user on the
-   * last fetch. Drives the dashboard Members tab "UNMATCHED" badges.
+   * last fetch. Drives the "Not linked" badges in Chronicle settings (Players).
    * @returns {Array<object>}
    */
   getUnmatchedMembers() {

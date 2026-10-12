@@ -5,7 +5,7 @@
  * Helps users scan their Foundry world, map content to Chronicle entity types,
  * assign tags, configure character mapping, and execute a bulk import.
  *
- * Launched from the "Setup Wizard" button in the sync dashboard Config tab.
+ * Launched from the "Setup Wizard" button in Chronicle settings, under Connection.
  */
 
 import { noticeText } from './_escape-html.mjs';

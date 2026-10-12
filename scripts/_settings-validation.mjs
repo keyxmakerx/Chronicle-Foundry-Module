@@ -26,9 +26,9 @@ export function isValidCampaignId(id) {
  * @returns {string|null}
  */
 export function describeCampaignIdError(id) {
-  if (typeof id !== 'string') return 'Chronicle: campaignId setting is missing or not a string. Open Module Settings → Chronicle Sync → Campaign ID and paste the campaign UUID from Chronicle.';
-  if (id.length === 0) return 'Chronicle: campaignId setting is empty. Open Module Settings → Chronicle Sync → Campaign ID and paste the campaign UUID from Chronicle.';
-  if (id.trim() !== id) return 'Chronicle: campaignId setting has surrounding whitespace. Trim it in Module Settings → Chronicle Sync → Campaign ID.';
-  if (!isValidCampaignId(id)) return 'Chronicle: campaignId setting is not a valid UUID. Expected 8-4-4-4-12 hex (e.g. "abc12345-6789-4abc-def0-123456789abc"). Open Module Settings → Chronicle Sync → Campaign ID.';
+  if (typeof id !== 'string') return 'Chronicle: campaignId setting is missing or not a string. Open Chronicle settings → Connection → Campaign and paste the campaign UUID from Chronicle.';
+  if (id.length === 0) return 'Chronicle: campaignId setting is empty. Open Chronicle settings → Connection → Campaign and paste the campaign UUID from Chronicle.';
+  if (id.trim() !== id) return 'Chronicle: campaignId setting has surrounding whitespace. Trim it in Chronicle settings → Connection → Campaign.';
+  if (!isValidCampaignId(id)) return 'Chronicle: campaignId setting is not a valid UUID. Expected 8-4-4-4-12 hex (e.g. "abc12345-6789-4abc-def0-123456789abc"). Open Chronicle settings → Connection → Campaign.';
   return null;
 }

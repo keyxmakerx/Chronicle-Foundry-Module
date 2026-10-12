@@ -1446,7 +1446,7 @@ the other's origin (Chronicle's, taken from `apiUrl`) before acting.
 | Calendar frame | `/embed/campaigns/:id/notes/calendar` | The campaign's default calendar, Chronicle's own page, as this player sees it (same grant; the frame reads `/api/notes-app/campaigns/:id/calendars/…`). An older Chronicle answers 404. |
 
 The module keeps a grant only when `campaignId` matches and the GM has matched
-the returned `userId` to this Foundry login (Members tab); an unmatched or
+the returned `userId` to this Foundry login (Chronicle settings → Players); an unmatched or
 mismatched account is refused. Frame to module: `chronicle:embed-ready` (the
 module answers `chronicle:notes-token` with the token and current `entityId`),
 `chronicle:grant-rejected` (the stored grant is dropped), `chronicle:open-note`

@@ -498,7 +498,7 @@ export class MapSync {
         error: err,
       });
       ui.notifications.error(
-        `Chronicle: could not fetch maps from Chronicle${status ? ` (HTTP ${status})` : ''}. Verify apiUrl, apiKey, and campaignId in Module Settings.`
+        `Chronicle: could not fetch maps from Chronicle${status ? ` (HTTP ${status})` : ''}. Check the connection in Chronicle settings.`
       );
       return { materialized: 0, errors: 1 };
     }

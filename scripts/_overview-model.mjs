@@ -89,7 +89,7 @@ export function buildOverviewModel(p = {}) {
       severity: 'warn',
       icon: 'fa-user-shield',
       text: `${unmatchedMembers} campaign member${s(unmatchedMembers)} not mapped to a Foundry user.`,
-      tab: 'members',
+      tab: 'settings:players',
     });
   }
   if (calendarRebuilding) {

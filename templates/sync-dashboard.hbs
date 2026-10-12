@@ -5,7 +5,7 @@
   <div class="dashboard-empty">
     <i class="fa-solid fa-plug fa-2x"></i>
     <p>Chronicle Sync is not configured.</p>
-    <p class="hint">Go to Module Settings to enter your Chronicle URL, API key, and Campaign ID.</p>
+    <p class="hint">{{localize "CHRONICLE.Dashboard.NotConfiguredHint"}}</p>
     <button type="button" data-action="open-settings" class="dashboard-btn">
       <i class="fa-solid fa-gear"></i> Open Settings
     </button>
@@ -62,15 +62,6 @@
     </a>
     <a class="item" data-tab="maps">
       <i class="fa-solid fa-map"></i> Maps
-    </a>
-
-    <div class="rail-group-label">Setup</div>
-    <a class="item" data-tab="config">
-      <i class="fa-solid fa-sliders"></i> Config
-    </a>
-    <a class="item" data-tab="members">
-      <i class="fa-solid fa-user-shield"></i> Members
-      {{#if members.hasUnmatched}}<span class="member-tab-badge" title="{{members.unmatchedCount}} unmatched member(s)">{{members.unmatchedCount}}</span>{{/if}}
     </a>
 
     <div class="rail-group-label">Diagnostics</div>
@@ -156,161 +147,6 @@
       {{/with}}
     </div>
 
-
-    {{!-- ================================================================= --}}
-    {{!-- CONFIG TAB                                                        --}}
-    {{!-- ================================================================= --}}
-    <div class="tab" data-tab="config" data-group="primary">
-      <div class="config-panel">
-
-        {{!-- Connection Setup --}}
-        <div class="config-section">
-          <h3 class="section-heading">Connection</h3>
-          <div class="connection-status state-{{connectionState}}">
-            <span class="status-dot"></span>
-            <span>{{connectionLabel}}</span>
-          </div>
-          <div class="config-field">
-            <label class="config-label">Chronicle URL</label>
-            <input type="text" class="config-input" data-config-key="apiUrl" value="{{config.apiUrl}}" placeholder="https://chronicle.example.com" />
-          </div>
-          <div class="config-field">
-            <label class="config-label">API Key</label>
-            <input type="password" class="config-input" data-config-key="apiKey" value="{{config.apiKey}}" placeholder="Enter API key" autocomplete="off" />
-          </div>
-          <div class="config-field">
-            <label class="config-label">Campaign ID</label>
-            <input type="text" class="config-input" data-config-key="campaignId" value="{{config.campaignId}}" placeholder="Campaign UUID" />
-          </div>
-          <div class="config-actions">
-            <button type="button" class="dashboard-btn btn-sm" data-action="test-connection">
-              <i class="fa-solid fa-plug"></i> Test Connection
-            </button>
-            <div class="config-test-result" data-test-result></div>
-          </div>
-        </div>
-
-        <p class="config-hint config-offline-note">
-          <i class="fa-solid fa-triangle-exclamation"></i>
-          {{localize "CHRONICLE.Dashboard.OfflineWarning"}}
-        </p>
-
-        {{!-- Import Wizard --}}
-        <div class="config-wizard-prompt">
-          <button type="button" class="dashboard-btn" data-action="open-wizard">
-            <i class="fa-solid fa-wand-magic-sparkles"></i> {{localize "CHRONICLE.Wizard.OpenWizard"}}
-          </button>
-          <p class="config-hint">{{localize "CHRONICLE.Wizard.Hint"}}</p>
-        </div>
-
-        {{!-- Sync Scope --}}
-        <div class="config-section">
-          <h3 class="section-heading">Sync Scope</h3>
-          <p class="config-hint">Choose what to sync and in which direction.</p>
-          <div class="config-scope-grid">
-            {{#each config.syncTypes}}
-            <div class="config-scope-row">
-              <div class="scope-info">
-                <i class="fa-solid {{icon}}"></i>
-                <span class="scope-label">{{label}}</span>
-                {{#if count}}<span class="scope-count">{{count}}</span>{{/if}}
-              </div>
-              <select class="config-direction-select" data-sync-type="{{key}}">
-                <option value="both" {{#if (eq direction "both")}}selected{{/if}}>Bidirectional</option>
-                <option value="pull" {{#if (eq direction "pull")}}selected{{/if}}>Pull Only</option>
-                <option value="push" {{#if (eq direction "push")}}selected{{/if}}>Push Only</option>
-                <option value="off" {{#if (eq direction "off")}}selected{{/if}}>Off</option>
-              </select>
-            </div>
-            {{/each}}
-          </div>
-        </div>
-
-        {{!-- Permission Mapping --}}
-        <div class="config-section">
-          <h3 class="section-heading">Permissions</h3>
-          <div class="config-toggle-row">
-            <label class="config-toggle-label">
-              <input type="checkbox" class="config-checkbox" data-config-key="syncPermissions" {{#if config.syncPermissions}}checked{{/if}} />
-              Sync visibility to Foundry ownership
-            </label>
-          </div>
-          <div class="config-toggle-row">
-            <label class="config-toggle-label">
-              <input type="checkbox" class="config-checkbox" data-config-key="dmOnlyHidden" {{#if config.dmOnlyHidden}}checked{{/if}} />
-              DM-only entities hidden in Foundry
-            </label>
-          </div>
-          <div class="config-field">
-            <label class="config-label">Default ownership for new documents</label>
-            <select class="config-select" data-config-key="defaultOwnership">
-              <option value="0" {{#if (eq config.defaultOwnership 0)}}selected{{/if}}>None</option>
-              <option value="1" {{#if (eq config.defaultOwnership 1)}}selected{{/if}}>Limited</option>
-              <option value="2" {{#if (eq config.defaultOwnership 2)}}selected{{/if}}>Observer</option>
-              <option value="3" {{#if (eq config.defaultOwnership 3)}}selected{{/if}}>Owner</option>
-            </select>
-          </div>
-        </div>
-
-        {{!-- Sync Behavior --}}
-        <div class="config-section">
-          <h3 class="section-heading">Behavior</h3>
-          <div class="config-field">
-            <label class="config-label">Conflict resolution</label>
-            <select class="config-select" data-config-key="conflictResolution">
-              <option value="chronicle" {{#if (eq config.conflictResolution "chronicle")}}selected{{/if}}>Chronicle wins</option>
-              <option value="foundry" {{#if (eq config.conflictResolution "foundry")}}selected{{/if}}>Foundry wins</option>
-              <option value="newest" {{#if (eq config.conflictResolution "newest")}}selected{{/if}}>Newest wins</option>
-            </select>
-          </div>
-          {{#if config.journalCreateTypes.length}}
-          <div class="config-field">
-            <label class="config-label">{{localize "CHRONICLE.JournalPush.TypeLabel"}}</label>
-            <select class="config-select" data-config-key="journalCreateTypeId">
-              {{#each config.journalCreateTypes}}
-              <option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.name}}</option>
-              {{/each}}
-            </select>
-            <span class="config-hint-inline">{{localize "CHRONICLE.JournalPush.TypeHint"}}</span>
-          </div>
-          {{/if}}
-          <div class="config-toggle-row">
-            <label class="config-toggle-label">
-              <input type="checkbox" class="config-checkbox" data-config-key="autoSync" {{#if config.autoSync}}checked{{/if}} />
-              Auto-sync on change
-            </label>
-            <span class="config-hint-inline">When disabled, use Pull/Push buttons to sync manually.</span>
-          </div>
-        </div>
-
-        {{!-- Exclusion Rules --}}
-        <div class="config-section">
-          <h3 class="section-heading">Exclusion Rules</h3>
-          <div class="config-field">
-            <label class="config-label">Excluded tags <span class="config-hint-inline">(comma-separated)</span></label>
-            <input type="text" class="config-input" data-config-key="excludedTags" value="{{config.excludedTagsText}}" placeholder="draft, wip, test" />
-          </div>
-          <div class="config-field">
-            <label class="config-label">Exclude by name <span class="config-hint-inline">(entities containing this text)</span></label>
-            <input type="text" class="config-input" data-config-key="excludedNamePattern" value="{{config.excludedNamePattern}}" placeholder="e.g. [DRAFT]" />
-          </div>
-          {{#if config.excludedTypeCount}}
-          <p class="config-hint">
-            <i class="fa-solid fa-circle-info"></i>
-            {{config.excludedTypeCount}} entity type(s) and {{config.excludedEntityCount}} individual entity(ies) excluded via the Entities tab.
-          </p>
-          {{/if}}
-        </div>
-
-        {{!-- Save --}}
-        <div class="config-save-bar">
-          <button type="button" class="dashboard-btn" data-action="save-config">
-            <i class="fa-solid fa-floppy-disk"></i> Save Configuration
-          </button>
-        </div>
-
-      </div>
-    </div>
 
     {{!-- ================================================================= --}}
     {{!-- ENTITIES TAB                                                      --}}
@@ -727,7 +563,7 @@
         <div class="dashboard-empty-tab">
           <i class="fa-solid fa-toggle-off fa-2x"></i>
           <p>Character sync is disabled.</p>
-          <p class="hint">Enable "Sync Characters" in Module Settings to sync actors with Chronicle.</p>
+          <p class="hint">{{localize "CHRONICLE.Dashboard.Characters.DisabledHint"}}</p>
           <button type="button" data-action="open-settings" class="dashboard-btn">
             <i class="fa-solid fa-gear"></i> Open Settings
           </button>
@@ -794,76 +630,6 @@
         <i class="fa-solid fa-circle-check fa-2x"></i>
         <p>No character sync issues.</p>
         <p class="hint">Every character actor is linked to a Chronicle entity. If a linked character's data looks stale, use the <strong>Re-sync</strong> button on the Characters tab.</p>
-      </div>
-      {{/if}}
-    </div>
-
-    {{!-- ================================================================= --}}
-    {{!-- MEMBERS TAB                                                       --}}
-    {{!-- ================================================================= --}}
-    <div class="tab" data-tab="members" data-group="primary">
-      <div class="dashboard-toolbar">
-        <div class="toolbar-title">
-          <i class="fa-solid fa-user-shield"></i>
-          {{localize "CHRONICLE.Dashboard.Members.Title"}}
-        </div>
-        <div class="toolbar-actions">
-          <button type="button" data-action="refresh-members" class="dashboard-btn btn-sm" title="{{localize "CHRONICLE.Dashboard.Members.RefreshHint"}}">
-            <i class="fa-solid fa-arrows-rotate"></i> {{localize "CHRONICLE.Dashboard.Members.Refresh"}}
-          </button>
-        </div>
-      </div>
-
-      <p class="config-hint">{{localize "CHRONICLE.Dashboard.Members.Intro"}}</p>
-
-      {{#if members.hasUnmatched}}
-      <div class="dashboard-load-errors member-unmatched-banner">
-        <i class="fa-solid fa-triangle-exclamation"></i>
-        {{localize "CHRONICLE.Dashboard.Members.UnmatchedWarning" count=members.unmatchedCount}}
-      </div>
-      {{/if}}
-      {{#if members.hasClaimUnmapped}}
-      <div class="dashboard-load-errors member-unmatched-banner">
-        <i class="fa-solid fa-triangle-exclamation"></i>
-        {{localize "CHRONICLE.Dashboard.Members.ClaimUnmappedWarning" count=members.claimUnmappedCount}}
-      </div>
-      {{/if}}
-
-      {{#if members.hasMembers}}
-      <div class="member-list">
-        {{#each members.rows}}
-        <div class="member-row {{#if matched}}matched{{else}}unmatched{{/if}}">
-          <div class="member-info">
-            <span class="member-name">{{name}}</span>
-            {{#if role}}<span class="member-role">{{role}}</span>{{/if}}
-            {{#if matched}}
-            <span class="member-badge matched"><i class="fa-solid fa-check"></i> {{localize "CHRONICLE.Dashboard.Members.Matched"}}</span>
-            {{else}}
-            <span class="member-badge unmatched"><i class="fa-solid fa-circle-exclamation"></i> {{localize "CHRONICLE.Dashboard.Members.Unmatched"}}</span>
-            {{/if}}
-            {{#if claimUnmapped}}
-            <span class="member-badge unmatched"><i class="fa-solid fa-user-lock"></i> {{localize "CHRONICLE.Dashboard.Members.ClaimUnmapped"}}</span>
-            {{/if}}
-          </div>
-          <div class="member-actions">
-            <label class="member-map-label">{{localize "CHRONICLE.Dashboard.Members.FoundryUser"}}</label>
-            <select class="member-map-select" data-member-key="{{key}}">
-              {{#each options}}
-              <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>
-              {{/each}}
-            </select>
-          </div>
-        </div>
-        {{/each}}
-      </div>
-      {{else}}
-      <div class="dashboard-empty-tab">
-        <i class="fa-solid fa-user-shield fa-2x"></i>
-        <p>{{localize "CHRONICLE.Dashboard.Members.NoMembers"}}</p>
-        <p class="hint">{{localize "CHRONICLE.Dashboard.Members.NoMembersHint"}}</p>
-        <button type="button" data-action="refresh-members" class="dashboard-btn">
-          <i class="fa-solid fa-arrows-rotate"></i> {{localize "CHRONICLE.Dashboard.Members.Refresh"}}
-        </button>
       </div>
       {{/if}}
     </div>
@@ -944,7 +710,7 @@
         <p>No calendar configured for this campaign in Chronicle.</p>
         {{else}}
         <i class="fa-solid fa-toggle-off fa-2x"></i>
-        <p>Calendar sync is disabled. Enable it in Module Settings.</p>
+        <p>Calendar sync is off. Turn it on in Chronicle settings, under What syncs.</p>
         <button type="button" data-action="open-settings" class="dashboard-btn">
           <i class="fa-solid fa-gear"></i> Open Settings
         </button>

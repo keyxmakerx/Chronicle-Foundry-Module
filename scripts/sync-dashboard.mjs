@@ -9,12 +9,12 @@
  */
 
 import { noticeText } from './_escape-html.mjs';
-import { getSetting, setSetting, getSyncDirections, setSyncDirections, getExcludedTags, setExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
+import { openChronicleSettings } from './chronicle-settings.mjs';
+import { getSetting, setSetting, getUserMappings } from './settings.mjs';
 import { SyncHistoryTab } from './sync-history-tab.mjs';
 import { FLAG_SCOPE, REPORT_STORE_FLAG } from './constants.mjs';
 import { confirmDialog, promptDialog } from './_dialogs.mjs';
-import { memberKey } from './sync-manager.mjs';
-import { buildMemberRows } from './_member-mapping.mjs';
+import { buildMemberRows, memberKey } from './_member-mapping.mjs';
 import {
   captureActorSnapshot,
   buildCapabilityReport,
@@ -28,7 +28,6 @@ import { log, getLogBuffer } from './logger.mjs';
 import { walkEntityPages } from './_entity-page-walk.mjs';
 import { mapThumbSrc } from './_map-look.mjs';
 import { _isAllowedImageHost } from './_url-validation.mjs';
-import { pickJournalCreateType } from './_journal-create.mjs';
 import { projectSubresourcePanel } from './_calendar-subresources.mjs';
 import { calendarStateFromError } from './_calendar-probe-state.mjs';
 import {
@@ -86,18 +85,14 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'open-shop': SyncDashboard.#onOpenShopAction,
       'push-actor': SyncDashboard.#onPushActorAction,
       'push-all-actors': SyncDashboard.#onPushAllActorsAction,
-      'test-connection': SyncDashboard.#onTestConnectionAction,
-      'save-config': SyncDashboard.#onSaveConfigAction,
       'copy-debug': SyncDashboard.#onCopyDebugAction,
       'copy-diagnostic-bundle': SyncDashboard.#onCopyDiagnosticBundleAction,
       'copy-capability': SyncDashboard.#onCopyCapabilityAction,
       'copy-capability-json': SyncDashboard.#onCopyCapabilityJsonAction,
-      'open-wizard': SyncDashboard.#onOpenWizardAction,
       'bulk-set-public': SyncDashboard.#onBulkSetPublicAction,
       'bulk-set-private': SyncDashboard.#onBulkSetPrivateAction,
       'bulk-delete': SyncDashboard.#onBulkDeleteAction,
       'create-entity-type': SyncDashboard.#onCreateEntityTypeAction,
-      'refresh-members': SyncDashboard.#onRefreshMembersAction,
       'resolve-match': SyncDashboard.#onResolveMatchAction,
       'resolve-create': SyncDashboard.#onResolveCreateAction,
       'resolve-repush': SyncDashboard.#onResolveRepushAction,
@@ -293,12 +288,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       loadErrors.push({ tab: 'issues', message: err.message || 'Failed to load issues' });
     }
 
-    // Build members (permission mapping) tab data.
-    const membersData = this._buildMembersData();
-
-    // Build config tab data.
-    const configData = this._buildConfigData(entityGroups);
-
     // Build the Overview cockpit from the pieces already computed above — a
     // calm landing view that routes problems to the tab that fixes each one.
     const overview = buildOverviewModel({
@@ -308,7 +297,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       linkedScenes: statusData.linkedScenes,
       characters: characterData.characters,
       issuesCount: issuesData.count,
-      unmatchedMembers: membersData.unmatchedCount,
+      unmatchedMembers: this._unmatchedMemberCount(),
       calendarRebuilding: !!calendarData.calendarRebuilding,
       errorCount: statusData.errorLog?.length ?? 0,
       matchedSystem: statusData.matchedSystem,
@@ -330,9 +319,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
       // Issues (resolver) tab.
       issues: issuesData,
-
-      // Config tab.
-      config: configData,
 
       // Entities tab.
       entityGroups: entityGroups.map(g => ({
@@ -356,9 +342,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
       // Characters tab.
       ...characterData,
-
-      // Members (permission mapping) tab.
-      members: membersData,
 
       // Calendar tab.
       calendar: calendarData,
@@ -808,130 +791,17 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     };
   }
 
-  // ---------------------------------------------------------------------------
-  // Members (permission mapping) data
-  // ---------------------------------------------------------------------------
-
   /**
-   * Build the Members tab: one row per Chronicle campaign member with their
-   * current Foundry-user mapping and a matched / UNMATCHED badge. Selecting a
-   * user persists the link via `setUserMappings`; the UNMATCHED badge is the
-   * operator's signal that a member's per-player permissions won't sync.
-   * @returns {object}
+   * Chronicle members not linked to a Foundry player. Their per-player
+   * permissions are dropped, so the Overview flags them; the links
+   * themselves are set in Chronicle settings, under Players.
+   * @returns {number}
    * @private
    */
-  _buildMembersData() {
+  _unmatchedMemberCount() {
     const members = this._syncManager?.getMembers?.() ?? [];
-    const mappings = getUserMappings();
     const foundryUsers = (game.users?.contents ?? []).map((u) => ({ id: u.id, name: u.name }));
-
-    // Players who own a linked character in Chronicle, from the owner each
-    // actor last applied.
-    const claimantKeys = (game.actors?.contents ?? [])
-      .filter((a) => a.getFlag?.(FLAG_SCOPE, 'entityId'))
-      .map((a) => a.getFlag(FLAG_SCOPE, 'chronicleOwnerUserId'))
-      .filter(Boolean);
-
-    const { rows, matchedCount, unmatchedCount, claimUnmappedCount } = buildMemberRows({
-      members,
-      mappings,
-      foundryUsers,
-      keyOf: memberKey,
-      claimantKeys,
-    });
-
-    return {
-      rows,
-      matchedCount,
-      unmatchedCount,
-      hasUnmatched: unmatchedCount > 0,
-      claimUnmappedCount,
-      hasClaimUnmapped: claimUnmappedCount > 0,
-      hasMembers: rows.length > 0,
-    };
-  }
-
-  /**
-   * Persist a manual Chronicle-member → Foundry-user mapping. An empty
-   * `foundryUserId` clears the mapping (back to UNMATCHED). Called from the
-   * Members tab dropdown's change handler (wired in `_onRender`, since
-   * ApplicationV2 `actions` only delegate `click`).
-   *
-   * @param {string} memberKeyValue - Chronicle user-id key.
-   * @param {string} foundryUserId - Foundry user id, or '' to unmap.
-   * @private
-   */
-  async _setMemberMapping(memberKeyValue, foundryUserId) {
-    if (!memberKeyValue) return;
-    const mappings = getUserMappings();
-    const member = (this._syncManager?.getMembers?.() ?? []).find(
-      (m) => memberKey(m) === memberKeyValue
-    );
-    const memberName = member?.display_name || memberKeyValue;
-
-    if (foundryUserId) {
-      mappings[memberKeyValue] = foundryUserId;
-      const userName = game.users?.get?.(foundryUserId)?.name || foundryUserId;
-      this._logActivity('link', `Mapped Chronicle member "${memberName}" → Foundry user "${userName}"`);
-    } else {
-      delete mappings[memberKeyValue];
-      this._logActivity('unlink', `Unmapped Chronicle member "${memberName}" — their per-player permissions will no longer sync`);
-    }
-    await setUserMappings(mappings);
-    this.render({ force: true });
-  }
-
-  // ---------------------------------------------------------------------------
-  // Config data
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Build config tab data from current settings.
-   * @param {Array} entityGroups - Entity groups for count display.
-   * @returns {object}
-   * @private
-   */
-  _buildConfigData(entityGroups) {
-    const directions = getSyncDirections();
-    const exclusions = this._getExclusions();
-    const excludedTags = getExcludedTags();
-
-    // Count items per sync type for the scope grid.
-    const entityCount = entityGroups.reduce((sum, g) => sum + g.totalCount, 0);
-    const mapCount = this._cache.maps?.length ?? 0;
-
-    const syncTypes = [
-      { key: 'journals', label: 'Journals / Entities', icon: 'fa-book', direction: directions.journals || 'both', count: entityCount },
-      { key: 'maps', label: 'Maps / Scenes', icon: 'fa-map', direction: directions.maps || 'both', count: mapCount },
-      { key: 'calendar', label: 'Calendar', icon: 'fa-calendar', direction: directions.calendar || 'both', count: null },
-      { key: 'characters', label: 'Characters / Actors', icon: 'fa-users', direction: directions.characters || 'both', count: null },
-      { key: 'shops', label: 'Shops', icon: 'fa-store', direction: directions.shops || 'both', count: null },
-    ];
-
-    // Page types for the "journals made in Foundry" dropdown; the selected one
-    // is what a new journal would be filed under right now.
-    const typeList = this._cache.entityTypes || [];
-    const selectedTypeId = pickJournalCreateType(typeList, getSetting('journalCreateTypeId'));
-    const journalCreateTypes = typeList
-      .filter((t) => t && t.enabled !== false)
-      .map((t) => ({ id: t.id, name: t.name_plural || t.name, selected: Number(t.id) === selectedTypeId }));
-
-    return {
-      apiUrl: getSetting('apiUrl'),
-      apiKey: getSetting('apiKey'),
-      campaignId: getSetting('campaignId'),
-      syncPermissions: getSetting('syncPermissions'),
-      defaultOwnership: getSetting('defaultOwnership'),
-      dmOnlyHidden: getSetting('dmOnlyHidden'),
-      conflictResolution: getSetting('conflictResolution'),
-      journalCreateTypes,
-      autoSync: getSetting('autoSync'),
-      excludedTagsText: excludedTags.join(', '),
-      excludedNamePattern: getSetting('excludedNamePattern'),
-      excludedTypeCount: exclusions.excludedTypes.length,
-      excludedEntityCount: exclusions.excludedEntities.length,
-      syncTypes,
-    };
+    return buildMemberRows({ members, mappings: getUserMappings(), foundryUsers, keyOf: memberKey }).unmatchedCount;
   }
 
   // ---------------------------------------------------------------------------
@@ -1288,34 +1158,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       });
     }
 
-    // --- Config tab: direction selects auto-save visual feedback ---
-    el.querySelectorAll('.config-direction-select').forEach((select) => {
-      select.addEventListener('change', () => {
-        // Mark the save bar as needing attention.
-        const saveBar = el.querySelector('.config-save-bar');
-        if (saveBar) saveBar.classList.add('config-unsaved');
-      });
-    });
-
-    // --- Config tab: checkbox changes mark unsaved ---
-    el.querySelectorAll('.config-checkbox, .config-input, .config-select').forEach((input) => {
-      const event = input.type === 'checkbox' ? 'change' : 'input';
-      input.addEventListener(event, () => {
-        const saveBar = el.querySelector('.config-save-bar');
-        if (saveBar) saveBar.classList.add('config-unsaved');
-      });
-    });
-
-    // --- Members tab: per-member Foundry-user mapping select ---
-    // ApplicationV2 `actions` only delegate `click`, so the `<select>` change
-    // is wired here directly.
-    el.querySelectorAll('.member-map-select').forEach((select) => {
-      select.addEventListener('change', (e) => {
-        const key = e.currentTarget.dataset.memberKey;
-        this._setMemberMapping(key, e.currentTarget.value);
-      });
-    });
-
     // --- Overview cockpit: jump-links to other tabs ---
     // Stat tiles and "needs attention" rows carry data-jump-tab and switch the
     // active tab (no data-action, so they bypass the ApplicationV2 click router).
@@ -1389,6 +1231,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    * @private
    */
   _applyActiveTab(el) {
+    // A tab saved by an older version may no longer exist.
+    if (!el.querySelector(`.dashboard-content .tab[data-tab="${CSS.escape(this._activeTab)}"]`)) {
+      this._activeTab = 'overview';
+    }
     el.querySelectorAll('.dashboard-tabs .item').forEach((t) =>
       t.classList.toggle('active', t.dataset.tab === this._activeTab));
     el.querySelectorAll('.dashboard-content .tab').forEach((p) =>
@@ -1404,6 +1250,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   _switchTab(tabName) {
     if (!tabName) return;
+    // "settings:players" and the like open that tab of Chronicle settings.
+    if (tabName.startsWith('settings:')) {
+      openChronicleSettings(tabName.slice('settings:'.length));
+      return;
+    }
     this._activeTab = tabName;
     setSetting('dashboardActiveTab', tabName);
     const el = this.element;
@@ -1705,23 +1556,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this.render({ force: true });
   }
 
-  /** Re-fetch campaign members from Chronicle and re-render the Members tab. */
-  static async #onRefreshMembersAction() {
-    if (this._syncManager?.fetchAndCacheMembers) {
-      await this._syncManager.fetchAndCacheMembers();
-    }
-    this.render({ force: true });
-  }
-
-  /** Open Foundry module settings. */
+  /** Open the Chronicle settings window, or bring it forward if open. */
   static #onOpenSettingsAction() {
-    const sheet = game.settings.sheet;
-    // v13 ApplicationV2 uses render({force}) instead of render(true).
-    if (sheet.render?.length === 0 || sheet.constructor?.DEFAULT_OPTIONS) {
-      sheet.render({ force: true });
-    } else {
-      sheet.render({ force: true });
-    }
+    openChronicleSettings();
   }
 
   /** Open a shop window via the ShopWidget module. */
@@ -1760,16 +1597,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Resolver / Characters: re-push a linked actor's current data to Chronicle. */
   static #onResolveRepushAction(event, target) {
     return this._onResolveRepush(target);
-  }
-
-  /** Test connection to Chronicle using current config field values. */
-  static #onTestConnectionAction() {
-    this._onTestConnection();
-  }
-
-  /** Save all config tab settings. */
-  static #onSaveConfigAction() {
-    this._onSaveConfig();
   }
 
   /** Copy system debug snapshot to clipboard for pasting into AI tools. */
@@ -1872,13 +1699,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         resultEl.className = 'debug-copy-result test-error';
       }
     }
-  }
-
-  static async #onOpenWizardAction() {
-    const { ImportWizard } = await import('./import-wizard.mjs');
-    const wizard = ImportWizard.instance;
-    wizard.bind(this._syncManager);
-    wizard.render({ force: true });
   }
 
   /** Set all selected entities to public. */
@@ -2357,255 +2177,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this._logActivity('push', `Re-synced everything (${done.join(', ') || 'nothing'})`);
     this.render({ force: true });
     ui.notifications.info(`Chronicle: Re-sync complete — ${done.join(', ') || 'nothing to sync'}.`);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Config actions
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Test connection to Chronicle with multi-step diagnostics.
-   * Tests API reachability, authentication, campaign access, and system match.
-   * Shows per-step results inline.
-   * @private
-   */
-  async _onTestConnection() {
-    const el = this.element;
-    if (!el) return;
-
-    const resultEl = el.querySelector('[data-test-result]');
-    const urlInput = el.querySelector('[data-config-key="apiUrl"]');
-    const keyInput = el.querySelector('[data-config-key="apiKey"]');
-    const campInput = el.querySelector('[data-config-key="campaignId"]');
-
-    const url = urlInput?.value?.trim();
-    const key = keyInput?.value?.trim();
-    const campaignId = campInput?.value?.trim();
-
-    if (!url || !key || !campaignId) {
-      this._renderTestResults(resultEl, [
-        { icon: 'xmark', text: 'Fill in URL, key, and campaign ID first.' },
-      ]);
-      return;
-    }
-
-    if (resultEl) {
-      resultEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Testing...';
-      resultEl.className = 'config-test-result test-pending';
-    }
-
-    const baseUrl = url.replace(/\/+$/, '');
-    const steps = [];
-
-    // Step 1: API reachable + auth + campaign
-    let resp;
-    try {
-      resp = await fetch(`${baseUrl}/api/v1/campaigns/${campaignId}/entity-types`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${key}`, 'Accept': 'application/json' },
-      });
-    } catch (err) {
-      const isCors = err instanceof TypeError && /failed to fetch|networkerror/i.test(err.message || '');
-      if (isCors) {
-        steps.push({ icon: 'xmark', text: `CORS: Chronicle is blocking requests from this domain. Ask admin to add ${window.location.origin} to CORS whitelist.` });
-      } else {
-        steps.push({ icon: 'xmark', text: `Unreachable: Chronicle server not responding at ${baseUrl}. Check URL and server status.` });
-      }
-      this._renderTestResults(resultEl, steps);
-      return;
-    }
-
-    if (resp.status === 401) {
-      steps.push({ icon: 'check', text: 'API reachable' });
-      steps.push({ icon: 'xmark', text: 'Auth failed: API key invalid or revoked. Create a new key in Chronicle Settings → Integrations.' });
-      this._renderTestResults(resultEl, steps);
-      return;
-    }
-    if (resp.status === 403) {
-      steps.push({ icon: 'check', text: 'API reachable' });
-      steps.push({ icon: 'xmark', text: 'Forbidden: API key lacks required permissions. Check Read/Write/Sync are enabled.' });
-      this._renderTestResults(resultEl, steps);
-      return;
-    }
-    if (resp.status === 404) {
-      steps.push({ icon: 'check', text: 'API reachable' });
-      steps.push({ icon: 'check', text: 'Auth OK' });
-      steps.push({ icon: 'xmark', text: `Campaign not found. Check campaign ID: ${campaignId}` });
-      this._renderTestResults(resultEl, steps);
-      return;
-    }
-    if (resp.status === 429) {
-      steps.push({ icon: 'check', text: 'API reachable' });
-      steps.push({ icon: 'xmark', text: 'Rate limit exceeded. Wait a moment or ask admin to increase the limit.' });
-      this._renderTestResults(resultEl, steps);
-      return;
-    }
-    if (!resp.ok) {
-      steps.push({ icon: 'check', text: 'API reachable' });
-      steps.push({ icon: 'xmark', text: `HTTP ${resp.status}: ${resp.statusText}` });
-      this._renderTestResults(resultEl, steps);
-      return;
-    }
-
-    steps.push({ icon: 'check', text: 'API reachable' });
-    steps.push({ icon: 'check', text: 'Auth OK' });
-    steps.push({ icon: 'check', text: 'Campaign accessible' });
-
-    // Step 2: System match check
-    try {
-      const sysResp = await fetch(`${baseUrl}/api/v1/campaigns/${campaignId}/systems`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${key}`, 'Accept': 'application/json' },
-      });
-      if (sysResp.ok) {
-        const sysResult = await sysResp.json();
-        const systems = sysResult.data || [];
-        const foundryId = game.system?.id;
-        if (foundryId) {
-          const match = systems.find(s => s.foundry_system_id === foundryId && s.enabled);
-          if (match) {
-            steps.push({ icon: 'check', text: `System matched: ${match.name}` });
-          } else {
-            const byId = systems.find(s => s.foundry_system_id === foundryId);
-            if (byId && !byId.enabled) {
-              steps.push({ icon: 'warn', text: `System "${byId.name}" found but not enabled for this campaign` });
-            } else if (systems.length > 0) {
-              steps.push({ icon: 'warn', text: `No system matches Foundry "${foundryId}". Available: ${systems.map(s => s.foundry_system_id || '(none)').join(', ')}` });
-            } else {
-              steps.push({ icon: 'warn', text: 'No game systems installed in Chronicle' });
-            }
-          }
-        }
-      }
-    } catch { /* system check is optional */ }
-
-    this._renderTestResults(resultEl, steps);
-  }
-
-  /**
-   * Render multi-step test connection results.
-   *
-   * Uses DOM construction, never `innerHTML`: `s.text` contains
-   * Chronicle-side strings (system names, error messages echoing Chronicle
-   * response data), and a malicious string there must render as text
-   * (`textContent`), never execute as HTML. See `.ai.md` → "Security
-   * footguns".
-   *
-   * @param {HTMLElement} resultEl
-   * @param {Array<{icon: string, text: string}>} steps
-   * @private
-   */
-  _renderTestResults(resultEl, steps) {
-    if (!resultEl) return;
-    const hasError = steps.some(s => s.icon === 'xmark');
-    // Static icon-class map — values are constant CSS class strings (no
-    // user input). Safe to assign to a Foundry-icon `<i>` element via class.
-    const iconClasses = {
-      check: { classes: ['fa-solid', 'fa-check-circle'], color: 'var(--cs-ok)' },
-      xmark: { classes: ['fa-solid', 'fa-circle-xmark'], color: 'var(--cs-bad)' },
-      warn:  { classes: ['fa-solid', 'fa-triangle-exclamation'], color: 'var(--cs-warn)' },
-    };
-    // Clear via replaceChildren — accepts a list of Node|string args; strings
-    // become text nodes, NEVER parsed as HTML. Resets the element atomically.
-    resultEl.replaceChildren(...steps.map((s) => {
-      const div = document.createElement('div');
-      const iconSpec = iconClasses[s.icon];
-      if (iconSpec) {
-        const icon = document.createElement('i');
-        icon.classList.add(...iconSpec.classes);
-        icon.style.color = iconSpec.color;
-        div.append(icon, ' ');
-      }
-      // textContent assignment — Chronicle-side strings rendered as TEXT,
-      // never as DOM. Malicious `<img src=x onerror=...>` strings appear
-      // verbatim and execute nothing.
-      div.append(document.createTextNode(s.text ?? ''));
-      return div;
-    }));
-    resultEl.className = `config-test-result ${hasError ? 'test-error' : 'test-success'}`;
-  }
-
-  /**
-   * Save all settings from the Config tab form inputs.
-   * Reads values from DOM, saves to Foundry settings, shows confirmation.
-   * @private
-   */
-  async _onSaveConfig() {
-    const el = this.element;
-    if (!el) return;
-
-    try {
-      // Connection fields (require reload if changed).
-      const apiUrl = el.querySelector('[data-config-key="apiUrl"]')?.value?.trim() ?? '';
-      const apiKey = el.querySelector('[data-config-key="apiKey"]')?.value?.trim() ?? '';
-      const campaignId = el.querySelector('[data-config-key="campaignId"]')?.value?.trim() ?? '';
-
-      const oldUrl = getSetting('apiUrl');
-      const oldKey = getSetting('apiKey');
-      const oldCamp = getSetting('campaignId');
-      const connectionChanged = apiUrl !== oldUrl || apiKey !== oldKey || campaignId !== oldCamp;
-
-      await setSetting('apiUrl', apiUrl);
-      await setSetting('apiKey', apiKey);
-      await setSetting('campaignId', campaignId);
-
-      // Sync directions.
-      const directions = {};
-      el.querySelectorAll('.config-direction-select').forEach((select) => {
-        directions[select.dataset.syncType] = select.value;
-      });
-      await setSyncDirections(directions);
-
-      // Update per-feature toggles from directions (for backward compat).
-      await setSetting('syncJournals', directions.journals !== 'off');
-      await setSetting('syncMaps', directions.maps !== 'off');
-      await setSetting('syncCalendar', directions.calendar !== 'off');
-      await setSetting('syncCharacters', directions.characters !== 'off');
-
-      // Permission settings.
-      const syncPerms = el.querySelector('[data-config-key="syncPermissions"]')?.checked ?? true;
-      await setSetting('syncPermissions', syncPerms);
-
-      const dmOnlyHidden = el.querySelector('[data-config-key="dmOnlyHidden"]')?.checked ?? true;
-      await setSetting('dmOnlyHidden', dmOnlyHidden);
-
-      const defaultOwnership = Number(el.querySelector('[data-config-key="defaultOwnership"]')?.value ?? 0);
-      await setSetting('defaultOwnership', defaultOwnership);
-
-      // Behavior settings.
-      const conflictRes = el.querySelector('[data-config-key="conflictResolution"]')?.value ?? 'chronicle';
-      await setSetting('conflictResolution', conflictRes);
-
-      // Only when the dropdown was shown (it is absent if types failed to load),
-      // so a failed load never resets the chosen type.
-      const journalTypeSelect = el.querySelector('[data-config-key="journalCreateTypeId"]');
-      if (journalTypeSelect?.value) {
-        await setSetting('journalCreateTypeId', Number(journalTypeSelect.value));
-      }
-
-      const autoSync = el.querySelector('[data-config-key="autoSync"]')?.checked ?? true;
-      await setSetting('autoSync', autoSync);
-
-      // Exclusion rules.
-      const tagsText = el.querySelector('[data-config-key="excludedTags"]')?.value ?? '';
-      const tags = tagsText.split(',').map(t => t.trim()).filter(Boolean);
-      await setExcludedTags(tags);
-
-      const namePattern = el.querySelector('[data-config-key="excludedNamePattern"]')?.value ?? '';
-      await setSetting('excludedNamePattern', namePattern);
-
-      ui.notifications.info('Chronicle: Configuration saved.');
-      this._logActivity('update', 'Sync configuration updated');
-
-      if (connectionChanged) {
-        ui.notifications.warn('Chronicle: Connection settings changed. Reload Foundry to apply.');
-      }
-
-      this.render({ force: true });
-    } catch (err) {
-      console.error('Chronicle Dashboard: Save config failed', err);
-      ui.notifications.error(`Failed to save config: ${noticeText(err.message)}`);
-    }
   }
 
   // ---------------------------------------------------------------------------

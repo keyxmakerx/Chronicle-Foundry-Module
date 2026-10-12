@@ -148,7 +148,7 @@ test('§3.1 _reportUnmatchedMembers: warns + logs listing each unmatched member'
   assert.equal(logged.length, 1);
   assert.equal(logged[0].type, 'warning');
   assert.ok(/Alice/.test(logged[0].msg) && /Bob/.test(logged[0].msg), 'both names listed');
-  assert.ok(/Members tab/.test(logged[0].msg), 'points operator at the fix');
+  assert.ok(/Chronicle settings, under Players/.test(logged[0].msg), 'points operator at the fix');
   assert.equal(notes.length, 1);
   assert.ok(/Alice/.test(notes[0]) && /Bob/.test(notes[0]));
 });
