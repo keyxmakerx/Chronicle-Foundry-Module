@@ -25,6 +25,7 @@ data flow, file index and feature details. Entry point: `scripts/module.mjs`
   Chronicle's `GET /dm-screen`.
 - `scripts/debug-hub.mjs` (UI): the dashboard's player reports (under Diagnostics) and player
   problem reports.
+- `assets/`: the generic monster token creatures fall back to.
 - `templates/` Handlebars, `styles/` CSS, `lang/en.json` strings,
   `tools/test-*.mjs` (Node's test runner, see TESTING.md).
 - `bench/`: the two-sided sync bench (real Chronicle + the real sync code in

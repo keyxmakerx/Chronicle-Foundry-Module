@@ -21,6 +21,8 @@ import {
 import { isAnsweringGM } from './_stash-relay.mjs';
 import { sameValue } from './_actor-apply-plan.mjs';
 import { log } from './logger.mjs';
+import { PictureStore } from './picture-store.mjs';
+import { pictureChoice, pictureIds, picturePlan, PICTURES_FLAG } from './_creature-pictures.mjs';
 
 /** Actor flag holding the creature page this actor follows. */
 export const CREATURE_FLAG = 'creatureEntityId';
@@ -54,6 +56,7 @@ export class CreatureSync {
     this._onUpdateActor = this._handleUpdateActor.bind(this);
     this._onEffect = this._handleEffect.bind(this);
     this._hooked = false;
+    this._pictures = null;
   }
 
   get _active() {
@@ -237,6 +240,9 @@ export class CreatureSync {
             [VERSION_FLAG]: entity.updated_at ?? null,
           },
         };
+        for (const [path, value] of Object.entries(await this._picturePlan(entity, null))) {
+          foundry.utils.setProperty(data, path, value);
+        }
         await Actor.create(data, syncOptions({ [APPLY_OPTION]: true }));
         return true;
       }
@@ -250,12 +256,33 @@ export class CreatureSync {
         if (keys.length) edited = seedPull({ entity, fields: this._defs.fields, pullKeys: this._pullKeys, choicesFor, onlyKeys: keys });
       }
       const changes = planCreatureApply({ update: { ...edited, ...update }, actor });
+      Object.assign(changes, await this._picturePlan(entity, actor));
       if (entity.updated_at) changes[`flags.${FLAG_SCOPE}.${VERSION_FLAG}`] = entity.updated_at;
       if (Object.keys(changes).length) await actor.update(changes, syncOptions({ [APPLY_OPTION]: true }));
       return true;
     } catch (err) {
       log.warn(`Creature sync: could not bring in "${entity?.name ?? entity?.id}"`, err);
       return false;
+    }
+  }
+
+  /**
+   * The portrait and token changes for a page, copying its pictures into the
+   * world first. Never throws: a picture that can't be copied is retried on
+   * the page's next change.
+   */
+  async _picturePlan(entity, actor) {
+    try {
+      const choice = pictureChoice(entity);
+      const applied = actor?.getFlag(FLAG_SCOPE, PICTURES_FLAG) || null;
+      if (applied && applied.img === choice.img && applied.token === choice.token) return {};
+      const current = actor ? { img: actor.img, token: actor.prototypeToken?.texture?.src } : null;
+      this._pictures ??= new PictureStore({ api: this._api });
+      const local = await this._pictures.ensure(pictureIds(choice));
+      return picturePlan({ choice, local, applied, current });
+    } catch (err) {
+      log.warn(`Creature sync: could not bring in the pictures for "${entity?.name ?? entity?.id}"`, err);
+      return {};
     }
   }
 
