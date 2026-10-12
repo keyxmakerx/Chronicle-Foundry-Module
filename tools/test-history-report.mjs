@@ -8,7 +8,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   describeMessage, resourceIdOf, resourceNameOf, idsInPath, activityToEvent,
-  HistoryReporter, HISTORY_BATCH, HISTORY_QUEUE_MAX, ECHO_WINDOW_MS,
+  HistoryReporter, HISTORY_BATCH, HISTORY_QUEUE_MAX, ECHO_WINDOW_MS, idsInResponse,
 } from '../scripts/_history-report.mjs';
 
 test('messages that are changes read as history; bursts are left out', () => {
@@ -58,6 +58,48 @@ test('a change Chronicle sends right after this world wrote it is an echo', () =
   assert.equal(r.isEcho(''), false);
   now += ECHO_WINDOW_MS + 1;
   assert.equal(r.isEcho('e-1'), false);
+});
+
+test('a create names its id only in the response; that id is an echo too', () => {
+  const r = new HistoryReporter({ send: async () => {} });
+  const end = r.beginWrite('/entities');
+  assert.equal(r.isEcho('new-1'), false);
+  end({ id: 'new-1', name: 'The Gilded Eel' });
+  assert.equal(r.isEcho('new-1'), true);
+  r.beginWrite('/notes')({ data: { id: 42 } });
+  assert.equal(r.isEcho('42'), true);
+});
+
+test('response ids: a record bare or enveloped, never a list or nothing', () => {
+  assert.deepEqual(idsInResponse({ id: 'a-1' }), ['a-1']);
+  assert.deepEqual(idsInResponse({ data: { id: 7 } }), ['7']);
+  assert.deepEqual(idsInResponse({ data: [{ id: 'x1' }] }), []);
+  assert.deepEqual(idsInResponse([{ id: 'x1' }]), []);
+  assert.deepEqual(idsInResponse(null), []);
+  assert.deepEqual(idsInResponse({ id: { nested: 1 } }), []);
+});
+
+test('a change announced before the create returns waits for it', async () => {
+  const r = new HistoryReporter({ send: async () => {} });
+  const end = r.beginWrite('/entities');
+  let echo = null;
+  const check = r.writesSettled().then(() => { echo = r.isEcho('new-2'); });
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(echo, null, 'still waiting on the create');
+  end({ id: 'new-2' });
+  await check;
+  assert.equal(echo, true);
+});
+
+test('a failed write ends without naming anything; a stuck one stops the wait at the cap', async () => {
+  const r = new HistoryReporter({ send: async () => {} });
+  r.beginWrite('/entities')();
+  await r.writesSettled();
+  assert.equal(r.isEcho('undefined'), false);
+  r.beginWrite('/entities');
+  const t0 = Date.now();
+  await r.writesSettled(20);
+  assert.ok(Date.now() - t0 < 1000, 'the cap ends the wait');
 });
 
 test('flush sends in batches of the server limit', async () => {

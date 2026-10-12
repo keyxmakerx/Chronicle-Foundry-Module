@@ -20,6 +20,13 @@ export const HISTORY_QUEUE_MAX = 500;
  */
 export const ECHO_WINDOW_MS = 10_000;
 
+/**
+ * How long a change Chronicle announces waits for this world's writes still
+ * in flight. A create's id is only known from its response, and Chronicle
+ * can announce the create before that response arrives.
+ */
+export const WRITE_WAIT_MS = 5_000;
+
 // Messages that are changes worth a history row, and how they read. Token
 // moves and the calendar's derived updates (moon, season, weather) are left
 // out: they arrive in bursts and bury the changes people made.
@@ -94,6 +101,22 @@ export function idsInPath(path) {
   return clean.split('/').filter((seg) => seg && /\d/.test(seg));
 }
 
+/**
+ * The id a write's response names: the created or updated record, bare or
+ * in a `data` envelope. Lists name no single record.
+ * @param {any} body - parsed response
+ * @returns {string[]}
+ */
+export function idsInResponse(body) {
+  const rec = body && typeof body === 'object' && !Array.isArray(body) ? body : null;
+  const inner = rec?.data && typeof rec.data === 'object' && !Array.isArray(rec.data) ? rec.data : null;
+  const ids = [];
+  for (const id of [rec?.id, inner?.id]) {
+    if ((typeof id === 'string' && id) || typeof id === 'number') ids.push(String(id));
+  }
+  return ids;
+}
+
 // Activity-log entries that become history rows. Pushes are left out:
 // Chronicle already records each push it receives, with its result.
 const ACTIVITY_ROWS = {
@@ -153,6 +176,7 @@ export class HistoryReporter {
     this._queue = [];
     this._sending = false;
     this._recentWrites = new Map();
+    this._inFlight = new Set();
     /** True once Chronicle has said it won't take reports. */
     this.disabled = false;
   }
@@ -162,6 +186,42 @@ export class HistoryReporter {
     const t = this._now();
     for (const id of idsInPath(path)) this._recentWrites.set(id, t);
     if (this._recentWrites.size > 1000) this._pruneWrites(t);
+  }
+
+  /**
+   * Note a write as it starts; the returned function ends it with the parsed
+   * response (or nothing, when it failed), noting the ids the response names.
+   * @param {string} path
+   * @returns {(body?: any) => void}
+   */
+  beginWrite(path) {
+    this.noteWrite(path);
+    let settle;
+    const pending = new Promise((resolve) => { settle = resolve; });
+    this._inFlight.add(pending);
+    return (body) => {
+      if (!this._inFlight.delete(pending)) return;
+      const t = this._now();
+      for (const id of idsInResponse(body)) this._recentWrites.set(id, t);
+      settle();
+    };
+  }
+
+  /**
+   * Resolves once the writes in flight now have ended, or after `maxMs`, so
+   * a change Chronicle announces before this world's create returns is still
+   * recognised as its echo.
+   * @param {number} [maxMs]
+   */
+  async writesSettled(maxMs = WRITE_WAIT_MS) {
+    if (!this._inFlight.size) return;
+    let timer;
+    const cap = new Promise((resolve) => { timer = setTimeout(resolve, maxMs); });
+    try {
+      await Promise.race([Promise.all([...this._inFlight]), cap]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /** True when Chronicle's message is this world's own write coming back. */

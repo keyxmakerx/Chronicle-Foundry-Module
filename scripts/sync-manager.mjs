@@ -46,7 +46,7 @@ export class SyncManager {
      * write is noted so Chronicle's echo of it isn't reported as a change.
      */
     this._history = new HistoryReporter({ send: (body) => this.api.post('/sync/history', body) });
-    this.api.onWrite = (path) => this._history.noteWrite(path);
+    this.api.onWrite = (path) => this._history.beginWrite(path);
     /** @type {ReturnType<typeof setInterval>|null} */
     this._historyTimer = null;
 
@@ -810,6 +810,7 @@ export class SyncManager {
     const what = describeMessage(msg?.type);
     if (!what) return;
     const id = resourceIdOf(msg);
+    await this._history.writesSettled();
     if (this._history.isEcho(id)) return;
     this.recordWorldOutcome(!failed);
     const reason = failed ? (failed.reason?.message || String(failed.reason)) : '';
