@@ -107,8 +107,9 @@ export const benchCreatureFields = {
 };
 
 /** A new, empty Foundry world wired to `seed`'s campaign. */
-export function newWorld(seed, { settings = {} } = {}) {
+export function newWorld(seed, { settings = {}, systemId } = {}) {
   const world = installFoundry({
+    systemId,
     settings: {
       apiUrl: CHRONICLE_URL,
       apiKey: seed.moduleKey,

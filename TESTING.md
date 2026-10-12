@@ -348,6 +348,10 @@ Chronicle settings, under What syncs.
 - [ ] A keyword Foundry doesn't know, or the Swarm organization, is left blank rather than guessed
 - [ ] Damage and conditions on the token stay in Foundry until the page allows sending them back; then they show on the page
 - [ ] Deleting the page in Chronicle (live or while Foundry is closed) keeps the actor, only unlinked
+- [ ] The actor's Abilities tab lists every ability and villain action from the page. Open a goblin's signature ability, target a hero and use it: one roll, the hero's tier result in chat, with Apply Damage and, where the result has one, Apply Effect
+- [ ] An area ability (a burst or cube) shows Place Template; placing it draws the area on the map
+- [ ] Drag an ability from the system's compendium onto a synced actor, named like one of the page's: after the next page edit the actor still has just that one, and the GM's copy is unchanged
+- [ ] Change a tier on the page in Chronicle: that ability updates on the actor; the others keep their place
 
 ## NPC Tokens (Spotlight, Talking)
 
