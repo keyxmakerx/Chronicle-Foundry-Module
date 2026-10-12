@@ -221,8 +221,24 @@ export function registerSettings() {
     onChange: () => Hooks.callAll('chronicleSyncCalendarSnapshot'),
   });
 
-  // Where this person dragged the calendar strip, and whether it is shrunk
-  // to the clock. Client scope: each player keeps their own spot.
+  // How this person's calendar looks: the strip, or the Sky Clock globe.
+  game.settings.register(MODULE_ID, 'calendarLook', {
+    name: game.i18n.localize('CHRONICLE.Settings.CalendarLook.Name'),
+    hint: game.i18n.localize('CHRONICLE.Settings.CalendarLook.Hint'),
+    scope: 'client',
+    config: true,
+    type: String,
+    choices: {
+      strip: game.i18n.localize('CHRONICLE.Settings.CalendarLook.Strip'),
+      globe: game.i18n.localize('CHRONICLE.Settings.CalendarLook.Globe'),
+    },
+    default: 'strip',
+    onChange: () => Hooks.callAll('chronicleSyncCalendarSnapshot'),
+  });
+
+  // Where this person put the calendar (the strip's spot, the globe's
+  // corner), whether it is locked there and whether it is shrunk to the
+  // small globe. Client scope: each player keeps their own.
   game.settings.register(MODULE_ID, 'calendarBarPlace', {
     scope: 'client',
     config: false,

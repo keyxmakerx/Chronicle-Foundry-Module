@@ -35,8 +35,7 @@
       "Drag": "Drag to move",
       "Lock": "Lock in place",
       "Unlock": "Unlock to move",
-      "Shrink": "Shrink to a clock",
-      "Clock": "Chronicle calendar: {date}, {time}. Click to open; drag to move",
+      "Shrink": "Shrink to a small globe",
       "RealTime": "This calendar follows real time, so its date can't be moved here.",
       "StepRefused": "Chronicle didn't take the new time. The Calendar tab of the Chronicle dashboard says why.",
       "SetRefused": "Chronicle didn't take that date. Check that it exists in the calendar.",
@@ -52,6 +51,22 @@
       "NameNeeded": "Give the event a name.",
       "EventAdded": "Added \"{name}\" to Chronicle's calendar.",
       "AddRefused": "Chronicle didn't take the event. Check the date and your key's role."
+    },
+    "SkyClock": {
+      "Shrink": "Make it smaller",
+      "Lock": "Lock in its corner",
+      "Unlock": "Unlock to move",
+      "MiniLabel": "{date}. Click to make it bigger.",
+      "GmLabel": "{date}. Click to change Chronicle's time; drag to move.",
+      "CradleLabel": "Change Chronicle's time",
+      "BackDay": "Back a day",
+      "BackHour": "Back an hour",
+      "ForwardHour": "Forward an hour",
+      "ForwardDay": "Forward a day",
+      "Saving": "Saving to Chronicle",
+      "Saved": "Saved in Chronicle, {time}",
+      "RealTime": "This calendar follows real time, so Chronicle keeps the time.",
+      "StepRefused": "Chronicle didn't take the new time. The Calendar tab of the Chronicle dashboard says why."
     },
     "Settings": {
       "ApiUrl": {
@@ -103,8 +118,14 @@
         "Hint": "Whisper a GM-only chat line when the Chronicle calendar crosses a season or era boundary. Never posted to players."
       },
       "CalendarStrip": {
-        "Name": "Show the calendar strip",
-        "Hint": "A thin strip with Chronicle's date, time and weather over a small sky, which you can drag anywhere. For you only."
+        "Name": "Show Chronicle's calendar",
+        "Hint": "Chronicle's date and weather on the table, as a strip or a Sky Clock (pick below). For you only."
+      },
+      "CalendarLook": {
+        "Name": "Calendar look",
+        "Hint": "The strip: a thin bar with the date, time and weather that you can drag anywhere. The Sky Clock: a small glass globe with the day carved in stone under Chronicle's sky, which sits in a corner. For you only.",
+        "Strip": "Strip",
+        "Globe": "Sky Clock"
       },
       "Motion": {
         "Name": "Motion",

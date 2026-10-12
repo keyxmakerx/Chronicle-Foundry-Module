@@ -186,6 +186,7 @@ export function snapshotCalendar(cal) {
   return {
     mode: str(cal.mode, 40),
     tracks_real_time: !!cal.tracks_real_time,
+    hemisphere: cal.hemisphere === 'south' ? 'south' : 'north',
     hours_per_day: hoursPerDay(cal),
     minutes_per_hour: minutesPerHour(cal),
     leap_year_every: num(cal.leap_year_every) ?? 0,
@@ -263,6 +264,8 @@ export function buildPlayerSnapshot({
       ? {
         label: str(w.preset_label, 80) || str(w.description, 80),
         icon: str(w.icon, 20),
+        preset_id: str(w.preset_id, 40),
+        precipitation: skyPrecipitation(w.precipitation),
         color: safeColor(w.color),
         temperature_celsius: num(w.temperature_celsius),
       }
@@ -272,6 +275,7 @@ export function buildPlayerSnapshot({
         name: str(m.moon_name, 80), phase_name: str(m.phase_name, 80), phase_icon: str(m.phase_icon, 40),
       }))
       : [],
+    skyMoons: filtered ? skyMoons(calendar.moons) : [],
     events: keep.slice(0, SNAPSHOT_EVENT_LIMIT).map(snapshotEvent),
     dayWeather: dayWeatherConfirmed ? pastDayWeather(dayWeather, dateInfo) : [],
   };
@@ -287,7 +291,11 @@ export function pastDayWeather(days, today) {
   if (!t || t.some((v) => v === null)) return [];
   const onOrBefore = (d) => d.year < t[0] || (d.year === t[0] && (d.month < t[1] || (d.month === t[1] && d.day <= t[2])));
   return (days || [])
-    .map((d) => ({ year: num(d?.year), month: num(d?.month), day: num(d?.day), icon: str(d?.icon, 20), label: str(d?.preset_label, 80) || str(d?.description, 80) }))
+    .map((d) => ({
+      year: num(d?.year), month: num(d?.month), day: num(d?.day), icon: str(d?.icon, 20),
+      label: str(d?.preset_label, 80) || str(d?.description, 80), preset_id: str(d?.preset_id, 40),
+      precipitation: skyPrecipitation(d?.precipitation),
+    }))
     .filter((d) => d.year !== null && d.month !== null && d.day !== null && onOrBefore(d))
     .slice(0, SNAPSHOT_EVENT_LIMIT);
 }
@@ -331,7 +339,54 @@ export function snapshotEvent(e) {
     start_hour: num(e.start_hour), start_minute: num(e.start_minute),
     all_day: !!e.all_day,
     color: safeColor(e.color),
+    sky: skyNight(e.payload),
   };
+}
+
+/** The moon-night kinds Chronicle's sky draws for an event. */
+const SKY_NIGHTS = new Set(['blood', 'magic', 'conjunction', 'eclipse', 'harvest']);
+
+/**
+ * An event's moon night (a blood moon, an eclipse) for the Sky Clock, from
+ * its JSON `payload`: just the kind and the moon ids, or null.
+ */
+export function skyNight(payload) {
+  let p = payload;
+  if (typeof p === 'string') { try { p = JSON.parse(p); } catch { return null; } }
+  if (!p || typeof p !== 'object' || !SKY_NIGHTS.has(p.type)) return null;
+  const moons = (Array.isArray(p.moons) ? p.moons : []).map(given).filter((n) => n !== null).slice(0, 8);
+  return { type: p.type, moons };
+}
+
+/**
+ * The moons the players' sky draws. Only ever built from a players-audience
+ * read, which leaves hidden moons out; this keeps what the sky needs to
+ * place and paint them, and drops lore links.
+ */
+export function skyMoons(moons) {
+  // A hidden moon is left out here too, should an older Chronicle send one.
+  return (Array.isArray(moons) ? moons : []).filter((m) => m && !m.hidden_from_players).slice(0, 12).map((m) => ({
+    id: given(m?.id),
+    name: str(m?.name, 80) || '',
+    cycle_days: num(m?.cycle_days) ?? 0,
+    phase_offset: num(m?.phase_offset) ?? 0,
+    color: safeColor(m?.color),
+    base_design: str(m?.base_design, 60),
+    tint: given(m?.tint),
+    size: given(m?.size),
+  })).filter((m) => m.id !== null);
+}
+
+/** A number that was actually given: null, blanks and junk are null, never 0. */
+function given(v) {
+  return v === null || v === undefined || v === '' ? null : num(v);
+}
+
+/** Precipitation as the sky reads it: a type and an amount, nothing else. */
+function skyPrecipitation(p) {
+  if (!p || typeof p !== 'object') return null;
+  const type = str(p.type, 20);
+  return type ? { type, intensity: num(p.intensity) ?? 0 } : null;
 }
 
 /** Events on one day of a list, ordered by start time (all-day first). */
