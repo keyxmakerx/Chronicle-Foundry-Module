@@ -24,6 +24,7 @@ import { bindDebugHub, registerDebugHub } from './debug-hub.mjs';
 import { SyncDashboard } from './sync-dashboard.mjs';
 import { MapViewerSheet } from './map-viewer.mjs';
 import { openDMScreen } from './dm-screen.mjs';
+import { initEncounterHooks } from './encounters.mjs';
 import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs';
 import { registerNpcPresence, npcSpotlightRelay } from './npc-presence.mjs';
 import { negotiationMirror } from './negotiation-mirror.mjs';
@@ -187,6 +188,12 @@ Hooks.once('ready', async () => {
     registerMapSheetItems();
   } catch (err) {
     console.warn('Chronicle Sync | Map items unavailable', err);
+  }
+  try {
+    // A planned fight's combatants stay hidden while their tokens are.
+    if (game.user.isGM) initEncounterHooks();
+  } catch (err) {
+    console.warn('Chronicle Sync | Encounter tracker follow unavailable', err);
   }
   try {
     registerNpcPresence(() => syncManager?.api ?? null);

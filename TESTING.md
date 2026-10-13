@@ -382,6 +382,24 @@ GM only. Needs a Chronicle that serves the DM Screen.
 - [ ] Rules tab: **Find a condition** filters the list. Reveal tab: **Reveal** on a hidden character makes it visible to players in Chronicle
 - [ ] Against a Chronicle without the DM Screen, the window says to update Chronicle; with a wrong key it says the key was not accepted; **Try again** reloads
 
+## Encounters (DM Screen tab)
+
+GM only. Needs a Chronicle that serves encounters, a key for the campaign owner or a co-DM, creature sync on (so creature pages have actors), and a scene with a grid open. Plan one fight in Chronicle with a creature of count 3, one planned hidden, one planned seen and one planned "arrives later".
+
+- [ ] DM Screen, **Encounters** tab: the panel widens; fights marked Ready are listed first with their page name and creature count; typing in **Search planned encounters** finds others after a short pause
+- [ ] A player-role key or a Chronicle without encounters shows a plain message and **Try again**, not an empty list
+- [ ] Open the fight: one row per creature copy ("Hobgoblin Soldier 1", "2", "3"), each with its group and planned start; every row reads **Not placed**; a creature with no actor says "Not in Foundry yet" and its Place is greyed out
+- [ ] **Set up the start**, then click the scene: seen and hidden creatures appear on free squares around the click, hidden ones with the hidden look for the GM; the arrives-later ones stay off. Log in as a player in another browser: no hidden token is visible
+- [ ] Each placed token is its own copy: damage one and the others keep their Stamina; the token name is the row name
+- [ ] **Place** on a row, then click the scene: that one creature lands there, hidden. Clicking **Click the scene** again or pressing Escape cancels
+- [ ] **Show** on a hidden row reveals only that token (the player now sees it); **Hide** hides it again; toggling a token with Foundry's own Toggle Visibility changes the row within a moment
+- [ ] **Show all hidden (n)** asks in the window first; **Cancel** reveals nothing; **Show them** reveals only this fight's hidden tokens, not other hidden tokens on the scene
+- [ ] **Add who's here to the tracker** makes a new combat that is not started, with the placed tokens (in groups A, B, C on Foundry 13 and later); hidden tokens' combatants are hidden in the tracker for a player; rows not on the scene read **Pending**
+- [ ] Place a pending row: it joins the tracker, hidden if its token is. Hide or Show a token with Foundry's own control: its combatant follows
+- [ ] With a started combat on the scene, **Add who's here** asks first; saying no changes nothing
+- [ ] **Undo placing** asks; confirming removes only the tokens this fight placed, other tokens stay
+- [ ] Switch scenes with the tab open: the roster reads the new scene (all **Not placed** there) and any waiting scene click is cancelled
+
 ## Character claims
 
 Needs the Player Character Claiming addon on in Chronicle, a character linked to an actor, and two players linked to Chronicle members (Chronicle settings → Players). Run as the GM.
