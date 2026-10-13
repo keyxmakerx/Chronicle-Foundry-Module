@@ -1,87 +1,43 @@
 # Chronicle Sync — Foundry VTT Module
 
 The **Chronicle Sync** module for Foundry VTT: bidirectional real-time sync
-between a [Chronicle](https://github.com/keyxmakerx/Chronicle) worldbuilding
-instance and a Foundry VTT game world. See `.ai.md` for full architecture,
-data flow, file index and feature details. Entry point: `scripts/module.mjs`
-— registers settings on `init`, starts `SyncManager` on `ready` (GM only).
+between a [Chronicle](https://github.com/keyxmakerx/Chronicle) instance and a
+Foundry world. Entry point `scripts/module.mjs` (settings on `init`,
+`SyncManager` on `ready`, GM only). **`.ai.md` is the full reference**: what
+each file does, data flow, endpoints, security posture. Read the section you
+need rather than the whole file.
 
-## File Structure
+## Layout
 
-- `module.json` (Foundry manifest, v12–v14), `chronicle-package.json`
-  (serving descriptor, schema v1) — cross-validated by
-  `tools/check-package-descriptor.mjs`.
-- `scripts/*.mjs`: sync (`journal-sync`+`picture-store`, `map-sync`+`map-viewer`+`map-sheet-items`,
-  `calendar-sync`+`calendar-bar`+`sky-clock`, `actor-sync`, `creature-sync`,
-  `item-sync`, `stash-sync`+`stash-client`), UI (`sync-dashboard`, `npc-presence`, `negotiation-mirror`, `_player-report` (the GM's client reports the world's players to Chronicle),
-  `sync-diagnostic-bundle`, `avatar-sync`, `sync-history-tab`, `update-info`, `chronicle-settings` (the GM's tabbed settings window), `gm-secret-view`, `character-claim-indicator`,
-  `capability-inspector`, `import-wizard`, `shop-widget`+`shop-room-window`, `player-notebook`, `stash-window`+`stash-chat`, `quest-board` (Chronicle's quest boards and sheets; the GM's client reads for players)), core (`module`,
-  `settings`, `motion`, `vendor-chronicle`, `constants`, `logger`, `sync-manager`, `api-client`),
-  `adapters/generic-adapter.mjs`. `.ai.md` has what each does. `_*.mjs` are
-  pure helpers, each unit-tested by its own `tools/test-*.mjs`.
-- `vendor/chronicle/`: Chronicle's shop room widget, copied unchanged; a
-  Chronicle change to it means copying it again (`tools/test-shop-room.mjs`).
-- `scripts/dm-screen.mjs` (UI): the GM's DM Screen window, drawn from
-  Chronicle's `GET /dm-screen`.
-- `scripts/encounters.mjs` (UI): the DM Screen's Encounters tab, which loads a
-  fight planned in Chronicle as a roster for the current scene (pure logic in
-  `_encounter-roster.mjs` and `_encounter-list.mjs`; Chronicle is read-only here).
-- `scripts/debug-hub.mjs` (UI): the dashboard's player reports (under Diagnostics) and player
-  problem reports.
-- `assets/`: the generic monster token creatures fall back to.
-- `templates/` Handlebars, `styles/` CSS, `lang/en.json` strings,
-  `tools/test-*.mjs` (Node's test runner, see TESTING.md).
-- `bench/`: the two-sided sync bench (real Chronicle + the real sync code in
-  a fake Foundry world); `CHRONICLE_DIR=../Chronicle bench/run.sh`. A sync
-  change is not ready until its bench scenarios pass. `bench/README.md`.
-- `.github/workflows/`: `check-descriptor.yml`, `check-error-catalog.yml`
-  (API-CONTRACT.md's error table vs Chronicle's catalog), `release.yml` (Actions → Release
-  with a version; tags main), `snapshot.yml`, `sync-bench.yml` (the bench,
-  against the same-named Chronicle branch or main).
+`scripts/*.mjs` module code (`_*.mjs` are pure helpers, each tested by its own
+`tools/test-*.mjs`); `templates/`, `styles/`, `lang/en.json`; `assets/` holds
+the generic monster token;
+`vendor/chronicle/` is Chronicle's shop room widget copied unchanged;
+`bench/` is the two-sided sync bench (`CHRONICLE_DIR=../Chronicle bench/run.sh`),
+and a sync change is not ready until its bench scenarios pass. Tests: Node's
+test runner, see `TESTING.md`. **API-CONTRACT.md** is the Chronicle REST and
+WebSocket contract.
 
-## API Contract
+## Rules the code must keep
 
-**API-CONTRACT.md**: full Chronicle REST/WebSocket contract plus the module
-distribution contract (manifest, downloads, descriptor, error shape).
-Install/update flow: also `.ai.md` → "Chronicle Integration — Install & Updates".
+Each is pinned by the test named in `.ai.md`; read it there before changing one.
 
-## Code Conventions
-
-- **ES modules** (`.mjs`), `export default class` pattern.
-- **Comments say why, briefly**, pointing at a test/issue for more — no incident stories, task IDs, dates or `file:line` (those go in the PR). Deferred work is `TODO(#issue)`. CI checks new comments with `tools/check-comment-clutter.sh` (self-test `tools/test-comment-clutter.sh`).
-- **Tool windows take colours from `styles/tokens.css`** (`--cs-*`, a light and a dark set that follow Foundry's theme), never dark-only literals. Paper is a player-facing touch, not the default: only the quest notices and sheet, the player notebook and the shop room keep their own palettes. `tools/test-colour-tokens.mjs`.
-- `_syncing` guard against infinite loops: a boolean.
-- Adapters implement `toChronicleFields()`/`fromChronicleFields()`; REST uses Bearer auth via `api-client.mjs`.
-- **API key is CLIENT-scoped, never world-scoped** (a world setting syncs to every client). `migrateApiKeyToClientScope()` migrates legacy values. `tools/test-api-key-scope.mjs`.
-- **List responses are bare array or `{"data":[…],"total":N}`** — unwrap defensively everywhere. Envelope: `/entities`, `/entity-types`, `/systems`, `/addons`, `/tags`, `/relations/types`, `/calendar/events`, `/calendar/weather/days`. Bare: `/maps`, `/maps/:id/*`, `/members`, `/entities/:id/relations`, `/notes`. `tools/test-envelope-audit.mjs`.
-- **Chronicle brings its own calendar; no Foundry calendar module is integrated.** `calendar-sync.mjs` pulls Chronicle's date, events and world state; `calendar-bar.mjs` draws the date bar and month view and writes dates and events back to Chronicle. Players have no key, so the GM's client publishes the `calendarSnapshot` world setting, built only from `?audience=players` reads that Chronicle echoes back (`buildPlayerSnapshot` in `_calendar-view-model.mjs`: copied by field, public events only). Day maths is Chronicle's own (`_chronicle-caldate.mjs`). `tools/test-calendar-view-model.mjs`, `tools/test-calendar-builtin.mjs`, `tools/test-chronicle-caldate.mjs`.
-- **Real-time calendars are read-only for dates**: `tracks_real_time` from `GET /calendar/date` pauses date-push only, via `scripts/_realtime-date-guard.mjs`. `tools/test-realtime-date-signal.mjs`.
-- **Calendar sub-resources are display-only** (dashboard + optional GM-whisper, never public); `structure.updated` only refetches the calendar. `scripts/_calendar-subresources.mjs`, `tools/test-calendar-subresources.mjs`, `tools/test-calendar-subresource-routing.mjs`.
-- **Chronicle update endpoints are PARTIAL**: absent preserves, `null` clears, present replaces (API-CONTRACT.md → "partial-update contract"). Send only changed fields; never echo untouched ones back. `tools/test-partial-put-contract.mjs`. One deliberate exception: the marker dialog in `scripts/map-viewer.mjs` spreads the stored marker, harmless on current Chronicle and needed by older servers that replace the whole record. Actor field pushes do the same for `fields_data` (`ActorSync._putFieldsMerged`).
-- **GM-only content never goes into a saved Foundry document.** Every client receives every journal page, so a pulled page holds a placeholder secret block (id keyed by an HMAC under the GM's API key) where Chronicle has GM-only text or pictures; the GM's client fills it on screen (`scripts/gm-secret-view.mjs`) and puts the content back before a push, which leaves the text out rather than send it without a placeholder's content. Anything in a secret block goes back to Chronicle GM-only. `scripts/_gm-secrets.mjs`, `tools/test-gm-secrets.mjs`.
-- **Sync never deletes without asking.** A Chronicle-side removal sets the Foundry journal aside (unlinked, in a "Chronicle: removed" folder, `scripts/_set-aside.mjs`); an item whose "Has Item" relation is gone is only unlinked (`scripts/_inventory-plan.mjs`), unless a stash move the GM just applied took it off that character (`scripts/_stash-reconcile.mjs`); a Foundry-side delete of a linked actor or journal asks before deleting the Chronicle copy (`scripts/_remote-deletes.mjs`). Ability items sync made from a creature page are the page's copy, rebuilt or removed as it changes; an ability the GM added is never touched (`scripts/_creature-abilities.mjs`). `tools/test-set-aside.mjs`, `tools/test-remote-deletes.mjs`.
-- **Never hard-cap a list walk.** `JournalSync.resyncAll` and `_buildEntityGroups` share `scripts/_entity-page-walk.mjs` (200-page bound); its `truncated` flag must be surfaced. `tools/test-entity-page-walk.mjs`.
-- WebSocket messages route by type through `SyncManager`, which then reports each applied change to Chronicle's sync history (`scripts/_history-report.mjs`); a change arriving within 10 s of this world writing the same id is its own echo and isn't reported.
-- **Connect catch-up reads Chronicle's change feed** (`GET /sync/changes`, `scripts/_change-feed.mjs`); journals, characters, inventories and map items use it so far. Inventories reconcile a whole character from its relations (`scripts/_inventory-plan.mjs`), and use the delta only once the saved cursor shows the server records `relation`. The cursor is saved only after its changes applied, so replays must be harmless: skip what is already at its version, decide "new" by the page's own `created_at` against the cursor's `createdAfter`, which moves only with the cursor. A journal's recorded version never moves backwards. `tools/test-change-feed.mjs`, `tools/test-journal-versions.mjs`, `tools/test-inventory-plan.mjs`.
-
-## Calendar blackout and date-push pauses
-
-Chronicle's date and event routes are live. Current Chronicle answers the
-old structure, settings, import, export and advance routes with
-`410 {"error":"calendar_route_retired"}` (the module calls none of them); an
-older Chronicle answers them with `HTTP 503 {"error":"calendar_rebuilding", ...}`. Only a 503 whose body says
-`calendar_rebuilding` arms the blackout (`scripts/_calendar-blackout-guard.mjs`,
-`_calendar-probe-state.mjs`); a bare 503 from a proxy or restart is an ordinary
-failed request retried next tick. The GM gets one notice when it arms; pushes
-pause for 30 s, then one is let through, and any good calendar answer clears it
-silently. `tools/test-calendar-blackout.mjs`.
-
-A 400 (or non-real-time 422) on a date push means Chronicle's calendar cannot
-hold the date; a 403 means the key is not the campaign owner's. Either pauses
-date push (`CalendarSync.pushDate`), with one GM notice per session, until the
-next pull (reconnect) (`scripts/_date-push-rejection.mjs`). The per-note echo
-guard for the built-in calendar's writes is `scripts/_apply-guard.mjs`.
-`tools/test-calendar-resilience.mjs`.
+- ES modules, `export default class`. Comments say why, briefly; no task IDs,
+  dates or `file:line` (`tools/check-comment-clutter.sh`). Deferred work is `TODO(#issue)`.
+- Tool windows take colours from `styles/tokens.css` (`--cs-*`, light and dark).
+  Paper look only on the quest notices and sheet, player notebook and shop room.
+- The API key is client-scoped, never world-scoped.
+- List responses are a bare array or `{"data":[…],"total":N}`; unwrap defensively.
+- Chronicle update endpoints are partial: send only changed fields.
+- GM-only content never goes into a saved Foundry document (secret-block placeholders).
+- Sync never deletes without asking; Chronicle-side removals set things aside.
+- Never hard-cap a list walk; surface the `truncated` flag.
+- Chronicle owns the calendar: the module pulls it and pushes dates and events
+  back; players see only `?audience=players` data. Real-time calendars are
+  read-only for dates. Retired calendar routes answer 410; only a 503 saying
+  `calendar_rebuilding` arms the blackout guard.
+- Connect catch-up reads `GET /sync/changes`; replays must be harmless.
+- `_syncing` is the boolean guard against sync loops.
 
 ## Working with this project
 
