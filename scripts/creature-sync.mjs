@@ -8,7 +8,9 @@
  * sends those back only for a page whose director turned it on (the page's
  * `foundry` system state). A page removed from Chronicle only unlinks its
  * actor; nothing is deleted. Active GM only, behind the `syncCreatures`
- * setting. Conversions live in _creature-fields.mjs.
+ * setting. Conversions live in _creature-fields.mjs. Under the Draw Steel
+ * system the page's abilities become the actor's ability items
+ * (_creature-abilities.mjs), so the system rolls and applies them.
  */
 
 import { getSetting } from './settings.mjs';
@@ -23,12 +25,16 @@ import { sameValue } from './_actor-apply-plan.mjs';
 import { log } from './logger.mjs';
 import { PictureStore } from './picture-store.mjs';
 import { pictureChoice, pictureIds, picturePlan, PICTURES_FLAG } from './_creature-pictures.mjs';
+import {
+  ABILITY_FLAG, abilitiesFingerprint, desiredAbilities, hasAbilityFields, planAbilityItems,
+} from './_creature-abilities.mjs';
 
 /** Actor flag holding the creature page this actor follows. */
 export const CREATURE_FLAG = 'creatureEntityId';
 const VERSION_FLAG = 'creatureUpdatedAt';
 /** Folder flag marking the "Chronicle: Creatures" folder. */
 export const FOLDER_FLAG = 'creatureFolder';
+const ABILITIES_FLAG = 'creatureAbilities';
 const STATE_KEY = 'foundry';
 const PULL_DELAY_MS = 750;
 
@@ -216,7 +222,9 @@ export class CreatureSync {
       const before = this._known.get(entity.id);
       this._remember(entity.id, entity.fields_data);
       const actor = this._findActor(entity.id);
-      if (actor && entity.updated_at && actor.getFlag(FLAG_SCOPE, VERSION_FLAG) === entity.updated_at) return true;
+      const abilities = this._abilitiesFor(entity);
+      if (actor && entity.updated_at && actor.getFlag(FLAG_SCOPE, VERSION_FLAG) === entity.updated_at
+        && (!abilities || actor.getFlag(FLAG_SCOPE, ABILITIES_FLAG) === abilities)) return true;
 
       const choicesFor = (path) => foundry.utils.getProperty(globalThis.CONFIG, path) ?? null;
       const { update, unknown } = creatureUpdate({
@@ -244,7 +252,8 @@ export class CreatureSync {
         for (const [path, value] of Object.entries(await this._picturePlan(entity, null))) {
           foundry.utils.setProperty(data, path, value);
         }
-        await Actor.create(data, syncOptions({ [APPLY_OPTION]: true }));
+        const created = await Actor.create(data, syncOptions({ [APPLY_OPTION]: true }));
+        if (abilities && created) await this._applyAbilities(created, entity, abilities);
         return true;
       }
 
@@ -260,10 +269,49 @@ export class CreatureSync {
       Object.assign(changes, await this._picturePlan(entity, actor));
       if (entity.updated_at) changes[`flags.${FLAG_SCOPE}.${VERSION_FLAG}`] = entity.updated_at;
       if (Object.keys(changes).length) await actor.update(changes, syncOptions({ [APPLY_OPTION]: true }));
+      if (abilities && actor.getFlag(FLAG_SCOPE, ABILITIES_FLAG) !== abilities) await this._applyAbilities(actor, entity, abilities);
       return true;
     } catch (err) {
       log.warn(`Creature sync: could not bring in "${entity?.name ?? entity?.id}"`, err);
       return false;
+    }
+  }
+
+  /** The page's abilities fingerprint when they become items here, else null. */
+  _abilitiesFor(entity) {
+    if (game.system?.id !== 'draw-steel' || !hasAbilityFields(entity.fields_data)) return null;
+    return abilitiesFingerprint(entity.fields_data);
+  }
+
+  /**
+   * Brings the actor's Chronicle-made ability items in line with the page.
+   * Never throws: the stat block still lands, and the next change retries.
+   */
+  async _applyAbilities(actor, entity, fingerprint) {
+    try {
+      const dsConfig = globalThis.ds?.CONFIG ?? globalThis.CONFIG?.DRAW_STEEL ?? {};
+      const keys = (obj) => (obj && typeof obj === 'object' ? Object.keys(obj) : null);
+      const conditions = Array.isArray(globalThis.CONFIG?.statusEffects) ? CONFIG.statusEffects.map((e) => e.id) : null;
+      const known = {
+        keywords: keys(dsConfig.abilities?.keywords),
+        damageTypes: keys(dsConfig.damageTypes),
+        conditions,
+      };
+      const desired = desiredAbilities(entity.fields_data, { known, flagScope: FLAG_SCOPE });
+      const items = (actor.items?.contents ?? [...(actor.items ?? [])]).map((i) => ({
+        id: i.id,
+        name: i.name ?? '',
+        type: i.type,
+        key: i.getFlag?.(FLAG_SCOPE, ABILITY_FLAG) ?? null,
+        hash: i.getFlag?.(FLAG_SCOPE, `${ABILITY_FLAG}Hash`) ?? null,
+      }));
+      const { create, remove } = planAbilityItems(desired, items);
+      const options = syncOptions({ [APPLY_OPTION]: true });
+      if (remove.length) await actor.deleteEmbeddedDocuments('Item', remove, options);
+      if (create.length) await actor.createEmbeddedDocuments('Item', create, options);
+      await actor.update({ [`flags.${FLAG_SCOPE}.${ABILITIES_FLAG}`]: fingerprint }, options);
+    } catch (err) {
+      log.warn(`Creature sync: could not bring in the abilities for "${entity?.name ?? entity?.id}"`, err);
     }
   }
 

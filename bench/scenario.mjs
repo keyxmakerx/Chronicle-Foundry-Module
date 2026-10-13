@@ -50,9 +50,9 @@ export async function chroniclePage(seed, name, html = `<p>${name} text</p>`) {
   return e;
 }
 
-export async function scenario(label, fn, { settings } = {}) {
+export async function scenario(label, fn, { settings, systemId } = {}) {
   const seed = await seedCampaign(label);
-  const world = newWorld(seed, { settings });
+  const world = newWorld(seed, { settings, systemId });
   const since = traffic.requests.length;
   try {
     await fn({ seed, world });
