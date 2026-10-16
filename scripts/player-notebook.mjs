@@ -34,6 +34,7 @@ import {
   withPlacement,
 } from './_jot-placement.mjs';
 import { openSatchel } from './satchel.mjs';
+import { calendarWindowSize } from './_calendar-window.mjs';
 
 const { ApplicationV2 } = foundry.applications.api;
 
@@ -244,13 +245,13 @@ export async function openNotebook(noteId = '') {
 class CalendarWindow extends ApplicationV2 {
   static DEFAULT_OPTIONS = {
     id: 'chronicle-calendar-window',
-    classes: ['chronicle-notebook', 'chronicle-calendar-window'],
+    classes: ['chronicle-notebook', 'chronicle-calendar-window', 'cs-borderless'],
     window: { title: 'CHRONICLE.Notebook.CalendarTitle', icon: 'fa-solid fa-calendar-days', resizable: true },
     position: { width: 760, height: 640 },
   };
 
   constructor(options = {}) {
-    super({ ...options, position: { ...CalendarWindow.DEFAULT_OPTIONS.position, ...savedWindowPlace() } });
+    super({ ...options, position: { ...calendarWindowSize(window.innerWidth, window.innerHeight), ...savedWindowPlace() } });
   }
 
   /** @override */

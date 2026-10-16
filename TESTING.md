@@ -192,6 +192,7 @@ Chronicle brings its own calendar; no Foundry calendar module is used.
 ### Calendar window
 - [ ] Chronicle scene controls -> **Calendar** button (player and GM) -> first time, Chronicle's Allow window asks about "notes and calendar"; press Allow -> a Foundry window opens with Chronicle's own calendar page: the sky moving, day weather, moons, events
 - [ ] A player already connected for the notebook -> **Calendar** opens straight away, no Allow window
+- [ ] The first time it opens on a player's screen it fills most of the screen (no squashed month grid), under a slim title bar with no padding or border around the page
 - [ ] Player: GM-only events, hidden moons and secret eras never appear (compare with the same player signed in on the site)
 - [ ] GM: Chronicle's editing works in the window (add an event, open it, change it); the change shows on the site after a refresh
 - [ ] Resize the window from its corner -> the calendar redraws to fit (narrow: one-letter weekdays); close and reopen -> same size and place, per player
