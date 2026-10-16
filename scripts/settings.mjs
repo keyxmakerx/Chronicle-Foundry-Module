@@ -10,7 +10,7 @@ import { MODULE_ID } from './constants.mjs';
 import { UpdateInfoApplication } from './update-info.mjs';
 import { defaultMotion } from './_motion.mjs';
 import { applyMotion } from './motion.mjs';
-import { ChronicleSettingsWindow } from './chronicle-settings.mjs';
+import { ChronicleSettingsMenu } from './chronicle-settings.mjs';
 import { parseConnectLine } from './_connect-line.mjs';
 
 /**
@@ -25,7 +25,7 @@ export function registerSettings() {
     hint: game.i18n.localize('CHRONICLE.SettingsWindow.MenuHint'),
     label: game.i18n.localize('CHRONICLE.SettingsWindow.MenuLabel'),
     icon: 'fa-solid fa-book-open',
-    type: ChronicleSettingsWindow,
+    type: ChronicleSettingsMenu,
     restricted: true,
   });
 

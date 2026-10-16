@@ -367,8 +367,8 @@ export class SyncManager {
     const shown = names.slice(0, 8).join(', ');
     const extra = names.length > 8 ? ` (+${names.length - 8} more)` : '';
     const summary = `${unmatched.length} Chronicle member${unmatched.length === 1 ? '' : 's'} could not be matched to a Foundry user: ${shown}${extra}`;
-    this.logActivity('warning', `${summary}. Link them in Chronicle settings, under Players — their per-player permissions won't sync until mapped.`);
-    ui.notifications?.warn?.(`Chronicle: ${noticeText(summary)}. Link them in Chronicle settings, under Players.`);
+    this.logActivity('warning', `${summary}. Link them in Chronicle Sync, under Settings, Players — their per-player permissions won't sync until mapped.`);
+    ui.notifications?.warn?.(`Chronicle: ${noticeText(summary)}. Link them in Chronicle Sync, under Settings, Players.`);
   }
 
   /**

@@ -56,15 +56,18 @@ let _statusIndicatorEl = null;
  * made the dashboard intermittently fail to reopen. Bring an already-open window to the front; otherwise build,
  * (re)bind, and render a fresh instance. `bind()` only sets a reference, so
  * recreating leaks nothing.
+ * @param {string} [tab] - a section to open at, e.g. "settings:players"
  * @returns {SyncDashboard|null}
  */
-function openDashboard() {
+function openDashboard(tab) {
   if (dashboard && dashboard.rendered) {
     dashboard.bringToFront?.();
+    if (typeof tab === 'string') dashboard.openOn(tab);
     return dashboard;
   }
   dashboard = new SyncDashboard();
   if (syncManager) dashboard.bind(syncManager);
+  if (typeof tab === 'string') dashboard.openOn(tab);
   dashboard.render({ force: true });
   return dashboard;
 }
@@ -515,7 +518,7 @@ Hooks.once('ready', () => {
       // expose the live reference rather than the one captured at ready time.
       get dashboard() { return dashboard; },
       getAPI: () => syncManager?.api,
-      openDashboard: () => openDashboard(),
+      openDashboard: (tab) => openDashboard(tab),
       // Version-independent diagnostics escape hatch. Lets an operator always
       // produce the System Debug snapshot from the console even if the toolbar
       // button or sidebar indicator regress on a Foundry upgrade. DOM-
