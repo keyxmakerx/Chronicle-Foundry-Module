@@ -166,7 +166,7 @@ test('Foundry\'s own list keeps only personal choices; the rest is behind the GM
   assert.deepEqual(shown.sort(), ['calendarLook', 'calendarStrip', 'calendarTemperatureUnit', 'motion']);
   const menu = src.slice(src.indexOf("registerMenu(MODULE_ID, 'chronicleSettings'"));
   assert.match(menu.slice(0, 500), /restricted: true/);
-  assert.match(menu.slice(0, 500), /type: ChronicleSettingsWindow/);
+  assert.match(menu.slice(0, 500), /type: ChronicleSettingsMenu/);
 });
 
 test('the window never puts the saved API key into the page', async () => {
@@ -192,13 +192,13 @@ test('only member dropdowns the GM changed are saved', async () => {
   const { readFileSync } = await import('node:fs');
   const src = readFileSync(new URL('../scripts/chronicle-settings.mjs', import.meta.url), 'utf8');
   assert.match(src, /defaultSelected/);
-  assert.match(src, /members: changedMemberLinks\(this\.element\)/);
+  assert.match(src, /members: changedMemberLinks\(form\)/);
 });
 
 test('the Setup Wizard button hands the wizard the sync manager', async () => {
   const { readFileSync } = await import('node:fs');
   const src = readFileSync(new URL('../scripts/chronicle-settings.mjs', import.meta.url), 'utf8');
-  const body = src.slice(src.indexOf('static async #onStartImport'), src.indexOf('static async #onSubmit'));
+  const body = src.slice(src.indexOf('export async function startImport'), src.indexOf('export async function saveSettingsForm'));
   assert.match(body, /ImportWizard\.instance/);
   assert.match(body, /\.bind\(game\.modules\.get\(MODULE_ID\)\?\.api\?\.syncManager\)/);
 });

@@ -37,12 +37,12 @@ test('stats format counts and the synced/total character ratio', () => {
     connectionState: 'connected',
   });
   const byTab = Object.fromEntries(m.stats.map((s) => [s.tab, s.value]));
-  assert.equal(byTab.entities, '7');
-  assert.equal(byTab.maps, '2');
-  assert.equal(byTab.characters, '2/3');
+  assert.equal(byTab['linked:pages'], '7');
+  assert.equal(byTab['linked:maps'], '2');
+  assert.equal(byTab['linked:characters'], '2/3');
 });
 
-test('disconnected surfaces a blocking error routed to diagnostics', () => {
+test('disconnected surfaces a blocking error routed to Problems', () => {
   const m = buildOverviewModel({
     connectionState: 'disconnected',
     connectionLabel: 'Disconnected',
@@ -51,7 +51,7 @@ test('disconnected surfaces a blocking error routed to diagnostics', () => {
   assert.equal(m.connection.ok, false);
   const err = m.attention.find((a) => a.severity === 'error');
   assert.ok(err, 'expected a blocking error');
-  assert.equal(err.tab, 'diagnostics:health');
+  assert.equal(err.tab, 'problems:health');
   // Error must be first (highest priority).
   assert.equal(m.attention[0].severity, 'error');
 });
@@ -67,11 +67,11 @@ test('each problem routes to the tab that fixes it', () => {
     matchedSystem: null,
   });
   const tabFor = (needle) => m.attention.find((a) => a.text.includes(needle))?.tab;
-  assert.equal(tabFor("couldn't be matched"), 'characters');
+  assert.equal(tabFor("couldn't be matched"), 'linked:characters');
   assert.equal(tabFor('not mapped'), 'settings:players');
-  assert.equal(tabFor('out of sync'), 'calendar');
-  assert.equal(tabFor('No matching game system'), 'diagnostics:health');
-  assert.equal(tabFor('recent sync error'), 'diagnostics:health');
+  assert.equal(tabFor('out of sync'), 'linked:calendar');
+  assert.equal(tabFor('No matching game system'), 'problems:health');
+  assert.equal(tabFor('recent sync error'), 'problems:health');
   assert.equal(m.allClear, false);
 });
 
@@ -84,9 +84,9 @@ test('pluralization: singular vs plural', () => {
 
 test('in-sync calendar produces no calendar alert; unavailable calendar is ignored', () => {
   const synced = buildOverviewModel({ connectionState: 'connected', calendarAvailable: true, calendarInSync: true, matchedSystem: 'x' });
-  assert.equal(synced.attention.find((a) => a.tab === 'calendar'), undefined);
+  assert.equal(synced.attention.find((a) => a.tab === 'linked:calendar'), undefined);
   const off = buildOverviewModel({ connectionState: 'connected', calendarAvailable: false, calendarInSync: false, matchedSystem: 'x' });
-  assert.equal(off.attention.find((a) => a.tab === 'calendar'), undefined);
+  assert.equal(off.attention.find((a) => a.tab === 'linked:calendar'), undefined);
 });
 
 test('defensive: empty input does not throw and reports disconnected', () => {

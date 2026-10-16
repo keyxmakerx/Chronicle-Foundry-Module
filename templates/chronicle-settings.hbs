@@ -1,15 +1,13 @@
-<div class="cs-settings">
-  <nav class="cs-tabs" role="tablist" aria-label="{{localize "CHRONICLE.SettingsWindow.Title"}}">
+{{!-- Chronicle Sync's Settings section; also shown on its own before a campaign is connected. --}}
+<form class="cs-settings" data-settings-form autocomplete="off">
+  <div class="cs-seg cs-settings-seg" role="tablist" aria-label="{{localize "CHRONICLE.Dashboard.Rail.Settings"}}">
     {{#each tabs}}
-    <button type="button" role="tab" id="cs-tab-{{id}}" data-tab="{{id}}" aria-controls="cs-panel-{{id}}"
-      aria-selected="{{#if active}}true{{else}}false{{/if}}" tabindex="{{#if active}}0{{else}}-1{{/if}}">
-      <i class="fa-solid {{icon}}" aria-hidden="true"></i>{{label}}
-    </button>
+    <button type="button" role="tab" data-subtab="settings:{{id}}"><i class="fa-solid {{icon}}" aria-hidden="true"></i>{{label}}</button>
     {{/each}}
-  </nav>
+  </div>
 
   <div class="cs-panels">
-    <section class="cs-panel" id="cs-panel-connection" data-panel="connection" role="tabpanel" aria-labelledby="cs-tab-connection" {{#unless (eq activeTab "connection")}}hidden{{/unless}}>
+    <section class="cs-panel cs-pane" role="tabpanel" data-subpane="settings:connection">
       <div class="cs-conn">
         <i class="fa-solid fa-globe" aria-hidden="true"></i>
         <div class="cs-conn-who">
@@ -64,7 +62,7 @@
       </div>
     </section>
 
-    <section class="cs-panel" id="cs-panel-sync" data-panel="sync" role="tabpanel" aria-labelledby="cs-tab-sync" {{#unless (eq activeTab "sync")}}hidden{{/unless}}>
+    <section class="cs-panel cs-pane" role="tabpanel" data-subpane="settings:sync">
       <div class="cs-field cs-inline">
         <label for="cs-sync-enabled">{{localize "CHRONICLE.SettingsWindow.SyncOn"}}</label>
         <div class="cs-ctl cs-row">
@@ -105,7 +103,7 @@
       {{/if}}
     </section>
 
-    <section class="cs-panel" id="cs-panel-calendar" data-panel="calendar" role="tabpanel" aria-labelledby="cs-tab-calendar" {{#unless (eq activeTab "calendar")}}hidden{{/unless}}>
+    <section class="cs-panel cs-pane" role="tabpanel" data-subpane="settings:calendar">
       <h3 class="cs-group">{{localize "CHRONICLE.SettingsWindow.TellMe"}}</h3>
       {{#each announce}}
       <div class="cs-field cs-inline">
@@ -118,7 +116,7 @@
       {{/each}}
     </section>
 
-    <section class="cs-panel" id="cs-panel-players" data-panel="players" role="tabpanel" aria-labelledby="cs-tab-players" {{#unless (eq activeTab "players")}}hidden{{/unless}}>
+    <section class="cs-panel cs-pane" role="tabpanel" data-subpane="settings:players">
       <h3 class="cs-group">{{localize "CHRONICLE.SettingsWindow.NewJournals"}}</h3>
       <div class="cs-field">
         <label for="cs-ownership">{{localize "CHRONICLE.SettingsWindow.PlayersCan"}}</label>
@@ -175,7 +173,7 @@
       </div>
     </section>
 
-    <section class="cs-panel" id="cs-panel-advanced" data-panel="advanced" role="tabpanel" aria-labelledby="cs-tab-advanced" {{#unless (eq activeTab "advanced")}}hidden{{/unless}}>
+    <section class="cs-panel cs-pane" role="tabpanel" data-subpane="settings:advanced">
       <div class="cs-field">
         <label for="cs-conflict">{{localize "CHRONICLE.SettingsWindow.WhenBoth"}}</label>
         <div class="cs-ctl">
@@ -213,7 +211,7 @@
   </div>
 
   <footer class="cs-foot">
-    <button type="button" data-action="close">{{localize "CHRONICLE.SettingsWindow.Cancel"}}</button>
+    <button type="reset">{{localize "CHRONICLE.SettingsWindow.Undo"}}</button>
     <button type="submit" class="cs-primary"><i class="fa-solid fa-check" aria-hidden="true"></i>{{localize "CHRONICLE.SettingsWindow.Save"}}</button>
   </footer>
-</div>
+</form>

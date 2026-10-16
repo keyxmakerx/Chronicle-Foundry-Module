@@ -10,8 +10,8 @@ repo root. There is no `package.json`.
 
 - [ ] Chronicle running with API key created for target campaign
 - [ ] Foundry VTT world with chronicle-sync module enabled
-- [ ] Chronicle settings → Connection filled in: address, API key, campaign
-- [ ] Chronicle settings → What syncs: Sync is on
+- [ ] Chronicle Sync → Settings → Connection filled in: address, API key, campaign
+- [ ] Chronicle Sync → Settings → What syncs: Sync is on
 
 ## Connection & Status
 
@@ -85,7 +85,7 @@ Needs a player client that can see the journal but does not own its page.
       `/permissions` endpoint) while a custom-visibility entity syncs; confirm players
       cannot see it.
 
-### Visibility Settings (Chronicle settings → Players)
+### Visibility Settings (Chronicle Sync → Settings → Players)
 These controls drive journal ownership:
 - [ ] **dmOnlyHidden ON (default):** a DM-only / private Chronicle entity → players have NO
       access to the journal (ownership NONE). Confirm as a player: the journal is hidden.
@@ -95,7 +95,7 @@ These controls drive journal ownership:
 - [ ] **defaultOwnership = Owner:** a player-visible entity → journal default ownership is OWNER
       (players can edit). Set it to **None** → public entities sync as GM-only.
 - [ ] Per-user Chronicle grant: an entity shared with a specific
-      Chronicle user (linked to a Foundry user in Chronicle settings → Players) → that Foundry
+      Chronicle user (linked to a Foundry user in Chronicle Sync → Settings → Players) → that Foundry
       user gets per-user OWNER/OBSERVER ownership; unmapped Chronicle users are dropped (the
       entity under-shares — no leak to the wrong player).
 
@@ -214,7 +214,7 @@ Chronicle brings its own calendar; no Foundry calendar module is used.
 - [ ] Player client: the same strip and month, without arrows, Set date or Add event; GM-only events, hidden moons, secret eras and future days' weather never appear
 - [ ] Move the date in Chronicle -> the strip updates for the GM and every player
 - [ ] A calendar hidden from players in Chronicle -> players see no strip
-- [ ] Turn Calendar off in Chronicle settings → What syncs -> the strip disappears for everyone without a reload
+- [ ] Turn Calendar off in Chronicle Sync → Settings → What syncs -> the strip disappears for everyone without a reload
 - [ ] Configure Settings -> Calendar temperature unit °F -> only your strip switches to °F
 
 ### Built-in calendar (Sky Clock)
@@ -239,7 +239,7 @@ Chronicle brings its own calendar; no Foundry calendar module is used.
 - [ ] Advance the date in Chronicle -> the tab shows the new date after the next refresh
 - [ ] Change weather, season, era or a moon phase in Chronicle -> the world-state panel updates
 - [ ] With the announce settings on, a GM-only whisper appears for each change; players never see it
-- [ ] Calendar off in Chronicle settings → What syncs -> the tab says it is off
+- [ ] Calendar off in Chronicle Sync → Settings → What syncs -> the tab says it is off
 - [ ] A campaign with no calendar -> the tab says none is configured
 
 ## Shop Widget
@@ -285,7 +285,7 @@ Chronicle brings its own calendar; no Foundry calendar module is used.
 
 ### Prerequisites
 - [ ] Game system matches a Chronicle system (built-in or custom with foundry_path annotations)
-- [ ] Characters switched on in Chronicle settings → What syncs
+- [ ] Characters switched on in Chronicle Sync → Settings → What syncs
 - [ ] Character entity type exists in Chronicle campaign
 
 ### Chronicle -> Foundry
@@ -324,12 +324,12 @@ Chronicle brings its own calendar; no Foundry calendar module is used.
 ### Generic Adapter (all systems)
 Character sync uses one API-driven adapter (`scripts/adapters/generic-adapter.mjs`)
 that reads each field's `foundry_path` from the matched Chronicle system's manifest.
-- [ ] A game system with a Chronicle package that declares `foundry_path` fields (e.g. D&D 5e, PF2e, Draw Steel) -> Dashboard Diagnostics → Health → Field Mapping shows Adapter loaded and a Character Type
+- [ ] A game system with a Chronicle package that declares `foundry_path` fields (e.g. D&D 5e, PF2e, Draw Steel) -> Chronicle Sync → Problems → Health → Field Mapping shows Adapter loaded and a Character Type
 - [ ] Mapped fields sync Chronicle -> Foundry and Foundry -> Chronicle (change one number field each way)
 - [ ] Fields with `foundry_writable: false` push to Chronicle only and are not written back to the actor
 - [ ] Number fields are cast to numbers; string fields pass through
-- [ ] System package with no `foundry_path` on any field -> character sync is off (Characters tab shows no adapter, Diagnostics → Health shows Adapter none)
-- [ ] The game system is matched by the Chronicle system's `foundry_system_id` and the system must be enabled for the campaign (Diagnostics → Health → Game System shows both ids); a system that is installed but not enabled shows the "not enabled" message in the activity log
+- [ ] System package with no `foundry_path` on any field -> character sync is off (Characters tab shows no adapter, Problems → Health shows Adapter none)
+- [ ] The game system is matched by the Chronicle system's `foundry_system_id` and the system must be enabled for the campaign (Problems → Health → Game System shows both ids); a system that is installed but not enabled shows the "not enabled" message in the activity log
 - [ ] When Chronicle is unreachable at load, the last matched system is reused
 
 ### Edge Cases
@@ -342,7 +342,7 @@ that reads each field's `foundry_path` from the matched Chronicle system's manif
 ## Creature Sync (Draw Steel creature pages → NPC actors)
 
 Needs Draw Steel in both Chronicle and Foundry, and Creatures switched on in
-Chronicle settings, under What syncs.
+Chronicle Sync → Settings, under What syncs.
 - [ ] A creature page made in Chronicle appears as one NPC actor in the "Chronicle: Creatures" folder, with level, organization, role, keywords, EV, size, Stamina, speed, stability, characteristics and free strike filled in
 - [ ] Editing the page in Chronicle updates the actor; editing the stat block on the actor sheet is not sent to Chronicle
 - [ ] A keyword Foundry doesn't know, or the Swarm organization, is left blank rather than guessed
@@ -402,17 +402,17 @@ GM only. Needs a Chronicle that serves encounters, a key for the campaign owner 
 
 ## Character claims
 
-Needs the Player Character Claiming addon on in Chronicle, a character linked to an actor, and two players linked to Chronicle members (Chronicle settings → Players). Run as the GM.
+Needs the Player Character Claiming addon on in Chronicle, a character linked to an actor, and two players linked to Chronicle members (Chronicle Sync → Settings → Players). Run as the GM.
 
 - [ ] In Chronicle, assign the character to player A -> within a few seconds A is **Owner** in the actor's Ownership settings, and A can open and edit the sheet; nothing about the ownership is sent back to Chronicle
 - [ ] Reassign it to player B -> B is Owner, A is still Owner, and the GM sees one notice saying A still owns it and can be changed in the actor's Ownership settings
 - [ ] Unassign it in Chronicle -> Foundry ownership is unchanged
-- [ ] Assign it to a member with no Foundry user mapped -> no ownership change, one GM notice that the player has no Foundry user, and Chronicle settings → Players shows that member as "Owns a character, not linked"; linking them, pressing **Save**, then reconnecting, gives them Owner
+- [ ] Assign it to a member with no Foundry user mapped -> no ownership change, one GM notice that the player has no Foundry user, and Chronicle Sync → Settings → Players shows that member as "Owns a character, not linked"; linking them, pressing **Save**, then reconnecting, gives them Owner
 - [ ] Reconnect (or Pull All) with a claim that is already applied -> no notice and no ownership change
 
 ## Stashes
 
-Needs the Armory addon on in Chronicle, a character linked to an actor, and a player linked to a Chronicle member (Chronicle settings → Players).
+Needs the Armory addon on in Chronicle, a character linked to an actor, and a player linked to a Chronicle member (Chronicle Sync → Settings → Players).
 
 - [ ] A **Stashes** button is in the title bar of a linked character sheet (players on characters they own, the GM on all); with the Armory off, or on a Chronicle without stash routes, it is absent
 - [ ] The window shows the character on the left and a destination on the right, a downtime badge, and Move / History tabs
@@ -447,7 +447,7 @@ Needs a Chronicle with quest boards (a category or a place page with at least on
 
 ## Import Wizard
 
-- [ ] Chronicle settings → Connection -> **Setup Wizard** opens a six-step wizard: Connect, Scan, Types, Tags, Characters, Review; there are no maps or calendar steps
+- [ ] Chronicle Sync → Settings → Connection -> **Setup Wizard** opens a six-step wizard: Connect, Scan, Types, Tags, Characters, Review; there are no maps or calendar steps
 - [ ] Tags and Characters steps are skipped when tags are unavailable or no game system matched
 - [ ] Review lists what will be created; running it creates the entities and marks the wizard completed
 
@@ -455,7 +455,7 @@ Needs a Chronicle with quest boards (a category or a place page with at least on
 
 Needs a GM client and a player client, on each of Foundry v12, v13 and v14.
 
-- [ ] As a player, open a character's Stashes window, click "Report a problem", send text: "Sent to your GM"; the GM sees "{name} reported a problem" and the Diagnostics badge goes up
+- [ ] As a player, open a character's Stashes window, click "Report a problem", send text: "Sent to your GM"; the GM sees "{name} reported a problem" and the Problems badge goes up
 - [ ] In the GM's Journal sidebar there is no "Chronicle: problem reports" entry
 - [ ] In the player's browser console, `game.journal.find(j => j.getFlag("chronicle-sync", "problemReportsStore"))` returns `undefined`, and `game.journal.contents.some(j => j.name.includes("problem reports"))` is `false`
 - [ ] As the GM, the same first console line returns the entry, and its `flags["chronicle-sync"].reports` lists the report
@@ -491,29 +491,29 @@ Edits made on Chronicle while Foundry was disconnected arrive after reconnect, w
 
 ## Sync Dashboard
 
-The dashboard is a left rail of seven sections. Rail order: Overview (top);
-Everyday: Entities, Characters, Calendar; Library: Maps, Shops; Diagnostics
-(at the foot, set apart). Settings live in the Chronicle settings window,
-opened by the gear in the dashboard's title bar.
+The Chronicle Sync window is a left rail of four sections: Overview, Linked
+(Entities, Characters, Maps, Shops and Calendar panes), Problems (Health,
+Player reports and History panes) and Settings (at the foot, set apart).
 
 ### Access
 - [ ] Click the sidebar status indicator (when connected) or the Chronicle Sync button in the scene controls → dashboard opens (GM only); right-click on the indicator opens it even when disconnected; clicking while disconnected tries to reconnect
-- [ ] Dashboard shows "Chronicle Sync is not configured" with an **Open Settings** button when URL, key or campaign ID is missing
-- [ ] Dashboard opens to the last-active section; an unknown saved tab falls back to Overview, and a tab saved by an older version opens where its content now lives (Status → Diagnostics, Health; Issues → Characters)
-- [ ] The gear in the title bar, next to the close button, opens Chronicle settings
+- [ ] With URL, key or campaign ID missing, the window shows "Chronicle Sync is not configured" and the Settings form under it, with no rail
+- [ ] It opens to the last-active section and pane; an unknown saved tab falls back to Overview, and a tab saved by an older version opens where its content now lives (Maps → Linked, Maps; Diagnostics → Problems; Status → Problems, Health; Issues → Linked, Characters)
+- [ ] Configure Settings → Chronicle Sync → **Open Chronicle Sync settings** opens the window at Settings (or brings it forward there)
+- [ ] Settings: change a field, let the window re-render (e.g. a player sends a report) → the change is still there; **Undo changes** puts the saved values back; **Save** saves and says so; arrow keys move along every pane strip
 - [ ] A tab that fails to load shows a "Some data failed to load" banner naming the tab, with **Retry**
 
 ### Tabs
-- [ ] **Overview:** connection banner (green/yellow/red) with **Reconnect** when not connected; stat tiles for Entities Synced, Characters Synced (n/total) and Maps Linked, each jumps to its tab on click; "Needs Attention" lists only real problems (each row jumps to the fixing tab) or says "Everything's in sync"; **Sync Everything Now**, **Diagnostics** and **Refresh** work; below them, the DM-only note when any were hidden, the last sync time, Recent Activity and **Clear Log**
+- [ ] **Overview:** connection banner (green/yellow/red) with **Reconnect** when not connected; stat tiles for Entities Synced, Characters Synced (n/total) and Maps Linked, each jumps to its tab on click; "Needs Attention" lists only real problems (each row jumps to the fixing tab) or says "Everything's in sync"; **Sync Everything Now**, **Problems** and **Refresh** work; below them, the DM-only note when any were hidden, the last sync time, Recent Activity and **Clear Log**
 - [ ] **Entities:** entity list grouped by type with sync status dots, Pull/Push per row, Pull All / Push All, Resync All Journals, visibility toggle, search filter, bulk select (Make Public / Private / Delete / Change Type), **Create Type**
 - [ ] **Characters:** when any character can't be matched, a "Needs a match" list comes first and the rail shows its count; each row offers a "Match to existing…" dropdown with **Match**, and **Create new**, and resolving a row links it and removes it. Below: system badge, synced and unlinked actors, Push / Push All / Re-sync (see Character Sync)
 - [ ] **Calendar:** shows Chronicle's date and time and the world-state panel (weather, season, era, moons); the tab explains why when sync is disabled, no calendar is configured, or the calendar is rebuilding or unreachable
 - [ ] **Shops:** shop entities with type, keeper, private lock, "Synced" badge and an **Open** button that opens the Shop window; empty states say whether the "Shop" entity type is missing or just has no shops
 - [ ] **Maps:** per-map rows with the map's picture (a shadowed map shows the players' copy), marker / drawing / token counts, **Open in Foundry**, external-link icon; **Resync All Maps**, **Open Chronicle Maps Folder**; summary row and dismissible error list (see Map Sync)
-- [ ] **Diagnostics:** a Health / Player reports / History switch; the badge counts new player reports. Health: Game System (Foundry and Chronicle system, Character Sync), Connection, Field Mapping, Sync Capability (pick an actor to inspect; **Copy** report and JSON), Error Log, Diagnostic Bundle copy and System Debug Export copy. Player reports and History as below
+- [ ] **Problems:** a Health / Player reports / History switch; the badge counts new player reports. Health: Game System (Foundry and Chronicle system, Character Sync), Connection, Field Mapping, Sync Capability (pick an actor to inspect; **Copy** report and JSON), Error Log, Diagnostic Bundle copy and System Debug Export copy. Player reports and History as below
 
 ### Layout Persistence
-- [ ] Switch to Maps tab, close dashboard, reopen -> Maps tab still active (a different tab than Overview)
+- [ ] Switch to Linked → Maps, close the window, reopen -> Linked → Maps still open
 - [ ] Collapse an entity type group, reload Foundry -> group still collapsed
 - [ ] A different browser/user has independent layout preferences (they are client settings)
 
@@ -524,15 +524,15 @@ opened by the gear in the dashboard's title bar.
 - [ ] New type appears in bulk "Change Type" dropdown
 - [ ] Cancel/close without name -> no API call, no errors
 
-### Chronicle settings
-- [ ] Configure Settings shows Chronicle's button and only the calendar strip, Motion and temperature unit; the button opens Chronicle settings with tabs Connection, What syncs, Calendar, Players and Advanced (GM only)
+### Settings (in Chronicle Sync)
+- [ ] Configure Settings shows Chronicle's button and only the calendar strip, Motion and temperature unit; the button opens Chronicle Sync at Settings, with panes Connection, What syncs, Calendar, Players and Advanced (GM only)
 - [ ] **Players:** one row per Chronicle member with a Linked / Not linked badge and a Foundry player dropdown; change one, press **Save**, reopen -> the change stuck and the other links are unchanged; **Fetch members again** re-reads the list
 - [ ] **What syncs:** the new-journal page type lists Chronicle's page types; pick one, **Save**, then make a journal in Foundry -> the Chronicle page has that type
 - [ ] **Connection:** **Setup Wizard** opens the import wizard; the API key field is always empty, with "Saved in this browser" when a key exists
-- [ ] Dashboard Overview -> "campaign member(s) not mapped" opens Chronicle settings on Players
+- [ ] Overview -> "campaign member(s) not mapped" opens Settings → Players
 - [ ] A dashboard last left on the old Config or Members tab opens on Overview
 
-### Test Connection (Multi-step, Chronicle settings → Connection)
+### Test Connection (Multi-step, Chronicle Sync → Settings → Connection)
 - [ ] Test with valid config -> Shows: API reachable ✓, Auth OK ✓, Campaign ✓, System match ✓
 - [ ] Test with wrong URL -> "Unreachable: Chronicle not responding at {url}"
 - [ ] Test with wrong API key -> "Auth failed: API key invalid or revoked"
@@ -540,11 +540,11 @@ opened by the gear in the dashboard's title bar.
 - [ ] Test with CORS issue -> Shows origin URL and whitelist instructions
 - [ ] Test with system not matched -> Shows available foundry_system_ids
 
-### Diagnostics
+### Problems
 - [ ] Health metrics: Uptime, API OK, API Errors, Reconnects, Last Success, Last Error
 - [ ] Error log: recent errors (up to 50) with timestamp, method, path, status
-- [ ] Retry queue: failed writes queued and processed on reconnect (Diagnostics → Health → Pending Retries drains to 0)
+- [ ] Retry queue: failed writes queued and processed on reconnect (Problems → Health → Pending Retries drains to 0)
 - [ ] Activity log: recent sync actions (up to 100 kept, newest first) with color-coded type icons
-- [ ] Diagnostics → Health → **Copy Diagnostic Bundle** puts a Markdown report (versions, connection health, sync state, field mapping, recent activity and errors) on the clipboard; it contains no API key
+- [ ] Problems → Health → **Copy Diagnostic Bundle** puts a Markdown report (versions, connection health, sync state, field mapping, recent activity and errors) on the clipboard; it contains no API key
 - [ ] Clear log button resets the Overview's recent activity
 - [ ] Reconnect button (Overview, when disconnected) triggers manual WebSocket reconnection

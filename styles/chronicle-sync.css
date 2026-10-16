@@ -289,14 +289,14 @@ html[data-cs-motion="off"] :is(.cs-grow, .cs-settle, .cs-peek) {
   margin-left: auto;
 }
 
-/* Diagnostics sits apart at the foot of the rail: it is for when something is wrong. */
-.dashboard-rail .item-diagnostics {
+/* Settings sits apart at the foot of the rail: set up once, rarely visited. */
+.dashboard-rail .item-settings {
   margin-top: 10px;
   padding-top: 9px;
   border-top: 1px solid color-mix(in srgb, var(--cs-text) 10%, transparent);
 }
 
-/* Diagnostics panes: a segmented switch, one pane shown at a time */
+/* A section's panes (Linked, Problems, Settings): a segmented switch, one pane shown at a time */
 .cs-seg {
   display: inline-flex;
   gap: 2px;
@@ -324,8 +324,16 @@ html[data-cs-motion="off"] :is(.cs-grow, .cs-settle, .cs-peek) {
 .cs-seg [role="tab"]:hover { color: var(--cs-text); }
 .cs-seg [role="tab"].active { background: var(--cs-surface); color: var(--cs-text); font-weight: 600; box-shadow: 0 1px 2px color-mix(in srgb, var(--cs-text) 18%, transparent); }
 .cs-seg [role="tab"]:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
-.diag-pane { display: none; }
-.diag-pane.active { display: block; }
+.cs-seg { flex-wrap: wrap; max-width: 100%; }
+.cs-settings-seg [role="tab"] { padding: 4px 9px; }
+.cs-pane { display: none; }
+.cs-pane.active { display: block; }
+
+/* Settings inside Chronicle Sync: the window scrolls, so the form doesn't; Save stays in reach at the bottom. */
+.chronicle-dashboard .cs-settings { min-height: 0; }
+.chronicle-dashboard .cs-panels { padding: 0 4px 8px; overflow: visible; }
+.chronicle-dashboard .cs-foot { position: sticky; bottom: -8px; margin: 0 -8px -8px; z-index: 1; }
+.chronicle-dashboard .dashboard-empty + .cs-settings { padding: 0 12px; }
 .overview-more { margin-top: 12px; }
 
 /* ---------------------------------------------------------------------------
@@ -1577,11 +1585,10 @@ html[data-cs-motion="off"] :is(.cs-grow, .cs-settle, .cs-peek) {
 }
 
 /* ================================================================= */
-/* CHRONICLE SETTINGS WINDOW                                          */
+/* CHRONICLE SYNC: SETTINGS                                          */
 /* ================================================================= */
 
-.chronicle-settings .window-content { padding: 0; container-type: inline-size; }
-.cs-settings { display: flex; flex-direction: column; min-height: 420px; color: var(--cs-text); }
+.cs-settings { display: flex; flex-direction: column; min-height: 420px; color: var(--cs-text); container-type: inline-size; }
 .cs-tabs { display: flex; gap: 2px; padding: 0 10px; border-bottom: 1px solid var(--cs-line); background: var(--cs-surface-2); overflow-x: auto; }
 .cs-tabs [role="tab"] {
   display: inline-flex; align-items: center; gap: 6px; width: auto; margin: 0; padding: 9px 11px 8px;

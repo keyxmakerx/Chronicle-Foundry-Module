@@ -1402,7 +1402,7 @@ export class JournalSync {
     if (droppedUsers.length > 0) {
       this._syncManager?.logActivity?.(
         'warning',
-        `"${entity.name || entity.id}": ${droppedUsers.length} per-user grant(s) dropped — no Foundry mapping for those Chronicle members. Link them in Chronicle settings, under Players.`
+        `"${entity.name || entity.id}": ${droppedUsers.length} per-user grant(s) dropped — no Foundry mapping for those Chronicle members. Link them in Chronicle Sync, under Settings, Players.`
       );
     }
 
@@ -1499,10 +1499,10 @@ export class JournalSync {
       const who = label ? ` on "${label}"` : '';
       this._syncManager?.logActivity?.(
         'warning',
-        `Permission push${who}: ${unmapped.length} player grant(s) not sent — no Chronicle mapping for ${named}. Link them in Chronicle settings, under Players.`
+        `Permission push${who}: ${unmapped.length} player grant(s) not sent — no Chronicle mapping for ${named}. Link them in Chronicle Sync, under Settings, Players.`
       );
       ui.notifications?.warn?.(
-        `Chronicle: ${unmapped.length} player permission grant(s)${label ? ` on "${noticeText(label)}"` : ''} were not sent — unmapped Foundry user(s): ${noticeText(named)}. Link them in Chronicle settings, under Players.`
+        `Chronicle: ${unmapped.length} player permission grant(s)${label ? ` on "${noticeText(label)}"` : ''} were not sent — unmapped Foundry user(s): ${noticeText(named)}. Link them in Chronicle Sync, under Settings, Players.`
       );
     }
 

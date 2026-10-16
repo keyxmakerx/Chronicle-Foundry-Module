@@ -6,10 +6,8 @@
     <i class="fa-solid fa-plug" aria-hidden="true"></i>
     <b>{{localize "CHRONICLE.Dashboard.NotConfigured"}}</b>
     <p>{{localize "CHRONICLE.Dashboard.NotConfiguredHint"}}</p>
-    <button type="button" data-action="open-settings" class="dashboard-btn">
-      <i class="fa-solid fa-gear"></i> {{localize "CHRONICLE.Dashboard.OpenSettings"}}
-    </button>
   </div>
+  {{> "modules/chronicle-sync/templates/chronicle-settings.hbs" settings}}
   {{else}}
 
   {{#if loading}}
@@ -36,30 +34,16 @@
     <a class="item item-overview" data-tab="overview">
       <i class="fa-solid fa-gauge-high"></i> {{localize "CHRONICLE.Dashboard.Rail.Overview"}}
     </a>
-
-    <div class="rail-group-label">{{localize "CHRONICLE.Dashboard.Rail.Everyday"}}</div>
-    <a class="item" data-tab="entities">
-      <i class="fa-solid fa-book"></i> {{localize "CHRONICLE.Dashboard.Rail.Entities"}}
-    </a>
-    <a class="item" data-tab="characters">
-      <i class="fa-solid fa-users"></i> {{localize "CHRONICLE.Dashboard.Rail.Characters"}}
+    <a class="item" data-tab="linked">
+      <i class="fa-solid fa-link"></i> {{localize "CHRONICLE.Dashboard.Rail.Linked"}}
       {{#if issues.hasIssues}}<span class="member-tab-badge" title="{{localize 'CHRONICLE.Dashboard.Rail.IssuesBadge' count=issues.count}}">{{issues.count}}</span>{{/if}}
     </a>
-    <a class="item" data-tab="calendar">
-      <i class="fa-solid fa-calendar"></i> {{localize "CHRONICLE.Dashboard.Rail.Calendar"}}
-    </a>
-
-    <div class="rail-group-label">{{localize "CHRONICLE.Dashboard.Rail.Library"}}</div>
-    <a class="item" data-tab="maps">
-      <i class="fa-solid fa-map"></i> {{localize "CHRONICLE.Dashboard.Rail.Maps"}}
-    </a>
-    <a class="item" data-tab="shops">
-      <i class="fa-solid fa-store"></i> {{localize "CHRONICLE.Dashboard.Rail.Shops"}}
-    </a>
-
-    <a class="item item-diagnostics" data-tab="diagnostics">
-      <i class="fa-solid fa-stethoscope"></i> {{localize "CHRONICLE.Dashboard.Rail.Diagnostics"}}
+    <a class="item" data-tab="problems">
+      <i class="fa-solid fa-stethoscope"></i> {{localize "CHRONICLE.Dashboard.Rail.Problems"}}
       {{#if debug.unread}}<span class="member-tab-badge" title="{{localize 'CHRONICLE.Debug.NewBadge' count=debug.unread}}">{{debug.unread}}</span>{{/if}}
+    </a>
+    <a class="item item-settings" data-tab="settings">
+      <i class="fa-solid fa-gear"></i> {{localize "CHRONICLE.Dashboard.Rail.Settings"}}
     </a>
   </nav>
 
@@ -122,8 +106,8 @@
           <button type="button" class="dashboard-btn btn-sm" data-action="resync-everything">
             <i class="fa-solid fa-rotate"></i> {{localize "CHRONICLE.Dashboard.Overview.SyncEverything"}}
           </button>
-          <button type="button" class="dashboard-btn btn-sm" data-jump-tab="diagnostics:health">
-            <i class="fa-solid fa-stethoscope"></i> {{localize "CHRONICLE.Dashboard.Rail.Diagnostics"}}
+          <button type="button" class="dashboard-btn btn-sm" data-jump-tab="problems:health">
+            <i class="fa-solid fa-stethoscope"></i> {{localize "CHRONICLE.Dashboard.Rail.Problems"}}
           </button>
           <button type="button" class="dashboard-btn btn-sm" data-action="refresh">
             <i class="fa-solid fa-arrows-rotate"></i> {{localize "CHRONICLE.Dashboard.Common.Refresh"}}
@@ -175,9 +159,21 @@
 
 
     {{!-- ================================================================= --}}
+    {{!-- LINKED: what this world shares with Chronicle, one kind at a time  --}}
+    {{!-- ================================================================= --}}
+    <div class="tab" data-tab="linked" data-group="primary">
+      <div class="cs-seg" role="tablist" aria-label="{{localize "CHRONICLE.Dashboard.Rail.Linked"}}">
+        <button type="button" role="tab" data-subtab="linked:pages">{{localize "CHRONICLE.Dashboard.Rail.Entities"}}</button>
+        <button type="button" role="tab" data-subtab="linked:characters">{{localize "CHRONICLE.Dashboard.Rail.Characters"}}{{#if issues.hasIssues}} <span class="member-tab-badge">{{issues.count}}</span>{{/if}}</button>
+        <button type="button" role="tab" data-subtab="linked:maps">{{localize "CHRONICLE.Dashboard.Rail.Maps"}}</button>
+        <button type="button" role="tab" data-subtab="linked:shops">{{localize "CHRONICLE.Dashboard.Rail.Shops"}}</button>
+        <button type="button" role="tab" data-subtab="linked:calendar">{{localize "CHRONICLE.Dashboard.Rail.Calendar"}}</button>
+      </div>
+
+    {{!-- ================================================================= --}}
     {{!-- ENTITIES TAB                                                      --}}
     {{!-- ================================================================= --}}
-    <div class="tab" data-tab="entities" data-group="primary">
+    <div class="cs-pane" role="tabpanel" data-subpane="linked:pages">
       <div class="dashboard-toolbar">
         <div class="toolbar-actions">
           {{#if hasChronicleOnly}}
@@ -342,7 +338,7 @@
     {{!-- ================================================================= --}}
     {{!-- SHOPS TAB                                                         --}}
     {{!-- ================================================================= --}}
-    <div class="tab" data-tab="shops" data-group="primary">
+    <div class="cs-pane" role="tabpanel" data-subpane="linked:shops">
       {{#if shops.length}}
       <div class="shop-list">
         {{#each shops}}
@@ -400,7 +396,7 @@
     {{!-- ================================================================= --}}
     {{!-- MAPS TAB                                                          --}}
     {{!-- ================================================================= --}}
-    <div class="tab" data-tab="maps" data-group="primary">
+    <div class="cs-pane" role="tabpanel" data-subpane="linked:maps">
       <div class="dashboard-toolbar">
         <button type="button" data-action="refresh" class="dashboard-btn btn-sm" title="{{localize 'CHRONICLE.Dashboard.Common.Refresh'}}">
           <i class="fa-solid fa-arrows-rotate"></i>
@@ -509,7 +505,7 @@
     {{!-- ================================================================= --}}
     {{!-- CHARACTERS TAB                                                    --}}
     {{!-- ================================================================= --}}
-    <div class="tab" data-tab="characters" data-group="primary">
+    <div class="cs-pane" role="tabpanel" data-subpane="linked:characters">
       {{!-- Characters that couldn't be matched come first: they need the GM. --}}
       {{#if issues.hasIssues}}
       <section class="character-issues">
@@ -634,7 +630,7 @@
           <i class="fa-solid fa-toggle-off" aria-hidden="true"></i>
           <b>{{localize "CHRONICLE.Dashboard.Characters.Disabled"}}</b>
           <p>{{localize "CHRONICLE.Dashboard.Characters.DisabledHint"}}</p>
-          <button type="button" data-action="open-settings" class="dashboard-btn">
+          <button type="button" data-action="open-settings" data-settings-tab="sync" class="dashboard-btn">
             <i class="fa-solid fa-gear" aria-hidden="true"></i> {{localize "CHRONICLE.Dashboard.OpenSettings"}}
           </button>
         </div>
@@ -655,7 +651,7 @@
     {{!-- ================================================================= --}}
     {{!-- CALENDAR TAB                                                      --}}
     {{!-- ================================================================= --}}
-    <div class="tab" data-tab="calendar" data-group="primary">
+    <div class="cs-pane" role="tabpanel" data-subpane="linked:calendar">
       {{#if calendar.available}}
       <div class="calendar-panel">
         <div class="calendar-date-compare">
@@ -729,7 +725,7 @@
         {{else}}
         <i class="fa-solid fa-toggle-off" aria-hidden="true"></i>
         <b>{{localize "CHRONICLE.Dashboard.Calendar.Disabled"}}</b>
-        <button type="button" data-action="open-settings" class="dashboard-btn">
+        <button type="button" data-action="open-settings" data-settings-tab="sync" class="dashboard-btn">
           <i class="fa-solid fa-gear" aria-hidden="true"></i> {{localize "CHRONICLE.Dashboard.OpenSettings"}}
         </button>
         {{/if}}
@@ -737,17 +733,19 @@
       {{/if}}
     </div>
 
+    </div>{{!-- /linked --}}
+
     {{!-- ================================================================= --}}
-    {{!-- DIAGNOSTICS TAB: health, player reports and sync history          --}}
+    {{!-- PROBLEMS: health, player reports and sync history                --}}
     {{!-- ================================================================= --}}
-    <div class="tab" data-tab="diagnostics" data-group="primary">
-      <div class="cs-seg" role="tablist" aria-label="{{localize "CHRONICLE.Dashboard.Rail.Diagnostics"}}">
-        <button type="button" role="tab" data-diag="health">{{localize "CHRONICLE.Dashboard.Diagnostics.Health"}}</button>
-        <button type="button" role="tab" data-diag="reports">{{localize "CHRONICLE.Dashboard.Diagnostics.Reports"}}{{#if debug.unread}} <span class="member-tab-badge">{{debug.unread}}</span>{{/if}}</button>
-        <button type="button" role="tab" data-diag="history">{{localize "CHRONICLE.Dashboard.Diagnostics.History"}}</button>
+    <div class="tab" data-tab="problems" data-group="primary">
+      <div class="cs-seg" role="tablist" aria-label="{{localize "CHRONICLE.Dashboard.Rail.Problems"}}">
+        <button type="button" role="tab" data-subtab="problems:health">{{localize "CHRONICLE.Dashboard.Diagnostics.Health"}}</button>
+        <button type="button" role="tab" data-subtab="problems:reports">{{localize "CHRONICLE.Dashboard.Diagnostics.Reports"}}{{#if debug.unread}} <span class="member-tab-badge">{{debug.unread}}</span>{{/if}}</button>
+        <button type="button" role="tab" data-subtab="problems:history">{{localize "CHRONICLE.Dashboard.Diagnostics.History"}}</button>
       </div>
 
-      <div class="diag-pane" role="tabpanel" data-diag-pane="health">
+      <div class="cs-pane" role="tabpanel" data-subpane="problems:health">
       <div class="status-panel">
         {{!-- Game system detection --}}
         <div class="system-detection">
@@ -918,7 +916,7 @@
       </div>
       </div>
 
-      <div class="diag-pane" role="tabpanel" data-diag-pane="reports">
+      <div class="cs-pane" role="tabpanel" data-subpane="problems:reports">
       <div class="debug-panel">
 
         <h3 class="section-heading">{{localize "CHRONICLE.Debug.Reported" count=debug.unread}}</h3>
@@ -1041,7 +1039,7 @@
       </div>
 
       {{!-- Chronicle's sync history, both directions (sync-history-tab.mjs) --}}
-      <div class="diag-pane" role="tabpanel" data-diag-pane="history">
+      <div class="cs-pane" role="tabpanel" data-subpane="problems:history">
       <div class="sync-history" data-history-root>
         <form class="sh-bar" data-history-filters>
           <label class="sh-search">
@@ -1062,6 +1060,13 @@
         <div class="sh-list" data-history-rows></div>
       </div>
       </div>
+    </div>
+
+    {{!-- ================================================================= --}}
+    {{!-- SETTINGS: connection, what syncs, calendar, players, advanced     --}}
+    {{!-- ================================================================= --}}
+    <div class="tab" data-tab="settings" data-group="primary">
+      {{> "modules/chronicle-sync/templates/chronicle-settings.hbs" settings}}
     </div>
 
   </section>

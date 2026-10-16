@@ -19,7 +19,7 @@ export const DEFAULT_STRINGS = {
   Never: 'Never',
   LastSync: 'Last sync: {time}',
   Paused: 'Sync is paused until the connection is restored.',
-  NotConnected: 'Not connected to Chronicle. Reconnect above, or open Diagnostics to see why.',
+  NotConnected: 'Not connected to Chronicle. Reconnect above, or open Problems to see why.',
   CharactersUnmatchedOne: "{count} character couldn't be matched to Chronicle.",
   CharactersUnmatchedMany: "{count} characters couldn't be matched to Chronicle.",
   MembersUnmappedOne: '{count} campaign member not mapped to a Foundry user.',
@@ -29,8 +29,8 @@ export const DEFAULT_STRINGS = {
   CalendarPaused: 'Calendar sync paused — see the Calendar tab.',
   CalendarOutOfSync: 'Calendar date is out of sync with Chronicle.',
   NoSystem: 'No matching game system — character fields may not sync.',
-  ErrorsOne: '{count} recent sync error — see Diagnostics.',
-  ErrorsMany: '{count} recent sync errors — see Diagnostics.',
+  ErrorsOne: '{count} recent sync error — see Problems.',
+  ErrorsMany: '{count} recent sync errors — see Problems.',
 };
 
 /** Default translator: the English map above with `{name}` substitution. */
@@ -92,9 +92,9 @@ export function buildOverviewModel(p = {}) {
   };
 
   const stats = [
-    { label: tr('StatEntities'), value: String(syncedEntities), tab: 'entities' },
-    { label: tr('StatCharacters'), value: `${charsSynced}/${charList.length}`, tab: 'characters' },
-    { label: tr('StatMaps'), value: String(linkedScenes), tab: 'maps' },
+    { label: tr('StatEntities'), value: String(syncedEntities), tab: 'linked:pages' },
+    { label: tr('StatCharacters'), value: `${charsSynced}/${charList.length}`, tab: 'linked:characters' },
+    { label: tr('StatMaps'), value: String(linkedScenes), tab: 'linked:maps' },
   ];
 
   // Prioritized problems only — an empty list renders the calm "all clear" state.
@@ -106,7 +106,7 @@ export function buildOverviewModel(p = {}) {
       severity: 'error',
       icon: 'fa-plug-circle-xmark',
       text: tr('NotConnected'),
-      tab: 'diagnostics:health',
+      tab: 'problems:health',
     });
   }
   if (issuesCount > 0) {
@@ -114,7 +114,7 @@ export function buildOverviewModel(p = {}) {
       severity: 'warn',
       icon: 'fa-link-slash',
       text: tr(issuesCount === 1 ? 'CharactersUnmatchedOne' : 'CharactersUnmatchedMany', { count: issuesCount }),
-      tab: 'characters',
+      tab: 'linked:characters',
     });
   }
   if (unmatchedMembers > 0) {
@@ -132,7 +132,7 @@ export function buildOverviewModel(p = {}) {
       severity: 'info',
       icon: 'fa-screwdriver-wrench',
       text: tr('CalendarRebuilding'),
-      tab: 'calendar',
+      tab: 'linked:calendar',
     });
   } else if (calendarAvailable && calendarSyncPaused) {
     // A hard pause, not mere date drift — error severity so it sorts above
@@ -143,14 +143,14 @@ export function buildOverviewModel(p = {}) {
       text: calendarPausedText
         ? tr('CalendarPausedReason', { reason: calendarPausedText })
         : tr('CalendarPaused'),
-      tab: 'calendar',
+      tab: 'linked:calendar',
     });
   } else if (calendarAvailable && !calendarInSync) {
     attention.push({
       severity: 'warn',
       icon: 'fa-calendar-xmark',
       text: tr('CalendarOutOfSync'),
-      tab: 'calendar',
+      tab: 'linked:calendar',
     });
   }
   if (!matchedSystem) {
@@ -158,7 +158,7 @@ export function buildOverviewModel(p = {}) {
       severity: 'info',
       icon: 'fa-circle-question',
       text: tr('NoSystem'),
-      tab: 'diagnostics:health',
+      tab: 'problems:health',
     });
   }
   if (errorCount > 0) {
@@ -166,7 +166,7 @@ export function buildOverviewModel(p = {}) {
       severity: 'info',
       icon: 'fa-triangle-exclamation',
       text: tr(errorCount === 1 ? 'ErrorsOne' : 'ErrorsMany', { count: errorCount }),
-      tab: 'diagnostics:health',
+      tab: 'problems:health',
     });
   }
 

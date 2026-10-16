@@ -1,15 +1,17 @@
 /**
  * Chronicle Sync - Sync Dashboard
  *
- * Tabbed ApplicationV2 window for managing all Chronicle sync operations.
- * Provides visibility into sync state, per-entity/type controls, map linking,
- * calendar sync, and connection status with activity log.
+ * The Chronicle Sync window: setup and health in one place. Four sections:
+ * Overview, Linked (pages, characters, maps, shops and the calendar), Problems
+ * (health, player reports, sync history) and Settings.
  *
  * Accessed via the sidebar status indicator or scene controls button (GM only).
  */
 
 import { noticeText } from './_escape-html.mjs';
-import { openChronicleSettings } from './chronicle-settings.mjs';
+import {
+  newSettingsState, settingsContext, wireSettingsForm, testConnection, refreshMembers, startImport,
+} from './chronicle-settings.mjs';
 import { getSetting, setSetting, getUserMappings } from './settings.mjs';
 import { SyncHistoryTab } from './sync-history-tab.mjs';
 import { FLAG_SCOPE, REPORT_STORE_FLAG } from './constants.mjs';
@@ -33,7 +35,7 @@ import { calendarStateFromError } from './_calendar-probe-state.mjs';
 import {
   REPORTS_CHANGED_HOOK, collectModuleInfo, collectSyncLog, gatherSideBySide, getReports, markReportDone, submitReport,
 } from './debug-hub.mjs';
-import { resolveDashboardTab } from './_dashboard-tabs.mjs';
+import { resolveDashboardTab, SECTION_PANES } from './_dashboard-tabs.mjs';
 import { MAX_TEXT, relativeAge, splitReports, unreadCount } from './_debug-reports.mjs';
 import { reportToMarkdown } from './_debug-markdown.mjs';
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -83,6 +85,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       reconnect: SyncDashboard.#onReconnectAction,
       'clear-log': SyncDashboard.#onClearLogAction,
       'open-settings': SyncDashboard.#onOpenSettingsAction,
+      testConnection: SyncDashboard.#onTestConnectionAction,
+      refreshMembers: SyncDashboard.#onRefreshMembersAction,
+      startImport: SyncDashboard.#onStartImportAction,
       'open-shop': SyncDashboard.#onOpenShopAction,
       'push-actor': SyncDashboard.#onPushActorAction,
       'push-all-actors': SyncDashboard.#onPushAllActorsAction,
@@ -110,6 +115,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   static PARTS = {
     dashboard: {
       template: 'modules/chronicle-sync/templates/sync-dashboard.hbs',
+      templates: ['modules/chronicle-sync/templates/chronicle-settings.hbs'],
     },
   };
 
@@ -147,8 +153,12 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const saved = resolveDashboardTab(getSetting('dashboardActiveTab') || 'overview');
     /** @type {string} Currently active rail section (persisted per-client). */
     this._activeTab = saved.tab;
-    /** @type {string} The open Diagnostics pane. */
-    this._diagPane = saved.pane || 'health';
+    /** @type {Record<string, string>} The open pane of each section that has panes. */
+    this._panes = Object.fromEntries(Object.entries(SECTION_PANES).map(([tab, panes]) => [tab, panes[0]]));
+    if (saved.pane) this._panes[saved.tab] = saved.pane;
+
+    /** The Settings section's page types and unsaved edits, kept across re-renders. */
+    this._settings = newSettingsState();
 
     /** The History pane's rows and filters, kept across re-renders. */
     this._historyTab = new SyncHistoryTab(() => this.api);
@@ -172,28 +182,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   _onFirstRender(context, options) {
     super._onFirstRender?.(context, options);
     Hooks.on(REPORTS_CHANGED_HOOK, this._onReportsChanged);
-  }
-
-  /**
-   * A gear in the title bar opens Chronicle settings. Foundry's own header
-   * controls sit in a menu; the gear stays in sight.
-   * @override
-   */
-  async _renderFrame(options) {
-    const frame = await super._renderFrame(options);
-    const header = frame.querySelector('.window-header');
-    if (header && !header.querySelector('[data-action="open-settings"]')) {
-      const gear = document.createElement('button');
-      gear.type = 'button';
-      gear.className = 'header-control icon fa-solid fa-gear';
-      gear.dataset.action = 'open-settings';
-      const label = game.i18n.localize('CHRONICLE.Dashboard.OpenSettings');
-      gear.dataset.tooltip = label;
-      gear.setAttribute('aria-label', label);
-      const close = header.querySelector('[data-action="close"]');
-      header.insertBefore(gear, close?.parentElement === header ? close : null);
-    }
-    return frame;
   }
 
   /** @override */
@@ -243,8 +231,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** @override */
   async _prepareContext(options = {}) {
+    // Before a campaign is connected the window is only its Settings.
     if (!this._syncManager || !this.api) {
-      return { configured: false };
+      return { configured: false, settings: await settingsContext(this._settings) };
     }
 
     this._loading = true;
@@ -298,7 +287,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       capabilityData = await this._buildCapabilityData();
     } catch (err) {
       log.error('Dashboard: Failed to build sync capability', err);
-      loadErrors.push({ tab: 'diagnostics', message: err.message || 'Failed to build sync capability' });
+      loadErrors.push({ tab: 'problems', message: err.message || 'Failed to build sync capability' });
     }
 
     // Build characters tab data.
@@ -337,6 +326,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     return {
       configured: true,
       loading: false,
+      settings: await settingsContext(this._settings),
       searchFilter: this._searchFilter,
       activeTab: this._activeTab,
       // Named as the rail names them, so the GM can find what didn't load.
@@ -826,7 +816,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   /**
    * Chronicle members not linked to a Foundry player. Their per-player
    * permissions are dropped, so the Overview flags them; the links
-   * themselves are set in Chronicle settings, under Players.
+   * themselves are set under Settings, Players.
    * @returns {number}
    * @private
    */
@@ -1107,6 +1097,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // --- Tab navigation ---
     this._initTabs(el);
+    wireSettingsForm(el.querySelector('[data-settings-form]'), this._settings, () => this.render({ force: true }));
     this._historyTab.mount(el, this._historyShown());
 
     // --- Search input ---
@@ -1241,14 +1232,26 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         this._switchTab(tab.dataset.tab);
       });
     });
-    el.querySelectorAll('[data-diag]').forEach((btn) => {
-      btn.addEventListener('click', () => this._switchTab(`diagnostics:${btn.dataset.diag}`));
+    // Each section's pane strip; arrow keys move along it, as the tab pattern expects.
+    el.querySelectorAll('.cs-seg[role="tablist"]').forEach((strip) => {
+      const tabs = [...strip.querySelectorAll('[data-subtab]')];
+      tabs.forEach((btn, i) => {
+        btn.addEventListener('click', () => this._switchTab(btn.dataset.subtab));
+        btn.addEventListener('keydown', (ev) => {
+          const step = ev.key === 'ArrowRight' ? 1 : ev.key === 'ArrowLeft' ? -1 : 0;
+          if (!step) return;
+          ev.preventDefault();
+          const next = tabs[(i + step + tabs.length) % tabs.length];
+          this._switchTab(next.dataset.subtab);
+          next.focus();
+        });
+      });
     });
   }
 
   /**
-   * Toggle the `.active` class on the nav item + content panel matching
-   * `this._activeTab`. Shared by initial render and programmatic switches.
+   * Toggle the `.active` class on the rail item, section and pane matching
+   * the open section and its pane. Shared by initial render and switches.
    * @param {HTMLElement} el
    * @private
    */
@@ -1260,45 +1263,55 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       t.classList.toggle('active', t.dataset.tab === this._activeTab));
     el.querySelectorAll('.dashboard-content .tab').forEach((p) =>
       p.classList.toggle('active', p.dataset.tab === this._activeTab));
-    el.querySelectorAll('[data-diag]').forEach((btn) => {
-      const on = btn.dataset.diag === this._diagPane;
+    // Before a campaign is connected there is no rail, only Settings.
+    const open = (key) => {
+      const [tab, pane] = key.split(':');
+      return this._panes[tab] === pane;
+    };
+    el.querySelectorAll('[data-subtab]').forEach((btn) => {
+      const on = open(btn.dataset.subtab);
       btn.classList.toggle('active', on);
       btn.setAttribute('aria-selected', String(on));
+      btn.tabIndex = on ? 0 : -1;
     });
-    el.querySelectorAll('[data-diag-pane]').forEach((p) =>
-      p.classList.toggle('active', p.dataset.diagPane === this._diagPane));
+    el.querySelectorAll('[data-subpane]').forEach((p) => p.classList.toggle('active', open(p.dataset.subpane)));
   }
 
   /** Whether the sync history pane is the one on screen. */
   _historyShown() {
-    return this._activeTab === 'diagnostics' && this._diagPane === 'history';
+    return this._activeTab === 'problems' && this._panes.problems === 'history';
   }
 
   /**
-   * Switch to a tab by name and persist it. Used by rail clicks and by the
-   * Overview cockpit's jump-links (`data-jump-tab`). Scrolls the content pane
-   * back to the top so the jumped-to tab starts at its heading.
+   * Open the window at a section, e.g. "settings:players", whether or not it
+   * is drawn yet.
+   * @param {string} tabName
+   */
+  openOn(tabName) {
+    this._switchTab(tabName);
+  }
+
+  /**
+   * Switch to a section (and pane) by name and persist it. Used by rail and
+   * pane-strip clicks and by the Overview's jump-links (`data-jump-tab`).
+   * Scrolls the content back to the top so the section starts at its heading.
    * @param {string} tabName
    * @private
    */
   _switchTab(tabName) {
     if (!tabName) return;
-    // "settings:players" and the like open that tab of Chronicle settings.
-    if (tabName.startsWith('settings:')) {
-      openChronicleSettings(tabName.slice('settings:'.length));
-      return;
-    }
     const { tab, pane } = resolveDashboardTab(tabName);
     const moved = tab !== this._activeTab;
     this._activeTab = tab;
-    if (pane) this._diagPane = pane;
-    setSetting('dashboardActiveTab', tab === 'diagnostics' ? `diagnostics:${this._diagPane}` : tab);
+    if (pane) this._panes[tab] = pane;
+    setSetting('dashboardActiveTab', SECTION_PANES[tab] ? `${tab}:${this._panes[tab]}` : tab);
     const el = this.element;
     if (!el) return;
     this._applyActiveTab(el);
     if (moved || pane) {
       el.querySelector('.dashboard-content')?.scrollTo?.({ top: 0 });
-      const shown = el.querySelector(tab === 'diagnostics' ? '[data-diag-pane].active' : '.dashboard-content .tab.active');
+      const section = el.querySelector('.dashboard-content .tab.active');
+      const shown = section?.querySelector('[data-subpane].active') ?? section;
       if (shown) { shown.classList.remove('cs-settle'); void shown.offsetWidth; shown.classList.add('cs-settle'); }
     }
     if (this._historyShown()) this._historyTab.shown();
@@ -1313,6 +1326,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Refresh button: invalidate caches and re-render. */
   static #onRefresh() {
     this._cache = { entityTypes: null, entities: null, maps: null, calendar: null };
+    this._settings.pageTypesTried = false;
     this.render({ force: true });
   }
 
@@ -1597,9 +1611,25 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this.render({ force: true });
   }
 
-  /** Open the Chronicle settings window, or bring it forward if open. */
-  static #onOpenSettingsAction() {
-    openChronicleSettings();
+  /** Go to the Settings section, at the tab the button names. */
+  static #onOpenSettingsAction(_event, target) {
+    this._switchTab(`settings:${target?.dataset?.settingsTab ?? ''}`);
+  }
+
+  /** Settings > Connection: test the typed (or saved) connection. */
+  static #onTestConnectionAction(_event, target) {
+    return testConnection(this.element, target);
+  }
+
+  /** Settings > Players: fetch Chronicle's members again. */
+  static async #onRefreshMembersAction(_event, target) {
+    await refreshMembers(target);
+    this.render({ force: true });
+  }
+
+  /** Settings > Connection: the Setup Wizard. */
+  static #onStartImportAction() {
+    return startImport();
   }
 
   /** Open a shop window via the ShopWidget module. */
