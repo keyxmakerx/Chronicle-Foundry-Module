@@ -30,7 +30,7 @@ repo root. There is no `package.json`.
 
 ## Keyboard shortcuts
 
-- [ ] Configure Controls lists a Chronicle Sync group with five shortcuts (dashboard, DM Screen, notebook, quest board, calendar), all with no key bound
+- [ ] Configure Controls lists a Chronicle Sync group with four shortcuts (Chronicle Sync, DM Screen, Satchel, calendar), all with no key bound
 - [ ] Bind a key to "Open the Chronicle Sync dashboard", press it as the GM: the dashboard opens; as a player the GM-only two are not listed
 - [ ] With the world not connected, a key bound to the notebook does nothing and Foundry's own use of that key still works
 
@@ -375,7 +375,7 @@ Needs a GM and a player client on the same scene, and an NPC page synced as a jo
 
 GM only. Needs a Chronicle that serves the DM Screen.
 
-- [ ] The scene controls' Chronicle group has a d20 button for the GM; a player's group has only the notebook button
+- [ ] The scene controls' Chronicle group has a d20 button for the GM; a player's group has only the Satchel and Calendar buttons
 - [ ] Click it: a d20 rolls out of the button, lands on 20 and the screen unfolds into three leaves (The world, The party, Rules and reveals); a click or Escape skips the opening
 - [ ] The world leaf shows In session / Downtime; pressing the other one asks first, **Cancel** leaves it, confirming switches it and a notice says how many waiting requests went through
 - [ ] The party leaf lists each hero on one line; a row expands for detail, with a green dot after "Played by" when that player is on Chronicle now
@@ -429,18 +429,20 @@ Needs the Armory addon on in Chronicle, a character linked to an actor, and a pl
 
 Needs a Chronicle with quest boards (a category or a place page with at least one board and a pinned notice) and the GM connected.
 
-- [ ] The Chronicle tool group in the scene controls has **Open the quest board** (thumbtack); it opens the boards of the first place with boards, and the drop-down switches places
+- [ ] The Satchel's **Quests** tab shows the boards of the first place with boards, and the drop-down switches places
 - [ ] Notices, sticky notes, pinned pages and red strings sit where they do on Chronicle's board; a notice due soon or late says so under it; with more than one board, the arrows turn boards
-- [ ] Click a notice -> its quest opens as a paper sheet; the GM also sees the ledger under it
+- [ ] Click a notice -> its quest opens as a paper sheet in the same tab, with **Back to the board**; the GM also sees the ledger under it
 - [ ] As GM, tick a step, toggle its eye, change the status -> Chronicle's page shows the same after a refresh; an edit made in Chronicle shows in the open Foundry window without reopening it
 - [ ] As GM, **Hand out** with a coin reward and two characters -> each sheet gets its share, with "as a reward for <quest>" in its money history; with an item reward -> the item lands on the chosen character; the ledger reads "Handed out to the party"
 - [ ] As a player, the board shows only what Chronicle shows a player: no hidden notices, no hidden steps (a "More steps the party has yet to learn" line instead), no ledger
 - [ ] A journal synced from a Chronicle quest page has an **Open quest** button in its header
 - [ ] With no GM connected, a player's board says it needs the GM to be connected
 
-## Player Notebook
+## Satchel and notebook
 
-- [ ] Every user (GM and players) has an **Open my Chronicle notebook** button in the Chronicle scene controls and a **Jot notes** tab in the bottom-right corner while the world is connected to Chronicle
+- [ ] Every user (GM and players) has an **Open my Satchel** button (briefcase) in the Chronicle scene controls and a **Jot notes** tab in the bottom-right corner while the world is connected to Chronicle
+- [ ] The Satchel opens on the tab it was last left on; **Notebook**, **Quests** and **Stash** switch without reloading the notebook frame
+- [ ] A player's **Stash** tab shows their character's Stashes window (move, history, report a problem); a player with no Chronicle character, and the GM, see a line saying where to look instead
 - [ ] First use: **Connect to Chronicle** opens Chronicle's Allow window; **Allow** closes it and the player's own Journal appears in the frame
 - [ ] A player whose Foundry user is not matched to a Chronicle member sees the "hasn't matched your Foundry login" message; one who allows with a different Chronicle account sees the "isn't the one your GM matched" message
 - [ ] Open a Chronicle-linked journal, then the Jot notes tab -> the jots follow the page in view; opening another linked journal moves them
