@@ -334,6 +334,21 @@ html[data-cs-motion="off"] :is(.cs-grow, .cs-settle, .cs-peek) {
 .chronicle-dashboard .cs-panels { padding: 0 4px 8px; overflow: visible; }
 .chronicle-dashboard .cs-foot { position: sticky; bottom: -8px; margin: 0 -8px -8px; z-index: 1; }
 .chronicle-dashboard .dashboard-empty + .cs-settings { padding: 0 12px; }
+
+/* First-run screen: a short heading and the setup's steps above the connection settings, then the wizard. */
+.cs-firstrun { padding: 12px 14px 4px; }
+.cs-firstrun-title { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; border: 0; font-size: 17px; }
+.cs-firstrun-title > i { color: var(--cs-accent); }
+.cs-firstrun-hint { margin: 0; max-width: 60ch; font-size: 12.5px; color: var(--cs-text-muted); }
+.cs-firstrun-steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; padding: 0; list-style: none; counter-reset: cs-step; }
+.cs-firstrun-steps > li { counter-increment: cs-step; display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 4px; border: 1px solid var(--cs-line); border-radius: 999px; font-size: 12px; color: var(--cs-text-muted); }
+.cs-firstrun-steps > li::before { content: counter(cs-step); display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--cs-surface-2); font-size: 11px; font-weight: 600; }
+.cs-firstrun-steps > li.is-current { border-color: var(--cs-accent); color: var(--cs-text); }
+.cs-firstrun-steps > li.is-current::before { background: var(--cs-accent); color: var(--cs-on-accent); }
+.cs-firstrun-head { display: flex; align-items: flex-start; gap: 12px; padding-bottom: 10px; }
+.cs-firstrun-head > div { flex: 1; min-width: 0; }
+.cs-firstrun-head > button { flex: none; width: auto; }
+.chronicle-dashboard .chronicle-wizard-inner { flex: 1; min-height: 0; }
 .overview-more { margin-top: 12px; }
 
 /* ---------------------------------------------------------------------------

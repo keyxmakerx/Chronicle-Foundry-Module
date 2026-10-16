@@ -447,7 +447,8 @@ Needs a Chronicle with quest boards (a category or a place page with at least on
 
 ## Import Wizard
 
-- [ ] Chronicle Sync → Settings → Connection -> **Setup Wizard** opens a six-step wizard: Connect, Scan, Types, Tags, Characters, Review; there are no maps or calendar steps
+- [ ] Chronicle Sync → Settings → Connection -> **Setup Wizard** shows a six-step wizard inside the Chronicle Sync window (no second window): Connect, Scan, Types, Tags, Characters, Review; there are no maps or calendar steps. The Connect step fills in its checks (connection, page types, game system) on its own
+- [ ] In a world with no connection, Chronicle Sync opens on "Set up Chronicle in this world" with the five steps listed and the connection settings below. Save a connect line and reload: Chronicle Sync opens on the wizard. **Skip setup** returns to the four sections and the wizard does not reappear on the next open
 - [ ] Tags and Characters steps are skipped when tags are unavailable or no game system matched
 - [ ] Review lists what will be created; running it creates the entities and marks the wizard completed
 
@@ -528,7 +529,7 @@ Player reports and History panes) and Settings (at the foot, set apart).
 - [ ] Configure Settings shows Chronicle's button and only the calendar strip, Motion and temperature unit; the button opens Chronicle Sync at Settings, with panes Connection, What syncs, Calendar, Players and Advanced (GM only)
 - [ ] **Players:** one row per Chronicle member with a Linked / Not linked badge and a Foundry player dropdown; change one, press **Save**, reopen -> the change stuck and the other links are unchanged; **Fetch members again** re-reads the list
 - [ ] **What syncs:** the new-journal page type lists Chronicle's page types; pick one, **Save**, then make a journal in Foundry -> the Chronicle page has that type
-- [ ] **Connection:** **Setup Wizard** opens the import wizard; the API key field is always empty, with "Saved in this browser" when a key exists
+- [ ] **Connection:** **Setup Wizard** shows the import wizard in the same window; the API key field is always empty, with "Saved in this browser" when a key exists
 - [ ] Overview -> "campaign member(s) not mapped" opens Settings → Players
 - [ ] A dashboard last left on the old Config or Members tab opens on Overview
 

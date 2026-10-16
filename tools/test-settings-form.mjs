@@ -195,12 +195,11 @@ test('only member dropdowns the GM changed are saved', async () => {
   assert.match(src, /members: changedMemberLinks\(form\)/);
 });
 
-test('the Setup Wizard button hands the wizard the sync manager', async () => {
+test('the Setup Wizard opens inside Chronicle Sync with its sync manager', async () => {
   const { readFileSync } = await import('node:fs');
-  const src = readFileSync(new URL('../scripts/chronicle-settings.mjs', import.meta.url), 'utf8');
-  const body = src.slice(src.indexOf('export async function startImport'), src.indexOf('export async function saveSettingsForm'));
-  assert.match(body, /ImportWizard\.instance/);
-  assert.match(body, /\.bind\(game\.modules\.get\(MODULE_ID\)\?\.api\?\.syncManager\)/);
+  const src = readFileSync(new URL('../scripts/sync-dashboard.mjs', import.meta.url), 'utf8');
+  assert.match(src, /ImportWizard\.hostedIn\(this, this\._syncManager\)/);
+  assert.ok(!/ImportWizard\.instance/.test(src));
 });
 
 test('the creatures switch is a plain on/off saved to syncCreatures', () => {

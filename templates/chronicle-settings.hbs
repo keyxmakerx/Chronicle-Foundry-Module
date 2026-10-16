@@ -53,6 +53,8 @@
         </div>
       </div>
 
+      {{!-- On the first-run screen the wizard follows the connection on its own. --}}
+      {{#unless firstRun}}
       <div class="cs-field">
         <span class="cs-lab">{{localize "CHRONICLE.SettingsWindow.StartImport"}}</span>
         <div class="cs-ctl">
@@ -60,6 +62,7 @@
           <p class="cs-hint">{{localize "CHRONICLE.Wizard.Hint"}}</p>
         </div>
       </div>
+      {{/unless}}
     </section>
 
     <section class="cs-panel cs-pane" role="tabpanel" data-subpane="settings:sync">
