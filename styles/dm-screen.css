@@ -100,6 +100,16 @@
 .chronicle-dm-screen .dms-row { display: flex; justify-content: space-between; align-items: center; gap: .5rem; font-size: .9em; border-top: 1px dashed var(--dms-leaf-edge); padding-top: .4rem; }
 .chronicle-dm-screen .dms-row button { font-size: .8em; border: 1px solid var(--dms-leaf-edge); border-radius: .35rem; padding: .1rem .45rem; }
 .chronicle-dm-screen .dms-done { font-size: .8em; color: var(--dms-ok); }
+/* Cast (scripts/dm-cast.mjs) and Party (scripts/dm-party.mjs) tabs. */
+.chronicle-dm-screen .dms-cast-who { display: grid; min-width: 0; }
+.chronicle-dm-screen .dms-cast-btns { display: flex; flex-wrap: wrap; gap: .25rem; justify-content: flex-end; }
+.chronicle-dm-screen .dms-row button[aria-pressed="true"] { background: var(--cs-accent-soft); border-color: var(--dms-hinge); }
+.chronicle-dm-screen .dms-tag { font-style: normal; font-size: .75em; padding: 0 .35rem; border-radius: 999px; border: 1px solid var(--dms-leaf-edge); color: var(--dms-ink-muted); }
+.chronicle-dm-screen .dms-stash { display: grid; gap: .2rem; }
+.chronicle-dm-screen .dms-stash-items { list-style: none; margin: 0; padding: 0 0 0 .5rem; display: grid; gap: .1rem; font-size: .85em; }
+.chronicle-dm-screen .dms-stash-items li { display: flex; justify-content: space-between; gap: .5rem; }
+.chronicle-dm-screen .dms-party-acts { display: flex; gap: .35rem; flex-wrap: wrap; }
+.chronicle-dm-screen .dms-party-acts button { font-size: .8em; border: 1px solid var(--dms-leaf-edge); border-radius: .35rem; padding: .1rem .45rem; }
 @container (max-width: 640px) {
   .chronicle-dm-screen .dms-leaves { flex-direction: column; }
   .chronicle-dm-screen .dms-leaf { flex: none; min-height: 0; }
@@ -108,11 +118,11 @@
   .chronicle-dm-screen .dms-leaf-r { border-radius: 0 0 .6rem .6rem; transform-origin: center top; }
 }
 /* Encounters tab (scripts/encounters.mjs): the roster of a planned fight. The
-   panel widens while the tab is open; button rules carry the extra .dms so
+   panel widens while it or Cast is open; button rules carry the extra .dms so
    they win over the reset above. */
-.chronicle-dm-screen .dms-leaves.dms-enc-open .dms-leaf-r { flex: 2.6 1 0; }
-.chronicle-dm-screen .dms-leaves.dms-enc-open .dms-leaf-l,
-.chronicle-dm-screen .dms-leaves.dms-enc-open .dms-leaf-m { flex: 1 1 0; }
+.chronicle-dm-screen .dms-leaves.dms-wide .dms-leaf-r { flex: 2.6 1 0; }
+.chronicle-dm-screen .dms-leaves.dms-wide .dms-leaf-l,
+.chronicle-dm-screen .dms-leaves.dms-wide .dms-leaf-m { flex: 1 1 0; }
 .chronicle-dm-screen .dms-elist, .chronicle-dm-screen .dms-efight { display: grid; gap: .35rem; align-content: start; }
 .chronicle-dm-screen .dms-eready { margin: .2rem 0 0; color: var(--dms-warn); }
 .chronicle-dm-screen .dms .dms-eitem {

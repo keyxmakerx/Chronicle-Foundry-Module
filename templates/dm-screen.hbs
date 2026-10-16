@@ -109,6 +109,8 @@
         {{/if}}
         <button type="button" role="tab" aria-selected="{{#if hasRules}}false{{else}}true{{/if}}" data-action="tab" data-tab="reveal">Reveal</button>
         <button type="button" role="tab" aria-selected="false" data-action="tab" data-tab="encounters">{{localize "CHRONICLE.Encounters.Tab"}}</button>
+        <button type="button" role="tab" aria-selected="false" data-action="tab" data-tab="cast">{{localize "CHRONICLE.DMScreen.Cast.Tab"}}</button>
+        <button type="button" role="tab" aria-selected="false" data-action="tab" data-tab="party">{{localize "CHRONICLE.DMScreen.Party.Tab"}}</button>
       </div>
       {{#if hasRules}}
         <div class="dms-blk" data-dms-pane="rules">
@@ -137,6 +139,8 @@
         {{/each}}
       </div>
       <div class="dms-blk" data-dms-pane="encounters" data-dms-enc hidden></div>
+      <div class="dms-blk" data-dms-pane="cast" data-dms-cast hidden></div>
+      <div class="dms-blk" data-dms-pane="party" data-dms-partytab hidden></div>
     </section>
   </div>
 {{/if}}

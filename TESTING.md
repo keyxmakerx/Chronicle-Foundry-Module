@@ -381,6 +381,8 @@ GM only. Needs a Chronicle that serves the DM Screen.
 - [ ] The party leaf lists each hero on one line; a row expands for detail
 - [ ] Rules tab: **Find a condition** filters the list. Reveal tab: **Reveal** on a hidden character makes it visible to players in Chronicle
 - [ ] Against a Chronicle without the DM Screen, the window says to update Chronicle; with a wrong key it says the key was not accepted; **Try again** reloads
+- [ ] **Cast** lists the scene's tokens that belong to a Chronicle page and no player, hidden ones marked Hidden. Spotlight, Talk as (then Stop talking) and Page do what the token's own buttons do; a player's hero never appears
+- [ ] **Party** shows each shared stash with its money and items, **Move things** opens a hero's Stashes window, and each shop's **Open** opens its shop room. With stashes off in Chronicle, it says so
 
 ## Encounters (DM Screen tab)
 
