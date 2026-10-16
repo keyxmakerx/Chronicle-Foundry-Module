@@ -191,8 +191,18 @@
     "Dashboard": {
       "Title": "Chronicle Sync",
       "OpenSettings": "Open Settings",
-      "NotConfigured": "Chronicle Sync is not configured.",
-      "NotConfiguredHint": "Paste a connect line from Chronicle below and save.",
+      "FirstRun": {
+        "Title": "Set up Chronicle in this world",
+        "ConnectFirst": "First, connect: paste the connect line from your Chronicle campaign, test it and save. After Foundry reloads, Chronicle Sync opens on the rest of the setup.",
+        "StepConnect": "Connect",
+        "StepScan": "Scan this world",
+        "StepTypes": "Choose page types and tags",
+        "StepCharacters": "Match characters",
+        "StepReview": "Review and import",
+        "NothingSent": "Nothing is sent to Chronicle until you press Start Import.",
+        "Skip": "Skip setup",
+        "Done": "Done"
+      },
       "Common": {
         "Loading": "Loading...",
         "LoadFailed": "Some data failed to load from Chronicle:",

@@ -5,7 +5,8 @@
  * Helps users scan their Foundry world, map content to Chronicle entity types,
  * assign tags, configure character mapping, and execute a bulk import.
  *
- * Launched from the "Setup Wizard" button in Chronicle Sync, under Settings, Connection.
+ * Shown inside Chronicle Sync as its first-run screen, and from the "Setup
+ * Wizard" button under Settings, Connection; it has no window of its own.
  */
 
 import { noticeText } from './_escape-html.mjs';
@@ -76,14 +77,22 @@ const TAG_COLORS = Object.freeze([
 ]);
 
 export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
-  /** @type {ImportWizard|null} */
-  static _instance = null;
+  /**
+   * A wizard drawn inside another window: rendering, its root element and
+   * closing all go to that host.
+   * @param {ApplicationV2 & {leaveFirstRun: Function}} host
+   * @param {import('./sync-manager.mjs').SyncManager} syncManager
+   */
+  static hostedIn(host, syncManager) {
+    const wizard = new ImportWizard();
+    wizard._host = host;
+    wizard.bind(syncManager);
+    return wizard;
+  }
 
-  static get instance() {
-    if (!ImportWizard._instance) {
-      ImportWizard._instance = new ImportWizard();
-    }
-    return ImportWizard._instance;
+  /** The step names the host's buttons may call, with this wizard as `this`. */
+  static get ACTION_NAMES() {
+    return Object.keys(ImportWizard.DEFAULT_OPTIONS.actions);
   }
 
   static DEFAULT_OPTIONS = {
@@ -119,6 +128,9 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
 
   constructor(options = {}) {
     super(options);
+
+    /** @type {ApplicationV2|null} The window this wizard is drawn inside. */
+    this._host = null;
 
     /** @type {import('./sync-manager.mjs').SyncManager|null} */
     this._syncManager = null;
@@ -174,6 +186,47 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @returns {import('./api-client.mjs').ChronicleAPI|null} */
   get api() {
     return this._syncManager?.api ?? null;
+  }
+
+  /** @override The wizard's markup inside the host window. */
+  get element() {
+    if (!this._host) return super.element;
+    return this._host.element?.querySelector('.chronicle-wizard-inner') ?? null;
+  }
+
+  /**
+   * @override Redraw the host, and only while it is open: an import keeps
+   * running after the window closes and must not reopen it on every batch.
+   */
+  render(options = {}) {
+    if (!this._host) return super.render(options);
+    if (this._host.rendered) this._host.render({ force: true });
+    return this;
+  }
+
+  /** @override Leaving the wizard returns the host to its own sections. */
+  close(options = {}) {
+    if (!this._host) return super.close(options);
+    this._host.leaveFirstRun();
+    return this;
+  }
+
+  /**
+   * Run the first step's checks. Entering a step runs its logic only when
+   * moving forward, which never lands on the first step, so opening the
+   * wizard has to run it.
+   */
+  async start() {
+    await this._onEnterStep(this._currentStep);
+    this.render({ force: true });
+  }
+
+  /**
+   * Run one of the wizard's buttons for the host window.
+   * @param {string} name - the button's data-action
+   */
+  handleAction(name, event, target) {
+    return ImportWizard.DEFAULT_OPTIONS.actions[name]?.call(this, event, target);
   }
 
   // ---------------------------------------------------------------------------
@@ -576,6 +629,7 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
       importPlan: this._importPlan,
       importProgress: this._importProgress,
       importRunning: this._importRunning,
+      importFinished: !this._importRunning && (this._importProgress.done + this._importProgress.errors) > 0,
     };
   }
 

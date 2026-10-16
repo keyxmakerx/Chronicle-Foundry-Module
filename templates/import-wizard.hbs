@@ -320,11 +320,11 @@
       {{localize "CHRONICLE.Wizard.StepOf" step=currentStepDisplay total=totalSteps}}
     </span>
     {{#if isLastStep}}
-    {{#unless importRunning}}
+    {{#unless importRunning}}{{#unless importFinished}}
     <button type="button" class="dashboard-btn btn-import" data-action="wizard-start-import">
       <i class="fa-solid fa-file-import"></i> {{localize "CHRONICLE.Wizard.StartImport"}}
     </button>
-    {{/unless}}
+    {{/unless}}{{/unless}}
     {{else}}
     <button type="button" class="dashboard-btn" data-action="wizard-next">
       {{localize "CHRONICLE.Wizard.Next"}} <i class="fa-solid fa-arrow-right"></i>
