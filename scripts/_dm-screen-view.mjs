@@ -48,6 +48,7 @@ export function foldHero(hero) {
     name: str(hero?.name),
     subtitle: str(hero?.subtitle),
     playerName: str(hero?.player_name),
+    playerHere: hero?.player_here === true,
     conditions,
     conditionList: conditions.join(', '),
     showWho: !!(str(hero?.subtitle) || str(hero?.player_name)),
@@ -61,6 +62,19 @@ export function foldHero(hero) {
 function siteUrl(apiUrl, path) {
   const base = str(apiUrl).replace(/\/+$/, '');
   return base ? `${base}${path}` : '';
+}
+
+const names = (v) => list(v).filter((n) => typeof n === 'string' && n);
+
+/** The strip's "3 of 4 players here", worded as Chronicle's PresenceView. */
+export function presenceLine(p) {
+  if (!p || typeof p !== 'object') return null;
+  const total = num(p.total);
+  const who = (l) => (l.length ? l.join(', ') : 'nobody');
+  return {
+    label: `${num(p.here)} of ${total} ${total === 1 ? 'player' : 'players'} here`,
+    title: `Here: ${who(names(p.here_names))}. Not here: ${who(names(p.away_names))}.`,
+  };
 }
 
 /**
@@ -81,6 +95,22 @@ export function screenContext(view, { apiUrl } = {}) {
     };
   }
 
+  // Read-only: Allow and Refuse post to Chronicle's web routes, which an API
+  // key can't reach, so each row points at the Stashes page instead.
+  let requests = null;
+  if (v.requests && typeof v.requests === 'object') {
+    const items = list(v.requests.items)
+      .map((r) => ({ text: str(r?.text) }))
+      .filter((r) => r.text);
+    const more = num(v.requests.more);
+    requests = {
+      items,
+      more: more > 0 ? `${more} more on the Stashes page` : '',
+      url: siteUrl(apiUrl, `/campaigns/${campaign}/armory/stashes`),
+    };
+    if (!items.length && !more) requests = null;
+  }
+
   let downtime = null;
   if (v.downtime && typeof v.downtime === 'object') {
     const open = v.downtime.open === true;
@@ -90,7 +120,8 @@ export function screenContext(view, { apiUrl } = {}) {
       open,
       canToggle,
       note: open ? 'Moves happen at once. Shops are open.' : 'Moves need your OK. Shops are closed.',
-      pending: pending > 0 ? `${plural(pending, 'request', 'requests')} waiting on you` : '',
+      // The Waiting on you rows replace this count when Chronicle sends them.
+      pending: pending > 0 && !requests ? `${plural(pending, 'request', 'requests')} waiting on you` : '',
       pendingUrl: siteUrl(apiUrl, `/campaigns/${campaign}/armory/stashes`),
       // Switching asks first: starting downtime puts every waiting request
       // through at once, and neither switch can be taken back cleanly.
@@ -133,9 +164,11 @@ export function screenContext(view, { apiUrl } = {}) {
 
   return {
     night,
+    presence: presenceLine(v.presence),
     downtime,
+    requests,
     world,
-    worldEmpty: !downtime && !world,
+    worldEmpty: !downtime && !world && !requests,
     party,
     partyNote,
     conditions,

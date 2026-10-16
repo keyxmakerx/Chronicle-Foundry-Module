@@ -378,7 +378,8 @@ GM only. Needs a Chronicle that serves the DM Screen.
 - [ ] The scene controls' Chronicle group has a d20 button for the GM; a player's group has only the notebook button
 - [ ] Click it: a d20 rolls out of the button, lands on 20 and the screen unfolds into three leaves (The world, The party, Rules and reveals); a click or Escape skips the opening
 - [ ] The world leaf shows In session / Downtime; pressing the other one asks first, **Cancel** leaves it, confirming switches it and a notice says how many waiting requests went through
-- [ ] The party leaf lists each hero on one line; a row expands for detail
+- [ ] The party leaf lists each hero on one line; a row expands for detail, with a green dot after "Played by" when that player is on Chronicle now
+- [ ] The top strip says how many players are here (hover lists who); with requests waiting, **Waiting on you** lists them and its link opens the Stashes page
 - [ ] Rules tab: **Find a condition** filters the list. Reveal tab: **Reveal** on a hidden character makes it visible to players in Chronicle
 - [ ] Against a Chronicle without the DM Screen, the window says to update Chronicle; with a wrong key it says the key was not accepted; **Try again** reloads
 - [ ] **Cast** lists the scene's tokens that belong to a Chronicle page and no player, hidden ones marked Hidden. Spotlight, Talk as (then Stop talking) and Page do what the token's own buttons do; a player's hero never appears

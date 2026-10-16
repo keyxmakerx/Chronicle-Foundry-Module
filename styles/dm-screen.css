@@ -23,6 +23,9 @@
   display: flex; flex-wrap: wrap; gap: .3rem 1rem; align-items: center; background: rgba(0, 0, 0, .55);
   color: #fff; border-radius: .5rem; padding: .35rem .75rem; margin-bottom: .45rem; font-size: .9em;
 }
+.chronicle-dm-screen .dms-dot { display: inline-block; width: .5rem; height: .5rem; border-radius: 50%; border: 1px solid #fff; margin-right: .35rem; }
+.chronicle-dm-screen .dms-dot-on { background: var(--dms-ok); border-color: var(--dms-ok); }
+.chronicle-dm-screen .dms-dot-after { margin: 0 0 0 .3rem; vertical-align: middle; }
 .chronicle-dm-screen .dms-leaves { display: flex; perspective: 1400px; transform-style: preserve-3d; }
 .chronicle-dm-screen .dms-leaf {
   flex: 1 1 0; min-width: 0; display: grid; gap: .65rem; align-content: start; padding: .9rem;
