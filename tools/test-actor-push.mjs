@@ -165,3 +165,19 @@ test('character lists page past 100 instead of stopping at the first page', asyn
   assert.equal(urls.length, 2);
   assert.match(urls[0], /type_id=7/);
 });
+
+test('a Chronicle update does not overwrite a field with a local edit still waiting to push', async () => {
+  const { sync } = await harness();
+  const writes = [];
+  const actor = actorDoc({
+    update: async (changes) => { writes.push(changes); },
+    hidden: false,
+  });
+  actor.system.attributes.hp.value = 15;
+  await sync._handleUpdateActor(actor, { system: { attributes: { hp: { value: 15 } } } }, {}, game.user.id);
+
+  const entity = { id: 'ent-1', updated_at: 'V2', fields_data: { hp: 11, bio: 'new bio' } };
+  assert.equal(await sync._updateActorFromEntity(actor, entity), true);
+  assert.deepEqual(writes, [{ 'system.details.biography': 'new bio' }]);
+  sync._actorPushDebouncer.flushAll?.();
+});

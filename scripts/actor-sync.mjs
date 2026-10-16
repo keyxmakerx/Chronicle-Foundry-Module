@@ -23,7 +23,7 @@ import { planClaimOwnership } from './_claim-ownership-plan.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { walkEntityPages, unwrapEntityList } from './_entity-page-walk.mjs';
 import { JournalPushDebouncer } from './_journal-push-debounce.mjs';
-import { mergeChanges } from './_actor-field-diff.mjs';
+import { mergeChanges, changeTouchesPath } from './_actor-field-diff.mjs';
 import { collapseChanges } from './_change-feed.mjs';
 import { planActorApply } from './_actor-apply-plan.mjs';
 import { planIdentityItems } from './_identity-item-plan.mjs';
@@ -535,6 +535,15 @@ export class ActorSync {
         update: this._adapter.fromChronicleFields(entity),
         actor,
       });
+      // A field with a local edit still waiting in the push debounce keeps
+      // that edit: the incoming value predates it, and writing it would be
+      // pushed back as the new truth.
+      const pending = this._pendingChanges.get(actor.id);
+      if (pending) {
+        for (const path of Object.keys(changes)) {
+          if (changeTouchesPath(pending, path)) delete changes[path];
+        }
+      }
       if (Object.keys(changes).length > 0) {
         await actor.update(changes, syncOptions({ [APPLY_OPTION]: true }));
       }
