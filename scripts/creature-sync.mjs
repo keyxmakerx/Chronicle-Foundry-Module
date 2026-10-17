@@ -411,7 +411,7 @@ export class CreatureSync {
   }
 
   /** The creature preset's Stamina paths, when the system has them. */
-  _staminaPaths() {
+  staminaPaths() {
     const path = (key) => this._defs?.fields?.find((f) => f.key === key)?.foundry_path || null;
     const max = path('stamina');
     const value = path('stamina_current');
@@ -444,7 +444,7 @@ export class CreatureSync {
       await before({ img: choice.img === 'generic' ? GENERIC_TOKEN : local.get(choice.img) || '', name: formName });
     }
 
-    const paths = this._staminaPaths();
+    const paths = this.staminaPaths();
     const get = foundry.utils.getProperty;
     const tokens = (canvas?.scene?.tokens?.contents ?? []).filter((t) => t.actorId === actor.id);
     if (!tokens.some((t) => t.id === tokenDoc.id) && tokenDoc.parent === canvas?.scene) tokens.push(tokenDoc);

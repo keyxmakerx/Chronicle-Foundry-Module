@@ -432,6 +432,13 @@ GM only. Needs a Chronicle that serves encounters, a key for the campaign owner 
 - [ ] **Undo placing** asks; confirming removes only the tokens this fight placed, other tokens stay
 - [ ] Switch scenes with the tab open: the roster reads the new scene (all **Not placed** there) and any waiting scene click is cancelled
 
+Stages (needs the encounter to have stages in Chronicle, a creature with a second form, and Change form working, see Creature Forms):
+
+- [ ] Under the roster, **Stages** lists each stage with when it comes and what it does; a fight with no stages shows nothing new
+- [ ] A "half Stamina" stage: damage the creature's token past half: the stage turns **Due**, and one notice says so. **Not yet** sets it back until the next round of the started tracker, then it is due again
+- [ ] **Start stage N**: the creature changes form the way the stage says (quiet or reveal); then the scene waits for one click and the arriving rows land there. The stage reads **Started**, and still does after closing and reopening the DM Screen
+- [ ] A "round 3" stage turns due at the start of round 3; a manual stage is never due but its Start works any time
+
 ## Character claims
 
 Needs the Player Character Claiming addon on in Chronicle, a character linked to an actor, and two players linked to Chronicle members (Chronicle Sync → Settings → Players). Run as the GM.

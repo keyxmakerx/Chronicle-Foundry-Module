@@ -43,6 +43,11 @@ function _onSocket(data, senderId) {
   playReveal(data).catch(() => {});
 }
 
+/** The creature sync this client runs, or null. */
+export function creatureSync() {
+  return state.getSync();
+}
+
 /* ---------------- Token HUD ---------------- */
 
 function _onRenderHud(hud, html) {

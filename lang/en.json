@@ -811,6 +811,24 @@
       }
     },
     "Encounters": {
+      "Stage": {
+        "Heading": "Stages",
+        "Title": "Stage {n}",
+        "Due": "Due",
+        "DueNotice": "Stage {n} of {name} is due. Start it from the DM Screen's Encounters tab.",
+        "WhenManual": "When you start it",
+        "WhenStamina": "When {name} is at or below {p}% Stamina",
+        "WhenRound": "At the start of round {n}",
+        "TakesForm": "{name} takes the form {form}",
+        "FirstForm": "its first form",
+        "Arrive": "Arriving: {names}",
+        "Someone": "A creature",
+        "Start": "Start stage {n}",
+        "NotYet": "Not yet",
+        "Started": "Started",
+        "Armed": "Click the scene where the arrivals come in. Esc cancels.",
+        "NoForm": "These creatures didn't change form, because they aren't on the scene or aren't Chronicle creatures: {names}"
+      },
       "Tab": "Encounters",
       "SearchPlaceholder": "Search planned encounters",
       "ReadyHeading": "Ready for game night",
