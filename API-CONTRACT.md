@@ -1653,6 +1653,19 @@ forgets its cached answer for that page, and reads
 the next send-back. Only `gm.sendBack === true` lets a creature's
 `foundry_pull_fields` go back to Chronicle; no state (404) means off.
 
+For `key` `forms` or `form-<id>` it forgets that page's cached forms and, when
+the page's actor is in that form (actor flag `creatureForm`), applies the page
+again. A creature's forms are read from
+`GET /entities/:entityId/system-state/<detectedSystem>/forms`
+(`gm.order`, `public.shown`, `public.current`) and `…/form-<id>` (`gm` is the
+form; the shape is the Draw Steel package's, see its `docs/monster-builder.md`).
+Changing form at the table writes only public halves:
+`PUT /entities/:entityId/system-state/<detectedSystem>/form-<id>` with
+`{ "public": <form> }` when players first see it, then
+`PUT …/forms` with `{ "public": { …, "shown": [ids], "current": id } }`.
+The PUT needs an owner-level key; an older Chronicle without it answers 404 or
+405 and the module only logs (`tools/test-creature-forms.mjs`).
+
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/systemstate`, `internal/plugins/syncapi/system_state_api.go`; keyxmakerx/Chronicle#1051)
 
 ### What the module does with `note.*`

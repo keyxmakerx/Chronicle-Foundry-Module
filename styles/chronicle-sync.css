@@ -2353,3 +2353,62 @@ body.ccal-rest #chronicle-calendar-bar .ccal-sky * { animation-play-state: pause
   border-radius: 4px;
   object-fit: contain;
 }
+
+/* Change form: the picker rows, and the reveal card that grows out of the
+ * token. The card's frame uses the same knobs as the hover art. */
+.chronicle-form-picker fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 10px;
+  border: 1px solid var(--cs-line);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.chronicle-form-picker legend { padding: 0 4px; font-weight: 600; }
+.chronicle-form-picker-row { display: flex; gap: 8px; align-items: baseline; min-height: 28px; }
+.chronicle-form-picker-row input { flex: none; }
+.chronicle-form-picker-now {
+  margin-left: auto;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cs-text-muted);
+}
+.chronicle-form-reveal {
+  position: fixed;
+  inset: 0;
+  z-index: 10002;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.chronicle-form-reveal-card {
+  --cs-hover-frame-width: 6px;
+  --cs-hover-frame-colour: var(--cs-surface-2);
+  --cs-hover-frame-edge: var(--cs-line);
+  position: relative;
+  width: min(280px, 60vw);
+  min-height: 80px;
+  padding: var(--cs-hover-frame-width);
+  border: 1px solid var(--cs-hover-frame-edge);
+  border-radius: 12px;
+  background: var(--cs-hover-frame-colour);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+}
+.chronicle-form-reveal-card img {
+  display: block;
+  width: 100%;
+  max-height: 60vh;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border: 1px solid var(--cs-hover-frame-edge);
+  border-radius: 6px;
+}
+.chronicle-form-reveal-card b {
+  display: block;
+  padding: 8px 4px 2px;
+  font-size: 1.1rem;
+  text-align: center;
+  color: var(--cs-text);
+}

@@ -30,6 +30,7 @@ import { registerNpcPresence, npcSpotlightRelay } from './npc-presence.mjs';
 import { negotiationMirror } from './negotiation-mirror.mjs';
 import { registerMapSheetItems } from './map-sheet-items.mjs';
 import { registerHoverArt, registerHoverArtSettings, toggleHoverArt } from './hover-art.mjs';
+import { registerCreatureForms } from './creature-forms.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { registerShopRoomSocket, registerShopJournalButton } from './shop-room-window.mjs';
 import { notebookAvailable, openCalendarWindow, registerPlayerNotebook } from './player-notebook.mjs';
@@ -142,7 +143,8 @@ Hooks.once('ready', async () => {
   const calendarSync = new CalendarSync();
   syncManager.registerModule(calendarSync);
   syncManager.registerModule(new ActorSync());
-  syncManager.registerModule(new CreatureSync());
+  const creatureSync = new CreatureSync();
+  syncManager.registerModule(creatureSync);
   syncManager.registerModule(new ItemSync());
   syncManager.registerModule(new StashSync());
   syncManager.registerModule(npcSpotlightRelay);
@@ -210,6 +212,11 @@ Hooks.once('ready', async () => {
     registerHoverArt();
   } catch (err) {
     console.warn('Chronicle Sync | Token art previews unavailable', err);
+  }
+  try {
+    registerCreatureForms(() => creatureSync);
+  } catch (err) {
+    console.warn('Chronicle Sync | Creature forms unavailable', err);
   }
 
   // Move a legacy world-scoped API key into this GM's client scope and

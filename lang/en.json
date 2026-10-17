@@ -1049,6 +1049,23 @@
       "InfoUnknown": "unknown",
       "InfoMoneyPending": "pick a character above"
     },
+    "Forms": {
+      "Hud": "Change form",
+      "Title": "Change form: {name}",
+      "ChangeTo": "Change to",
+      "Now": "Now",
+      "How": "How players see it",
+      "Quiet": "Quiet.",
+      "QuietHint": "The token and sheet just change.",
+      "Reveal": "Reveal.",
+      "RevealHint": "The new art shows big on every screen that can see the token for a moment, then the token changes.",
+      "Go": "Change form",
+      "Became": "<b>{name}</b> becomes <b>{form}</b>.",
+      "StaminaLeft": "{name}: {value} of {max} Stamina.",
+      "NotRecorded": "The form changed here, but Chronicle did not record it, so players' page may not list it yet. Updating Chronicle fixes this.",
+      "LoadFailed": "Could not read this creature's forms from Chronicle. Try again.",
+      "Failed": "Could not change {name}'s form. Try again."
+    },
     "HoverArt": {
       "World": {
         "Name": "Token art on hover",

@@ -367,6 +367,21 @@ Needs a GM and a player client on the same scene, and a creature actor whose por
 - [ ] GM: untick "Token art on hover" in the world settings: nobody gets previews
 - [ ] Motion Calm: the picture fades in; Off: it appears at once
 
+## Creature Forms (Change Form)
+
+Needs Sync Creatures on, a GM and a player client on the same scene, a Chronicle creature page with a second form (Draw Steel: Add a form on its stat block), and its token on the scene. The GM's Chronicle must have the system-state write route (keyxmakerx/Chronicle#1504) for the page steps.
+
+- [ ] GM: right-click the token; the HUD has a masks button "Change form". A creature with no other forms has none
+- [ ] Click it: a window lists the first form and each other form, the current one marked Now and not pickable, with Quiet and Reveal (Reveal picked)
+- [ ] Reveal: on both clients the new art grows out of the token, holds, and shrinks back; then the sheet, portrait and token change. Position, conditions and the combat tracker entry stay
+- [ ] Chat: everyone sees "<name> becomes <form>"; the GM alone gets the Stamina left
+- [ ] Stamina: with "Damage carries over" on the form, a creature that had taken 95 damage keeps it against the new maximum; with "Starts at full Stamina" it is full
+- [ ] Quiet: no reveal and no public chat line; only the GM's whisper
+- [ ] Hidden token, Reveal: the player sees nothing; the creature's Chronicle page does not list the form for the player
+- [ ] Visible token: the player's view of the creature's Chronicle page now lists the form and opens on it
+- [ ] Change back to the first form: everything returns; edit the current form on the Chronicle page and the actor follows
+- [ ] Motion Calm: the reveal fades instead of growing; Off: the card shows still for a moment
+
 ## NPC Tokens (Spotlight, Talking)
 
 Needs a GM and a player client on the same scene, and an NPC page synced as a journal.

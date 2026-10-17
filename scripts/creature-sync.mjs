@@ -10,7 +10,9 @@
  * actor; nothing is deleted. Active GM only, behind the `syncCreatures`
  * setting. Conversions live in _creature-fields.mjs. Under the Draw Steel
  * system the page's abilities become the actor's ability items
- * (_creature-abilities.mjs), so the system rolls and applies them.
+ * (_creature-abilities.mjs), so the system rolls and applies them. A page
+ * with other forms (_creature-forms.mjs) puts its actor in one form at a time;
+ * the GM changes it from the token (creature-forms.mjs).
  */
 
 import { getSetting } from './settings.mjs';
@@ -24,10 +26,14 @@ import { isAnsweringGM } from './_stash-relay.mjs';
 import { sameValue } from './_actor-apply-plan.mjs';
 import { log } from './logger.mjs';
 import { PictureStore } from './picture-store.mjs';
-import { pictureChoice, pictureIds, picturePlan, PICTURES_FLAG } from './_creature-pictures.mjs';
+import { GENERIC_TOKEN, pictureChoice, pictureIds, picturePlan, PICTURES_FLAG } from './_creature-pictures.mjs';
 import {
   ABILITY_FLAG, abilitiesFingerprint, desiredAbilities, hasAbilityFields, planAbilityItems,
 } from './_creature-abilities.mjs';
+import {
+  FORM_FLAG, FORMS_KEY, appliedVersion, cleanForm, formEntity, formIndex, formKey, isFormId, isFormsKey,
+  publicAfterChange, staminaAfter,
+} from './_creature-forms.mjs';
 
 /** Actor flag holding the creature page this actor follows. */
 export const CREATURE_FLAG = 'creatureEntityId';
@@ -64,6 +70,7 @@ export class CreatureSync {
     this._onEffect = this._handleEffect.bind(this);
     this._hooked = false;
     this._pictures = null;
+    this._formsCache = new Map();
   }
 
   get _active() {
@@ -131,6 +138,7 @@ export class CreatureSync {
     this._sendBack.clear();
     this._known.clear();
     this._inFlight.clear();
+    this._formsCache.clear();
     this._folderPromise = null;
     this._defs = null;
   }
@@ -163,6 +171,13 @@ export class CreatureSync {
     if (!this._active) return;
     if (msg?.type === 'system_state.updated' && msg.payload?.key === STATE_KEY) {
       this._sendBack.delete(msg.resourceId);
+      return;
+    }
+    if (msg?.type === 'system_state.updated' && isFormsKey(msg.payload?.key)) {
+      // An edited form reaches an actor already in it.
+      this._formsCache.delete(msg.resourceId);
+      const actor = msg.resourceId && this._findActor(msg.resourceId);
+      if (actor && msg.payload.key === formKey(actor.getFlag(FLAG_SCOPE, FORM_FLAG))) await this._upsert({ id: msg.resourceId });
       return;
     }
     if (!msg?.type?.startsWith('entity.')) return;
@@ -222,8 +237,13 @@ export class CreatureSync {
       const before = this._known.get(entity.id);
       this._remember(entity.id, entity.fields_data);
       const actor = this._findActor(entity.id);
+      // An actor in another form shows the page as that form.
+      const form = actor ? await this._formFor(entity.id, actor) : null;
+      const page = entity;
+      entity = formEntity(page, form);
+      const version = appliedVersion(page.updated_at, form);
       const abilities = this._abilitiesFor(entity);
-      if (actor && entity.updated_at && actor.getFlag(FLAG_SCOPE, VERSION_FLAG) === entity.updated_at
+      if (actor && entity.updated_at && actor.getFlag(FLAG_SCOPE, VERSION_FLAG) === version
         && (!abilities || actor.getFlag(FLAG_SCOPE, ABILITIES_FLAG) === abilities)) return true;
 
       const choicesFor = (path) => foundry.utils.getProperty(globalThis.CONFIG, path) ?? null;
@@ -267,7 +287,7 @@ export class CreatureSync {
       }
       const changes = planCreatureApply({ update: { ...edited, ...update }, actor });
       Object.assign(changes, await this._picturePlan(entity, actor));
-      if (entity.updated_at) changes[`flags.${FLAG_SCOPE}.${VERSION_FLAG}`] = entity.updated_at;
+      if (entity.updated_at) changes[`flags.${FLAG_SCOPE}.${VERSION_FLAG}`] = version;
       if (Object.keys(changes).length) await actor.update(changes, syncOptions({ [APPLY_OPTION]: true }));
       if (abilities && actor.getFlag(FLAG_SCOPE, ABILITIES_FLAG) !== abilities) await this._applyAbilities(actor, entity, abilities);
       return true;
@@ -332,6 +352,146 @@ export class CreatureSync {
     } catch (err) {
       log.warn(`Creature sync: could not bring in the pictures for "${entity?.name ?? entity?.id}"`, err);
       return {};
+    }
+  }
+
+  _statePath(entityId, key) {
+    return `/entities/${entityId}/system-state/${this._defs.system_id}/${key}`;
+  }
+
+  /** A state document, or null when the page has none (or the system is off). */
+  async _readState(entityId, key) {
+    try {
+      return await this._api.get(this._statePath(entityId, key));
+    } catch (err) {
+      if ([400, 404, 422].includes(err?.status)) return null;
+      throw err;
+    }
+  }
+
+  /**
+   * The form an actor is in, or null for the first form. A form that has
+   * since been removed puts the actor back in the first form; a failed read
+   * throws, so a passing outage never strips a form.
+   */
+  async _formFor(entityId, actor) {
+    const id = actor.getFlag(FLAG_SCOPE, FORM_FLAG);
+    if (!isFormId(id)) return null;
+    const form = cleanForm((await this._readState(entityId, formKey(id)))?.gm);
+    return form?.id === id ? form : null;
+  }
+
+  /** The Chronicle creature page behind a token, or null. */
+  creatureFor(tokenDoc) {
+    const actor = tokenDoc?.baseActor ?? game.actors?.get(tokenDoc?.actorId) ?? null;
+    const entityId = actor?.getFlag(FLAG_SCOPE, CREATURE_FLAG);
+    return this._active && entityId ? { actor, entityId } : null;
+  }
+
+  /**
+   * A page's forms in the director's order, with the `forms` index. Read
+   * once and kept until Chronicle says they changed.
+   * @returns {Promise<{index: object, forms: object[]}>}
+   */
+  formsFor(entityId) {
+    const hit = this._formsCache.get(entityId);
+    if (hit) return hit;
+    const run = (async () => {
+      const index = formIndex(await this._readState(entityId, FORMS_KEY));
+      const forms = [];
+      for (const id of index.order) {
+        const form = cleanForm((await this._readState(entityId, formKey(id)))?.gm);
+        if (form?.id === id) forms.push(form);
+      }
+      return { index, forms };
+    })();
+    this._formsCache.set(entityId, run);
+    run.catch(() => this._formsCache.delete(entityId));
+    return run;
+  }
+
+  /** The creature preset's Stamina paths, when the system has them. */
+  _staminaPaths() {
+    const path = (key) => this._defs?.fields?.find((f) => f.key === key)?.foundry_path || null;
+    const max = path('stamina');
+    const value = path('stamina_current');
+    return max && value ? { max, value } : null;
+  }
+
+  /**
+   * Puts a creature in another form ('' for the first): the actor's sheet,
+   * abilities, portrait and token change in place, so position, conditions
+   * and initiative stay. Each of its tokens on this scene takes the new token
+   * picture and its Stamina follows the form's rule. `before(art)` runs once
+   * the new art is in the world, for the reveal. Chronicle then records the
+   * current form, and that players have seen it when a token was visible.
+   * @returns {Promise<{formName: string, stamina: Array<{name: string, value: number, max: number}>, recorded: boolean}>}
+   */
+  async changeForm(tokenDoc, formId, { before } = {}) {
+    const found = this.creatureFor(tokenDoc);
+    if (!found) throw new Error('This token is not a Chronicle creature.');
+    const { actor, entityId } = found;
+    const { forms } = await this.formsFor(entityId);
+    const form = formId ? forms.find((f) => f.id === formId) : null;
+    if (formId && !form) throw new Error('That form is no longer on the page.');
+    const page = await this._api.get(`/entities/${entityId}`);
+    const formName = form ? form.name : page.name;
+
+    if (before) {
+      const choice = pictureChoice(formEntity(page, form));
+      this._pictures ??= new PictureStore({ api: this._api });
+      const local = await this._pictures.ensure(pictureIds(choice));
+      await before({ img: choice.img === 'generic' ? GENERIC_TOKEN : local.get(choice.img) || '', name: formName });
+    }
+
+    const paths = this._staminaPaths();
+    const get = foundry.utils.getProperty;
+    const tokens = (canvas?.scene?.tokens?.contents ?? []).filter((t) => t.actorId === actor.id);
+    if (!tokens.some((t) => t.id === tokenDoc.id) && tokenDoc.parent === canvas?.scene) tokens.push(tokenDoc);
+    const was = tokens.map((t) => ({ t, max: paths ? get(t.actor, paths.max) : null, value: paths ? get(t.actor, paths.value) : null }));
+
+    const flag = formId ? { [`flags.${FLAG_SCOPE}.${FORM_FLAG}`]: formId } : { [`flags.${FLAG_SCOPE}.-=${FORM_FLAG}`]: null };
+    await actor.update(flag, syncOptions({ [APPLY_OPTION]: true }));
+    if (!(await this._upsert(page))) throw new Error('The new form could not be applied.');
+
+    const src = actor.prototypeToken?.texture?.src;
+    const stamina = [];
+    const doneActors = new Set();
+    for (const w of was) {
+      if (src && w.t.texture?.src !== src) await w.t.update({ 'texture.src': src }, syncOptions());
+      const a = w.t.actor;
+      if (!paths || !a || doneActors.has(a)) continue;
+      doneActors.add(a);
+      const max = get(a, paths.max);
+      const value = staminaAfter({ oldMax: w.max, oldValue: w.value, newMax: max, mode: form?.stamina });
+      if (value === null) continue;
+      // Not an apply: current Stamina goes back to Chronicle like any other hit.
+      if (value !== get(a, paths.value)) await a.update({ [paths.value]: value });
+      stamina.push({ name: w.t.name, value, max });
+    }
+
+    const recorded = await this._recordForm(entityId, form, tokens.some((t) => !t.hidden));
+    return { formName, stamina, recorded };
+  }
+
+  /**
+   * Tells Chronicle the current form, and that players have seen it. The
+   * form's public copy is written before the index lists it. An older
+   * Chronicle has no write route: the change still happened here.
+   */
+  async _recordForm(entityId, form, seen) {
+    try {
+      const index = formIndex(await this._readState(entityId, FORMS_KEY));
+      if (form && seen && !index.shown.includes(form.id)) {
+        await this._api.put(this._statePath(entityId, formKey(form.id)), { public: form });
+      }
+      await this._api.put(this._statePath(entityId, FORMS_KEY), { public: publicAfterChange(index, form?.id ?? '', seen) });
+      return true;
+    } catch (err) {
+      log.warn('Creature sync: Chronicle did not record the change of form', err);
+      return false;
+    } finally {
+      this._formsCache.delete(entityId);
     }
   }
 
