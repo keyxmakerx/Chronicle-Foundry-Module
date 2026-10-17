@@ -41,8 +41,8 @@ test('each shortcut names keys found in en.json', () => {
   }
 });
 
-test('four shortcuts: Chronicle Sync, DM Screen, Satchel and Calendar', () => {
-  assert.deepEqual(SHORTCUTS.map((s) => s.action), ['openDashboard', 'openDMScreen', 'openSatchel', 'openCalendar']);
+test('five shortcuts: Chronicle Sync, DM Screen, Satchel, Calendar and token art', () => {
+  assert.deepEqual(SHORTCUTS.map((s) => s.action), ['openDashboard', 'openDMScreen', 'openSatchel', 'openCalendar', 'toggleHoverArt']);
 });
 
 test('a pressed shortcut opens its window and consumes the key', () => {
