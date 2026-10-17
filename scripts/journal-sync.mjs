@@ -699,10 +699,11 @@ export class JournalSync {
     }
 
     // One write for name, ownership and link flags; pages follow.
-    const ownership = await this._buildOwnership(entity);
+    // With "Follow Chronicle's visibility" off, ownership stays as the GM set it.
+    const ownership = this._followsVisibility() ? await this._buildOwnership(entity) : undefined;
     await journal.update({
       name: entity.name,
-      ownership,
+      ...(ownership && { ownership }),
       [`flags.${FLAG_SCOPE}.entityType`]: entity.type_name || '',
       [`flags.${FLAG_SCOPE}.${TYPE_SLUG_FLAG}`]: entity.type_slug || '',
       // Field values are not kept on the journal: every client receives its
@@ -887,7 +888,8 @@ export class JournalSync {
     }
 
     // Determine ownership from Chronicle permissions.
-    const ownership = await this._buildOwnership(entity);
+    // Off: a new journal takes Foundry's own default ownership.
+    const ownership = this._followsVisibility() ? await this._buildOwnership(entity) : undefined;
 
     // Find or create a folder for this entity type.
     const folder = await this._getOrCreateEntityFolder(entity);
@@ -895,7 +897,7 @@ export class JournalSync {
     const journalData = {
       name: entity.name,
       pages,
-      ownership,
+      ...(ownership && { ownership }),
       folder: folder?.id || null,
       flags: {
         [FLAG_SCOPE]: {
@@ -1307,6 +1309,16 @@ export class JournalSync {
   // --- Permission Mapping Helpers ---
 
   /**
+   * Whether the "Follow Chronicle's visibility" setting is on (the default):
+   * ownership is then pulled from and pushed to Chronicle permissions.
+   * @returns {boolean}
+   * @private
+   */
+  _followsVisibility() {
+    return getSetting('syncPermissions') !== false;
+  }
+
+  /**
    * Build a Foundry ownership object from Chronicle entity permissions.
    *
    * Mapping: visibility "default" → `defaultLevelForVisibility(is_private)`,
@@ -1493,6 +1505,7 @@ export class JournalSync {
    * @private
    */
   async _pushPermissions(entityId, ownership, isPrivate, label, journal) {
+    if (!this._followsVisibility()) return;
     const { permissions, unmapped, hasUserGrants } = this._buildPermissionGrants(
       ownership,
       isPrivate,
