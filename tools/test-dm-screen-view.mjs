@@ -6,7 +6,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { downtimeNotice, errorKey, foldHero, plural, screenContext } from '../scripts/_dm-screen-view.mjs';
+import { downtimeNotice, errorKey, foldHero, plural, presenceLine, screenContext } from '../scripts/_dm-screen-view.mjs';
 
 const VIEW = {
   campaign_id: 'camp 1',
@@ -113,4 +113,31 @@ test('downtimeNotice matches the Stashes page wording', () => {
   assert.equal(downtimeNotice(true, { applied: 2, failed: 0 }), 'Downtime is open. 2 requests went through.');
   assert.equal(downtimeNotice(true, { applied: 1, failed: 1 }), 'Downtime is open. 1 request went through; 1 could not.');
   assert.equal(downtimeNotice(true, null), 'Downtime is open.');
+});
+
+test('presence: the strip line and tooltip match Chronicle\'s PresenceView', () => {
+  assert.deepEqual(presenceLine({ here: 3, total: 4, here_names: ['Ana', 'Bo', 'Cy'], away_names: ['Dee'] }), {
+    label: '3 of 4 players here', title: 'Here: Ana, Bo, Cy. Not here: Dee.',
+  });
+  assert.deepEqual(presenceLine({ here: 0, total: 1 }), { label: '0 of 1 player here', title: 'Here: nobody. Not here: nobody.' });
+  assert.equal(presenceLine(undefined), null);
+  assert.equal(screenContext({}).presence, null);
+  assert.equal(foldHero({ player_name: 'Sam', player_here: true }).playerHere, true);
+  assert.equal(foldHero({ player_name: 'Sam' }).playerHere, false);
+});
+
+test('Waiting on you: rows replace the pending count and point at the Stashes page', () => {
+  const c = screenContext({
+    campaign_id: 'c1',
+    downtime: { open: false, can_toggle: true, pending: 5 },
+    requests: { items: [{ kind: 'move', id: 4, text: 'Bren: move 2 × Rope from A to B' }, { kind: 'purchase', id: 9, text: '' }], more: 3 },
+  }, { apiUrl: 'https://chronicle.example' });
+  assert.deepEqual(c.requests.items, [{ text: 'Bren: move 2 × Rope from A to B' }]);
+  assert.equal(c.requests.more, '3 more on the Stashes page');
+  assert.equal(c.requests.url, 'https://chronicle.example/campaigns/c1/armory/stashes');
+  assert.equal(c.downtime.pending, '');
+  // An older Chronicle sends only the count.
+  assert.equal(screenContext({ downtime: { pending: 2 } }).downtime.pending, '2 requests waiting on you');
+  assert.equal(screenContext({ requests: { items: [] } }).requests, null);
+  assert.equal(screenContext({ requests: { items: [{ text: 'x' }] } }).worldEmpty, false);
 });

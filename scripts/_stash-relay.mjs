@@ -181,8 +181,10 @@ export class PendingRequests {
    */
   constructor({ timeoutMs = RELAY_TIMEOUT_MS, setTimer = setTimeout, clearTimer = clearTimeout, makeId } = {}) {
     this._timeoutMs = timeoutMs;
-    this._set = setTimer;
-    this._clear = clearTimer;
+    // Called as plain functions: a browser's own setTimeout throws "Illegal
+    // invocation" when called as a method of another object.
+    this._set = (fn, ms) => setTimer(fn, ms);
+    this._clear = (timer) => clearTimer(timer);
     this._seq = 0;
     this._makeId = makeId || (() => `r${Date.now().toString(36)}${(this._seq++).toString(36)}${Math.random().toString(36).slice(2, 8)}`);
     /** @type {Map<string, {resolve: Function, timer: any}>} */

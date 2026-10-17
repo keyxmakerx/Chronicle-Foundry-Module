@@ -189,3 +189,24 @@ export function shouldAskReveal({ wasHidden, nowHidden, entityId, pagePrivate })
 function easeOut(x) {
   return 1 - Math.pow(1 - x, 3);
 }
+
+/**
+ * The DM Screen's Cast list: one row per token on the scene that belongs to a
+ * Chronicle page and to no player, by name. Player characters are the party.
+ * @param {Array<{id: string, name: string, entityId: string|null, typeName?: string,
+ *   playerOwned: boolean, hidden: boolean, talking: boolean}>} tokens
+ * @returns {Array<{id: string, name: string, entityId: string, typeName: string, hidden: boolean, talking: boolean}>}
+ */
+export function castRows(tokens) {
+  return (tokens ?? [])
+    .filter((t) => t?.id && t.entityId && !t.playerOwned)
+    .map((t) => ({
+      id: String(t.id),
+      name: String(t.name ?? ''),
+      entityId: String(t.entityId),
+      typeName: String(t.typeName ?? ''),
+      hidden: !!t.hidden,
+      talking: !!t.talking,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+}

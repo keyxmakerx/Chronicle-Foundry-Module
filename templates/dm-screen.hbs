@@ -14,6 +14,9 @@
     {{else}}
       <span>No game night planned</span>
     {{/if}}
+    {{#if presence}}
+      <span title="{{presence.title}}"><span class="dms-dot dms-dot-on" aria-hidden="true"></span>{{presence.label}}</span>
+    {{/if}}
   </div>
   <div class="dms-leaves">
     <section class="dms-leaf dms-leaf-l" data-dms-leaf="l" aria-label="The world">
@@ -36,6 +39,15 @@
           {{#if downtime.pending}}
             <a class="dms-link" href="{{downtime.pendingUrl}}" target="_blank" rel="noopener">{{downtime.pending}}</a>
           {{/if}}
+        </div>
+      {{/if}}
+      {{#if requests}}
+        <div class="dms-blk" data-dms-waiting>
+          <span class="dms-lbl">Waiting on you</span>
+          {{#each requests.items}}
+            <div class="dms-row dms-req"><span>{{text}}</span></div>
+          {{/each}}
+          <a class="dms-link" href="{{requests.url}}" target="_blank" rel="noopener">{{#if requests.more}}{{requests.more}}{{else}}Allow or refuse on the Stashes page{{/if}}</a>
         </div>
       {{/if}}
       {{#if world}}
@@ -78,7 +90,7 @@
                 <div class="dms-hmore">
                   <div class="dms-hin">
                     {{#if showWho}}
-                      <div class="dms-who"><span>{{subtitle}}</span>{{#if playerName}}<span>Played by {{playerName}}</span>{{/if}}</div>
+                      <div class="dms-who"><span>{{subtitle}}</span>{{#if playerName}}<span>Played by {{playerName}}{{#if playerHere}}<span class="dms-dot dms-dot-on dms-dot-after" role="img" aria-label="Here now" title="Here now"></span>{{/if}}</span>{{/if}}</div>
                     {{/if}}
                     {{#each rest}}
                       <div class="dms-meter">
@@ -109,6 +121,8 @@
         {{/if}}
         <button type="button" role="tab" aria-selected="{{#if hasRules}}false{{else}}true{{/if}}" data-action="tab" data-tab="reveal">Reveal</button>
         <button type="button" role="tab" aria-selected="false" data-action="tab" data-tab="encounters">{{localize "CHRONICLE.Encounters.Tab"}}</button>
+        <button type="button" role="tab" aria-selected="false" data-action="tab" data-tab="cast">{{localize "CHRONICLE.DMScreen.Cast.Tab"}}</button>
+        <button type="button" role="tab" aria-selected="false" data-action="tab" data-tab="party">{{localize "CHRONICLE.DMScreen.Party.Tab"}}</button>
       </div>
       {{#if hasRules}}
         <div class="dms-blk" data-dms-pane="rules">
@@ -137,6 +151,8 @@
         {{/each}}
       </div>
       <div class="dms-blk" data-dms-pane="encounters" data-dms-enc hidden></div>
+      <div class="dms-blk" data-dms-pane="cast" data-dms-cast hidden></div>
+      <div class="dms-blk" data-dms-pane="party" data-dms-partytab hidden></div>
     </section>
   </div>
 {{/if}}
