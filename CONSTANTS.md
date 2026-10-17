@@ -54,12 +54,18 @@ image page, so no pixel conversion happens.
 | `"view"` | `OBSERVER` (2) |
 | `"edit"` | `OWNER` (3) |
 
+Only the Player role (`"1"`) sets the default level. A `public` grant raises the
+default to at least that level, never lowers it. A `user` grant sets that
+user's own level, and only for users mapped to a Foundry user; unmapped users
+are dropped. A failed permissions fetch, or a response with no grants, leaves
+the default at `NONE`.
+
 ### Chronicle Role IDs
 
 | Role ID | Meaning |
 |---------|---------|
 | `"1"` | Player |
-| `"2"` | Scribe |
+| `"2"` | Scribe (no Foundry equivalent; the default level covers it) |
 
 ## System Matching
 
@@ -69,12 +75,11 @@ against `game.system.id`. There is no in-module fallback table.
 
 ### Actor Type by System
 
-| System | Foundry `actor.type` |
-|--------|---------------------|
-| D&D 5e | `"character"` |
-| Pathfinder 2e | `"character"` |
-| Draw Steel | `"hero"` |
-| Generic | Via `foundry_actor_type` in system manifest |
+The actor type comes from the system manifest's `foundry_actor_type`, read by
+`adapters/generic-adapter.mjs`; it falls back to `"character"` when the
+manifest names none. Draw Steel's manifest sets `"hero"` for characters and
+`"npc"` for creatures. Creature sync is off for a system that sets no
+`foundry_actor_type`.
 
 ## Relation Types (Inventory)
 
@@ -90,7 +95,6 @@ When creating inventory items via relation metadata:
 |-------|---------|-------|
 | `quantity` | 1 | |
 | `equipped` | false | |
-| `in_stock` | true | For shop items |
 | Foundry item type | `"equipment"` | May not match all systems |
 
 ## Sync Direction Values
