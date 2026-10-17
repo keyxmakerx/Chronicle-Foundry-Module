@@ -36,6 +36,7 @@ import { openSatchel } from './satchel.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
 import { registerShortcuts } from './_keybindings.mjs';
 import { registerMotion } from './motion.mjs';
+import { registerDiceSoNice } from './dice-so-nice.mjs';
 import { questLive, registerQuestBoard } from './quest-board.mjs';
 import { retireNotesFolder } from './_notes-folder.mjs';
 import { FLAG_SCOPE, MODULE_ID, syncOptions } from './constants.mjs';
@@ -81,6 +82,13 @@ Hooks.once('init', () => {
   console.debug('Chronicle Sync | Initializing');
   registerSettings();
   registerMotion();
+  try {
+    // Every client, not only the GM: each one registers the rune dice with
+    // its own Dice So Nice, which starts after Foundry's ready.
+    registerDiceSoNice();
+  } catch (err) {
+    console.warn('Chronicle Sync | Dice So Nice bridge unavailable', err);
+  }
   registerShortcuts(game.keybindings, MODULE_ID, {
     run: {
       openDashboard,
