@@ -30,7 +30,7 @@ repo root. There is no `package.json`.
 
 ## Keyboard shortcuts
 
-- [ ] Configure Controls lists a Chronicle Sync group with four shortcuts (Chronicle Sync, DM Screen, Satchel, calendar), all with no key bound
+- [ ] Configure Controls lists a Chronicle Sync group with five shortcuts (Chronicle Sync, DM Screen, Satchel, calendar, token art on hover), all with no key bound
 - [ ] Bind a key to "Open the Chronicle Sync dashboard", press it as the GM: the dashboard opens; as a player the GM-only two are not listed
 - [ ] With the world not connected, a key bound to the notebook does nothing and Foundry's own use of that key still works
 
@@ -353,6 +353,19 @@ Chronicle Sync → Settings, under What syncs.
 - [ ] An area ability (a burst or cube) shows Place Template; placing it draws the area on the map
 - [ ] Drag an ability from the system's compendium onto a synced actor, named like one of the page's: after the next page edit the actor still has just that one, and the GM's copy is unchanged
 - [ ] Change a tier on the page in Chronicle: that ability updates on the actor; the others keep their place
+
+## Token Art on Hover
+
+Needs a GM and a player client on the same scene, and a creature actor whose portrait differs from its token (Sync Creatures does this when the page has both art and a token).
+
+- [ ] As the player, rest the cursor on the creature's token: after a moment its full art appears beside the cursor and follows it; moving off the token, clicking or dragging takes it away
+- [ ] Near the right or bottom edge of the screen the picture flips to the other side of the cursor and stays on screen
+- [ ] A token whose portrait is the same as its token, or the default mystery man, shows nothing
+- [ ] GM: right-click the token; the HUD has a portrait button. Click it: the tooltip says off, and the player no longer gets the art for that token. Click again: it's back
+- [ ] GM: hide the token, or set its disposition to Secret: the player gets no art; the GM still does
+- [ ] Player: Game Settings, Chronicle Sync, untick "Show token art on hover": no more previews for that player only. Bind "Show or hide token art on hover" in Configure Controls: the key switches it with a notice
+- [ ] GM: untick "Token art on hover" in the world settings: nobody gets previews
+- [ ] Motion Calm: the picture fades in; Off: it appears at once
 
 ## NPC Tokens (Spotlight, Talking)
 

@@ -665,6 +665,10 @@
       "OpenCalendar": {
         "Name": "Open the Chronicle calendar",
         "Hint": "Works once the world is connected to Chronicle."
+      },
+      "ToggleHoverArt": {
+        "Name": "Show or hide token art on hover",
+        "Hint": "Switches the picture that appears when you rest the cursor on a token. Just for you."
       }
     },
     "SceneControl": {
@@ -1044,6 +1048,21 @@
       "InfoMoney": "Money field",
       "InfoUnknown": "unknown",
       "InfoMoneyPending": "pick a character above"
+    },
+    "HoverArt": {
+      "World": {
+        "Name": "Token art on hover",
+        "Hint": "Resting the cursor on a token shows its actor's full picture beside the cursor. Hidden tokens and Secret ones never show theirs to players. Switch one token off from its token HUD."
+      },
+      "Client": {
+        "Name": "Show token art on hover",
+        "Hint": "The full picture beside the cursor when you rest it on a token. Just for you."
+      },
+      "HudOn": "Art on hover: on. Click to stop showing it for this token",
+      "HudOff": "Art on hover: off. Click to show it for this token",
+      "TurnedOn": "Token art on hover is on.",
+      "TurnedOff": "Token art on hover is off. The same shortcut turns it back on.",
+      "SwitchFailed": "Chronicle: couldn't switch this token's art preview."
     },
     "Npc": {
       "Spotlight": "Spotlight",
