@@ -90,8 +90,8 @@ test('deletes after an answer start a new question', async () => {
 
 test('the sync files queue their Foundry-side deletes instead of calling the API', () => {
   const src = (f) => readFileSync(resolve(REPO_ROOT, 'scripts', f), 'utf8');
-  const actor = src('actor-sync.mjs'), journal = src('journal-sync.mjs');
-  for (const [name, text] of [['actor-sync', actor], ['journal-sync', journal]]) {
+  const actor = src('actor-sync.mjs'), journal = src('journal-sync.mjs'), item = src('item-sync.mjs');
+  for (const [name, text] of [['actor-sync', actor], ['journal-sync', journal], ['item-sync', item]]) {
     assert.match(text, /queueRemoteDelete\(/, `${name} must ask before deleting in Chronicle`);
   }
   assert.doesNotMatch(actor, /await this\._api\.delete\(`\/entities/, 'actor-sync must not delete a Chronicle page without asking');
