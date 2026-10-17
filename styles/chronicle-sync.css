@@ -2306,3 +2306,21 @@ body.ccal-rest #chronicle-calendar-bar .ccal-sky * { animation-play-state: pause
 
 /* The journal header's "Open shop" button, tinted like the shop's coin. */
 .chronicle-shop-open { width: auto; gap: 4px; padding: 0 6px; color: #e0b44a; }
+
+/* Satchel: the notebook, quest board and stash windows drawn as tabs of one
+   window in the module look. The hosted windows keep their own styles; the
+   notebook page and quest notices keep their paper. */
+.chronicle-satchel .window-content { padding: 8px 10px 10px; overflow: hidden; }
+.cs-satchel { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.cs-satchel-tabs { align-self: flex-start; flex-shrink: 0; }
+.cs-satchel-pane { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.cs-satchel-pane[hidden] { display: none; }
+.cs-satchel-notebook { overflow: hidden; border-radius: 6px; }
+.cs-satchel-pane > .application { position: static; width: auto; height: auto; max-height: none; box-shadow: none; }
+.cs-satchel-back { width: auto; margin: 0 0 8px; }
+
+/* Calendar window: Chronicle's calendar page edge to edge, under a slim
+   title bar, so the frame reads as the page rather than a box in a box. */
+.chronicle-calendar-window.cs-borderless { border: 0; }
+.chronicle-calendar-window.cs-borderless .window-header { min-height: 0; padding-block: 2px; border-bottom: 0; font-size: 12px; }
+.chronicle-calendar-window.cs-borderless .window-content { padding: 0; border: 0; background: transparent; }

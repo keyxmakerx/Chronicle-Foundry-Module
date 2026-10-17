@@ -1,9 +1,9 @@
 /**
  * Pure builder for the Chronicle group in Foundry's scene controls.
  *
- * GMs get the Sync Dashboard and DM Screen; the Notebook, Calendar and
- * Quest board are for every user once the world is connected to Chronicle. The GM tools must never
- * reach a player: tools/test-scene-controls.mjs pins that.
+ * GMs get Chronicle Sync and the DM Screen; the Satchel and the Calendar are
+ * for every user once the world is connected to Chronicle. The GM tools must
+ * never reach a player: tools/test-scene-controls.mjs pins that.
  */
 
 /**
@@ -14,15 +14,15 @@
  * @param {object} opts
  * @param {boolean} opts.isGM
  * @param {boolean} opts.notebook - the world is connected to Chronicle
- * @param {{dashboard: Function, dmScreen: Function, notebook: Function, calendar?: Function, quests?: Function}} opts.run
- * @param {{dmScreen: string, notebook: string, calendar?: string, quests?: string}} opts.titles - localized
+ * @param {{dashboard: Function, dmScreen: Function, satchel: Function, calendar?: Function}} opts.run
+ * @param {{dashboard: string, dmScreen: string, satchel: string, calendar?: string}} opts.titles - localized
  */
 export function addChronicleControls(controls, { isGM, notebook, run, titles }) {
   const tools = [];
   if (isGM) {
     tools.push({
       name: 'dashboard',
-      title: 'Open Chronicle Sync Dashboard',
+      title: titles.dashboard,
       icon: 'fa-solid fa-rotate',
       button: true,
       run: run.dashboard,
@@ -37,11 +37,11 @@ export function addChronicleControls(controls, { isGM, notebook, run, titles }) 
   }
   if (notebook) {
     tools.push({
-      name: 'notebook',
-      title: titles.notebook,
-      icon: 'fa-solid fa-book',
+      name: 'satchel',
+      title: titles.satchel,
+      icon: 'fa-solid fa-briefcase',
       button: true,
-      run: run.notebook,
+      run: run.satchel,
     });
     if (run.calendar) {
       tools.push({
@@ -52,19 +52,10 @@ export function addChronicleControls(controls, { isGM, notebook, run, titles }) 
         run: run.calendar,
       });
     }
-    if (run.quests) {
-      tools.push({
-        name: 'quests',
-        title: titles.quests,
-        icon: 'fa-solid fa-thumbtack',
-        button: true,
-        run: run.quests,
-      });
-    }
   }
   if (!tools.length) return;
 
-  const icon = isGM ? 'fa-solid fa-rotate' : 'fa-solid fa-book';
+  const icon = isGM ? 'fa-solid fa-rotate' : 'fa-solid fa-briefcase';
   // v13: controls and tools are keyed objects with onChange callback.
   // v12: controls and tools are arrays with onClick callback.
   if (Array.isArray(controls)) {

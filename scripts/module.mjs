@@ -31,11 +31,12 @@ import { negotiationMirror } from './negotiation-mirror.mjs';
 import { registerMapSheetItems } from './map-sheet-items.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { registerShopRoomSocket, registerShopJournalButton } from './shop-room-window.mjs';
-import { notebookAvailable, openCalendarWindow, openNotebook, registerPlayerNotebook } from './player-notebook.mjs';
+import { notebookAvailable, openCalendarWindow, registerPlayerNotebook } from './player-notebook.mjs';
+import { openSatchel } from './satchel.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
 import { registerShortcuts } from './_keybindings.mjs';
 import { registerMotion } from './motion.mjs';
-import { openQuestBoard, questLive, registerQuestBoard } from './quest-board.mjs';
+import { questLive, registerQuestBoard } from './quest-board.mjs';
 import { retireNotesFolder } from './_notes-folder.mjs';
 import { FLAG_SCOPE, MODULE_ID, syncOptions } from './constants.mjs';
 import { removedFolder } from './_set-aside.mjs';
@@ -84,9 +85,8 @@ Hooks.once('init', () => {
     run: {
       openDashboard,
       openDMScreen: () => { openDMScreen(() => syncManager?.api ?? null); },
-      openNotebook: () => { openNotebook(); },
+      openSatchel: () => { openSatchel(); },
       openCalendar: () => { openCalendarWindow(); },
-      openQuests: () => { openQuestBoard(); },
     },
     connected: notebookAvailable,
   });
@@ -329,7 +329,7 @@ async function _runtimeValidateDescriptor() {
 
 /**
  * Add the Chronicle group to Foundry's scene controls toolbar: the Sync
- * Dashboard and DM Screen for GMs, the Notebook, Calendar and Quest board for everyone
+ * Dashboard and DM Screen for GMs, the Satchel and Calendar for everyone
  * once the world is connected to Chronicle.
  */
 Hooks.on('getSceneControlButtons', (controls) => {
@@ -341,15 +341,14 @@ Hooks.on('getSceneControlButtons', (controls) => {
     run: {
       dashboard: openDashboard,
       dmScreen: () => { openDMScreen(() => syncManager?.api ?? null); },
-      notebook: () => { openNotebook(); },
+      satchel: () => { openSatchel(); },
       calendar: () => { openCalendarWindow(); },
-      quests: () => { openQuestBoard(); },
     },
     titles: {
+      dashboard: game.i18n.localize('CHRONICLE.SceneControl.Dashboard'),
       dmScreen: game.i18n.localize('CHRONICLE.SceneControl.DMScreen'),
-      notebook: game.i18n.localize('CHRONICLE.SceneControl.Notebook'),
+      satchel: game.i18n.localize('CHRONICLE.SceneControl.Satchel'),
       calendar: game.i18n.localize('CHRONICLE.SceneControl.Calendar'),
-      quests: game.i18n.localize('CHRONICLE.SceneControl.Quests'),
     },
   });
 });

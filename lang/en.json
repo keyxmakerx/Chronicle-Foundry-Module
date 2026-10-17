@@ -651,31 +651,42 @@
     },
     "Keybindings": {
       "OpenDashboard": {
-        "Name": "Open the Chronicle Sync dashboard",
+        "Name": "Open Chronicle Sync",
         "Hint": "GM only."
       },
       "OpenDMScreen": {
         "Name": "Open the DM Screen",
         "Hint": "GM only. Works once the world is connected to Chronicle."
       },
-      "OpenNotebook": {
-        "Name": "Open my Chronicle notebook",
-        "Hint": "Works once the world is connected to Chronicle."
+      "OpenSatchel": {
+        "Name": "Open my Satchel",
+        "Hint": "Your notebook, the quest board and your stash. Works once the world is connected to Chronicle."
       },
       "OpenCalendar": {
         "Name": "Open the Chronicle calendar",
         "Hint": "Works once the world is connected to Chronicle."
-      },
-      "OpenQuests": {
-        "Name": "Open the quest board",
-        "Hint": "Works once the world is connected to Chronicle."
       }
     },
     "SceneControl": {
-      "Notebook": "Open my Chronicle notebook",
-      "Calendar": "Open the Chronicle calendar",
+      "Dashboard": "Open Chronicle Sync",
       "DMScreen": "Open the DM Screen",
-      "Quests": "Open the quest board"
+      "Satchel": "Open my Satchel",
+      "Calendar": "Open the Chronicle calendar"
+    },
+    "Satchel": {
+      "Title": "Satchel",
+      "Tab": {
+        "notebook": "Notebook",
+        "quests": "Quests",
+        "stash": "Stash"
+      },
+      "BackToBoard": "Back to the board",
+      "StashGMTitle": "Your stash lives on a character",
+      "StashGM": "The party's shared stashes are in the DM Screen's Party tab.",
+      "StashOffTitle": "Stashes are off",
+      "StashOff": "This campaign doesn't use stashes in Chronicle.",
+      "StashNoCharacterTitle": "No character yet",
+      "StashNoCharacter": "Your stash shows here once your GM gives you a character from Chronicle."
     },
     "Quests": {
       "BoardTitle": "Quest Board",
@@ -945,7 +956,7 @@
       "Refused": {
         "unmapped": "Chronicle said yes, but your GM hasn't matched your Foundry login to a Chronicle player yet. Ask them to match you in Chronicle Sync > Members, then try again.",
         "mismatch": "The Chronicle account that pressed Allow isn't the one your GM matched to your Foundry login. Sign in to Chronicle as yourself and try again.",
-        "campaign": "That Chronicle window was for a different campaign. Try again from the notebook button."
+        "campaign": "That Chronicle window was for a different campaign. Try again from the Satchel's Notebook tab."
       }
     },
     "Removed": {
