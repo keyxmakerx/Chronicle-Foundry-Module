@@ -20,6 +20,15 @@ export const ID_PREFIX = 'chronicle-rune';
 /** The group players see in Dice So Nice's dice and theme lists. */
 export const GROUP = 'Chronicle Rune';
 
+/**
+ * The rune set ids Chronicle's rolls carry. A listed set outside these still
+ * loads, but no Chronicle roll will ever ask for it, so the check flags it.
+ */
+export const RUNE_SET_IDS = Object.freeze([
+  'jewelled', 'confetti', 'acrylic', 'cage', 'heartlight', 'gothic',
+  'obsidian', 'moonstone', 'oak', 'nebula', 'bone', 'scale',
+]);
+
 /** Die types Chronicle rolls; Dice So Nice knows each one. */
 export const DIE_TYPES = Object.freeze(['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100']);
 
@@ -35,6 +44,9 @@ const MODEL_EXT = /\.(glb|gltf)$/i;
 const SET_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 const COLOUR_KEYS = ['foreground', 'background', 'outline', 'edge'];
+
+/** A set with no colours listed still gets one theme, so its dice can register. */
+const DEFAULT_COLOUR = 'default';
 
 /** How many faces each die type needs labels for. */
 const FACES = Object.freeze({ d4: 4, d6: 6, d8: 8, d10: 10, d12: 12, d20: 20, d100: 10 });
@@ -82,15 +94,32 @@ export function readManifest(raw) {
       continue;
     }
     seen.add(id);
+    if (!RUNE_SET_IDS.includes(id)) problems.push({ code: 'SetUnknown', set: id });
     const name = typeof entry.name === 'string' && entry.name.trim() ? entry.name.trim().slice(0, 60) : id;
 
-    const colours = {};
-    for (const key of COLOUR_KEYS) {
-      const v = entry.colours?.[key];
-      if (v == null) continue;
-      if (typeof v === 'string' && HEX.test(v)) colours[key] = v;
-      else problems.push({ code: 'SetColour', set: id, detail: key });
+    // Each set comes in several colours, each its own key, the same keys
+    // Chronicle's roll carries; the first is the set's default.
+    const colours = [];
+    const seenColour = new Set();
+    for (const c of Array.isArray(entry.colours) ? entry.colours : []) {
+      const cid = typeof c?.id === 'string' ? c.id.trim() : '';
+      if (!SET_ID.test(cid) || seenColour.has(cid)) {
+        problems.push({ code: 'ColourId', set: id, detail: String(c?.id ?? '') });
+        continue;
+      }
+      seenColour.add(cid);
+      const values = {};
+      for (const key of COLOUR_KEYS) {
+        const v = c[key];
+        if (v == null) continue;
+        if (typeof v === 'string' && HEX.test(v)) values[key] = v;
+        else problems.push({ code: 'SetColour', set: id, detail: `${cid}.${key}` });
+      }
+      const cname = typeof c.name === 'string' && c.name.trim() ? c.name.trim().slice(0, 60) : cid;
+      colours.push({ id: cid, name: cname, values });
     }
+    if (entry.colours != null && !Array.isArray(entry.colours)) problems.push({ code: 'SetColour', set: id, detail: 'colours' });
+    if (!colours.length) colours.push({ id: DEFAULT_COLOUR, name, values: {} });
 
     let material = null;
     if (entry.material != null) {
@@ -124,8 +153,13 @@ export function readManifest(raw) {
   return { version, sets, problems };
 }
 
-/** @param {string} setId */
-export const colorsetId = (setId) => `${ID_PREFIX}-${setId}`;
+/**
+ * One Dice So Nice theme per set colour. The double dash keeps "a-b" + "c"
+ * apart from "a" + "b-c".
+ * @param {string} setId
+ * @param {string} colourId
+ */
+export const colorsetId = (setId, colourId) => `${ID_PREFIX}-${setId}--${colourId}`;
 /** @param {string} setId */
 export const systemId = (setId) => `${ID_PREFIX}-${setId}`;
 
@@ -134,26 +168,30 @@ export const systemId = (setId) => `${ID_PREFIX}-${setId}`;
  * the module folder so Dice So Nice loads them from where Foundry serves us.
  * @param {object[]} sets - from readManifest
  * @param {string} moduleRoot - e.g. "modules/chronicle-sync/"
- * @returns {{colorsets: object[], systems: object[], presets: object[], files: string[]}}
+ * @returns {{colorsets: object[], setOf: Map<string, string>, systems: object[], presets: object[], files: string[]}} `setOf` maps each theme to its set
  */
 export function buildRegistrations(sets, moduleRoot) {
   let root = moduleRoot || '';
   if (root && !root.endsWith('/')) root += '/';
   const colorsets = [];
+  const setOf = new Map();
   const systems = [];
   const presets = [];
   const files = new Set();
   for (const s of sets ?? []) {
-    const cs = { name: colorsetId(s.id), description: s.name, category: GROUP, ...s.colours };
-    if (s.material) cs.material = s.material;
-    colorsets.push(cs);
+    for (const c of s.colours) {
+      const cs = { name: colorsetId(s.id, c.id), description: c.id === DEFAULT_COLOUR ? s.name : `${s.name}: ${c.name}`, category: GROUP, ...c.values };
+      if (s.material) cs.material = s.material;
+      colorsets.push(cs);
+      setOf.set(cs.name, s.id);
+    }
 
     const types = new Set([...Object.keys(s.faces), ...Object.keys(s.models)]);
     if (!types.size) continue;
     systems.push({ id: systemId(s.id), name: s.name, group: GROUP });
     for (const type of DIE_TYPES) {
       if (!types.has(type)) continue;
-      const preset = { type, system: systemId(s.id), colorset: colorsetId(s.id) };
+      const preset = { type, system: systemId(s.id), colorset: colorsetId(s.id, s.colours[0].id) };
       if (s.faces[type]) {
         preset.labels = s.faces[type].map((p) => root + p);
         preset.labels.forEach((p) => files.add(p));
@@ -165,23 +203,25 @@ export function buildRegistrations(sets, moduleRoot) {
       presets.push(preset);
     }
   }
-  return { colorsets, systems, presets, files: [...files] };
+  return { colorsets, setOf, systems, presets, files: [...files] };
 }
 
 /**
- * The Dice So Nice look for one die, from its roller's Chronicle picks. The
- * die wears its roller's set; the viewer's own Dice So Nice settings decide
- * the rest. An unknown or unregistered set gives null, so the die keeps the
- * viewer's normal look instead of a broken one.
+ * The Dice So Nice look for one die, from its roller's Chronicle picks: the
+ * roller's set in the roller's colour. A colour that didn't register here
+ * falls back to the set's first registered colour; a set that didn't register
+ * gives null, so the die keeps the viewer's own look instead of a broken one.
  * @param {{set?: string, colour?: string}} pick
- * @param {{colorsets: Set<string>, systems: Set<string>}} registered - what actually registered on this client
- * @returns {{colorset: string, system?: string, background?: string}|null}
+ * @param {{colorsets: Set<string>, systems: Set<string>, defaults: Map<string, string>}} registered - what registered on this client; `defaults` maps a set to its first registered theme
+ * @returns {{colorset: string, system?: string}|null}
  */
 export function appearanceFor(pick, registered) {
   const setId = typeof pick?.set === 'string' ? pick.set : '';
-  if (!SET_ID.test(setId) || !registered?.colorsets?.has(colorsetId(setId))) return null;
-  const look = { colorset: colorsetId(setId) };
+  if (!SET_ID.test(setId) || !registered?.colorsets) return null;
+  const wanted = typeof pick.colour === 'string' && SET_ID.test(pick.colour) ? colorsetId(setId, pick.colour) : '';
+  const colorset = registered.colorsets.has(wanted) ? wanted : registered.defaults?.get(setId);
+  if (!colorset) return null;
+  const look = { colorset };
   if (registered.systems?.has(systemId(setId))) look.system = systemId(setId);
-  if (typeof pick.colour === 'string' && HEX.test(pick.colour)) look.background = pick.colour;
   return look;
 }

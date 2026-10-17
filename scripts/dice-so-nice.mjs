@@ -30,7 +30,7 @@ const state = {
   manifest: null,
   registration: null,
   files: null,
-  registered: { colorsets: new Set(), systems: new Set() },
+  registered: { colorsets: new Set(), systems: new Set(), defaults: new Map() },
 };
 
 const moduleRoot = () => `modules/${MODULE_ID}/`;
@@ -83,7 +83,10 @@ async function onDiceReady(dice3d) {
   };
 
   for (const cs of plan.colorsets) {
-    if (await attempt('colorset', cs.name, () => dice3d.addColorset(cs, 'default'))) state.registered.colorsets.add(cs.name);
+    if (!(await attempt('colorset', cs.name, () => dice3d.addColorset(cs, 'default')))) continue;
+    state.registered.colorsets.add(cs.name);
+    const set = plan.setOf.get(cs.name);
+    if (!state.registered.defaults.has(set)) state.registered.defaults.set(set, cs.name);
   }
   for (const sys of plan.systems) {
     if (await attempt('system', sys.id, () => dice3d.addSystem(sys, 'default'))) state.registered.systems.add(sys.id);

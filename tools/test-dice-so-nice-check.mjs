@@ -89,7 +89,7 @@ test('every row has words, every error and warning says what to do', () => {
     assert.equal(typeof lang[r.code], 'string', r.code);
     if (r.level === 'error' || r.level === 'warn') assert.equal(typeof lang[`${r.code}Fix`], 'string', `${r.code}Fix`);
   }
-  for (const code of ['ManifestShape', 'ManifestVersion', 'SetId', 'SetDuplicate', 'SetColour', 'SetMaterial', 'FaceType', 'FaceList', 'ModelPath']) {
+  for (const code of ['ManifestShape', 'ManifestVersion', 'SetId', 'SetDuplicate', 'SetUnknown', 'ColourId', 'SetColour', 'SetMaterial', 'FaceType', 'FaceList', 'ModelPath']) {
     assert.equal(typeof lang.Problem[code], 'string', code);
   }
 });
