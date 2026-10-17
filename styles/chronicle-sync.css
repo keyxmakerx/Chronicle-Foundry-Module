@@ -2325,17 +2325,22 @@ body.ccal-rest #chronicle-calendar-bar .ccal-sky * { animation-play-state: pause
 .chronicle-calendar-window.cs-borderless .window-header { min-height: 0; padding-block: 2px; border-bottom: 0; font-size: 12px; }
 .chronicle-calendar-window.cs-borderless .window-content { padding: 0; border: 0; background: transparent; }
 
-/* Token art on hover: the actor's full picture beside the cursor. It never
-   takes the pointer, so it can't steal the hover from the token under it. */
+/* Token art on hover: the actor's full picture beside the cursor, in a frame.
+   It never takes the pointer, so it can't steal the hover from the token
+   under it. The frame reads from --cs-hover-frame-* so a token frame chosen
+   elsewhere can restyle it without new rules. */
 .chronicle-hover-art {
+  --cs-hover-frame-width: 6px;
+  --cs-hover-frame-colour: var(--cs-surface-2);
+  --cs-hover-frame-edge: var(--cs-line);
   position: fixed;
   left: 0;
   top: 0;
   z-index: 10001;
-  padding: 4px;
-  border: 1px solid var(--cs-line);
-  border-radius: 6px;
-  background: var(--cs-surface);
+  padding: var(--cs-hover-frame-width);
+  border: 1px solid var(--cs-hover-frame-edge);
+  border-radius: 8px;
+  background: var(--cs-hover-frame-colour);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
   pointer-events: none;
 }
@@ -2344,7 +2349,7 @@ body.ccal-rest #chronicle-calendar-bar .ccal-sky * { animation-play-state: pause
   display: block;
   max-width: min(280px, 40vw);
   max-height: min(320px, 50vh);
-  border: 0;
+  border: 1px solid var(--cs-hover-frame-edge);
   border-radius: 4px;
   object-fit: contain;
 }
