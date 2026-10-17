@@ -79,7 +79,7 @@
       },
       "ConnectLine": {
         "Name": "Connect line",
-        "Hint": "Paste the connect line from Chronicle (your campaign → Manage → Apps & game system → Foundry VTT → Make a connect line) and save. It fills in the URL, campaign ID and API key for you, then clears itself. GM only.",
+        "Hint": "Paste the connect line from Chronicle (your campaign → Manage → Foundry → Connection) and save. It fills in the URL, campaign ID and API key for you, then clears itself. GM only.",
         "Success": "Connected to Chronicle. Reload Foundry to start syncing.",
         "Invalid": "That is not a valid Chronicle connect line ({reason}). Nothing was changed.",
         "GmOnly": "Only a GM can apply a Chronicle connect line. Nothing was changed.",
@@ -1097,7 +1097,7 @@
       "Connected": "Connected",
       "NotSetUp": "Not set up yet",
       "ConnectLine": "Connect line",
-      "ConnectLineHint": "In Chronicle: your campaign, then Manage, Apps and game system, Foundry VTT, Make a connect line. Kept in this browser only.",
+      "ConnectLineHint": "In Chronicle: your campaign, then Manage, Foundry, Connection. Kept in this browser only.",
       "ByHand": "Enter details by hand",
       "Address": "Chronicle address",
       "ApiKey": "API key",

@@ -50,8 +50,8 @@ chronicle+http://192.168.1.5:8080/sub/c/<campaignId>?key=<apiKey>
   invalid and changes nothing.
 
 The module parses it in `scripts/_connect-line.mjs` (`parseConnectLine`); a GM
-pastes it into the "Connect line" module setting, which fills the URL,
-campaign ID and client-scoped API key and then clears itself.
+pastes it into the Connect line field of Chronicle Sync's Settings (Connection),
+which fills the URL, campaign ID and client-scoped API key and then clears itself.
 
 ## Base URL Pattern
 
@@ -216,21 +216,25 @@ Lists entities in the campaign. Supports pagination and filtering.
 
 **Used by:** `journal-sync.mjs` → initial sync
 
-**Query params:** `?page=1&per_page=50&type_id=X&updated_since=ISO`
+**Query params:** `?page=1&per_page=50&type_id=X&q=text`. `per_page` is 1 to 100
+and defaults to 20; `q` searches. There is no `updated_since` filter; catch-up
+uses `/sync/pull` and `/sync/changes`.
 
 **Response:**
 ```json
 {
   "data": [
     {
-      "id": "uuid", "name": "Entity Name", "content": "<p>HTML content</p>",
-      "summary": "Short text", "entity_type_id": 1,
+      "id": "uuid", "name": "Entity Name",
+      "entry": "{ProseMirror JSON}", "entry_html": "<p>HTML content</p>",
+      "player_notes": "{ProseMirror JSON}", "player_notes_html": "<p>Player-facing</p>",
+      "entity_type_id": 1, "parent_id": null, "is_private": false,
+      "visibility": "default",
       "fields_data": { "hp_current": 45, "str": 18 },
-      "tags": ["npc", "villain"], "visibility": "public",
       "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-15T12:00:00Z"
     }
   ],
-  "pagination": { "page": 1, "per_page": 50, "total": 120 }
+  "total": 120, "page": 1, "per_page": 50
 }
 ```
 
@@ -241,8 +245,13 @@ Creates a new entity.
 
 **Request:**
 ```json
-{ "name": "Entity Name", "content": "<p>HTML content</p>", "entity_type_id": 1, "visibility": "public" }
+{ "name": "Entity Name", "entity_type_id": 1, "is_private": false }
 ```
+
+`entity_type_id` is required (400 without it). Optional: `type_label`,
+`fields_data`, `owner_user_id` (must be a campaign member). An absent
+`is_private` takes the campaign's default visibility. The create request has no
+text field; the text goes in a following `PUT` as `entry`.
 
 **Response:** The created entity object (same shape as GET).
 
@@ -276,7 +285,8 @@ Both are fixed on the server. Send only the fields you mean to change.
 
 Send only the fields you mean to change.
 
-**Request:** any subset of the POST shape, plus `parent_id`:
+**Request:** any subset of `name`, `type_label`, `parent_id`, `is_private`,
+`entry` (HTML), `player_notes`, `fields_data` and `expected_updated_at`:
 
 ```json
 { "name": "Renamed Character" }
@@ -580,7 +590,7 @@ Creates a new sync mapping. Body shape is `CreateSyncMappingInput`.
 }
 ```
 
-- `chronicle_type` — one of `entity, map, calendar_event, marker, drawing, token`
+- `chronicle_type` — one of `entity, map, marker, drawing, token, calendar_event, fog, layer`
 - `external_system` — `foundry`
 - `sync_direction` — `both | push | pull` (defaults to `both`)
 - `sync_metadata` — optional object
@@ -617,15 +627,18 @@ mapping exists. This is the normal "not yet mapped" signal callers use to decide
 create one — **not** an error (the client scrubs it from the diagnostics error log).
 
 #### GET /sync/pull
-Pulls all changes since a timestamp.
+Pulls the sync mappings modified after a timestamp, oldest first.
 
-**Used by:** `sync-manager.mjs` → initial sync
+**Used by:** `sync-manager.mjs` → initial sync, through `_sync-pull-walk.mjs`
 
-**Query:** `?since=2026-01-01T00:00:00Z`
+**Query:** `?since=2026-01-01T00:00:00Z&limit=1000` (`since` RFC 3339 and strict;
+`limit` defaults to 100, max 1000)
 
-**Response:**
+**Response:** full `SyncMapping` objects; `has_more` is true when another page
+exists. There is no cursor, so the module resumes from just before the last
+row's `updated_at`.
 ```json
-{ "entities": [ ], "deleted_entities": [ "uuid1", "uuid2" ], "drawings": [ ], "tokens": [ ], "calendar_events": [ ] }
+{ "server_time": "2026-01-01T00:00:00Z", "mappings": [ ], "has_more": false }
 ```
 
 #### GET /sync/changes
@@ -654,14 +667,14 @@ has given DM access only (403 otherwise); absent on older Chronicle (404).
   only when the cursor was saved while `relation` was recorded, else every
   linked character is reconciled.
 
-Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/sync_changes_handler.go`, `sync_change_repository.go`)
+Re-verify by: 2026-11-17 (Chronicle `internal/plugins/syncapi/sync_changes_handler.go`, `sync_change_repository.go`)
 
 #### GET /sync/history
 The campaign's sync history, both directions, newest first. Owner keys and
 keys of members with DM access only (403 otherwise); absent on older
 Chronicle (404).
 
-**Used by:** `sync-history-tab.mjs` → the dashboard's History pane, under Diagnostics
+**Used by:** `sync-history-tab.mjs` → the dashboard's History pane, under Problems
 
 **Query:** `?limit=50&before=<id>&direction=to_chronicle|to_foundry|link&failed=1&q=<text>` (limit default 50, max 200; a filter matches a run when any of its steps does)
 
@@ -839,7 +852,7 @@ Deletes a map marker.
 > `410 {"error":"calendar_route_retired"}`; the module calls none of them. An
 > older Chronicle, mid-rebuild, answers calendar routes with `503
 > {"error":"calendar_rebuilding"}`, which arms the module's push pause. See
-> CLAUDE.md → "Calendar blackout and date-push pauses". A route marked
+> CLAUDE.md → "Rules the code must keep" (the calendar rule). A route marked
 > Retired below answers 410.
 >
 > **Re-verify by: when calendar V5 ships.**
@@ -955,16 +968,17 @@ Answers `410 {"error":"calendar_route_retired"}`.
 
 #### Calendar Sub-Resources
 
-Each resource has a `GET` (returns all definitions) and a `PUT` (bulk-replaces all definitions):
+Each resource has a `GET` that returns all its definitions. Its `PUT`
+(bulk-replace) is retired and answers `410 {"error":"calendar_route_retired"}`.
 
 | Resource | Routes | Notes |
 |---|---|---|
-| Seasons | `GET`/`PUT /calendar/seasons` | |
-| Moons | `GET`/`PUT /calendar/moons` | |
-| Eras | `GET`/`PUT /calendar/eras` | |
-| Event categories | `GET`/`PUT /calendar/event-categories` | |
-| Cycles | `GET`/`PUT /calendar/cycles` | zodiac/elemental cycles, `PUT` includes entries |
-| Festivals | `GET`/`PUT /calendar/festivals` | fixed calendar entries |
+| Seasons | `GET /calendar/seasons` | |
+| Moons | `GET /calendar/moons` | |
+| Eras | `GET /calendar/eras` | |
+| Event categories | none | `GET` and `PUT /calendar/event-categories` both answer 410; event kinds replaced categories |
+| Cycles | `GET /calendar/cycles` | zodiac/elemental cycles |
+| Festivals | `GET /calendar/festivals` | fixed calendar entries |
 
 ---
 
@@ -1034,13 +1048,11 @@ Returns a single event by ID.
 
 | Route | Behavior |
 |---|---|
-| `PUT /calendar/settings` | Updates calendar name, time system, leap year, current date/time |
-| `PUT /calendar/months` | Replaces all month definitions |
-| `PUT /calendar/weekdays` | Replaces all weekday definitions |
 | `GET /calendar/structure` | Returns the calendar structure |
 | `GET /calendar/weather` | Returns current weather state, or `{}` if none set |
-| `PUT /calendar/weather` | Sets current weather state (GM override) |
-| `GET /calendar/export` | Exports the full calendar as Chronicle JSON; `?events=true` includes events |
+| `PUT /calendar/settings`, `/months`, `/weekdays` | Retired: answer 410 |
+| `PUT /calendar/weather` | Retired: answers 410; weather is set per day in Chronicle's calendar |
+| `GET /calendar/export` | Retired: answers 410; calendars are in the campaign export |
 | `POST /calendar/import` | Retired: answers `410 {"error":"calendar_route_retired"}`; use `POST /calendar` |
 
 ---
@@ -1226,7 +1238,7 @@ so the operator can confirm reachability.
 
 Per-campaign signed token in the query string — not the Bearer-token API key.
 Chronicle rotates it on request from the campaign owner. Generated when the
-owner first opens the Foundry VTT disclosure in campaign settings.
+owner first opens the campaign's Foundry page (Manage → Foundry).
 
 ```
 ?token=<signed>
@@ -1234,8 +1246,8 @@ owner first opens the Foundry VTT disclosure in campaign settings.
 
 ### Token rotation behavior
 
-The owner rotates their token any time from the Foundry VTT disclosure in
-campaign settings (rotate button → `token/rotate` below). After rotation:
+The owner rotates their token any time from the Foundry page's Install in
+Foundry card (Rotate token → `token/rotate` below). After rotation:
 
 - The old token is **immediately invalidated**: a pre-rotation install gets
   `403` with `{ "error": "invalid_token", "category": "auth", ... }` on its
@@ -1309,7 +1321,7 @@ The catalog carries `"schemaVersion": 1`. CI (`tools/check-error-catalog.mjs`,
 | `no_package_registered` | `config` | No package registered for this campaign's Foundry serving slot — install / re-pin a release | 503 |
 | `no_version_available` | `config` | No pinned version and no auto-latest available (catalog empty) | 503 |
 | `pinned_version_not_installed` | `config` | Pinned version isn't in Chronicle's installed catalog (race after unpublish, or stale pin) | 503 |
-| `token_not_initialized` | `config` | Owner has never opened the Foundry VTT disclosure for this campaign | 503 |
+| `token_not_initialized` | `config` | Owner has never opened the campaign's Foundry page, so no token exists yet | 503 |
 
 `error-catalog.json` also lists a catch-all `ErrInternal` constructor:
 `wildcard: true`, category `internal`, HTTP 500. Its catalog `code` is the
@@ -1346,29 +1358,29 @@ campaigns hitting the same source zip get differently-addressed zips.
 
 Part of Chronicle's web UI, **not** called by Foundry or this module.
 Documented because they affect the contract: token rotation invalidates
-installs, pin changes change the version served to Foundry.
+installs, and the owner's update choice changes the version served to Foundry.
+Their paths are under `/campaigns/:campaignId/foundry-vtt/`, not `/api/v1`.
 
-#### POST /api/v1/campaigns/:campaignId/foundry-vtt/token/rotate
+#### POST /campaigns/:campaignId/foundry-vtt/token/rotate
 
 Owner-only. Rotates the per-campaign signed token. After rotation, all
 existing Foundry installs of this campaign's module get `invalid_token`
 errors on their next update check (see "Token rotation behavior" above).
 
-**Used by:** Chronicle's owner-side Foundry VTT disclosure (rotate button).
+**Used by:** the Rotate token button on the owner's Foundry page.
 
 **Response (200):** The new signed token. Owner-side UI re-renders the
 per-campaign install URL with the new token embedded.
 
-#### PUT /api/v1/campaigns/:campaignId/settings/foundry-vtt-pin
+#### POST /campaigns/:campaignId/foundry-vtt/update, `/update/later`, `/update/switch`, `/update/mode`
 
-Owner-only. Sets or clears the campaign's pinned module version. An empty /
-absent pin means "track latest". A specific version (e.g., `0.1.11`) means
-"serve exactly this version regardless of newer releases".
-
-**Used by:** Chronicle's owner-side Foundry VTT disclosure (pin selector).
+Owner-only form posts behind the Module version card on the Foundry page. The
+owner picks how the campaign takes new versions (`automatic`, `approve_first`
+or `pinned`) and moves to a version with Update or Use another version. There
+is no route that writes the version directly.
 
 **Effect on Foundry:** installed instances see the new version on their next
-`module.json` check — an update offer if the pin's version is greater, a
+`module.json` check: an update offer if the served version is greater, a
 downgrade prompt if lower (Foundry's native behavior), nothing if equal.
 
 ### Serving descriptor
@@ -1487,7 +1499,7 @@ the other's origin (Chronicle's, taken from `apiUrl`) before acting.
 | Calendar frame | `/embed/campaigns/:id/notes/calendar` | The campaign's default calendar, Chronicle's own page, as this player sees it (same grant; the frame reads `/api/notes-app/campaigns/:id/calendars/…`). An older Chronicle answers 404. |
 
 The module keeps a grant only when `campaignId` matches and the GM has matched
-the returned `userId` to this Foundry login (Chronicle settings → Players); an unmatched or
+the returned `userId` to this Foundry login (Chronicle Sync → Settings → Players); an unmatched or
 mismatched account is refused. Frame to module: `chronicle:embed-ready` (the
 module answers `chronicle:notes-token` with the token and current `entityId`),
 `chronicle:grant-rejected` (the stored grant is dropped), `chronicle:open-note`
@@ -1687,7 +1699,7 @@ Every cross-repo claim here carries a `Re-verify by:` line.
 ### Reconnection
 
 The API client automatically reconnects on WebSocket disconnection:
-- Initial retry delay: 2 seconds
+- Initial retry delay: 1 second
 - Max retry delay: 30 seconds (exponential backoff)
 - Infinite retries (never gives up)
 - Queued messages are replayed on reconnection

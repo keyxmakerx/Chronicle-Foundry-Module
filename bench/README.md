@@ -40,7 +40,7 @@ CHRONICLE_DIR=../Chronicle bench/run.sh journals   # one area
 `run.sh` builds Chronicle from `CHRONICLE_DIR`, starts it on a fresh
 database, runs the scenarios and stops it. It uses `DATABASE_URL` and
 `REDIS_URL` when set (CI services), otherwise Chronicle's no-Docker test
-MariaDB (`tools/start-test-db.sh`) and a local `redis-server`. Needs Go,
+MariaDB (`tools/start-test-db.sh` in that checkout) and a local `redis-server`. Needs Go,
 Node 22 (built-in `WebSocket`) and the `mysql` client. `BENCH_VERBOSE=1`
 shows the module's own console output; `BENCH_KEEP_LOG=1` keeps the
 server log.
