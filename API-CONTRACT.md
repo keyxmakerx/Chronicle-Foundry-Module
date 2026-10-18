@@ -207,6 +207,19 @@ Returns item preset field definitions. Same shape as character-fields.
 
 **Used by:** `item-sync.mjs`
 
+#### GET /system-entries?fieldKey=ancestry
+The campaign's own pick-list entries (a homebrew ancestry, kit, culture...),
+as `{"data":[{fieldKey, slug, name, summary, description, properties, updatedAt}],"total":N}`.
+Always the player view, whoever holds the key: Directors-only entries are left
+out and secret spans are stripped, because the module writes this into items
+players can open. `properties` holds scalars and lists of `{name, cost?, description?}`.
+404 on a Chronicle without the route; the module then stops asking for the
+session and leaves made items name-only.
+
+**Used by:** `actor-sync.mjs` `_campaignEntries`, `_campaign-entry-item.mjs`
+
+Re-verify by: 2026-11-18 (Chronicle `internal/plugins/syncapi/system_entries_api.go`; lands with the Chronicle PR on branch `claude/custom-ancestries-foundry-1l665k`)
+
 ---
 
 ### Entities
