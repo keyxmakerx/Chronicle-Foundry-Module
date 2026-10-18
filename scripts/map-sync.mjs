@@ -26,7 +26,8 @@
 
 import { noticeText } from './_escape-html.mjs';
 import { getSetting } from './settings.mjs';
-import { FLAG_SCOPE } from './constants.mjs';
+import { FLAG_SCOPE, syncOptions } from './constants.mjs';
+import { setAside } from './_set-aside.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
 import { parseMapLook, resolveMapLook } from './_map-look.mjs';
 import {
@@ -1363,8 +1364,9 @@ export class MapSync {
   }
 
   /**
-   * On map.deleted: preserve the JournalEntry if local pins exist
-   * (`page.flags['chronicle-sync'].pins` non-empty). Otherwise delete it.
+   * On map.deleted: keep the JournalEntry. With local pins
+   * (`page.flags['chronicle-sync'].pins` non-empty) it is renamed "(archived)";
+   * otherwise it is set aside in the removed folder.
    */
   async _onMapDeleted(payload) {
     const mapId = payload?.id || payload;
@@ -1379,17 +1381,17 @@ export class MapSync {
     const entry = page.parent;
     const localPins = page.getFlag(FLAG_SCOPE, 'pins') || [];
 
-    if (localPins.length > 0) {
-      // Strip Chronicle linkage; preserve user data.
-      await page.update({
-        [`flags.${FLAG_SCOPE}.-=mapId`]: null,
-        [`flags.${FLAG_SCOPE}.-=chronicleMapMeta`]: null,
-        [`flags.${FLAG_SCOPE}.-=chronicleMarkers`]: null,
-        [`flags.${FLAG_SCOPE}.-=chronicleDrawings`]: null,
-        [`flags.${FLAG_SCOPE}.-=chronicleTokens`]: null,
-        [`flags.${FLAG_SCOPE}.-=chronicleLayers`]: null,
-      });
+    // Strip Chronicle linkage either way; the page and its entry are the GM's.
+    await page.update({
+      [`flags.${FLAG_SCOPE}.-=mapId`]: null,
+      [`flags.${FLAG_SCOPE}.-=chronicleMapMeta`]: null,
+      [`flags.${FLAG_SCOPE}.-=chronicleMarkers`]: null,
+      [`flags.${FLAG_SCOPE}.-=chronicleDrawings`]: null,
+      [`flags.${FLAG_SCOPE}.-=chronicleTokens`]: null,
+      [`flags.${FLAG_SCOPE}.-=chronicleLayers`]: null,
+    });
 
+    if (localPins.length > 0) {
       if (entry && !entry.name.endsWith('(archived)')) {
         await entry.update({ name: `${entry.name} (archived)` });
       }
@@ -1400,8 +1402,12 @@ export class MapSync {
       );
       console.debug(`Chronicle: Archived map ${mapId} (local pins preserved)`);
     } else if (entry) {
-      await entry.delete();
-      console.debug(`Chronicle: Deleted JournalEntry for removed map ${mapId}`);
+      // The entry may hold other GM pages, so it is filed away, never deleted.
+      await setAside(entry, FLAG_SCOPE, syncOptions());
+      ui.notifications.info(
+        game.i18n.format('CHRONICLE.Removed.Entity', { name: noticeText(entry.name) })
+      );
+      console.debug(`Chronicle: Set aside JournalEntry for removed map ${mapId}`);
     }
 
     this._cache.delete(mapId);
