@@ -900,6 +900,31 @@
         {{/if}}
         {{/if}}
 
+        {{!-- Dice So Nice: someone else's module, so what we rely on is checked, not assumed --}}
+        {{#if dice}}
+        <h3 class="section-heading">{{localize "CHRONICLE.Dice.Heading"}}</h3>
+        <p class="config-hint">{{localize "CHRONICLE.Dice.Intro"}}</p>
+        <div class="diagnostics-detail dice-check dice-check--{{dice.state}}">
+          <div class="system-info-row">
+            <span class="system-label">{{localize "CHRONICLE.Dice.State"}}:</span>
+            <span class="system-value dice-check-state">{{dice.stateLabel}}</span>
+          </div>
+          <ul class="dice-check-rows">
+            {{#each dice.rows}}
+            <li class="dice-check-row dice-check-row--{{level}}">
+              <i class="fa-solid {{#if (eq level 'error')}}fa-circle-xmark{{else if (eq level 'warn')}}fa-triangle-exclamation{{else if (eq level 'ok')}}fa-circle-check{{else}}fa-circle-info{{/if}}" aria-hidden="true"></i>
+              <span>{{text}}{{#if fix}} <span class="dice-check-fix">{{localize "CHRONICLE.Dice.Fix"}}: {{fix}}</span>{{/if}}</span>
+            </li>
+            {{/each}}
+          </ul>
+        </div>
+        <div class="config-actions">
+          <button type="button" class="dashboard-btn btn-sm" data-action="check-dice-files" title="{{localize "CHRONICLE.Dice.CheckFilesHint"}}">
+            <i class="fa-solid fa-dice-d20"></i> {{localize "CHRONICLE.Dice.CheckFiles"}}
+          </button>
+        </div>
+        {{/if}}
+
         {{!-- Error log --}}
         {{#if hasErrors}}
         <h3 class="section-heading">{{localize "CHRONICLE.Dashboard.Health.ErrorLog"}}</h3>
