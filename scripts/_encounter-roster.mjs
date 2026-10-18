@@ -46,6 +46,7 @@ export function parseEncounter(raw) {
     ready: raw?.ready === true,
     heroes: list(raw?.heroes).map((h) => ({ id: str(h?.id), name: str(h?.name) })),
     creatures: list(raw?.creatures).map(creature),
+    stages: list(raw?.stages),
     version: Number.isFinite(raw?.version) ? raw.version : 0,
   };
 }

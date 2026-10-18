@@ -11,7 +11,10 @@
  * Nothing here reveals a creature on its own. A token becomes visible only
  * when the GM presses Show on its row or confirms "Show all hidden". Chronicle
  * is read-only from here: encounters are never written back. GM only.
- * Pure logic lives in _encounter-roster.mjs and _encounter-list.mjs.
+ * A fight's stages say when it is due for a creature to change form or the
+ * later rows to arrive; the GM presses Start or Not yet, and what was started
+ * is kept on the scene (flag `encounterStages`). Pure logic lives in
+ * _encounter-roster.mjs, _encounter-stages.mjs and _encounter-list.mjs.
  */
 
 import { FLAG_SCOPE } from './constants.mjs';
@@ -29,6 +32,12 @@ import {
   layoutItems, occupiedCells, parseEncounter, pickCombat, placedTokenIds, placeHidden, pointToCell,
   resolveActor, rosterState, startRows, tokenRef, trackerAdditions, trackerBadge,
 } from './_encounter-roster.mjs';
+import {
+  afterNotYet, afterStart, newlyDue, parseStages, stageStates,
+} from './_encounter-stages.mjs';
+import { changeForm, creatureSync } from './creature-forms.mjs';
+
+const STAGES_FLAG = 'encounterStages';
 
 const SEARCH_DELAY_MS = 300;
 const REDRAW_DELAY_MS = 60;
@@ -178,6 +187,8 @@ export class EncountersPane {
       ['createToken', onScene], ['updateToken', onScene], ['deleteToken', onScene],
       ['canvasReady', sceneChanged],
       ['createCombatant', redraw], ['deleteCombatant', redraw], ['updateCombat', redraw], ['deleteCombat', redraw],
+      // A linked creature's Stamina lives on its actor, and a stage may wait on it.
+      ['updateActor', redraw],
     ]) {
       this._hooks.push([name, Hooks.on(name, fn)]);
     }
@@ -236,7 +247,7 @@ export class EncountersPane {
     try {
       const enc = parseEncounter(await api.get(encounterPath(id)));
       if (!enc) throw new Error('encounter without an id');
-      this._open = { enc, rows: expandRows(enc.creatures) };
+      this._open = { enc, rows: expandRows(enc.creatures), stages: parseStages(enc.stages, new Set(enc.creatures.map((c) => c.id))), seen: null };
     } catch (err) {
       this._open = null;
       this._openError = t(`Error.${encounterErrorKey(err)}`);
@@ -330,7 +341,7 @@ export class EncountersPane {
     }).join('');
 
     const armedBanner = this._armed
-      ? `<div class="dms-earmed" role="status"><span>${escapeHtml(this._armed.kind === 'start' ? t('ArmedStart') : f('ArmedRow', { name: noticeText(this._armed.name) }))}</span><button type="button" class="dms-ebtn" data-enc-act="cancelArm">${escapeHtml(t('Cancel'))}</button></div>`
+      ? `<div class="dms-earmed" role="status"><span>${escapeHtml(this._armed.kind === 'start' ? t('ArmedStart') : this._armed.kind === 'stage' ? t('Stage.Armed') : f('ArmedRow', { name: noticeText(this._armed.name) }))}</span><button type="button" class="dms-ebtn" data-enc-act="cancelArm">${escapeHtml(t('Cancel'))}</button></div>`
       : '';
     const confirm = this._confirmShowAll
       ? `<div class="dms-confirm" role="alertdialog" aria-label="${escapeHtml(t('ShowAllYes'))}"><p>${escapeHtml(f('ShowAllAsk', { n: hiddenCount }))}</p><div class="dms-confirm-btns"><button type="button" class="dms-confirm-yes" data-enc-act="showAllYes">${escapeHtml(t('ShowAllYes'))}</button><button type="button" data-enc-act="showAllNo">${escapeHtml(t('Cancel'))}</button></div></div>`
@@ -349,7 +360,92 @@ export class EncountersPane {
       </div>
       ${armedBanner}${confirm}
       <p class="dms-small dms-enotice" role="status">${escapeHtml(this._notice)}</p>
-      <div class="dms-eroster">${rowHtml || `<p class="dms-small">${escapeHtml(t('NoCreatures'))}</p>`}</div>`;
+      <div class="dms-eroster">${rowHtml || `<p class="dms-small">${escapeHtml(t('NoCreatures'))}</p>`}</div>
+      ${this._stagesHtml(scene)}`;
+  }
+
+  // ---- Stages -------------------------------------------------------------
+
+  /** This fight's round: its started tracker's, else 0. */
+  _round() {
+    const mine = new Set(placedTokenIds(this._open.enc.id, sceneTokens()));
+    const combat = sceneCombats().find((c) => c.started && c.combatants.some((cb) => mine.has(cb.tokenId)));
+    return combat?.round ?? 0;
+  }
+
+  /** Each placed token of this fight with its Stamina, when the system has it. */
+  _staminaTokens() {
+    const paths = creatureSync()?.staminaPaths?.();
+    if (!paths) return [];
+    const get = foundry.utils.getProperty;
+    return (canvas?.scene?.tokens?.contents ?? []).flatMap((d) => {
+      const ref = tokenRef(d.getFlag?.(FLAG_SCOPE, ENCOUNTER_TOKEN_FLAG));
+      if (!ref || ref.encounterId !== this._open.enc.id || !d.actor) return [];
+      return [{ rowId: ref.rowId, value: get(d.actor, paths.value), max: get(d.actor, paths.max) }];
+    });
+  }
+
+  _memory() {
+    return canvas?.scene?.getFlag?.(FLAG_SCOPE, STAGES_FLAG)?.[this._open.enc.id] ?? { started: [], notYet: {} };
+  }
+
+  async _saveMemory(memory) {
+    await canvas.scene.setFlag(FLAG_SCOPE, `${STAGES_FLAG}.${this._open.enc.id}`, memory);
+  }
+
+  _stagesHtml(scene) {
+    const { enc, stages } = this._open;
+    if (!stages.length) return '';
+    const states = scene ? stageStates(stages, { round: this._round(), tokens: this._staminaTokens() }, this._memory()) : stages.map(() => 'waiting');
+    // A stage that has just come due is announced once, besides being marked.
+    for (const i of newlyDue(this._open.seen, states)) ui.notifications.info(f('Stage.DueNotice', { n: i + 1, name: noticeText(enc.name) }));
+    this._open.seen = states;
+    const nameOf = (rowId) => enc.creatures.find((c) => c.id === rowId)?.name || t('Stage.Someone');
+    const cards = stages.map((s, i) => {
+      const when = s.when.kind === 'stamina' ? f('Stage.WhenStamina', { name: nameOf(s.when.row), p: s.when.percent })
+        : s.when.kind === 'round' ? f('Stage.WhenRound', { n: s.when.round }) : t('Stage.WhenManual');
+      const what = [
+        ...s.forms.map((fc) => f('Stage.TakesForm', { name: nameOf(fc.row), form: fc.formName || t('Stage.FirstForm') })),
+        ...(s.arrive.length ? [f('Stage.Arrive', { names: s.arrive.map(nameOf).join(', ') })] : []),
+      ];
+      const st = states[i];
+      const acts = st === 'started' ? `<span class="dms-small">${escapeHtml(t('Stage.Started'))}</span>`
+        : st === 'due'
+          ? `<button type="button" class="dms-ebtn dms-egold" data-enc-act="stageStart" data-id="${escapeHtml(s.id)}" ${scene ? '' : 'disabled'}>${escapeHtml(f('Stage.Start', { n: i + 1 }))}</button><button type="button" class="dms-ebtn" data-enc-act="stageNotYet" data-id="${escapeHtml(s.id)}">${escapeHtml(t('Stage.NotYet'))}</button>`
+          : `<button type="button" class="dms-ebtn" data-enc-act="stageStart" data-id="${escapeHtml(s.id)}" ${scene ? '' : 'disabled'}>${escapeHtml(f('Stage.Start', { n: i + 1 }))}</button>`;
+      return `<div class="dms-estage" data-state="${st}">
+        <p class="dms-estage-h"><b>${escapeHtml(f('Stage.Title', { n: i + 1 }))}</b>${st === 'due' ? ` <span class="dms-estage-due">${escapeHtml(t('Stage.Due'))}</span>` : ''}</p>
+        <p class="dms-small">${escapeHtml(when)}</p>
+        <ul class="dms-estage-what">${what.map((w) => `<li>${escapeHtml(w)}</li>`).join('')}</ul>
+        ${s.note ? `<p class="dms-small"><em>${escapeHtml(s.note)}</em></p>` : ''}
+        <div class="dms-estage-acts">${acts}</div>
+      </div>`;
+    }).join('');
+    return `<p class="dms-lbl dms-estages-h">${escapeHtml(t('Stage.Heading'))}</p><div class="dms-estages" aria-live="polite">${cards}</div>`;
+  }
+
+  /**
+   * Start a stage: each named creature changes form (quiet or reveal as the
+   * stage says), then the scene waits for one click to place the arrivals.
+   */
+  async _startStage(id) {
+    const { enc, stages } = this._open;
+    const stage = stages.find((s) => s.id === id);
+    if (!stage || !canvas?.scene) return;
+    await this._saveMemory(afterStart(this._memory(), id));
+    const missing = [];
+    for (const fc of stage.forms) {
+      const doc = canvas.scene.tokens.contents.find((d) => {
+        const ref = tokenRef(d.getFlag?.(FLAG_SCOPE, ENCOUNTER_TOKEN_FLAG));
+        return ref?.encounterId === enc.id && ref.rowId === fc.row;
+      });
+      if (!doc || !creatureSync()?.creatureFor(doc)) { missing.push(enc.creatures.find((c) => c.id === fc.row)?.name || '?'); continue; }
+      await changeForm(doc, fc.form, stage.how);
+    }
+    if (missing.length) ui.notifications.warn(f('Stage.NoForm', { names: noticeText(missing.join(', ')) }));
+    const arriving = this._stateRows().filter((r) => stage.arrive.includes(r.rowId) && r.state === 'out');
+    if (arriving.length) this._arm({ kind: 'stage', keys: arriving.map((r) => r.key) });
+    else this._drawFight();
   }
 
   // ---- Events -------------------------------------------------------------
@@ -388,6 +484,8 @@ export class EncountersPane {
         case 'showAllYes': await this._showAll(); break;
         case 'tracker': await this._addToTracker(); break;
         case 'undo': await this._undo(); break;
+        case 'stageStart': await this._startStage(btn.dataset.id); break;
+        case 'stageNotYet': await this._saveMemory(afterNotYet(this._memory(), btn.dataset.id, this._round())); this._drawFight(); break;
         default: break;
       }
     } catch (err) {
@@ -454,7 +552,9 @@ export class EncountersPane {
     if (!this._open) return;
     const rows = armed.kind === 'start'
       ? startRows(this._stateRows())
-      : this._stateRows().filter((r) => r.key === armed.key && r.state === 'out');
+      : armed.kind === 'stage'
+        ? this._stateRows().filter((r) => armed.keys.includes(r.key) && r.state === 'out')
+        : this._stateRows().filter((r) => r.key === armed.key && r.state === 'out');
     if (!rows.length) {
       this._notice = t('NothingToPlace');
       this._drawFight();

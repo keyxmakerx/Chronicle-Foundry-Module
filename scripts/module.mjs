@@ -29,6 +29,8 @@ import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs
 import { registerNpcPresence, npcSpotlightRelay } from './npc-presence.mjs';
 import { negotiationMirror } from './negotiation-mirror.mjs';
 import { registerMapSheetItems } from './map-sheet-items.mjs';
+import { registerHoverArt, registerHoverArtSettings, toggleHoverArt } from './hover-art.mjs';
+import { registerCreatureForms } from './creature-forms.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { registerShopRoomSocket, registerShopJournalButton } from './shop-room-window.mjs';
 import { notebookAvailable, openCalendarWindow, registerPlayerNotebook } from './player-notebook.mjs';
@@ -81,6 +83,7 @@ function openDashboard(tab) {
 Hooks.once('init', () => {
   console.debug('Chronicle Sync | Initializing');
   registerSettings();
+  registerHoverArtSettings();
   registerMotion();
   try {
     // Every client, not only the GM: each one registers the rune dice with
@@ -95,6 +98,7 @@ Hooks.once('init', () => {
       openDMScreen: () => { openDMScreen(() => syncManager?.api ?? null); },
       openSatchel: () => { openSatchel(); },
       openCalendar: () => { openCalendarWindow(); },
+      toggleHoverArt: () => { toggleHoverArt(); },
     },
     connected: notebookAvailable,
   });
@@ -147,7 +151,8 @@ Hooks.once('ready', async () => {
   const calendarSync = new CalendarSync();
   syncManager.registerModule(calendarSync);
   syncManager.registerModule(new ActorSync());
-  syncManager.registerModule(new CreatureSync());
+  const creatureSync = new CreatureSync();
+  syncManager.registerModule(creatureSync);
   syncManager.registerModule(new ItemSync());
   syncManager.registerModule(new StashSync());
   syncManager.registerModule(npcSpotlightRelay);
@@ -210,6 +215,16 @@ Hooks.once('ready', async () => {
     registerNpcPresence(() => syncManager?.api ?? null);
   } catch (err) {
     console.warn('Chronicle Sync | NPC token tools unavailable', err);
+  }
+  try {
+    registerHoverArt();
+  } catch (err) {
+    console.warn('Chronicle Sync | Token art previews unavailable', err);
+  }
+  try {
+    registerCreatureForms(() => creatureSync);
+  } catch (err) {
+    console.warn('Chronicle Sync | Creature forms unavailable', err);
   }
 
   // Move a legacy world-scoped API key into this GM's client scope and

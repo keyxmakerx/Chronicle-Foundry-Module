@@ -1203,9 +1203,23 @@ Used by: `encounters.mjs`. Scope: read.
   "creatures": [
     { "id": "uuid", "entityId": "uuid", "name": "Hobgoblin Soldier", "count": 2, "group": "B", "start": "seen" }
   ],
+  "stages": [
+    { "id": "uuid", "when": { "kind": "stamina", "row": "<creature row id>", "percent": 50 },
+      "forms": [ { "row": "<creature row id>", "form": "unmasked", "formName": "Unmasked" } ],
+      "arrive": [ "<creature row id>" ], "how": "reveal", "note": "" }
+  ],
   "version": 4, "updatedAt": "2026-10-12T20:00:00Z"
 }
 ```
+
+`stages` (absent on an older Chronicle, read as none): `when.kind` is
+`manual`, `stamina` (`row`, `percent` 1 to 99: due when that row's lowest
+placed token is at or below it) or `round` (`round`: due from the start of
+that round of the fight's started tracker). `forms[].form` is a form id from
+the creature page's forms, `""` for its first form; `how` is `quiet` or
+`reveal`. The module drops references to rows the encounter doesn't have
+(`_encounter-stages.mjs` `parseStages`). Re-verify by: 2026-11-17 (Chronicle
+`internal/plugins/encounters/model.go` `Stage`; keyxmakerx/Chronicle#1504)
 
 ---
 
@@ -1652,6 +1666,19 @@ forgets its cached answer for that page, and reads
 `GET /entities/:entityId/system-state/<detectedSystem>/foundry` again before
 the next send-back. Only `gm.sendBack === true` lets a creature's
 `foundry_pull_fields` go back to Chronicle; no state (404) means off.
+
+For `key` `forms` or `form-<id>` it forgets that page's cached forms and, when
+the page's actor is in that form (actor flag `creatureForm`), applies the page
+again. A creature's forms are read from
+`GET /entities/:entityId/system-state/<detectedSystem>/forms`
+(`gm.order`, `public.shown`, `public.current`) and `…/form-<id>` (`gm` is the
+form; the shape is the Draw Steel package's, see its `docs/monster-builder.md`).
+Changing form at the table writes only public halves:
+`PUT /entities/:entityId/system-state/<detectedSystem>/form-<id>` with
+`{ "public": <form> }` when players first see it, then
+`PUT …/forms` with `{ "public": { …, "shown": [ids], "current": id } }`.
+The PUT needs an owner-level key; an older Chronicle without it answers 404 or
+405 and the module only logs (`tools/test-creature-forms.mjs`).
 
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/systemstate`, `internal/plugins/syncapi/system_state_api.go`; keyxmakerx/Chronicle#1051)
 
