@@ -1103,7 +1103,10 @@
         "RegisterFailedFix": "Report this with the Diagnostic Bundle. That set shows with the player's own dice instead.",
         "FileMissing": "Missing dice file: {path} ({status})",
         "FileMissingFix": "The file is not where the rune dice list says. Reinstall Chronicle Sync; if it stays, report it.",
-        "FilesOk": "All {count} dice files are where they should be."
+        "FilesOk": "All {count} dice files are where they should be.",
+        "CritsRegistered": "The 12 Chronicle crits are in Dice So Nice's Special Effects settings, under the \"Chronicle crit\" trigger.",
+        "CritsMissing": "The Chronicle crits could not be added to Dice So Nice, so crit dice land without an effect.",
+        "CritsMissingFix": "Dice So Nice may have changed its special effects calls. Report this with the Diagnostic Bundle; the dice themselves still work."
       }
     },
     "Npc": {

@@ -16,7 +16,7 @@
 import { MODULE_ID } from './constants.mjs';
 import { log } from './logger.mjs';
 import { DSN_ID, OPTIONAL_API, REQUIRED_API, judgeDiceSoNice } from './_dice-so-nice-check.mjs';
-import { MANIFEST_PATH, appearanceFor, buildRegistrations, readManifest } from './_rune-dice.mjs';
+import { MANIFEST_PATH, appearanceFor, buildRegistrations, critRegistrations, critSfx, readManifest } from './_rune-dice.mjs';
 
 /** After our ready, how long Dice So Nice gets to start before the check calls it stuck. */
 const START_GRACE_MS = 30000;
@@ -26,6 +26,7 @@ const FILE_CHECK_BATCH = 8;
 
 const state = {
   readyAt: 0,
+  crits: false,
   hookFired: false,
   manifest: null,
   registration: null,
@@ -96,6 +97,15 @@ async function onDiceReady(dice3d) {
     if (!state.registered.systems.has(p.system)) continue;
     if (await attempt('preset', `${p.system}/${p.type}`, () => dice3d.addDicePreset(p))) presets++;
   }
+  // Crits: a trigger players bind effects to, with stand-in lines for new players.
+  let crits = false;
+  if (typeof dice3d.addSFXTrigger === 'function') {
+    const { trigger, defaults } = critRegistrations();
+    crits = await attempt('crit trigger', trigger.id, () => dice3d.addSFXTrigger(trigger.id, trigger.name, trigger.results));
+    if (crits && typeof dice3d.addSFXDefaults === 'function') await attempt('crit defaults', trigger.id, () => dice3d.addSFXDefaults(defaults));
+  }
+  state.crits = crits;
+
   if (typeof dice3d.preloadPresets === 'function') {
     for (const id of state.registered.systems) await attempt('preload', id, () => dice3d.preloadPresets(id));
   }
@@ -104,6 +114,7 @@ async function onDiceReady(dice3d) {
     colorsets: state.registered.colorsets.size,
     systems: state.registered.systems.size,
     presets,
+    crits,
     errors,
     files: plan.files,
   };
@@ -118,6 +129,16 @@ async function onDiceReady(dice3d) {
 export function diceAppearance(pick) {
   if (!game.dice3d) return null;
   return appearanceFor(pick, state.registered);
+}
+
+/**
+ * The Dice So Nice `sfx` option for one die of a Chronicle roll, or null when
+ * it doesn't crit or the crit trigger didn't register here.
+ * @param {{crit?: string|null, succ?: string, fail?: string}} die
+ */
+export function diceCritSfx(die) {
+  if (!game.dice3d || !state.crits) return null;
+  return critSfx(die);
 }
 
 /** Facts for the check, as this client sees them now. */

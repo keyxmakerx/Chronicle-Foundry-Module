@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { REQUIRED_API, TESTED_VERSION, compareVersions, judgeDiceSoNice } from '../scripts/_dice-so-nice-check.mjs';
+import { OPTIONAL_API, REQUIRED_API, TESTED_VERSION, compareVersions, judgeDiceSoNice } from '../scripts/_dice-so-nice-check.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => readFileSync(resolve(ROOT, p), 'utf8');
@@ -22,7 +22,7 @@ const lang = JSON.parse(read('lang/en.json')).CHRONICLE.Dice.Check;
 
 const running = {
   installed: true, active: true, version: TESTED_VERSION, hasApi: true, ready: true,
-  methods: [...REQUIRED_API, 'preloadPresets', 'isEnabled'], enabled: true,
+  methods: [...REQUIRED_API, ...OPTIONAL_API], enabled: true,
   manifest: { ok: true, problems: [], setCount: 12 },
   registration: { colorsets: 12, systems: 12, presets: 84, errors: [] },
 };
@@ -76,6 +76,14 @@ test('list, registration and file problems each name what broke', () => {
   assert.equal(judgeDiceSoNice({ ...running, manifest: { ok: true, problems: [], setCount: 0 }, registration: null }).rows.at(-1).code, 'NoSets');
 });
 
+test('crits registering, or not, is its own row', () => {
+  const on = judgeDiceSoNice({ ...running, registration: { ...running.registration, crits: true } });
+  assert.ok(codes(on).includes('CritsRegistered'));
+  const off = judgeDiceSoNice({ ...running, registration: { ...running.registration, crits: false } });
+  assert.equal(off.state, 'warn');
+  assert.ok(codes(off).includes('CritsMissing'));
+});
+
 test('every row has words, every error and warning says what to do', () => {
   const all = [
     judgeDiceSoNice({ installed: false }), judgeDiceSoNice({ installed: true }),
@@ -83,7 +91,8 @@ test('every row has words, every error and warning says what to do', () => {
     judgeDiceSoNice({ ...running, version: '6.1', methods: [], enabled: false, ready: false, waitedLong: true }),
     judgeDiceSoNice({ ...running, hasApi: false, waitedLong: true }),
     judgeDiceSoNice({ ...running, manifest: { ok: false } }),
-    judgeDiceSoNice({ ...running, manifest: { ok: true, problems: [{ code: 'SetId' }] }, registration: { errors: [{}] }, files: [{ ok: false }] }),
+    judgeDiceSoNice({ ...running, manifest: { ok: true, problems: [{ code: 'SetId' }] }, registration: { errors: [{}], crits: false }, files: [{ ok: false }] }),
+    judgeDiceSoNice({ ...running, registration: { ...running.registration, crits: true } }),
   ].flatMap((r) => r.rows);
   for (const r of all) {
     assert.equal(typeof lang[r.code], 'string', r.code);

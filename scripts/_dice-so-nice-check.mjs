@@ -18,7 +18,7 @@ export const TESTED_VERSION = '6.4.4';
 export const REQUIRED_API = Object.freeze(['addSystem', 'addDicePreset', 'addColorset']);
 
 /** Calls the bridge uses when present and does without otherwise. */
-export const OPTIONAL_API = Object.freeze(['preloadPresets', 'isEnabled']);
+export const OPTIONAL_API = Object.freeze(['preloadPresets', 'isEnabled', 'addSFXTrigger', 'addSFXDefaults']);
 
 /** Row levels, worst last. */
 export const LEVELS = Object.freeze(['ok', 'info', 'warn', 'error']);
@@ -50,7 +50,7 @@ export function compareVersions(a, b) {
  * @property {string[]} [methods]     - functions present on game.dice3d
  * @property {boolean} [enabled]      - its own on/off for this player (isEnabled)
  * @property {{ok: boolean, error?: string, problems?: object[], setCount?: number}} [manifest]
- * @property {{colorsets: number, systems: number, presets: number, errors: {step: string, id: string, message: string}[]}} [registration]
+ * @property {{colorsets: number, systems: number, presets: number, crits?: boolean, errors: {step: string, id: string, message: string}[]}} [registration]
  * @property {{path: string, ok: boolean, status?: number}[]} [files] - only when the GM ran the file check
  */
 
@@ -105,6 +105,8 @@ export function judgeDiceSoNice(f = {}) {
     if (r.colorsets || r.systems) {
       rows.push(row('ok', 'Registered', { colorsets: r.colorsets, systems: r.systems, presets: r.presets }));
     }
+    if (r.crits === true) rows.push(row('ok', 'CritsRegistered'));
+    else if (r.crits === false) rows.push(row('warn', 'CritsMissing'));
   }
 
   if (Array.isArray(f.files)) {

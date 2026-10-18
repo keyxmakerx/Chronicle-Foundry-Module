@@ -225,3 +225,60 @@ export function appearanceFor(pick, registered) {
   if (registered.systems?.has(systemId(setId))) look.system = systemId(setId);
   return look;
 }
+
+/** The Dice So Nice trigger a Chronicle crit die carries; players bind effects to its results. */
+export const CRIT_TRIGGER = 'chronicle-crit';
+
+/** Chronicle's crits, by the key a die's `succ` / `fail` pick carries. */
+export const CRITS = Object.freeze([
+  { id: 'storm', name: 'Storm call', kind: 'succ' },
+  { id: 'phoenix', name: 'Phoenix', kind: 'succ' },
+  { id: 'dawn', name: 'Dawnbreak', kind: 'succ' },
+  { id: 'starfall', name: 'Starfall', kind: 'succ' },
+  { id: 'bloom', name: 'Wildbloom', kind: 'succ' },
+  { id: 'hoard', name: "Dragon's hoard", kind: 'succ' },
+  { id: 'grasp', name: 'Eldritch grasp', kind: 'fail' },
+  { id: 'frost', name: 'Frostbite', kind: 'fail' },
+  { id: 'shatter', name: 'Shatter', kind: 'fail' },
+  { id: 'hex', name: 'Hex', kind: 'fail' },
+  { id: 'crows', name: 'Murder of crows', kind: 'fail' },
+  { id: 'abyss', name: 'The abyss', kind: 'fail' },
+]);
+
+/** Chronicle's default picks, used when a crit die names none or an unknown one. */
+export const DEFAULT_CRIT = Object.freeze({ succ: 'phoenix', fail: 'grasp' });
+
+/**
+ * Dice So Nice's own effects stand in for the rune crits, which are drawn on
+ * Chronicle's stage and don't run inside Dice So Nice. These lines only reach
+ * players who never saved their effect settings; anyone can rebind them.
+ */
+const STAND_IN = Object.freeze({ succ: 'PlayAnimationParticleSparkles', fail: 'PlayAnimationDark' });
+
+/**
+ * What registers the crits: the trigger with one named result per crit, and
+ * the stand-in effect lines for new players.
+ * @returns {{trigger: {id: string, name: string, results: {id: string, name: string}[]}, defaults: object[]}}
+ */
+export function critRegistrations() {
+  const byKind = (kind) => CRITS.filter((c) => c.kind === kind).map((c) => c.id);
+  return {
+    trigger: { id: CRIT_TRIGGER, name: 'Chronicle crit', results: CRITS.map((c) => ({ id: c.id, name: c.name })) },
+    defaults: ['succ', 'fail'].map((kind) => ({ diceType: CRIT_TRIGGER, onResult: byKind(kind), specialEffect: STAND_IN[kind] })),
+  };
+}
+
+/**
+ * The Dice So Nice `sfx` option for one die of a Chronicle roll: its roller's
+ * crit pick when the die crits, else null. An unknown pick plays the default
+ * crit of that kind, so a crit never goes silent over a renamed key.
+ * @param {{crit?: 'succ'|'fail'|null, succ?: string, fail?: string}} die
+ * @returns {{id: string, result: string}|null}
+ */
+export function critSfx(die) {
+  const kind = die?.crit;
+  if (kind !== 'succ' && kind !== 'fail') return null;
+  const pick = die[kind];
+  const known = CRITS.some((c) => c.id === pick && c.kind === kind);
+  return { id: CRIT_TRIGGER, result: known ? pick : DEFAULT_CRIT[kind] };
+}

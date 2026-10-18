@@ -15,7 +15,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
-  ASSET_ROOT, GROUP, MANIFEST_PATH, RUNE_SET_IDS, appearanceFor, buildRegistrations, colorsetId, readManifest, safeAssetPath, systemId,
+  ASSET_ROOT, CRITS, CRIT_TRIGGER, GROUP, MANIFEST_PATH, RUNE_SET_IDS, appearanceFor, critRegistrations, critSfx, buildRegistrations, colorsetId, readManifest, safeAssetPath, systemId,
 } from '../scripts/_rune-dice.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -140,4 +140,30 @@ test('the twelve rune sets are known; anything else is flagged but still loads',
   const odd = readManifest({ version: 1, sets: [{ id: 'ember' }] });
   assert.deepEqual(odd.problems, [{ code: 'SetUnknown', set: 'ember' }]);
   assert.equal(odd.sets.length, 1);
+});
+
+test('crits: one trigger result per crit, stand-ins split by kind', () => {
+  const { trigger, defaults } = critRegistrations();
+  assert.equal(trigger.id, CRIT_TRIGGER);
+  assert.deepEqual(trigger.results.map((r) => r.id), CRITS.map((c) => c.id));
+  assert.equal(CRITS.filter((c) => c.kind === 'succ').length, 6);
+  assert.deepEqual(defaults.map((d) => [d.diceType, d.onResult.length]), [[CRIT_TRIGGER, 6], [CRIT_TRIGGER, 6]]);
+  assert.ok(defaults[0].onResult.includes('phoenix') && defaults[1].onResult.includes('grasp'));
+});
+
+test("a crit die plays its roller's crit; unknown picks fall back, non-crits play nothing", () => {
+  assert.deepEqual(critSfx({ crit: 'succ', succ: 'storm', fail: 'hex' }), { id: CRIT_TRIGGER, result: 'storm' });
+  assert.deepEqual(critSfx({ crit: 'fail', succ: 'storm', fail: 'hex' }), { id: CRIT_TRIGGER, result: 'hex' });
+  assert.deepEqual(critSfx({ crit: 'succ', succ: 'renamed' }), { id: CRIT_TRIGGER, result: 'phoenix' });
+  assert.deepEqual(critSfx({ crit: 'fail', fail: 'storm' }), { id: CRIT_TRIGGER, result: 'grasp' });
+  assert.equal(critSfx({ crit: null, succ: 'storm' }), null);
+  assert.equal(critSfx({ crit: 'max' }), null);
+  assert.equal(critSfx(undefined), null);
+});
+
+test('the shipped list is the twelve signed sets', () => {
+  const r = readManifest(JSON.parse(readFileSync(resolve(ROOT, MANIFEST_PATH), 'utf8')));
+  assert.deepEqual(r.sets.map((s) => s.id), [...RUNE_SET_IDS]);
+  assert.ok(r.sets.every((s) => s.colours.length >= 5 && s.material));
+  assert.equal(r.sets.find((s) => s.id === 'jewelled').colours[0].id, 'onyx');
 });
