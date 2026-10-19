@@ -21,6 +21,12 @@ request once without the header and stops sending it for the session
 (`scripts/_module-version.mjs`), so an older server keeps syncing. WebSocket
 connections do not send it.
 
+One endpoint is public and outside the campaign path: `GET /api/version`
+returns `{"version": "<build>"}` (a release tag, a commit, or `unknown`). The
+module reads it on connect without the API key (`scripts/_chronicle-version.mjs`)
+to show which Chronicle it is talking to. Chronicle side:
+`internal/plugins/syncapi/version_handler.go`, routed in `routes.go`.
+
 WebSocket connections authenticate via query parameter at connection time:
 ```
 wss://chronicle.example.com/ws?token=<api-key>
