@@ -30,9 +30,17 @@ repo root. There is no `package.json`.
 
 ## Keyboard shortcuts
 
-- [ ] Configure Controls lists a Chronicle Sync group with five shortcuts (dashboard, DM Screen, notebook, quest board, calendar), all with no key bound
+- [ ] Configure Controls lists a Chronicle Sync group with five shortcuts (Chronicle Sync, DM Screen, Satchel, calendar, token art on hover), all with no key bound
 - [ ] Bind a key to "Open the Chronicle Sync dashboard", press it as the GM: the dashboard opens; as a player the GM-only two are not listed
 - [ ] With the world not connected, a key bound to the notebook does nothing and Foundry's own use of that key still works
+
+## Dice So Nice
+
+- [ ] Without Dice So Nice installed: roll `/r 1d20` as GM and as a player; both get Foundry's normal roll card and no console errors. Chronicle Sync → Problems → Health shows Dice So Nice "Not in use"
+- [ ] With Dice So Nice 6.x on: the same pane shows "Working", the version, and "calls for adding dice are all there"; "Check dice files" adds "All N dice files are where they should be" (or "No rune dice sets are shipped" while the list is empty)
+- [ ] With rune sets shipped: Dice So Nice's settings (the dice icon in chat) list a "Chronicle Rune" group under dice and themes, on a player's client too
+- [ ] A player with Dice So Nice turned off in its own settings, or with Foundry's canvas off, still sees the roll card
+- [ ] Dice So Nice's settings → Special Effects: a new player has two "Chronicle crit" lines (six success crits → sparkles, six fail crits → dark); the trigger's result list names all 12 crits
 
 ## Journal Sync (Entities)
 
@@ -192,6 +200,7 @@ Chronicle brings its own calendar; no Foundry calendar module is used.
 ### Calendar window
 - [ ] Chronicle scene controls -> **Calendar** button (player and GM) -> first time, Chronicle's Allow window asks about "notes and calendar"; press Allow -> a Foundry window opens with Chronicle's own calendar page: the sky moving, day weather, moons, events
 - [ ] A player already connected for the notebook -> **Calendar** opens straight away, no Allow window
+- [ ] The first time it opens on a player's screen it fills most of the screen (no squashed month grid), under a slim title bar with no padding or border around the page
 - [ ] Player: GM-only events, hidden moons and secret eras never appear (compare with the same player signed in on the site)
 - [ ] GM: Chronicle's editing works in the window (add an event, open it, change it); the change shows on the site after a refresh
 - [ ] Resize the window from its corner -> the calendar redraws to fit (narrow: one-letter weekdays); close and reopen -> same size and place, per player
@@ -353,6 +362,34 @@ Chronicle Sync → Settings, under What syncs.
 - [ ] Drag an ability from the system's compendium onto a synced actor, named like one of the page's: after the next page edit the actor still has just that one, and the GM's copy is unchanged
 - [ ] Change a tier on the page in Chronicle: that ability updates on the actor; the others keep their place
 
+## Token Art on Hover
+
+Needs a GM and a player client on the same scene, and a creature actor whose portrait differs from its token (Sync Creatures does this when the page has both art and a token).
+
+- [ ] As the player, rest the cursor on the creature's token: after a moment its full art appears beside the cursor and follows it; moving off the token, clicking or dragging takes it away
+- [ ] Near the right or bottom edge of the screen the picture flips to the other side of the cursor and stays on screen
+- [ ] A token whose portrait is the same as its token, or the default mystery man, shows nothing
+- [ ] GM: right-click the token; the HUD has a portrait button. Click it: the tooltip says off, and the player no longer gets the art for that token. Click again: it's back
+- [ ] GM: hide the token, or set its disposition to Secret: the player gets no art; the GM still does
+- [ ] Player: Game Settings, Chronicle Sync, untick "Show token art on hover": no more previews for that player only. Bind "Show or hide token art on hover" in Configure Controls: the key switches it with a notice
+- [ ] GM: untick "Token art on hover" in the world settings: nobody gets previews
+- [ ] Motion Calm: the picture fades in; Off: it appears at once
+
+## Creature Forms (Change Form)
+
+Needs Sync Creatures on, a GM and a player client on the same scene, a Chronicle creature page with a second form (Draw Steel: Add a form on its stat block), and its token on the scene. The GM's Chronicle must have the system-state write route (keyxmakerx/Chronicle#1504) for the page steps.
+
+- [ ] GM: right-click the token; the HUD has a masks button "Change form". A creature with no other forms has none
+- [ ] Click it: a window lists the first form and each other form, the current one marked Now and not pickable, with Quiet and Reveal (Reveal picked)
+- [ ] Reveal: on both clients the new art grows out of the token, holds, and shrinks back; then the sheet, portrait and token change. Position, conditions and the combat tracker entry stay
+- [ ] Chat: everyone sees "<name> becomes <form>"; the GM alone gets the Stamina left
+- [ ] Stamina: with "Damage carries over" on the form, a creature that had taken 95 damage keeps it against the new maximum; with "Starts at full Stamina" it is full
+- [ ] Quiet: no reveal and no public chat line; only the GM's whisper
+- [ ] Hidden token, Reveal: the player sees nothing; the creature's Chronicle page does not list the form for the player
+- [ ] Visible token: the player's view of the creature's Chronicle page now lists the form and opens on it
+- [ ] Change back to the first form: everything returns; edit the current form on the Chronicle page and the actor follows
+- [ ] Motion Calm: the reveal fades instead of growing; Off: the card shows still for a moment
+
 ## NPC Tokens (Spotlight, Talking)
 
 Needs a GM and a player client on the same scene, and an NPC page synced as a journal.
@@ -375,12 +412,15 @@ Needs a GM and a player client on the same scene, and an NPC page synced as a jo
 
 GM only. Needs a Chronicle that serves the DM Screen.
 
-- [ ] The scene controls' Chronicle group has a d20 button for the GM; a player's group has only the notebook button
+- [ ] The scene controls' Chronicle group has a d20 button for the GM; a player's group has only the Satchel and Calendar buttons
 - [ ] Click it: a d20 rolls out of the button, lands on 20 and the screen unfolds into three leaves (The world, The party, Rules and reveals); a click or Escape skips the opening
 - [ ] The world leaf shows In session / Downtime; pressing the other one asks first, **Cancel** leaves it, confirming switches it and a notice says how many waiting requests went through
-- [ ] The party leaf lists each hero on one line; a row expands for detail
+- [ ] The party leaf lists each hero on one line; a row expands for detail, with a green dot after "Played by" when that player is on Chronicle now
+- [ ] The top strip says how many players are here (hover lists who); with requests waiting, **Waiting on you** lists them and its link opens the Stashes page
 - [ ] Rules tab: **Find a condition** filters the list. Reveal tab: **Reveal** on a hidden character makes it visible to players in Chronicle
 - [ ] Against a Chronicle without the DM Screen, the window says to update Chronicle; with a wrong key it says the key was not accepted; **Try again** reloads
+- [ ] **Cast** lists the scene's tokens that belong to a Chronicle page and no player, hidden ones marked Hidden. Spotlight, Talk as (then Stop talking) and Page do what the token's own buttons do; a player's hero never appears
+- [ ] **Party** shows each shared stash with its money and items, **Move things** opens a hero's Stashes window, and each shop's **Open** opens its shop room. With stashes off in Chronicle, it says so
 
 ## Encounters (DM Screen tab)
 
@@ -399,6 +439,13 @@ GM only. Needs a Chronicle that serves encounters, a key for the campaign owner 
 - [ ] With a started combat on the scene, **Add who's here** asks first; saying no changes nothing
 - [ ] **Undo placing** asks; confirming removes only the tokens this fight placed, other tokens stay
 - [ ] Switch scenes with the tab open: the roster reads the new scene (all **Not placed** there) and any waiting scene click is cancelled
+
+Stages (needs the encounter to have stages in Chronicle, a creature with a second form, and Change form working, see Creature Forms):
+
+- [ ] Under the roster, **Stages** lists each stage with when it comes and what it does; a fight with no stages shows nothing new
+- [ ] A "half Stamina" stage: damage the creature's token past half: the stage turns **Due**, and one notice says so. **Not yet** sets it back until the next round of the started tracker, then it is due again
+- [ ] **Start stage N**: the creature changes form the way the stage says (quiet or reveal); then the scene waits for one click and the arriving rows land there. The stage reads **Started**, and still does after closing and reopening the DM Screen
+- [ ] A "round 3" stage turns due at the start of round 3; a manual stage is never due but its Start works any time
 
 ## Character claims
 
@@ -426,18 +473,20 @@ Needs the Armory addon on in Chronicle, a character linked to an actor, and a pl
 
 Needs a Chronicle with quest boards (a category or a place page with at least one board and a pinned notice) and the GM connected.
 
-- [ ] The Chronicle tool group in the scene controls has **Open the quest board** (thumbtack); it opens the boards of the first place with boards, and the drop-down switches places
+- [ ] The Satchel's **Quests** tab shows the boards of the first place with boards, and the drop-down switches places
 - [ ] Notices, sticky notes, pinned pages and red strings sit where they do on Chronicle's board; a notice due soon or late says so under it; with more than one board, the arrows turn boards
-- [ ] Click a notice -> its quest opens as a paper sheet; the GM also sees the ledger under it
+- [ ] Click a notice -> its quest opens as a paper sheet in the same tab, with **Back to the board**; the GM also sees the ledger under it
 - [ ] As GM, tick a step, toggle its eye, change the status -> Chronicle's page shows the same after a refresh; an edit made in Chronicle shows in the open Foundry window without reopening it
 - [ ] As GM, **Hand out** with a coin reward and two characters -> each sheet gets its share, with "as a reward for <quest>" in its money history; with an item reward -> the item lands on the chosen character; the ledger reads "Handed out to the party"
 - [ ] As a player, the board shows only what Chronicle shows a player: no hidden notices, no hidden steps (a "More steps the party has yet to learn" line instead), no ledger
 - [ ] A journal synced from a Chronicle quest page has an **Open quest** button in its header
 - [ ] With no GM connected, a player's board says it needs the GM to be connected
 
-## Player Notebook
+## Satchel and notebook
 
-- [ ] Every user (GM and players) has an **Open my Chronicle notebook** button in the Chronicle scene controls and a **Jot notes** tab in the bottom-right corner while the world is connected to Chronicle
+- [ ] Every user (GM and players) has an **Open my Satchel** button (briefcase) in the Chronicle scene controls and a **Jot notes** tab in the bottom-right corner while the world is connected to Chronicle
+- [ ] The Satchel opens on the tab it was last left on; **Notebook**, **Quests** and **Stash** switch without reloading the notebook frame
+- [ ] A player's **Stash** tab shows their character's Stashes window (move, history, report a problem); a player with no Chronicle character, and the GM, see a line saying where to look instead
 - [ ] First use: **Connect to Chronicle** opens Chronicle's Allow window; **Allow** closes it and the player's own Journal appears in the frame
 - [ ] A player whose Foundry user is not matched to a Chronicle member sees the "hasn't matched your Foundry login" message; one who allows with a different Chronicle account sees the "isn't the one your GM matched" message
 - [ ] Open a Chronicle-linked journal, then the Jot notes tab -> the jots follow the page in view; opening another linked journal moves them
@@ -447,7 +496,8 @@ Needs a Chronicle with quest boards (a category or a place page with at least on
 
 ## Import Wizard
 
-- [ ] Chronicle Sync → Settings → Connection -> **Setup Wizard** opens a six-step wizard: Connect, Scan, Types, Tags, Characters, Review; there are no maps or calendar steps
+- [ ] Chronicle Sync → Settings → Connection -> **Setup Wizard** shows a six-step wizard inside the Chronicle Sync window (no second window): Connect, Scan, Types, Tags, Characters, Review; there are no maps or calendar steps. The Connect step fills in its checks (connection, page types, game system) on its own
+- [ ] In a world with no connection, Chronicle Sync opens on "Set up Chronicle in this world" with the five steps listed and the connection settings below. Save a connect line and reload: Chronicle Sync opens on the wizard. **Skip setup** returns to the four sections and the wizard does not reappear on the next open
 - [ ] Tags and Characters steps are skipped when tags are unavailable or no game system matched
 - [ ] Review lists what will be created; running it creates the entities and marks the wizard completed
 
@@ -528,7 +578,7 @@ Player reports and History panes) and Settings (at the foot, set apart).
 - [ ] Configure Settings shows Chronicle's button and only the calendar strip, Motion and temperature unit; the button opens Chronicle Sync at Settings, with panes Connection, What syncs, Calendar, Players and Advanced (GM only)
 - [ ] **Players:** one row per Chronicle member with a Linked / Not linked badge and a Foundry player dropdown; change one, press **Save**, reopen -> the change stuck and the other links are unchanged; **Fetch members again** re-reads the list
 - [ ] **What syncs:** the new-journal page type lists Chronicle's page types; pick one, **Save**, then make a journal in Foundry -> the Chronicle page has that type
-- [ ] **Connection:** **Setup Wizard** opens the import wizard; the API key field is always empty, with "Saved in this browser" when a key exists
+- [ ] **Connection:** **Setup Wizard** shows the import wizard in the same window; the API key field is always empty, with "Saved in this browser" when a key exists
 - [ ] Overview -> "campaign member(s) not mapped" opens Settings → Players
 - [ ] A dashboard last left on the old Config or Members tab opens on Overview
 

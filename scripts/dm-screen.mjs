@@ -11,7 +11,9 @@
  * button, lands on 20, and the screen unfolds out of it while the faces fall
  * and settle. One click or Escape skips it; reduced motion gets a fade.
  * Nothing loops. GM only; the key is the GM's own sync key. Its Encounters
- * tab (encounters.mjs) loads a planned fight as a roster for the scene.
+ * tab (encounters.mjs) loads a planned fight as a roster for the scene, Cast
+ * (dm-cast.mjs) lists the scene's NPCs and Party (dm-party.mjs) shows the
+ * shared stashes and the shops.
  */
 
 import { getSetting } from './settings.mjs';
@@ -19,6 +21,8 @@ import { currentMotion } from './motion.mjs';
 import { noticeText } from './_escape-html.mjs';
 import { downtimeNotice, errorKey, screenContext } from './_dm-screen-view.mjs';
 import { EncountersPane } from './encounters.mjs';
+import { CastPane } from './dm-cast.mjs';
+import { PartyPane } from './dm-party.mjs';
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -101,6 +105,8 @@ class DMScreenWindow extends HandlebarsApplicationMixin(ApplicationV2) {
     this._openHeroes = new Set();
     this._tab = '';
     this._encounters = new EncountersPane(getApi);
+    this._cast = new CastPane();
+    this._party = new PartyPane();
     this._fx = { anims: [], nodes: [], raf: 0, playing: false, onKey: null };
   }
 
@@ -136,6 +142,10 @@ class DMScreenWindow extends HandlebarsApplicationMixin(ApplicationV2) {
     root.querySelector('[data-dms-party]')?.addEventListener('scroll', (e) => partyEdges(e.target));
     const encounters = root.querySelector('[data-dms-enc]');
     if (encounters) this._encounters.mount(encounters);
+    const cast = root.querySelector('[data-dms-cast]');
+    if (cast) this._cast.mount(cast);
+    const party = root.querySelector('[data-dms-partytab]');
+    if (party) this._party.mount(party);
     if (options.isFirstRender && !this._error) this._playOpening(root);
     else this._refreshParty();
   }
@@ -367,6 +377,8 @@ class DMScreenWindow extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @override */
   _onClose(options) {
     this._encounters.destroy();
+    this._cast.destroy();
+    this._party.destroy();
     super._onClose?.(options);
   }
 
@@ -464,6 +476,8 @@ class DMScreenWindow extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 }
 
+const WIDE_TABS = ['encounters', 'cast'];
+
 function selectTab(root, tab) {
   const name = tab.dataset.tab;
   root.querySelectorAll('[data-action="tab"]').forEach((b) => {
@@ -472,8 +486,8 @@ function selectTab(root, tab) {
   root.querySelectorAll('[data-dms-pane]').forEach((p) => {
     p.hidden = p.dataset.dmsPane !== name;
   });
-  // The roster needs room, so the tab's panel widens while it is open.
-  root.querySelector('.dms-leaves')?.classList.toggle('dms-enc-open', name === 'encounters');
+  // A roster or a row of buttons needs room, so the panel widens for those tabs.
+  root.querySelector('.dms-leaves')?.classList.toggle('dms-wide', WIDE_TABS.includes(name));
 }
 
 // The list grows past its usual height when one open hero alone wouldn't

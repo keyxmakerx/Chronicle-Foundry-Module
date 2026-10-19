@@ -5,6 +5,7 @@
  * pass a fake world.
  */
 import { FLAG_SCOPE, syncOptions, APPLY_OPTION } from './constants.mjs';
+import { findEntry, entryItemFill } from './_campaign-entry-item.mjs';
 
 const norm = (s) => String(s ?? '').trim().toLowerCase();
 
@@ -52,10 +53,12 @@ export async function findIdentityItem(game, itemType, name) {
 
 /**
  * Apply one planned swap. The new item is created before the old ones go, so
- * a failed create leaves the sheet as it was.
+ * a failed create leaves the sheet as it was. A Foundry item of that name wins
+ * over the campaign's entry, since it may carry the system's own advancements.
+ * @param {Array<object>} [entries] - the campaign's entries for this field
  * @returns {Promise<'found'|'made'>}
  */
-export async function applyIdentityItem(actor, step, game) {
+export async function applyIdentityItem(actor, step, game, entries) {
   const source = await findIdentityItem(game, step.itemType, step.wantName);
   let data;
   if (source) {
@@ -67,6 +70,8 @@ export async function applyIdentityItem(actor, step, game) {
   } else {
     // A campaign's own entry has no Foundry item to copy; the flag marks it as made here.
     data = { name: step.wantName, type: step.itemType, flags: { [FLAG_SCOPE]: { chronicleMade: true } } };
+    const fill = entryItemFill(findEntry(entries, step.wantName));
+    if (fill) Object.assign(data, fill);
   }
   await actor.createEmbeddedDocuments('Item', [data], writeOptions());
   if (step.removeIds.length) {
@@ -77,14 +82,15 @@ export async function applyIdentityItem(actor, step, game) {
 
 /**
  * Apply a whole plan; one failed step does not stop the rest.
+ * @param {Record<string, Array<object>>} [entriesByField]
  * @returns {Promise<{done: string[], failed: string[]}>} field keys
  */
-export async function applyIdentityPlan(actor, plan, game) {
+export async function applyIdentityPlan(actor, plan, game, entriesByField) {
   const done = [];
   const failed = [];
   for (const step of plan) {
     try {
-      await applyIdentityItem(actor, step, game);
+      await applyIdentityItem(actor, step, game, entriesByField?.[step.fieldKey]);
       done.push(step.fieldKey);
     } catch (err) {
       console.error(`Chronicle: could not set ${step.fieldKey} "${step.wantName}" on "${actor.name}"`, err);
@@ -92,4 +98,15 @@ export async function applyIdentityPlan(actor, plan, game) {
     }
   }
   return { done, failed };
+}
+
+/**
+ * Rewrite the text of items sync made whose campaign entry changed
+ * (`planEntryRefresh`). One write for all of them.
+ * @returns {Promise<string[]>} the field keys refreshed
+ */
+export async function applyEntryRefresh(actor, refresh) {
+  if (!refresh.length) return [];
+  await actor.updateEmbeddedDocuments('Item', refresh.map((r) => r.update), writeOptions());
+  return refresh.map((r) => r.fieldKey);
 }

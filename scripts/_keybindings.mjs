@@ -12,9 +12,9 @@
 export const SHORTCUTS = [
   { action: 'openDashboard', gm: true, connected: false },
   { action: 'openDMScreen', gm: true, connected: true },
-  { action: 'openNotebook', gm: false, connected: true },
-  { action: 'openQuests', gm: false, connected: true },
+  { action: 'openSatchel', gm: false, connected: true },
   { action: 'openCalendar', gm: false, connected: true },
+  { action: 'toggleHoverArt', gm: false, connected: false },
 ];
 
 /**

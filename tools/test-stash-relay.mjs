@@ -194,6 +194,23 @@ test('PendingRequests: no reply in time resolves with a timeout error', async ()
   assert.equal(p.size, 0);
 });
 
+test('PendingRequests calls its timers as plain functions, as a browser requires', async () => {
+  // A browser's setTimeout and clearTimeout throw "Illegal invocation" when
+  // called as a method of another object; these stand-ins do the same.
+  const t = fakeTimers();
+  const strict = (fn) => function (...args) {
+    if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
+    return fn(...args);
+  };
+  const p = new PendingRequests({ setTimer: strict(t.setTimer), clearTimer: strict(t.clearTimer) });
+  const a = p.create();
+  assert.equal(p.settle(a.id, { ok: true }), true);
+  assert.deepEqual(await a.promise, { ok: true });
+  const b = p.create('w');
+  p.cancelAll('w');
+  assert.equal((await b.promise).error.code, 'cancelled');
+});
+
 test('PendingRequests: late or unknown replies are ignored; ids are unique', () => {
   const p = new PendingRequests();
   const a = p.create();

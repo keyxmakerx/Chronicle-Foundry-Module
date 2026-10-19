@@ -1,0 +1,593 @@
+{
+  "version": 1,
+  "sets": [
+    {
+      "id": "jewelled",
+      "name": "Jewelled",
+      "material": "stone",
+      "colours": [
+        {
+          "id": "onyx",
+          "name": "Onyx and silver",
+          "foreground": "#e4e7ec",
+          "background": "#2a2b30",
+          "outline": "#000000",
+          "edge": "#e4e7ec"
+        },
+        {
+          "id": "ivory",
+          "name": "Ivory and gold",
+          "foreground": "#f0c25e",
+          "background": "#fbf5e6",
+          "outline": "#000000",
+          "edge": "#f0c25e"
+        },
+        {
+          "id": "marble",
+          "name": "Marble and black iron",
+          "foreground": "#3b3e45",
+          "background": "#fbfbfa",
+          "outline": "#ffffff",
+          "edge": "#3b3e45"
+        },
+        {
+          "id": "lapis",
+          "name": "Lapis and gold",
+          "foreground": "#eabf5c",
+          "background": "#2d4fb0",
+          "outline": "#000000",
+          "edge": "#eabf5c"
+        },
+        {
+          "id": "jade",
+          "name": "Jade and bronze",
+          "foreground": "#c48a52",
+          "background": "#4fa37b",
+          "outline": "#000000",
+          "edge": "#c48a52"
+        },
+        {
+          "id": "garnet",
+          "name": "Garnet and rose gold",
+          "foreground": "#efbfae",
+          "background": "#8e1b2c",
+          "outline": "#000000",
+          "edge": "#efbfae"
+        },
+        {
+          "id": "amethyst",
+          "name": "Amethyst and silver",
+          "foreground": "#dfe3ea",
+          "background": "#7a4cc2",
+          "outline": "#000000",
+          "edge": "#dfe3ea"
+        }
+      ]
+    },
+    {
+      "id": "confetti",
+      "name": "Confetti glass",
+      "material": "glass",
+      "colours": [
+        {
+          "id": "clear",
+          "name": "Clear prism",
+          "foreground": "#191c2a",
+          "background": "#f3f7ff",
+          "outline": "#ffffff",
+          "edge": "#eef4ff"
+        },
+        {
+          "id": "smoke",
+          "name": "Smoke and gold",
+          "foreground": "#f3d27a",
+          "background": "#757271",
+          "outline": "#000000",
+          "edge": "#3a3634"
+        },
+        {
+          "id": "sea",
+          "name": "Sea glass",
+          "foreground": "#ffffff",
+          "background": "#a5e2d7",
+          "outline": "#000000",
+          "edge": "#7fd6c6"
+        },
+        {
+          "id": "rose",
+          "name": "Rose quartz",
+          "foreground": "#ffffff",
+          "background": "#ffcad8",
+          "outline": "#000000",
+          "edge": "#ffb3c7"
+        },
+        {
+          "id": "midnight",
+          "name": "Midnight",
+          "foreground": "#e8eef9",
+          "background": "#616ca2",
+          "outline": "#000000",
+          "edge": "#1d2d7a"
+        }
+      ]
+    },
+    {
+      "id": "acrylic",
+      "name": "Acrylic",
+      "material": "plastic",
+      "colours": [
+        {
+          "id": "oxblood",
+          "name": "Oxblood and cream",
+          "foreground": "#f4e8cf",
+          "background": "#7a1322",
+          "outline": "#000000",
+          "edge": "#3a050d"
+        },
+        {
+          "id": "bone",
+          "name": "Bone and black",
+          "foreground": "#16130f",
+          "background": "#f3ecdc",
+          "outline": "#ffffff",
+          "edge": "#d8ccb2"
+        },
+        {
+          "id": "forest",
+          "name": "Forest pearl",
+          "foreground": "#f0c75e",
+          "background": "#2f7a55",
+          "outline": "#000000",
+          "edge": "#123a28"
+        },
+        {
+          "id": "royal",
+          "name": "Royal violet",
+          "foreground": "#ffffff",
+          "background": "#5b2fb0",
+          "outline": "#000000",
+          "edge": "#22104f"
+        },
+        {
+          "id": "ink",
+          "name": "Ink and gold",
+          "foreground": "#e9c15a",
+          "background": "#24252b",
+          "outline": "#000000",
+          "edge": "#050506"
+        },
+        {
+          "id": "coral",
+          "name": "Coral",
+          "foreground": "#ffffff",
+          "background": "#ff7a5c",
+          "outline": "#000000",
+          "edge": "#c93c2a"
+        }
+      ]
+    },
+    {
+      "id": "cage",
+      "name": "Verdant cage",
+      "material": "metal",
+      "colours": [
+        {
+          "id": "bronze",
+          "name": "Bronze and jade",
+          "foreground": "#f6e6c0",
+          "background": "#7f5c36",
+          "outline": "#000000",
+          "edge": "#382414"
+        },
+        {
+          "id": "iron",
+          "name": "Black iron and thorn",
+          "foreground": "#f8eadd",
+          "background": "#46474f",
+          "outline": "#000000",
+          "edge": "#1a1b20"
+        },
+        {
+          "id": "silver",
+          "name": "Silver and moss",
+          "foreground": "#f6f8f0",
+          "background": "#b3b8c1",
+          "outline": "#000000",
+          "edge": "#5a5f6a"
+        },
+        {
+          "id": "gold",
+          "name": "Gold and emerald",
+          "foreground": "#fff0c0",
+          "background": "#ad873a",
+          "outline": "#000000",
+          "edge": "#553810"
+        },
+        {
+          "id": "pewter",
+          "name": "Pewter and nightshade",
+          "foreground": "#f4eeff",
+          "background": "#737a8d",
+          "outline": "#000000",
+          "edge": "#2f3443"
+        }
+      ]
+    },
+    {
+      "id": "heartlight",
+      "name": "Heartlight",
+      "material": "glass",
+      "colours": [
+        {
+          "id": "violet",
+          "name": "Arcane violet",
+          "foreground": "#f3edff",
+          "background": "#6a2fe8",
+          "outline": "#000000",
+          "edge": "#cfbfff"
+        },
+        {
+          "id": "fey",
+          "name": "Fey green",
+          "foreground": "#effff4",
+          "background": "#0c9a50",
+          "outline": "#000000",
+          "edge": "#a6e8c2"
+        },
+        {
+          "id": "sun",
+          "name": "Sun gold",
+          "foreground": "#fff8e3",
+          "background": "#dd7a00",
+          "outline": "#000000",
+          "edge": "#ffdb88"
+        },
+        {
+          "id": "abyss",
+          "name": "Abyss blue",
+          "foreground": "#ecf5ff",
+          "background": "#1050f0",
+          "outline": "#000000",
+          "edge": "#a6cbff"
+        },
+        {
+          "id": "blood",
+          "name": "Blood red",
+          "foreground": "#fff0f0",
+          "background": "#cc0f28",
+          "outline": "#000000",
+          "edge": "#ffa8b2"
+        }
+      ]
+    },
+    {
+      "id": "gothic",
+      "name": "Gothic",
+      "material": "metal",
+      "colours": [
+        {
+          "id": "cathedral",
+          "name": "Cathedral",
+          "foreground": "#eceaf0",
+          "background": "#55535c",
+          "outline": "#000000",
+          "edge": "#0c0b0f"
+        },
+        {
+          "id": "nightshade",
+          "name": "Nightshade",
+          "foreground": "#ece6f7",
+          "background": "#4f4b62",
+          "outline": "#000000",
+          "edge": "#0b0a12"
+        },
+        {
+          "id": "ember",
+          "name": "Ember",
+          "foreground": "#f5eadb",
+          "background": "#5c4a44",
+          "outline": "#000000",
+          "edge": "#120907"
+        },
+        {
+          "id": "frost",
+          "name": "Frost chapel",
+          "foreground": "#1e2636",
+          "background": "#c9cfd9",
+          "outline": "#ffffff",
+          "edge": "#f4f8fc"
+        },
+        {
+          "id": "verdigris",
+          "name": "Verdigris",
+          "foreground": "#f1efe0",
+          "background": "#4d6a60",
+          "outline": "#000000",
+          "edge": "#07100d"
+        }
+      ]
+    },
+    {
+      "id": "obsidian",
+      "name": "Ember obsidian",
+      "material": "pristine",
+      "colours": [
+        {
+          "id": "magma",
+          "name": "Magma",
+          "foreground": "#ffb04a",
+          "background": "#202026",
+          "outline": "#000000",
+          "edge": "#08080b"
+        },
+        {
+          "id": "ember",
+          "name": "Ember",
+          "foreground": "#ff7a52",
+          "background": "#2a1618",
+          "outline": "#000000",
+          "edge": "#0a0405"
+        },
+        {
+          "id": "witchfire",
+          "name": "Witchfire",
+          "foreground": "#b6ff9a",
+          "background": "#16231c",
+          "outline": "#000000",
+          "edge": "#050907"
+        },
+        {
+          "id": "soulfire",
+          "name": "Soulfire",
+          "foreground": "#a8dcff",
+          "background": "#161c30",
+          "outline": "#000000",
+          "edge": "#05060d"
+        },
+        {
+          "id": "mahogany",
+          "name": "Mahogany obsidian",
+          "foreground": "#ffc27a",
+          "background": "#472a1d",
+          "outline": "#000000",
+          "edge": "#150907"
+        }
+      ]
+    },
+    {
+      "id": "moonstone",
+      "name": "Moonstone",
+      "material": "iridescent",
+      "colours": [
+        {
+          "id": "blue",
+          "name": "Blue moonstone",
+          "foreground": "#cdd4e0",
+          "background": "#d9e0eb",
+          "outline": "#000000",
+          "edge": "#8e9db6"
+        },
+        {
+          "id": "peach",
+          "name": "Peach moonstone",
+          "foreground": "#d9a547",
+          "background": "#ecd8c6",
+          "outline": "#000000",
+          "edge": "#b4937f"
+        },
+        {
+          "id": "rainbow",
+          "name": "Rainbow moonstone",
+          "foreground": "#d3d8e4",
+          "background": "#dfdfe8",
+          "outline": "#000000",
+          "edge": "#9895ab"
+        },
+        {
+          "id": "grey",
+          "name": "Grey moonstone",
+          "foreground": "#eef0f4",
+          "background": "#b9bdc6",
+          "outline": "#000000",
+          "edge": "#5c616c"
+        },
+        {
+          "id": "black",
+          "name": "Black moonstone",
+          "foreground": "#e3e8f2",
+          "background": "#2c2e37",
+          "outline": "#000000",
+          "edge": "#090a0f"
+        }
+      ]
+    },
+    {
+      "id": "oak",
+      "name": "Druid's oak",
+      "material": "wood",
+      "colours": [
+        {
+          "id": "oak",
+          "name": "Oak and brass",
+          "foreground": "#dcae4c",
+          "background": "#c9a468",
+          "outline": "#000000",
+          "edge": "#8c6234"
+        },
+        {
+          "id": "walnut",
+          "name": "Walnut and brass",
+          "foreground": "#e8bf5a",
+          "background": "#6e4c37",
+          "outline": "#000000",
+          "edge": "#3a2418"
+        },
+        {
+          "id": "ebony",
+          "name": "Ebony and silver",
+          "foreground": "#dde2ea",
+          "background": "#2c2723",
+          "outline": "#000000",
+          "edge": "#0f0d0c"
+        },
+        {
+          "id": "bloodwood",
+          "name": "Bloodwood and gold",
+          "foreground": "#f2c24e",
+          "background": "#a8382a",
+          "outline": "#000000",
+          "edge": "#5e170f"
+        },
+        {
+          "id": "ash",
+          "name": "Ash and copper",
+          "foreground": "#d98650",
+          "background": "#e6d6b0",
+          "outline": "#000000",
+          "edge": "#b89c6c"
+        }
+      ]
+    },
+    {
+      "id": "nebula",
+      "name": "Nebula resin",
+      "material": "resin",
+      "colours": [
+        {
+          "id": "orion",
+          "name": "Orion",
+          "foreground": "#ffe6f6",
+          "background": "#1b1034",
+          "outline": "#000000",
+          "edge": "#c04ad0"
+        },
+        {
+          "id": "carina",
+          "name": "Carina",
+          "foreground": "#fff0dc",
+          "background": "#102226",
+          "outline": "#000000",
+          "edge": "#ff9a40"
+        },
+        {
+          "id": "veil",
+          "name": "Veil",
+          "foreground": "#e8ffee",
+          "background": "#0f2218",
+          "outline": "#000000",
+          "edge": "#5ae09a"
+        },
+        {
+          "id": "void",
+          "name": "Void",
+          "foreground": "#f5f7ff",
+          "background": "#0e0f16",
+          "outline": "#000000",
+          "edge": "#8e98c0"
+        },
+        {
+          "id": "aurora",
+          "name": "Aurora",
+          "foreground": "#e4fff6",
+          "background": "#0a1d20",
+          "outline": "#000000",
+          "edge": "#5af0c0"
+        }
+      ]
+    },
+    {
+      "id": "bone",
+      "name": "Dragonbone",
+      "material": "stone",
+      "colours": [
+        {
+          "id": "bleached",
+          "name": "Bleached and black ink",
+          "foreground": "#17151b",
+          "background": "#f2ecde",
+          "outline": "#ffffff",
+          "edge": "#d8ceb8"
+        },
+        {
+          "id": "ivory",
+          "name": "Ivory and red ink",
+          "foreground": "#a3151f",
+          "background": "#eddcb6",
+          "outline": "#ffffff",
+          "edge": "#cbb283"
+        },
+        {
+          "id": "ochre",
+          "name": "Ochre and umber ink",
+          "foreground": "#3a2310",
+          "background": "#d3a560",
+          "outline": "#ffffff",
+          "edge": "#a87638"
+        },
+        {
+          "id": "charred",
+          "name": "Charred and gold ink",
+          "foreground": "#e8bb48",
+          "background": "#34302c",
+          "outline": "#000000",
+          "edge": "#100f0e"
+        },
+        {
+          "id": "jade",
+          "name": "Jade and green ink",
+          "foreground": "#0d3324",
+          "background": "#a5c9a8",
+          "outline": "#ffffff",
+          "edge": "#6f9f82"
+        }
+      ]
+    },
+    {
+      "id": "scale",
+      "name": "Dragonscale",
+      "material": "iridescent",
+      "colours": [
+        {
+          "id": "red",
+          "name": "Red dragon",
+          "foreground": "#ffe2a6",
+          "background": "#b3141c",
+          "outline": "#000000",
+          "edge": "#4a0509"
+        },
+        {
+          "id": "green",
+          "name": "Green dragon",
+          "foreground": "#f2ffd2",
+          "background": "#14864c",
+          "outline": "#000000",
+          "edge": "#06301c"
+        },
+        {
+          "id": "blue",
+          "name": "Blue dragon",
+          "foreground": "#e2f5ff",
+          "background": "#2145c0",
+          "outline": "#000000",
+          "edge": "#0a1a58"
+        },
+        {
+          "id": "gold",
+          "name": "Gold dragon",
+          "foreground": "#fff3c6",
+          "background": "#e8b84a",
+          "outline": "#000000",
+          "edge": "#8a5a10"
+        },
+        {
+          "id": "black",
+          "name": "Black dragon",
+          "foreground": "#e9edff",
+          "background": "#2a2c38",
+          "outline": "#000000",
+          "edge": "#07080c"
+        }
+      ]
+    }
+  ]
+}

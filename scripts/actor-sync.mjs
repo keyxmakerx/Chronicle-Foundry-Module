@@ -26,8 +26,12 @@ import { JournalPushDebouncer } from './_journal-push-debounce.mjs';
 import { mergeChanges, changeTouchesPath } from './_actor-field-diff.mjs';
 import { collapseChanges } from './_change-feed.mjs';
 import { planActorApply } from './_actor-apply-plan.mjs';
-import { planIdentityItems } from './_identity-item-plan.mjs';
-import { applyIdentityPlan } from './_identity-item-apply.mjs';
+import { planIdentityItems, identityFieldTypes } from './_identity-item-plan.mjs';
+import { applyIdentityPlan, applyEntryRefresh } from './_identity-item-apply.mjs';
+import { planEntryRefresh } from './_campaign-entry-item.mjs';
+
+/** How long a read of the campaign's pick-list entries is reused. */
+const ENTRY_CACHE_MS = 30_000;
 
 /**
  * ActorSync handles character entity ↔ Actor synchronization.
@@ -476,13 +480,31 @@ export class ActorSync {
   async _applyIdentityItems(actor, entity) {
     if (!game.user?.isGM) return;
     try {
-      const plan = planIdentityItems({
-        items: (actor.items?.contents ?? Array.from(actor.items ?? [])),
-        fieldDefs: this._adapter.identityFields ?? [],
-        fieldsData: entity?.fields_data,
+      const items = actor.items?.contents ?? Array.from(actor.items ?? []);
+      const fieldDefs = this._adapter.identityFields ?? [];
+      const plan = planIdentityItems({ items, fieldDefs, fieldsData: entity?.fields_data });
+      // Campaign entries are read only for a field that may make an item, or
+      // whose item sync made earlier and may need its text refreshed.
+      const planned = new Set(plan.map((step) => step.fieldKey));
+      const madeFields = identityFieldTypes(fieldDefs).filter(({ fieldKey, itemType }) => {
+        if (planned.has(fieldKey)) return false;
+        const first = items.find((it) => it?.type === itemType);
+        return !!first?.flags?.[FLAG_SCOPE]?.chronicleMade;
       });
-      if (!plan.length) return;
-      const { failed } = await applyIdentityPlan(actor, plan, game);
+      if (!plan.length && !madeFields.length) return;
+      const entriesByField = await this._campaignEntries([...planned, ...madeFields.map((f) => f.fieldKey)]);
+
+      const failed = [];
+      if (plan.length) {
+        failed.push(...(await applyIdentityPlan(actor, plan, game, entriesByField)).failed);
+      }
+      const refresh = planEntryRefresh({ items, fields: madeFields, fieldsData: entity?.fields_data, entriesByField });
+      try {
+        await applyEntryRefresh(actor, refresh);
+      } catch (err) {
+        console.error(`Chronicle: could not refresh campaign entries on "${actor.name}"`, err);
+        failed.push(...refresh.map((r) => r.fieldKey));
+      }
       if (failed.length) {
         ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.IdentityItemFailed', {
           actor: noticeText(actor.name),
@@ -496,6 +518,42 @@ export class ActorSync {
         fields: '',
       }));
     }
+  }
+
+  /**
+   * The campaign's own pick-list entries for these fields, keyed by field.
+   * Cached briefly so a full pull reads each field once, not once per actor.
+   * An older Chronicle without the route (404) is remembered and never asked
+   * again this session; any other failure leaves the items name-only.
+   * @param {string[]} fieldKeys
+   * @returns {Promise<Record<string, Array<object>>>}
+   * @private
+   */
+  async _campaignEntries(fieldKeys) {
+    const out = {};
+    if (!this._api || this._entriesUnsupported) return out;
+    this._entryCache ??= new Map();
+    const now = Date.now();
+    for (const key of new Set(fieldKeys)) {
+      const hit = this._entryCache.get(key);
+      if (hit && now - hit.at < ENTRY_CACHE_MS) {
+        out[key] = hit.list;
+        continue;
+      }
+      try {
+        const raw = await this._api.get(`/system-entries?fieldKey=${encodeURIComponent(key)}`);
+        const list = Array.isArray(raw) ? raw : (Array.isArray(raw?.data) ? raw.data : []);
+        this._entryCache.set(key, { at: now, list });
+        out[key] = list;
+      } catch (err) {
+        if (err?.status === 404) {
+          this._entriesUnsupported = true;
+          return out;
+        }
+        console.warn(`Chronicle: could not read the campaign's ${key} entries`, err);
+      }
+    }
+    return out;
   }
 
   /**

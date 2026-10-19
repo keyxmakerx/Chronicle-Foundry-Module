@@ -49,7 +49,7 @@ flowchart LR
     </td>
     <td width="50%" valign="top">
       <b>DM Screen, notebook and NPCs</b><br>
-      The GM's DM Screen in a Foundry window, each player's own journal and jot notes, and spotlight, talking glow and open page for NPC tokens.
+      The GM's DM Screen in a Foundry window, each player's own journal and jot notes, spotlight, talking glow and open page for NPC tokens, a token's full art beside the cursor when you hover it, and Change form for creatures with more than one form.
     </td>
   </tr>
 </table>

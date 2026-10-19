@@ -29,13 +29,17 @@ import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs
 import { registerNpcPresence, npcSpotlightRelay } from './npc-presence.mjs';
 import { negotiationMirror } from './negotiation-mirror.mjs';
 import { registerMapSheetItems } from './map-sheet-items.mjs';
+import { registerHoverArt, registerHoverArtSettings, toggleHoverArt } from './hover-art.mjs';
+import { registerCreatureForms } from './creature-forms.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { registerShopRoomSocket, registerShopJournalButton } from './shop-room-window.mjs';
-import { notebookAvailable, openCalendarWindow, openNotebook, registerPlayerNotebook } from './player-notebook.mjs';
+import { notebookAvailable, openCalendarWindow, registerPlayerNotebook } from './player-notebook.mjs';
+import { openSatchel } from './satchel.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
 import { registerShortcuts } from './_keybindings.mjs';
 import { registerMotion } from './motion.mjs';
-import { openQuestBoard, questLive, registerQuestBoard } from './quest-board.mjs';
+import { registerDiceSoNice } from './dice-so-nice.mjs';
+import { questLive, registerQuestBoard } from './quest-board.mjs';
 import { retireNotesFolder } from './_notes-folder.mjs';
 import { FLAG_SCOPE, MODULE_ID, syncOptions } from './constants.mjs';
 import { removedFolder } from './_set-aside.mjs';
@@ -79,14 +83,22 @@ function openDashboard(tab) {
 Hooks.once('init', () => {
   console.debug('Chronicle Sync | Initializing');
   registerSettings();
+  registerHoverArtSettings();
   registerMotion();
+  try {
+    // Every client, not only the GM: each one registers the rune dice with
+    // its own Dice So Nice, which starts after Foundry's ready.
+    registerDiceSoNice();
+  } catch (err) {
+    console.warn('Chronicle Sync | Dice So Nice bridge unavailable', err);
+  }
   registerShortcuts(game.keybindings, MODULE_ID, {
     run: {
       openDashboard,
       openDMScreen: () => { openDMScreen(() => syncManager?.api ?? null); },
-      openNotebook: () => { openNotebook(); },
+      openSatchel: () => { openSatchel(); },
       openCalendar: () => { openCalendarWindow(); },
-      openQuests: () => { openQuestBoard(); },
+      toggleHoverArt: () => { toggleHoverArt(); },
     },
     connected: notebookAvailable,
   });
@@ -139,7 +151,8 @@ Hooks.once('ready', async () => {
   const calendarSync = new CalendarSync();
   syncManager.registerModule(calendarSync);
   syncManager.registerModule(new ActorSync());
-  syncManager.registerModule(new CreatureSync());
+  const creatureSync = new CreatureSync();
+  syncManager.registerModule(creatureSync);
   syncManager.registerModule(new ItemSync());
   syncManager.registerModule(new StashSync());
   syncManager.registerModule(npcSpotlightRelay);
@@ -202,6 +215,16 @@ Hooks.once('ready', async () => {
     registerNpcPresence(() => syncManager?.api ?? null);
   } catch (err) {
     console.warn('Chronicle Sync | NPC token tools unavailable', err);
+  }
+  try {
+    registerHoverArt();
+  } catch (err) {
+    console.warn('Chronicle Sync | Token art previews unavailable', err);
+  }
+  try {
+    registerCreatureForms(() => creatureSync);
+  } catch (err) {
+    console.warn('Chronicle Sync | Creature forms unavailable', err);
   }
 
   // Move a legacy world-scoped API key into this GM's client scope and
@@ -329,7 +352,7 @@ async function _runtimeValidateDescriptor() {
 
 /**
  * Add the Chronicle group to Foundry's scene controls toolbar: the Sync
- * Dashboard and DM Screen for GMs, the Notebook, Calendar and Quest board for everyone
+ * Dashboard and DM Screen for GMs, the Satchel and Calendar for everyone
  * once the world is connected to Chronicle.
  */
 Hooks.on('getSceneControlButtons', (controls) => {
@@ -341,15 +364,14 @@ Hooks.on('getSceneControlButtons', (controls) => {
     run: {
       dashboard: openDashboard,
       dmScreen: () => { openDMScreen(() => syncManager?.api ?? null); },
-      notebook: () => { openNotebook(); },
+      satchel: () => { openSatchel(); },
       calendar: () => { openCalendarWindow(); },
-      quests: () => { openQuestBoard(); },
     },
     titles: {
+      dashboard: game.i18n.localize('CHRONICLE.SceneControl.Dashboard'),
       dmScreen: game.i18n.localize('CHRONICLE.SceneControl.DMScreen'),
-      notebook: game.i18n.localize('CHRONICLE.SceneControl.Notebook'),
+      satchel: game.i18n.localize('CHRONICLE.SceneControl.Satchel'),
       calendar: game.i18n.localize('CHRONICLE.SceneControl.Calendar'),
-      quests: game.i18n.localize('CHRONICLE.SceneControl.Quests'),
     },
   });
 });

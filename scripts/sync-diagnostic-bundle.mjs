@@ -20,6 +20,7 @@
  * @property {Array}  [syncStatus]  - [{ resource, direction, lastSync, count, errors }]
  * @property {object} [fieldMapping]- { systemId, characterTypeSlug, adapterType }
  * @property {object} [capability]  - { source:{actorName,actorType}, summary:{...} }
+ * @property {object} [dice]        - { state, stateLabel, rows:[{ level, text, fix }], facts:{ version } }
  * @property {Array}  [activityLog] - [{ timeFormatted, type, message }]
  * @property {Array}  [errorLog]    - [{ timeFormatted, method, path, status, message }]
  * @property {string} [generatedAt] - ISO timestamp (caller stamps it; pure builder won't read the clock)
@@ -91,6 +92,18 @@ export function buildDiagnosticBundle(input) {
     L.push(`- Mapped, missing on actor: ${_n(s.mappedMissing)}`);
     L.push(`- Available, not mapped: ${_n(s.availableUnmapped)}`);
     L.push(`- Collections available: ${_n(s.collectionsAvailable)}`);
+    L.push('');
+  }
+
+  // --- Dice So Nice (this GM's client only; players' clients may differ) ---
+  if (d.dice && Array.isArray(d.dice.rows)) {
+    L.push('## Dice So Nice');
+    L.push(`- State: **${_s(d.dice.stateLabel || d.dice.state)}**`);
+    if (d.dice.facts && d.dice.facts.version) L.push(`- Version: ${_s(d.dice.facts.version)}`);
+    for (const r of d.dice.rows) {
+      const fix = r.fix ? ` Fix: ${_s(r.fix)}` : '';
+      L.push(`- [${_s(r.level)}] ${_s(r.text)}${fix}`);
+    }
     L.push('');
   }
 

@@ -1,9 +1,9 @@
 /**
  * Chronicle Sync - Player notebook, jot notes and calendar window
  *
- * Every user (players and GM) gets Notebook and Calendar buttons in the
- * Chronicle scene controls and a small "Jot notes" tab in the bottom-right
- * corner; the player can drag the tab and the jot panel anywhere. Each
+ * Every user (players and GM) gets the notebook (the Satchel's first tab)
+ * and the Calendar button in the Chronicle scene controls, and a small "Jot
+ * notes" tab in the bottom-right corner; the player can drag the tab and the jot panel anywhere. Each
  * shows a frame of Chronicle's own pages as that player sees them (the
  * Journal, the jots, the campaign calendar), with nothing copied
  * into Foundry documents.
@@ -33,15 +33,14 @@ import {
   pastThreshold,
   withPlacement,
 } from './_jot-placement.mjs';
+import { openSatchel } from './satchel.mjs';
+import { calendarWindowSize } from './_calendar-window.mjs';
 
 const { ApplicationV2 } = foundry.applications.api;
 
 const t = (key) => game.i18n.localize(`CHRONICLE.Notebook.${key}`);
 
 const pages = new PageTracker();
-
-/** @type {NotebookApplication|null} */
-let notebook = null;
 
 /** @type {CalendarWindow|null} */
 let calendarWindow = null;
@@ -129,7 +128,7 @@ function connect(ctx) {
  * the frame says it is ready, and offers a Reconnect button when Chronicle
  * stops accepting the token.
  */
-class FrameHost {
+export class FrameHost {
   /**
    * @param {'journal'|'jots'|'calendar'} mode
    * @param {HTMLElement} container
@@ -228,54 +227,14 @@ class FrameHost {
   }
 }
 
-/** The notebook window: the Chronicle Journal, filling it. */
-class NotebookApplication extends ApplicationV2 {
-  static DEFAULT_OPTIONS = {
-    id: 'chronicle-notebook',
-    classes: ['chronicle-notebook'],
-    window: { title: 'CHRONICLE.Notebook.Title', icon: 'fa-solid fa-book', resizable: true },
-    position: { width: 760, height: 620 },
-  };
-
-  /** @override */
-  async _renderHTML() {
-    return null;
-  }
-
-  /** @override Make the frame once; a re-render must not reload it. */
-  _replaceHTML(_result, content) {
-    if (this.host) return;
-    const box = document.createElement('div');
-    box.className = 'chronicle-notes-host';
-    content.replaceChildren(box);
-    this.host = new FrameHost('journal', box);
-    this.host.start();
-  }
-
-  /** @override */
-  _onClose(options) {
-    this.host?.destroy();
-    this.host = null;
-    super._onClose?.(options);
-  }
-}
-
 /**
- * Open the notebook, connecting first if needed. Called from a click.
+ * Open the notebook (the Satchel's Notebook tab). The tab offers Connect
+ * itself when this player isn't connected yet.
  * @param {string} [noteId] - a note to show
  */
 export async function openNotebook(noteId = '') {
-  const ctx = chronicle();
-  if (!ctx) return ui.notifications.warn(t('NotSetUp'));
-  if (!storedGrant(ctx) && !(await connect(ctx))) return;
-
-  if (notebook?.rendered) {
-    notebook.bringToFront?.();
-  } else {
-    notebook = new NotebookApplication();
-    await notebook.render({ force: true });
-  }
-  if (noteId) notebook.host?.openNote(noteId);
+  if (!chronicle()) return ui.notifications.warn(t('NotSetUp'));
+  await openSatchel('notebook', { noteId });
 }
 
 /**
@@ -286,13 +245,13 @@ export async function openNotebook(noteId = '') {
 class CalendarWindow extends ApplicationV2 {
   static DEFAULT_OPTIONS = {
     id: 'chronicle-calendar-window',
-    classes: ['chronicle-notebook', 'chronicle-calendar-window'],
+    classes: ['chronicle-notebook', 'chronicle-calendar-window', 'cs-borderless'],
     window: { title: 'CHRONICLE.Notebook.CalendarTitle', icon: 'fa-solid fa-calendar-days', resizable: true },
     position: { width: 760, height: 640 },
   };
 
   constructor(options = {}) {
-    super({ ...options, position: { ...CalendarWindow.DEFAULT_OPTIONS.position, ...savedWindowPlace() } });
+    super({ ...options, position: { ...calendarWindowSize(window.innerWidth, window.innerHeight), ...savedWindowPlace() } });
   }
 
   /** @override */

@@ -41,16 +41,20 @@ test('each shortcut names keys found in en.json', () => {
   }
 });
 
+test('five shortcuts: Chronicle Sync, DM Screen, Satchel, Calendar and token art', () => {
+  assert.deepEqual(SHORTCUTS.map((s) => s.action), ['openDashboard', 'openDMScreen', 'openSatchel', 'openCalendar', 'toggleHoverArt']);
+});
+
 test('a pressed shortcut opens its window and consumes the key', () => {
   const { calls, opened } = register(true);
-  const notebook = calls.find((c) => c.action === 'openNotebook');
-  assert.equal(notebook.opts.onDown(), true);
-  assert.deepEqual(opened, ['openNotebook']);
+  const satchel = calls.find((c) => c.action === 'openSatchel');
+  assert.equal(satchel.opts.onDown(), true);
+  assert.deepEqual(opened, ['openSatchel']);
 });
 
 test('while not connected, Chronicle-only shortcuts let the key through', () => {
   const { calls, opened } = register(false);
-  assert.equal(calls.find((c) => c.action === 'openNotebook').opts.onDown(), false);
+  assert.equal(calls.find((c) => c.action === 'openSatchel').opts.onDown(), false);
   assert.equal(calls.find((c) => c.action === 'openDashboard').opts.onDown(), true);
   assert.deepEqual(opened, ['openDashboard']);
 });
