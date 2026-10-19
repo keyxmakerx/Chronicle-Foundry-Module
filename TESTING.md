@@ -122,7 +122,7 @@ campaign with at least one map that has an image, markers (some `Everyone`, one
 `DM only`), and ideally a drawing, a token and a fog region.
 
 ### Materialize
-- [ ] Dashboard → Maps tab → **Resync All Maps** → each Chronicle map is listed under
+- [ ] Dashboard → Linked → Maps → **Resync All Maps** → each Chronicle map is listed under
       "Chronicle Maps" with marker / drawing / token counts and an **Open in Foundry** button
 - [ ] **Open Chronicle Maps Folder** reveals the "Chronicle Maps" folder in the Journal sidebar
 - [ ] The summary row shows Materialized count, Open viewers and Last sync (not "never")
@@ -185,7 +185,7 @@ test player Observer on the map journal.
 - [ ] A player who does not own the character cannot open the map
 
 ### View in Chronicle
-- [ ] Dashboard Maps tab → the external-link icon on a map row opens the Chronicle map URL
+- [ ] Dashboard Linked → Maps → the external-link icon on a map row opens the Chronicle map URL
 
 ## Calendar Sync
 
@@ -254,7 +254,7 @@ Chronicle brings its own calendar; no Foundry calendar module is used.
 ## Shop Widget
 
 - [ ] Right-click JournalEntry linked to Shop entity -> "Open Chronicle Shop" option appears
-- [ ] Dashboard Shops tab -> each shop row has an **Open** button that opens the same shop room
+- [ ] Dashboard Linked → Shops -> each shop row has an **Open** button that opens the same shop room
 - [ ] Shop room opens with the shop's name; the room matches the Chronicle shop page (same furniture, keeper picture, wares)
 - [ ] Hovering an item in the room shows its name and price; clicking the keeper shows their lines
 - [ ] Wares list shows price and stock; sold-out goods are faded; hidden or GM-only goods are missing
@@ -321,7 +321,7 @@ Chronicle brings its own calendar; no Foundry calendar module is used.
 - [ ] Delete Actor -> asked "Delete in Chronicle too?": No keeps the entity, Yes deletes it
 
 ### Dashboard - Characters Tab
-- [ ] Characters tab visible in sync dashboard (rail group "Everyday")
+- [ ] Characters pane visible in the sync dashboard under Linked
 - [ ] System badge shows matched system name
 - [ ] Synced actors show green check with "Synced" label, a last-sync time and a **Re-sync** button
 - [ ] Unlinked actors show "Not linked" with a Push button, and **Push All** appears in the toolbar

@@ -9,10 +9,10 @@ need rather than the whole file.
 
 ## Layout
 
-`scripts/*.mjs` module code (`_*.mjs` are pure helpers, each tested by its own
-`tools/test-*.mjs`); `templates/`, `styles/`, `lang/en.json`; `assets/` holds
-the generic monster token;
-`vendor/chronicle/` is Chronicle's shop room widget copied unchanged;
+`scripts/*.mjs` module code (`_*.mjs` are pure helpers, most tested by their own
+`tools/test-*.mjs`); `templates/`, `styles/`, `lang/en.json`; `fonts/` holds the
+Sky Clock's font; `assets/` holds the generic monster token;
+`vendor/chronicle/` holds Chronicle's shop room and sky widgets, copied unchanged;
 `bench/` is the two-sided sync bench (`CHRONICLE_DIR=../Chronicle bench/run.sh`),
 and a sync change is not ready until its bench scenarios pass. Tests: Node's
 test runner, see `TESTING.md`. **API-CONTRACT.md** is the Chronicle REST and
