@@ -456,6 +456,12 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       const eid = j.getFlag(FLAG_SCOPE, 'entityId');
       if (eid) journalsByEntityId.set(eid, j);
     }
+    // Characters sync as actors, not journals, so a linked actor counts too.
+    const actorEntityIds = new Set();
+    for (const a of game.actors?.contents ?? []) {
+      const eid = a.getFlag(FLAG_SCOPE, 'entityId');
+      if (eid) actorEntityIds.add(eid);
+    }
 
     // Build groups.
     const groups = [];
@@ -467,7 +473,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         const journal = journalsByEntityId.get(entity.id);
         const isExcluded = exclusions.excludedEntities.includes(entity.id) || isTypeExcluded;
 
-        let status = 'chronicle-only';
+        let status = actorEntityIds.has(entity.id) ? 'actor' : 'chronicle-only';
         if (journal) {
           const lastSync = journal.getFlag(FLAG_SCOPE, 'lastSync');
           if (lastSync) {
@@ -502,7 +508,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         ? entities.filter(e => e.name.toLowerCase().includes(this._searchFilter.toLowerCase()))
         : entities;
 
-      const syncedCount = filtered.filter(e => e.status === 'synced' || e.status === 'modified').length;
+      const syncedCount = filtered.filter(e => e.status === 'synced' || e.status === 'modified' || e.status === 'actor').length;
       const chronicleOnlyCount = filtered.filter(e => e.status === 'chronicle-only').length;
 
       groups.push({
@@ -1965,6 +1971,12 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
       // Find the JournalSync module.
       const journalSync = this._syncManager?._modules?.find(m => m.constructor?.name === 'JournalSync');
+      // A character pulled as a journal would duplicate its actor, and the
+      // next connect would set that journal aside again.
+      if (journalSync?._isHandledByActorSync(entity)) {
+        ui.notifications.info(game.i18n.format('CHRONICLE.Dashboard.Entities.PullCharacter', { name: noticeText(entity.name) }));
+        return;
+      }
       if (journalSync) {
         await journalSync._createJournalFromEntity(entity);
         this._logActivity('pull', `Pulled "${entity.name}" from Chronicle`);

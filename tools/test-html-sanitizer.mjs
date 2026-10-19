@@ -96,6 +96,14 @@ test('_sanitizeIncomingHTML: prefers v14 .implementation over the deprecated glo
   assert.equal(_sanitizeIncomingHTML('input'), 'v14impl');
 });
 
+// Foundry 14.369 has no cleanHTML on TextEditor at all, only
+// foundry.utils.cleanHTML; the TextEditor probes found nothing there.
+test('_sanitizeIncomingHTML: uses foundry.utils.cleanHTML on v14', () => {
+  clearCleanHTML();
+  globalThis.foundry = { utils: { cleanHTML: (s) => s.replace(/<script[\s\S]*?<\/script>/gi, '') }, applications: { ux: { TextEditor: {} } } };
+  assert.equal(_sanitizeIncomingHTML('<p>safe</p><script>alert(1)</script>'), '<p>safe</p>');
+});
+
 // ---------------------------------------------------------------------
 // Operator-config escape
 // ---------------------------------------------------------------------

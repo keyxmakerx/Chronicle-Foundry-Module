@@ -266,6 +266,8 @@ export class ActorSync {
         entity = await this._api.get(`/entities/${entityId}`);
       } catch (err) {
         if ((err?.status ?? err?.statusCode) === 404) {
+          this._api.dropLastErrorLogEntry?.({ path: `/entities/${entityId}`, status: 404 });
+          this._syncManager?.logActivity?.('unlink', `"${actor.name}" is gone from Chronicle; the actor was unlinked`);
           await this._onCharacterDeleted({ id: entityId });
         } else {
           errors++;
@@ -1195,7 +1197,12 @@ export class ActorSync {
       return true;
     } catch (err) {
       const status = err?.status ?? err?.statusCode ?? err?.response?.status;
-      if (status === 404 || /\b404\b|not found/i.test(err?.message || '')) return false;
+      if (status === 404 || /\b404\b|not found/i.test(err?.message || '')) {
+        // The answer to the question, not a failure; the broken link is
+        // reported through the Characters section instead.
+        this._api.dropLastErrorLogEntry?.({ path: `/entities/${entityId}`, status: 404 });
+        return false;
+      }
       return true;
     }
   }

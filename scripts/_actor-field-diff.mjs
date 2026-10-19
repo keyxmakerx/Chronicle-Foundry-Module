@@ -6,6 +6,8 @@
  * Pure — see tools/test-actor-field-diff.mjs.
  */
 
+import { removesKey } from './_flag-removal.mjs';
+
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
 /** Deep-merge `b` into a copy of `a` (later change wins). */
@@ -29,10 +31,9 @@ export function changeTouchesPath(change, path) {
     // A non-object where the path continues means a parent was replaced
     // wholesale (e.g. hp: 5 over hp: {value}), which changes the path too.
     if (!isObj(cur)) return true;
-    if (!(key in cur)) {
-      // Foundry reports a deleted key as `-=key`.
-      return `-=${key}` in cur;
-    }
+    // A removal arrives as `-=key`, or as a ForcedDeletion on Foundry 14+.
+    if (removesKey(cur, key)) return true;
+    if (!(key in cur)) return false;
     cur = cur[key];
   }
   return true;

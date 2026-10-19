@@ -9,6 +9,7 @@
  * - Foundry → Chronicle: JournalEntry changes detected via Hooks, push to Chronicle API.
  */
 
+import { flagRemoval } from './_flag-removal.mjs';
 import { noticeText } from './_escape-html.mjs';
 import { getSetting, getSyncExclusions } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
@@ -339,6 +340,7 @@ export class JournalSync {
           // Removed after this change was recorded: its own delete entry may
           // be later in the feed, but check rather than rely on it.
           if ((err?.status ?? err?.statusCode) === 404) {
+            this._expectedGone(entityId);
             if (journal) await this._setAsideIfGone(journal, entityId, { knownGone: true });
             continue;
           }
@@ -391,6 +393,7 @@ export class JournalSync {
         await this._api.get(`/entities/${eid}`);
       } catch (err) {
         gone = (err?.status ?? err?.statusCode) === 404;
+        if (gone) this._expectedGone(eid);
       }
     }
     if (!gone) return;
@@ -399,7 +402,17 @@ export class JournalSync {
       this._pendingJournalChanges.delete(journal.id);
       await setAside(journal, FLAG_SCOPE, syncOptions());
       ui.notifications?.info?.(game.i18n.format('CHRONICLE.Removed.Entity', { name: noticeText(journal.name) }));
+      this._syncManager?.logActivity?.('unlink', `"${journal.name}" is gone from Chronicle; its journal was set aside`);
     });
+  }
+
+  /**
+   * A 404 that answered "is this page still there?" is the answer, not a
+   * failure, so it leaves the error log; the outcome goes in the activity log.
+   * @private
+   */
+  _expectedGone(entityId) {
+    this._api?.dropLastErrorLogEntry?.({ path: `/entities/${entityId}`, status: 404 });
   }
 
   /** True when a synced actor already carries this entity id. @private */
@@ -709,7 +722,7 @@ export class JournalSync {
       // Field values are not kept on the journal: every client receives its
       // flags, and the Owner key's copy includes GM-only fields. Removes the
       // copy older versions stored.
-      [`flags.${FLAG_SCOPE}.-=fields`]: null,
+      ...flagRemoval(FLAG_SCOPE, 'fields'),
       [`flags.${FLAG_SCOPE}.tags`]: entity.tags || [],
       [`flags.${FLAG_SCOPE}.lastSync`]: new Date().toISOString(),
       [`flags.${FLAG_SCOPE}.chronicleUpdatedAt`]: entity.updated_at || '',
@@ -1814,7 +1827,7 @@ export class JournalSync {
       if (!entityId) continue;
       try {
         if (journal.flags?.[FLAG_SCOPE]?.fields !== undefined) {
-          await journal.update({ [`flags.${FLAG_SCOPE}.-=fields`]: null }, syncOptions());
+          await journal.update(flagRemoval(FLAG_SCOPE, 'fields'), syncOptions());
         }
         const clear = journal.pages.some((p) => p.type === 'text'
           && hasClearSecrets(p.text?.content || '', { chronicleOnly: true }));

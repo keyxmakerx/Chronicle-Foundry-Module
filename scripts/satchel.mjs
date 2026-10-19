@@ -73,7 +73,8 @@ class SatchelWindow extends ApplicationV2 {
     id: 'chronicle-satchel',
     classes: ['chronicle-satchel'],
     window: { title: 'CHRONICLE.Satchel.Title', icon: 'fa-solid fa-briefcase', resizable: true },
-    position: { width: 760, height: 640 },
+    // The notebook is a whole Chronicle page; smaller cuts it off.
+    position: { width: 920, height: 760 },
   };
 
   constructor(options = {}) {

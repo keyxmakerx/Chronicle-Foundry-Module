@@ -323,6 +323,8 @@
         "Synced": "Synced",
         "Modified": "Modified",
         "ChronicleOnly": "Chronicle",
+        "SyncedAsActor": "Synced as an actor",
+        "PullCharacter": "Chronicle: \"{name}\" is a character, so it syncs as an actor, not a journal. Link it in Chronicle Sync › Characters.",
         "FoundryOnly": "Foundry",
         "Pull": "Pull",
         "Push": "Push",

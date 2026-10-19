@@ -85,7 +85,7 @@ class DMScreenWindow extends HandlebarsApplicationMixin(ApplicationV2) {
       downtimeAsk: DMScreenWindow._onDowntimeAsk,
       downtimeCancel: DMScreenWindow._onDowntimeCancel,
       reveal: DMScreenWindow._onReveal,
-      tab: DMScreenWindow._onTab,
+      dmsTab: DMScreenWindow._onTab,
       hero: DMScreenWindow._onHero,
       retry: DMScreenWindow._onRetry,
     },
@@ -158,7 +158,7 @@ class DMScreenWindow extends HandlebarsApplicationMixin(ApplicationV2) {
       hero.classList.add('dms-open');
       hero.querySelector('[data-action="hero"]')?.setAttribute('aria-expanded', 'true');
     });
-    const tab = this._tab && root.querySelector(`[data-action="tab"][data-tab="${this._tab}"]`);
+    const tab = this._tab && root.querySelector(`[data-action="dmsTab"][data-tab="${this._tab}"]`);
     if (tab) selectTab(root, tab);
   }
 
@@ -480,7 +480,7 @@ const WIDE_TABS = ['encounters', 'cast'];
 
 function selectTab(root, tab) {
   const name = tab.dataset.tab;
-  root.querySelectorAll('[data-action="tab"]').forEach((b) => {
+  root.querySelectorAll('[data-action="dmsTab"]').forEach((b) => {
     b.setAttribute('aria-selected', b === tab ? 'true' : 'false');
   });
   root.querySelectorAll('[data-dms-pane]').forEach((p) => {

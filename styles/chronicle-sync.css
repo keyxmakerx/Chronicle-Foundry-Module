@@ -749,7 +749,8 @@ html[data-cs-motion="off"] :is(.cs-grow, .cs-settle, .cs-peek) {
   flex-shrink: 0;
 }
 
-.entity-row.status-synced .entity-status-dot { background: var(--cs-ok); }
+.entity-row.status-synced .entity-status-dot,
+.entity-row.status-actor .entity-status-dot { background: var(--cs-ok); }
 .entity-row.status-modified .entity-status-dot { background: var(--cs-warn); }
 .entity-row.status-chronicle-only .entity-status-dot { background: var(--cs-info); }
 .entity-row.status-foundry-only .entity-status-dot { background: var(--cs-attention); }
@@ -783,7 +784,8 @@ html[data-cs-motion="off"] :is(.cs-grow, .cs-settle, .cs-peek) {
   white-space: nowrap;
 }
 
-.entity-row.status-synced .entity-status-label { color: var(--cs-ok); }
+.entity-row.status-synced .entity-status-label,
+.entity-row.status-actor .entity-status-label { color: var(--cs-ok); }
 .entity-row.status-modified .entity-status-label { color: var(--cs-warn); }
 .entity-row.status-chronicle-only .entity-status-label { color: var(--cs-info); }
 .entity-row.status-foundry-only .entity-status-label { color: var(--cs-attention); }
@@ -2339,13 +2341,17 @@ body.ccal-rest #chronicle-calendar-bar .ccal-sky * { animation-play-state: pause
 /* Satchel: the notebook, quest board and stash windows drawn as tabs of one
    window in the module look. The hosted windows keep their own styles; the
    notebook page and quest notices keep their paper. */
-.chronicle-satchel .window-content { padding: 8px 10px 10px; overflow: hidden; }
+.chronicle-satchel { min-width: 480px; min-height: 360px; }
+.chronicle-satchel .window-content { padding: 0; overflow: hidden; }
 .cs-satchel { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-.cs-satchel-tabs { align-self: flex-start; flex-shrink: 0; }
-.cs-satchel-pane { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.cs-satchel-tabs { align-self: flex-start; flex-shrink: 0; margin: 6px 10px; }
+.cs-satchel-pane { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0 10px 10px; }
 .cs-satchel-pane[hidden] { display: none; }
-.cs-satchel-notebook { overflow: hidden; border-radius: 6px; }
-.cs-satchel-pane > .application { position: static; width: auto; height: auto; max-height: none; box-shadow: none; }
+/* The notebook is Chronicle's page in a frame: edge to edge, its own scroll. */
+.cs-satchel-notebook { overflow: hidden; padding: 0; border-top: 1px solid var(--cs-line); }
+/* Hosted windows drop Foundry's floating-window sizing and fill the pane. */
+.cs-satchel-pane > .application,
+.cs-satchel-pane .application { position: static; inset: auto; width: 100%; min-width: 0; max-width: none; height: auto; min-height: 0; max-height: none; transform: none; box-shadow: none; overflow: visible; }
 .cs-satchel-back { width: auto; margin: 0 0 8px; }
 
 /* Calendar window: Chronicle's calendar page edge to edge, under a slim

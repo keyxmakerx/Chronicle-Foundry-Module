@@ -7,6 +7,7 @@
  * The decisions are in `_avatar-sync.mjs`.
  */
 
+import { flagRemoval } from './_flag-removal.mjs';
 import { MODULE_ID } from './constants.mjs';
 import { getSetting } from './settings.mjs';
 import { extensionForMime } from './_inline-pictures.mjs';
@@ -84,7 +85,7 @@ export class AvatarSync {
       if (!path) return;
       await user.update({ avatar: path, [`flags.${MODULE_ID}.${AVATAR_FLAG}`]: { id: mediaId, path } });
     } else if (action === 'clear') {
-      await user.update({ avatar: this._default(), [`flags.${MODULE_ID}.-=${AVATAR_FLAG}`]: null });
+      await user.update({ avatar: this._default(), ...flagRemoval(MODULE_ID, AVATAR_FLAG) });
     }
   }
 

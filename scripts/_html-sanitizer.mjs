@@ -20,16 +20,21 @@ import { MODULE_ID } from './constants.mjs';
 /**
  * Look up Foundry's HTML sanitizer across v12 / v13 / v14+ namespaces:
  * `TextEditor.cleanHTML` moved from a v12 global into
- * `foundry.applications.ux.TextEditor` in v13, then onto that namespace's
- * `.implementation` in v14. Probe most-specific-modern first so we don't
+ * `foundry.applications.ux.TextEditor` in v13; v14 has it only as
+ * `foundry.utils.cleanHTML`. Probe most-specific-modern first so we don't
  * touch the deprecated v12 global (which logs a warning on every access)
  * unless nothing else resolves.
  *
  * @returns {((html: string) => string) | null}
  */
 function _resolveCleanHTML() {
+  // v14: the sanitizer left TextEditor for foundry.utils.
+  try {
+    const utils = globalThis.foundry?.utils?.cleanHTML;
+    if (typeof utils === 'function') return utils;
+  } catch { /* ignore — fall through */ }
   const ns = globalThis.foundry?.applications?.ux?.TextEditor;
-  // v14+: the static lives on the implementation class.
+  // Builds that kept it on the TextEditor implementation class.
   try {
     const impl = ns?.implementation?.cleanHTML;
     if (typeof impl === 'function') return impl.bind(ns.implementation);

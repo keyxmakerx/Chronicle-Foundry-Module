@@ -7,6 +7,8 @@
  * `tools/test-set-aside.mjs`.
  */
 
+import { flagRemoval } from './_flag-removal.mjs';
+
 /** Marks the folder, so it is found again whatever it has been renamed to. */
 export const REMOVED_FOLDER_FLAG = 'removedFolder';
 
@@ -20,9 +22,7 @@ export const LINK_FLAGS = ['entityId', 'noteId', 'isNote', 'entityType', 'entity
  * @returns {object}
  */
 export function setAsideUpdate(scope, folderId) {
-  const update = { folder: folderId };
-  for (const key of LINK_FLAGS) update[`flags.${scope}.-=${key}`] = null;
-  return update;
+  return { folder: folderId, ...flagRemoval(scope, ...LINK_FLAGS) };
 }
 
 let creating = null;

@@ -15,6 +15,7 @@
  * the GM changes it from the token (creature-forms.mjs).
  */
 
+import { flagRemoval } from './_flag-removal.mjs';
 import { getSetting } from './settings.mjs';
 import { FLAG_SCOPE, syncOptions, APPLY_OPTION } from './constants.mjs';
 import { LINK_FLAG } from './npc-presence.mjs';
@@ -450,7 +451,7 @@ export class CreatureSync {
     if (!tokens.some((t) => t.id === tokenDoc.id) && tokenDoc.parent === canvas?.scene) tokens.push(tokenDoc);
     const was = tokens.map((t) => ({ t, max: paths ? get(t.actor, paths.max) : null, value: paths ? get(t.actor, paths.value) : null }));
 
-    const flag = formId ? { [`flags.${FLAG_SCOPE}.${FORM_FLAG}`]: formId } : { [`flags.${FLAG_SCOPE}.-=${FORM_FLAG}`]: null };
+    const flag = formId ? { [`flags.${FLAG_SCOPE}.${FORM_FLAG}`]: formId } : flagRemoval(FLAG_SCOPE, FORM_FLAG);
     await actor.update(flag, syncOptions({ [APPLY_OPTION]: true }));
     if (!(await this._upsert(page))) throw new Error('The new form could not be applied.');
 
@@ -508,11 +509,8 @@ export class CreatureSync {
   async _unlink(entityId) {
     const actor = this._findActor(entityId);
     if (!actor) return;
-    const change = {
-      [`flags.${FLAG_SCOPE}.-=${CREATURE_FLAG}`]: null,
-      [`flags.${FLAG_SCOPE}.-=${VERSION_FLAG}`]: null,
-    };
-    if (actor.getFlag(FLAG_SCOPE, LINK_FLAG) === entityId) change[`flags.${FLAG_SCOPE}.-=${LINK_FLAG}`] = null;
+    const change = flagRemoval(FLAG_SCOPE, CREATURE_FLAG, VERSION_FLAG);
+    if (actor.getFlag(FLAG_SCOPE, LINK_FLAG) === entityId) Object.assign(change, flagRemoval(FLAG_SCOPE, LINK_FLAG));
     await actor.update(change, syncOptions({ [APPLY_OPTION]: true }));
     this._known.delete(entityId);
   }

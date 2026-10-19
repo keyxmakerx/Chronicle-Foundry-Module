@@ -16,6 +16,7 @@
  * - Foundry → Chronicle: Item hooks on Actors push to Chronicle API as relations.
  */
 
+import { flagRemoval } from './_flag-removal.mjs';
 import { getSetting } from './settings.mjs';
 import { FLAG_SCOPE, APPLY_OPTION } from './constants.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
@@ -238,7 +239,7 @@ export class ItemSync {
     // A fresh options object per write: Foundry writes into the one it gets.
     const opts = () => ({ [APPLY_OPTION]: true });
     for (const { id, relationId } of plan.adopt) {
-      await actor.items.get(id)?.update({ [`flags.${FLAG_SCOPE}.relationId`]: relationId, [`flags.${FLAG_SCOPE}.-=unlinkedRelationId`]: null }, opts());
+      await actor.items.get(id)?.update({ [`flags.${FLAG_SCOPE}.relationId`]: relationId, ...flagRemoval(FLAG_SCOPE, 'unlinkedRelationId') }, opts());
     }
     for (const { id, change } of plan.update) {
       await actor.items.get(id)?.update(change, opts());
@@ -250,7 +251,7 @@ export class ItemSync {
     for (const id of unlink) {
       const item = actor.items.get(id);
       await item?.update({
-        [`flags.${FLAG_SCOPE}.-=relationId`]: null,
+        ...flagRemoval(FLAG_SCOPE, 'relationId'),
         [`flags.${FLAG_SCOPE}.unlinkedRelationId`]: item.getFlag(FLAG_SCOPE, 'relationId'),
       }, opts());
     }
@@ -290,10 +291,7 @@ export class ItemSync {
     // that relation belongs to the original. Drop it and push the copy as its
     // own item instead.
     if (item.getFlag(FLAG_SCOPE, 'relationId') || item.getFlag(FLAG_SCOPE, 'unlinkedRelationId')) {
-      await item.update({
-        [`flags.${FLAG_SCOPE}.-=relationId`]: null,
-        [`flags.${FLAG_SCOPE}.-=unlinkedRelationId`]: null,
-      }, { [APPLY_OPTION]: true });
+      await item.update(flagRemoval(FLAG_SCOPE, 'relationId', 'unlinkedRelationId'), { [APPLY_OPTION]: true });
     }
 
     const actor = item.parent;
