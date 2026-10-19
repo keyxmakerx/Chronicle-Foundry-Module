@@ -14,6 +14,7 @@ export const SHORTCUTS = [
   { action: 'openDMScreen', gm: true, connected: true },
   { action: 'openSatchel', gm: false, connected: true },
   { action: 'openCalendar', gm: false, connected: true },
+  { action: 'toggleHoverArt', gm: false, connected: false },
 ];
 
 /**

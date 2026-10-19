@@ -170,14 +170,28 @@ test('fix5: create sends snake_case body + object metadata when a target entity 
   assert.equal(call.body.metadata.quantity, 3);
 });
 
-test('fix5: delete uses the FLAT route DELETE /relations/:relationId', async () => {
-  const api = recordingApi();
-  const is = makeItemSync(api);
-  const item = makeItem({ flags: { relationId: 42 } }, { entityId: 'actor-1' });
-  await is._handleDeleteItem(item, {}, 'u1');
-  assert.equal(api.calls.length, 1);
-  assert.equal(api.calls[0].method, 'DELETE');
-  assert.equal(api.calls[0].path, '/relations/42', 'flat route, not /entities/:id/relations/:id');
+test('fix5: delete uses the FLAT route DELETE /relations/:relationId, after the GM agrees', async () => {
+  const dialog = globalThis.foundry.applications.api;
+  const saved = dialog.DialogV2;
+  globalThis.ui ??= { notifications: { info: () => {}, warn: () => {}, error: () => {} } };
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  try {
+    for (const [answer, calls] of [[false, 0], [true, 1]]) {
+      dialog.DialogV2 = { confirm: async () => answer };
+      const api = recordingApi();
+      const is = makeItemSync(api);
+      const item = makeItem({ flags: { relationId: 42 } }, { entityId: 'actor-1' });
+      await is._handleDeleteItem(item, {}, 'u1');
+      await wait(700);
+      assert.equal(api.calls.length, calls, answer ? 'Yes deletes' : 'No keeps the relation');
+      if (answer) {
+        assert.equal(api.calls[0].method, 'DELETE');
+        assert.equal(api.calls[0].path, '/relations/42', 'flat route, not /entities/:id/relations/:id');
+      }
+    }
+  } finally {
+    dialog.DialogV2 = saved;
+  }
 });
 
 test('fix5: update uses PUT /relations/:relationId with an object metadata body', async () => {

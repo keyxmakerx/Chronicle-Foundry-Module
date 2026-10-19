@@ -71,3 +71,18 @@ test('leveled log buffer renders when present', () => {
   assert.match(out, /ERROR PUT failed/);
   assert.match(out, /2026-06-26T12:00:01\.000Z` DEBUG pull start/);
 });
+
+test('Dice So Nice rows carry their fix into the bundle', () => {
+  const out = buildDiagnosticBundle({
+    dice: {
+      state: 'error', stateLabel: 'Something needs fixing', facts: { version: '7.0.0' },
+      rows: [{ level: 'error', text: 'Calls missing: addColorset.', fix: 'Report this.' }, { level: 'ok', text: 'Fine.', fix: '' }],
+    },
+  });
+  assert.match(out, /## Dice So Nice/);
+  assert.match(out, /State: \*\*Something needs fixing\*\*/);
+  assert.match(out, /Version: 7\.0\.0/);
+  assert.match(out, /- \[error\] Calls missing: addColorset\. Fix: Report this\./);
+  assert.match(out, /- \[ok\] Fine\.\n/);
+  assert.doesNotMatch(buildDiagnosticBundle({}), /Dice So Nice/);
+});

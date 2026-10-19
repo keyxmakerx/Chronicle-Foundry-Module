@@ -30,9 +30,17 @@ repo root. There is no `package.json`.
 
 ## Keyboard shortcuts
 
-- [ ] Configure Controls lists a Chronicle Sync group with four shortcuts (Chronicle Sync, DM Screen, Satchel, calendar), all with no key bound
+- [ ] Configure Controls lists a Chronicle Sync group with five shortcuts (Chronicle Sync, DM Screen, Satchel, calendar, token art on hover), all with no key bound
 - [ ] Bind a key to "Open the Chronicle Sync dashboard", press it as the GM: the dashboard opens; as a player the GM-only two are not listed
 - [ ] With the world not connected, a key bound to the notebook does nothing and Foundry's own use of that key still works
+
+## Dice So Nice
+
+- [ ] Without Dice So Nice installed: roll `/r 1d20` as GM and as a player; both get Foundry's normal roll card and no console errors. Chronicle Sync → Problems → Health shows Dice So Nice "Not in use"
+- [ ] With Dice So Nice 6.x on: the same pane shows "Working", the version, and "calls for adding dice are all there"; "Check dice files" adds "All N dice files are where they should be" (or "No rune dice sets are shipped" while the list is empty)
+- [ ] With rune sets shipped: Dice So Nice's settings (the dice icon in chat) list a "Chronicle Rune" group under dice and themes, on a player's client too
+- [ ] A player with Dice So Nice turned off in its own settings, or with Foundry's canvas off, still sees the roll card
+- [ ] Dice So Nice's settings → Special Effects: a new player has two "Chronicle crit" lines (six success crits → sparkles, six fail crits → dark); the trigger's result list names all 12 crits
 
 ## Journal Sync (Entities)
 
@@ -354,6 +362,34 @@ Chronicle Sync → Settings, under What syncs.
 - [ ] Drag an ability from the system's compendium onto a synced actor, named like one of the page's: after the next page edit the actor still has just that one, and the GM's copy is unchanged
 - [ ] Change a tier on the page in Chronicle: that ability updates on the actor; the others keep their place
 
+## Token Art on Hover
+
+Needs a GM and a player client on the same scene, and a creature actor whose portrait differs from its token (Sync Creatures does this when the page has both art and a token).
+
+- [ ] As the player, rest the cursor on the creature's token: after a moment its full art appears beside the cursor and follows it; moving off the token, clicking or dragging takes it away
+- [ ] Near the right or bottom edge of the screen the picture flips to the other side of the cursor and stays on screen
+- [ ] A token whose portrait is the same as its token, or the default mystery man, shows nothing
+- [ ] GM: right-click the token; the HUD has a portrait button. Click it: the tooltip says off, and the player no longer gets the art for that token. Click again: it's back
+- [ ] GM: hide the token, or set its disposition to Secret: the player gets no art; the GM still does
+- [ ] Player: Game Settings, Chronicle Sync, untick "Show token art on hover": no more previews for that player only. Bind "Show or hide token art on hover" in Configure Controls: the key switches it with a notice
+- [ ] GM: untick "Token art on hover" in the world settings: nobody gets previews
+- [ ] Motion Calm: the picture fades in; Off: it appears at once
+
+## Creature Forms (Change Form)
+
+Needs Sync Creatures on, a GM and a player client on the same scene, a Chronicle creature page with a second form (Draw Steel: Add a form on its stat block), and its token on the scene. The GM's Chronicle must have the system-state write route (keyxmakerx/Chronicle#1504) for the page steps.
+
+- [ ] GM: right-click the token; the HUD has a masks button "Change form". A creature with no other forms has none
+- [ ] Click it: a window lists the first form and each other form, the current one marked Now and not pickable, with Quiet and Reveal (Reveal picked)
+- [ ] Reveal: on both clients the new art grows out of the token, holds, and shrinks back; then the sheet, portrait and token change. Position, conditions and the combat tracker entry stay
+- [ ] Chat: everyone sees "<name> becomes <form>"; the GM alone gets the Stamina left
+- [ ] Stamina: with "Damage carries over" on the form, a creature that had taken 95 damage keeps it against the new maximum; with "Starts at full Stamina" it is full
+- [ ] Quiet: no reveal and no public chat line; only the GM's whisper
+- [ ] Hidden token, Reveal: the player sees nothing; the creature's Chronicle page does not list the form for the player
+- [ ] Visible token: the player's view of the creature's Chronicle page now lists the form and opens on it
+- [ ] Change back to the first form: everything returns; edit the current form on the Chronicle page and the actor follows
+- [ ] Motion Calm: the reveal fades instead of growing; Off: the card shows still for a moment
+
 ## NPC Tokens (Spotlight, Talking)
 
 Needs a GM and a player client on the same scene, and an NPC page synced as a journal.
@@ -403,6 +439,13 @@ GM only. Needs a Chronicle that serves encounters, a key for the campaign owner 
 - [ ] With a started combat on the scene, **Add who's here** asks first; saying no changes nothing
 - [ ] **Undo placing** asks; confirming removes only the tokens this fight placed, other tokens stay
 - [ ] Switch scenes with the tab open: the roster reads the new scene (all **Not placed** there) and any waiting scene click is cancelled
+
+Stages (needs the encounter to have stages in Chronicle, a creature with a second form, and Change form working, see Creature Forms):
+
+- [ ] Under the roster, **Stages** lists each stage with when it comes and what it does; a fight with no stages shows nothing new
+- [ ] A "half Stamina" stage: damage the creature's token past half: the stage turns **Due**, and one notice says so. **Not yet** sets it back until the next round of the started tracker, then it is due again
+- [ ] **Start stage N**: the creature changes form the way the stage says (quiet or reveal); then the scene waits for one click and the arriving rows land there. The stage reads **Started**, and still does after closing and reopening the DM Screen
+- [ ] A "round 3" stage turns due at the start of round 3; a manual stage is never due but its Start works any time
 
 ## Character claims
 

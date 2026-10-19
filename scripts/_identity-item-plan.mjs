@@ -32,6 +32,11 @@ export function identityFieldDefs(fieldDefs) {
   });
 }
 
+/** Each eligible field with the one item type it maps. */
+export function identityFieldTypes(fieldDefs) {
+  return identityFieldDefs(fieldDefs).map((def) => ({ fieldKey: def.key, itemType: singleType(def) }));
+}
+
 /**
  * @param {object} args
  * @param {Array<{id: string, name: string, type: string}>} args.items - the actor's embedded items

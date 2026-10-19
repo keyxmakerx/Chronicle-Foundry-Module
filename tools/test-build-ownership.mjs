@@ -368,3 +368,25 @@ test('pin: defaultOwnership setting default is OBSERVER (2), not the dead 0', ()
   assert.ok(/default:\s*2\b/.test(m[1]),
     'defaultOwnership default must be OBSERVER (2) so wiring the setting is non-breaking');
 });
+
+// ---------------------------------------------------------------------
+// syncPermissions off: ownership is neither pushed nor pulled
+// ---------------------------------------------------------------------
+
+test('syncPermissions off: _pushPermissions sends nothing; on (or unset) still pushes', async () => {
+  const puts = [];
+  const sync = new JournalSync();
+  sync._api = { put: async (...a) => { puts.push(a); }, get: async () => null };
+  const ownership = { default: L.NONE };
+  settings.syncPermissions = false;
+  assert.equal(sync._followsVisibility(), false);
+  await sync._pushPermissions('e1', ownership, true, 'Page');
+  assert.equal(puts.length, 0);
+  for (const on of [true, undefined]) {
+    settings.syncPermissions = on;
+    assert.equal(sync._followsVisibility(), true);
+  }
+  await sync._pushPermissions('e1', { default: L.OBSERVER }, false, 'Page');
+  assert.equal(puts.length, 1);
+  delete settings.syncPermissions;
+});

@@ -27,6 +27,7 @@ import {
   CAP_STATUS,
 } from './capability-inspector.mjs';
 import { buildDiagnosticBundle } from './sync-diagnostic-bundle.mjs';
+import { checkDiceFiles, diceSoNiceReport } from './dice-so-nice.mjs';
 import { buildOverviewModel } from './_overview-model.mjs';
 import { log, getLogBuffer } from './logger.mjs';
 import { walkEntityPages } from './_entity-page-walk.mjs';
@@ -96,6 +97,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'push-all-actors': SyncDashboard.#onPushAllActorsAction,
       'copy-debug': SyncDashboard.#onCopyDebugAction,
       'copy-diagnostic-bundle': SyncDashboard.#onCopyDiagnosticBundleAction,
+      'check-dice-files': SyncDashboard.#onCheckDiceFilesAction,
       'copy-capability': SyncDashboard.#onCopyCapabilityAction,
       'copy-capability-json': SyncDashboard.#onCopyCapabilityJsonAction,
       'bulk-set-public': SyncDashboard.#onBulkSetPublicAction,
@@ -405,6 +407,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
       // Sync Capability (status tab panel).
       capability: capabilityData,
+
+      // Diagnostics, Health pane: Dice So Nice as this client sees it.
+      dice: this._buildDiceData(),
 
       // Diagnostics, Player reports pane.
       debug: debugData,
@@ -1753,11 +1758,34 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         retryQueue: this.api?.getRetryQueueSize?.() ?? null,
       },
       fieldMapping: this._buildFieldMappingInfo(matchedSystem),
+      dice: this._buildDiceData(),
       capability: cap && cap.ok ? { source: cap.source, summary: cap.summary } : null,
       activityLog: (this._syncManager?.getActivityLog?.() ?? []).slice(0, 100),
       errorLog: (this.api?.getErrorLog?.() ?? []).slice(0, 100),
       logBuffer: getLogBuffer().slice(-200),
     };
+  }
+
+  /** Health pane's Dice So Nice rows; a failure here never blanks the pane. @private */
+  _buildDiceData() {
+    try {
+      const report = diceSoNiceReport();
+      const label = { off: 'StateOff', ok: 'StateOk', warn: 'StateWarn', error: 'StateError' }[report.state];
+      return { ...report, stateLabel: game.i18n.localize(`CHRONICLE.Dice.${label}`) };
+    } catch (err) {
+      log.warn('Dashboard: Dice So Nice check failed', err);
+      return null;
+    }
+  }
+
+  /** Ask the server for every rune dice file, then redraw the rows. */
+  static async #onCheckDiceFilesAction() {
+    try {
+      await checkDiceFiles();
+    } catch (err) {
+      log.warn('Dashboard: dice file check failed', err);
+    }
+    this.render();
   }
 
   /** Build + copy the troubleshooting Diagnostic Bundle. Mirrors _onCopyDebug. @private */
