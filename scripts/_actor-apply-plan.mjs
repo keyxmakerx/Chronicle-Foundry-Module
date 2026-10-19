@@ -3,7 +3,8 @@
  * Writing only the differences means an echo of what the actor already
  * holds writes nothing and the write names just the fields that moved.
  * It does not guard against a stale Chronicle value: that differs from
- * the actor's, so it is still written.
+ * the actor's, so it is still written. The caller drops fields with a
+ * local edit still waiting to push (see ActorSync._updateActorFromEntity).
  *
  * Pure — see tools/test-actor-apply-plan.mjs.
  */
