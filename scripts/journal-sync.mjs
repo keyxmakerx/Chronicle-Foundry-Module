@@ -19,6 +19,7 @@ import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
 import {
   toFoundrySecrets, toChronicleSecrets, secretBlockRanges, PART_ATTR,
   hideSecrets, restoreSecrets, secretKeyer, hasClearSecrets, DEFAULT_PLACEHOLDER_TEXT,
+  applyReveals, carryReveals, revealableSecrets,
 } from './_gm-secrets.mjs';
 import { watchGMSecrets } from './gm-secret-view.mjs';
 import { defaultLevelForVisibility } from './_ownership.mjs';
@@ -164,6 +165,7 @@ export class JournalSync {
     this._onDeleteJournal = this._handleDeleteJournal.bind(this);
     this._onPageChange = this._handlePageChange.bind(this);
     this._onPageUpdate = (page, change, options, userId) => this._handlePageChange(page, options, userId);
+    this._onPreUpdatePage = this._fillReveals.bind(this);
     this._onCloseJournalSheet = this._handleCloseJournalSheet.bind(this);
     this._onBeforeUnload = () => this._journalPushDebouncer.flushAll();
 
@@ -200,6 +202,7 @@ export class JournalSync {
     Hooks.on('createJournalEntryPage', this._onPageChange);
     Hooks.on('updateJournalEntryPage', this._onPageUpdate);
     Hooks.on('deleteJournalEntryPage', this._onPageChange);
+    if (game.user?.isGM) Hooks.on('preUpdateJournalEntryPage', this._onPreUpdatePage);
     // v12's sheet fires closeJournalSheet; v13+ (ApplicationV2) fires
     // closeJournalEntrySheet.
     Hooks.on('closeJournalSheet', this._onCloseJournalSheet);
@@ -590,6 +593,7 @@ export class JournalSync {
     Hooks.off('createJournalEntryPage', this._onPageChange);
     Hooks.off('updateJournalEntryPage', this._onPageUpdate);
     Hooks.off('deleteJournalEntryPage', this._onPageChange);
+    Hooks.off('preUpdateJournalEntryPage', this._onPreUpdatePage);
     Hooks.off('closeJournalSheet', this._onCloseJournalSheet);
     Hooks.off('closeJournalEntrySheet', this._onCloseJournalSheet);
     globalThis.window?.removeEventListener?.('beforeunload', this._onBeforeUnload);
@@ -1108,6 +1112,21 @@ export class JournalSync {
    * @param {string} userId
    * @private
    */
+  /**
+   * Foundry's Reveal only flips a class on the block, which on a synced page
+   * holds a placeholder. Before that save, put the GM-only content in a
+   * revealed block (players then see it) and the label back in one hidden
+   * again. Revealing stays in Foundry: Chronicle has no per-secret reveal,
+   * and the text stays GM-only there.
+   * @private
+   */
+  _fillReveals(page, change) {
+    const content = change?.text?.content;
+    if (typeof content !== 'string' || !page?.parent?.getFlag(FLAG_SCOPE, 'entityId')) return;
+    const next = applyReveals(content, this._secretPieces, secretPlaceholderText(), _sanitizeIncomingHTML);
+    if (next !== null) change.text.content = next;
+  }
+
   _handlePageChange(page, options, userId) {
     const journal = page?.parent;
     if (!journal) return;
@@ -1697,10 +1716,10 @@ export class JournalSync {
   /** @private */
   async _forPush(journal, html, entityId, { fetch = true } = {}) {
     const label = secretPlaceholderText();
-    let r = restoreSecrets(html, this._secretPieces, label);
+    let r = restoreSecrets(html, this._secretPieces, label, _sanitizeIncomingHTML);
     if (r.missing.length && fetch && entityId) {
       await this._loadSecretPieces(entityId);
-      r = restoreSecrets(html, this._secretPieces, label);
+      r = restoreSecrets(html, this._secretPieces, label, _sanitizeIncomingHTML);
     }
     if (r.missing.length) {
       if (!this._warnedUnrestored.has(journal.id)) {
@@ -1828,6 +1847,10 @@ export class JournalSync {
       try {
         if (journal.flags?.[FLAG_SCOPE]?.fields !== undefined) {
           await journal.update(flagRemoval(FLAG_SCOPE, 'fields'), syncOptions());
+        }
+        for (const p of journal.pages) {
+          const fixed = p.type === 'text' ? revealableSecrets(p.text?.content) : null;
+          if (fixed !== null) await p.update({ 'text.content': fixed }, syncOptions());
         }
         const clear = journal.pages.some((p) => p.type === 'text'
           && hasClearSecrets(p.text?.content || '', { chronicleOnly: true }));
@@ -1966,7 +1989,9 @@ export class JournalSync {
       if (i < existingTextPages.length) {
         // Update existing page.
         const page = existingTextPages[i];
-        const updates = { 'text.content': section.content };
+        // A pull keeps what the GM revealed at the table.
+        const kept = carryReveals(page.text?.content, section.content);
+        const updates = { 'text.content': applyReveals(kept, this._secretPieces, secretPlaceholderText(), _sanitizeIncomingHTML) ?? kept };
         if (page.name !== section.title) {
           updates.name = section.title;
         }

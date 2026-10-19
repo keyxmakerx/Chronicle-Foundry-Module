@@ -9,7 +9,8 @@
  *
  * Watches the whole document rather than a sheet's render hook, so it
  * works for every journal sheet in v12 to v14 and for pages shown inline.
- * Revealing such a block to players shows them only the placeholder.
+ * Revealing a block writes its content into the page (JournalSync
+ * `_fillReveals`), so players see what the GM revealed.
  */
 
 import { PLACEHOLDER_ID_PREFIX } from './_gm-secrets.mjs';
