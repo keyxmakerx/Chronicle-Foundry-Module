@@ -53,6 +53,16 @@ function webSession() {
       store(res);
       return res;
     },
+    async putJSON(path, body) {
+      const res = await fetch(CHRONICLE_URL + path, {
+        method: 'PUT',
+        redirect: 'manual',
+        headers: { cookie: cookie(), 'content-type': 'application/json', 'x-csrf-token': csrf() },
+        body: JSON.stringify(body),
+      });
+      store(res);
+      return res;
+    },
   };
 }
 
@@ -151,7 +161,24 @@ export async function seedCampaign(label = 'bench') {
     });
     if (r.status >= 300) throw new Error(`owner assign failed: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
   };
-  return { campaignId, moduleKey, displayName, createMap, enableClaiming, assignOwner, chronicle: apiClient(campaignId, otherKey), module: apiClient(campaignId, moduleKey) };
+  // Sidebar folders are web routes too: make one in a category, nest it
+  // under another, and file a page into it.
+  const createFolder = async (name, entityTypeId, parentId = null) => {
+    const r = await web.postJSON(`/campaigns/${campaignId}/sidebar-nodes`, { name, entity_type_id: entityTypeId });
+    const text = await r.text();
+    if (r.status >= 300) throw new Error(`folder create failed: HTTP ${r.status} ${text.slice(0, 200)}`);
+    const node = JSON.parse(text);
+    if (parentId) {
+      const m = await web.putJSON(`/campaigns/${campaignId}/sidebar-nodes/${node.id}/reorder`, { parent_id: parentId });
+      if (m.status >= 300) throw new Error(`folder nest failed: HTTP ${m.status} ${(await m.text()).slice(0, 200)}`);
+    }
+    return node;
+  };
+  const fileInFolder = async (entityId, nodeId) => {
+    const r = await web.putJSON(`/campaigns/${campaignId}/entities/${entityId}/reorder`, { parent_node_id: nodeId });
+    if (r.status >= 300) throw new Error(`file in folder failed: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
+  };
+  return { campaignId, moduleKey, displayName, createMap, enableClaiming, assignOwner, createFolder, fileInFolder, chronicle: apiClient(campaignId, otherKey), module: apiClient(campaignId, moduleKey) };
 }
 
 /** A REST client scoped to one campaign, for scenario setup and assertions. */

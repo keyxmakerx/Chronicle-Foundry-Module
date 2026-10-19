@@ -11,7 +11,7 @@
 
 import { flagRemoval } from './_flag-removal.mjs';
 import { noticeText } from './_escape-html.mjs';
-import { getSetting, getSyncExclusions } from './settings.mjs';
+import { getSetting, setSetting, getSyncExclusions } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
 import { FLAG_SCOPE, syncOptions } from './constants.mjs';
 import { TYPE_SLUG_FLAG } from './_shop-journal.mjs';
@@ -26,6 +26,7 @@ import { defaultLevelForVisibility } from './_ownership.mjs';
 import { isCalendarNoteJournal } from './calendar-sync.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
 import { walkEntityPages, unwrapEntityList } from './_entity-page-walk.mjs';
+import { folderChain, layoutFingerprint } from './_folder-tree.mjs';
 import { KeyedQueue } from './_keyed-queue.mjs';
 import { isMapJournal } from './_journal-ownership.mjs';
 import { pickJournalCreateType, buildEntityCreateBody } from './_journal-create.mjs';
@@ -132,6 +133,12 @@ export class JournalSync {
     // only sync's own echoes (a GM edit made meanwhile still pushes).
     /** @type {KeyedQueue} */
     this._queue = new KeyedQueue();
+
+    // Chronicle's categories, sidebar folders and the parents of pages seen,
+    // for placing journals in matching Foundry folders (_folder-tree.mjs).
+    this._tree = { types: new Map(), folders: new Map(), parents: new Map() };
+    /** Folder creates in flight by level key, so a burst makes one folder. */
+    this._folderMaking = new Map();
 
     /**
      * Journals whose create POST is in flight (journal id -> name). The
@@ -299,14 +306,28 @@ export class JournalSync {
     // new one after every module's onInitialSync). None yet → no creates:
     // a first connect leaves importing to the import wizard.
     const createdAfter = getSetting('lastSyncTime') || null;
+    let relayout = false;
+    try {
+      relayout = await this._loadTree();
+    } catch (err) {
+      console.warn('Chronicle: could not read categories and folders; journals stay where they are', err);
+    }
     if (feed?.mode === 'delta') {
       await this._catchUpFromFeed(feed.changes, feed.createdAfter ?? createdAfter);
+      if (relayout) {
+        const walked = await walkEntityPages(
+          (page, perPage) => this._api.get(`/entities?per_page=${perPage}&page=${page}`),
+          unwrapEntityList,
+        );
+        if (!walked.truncated) await this._placeAll(walked.entities);
+      }
       await this._hideStoredSecrets();
       return;
     }
     const summary = await this.resyncAll({ verbose: false, onlyChanged: true, createdAfter });
     // A failed or partial walk proves nothing about deletions.
     if (summary.errors > 0 && !this._lastWalk) throw new Error('journal reconcile: entity list failed');
+    if (relayout && this._lastWalk && !this._lastWalk.truncated) await this._placeAll(this._lastWalkEntities);
     await this._setAsideMissing();
     await this._hideStoredSecrets();
   }
@@ -458,6 +479,17 @@ export class JournalSync {
 
     if (verbose) ui.notifications.info('Chronicle: fetching entities for resync…');
 
+    // A resync started from the dashboard runs before any connect has read
+    // the folder layout; without it every new journal would land loose.
+    let relayout = false;
+    if (!this._treeLoaded) {
+      try {
+        relayout = await this._loadTree();
+      } catch (err) {
+        console.warn('Chronicle: could not read categories and folders; journals stay where they are', err);
+      }
+    }
+
     // Paginated fetch — shares the walk with the dashboard's
     // _buildEntityGroups (scripts/_entity-page-walk.mjs). Both used to stop
     // after five pages, so a campaign past 500 entities resynced only its
@@ -472,6 +504,8 @@ export class JournalSync {
       );
       allEntities = walked.entities;
       truncated = walked.truncated;
+      this._lastWalkEntities = walked.entities;
+      for (const e of walked.entities) this._rememberEntity(e);
       this._lastWalk = { ids: new Set(walked.entities.map((e) => e?.id).filter(Boolean)), truncated };
     } catch (err) {
       const status = err?.status || null;
@@ -565,6 +599,8 @@ export class JournalSync {
         this._syncManager?.recordWorldOutcome?.(false);
       }
     }
+
+    if (relayout && !truncated) await this._placeAll(allEntities);
 
     console.debug(`Chronicle: resyncAll complete — updated=${updated} created=${created} skipped=${skipped} errors=${errors}`);
 
@@ -732,6 +768,13 @@ export class JournalSync {
       [`flags.${FLAG_SCOPE}.chronicleUpdatedAt`]: entity.updated_at || '',
     }, syncOptions());
 
+    // A page moved in Chronicle's sidebar moves here too.
+    try {
+      await this._placeJournal(journal, entity);
+    } catch (err) {
+      console.warn(`Chronicle: could not move "${journal.name}" to its folder`, err);
+    }
+
     // Split entity content into pages and sync them.
     await this._syncPagesToJournal(journal, await this._pullHtml(entity.id, entity.entry_html));
 
@@ -832,11 +875,131 @@ export class JournalSync {
   }
 
   /**
-   * Create a Foundry JournalEntry from Chronicle entity data.
+   * The Foundry folder a page's journal belongs in: its category inside any
+   * parent category, then its Chronicle folders. Made as needed.
    * @param {object} entity
-   * @param {string} [forceId] - Optionally use a specific Foundry document ID.
+   * @returns {Promise<Folder|null>}
    * @private
    */
+  async _getOrCreateEntityFolder(entity) {
+    this._rememberEntity(entity);
+    const depth = globalThis.CONST?.FOLDER_MAX_DEPTH ?? 4;
+    let parent = null;
+    for (const level of folderChain(entity, this._tree, depth)) {
+      parent = await this._folderForLevel(level, parent);
+      if (!parent) break;
+    }
+    return parent;
+  }
+
+  /** Whether sync made this folder, so it may move or rename it. @private */
+  _isSyncFolder(folder) {
+    return !!(folder?.getFlag(FLAG_SCOPE, 'entityTypeId') || folder?.getFlag(FLAG_SCOPE, 'folderNodeId'));
+  }
+
+  /**
+   * One level of the chain: found by its flag (a category folder from older
+   * versions also by name), else made. A folder sync made follows Chronicle's
+   * nesting and names unless the GM filed it inside a folder of their own.
+   * @private
+   */
+  async _folderForLevel(level, parent) {
+    const flag = level.kind === 'type' ? 'entityTypeId' : 'folderNodeId';
+    let folder = game.folders.find((f) => f.type === 'JournalEntry' && f.getFlag(FLAG_SCOPE, flag) === level.id);
+    if (!folder && level.kind === 'type') {
+      folder = game.folders.find((f) => f.type === 'JournalEntry' && f.name === level.name
+        && !this._isSyncFolder(f) && (f.folder?.id ?? null) === (parent?.id ?? null));
+      if (folder) await folder.setFlag(FLAG_SCOPE, 'entityTypeId', level.id);
+    }
+    if (folder) {
+      const updates = {};
+      const current = folder.folder ?? null;
+      if ((current?.id ?? null) !== (parent?.id ?? null) && (!current || this._isSyncFolder(current))) {
+        updates.folder = parent?.id ?? null;
+      }
+      if (level.kind === 'node' && folder.name !== level.name) updates.name = level.name;
+      if (level.color && !folder.color) updates.color = level.color;
+      if (Object.keys(updates).length) await folder.update(updates, syncOptions());
+      return folder;
+    }
+    const making = this._folderMaking.get(level.key);
+    if (making) return making;
+    const data = {
+      name: level.name,
+      type: 'JournalEntry',
+      folder: parent?.id ?? null,
+      flags: { [FLAG_SCOPE]: { [flag]: level.id } },
+    };
+    if (level.color) data.color = level.color;
+    const run = Folder.create(data, syncOptions()).finally(() => this._folderMaking.delete(level.key));
+    this._folderMaking.set(level.key, run);
+    return run;
+  }
+
+  /** Note where a page sits, for its own place and its sub-pages'. @private */
+  _rememberEntity(entity) {
+    if (!entity?.id) return;
+    this._tree.parents.set(entity.id, { parent_id: entity.parent_id ?? null, parent_node_id: entity.parent_node_id ?? null });
+  }
+
+  /**
+   * Move a journal to its page's folder. A journal the GM filed in a folder
+   * of their own stays there.
+   * @private
+   */
+  async _placeJournal(journal, entity) {
+    const current = journal.folder ?? null;
+    if (current && !this._isSyncFolder(current)) return;
+    const target = await this._getOrCreateEntityFolder(entity);
+    if (target && current?.id !== target.id) await journal.update({ folder: target.id }, syncOptions());
+  }
+
+  /**
+   * Read Chronicle's categories and folders. An older Chronicle without the
+   * folder list files pages by category only.
+   * @returns {Promise<boolean>} whether the layout changed since journals
+   *   were last placed
+   * @private
+   */
+  async _loadTree() {
+    const types = unwrapEntityList(await this._api.get('/entity-types'), 'entity_types');
+    let folders = [];
+    try {
+      folders = unwrapEntityList(await this._api.get('/folders'), 'folders');
+    } catch (err) {
+      if ((err?.status ?? err?.statusCode) !== 404) throw err;
+      this._api.dropLastErrorLogEntry?.({ path: '/folders', status: 404 });
+    }
+    this._tree.types = new Map(types.filter((t) => t?.id != null).map((t) => [t.id, t]));
+    this._tree.folders = new Map(folders.filter((f) => f?.id).map((f) => [f.id, f]));
+    this._treeLoaded = true;
+    const print = layoutFingerprint(this._tree);
+    if (getSetting('folderLayout') === print) return false;
+    this._pendingLayout = print;
+    return true;
+  }
+
+  /**
+   * Put every linked journal in its page's folder, then record the layout.
+   * @param {object[]} entities - every page, as listed
+   * @private
+   */
+  async _placeAll(entities) {
+    for (const e of entities) this._rememberEntity(e);
+    let failed = 0;
+    for (const entity of entities) {
+      const journal = this._findJournal(entity?.id);
+      if (!journal || this._isHandledByActorSync(entity)) continue;
+      try {
+        await this._placeJournal(journal, entity);
+      } catch (err) {
+        failed++;
+        console.warn(`Chronicle: could not move "${journal.name}" to its folder`, err);
+      }
+    }
+    if (!failed && this._pendingLayout) await setSetting('folderLayout', this._pendingLayout);
+  }
+
   _createJournalFromEntity(entity, forceId) {
     if (!entity?.id) return Promise.resolve(null);
     return this._queue.run(entity.id, () => this._createJournalLocked(entity, forceId));

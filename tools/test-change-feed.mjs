@@ -223,7 +223,8 @@ test('delta: only listed pages are fetched; versions already seen are skipped', 
   settings.lastSyncTime = '2026-05-01T00:00:00Z';
   await js.onInitialSync({ feed: { mode: 'delta', changes: [ch(1, 'e-same'), ch(2, 'e-changed'), ch(3, 'e-new', 'created')] } });
   settings.lastSyncTime = '';
-  assert.deepEqual(gets.sort(), ['/entities/e-changed', '/entities/e-new', '/entities/e-same']);
+  // Pages only; the category and folder lists are read once per connect.
+  assert.deepEqual(gets.filter((p) => p.startsWith('/entities/')).sort(), ['/entities/e-changed', '/entities/e-new', '/entities/e-same']);
   assert.deepEqual(updated, ['e-changed']);
   assert.deepEqual(created, ['e-new']);
 });

@@ -290,6 +290,15 @@ export function registerSettings() {
     default: '',
   });
 
+  // Internal: fingerprint of Chronicle's category and folder layout the
+  // journals were last placed for (_folder-tree.mjs).
+  game.settings.register(MODULE_ID, 'folderLayout', {
+    scope: 'world',
+    config: false,
+    type: String,
+    default: '',
+  });
+
   // Internal: last sync timestamp (not shown in UI).
   game.settings.register(MODULE_ID, 'lastSyncTime', {
     scope: 'world',

@@ -382,6 +382,18 @@ Lists all entity types in the campaign.
 }
 ```
 
+#### GET /folders
+The campaign's sidebar folders, for nesting journals the way pages sit in
+Chronicle. Folders in a category the key cannot see are left out.
+
+**Used by:** `journal-sync.mjs` (`_loadTree`, on every connect)
+
+**Response:** `{"data":[{"id":"…","entity_type_id":1,"name":"Waterdeep","parent_id":"…","sort_order":0}],"total":N}`.
+`parent_id` is another folder or a page, absent at the top of the category.
+An older Chronicle answers 404; the module then files pages by category only.
+
+Re-verify by: 2026-11-19 (Chronicle `internal/plugins/syncapi/folders_api.go`; lands with the Chronicle PR on branch `claude/foundry-sync-404-2inm82`)
+
 #### GET /entity-types/:typeId
 Returns a single entity type with field definitions.
 
