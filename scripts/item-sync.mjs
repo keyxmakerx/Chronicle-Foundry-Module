@@ -18,6 +18,7 @@
 
 import { getSetting } from './settings.mjs';
 import { FLAG_SCOPE, APPLY_OPTION } from './constants.mjs';
+import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { collapseChanges } from './_change-feed.mjs';
 import { HAS_ITEM, planInventory, itemDataFor } from './_inventory-plan.mjs';
 import { itemsToRemove } from './_stash-reconcile.mjs';
@@ -344,7 +345,7 @@ export class ItemSync {
 
   /**
    * Handle Foundry deleteItem hook (item removed from actor).
-   * Deletes the corresponding "Has Item" relation in Chronicle.
+   * Deletes the corresponding "Has Item" relation in Chronicle once the GM agrees.
    * @param {Item} item
    * @param {object} options
    * @param {string} userId
@@ -361,15 +362,22 @@ export class ItemSync {
     const entityId = actor?.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
 
-    try {
-      // Chronicle serves a flat relation route: DELETE /relations/:relationId.
-      await this._api.delete(`/relations/${relationId}`);
-      console.debug(`Chronicle: Removed item relation for "${item.name}" from Chronicle`);
-      this._syncManager?.recordUserOutcome?.(userId);
-    } catch (err) {
-      console.warn(`Chronicle: Failed to remove item relation for "${item.name}"`, err);
-      this._syncManager?.recordUserOutcome?.(userId, err);
-    }
+    // The GM is asked before the Chronicle relation goes too (_remote-deletes.mjs).
+    // Chronicle serves a flat relation route: DELETE /relations/:relationId.
+    const name = item.name;
+    queueRemoteDelete({
+      label: `${name} (${actor.name})`,
+      run: async () => {
+        try {
+          await this._api.delete(`/relations/${relationId}`);
+          console.debug(`Chronicle: Removed item relation for "${name}" from Chronicle`);
+          this._syncManager?.recordUserOutcome?.(userId);
+        } catch (err) {
+          this._syncManager?.recordUserOutcome?.(userId, err);
+          throw err;
+        }
+      },
+    });
   }
 
   /**

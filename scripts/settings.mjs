@@ -417,6 +417,15 @@ export function registerSettings() {
     default: '',
   });
 
+  // Set when the connection is first saved, so Chronicle Sync opens on the
+  // rest of the setup after the reload that connects; cleared on leaving it.
+  game.settings.register(MODULE_ID, 'firstRunPending', {
+    scope: 'world',
+    config: false,
+    type: Boolean,
+    default: false,
+  });
+
   // Whether the import wizard has been completed at least once.
   game.settings.register(MODULE_ID, 'wizardCompleted', {
     scope: 'world',

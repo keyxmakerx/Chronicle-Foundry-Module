@@ -8,6 +8,7 @@
  *   NPC. Stored as a token flag so late joiners see it; one NPC at a time;
  *   switches itself off after two quiet minutes.
  * - Open page: the NPC's synced Chronicle journal.
+ * The DM Screen's Cast tab lists the scene's NPCs with the same three buttons.
  *
  * "Show in Foundry" on a Chronicle NPC page arrives as `npc.spotlight` and
  * runs the same spotlight on the active GM's client (`npcSpotlightRelay`).
@@ -33,6 +34,7 @@ import {
   isResting,
   shouldAskReveal,
   chooseSpotlightToken,
+  castRows,
 } from './_npc-presence.mjs';
 
 const CHANNEL = `module.${MODULE_ID}`;
@@ -124,6 +126,42 @@ function _tokenPage(tokenDoc, pages = syncedPages()) {
 
 function _pagePrivate(journal) {
   return (journal?.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER;
+}
+
+/* ---------------- DM Screen Cast ---------------- */
+
+/** The current scene's Chronicle NPC tokens, for the DM Screen's Cast tab. */
+export function sceneCast() {
+  if (!canvas?.ready) return [];
+  const pages = syncedPages();
+  const now = Date.now();
+  return castRows((canvas.tokens?.placeables ?? []).map((token) => {
+    const doc = token.document;
+    const entityId = _tokenPage(doc, pages)?.entityId ?? null;
+    return {
+      id: token.id,
+      name: doc.name,
+      entityId,
+      typeName: pages.find((p) => p.entityId === entityId)?.typeName ?? '',
+      playerOwned: !!_baseActor(doc)?.hasPlayerOwner,
+      hidden: !!doc.hidden,
+      talking: isTalkLive(doc.getFlag(FLAG_SCOPE, TALK_FLAG), now),
+    };
+  }));
+}
+
+/**
+ * A Cast row's button: the same three actions as the token HUD's. GM only.
+ * @param {string} tokenId - a token on the current scene
+ * @param {'spotlight'|'talk'|'page'} action
+ */
+export async function castAction(tokenId, action) {
+  if (!game.user.isGM) return;
+  const token = canvas?.tokens?.get(tokenId);
+  if (!token) return;
+  if (action === 'spotlight') _spotlight(token);
+  else if (action === 'talk') await _toggleTalk(token);
+  else if (action === 'page') _tokenPage(token.document)?.journal.sheet?.render({ force: true });
 }
 
 /* ---------------- Spotlight ---------------- */

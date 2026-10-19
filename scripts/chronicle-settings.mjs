@@ -146,15 +146,6 @@ export async function refreshMembers(button) {
   }
 }
 
-/** The Setup Wizard button. */
-export async function startImport() {
-  const { ImportWizard } = await import('./import-wizard.mjs');
-  // The wizard reaches Chronicle through the sync manager it is bound to.
-  const wizard = ImportWizard.instance;
-  wizard.bind(game.modules.get(MODULE_ID)?.api?.syncManager);
-  wizard.render({ force: true });
-}
-
 /**
  * Save the form.
  * @param {HTMLFormElement} form

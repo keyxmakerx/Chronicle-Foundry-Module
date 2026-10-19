@@ -110,20 +110,8 @@ const source = {
 
 // ---------- Windows ----------
 
-/** @type {QuestBoardWindow|null} */
-let boardWin = null;
 /** @type {Map<string, QuestSheetWindow>} */
 const sheets = new Map();
-
-/** Open the Quest Board, or bring it forward. */
-export function openQuestBoard() {
-  if (boardWin?.rendered) {
-    boardWin.bringToFront?.();
-    return;
-  }
-  boardWin = new QuestBoardWindow();
-  boardWin.render({ force: true });
-}
 
 /** Open one quest's sheet, or bring it forward. */
 export function openQuestSheet(questId) {
@@ -138,7 +126,7 @@ export function openQuestSheet(questId) {
   win.render({ force: true });
 }
 
-class QuestBoardWindow extends HandlebarsApplicationMixin(ApplicationV2) {
+export class QuestBoardWindow extends HandlebarsApplicationMixin(ApplicationV2) {
   static DEFAULT_OPTIONS = {
     id: 'chronicle-quest-board',
     classes: ['chronicle-quests'],
@@ -154,8 +142,8 @@ class QuestBoardWindow extends HandlebarsApplicationMixin(ApplicationV2) {
 
   static PARTS = { board: { template: 'modules/chronicle-sync/templates/quest-board.hbs' } };
 
-  constructor() {
-    super();
+  constructor(options = {}) {
+    super(options);
     this._options = null;
     this._homeKey = '';
     this._view = null;
@@ -233,7 +221,6 @@ class QuestBoardWindow extends HandlebarsApplicationMixin(ApplicationV2) {
   _onClose(options) {
     super._onClose?.(options);
     open.delete(this);
-    if (boardWin === this) boardWin = null;
   }
 
   static _onPrev() { this._turn(-1); }
@@ -247,8 +234,13 @@ class QuestBoardWindow extends HandlebarsApplicationMixin(ApplicationV2) {
 
   static _onOpenQuest(event, target) {
     const id = target?.dataset?.quest;
-    if (id) openQuestSheet(id);
+    if (id) this.openQuest(id);
     else ui.notifications.info(t('NoSheet'));
+  }
+
+  /** A notice opens its quest in a sheet window; the Satchel opens it in place. */
+  openQuest(id) {
+    openQuestSheet(id);
   }
 
   static async _onRetry() {
@@ -283,7 +275,7 @@ function drawStrings(root, strings) {
   }
 }
 
-class QuestSheetWindow extends HandlebarsApplicationMixin(ApplicationV2) {
+export class QuestSheetWindow extends HandlebarsApplicationMixin(ApplicationV2) {
   static DEFAULT_OPTIONS = {
     classes: ['chronicle-quests', 'chronicle-quest-sheet'],
     window: { title: 'CHRONICLE.Quests.SheetTitle', icon: 'fa-solid fa-scroll', resizable: true },
@@ -299,8 +291,8 @@ class QuestSheetWindow extends HandlebarsApplicationMixin(ApplicationV2) {
 
   static PARTS = { sheet: { template: 'modules/chronicle-sync/templates/quest-sheet.hbs' } };
 
-  constructor(questId) {
-    super({ id: `chronicle-quest-${questId}` });
+  constructor(questId, options = {}) {
+    super({ id: `chronicle-quest-${questId}`, ...options });
     this._questId = questId;
     this._view = null;
     this._error = '';

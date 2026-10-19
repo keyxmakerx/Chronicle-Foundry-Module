@@ -3,15 +3,17 @@
  *
  * The Chronicle Sync window: setup and health in one place. Four sections:
  * Overview, Linked (pages, characters, maps, shops and the calendar), Problems
- * (health, player reports, sync history) and Settings.
+ * (health, player reports, sync history) and Settings. Until a world is set
+ * up, its first-run screen takes the window: connect, then the import wizard.
  *
  * Accessed via the sidebar status indicator or scene controls button (GM only).
  */
 
 import { noticeText } from './_escape-html.mjs';
 import {
-  newSettingsState, settingsContext, wireSettingsForm, testConnection, refreshMembers, startImport,
+  newSettingsState, settingsContext, wireSettingsForm, testConnection, refreshMembers,
 } from './chronicle-settings.mjs';
+import { ImportWizard } from './import-wizard.mjs';
 import { getSetting, setSetting, getUserMappings } from './settings.mjs';
 import { SyncHistoryTab } from './sync-history-tab.mjs';
 import { FLAG_SCOPE, REPORT_STORE_FLAG } from './constants.mjs';
@@ -25,6 +27,7 @@ import {
   CAP_STATUS,
 } from './capability-inspector.mjs';
 import { buildDiagnosticBundle } from './sync-diagnostic-bundle.mjs';
+import { checkDiceFiles, diceSoNiceReport } from './dice-so-nice.mjs';
 import { buildOverviewModel } from './_overview-model.mjs';
 import { log, getLogBuffer } from './logger.mjs';
 import { walkEntityPages } from './_entity-page-walk.mjs';
@@ -88,11 +91,13 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       testConnection: SyncDashboard.#onTestConnectionAction,
       refreshMembers: SyncDashboard.#onRefreshMembersAction,
       startImport: SyncDashboard.#onStartImportAction,
+      ...Object.fromEntries(ImportWizard.ACTION_NAMES.map((name) => [name, SyncDashboard.#onWizardAction])),
       'open-shop': SyncDashboard.#onOpenShopAction,
       'push-actor': SyncDashboard.#onPushActorAction,
       'push-all-actors': SyncDashboard.#onPushAllActorsAction,
       'copy-debug': SyncDashboard.#onCopyDebugAction,
       'copy-diagnostic-bundle': SyncDashboard.#onCopyDiagnosticBundleAction,
+      'check-dice-files': SyncDashboard.#onCheckDiceFilesAction,
       'copy-capability': SyncDashboard.#onCopyCapabilityAction,
       'copy-capability-json': SyncDashboard.#onCopyCapabilityJsonAction,
       'bulk-set-public': SyncDashboard.#onBulkSetPublicAction,
@@ -115,7 +120,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   static PARTS = {
     dashboard: {
       template: 'modules/chronicle-sync/templates/sync-dashboard.hbs',
-      templates: ['modules/chronicle-sync/templates/chronicle-settings.hbs'],
+      templates: [
+        'modules/chronicle-sync/templates/chronicle-settings.hbs',
+        'modules/chronicle-sync/templates/import-wizard.hbs',
+      ],
     },
   };
 
@@ -160,6 +168,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     /** The Settings section's page types and unsaved edits, kept across re-renders. */
     this._settings = newSettingsState();
 
+    /** @type {ImportWizard|null} The first-run screen's wizard while it is showing. */
+    this._firstRun = null;
+
     /** The History pane's rows and filters, kept across re-renders. */
     this._historyTab = new SyncHistoryTab(() => this.api);
 
@@ -182,6 +193,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   _onFirstRender(context, options) {
     super._onFirstRender?.(context, options);
     Hooks.on(REPORTS_CHANGED_HOOK, this._onReportsChanged);
+    if (context.configured && getSetting('firstRunPending')) this.startFirstRun();
   }
 
   /** @override */
@@ -229,11 +241,33 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     return [];
   }
 
+  /**
+   * Show the import wizard in place of the four sections.
+   * @returns {Promise<void>}
+   */
+  async startFirstRun() {
+    if (!this._syncManager || !this.api) return;
+    if (!this._firstRun) this._firstRun = ImportWizard.hostedIn(this, this._syncManager);
+    this.render({ force: true });
+    await this._firstRun.start();
+  }
+
+  /** Back to the four sections; the setup only offers itself again from Settings. */
+  leaveFirstRun() {
+    this._firstRun = null;
+    setSetting('firstRunPending', false).catch(() => {});
+    this.render({ force: true });
+  }
+
   /** @override */
   async _prepareContext(options = {}) {
-    // Before a campaign is connected the window is only its Settings.
+    // Before a campaign is connected the window is the first-run screen's
+    // first step, the connection settings.
     if (!this._syncManager || !this.api) {
-      return { configured: false, settings: await settingsContext(this._settings) };
+      return { configured: false, settings: { ...(await settingsContext(this._settings)), firstRun: true } };
+    }
+    if (this._firstRun) {
+      return { configured: true, firstRun: await this._firstRun._prepareContext() };
     }
 
     this._loading = true;
@@ -373,6 +407,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
       // Sync Capability (status tab panel).
       capability: capabilityData,
+
+      // Diagnostics, Health pane: Dice So Nice as this client sees it.
+      dice: this._buildDiceData(),
 
       // Diagnostics, Player reports pane.
       debug: debugData,
@@ -1094,10 +1131,20 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   _onRender(context, options) {
     const el = this.element;
     if (!el) return;
+    if (context.firstRun) {
+      this._firstRun?._onRender(context.firstRun, options);
+      return;
+    }
 
     // --- Tab navigation ---
     this._initTabs(el);
-    wireSettingsForm(el.querySelector('[data-settings-form]'), this._settings, () => this.render({ force: true }));
+    // Saving the connection on the first-run screen marks the rest of the
+    // setup to open once Foundry has reloaded and connected.
+    const firstSave = context.configured === false;
+    wireSettingsForm(el.querySelector('[data-settings-form]'), this._settings, async () => {
+      if (firstSave) await setSetting('firstRunPending', true).catch(() => {});
+      this.render({ force: true });
+    });
     this._historyTab.mount(el, this._historyShown());
 
     // --- Search input ---
@@ -1627,9 +1674,14 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this.render({ force: true });
   }
 
-  /** Settings > Connection: the Setup Wizard. */
+  /** Settings > Connection: the Setup Wizard, shown as the first-run screen. */
   static #onStartImportAction() {
-    return startImport();
+    return this.startFirstRun();
+  }
+
+  /** The first-run screen's wizard buttons. */
+  static #onWizardAction(event, target) {
+    return this._firstRun?.handleAction(target.dataset.action, event, target);
   }
 
   /** Open a shop window via the ShopWidget module. */
@@ -1706,11 +1758,34 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         retryQueue: this.api?.getRetryQueueSize?.() ?? null,
       },
       fieldMapping: this._buildFieldMappingInfo(matchedSystem),
+      dice: this._buildDiceData(),
       capability: cap && cap.ok ? { source: cap.source, summary: cap.summary } : null,
       activityLog: (this._syncManager?.getActivityLog?.() ?? []).slice(0, 100),
       errorLog: (this.api?.getErrorLog?.() ?? []).slice(0, 100),
       logBuffer: getLogBuffer().slice(-200),
     };
+  }
+
+  /** Health pane's Dice So Nice rows; a failure here never blanks the pane. @private */
+  _buildDiceData() {
+    try {
+      const report = diceSoNiceReport();
+      const label = { off: 'StateOff', ok: 'StateOk', warn: 'StateWarn', error: 'StateError' }[report.state];
+      return { ...report, stateLabel: game.i18n.localize(`CHRONICLE.Dice.${label}`) };
+    } catch (err) {
+      log.warn('Dashboard: Dice So Nice check failed', err);
+      return null;
+    }
+  }
+
+  /** Ask the server for every rune dice file, then redraw the rows. */
+  static async #onCheckDiceFilesAction() {
+    try {
+      await checkDiceFiles();
+    } catch (err) {
+      log.warn('Dashboard: dice file check failed', err);
+    }
+    this.render();
   }
 
   /** Build + copy the troubleshooting Diagnostic Bundle. Mirrors _onCopyDebug. @private */

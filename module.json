@@ -48,6 +48,13 @@
         "compatibility": {},
         "reason": "Optional: Enhanced journal page support for Chronicle entity sync"
       }
+    ],
+    "recommends": [
+      {
+        "id": "dice-so-nice",
+        "type": "module",
+        "reason": "Optional: shows the Chronicle rune dice as 3D dice. Without it, rolls show as Foundry's normal chat roll."
+      }
     ]
   }
 }

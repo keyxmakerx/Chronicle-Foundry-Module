@@ -334,6 +334,21 @@ html[data-cs-motion="off"] :is(.cs-grow, .cs-settle, .cs-peek) {
 .chronicle-dashboard .cs-panels { padding: 0 4px 8px; overflow: visible; }
 .chronicle-dashboard .cs-foot { position: sticky; bottom: -8px; margin: 0 -8px -8px; z-index: 1; }
 .chronicle-dashboard .dashboard-empty + .cs-settings { padding: 0 12px; }
+
+/* First-run screen: a short heading and the setup's steps above the connection settings, then the wizard. */
+.cs-firstrun { padding: 12px 14px 4px; }
+.cs-firstrun-title { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; border: 0; font-size: 17px; }
+.cs-firstrun-title > i { color: var(--cs-accent); }
+.cs-firstrun-hint { margin: 0; max-width: 60ch; font-size: 12.5px; color: var(--cs-text-muted); }
+.cs-firstrun-steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; padding: 0; list-style: none; counter-reset: cs-step; }
+.cs-firstrun-steps > li { counter-increment: cs-step; display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 4px; border: 1px solid var(--cs-line); border-radius: 999px; font-size: 12px; color: var(--cs-text-muted); }
+.cs-firstrun-steps > li::before { content: counter(cs-step); display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--cs-surface-2); font-size: 11px; font-weight: 600; }
+.cs-firstrun-steps > li.is-current { border-color: var(--cs-accent); color: var(--cs-text); }
+.cs-firstrun-steps > li.is-current::before { background: var(--cs-accent); color: var(--cs-on-accent); }
+.cs-firstrun-head { display: flex; align-items: flex-start; gap: 12px; padding-bottom: 10px; }
+.cs-firstrun-head > div { flex: 1; min-width: 0; }
+.cs-firstrun-head > button { flex: none; width: auto; }
+.chronicle-dashboard .chronicle-wizard-inner { flex: 1; min-height: 0; }
 .overview-more { margin-top: 12px; }
 
 /* ---------------------------------------------------------------------------
@@ -1302,6 +1317,35 @@ html[data-cs-motion="off"] :is(.cs-grow, .cs-settle, .cs-peek) {
   border-radius: 4px;
   font-size: 12px;
 }
+
+/* Dice So Nice check (Health pane): one line per finding, the fix under it. */
+.dice-check-rows {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.dice-check-row {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 2px 0;
+  color: var(--cs-text);
+}
+
+.dice-check-row--ok i { color: var(--cs-ok); }
+.dice-check-row--info i { color: var(--cs-info); }
+.dice-check-row--warn i { color: var(--cs-warn); }
+.dice-check-row--error i { color: var(--cs-bad); }
+
+.dice-check-fix {
+  display: block;
+  color: var(--cs-text-2);
+}
+
+.dice-check--error .dice-check-state { color: var(--cs-bad); }
+.dice-check--warn .dice-check-state { color: var(--cs-warn); }
+.dice-check--ok .dice-check-state { color: var(--cs-ok); }
 
 /* Capability Inspector actor picker (Status tab) */
 .capability-actor-picker {
@@ -2291,3 +2335,109 @@ body.ccal-rest #chronicle-calendar-bar .ccal-sky * { animation-play-state: pause
 
 /* The journal header's "Open shop" button, tinted like the shop's coin. */
 .chronicle-shop-open { width: auto; gap: 4px; padding: 0 6px; color: #e0b44a; }
+
+/* Satchel: the notebook, quest board and stash windows drawn as tabs of one
+   window in the module look. The hosted windows keep their own styles; the
+   notebook page and quest notices keep their paper. */
+.chronicle-satchel .window-content { padding: 8px 10px 10px; overflow: hidden; }
+.cs-satchel { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.cs-satchel-tabs { align-self: flex-start; flex-shrink: 0; }
+.cs-satchel-pane { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.cs-satchel-pane[hidden] { display: none; }
+.cs-satchel-notebook { overflow: hidden; border-radius: 6px; }
+.cs-satchel-pane > .application { position: static; width: auto; height: auto; max-height: none; box-shadow: none; }
+.cs-satchel-back { width: auto; margin: 0 0 8px; }
+
+/* Calendar window: Chronicle's calendar page edge to edge, under a slim
+   title bar, so the frame reads as the page rather than a box in a box. */
+.chronicle-calendar-window.cs-borderless { border: 0; }
+.chronicle-calendar-window.cs-borderless .window-header { min-height: 0; padding-block: 2px; border-bottom: 0; font-size: 12px; }
+.chronicle-calendar-window.cs-borderless .window-content { padding: 0; border: 0; background: transparent; }
+
+/* Token art on hover: the actor's full picture beside the cursor, in a frame.
+   It never takes the pointer, so it can't steal the hover from the token
+   under it. The frame reads from --cs-hover-frame-* so a token frame chosen
+   elsewhere can restyle it without new rules. */
+.chronicle-hover-art {
+  --cs-hover-frame-width: 6px;
+  --cs-hover-frame-colour: var(--cs-surface-2);
+  --cs-hover-frame-edge: var(--cs-line);
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 10001;
+  padding: var(--cs-hover-frame-width);
+  border: 1px solid var(--cs-hover-frame-edge);
+  border-radius: 8px;
+  background: var(--cs-hover-frame-colour);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.chronicle-hover-art[hidden] { display: none; }
+.chronicle-hover-art img {
+  display: block;
+  max-width: min(280px, 40vw);
+  max-height: min(320px, 50vh);
+  border: 1px solid var(--cs-hover-frame-edge);
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+/* Change form: the picker rows, and the reveal card that grows out of the
+ * token. The card's frame uses the same knobs as the hover art. */
+.chronicle-form-picker fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 10px;
+  border: 1px solid var(--cs-line);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.chronicle-form-picker legend { padding: 0 4px; font-weight: 600; }
+.chronicle-form-picker-row { display: flex; gap: 8px; align-items: baseline; min-height: 28px; }
+.chronicle-form-picker-row input { flex: none; }
+.chronicle-form-picker-now {
+  margin-left: auto;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cs-text-muted);
+}
+.chronicle-form-reveal {
+  position: fixed;
+  inset: 0;
+  z-index: 10002;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.chronicle-form-reveal-card {
+  --cs-hover-frame-width: 6px;
+  --cs-hover-frame-colour: var(--cs-surface-2);
+  --cs-hover-frame-edge: var(--cs-line);
+  position: relative;
+  width: min(280px, 60vw);
+  min-height: 80px;
+  padding: var(--cs-hover-frame-width);
+  border: 1px solid var(--cs-hover-frame-edge);
+  border-radius: 12px;
+  background: var(--cs-hover-frame-colour);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+}
+.chronicle-form-reveal-card img {
+  display: block;
+  width: 100%;
+  max-height: 60vh;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border: 1px solid var(--cs-hover-frame-edge);
+  border-radius: 6px;
+}
+.chronicle-form-reveal-card b {
+  display: block;
+  padding: 8px 4px 2px;
+  font-size: 1.1rem;
+  text-align: center;
+  color: var(--cs-text);
+}

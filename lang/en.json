@@ -191,8 +191,18 @@
     "Dashboard": {
       "Title": "Chronicle Sync",
       "OpenSettings": "Open Settings",
-      "NotConfigured": "Chronicle Sync is not configured.",
-      "NotConfiguredHint": "Paste a connect line from Chronicle below and save.",
+      "FirstRun": {
+        "Title": "Set up Chronicle in this world",
+        "ConnectFirst": "First, connect: paste the connect line from your Chronicle campaign, test it and save. After Foundry reloads, Chronicle Sync opens on the rest of the setup.",
+        "StepConnect": "Connect",
+        "StepScan": "Scan this world",
+        "StepTypes": "Choose page types and tags",
+        "StepCharacters": "Match characters",
+        "StepReview": "Review and import",
+        "NothingSent": "Nothing is sent to Chronicle until you press Start Import.",
+        "Skip": "Skip setup",
+        "Done": "Done"
+      },
       "Common": {
         "Loading": "Loading...",
         "LoadFailed": "Some data failed to load from Chronicle:",
@@ -641,31 +651,46 @@
     },
     "Keybindings": {
       "OpenDashboard": {
-        "Name": "Open the Chronicle Sync dashboard",
+        "Name": "Open Chronicle Sync",
         "Hint": "GM only."
       },
       "OpenDMScreen": {
         "Name": "Open the DM Screen",
         "Hint": "GM only. Works once the world is connected to Chronicle."
       },
-      "OpenNotebook": {
-        "Name": "Open my Chronicle notebook",
-        "Hint": "Works once the world is connected to Chronicle."
+      "OpenSatchel": {
+        "Name": "Open my Satchel",
+        "Hint": "Your notebook, the quest board and your stash. Works once the world is connected to Chronicle."
       },
       "OpenCalendar": {
         "Name": "Open the Chronicle calendar",
         "Hint": "Works once the world is connected to Chronicle."
       },
-      "OpenQuests": {
-        "Name": "Open the quest board",
-        "Hint": "Works once the world is connected to Chronicle."
+      "ToggleHoverArt": {
+        "Name": "Show or hide token art on hover",
+        "Hint": "Switches the picture that appears when you rest the cursor on a token. Just for you."
       }
     },
     "SceneControl": {
-      "Notebook": "Open my Chronicle notebook",
-      "Calendar": "Open the Chronicle calendar",
+      "Dashboard": "Open Chronicle Sync",
       "DMScreen": "Open the DM Screen",
-      "Quests": "Open the quest board"
+      "Satchel": "Open my Satchel",
+      "Calendar": "Open the Chronicle calendar"
+    },
+    "Satchel": {
+      "Title": "Satchel",
+      "Tab": {
+        "notebook": "Notebook",
+        "quests": "Quests",
+        "stash": "Stash"
+      },
+      "BackToBoard": "Back to the board",
+      "StashGMTitle": "Your stash lives on a character",
+      "StashGM": "The party's shared stashes are in the DM Screen's Party tab.",
+      "StashOffTitle": "Stashes are off",
+      "StashOff": "This campaign doesn't use stashes in Chronicle.",
+      "StashNoCharacterTitle": "No character yet",
+      "StashNoCharacter": "Your stash shows here once your GM gives you a character from Chronicle."
     },
     "Quests": {
       "BoardTitle": "Quest Board",
@@ -748,6 +773,34 @@
       "WorldEmpty": "Add a calendar or turn on the Armory to see the world's date and game state here.",
       "Skip": "Click anywhere to skip",
       "Retry": "Try again",
+      "Cast": {
+        "Tab": "Cast",
+        "Heading": "NPCs in this scene",
+        "NoScene": "Open a scene to see its NPCs.",
+        "EmptyTitle": "No Chronicle NPCs here",
+        "Empty": "Tokens show here when they belong to a Chronicle page and no player. Drop a page on a token to link it.",
+        "Hidden": "Hidden",
+        "Spotlight": "Spotlight",
+        "Talk": "Talk as",
+        "TalkStop": "Stop talking",
+        "Page": "Page"
+      },
+      "Party": {
+        "Tab": "Party",
+        "StashHeading": "Party stashes",
+        "StashesOff": "Stashes are off for this campaign in Chronicle.",
+        "NoHero": "Stashes show once a player character is synced from Chronicle.",
+        "StashFailed": "The stashes couldn't load from Chronicle.",
+        "TryAgain": "Try again",
+        "Money": "Money {amount}",
+        "StashEmpty": "Nothing in it.",
+        "NoStashes": "No shared stashes yet.",
+        "Move": "Move things",
+        "Reload": "Reload",
+        "ShopHeading": "Shops",
+        "OpenShop": "Open",
+        "NoShops": "No shop pages are synced to this world."
+      },
       "Error": {
         "NotSetUp": "Connect this world to Chronicle first (Chronicle Sync settings).",
         "NeedsUpdate": "This Chronicle doesn't have the DM Screen yet. Update Chronicle to use it here.",
@@ -758,6 +811,24 @@
       }
     },
     "Encounters": {
+      "Stage": {
+        "Heading": "Stages",
+        "Title": "Stage {n}",
+        "Due": "Due",
+        "DueNotice": "Stage {n} of {name} is due. Start it from the DM Screen's Encounters tab.",
+        "WhenManual": "When you start it",
+        "WhenStamina": "When {name} is at or below {p}% Stamina",
+        "WhenRound": "At the start of round {n}",
+        "TakesForm": "{name} takes the form {form}",
+        "FirstForm": "its first form",
+        "Arrive": "Arriving: {names}",
+        "Someone": "A creature",
+        "Start": "Start stage {n}",
+        "NotYet": "Not yet",
+        "Started": "Started",
+        "Armed": "Click the scene where the arrivals come in. Esc cancels.",
+        "NoForm": "These creatures didn't change form, because they aren't on the scene or aren't Chronicle creatures: {names}"
+      },
       "Tab": "Encounters",
       "SearchPlaceholder": "Search planned encounters",
       "ReadyHeading": "Ready for game night",
@@ -907,7 +978,7 @@
       "Refused": {
         "unmapped": "Chronicle said yes, but your GM hasn't matched your Foundry login to a Chronicle player yet. Ask them to match you in Chronicle Sync > Members, then try again.",
         "mismatch": "The Chronicle account that pressed Allow isn't the one your GM matched to your Foundry login. Sign in to Chronicle as yourself and try again.",
-        "campaign": "That Chronicle window was for a different campaign. Try again from the notebook button."
+        "campaign": "That Chronicle window was for a different campaign. Try again from the Satchel's Notebook tab."
       }
     },
     "Removed": {
@@ -995,6 +1066,102 @@
       "InfoMoney": "Money field",
       "InfoUnknown": "unknown",
       "InfoMoneyPending": "pick a character above"
+    },
+    "Dice": {
+      "Heading": "Dice So Nice",
+      "Intro": "The Chronicle rune dice play in Dice So Nice, another author's module. This checks what your own client found, so a change on their side shows up here instead of as silently missing dice.",
+      "State": "State",
+      "StateOff": "Not in use",
+      "StateOk": "Working",
+      "StateWarn": "Working, with warnings",
+      "StateError": "Something needs fixing",
+      "Fix": "Fix",
+      "CheckFiles": "Check dice files",
+      "CheckFilesHint": "Asks Foundry's server for every dice picture and model the rune dice list names.",
+      "Check": {
+        "NotInstalled": "Dice So Nice is not installed in this world. Rolls show as Foundry's normal roll card in chat.",
+        "NotInstalledFix": "Nothing to fix. To see the rune dice in 3D, install Dice So Nice and turn it on in Manage Modules.",
+        "NotActive": "Dice So Nice is installed but turned off in this world. Rolls show as Foundry's normal roll card in chat.",
+        "NotActiveFix": "Nothing to fix. To see 3D dice, turn Dice So Nice on in Manage Modules.",
+        "VersionTested": "Dice So Nice {version}, the version this was tested with.",
+        "VersionOther": "Dice So Nice {version}. This was tested with {tested}; the rows below say whether the parts we use still work.",
+        "VersionMajor": "Dice So Nice {version} is a different major version from the one this was tested with ({tested}). It may have changed how other modules add dice.",
+        "VersionMajorFix": "If the rows below show errors, report them with the Diagnostic Bundle so the module can be updated. Meanwhile, rolls still show in chat.",
+        "VersionUnknown": "Dice So Nice did not say which version it is.",
+        "VersionUnknownFix": "Check Manage Modules for its version and include it in any report.",
+        "StreamView": "This is Foundry's stream page, where Dice So Nice never runs. Rolls show without 3D dice here.",
+        "NoCanvas": "This client has Foundry's canvas turned off, so Dice So Nice does not start. Rolls show without 3D dice.",
+        "Starting": "Dice So Nice is still starting.",
+        "NoApi": "Dice So Nice is on but never started on this client.",
+        "NoApiFix": "Reload Foundry. If it stays, open the browser console (F12) and look for Dice So Nice errors; another module may be stopping it.",
+        "ApiOk": "Dice So Nice's calls for adding dice are all there.",
+        "ApiMissing": "Dice So Nice no longer has these calls: {methods}. The rune dice can't be added.",
+        "ApiMissingFix": "Dice So Nice changed how modules add dice. Report this with the Diagnostic Bundle. Rolls still show with Dice So Nice's own dice.",
+        "ApiOptionalMissing": "Dice So Nice no longer has: {methods}. The rune dice still work without them.",
+        "NoReadyHook": "Dice So Nice started but never told other modules it was ready, so the rune dice were not added.",
+        "NoReadyHookFix": "Dice So Nice may have renamed its start-up signal. Report this with the Diagnostic Bundle.",
+        "DisabledForUser": "Dice So Nice is turned off in this player's own Dice So Nice settings.",
+        "ManifestUnreadable": "The rune dice list could not be read ({error}).",
+        "ManifestUnreadableFix": "The module's files may be incomplete. Reinstall Chronicle Sync from Foundry's Add-on Modules list.",
+        "ManifestProblem": "A rune dice entry was skipped: {problem}",
+        "ManifestProblemFix": "The other sets still load. Report this so the list can be corrected.",
+        "Problem": {
+          "ManifestShape": "the list is not in the expected shape.",
+          "ManifestVersion": "the list is a format this module doesn't know ({detail}).",
+          "SetId": "a set has an id that can't be used ({detail}).",
+          "SetDuplicate": "the set {set} is listed twice.",
+          "SetUnknown": "the set {set} is not one Chronicle rolls with, so no roll will use it (it still loads).",
+          "ColourId": "the set {set} has a colour with an id that can't be used or is listed twice ({detail}).",
+          "SetColour": "the set {set} has a colour value that isn't a colour ({detail}).",
+          "SetMaterial": "the set {set} names a material Dice So Nice doesn't have ({detail}).",
+          "FaceType": "the set {set} has faces for an unknown die ({detail}).",
+          "FaceList": "the set {set} has the wrong number of faces, or a face outside the dice folder, for its {detail}.",
+          "ModelPath": "the set {set} has a 3D model outside the dice folder for its {detail}."
+        },
+        "NoSets": "No rune dice sets are shipped in this version yet.",
+        "SetsListed": "{count} rune dice sets listed.",
+        "Registered": "Added to Dice So Nice: {colorsets} colour themes, {systems} dice sets, {presets} dice.",
+        "RegisterFailed": "Dice So Nice refused the {step} {id}: {message}",
+        "RegisterFailedFix": "Report this with the Diagnostic Bundle. That set shows with the player's own dice instead.",
+        "FileMissing": "Missing dice file: {path} ({status})",
+        "FileMissingFix": "The file is not where the rune dice list says. Reinstall Chronicle Sync; if it stays, report it.",
+        "FilesOk": "All {count} dice files are where they should be.",
+        "CritsRegistered": "The 12 Chronicle crits are in Dice So Nice's Special Effects settings, under the \"Chronicle crit\" trigger.",
+        "CritsMissing": "The Chronicle crits could not be added to Dice So Nice, so crit dice land without an effect.",
+        "CritsMissingFix": "Dice So Nice may have changed its special effects calls. Report this with the Diagnostic Bundle; the dice themselves still work."
+      }
+    },
+    "Forms": {
+      "Hud": "Change form",
+      "Title": "Change form: {name}",
+      "ChangeTo": "Change to",
+      "Now": "Now",
+      "How": "How players see it",
+      "Quiet": "Quiet.",
+      "QuietHint": "The token and sheet just change.",
+      "Reveal": "Reveal.",
+      "RevealHint": "The new art shows big on every screen that can see the token for a moment, then the token changes.",
+      "Go": "Change form",
+      "Became": "<b>{name}</b> becomes <b>{form}</b>.",
+      "StaminaLeft": "{name}: {value} of {max} Stamina.",
+      "NotRecorded": "The form changed here, but Chronicle did not record it, so players' page may not list it yet. Updating Chronicle fixes this.",
+      "LoadFailed": "Could not read this creature's forms from Chronicle. Try again.",
+      "Failed": "Could not change {name}'s form. Try again."
+    },
+    "HoverArt": {
+      "World": {
+        "Name": "Token art on hover",
+        "Hint": "Resting the cursor on a token shows its actor's full picture beside the cursor. Hidden tokens and Secret ones never show theirs to players. Switch one token off from its token HUD."
+      },
+      "Client": {
+        "Name": "Show token art on hover",
+        "Hint": "The full picture beside the cursor when you rest it on a token. Just for you."
+      },
+      "HudOn": "Art on hover: on. Click to stop showing it for this token",
+      "HudOff": "Art on hover: off. Click to show it for this token",
+      "TurnedOn": "Token art on hover is on.",
+      "TurnedOff": "Token art on hover is off. The same shortcut turns it back on.",
+      "SwitchFailed": "Chronicle: couldn't switch this token's art preview."
     },
     "Npc": {
       "Spotlight": "Spotlight",

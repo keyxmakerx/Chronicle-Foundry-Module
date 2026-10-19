@@ -70,8 +70,8 @@ test('the Settings section is the settings form, and shows alone before a campai
   assert.equal(hbs.split(partial).length - 1, 2);
   assert.ok(hbs.indexOf(partial) < hbs.indexOf('{{else}}'), 'the unconnected state shows the form');
   const src = read('scripts/sync-dashboard.mjs');
-  assert.match(src, /templates: \['modules\/chronicle-sync\/templates\/chronicle-settings\.hbs'\]/);
-  assert.match(src, /return \{ configured: false, settings: await settingsContext\(this\._settings\) \}/);
+  assert.match(src, /templates: \[\s*'modules\/chronicle-sync\/templates\/chronicle-settings\.hbs',/);
+  assert.match(src, /return \{ configured: false, settings: \{ \.\.\.\(await settingsContext\(this\._settings\)\), firstRun: true \} \}/);
 });
 
 test('every overview jump target resolves to a real section', () => {

@@ -28,6 +28,7 @@ import { KeyedQueue } from './_keyed-queue.mjs';
 import { isMapJournal } from './_journal-ownership.mjs';
 import { pickJournalCreateType, buildEntityCreateBody } from './_journal-create.mjs';
 import { JournalPushDebouncer } from './_journal-push-debounce.mjs';
+import { mergeJournalChange, changedJournalFields } from './_journal-push-fields.mjs';
 import { setAside } from './_set-aside.mjs';
 import { isOldNotesJournal } from './_notes-folder.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
@@ -170,6 +171,8 @@ export class JournalSync {
     // API key's 60 requests/minute limit (API-CONTRACT.md). A pending push
     // is flushed on journal close and world unload, so the last edit is
     // never left behind a timer that doesn't get to fire.
+    /** Name/ownership changes seen since a journal's last push, by journal id. */
+    this._pendingJournalChanges = new Map();
     this._journalPushDebouncer = new JournalPushDebouncer(
       (journal, entityId) => { this._pushJournalUpdate(journal, entityId); }
     );
@@ -393,6 +396,7 @@ export class JournalSync {
     if (!gone) return;
     await this._queue.run(eid, async () => {
       this._journalPushDebouncer.cancel(journal.id);
+      this._pendingJournalChanges.delete(journal.id);
       await setAside(journal, FLAG_SCOPE, syncOptions());
       ui.notifications?.info?.(game.i18n.format('CHRONICLE.Removed.Entity', { name: noticeText(journal.name) }));
     });
@@ -695,10 +699,11 @@ export class JournalSync {
     }
 
     // One write for name, ownership and link flags; pages follow.
-    const ownership = await this._buildOwnership(entity);
+    // With "Follow Chronicle's visibility" off, ownership stays as the GM set it.
+    const ownership = this._followsVisibility() ? await this._buildOwnership(entity) : undefined;
     await journal.update({
       name: entity.name,
-      ownership,
+      ...(ownership && { ownership }),
       [`flags.${FLAG_SCOPE}.entityType`]: entity.type_name || '',
       [`flags.${FLAG_SCOPE}.${TYPE_SLUG_FLAG}`]: entity.type_slug || '',
       // Field values are not kept on the journal: every client receives its
@@ -738,6 +743,7 @@ export class JournalSync {
     // The journal is going away from sync; an edit still pending for it
     // would only push at a page that no longer exists.
     this._journalPushDebouncer.cancel(journal.id);
+    this._pendingJournalChanges.delete(journal.id);
     await setAside(journal, FLAG_SCOPE, syncOptions());
     ui.notifications?.info?.(game.i18n.format('CHRONICLE.Removed.Entity', { name: noticeText(journal.name) }));
     console.debug(`Chronicle: Set aside journal for deleted entity ${data.id}`);
@@ -882,7 +888,8 @@ export class JournalSync {
     }
 
     // Determine ownership from Chronicle permissions.
-    const ownership = await this._buildOwnership(entity);
+    // Off: a new journal takes Foundry's own default ownership.
+    const ownership = this._followsVisibility() ? await this._buildOwnership(entity) : undefined;
 
     // Find or create a folder for this entity type.
     const folder = await this._getOrCreateEntityFolder(entity);
@@ -890,7 +897,7 @@ export class JournalSync {
     const journalData = {
       name: entity.name,
       pages,
-      ownership,
+      ...(ownership && { ownership }),
       folder: folder?.id || null,
       flags: {
         [FLAG_SCOPE]: {
@@ -1073,6 +1080,9 @@ export class JournalSync {
     // the last edit. `journal` reflects the live document state by the
     // time the timer fires, so re-reading it at push time (not now)
     // captures whatever the GM last typed.
+    this._pendingJournalChanges.set(
+      journal.id, mergeJournalChange(this._pendingJournalChanges.get(journal.id), change)
+    );
     this._journalPushDebouncer.schedule(journal.id, journal, entityId);
   }
 
@@ -1111,6 +1121,8 @@ export class JournalSync {
    * @private
    */
   async _pushJournalUpdate(journal, entityId) {
+    const changed = this._pendingJournalChanges.get(journal.id);
+    this._pendingJournalChanges.delete(journal.id);
     try {
       // Concatenate all text pages into a single entry for Chronicle.
       const entryHtml = await this._entryForPush(journal, entityId);
@@ -1121,10 +1133,7 @@ export class JournalSync {
       // Build the update body with optimistic concurrency. Text whose GM-only
       // content can't be put back (undefined) is left out, never sent
       // without it.
-      const body = {
-        name: journal.name,
-        is_private: isPrivate,
-      };
+      const body = changedJournalFields({ name: journal.name, isPrivate }, changed);
       if (entryHtml !== undefined) body.entry = entryHtml;
 
       // Include player notes if present.
@@ -1150,7 +1159,9 @@ export class JournalSync {
       }
 
       // Push ownership changes as Chronicle permission updates.
-      await this._pushPermissions(entityId, journal.ownership, isPrivate, journal.name, journal);
+      if (changed?.ownership) {
+        await this._pushPermissions(entityId, journal.ownership, isPrivate, journal.name, journal);
+      }
 
       await this._recordPush(journal, result);
       await this._hidePushedSecrets(journal, result);
@@ -1164,10 +1175,10 @@ export class JournalSync {
       // the next pull rather than corrupting data.
       console.error('Chronicle: Failed to push journal update', err);
       this._syncManager?.recordUserOutcome?.(game.user.id, err);
-      const retry = {
+      const retry = changedJournalFields({
         name: journal.name,
-        is_private: (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER,
-      };
+        isPrivate: (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER,
+      }, changed);
       const entry = await this._entryForPush(journal, entityId, { fetch: false }).catch(() => undefined);
       if (entry !== undefined) retry.entry = entry;
       this._api.queueForRetry?.('PUT', `/entities/${entityId}`, retry);
@@ -1217,6 +1228,7 @@ export class JournalSync {
     // Otherwise it fires after the delete, and the queueForRetry in its
     // catch block can resurrect the deleted entity's data on Chronicle.
     this._journalPushDebouncer.cancel(journal.id);
+    this._pendingJournalChanges.delete(journal.id);
 
     const entityId = journal.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
@@ -1295,6 +1307,16 @@ export class JournalSync {
   }
 
   // --- Permission Mapping Helpers ---
+
+  /**
+   * Whether the "Follow Chronicle's visibility" setting is on (the default):
+   * ownership is then pulled from and pushed to Chronicle permissions.
+   * @returns {boolean}
+   * @private
+   */
+  _followsVisibility() {
+    return getSetting('syncPermissions') !== false;
+  }
 
   /**
    * Build a Foundry ownership object from Chronicle entity permissions.
@@ -1483,6 +1505,7 @@ export class JournalSync {
    * @private
    */
   async _pushPermissions(entityId, ownership, isPrivate, label, journal) {
+    if (!this._followsVisibility()) return;
     const { permissions, unmapped, hasUserGrants } = this._buildPermissionGrants(
       ownership,
       isPrivate,
