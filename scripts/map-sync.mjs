@@ -24,6 +24,7 @@
  * player's machine reads only the page flags the GM client wrote.
  */
 
+import { flagRemoval } from './_flag-removal.mjs';
 import { noticeText } from './_escape-html.mjs';
 import { getSetting } from './settings.mjs';
 import { FLAG_SCOPE, syncOptions } from './constants.mjs';
@@ -1382,14 +1383,7 @@ export class MapSync {
     const localPins = page.getFlag(FLAG_SCOPE, 'pins') || [];
 
     // Strip Chronicle linkage either way; the page and its entry are the GM's.
-    await page.update({
-      [`flags.${FLAG_SCOPE}.-=mapId`]: null,
-      [`flags.${FLAG_SCOPE}.-=chronicleMapMeta`]: null,
-      [`flags.${FLAG_SCOPE}.-=chronicleMarkers`]: null,
-      [`flags.${FLAG_SCOPE}.-=chronicleDrawings`]: null,
-      [`flags.${FLAG_SCOPE}.-=chronicleTokens`]: null,
-      [`flags.${FLAG_SCOPE}.-=chronicleLayers`]: null,
-    });
+    await page.update(flagRemoval(FLAG_SCOPE, 'mapId', 'chronicleMapMeta', 'chronicleMarkers', 'chronicleDrawings', 'chronicleTokens', 'chronicleLayers'));
 
     if (localPins.length > 0) {
       if (entry && !entry.name.endsWith('(archived)')) {

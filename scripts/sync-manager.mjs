@@ -15,6 +15,7 @@ import { HistoryReporter, activityToEvent, describeMessage, resourceIdOf, resour
 import { walkChangeFeed, cursorFor, feedForArea, FEED_PAGE_SIZE, FEED_SETTLE_MS } from './_change-feed.mjs';
 import { getSetting, setSetting, isConfigured, getSyncDirections, getExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
 import { memberKey } from './_member-mapping.mjs';
+import { fetchChronicleVersion } from './_chronicle-version.mjs';
 
 /**
  * How long the connection must stay continuously connected after a reconnect
@@ -77,6 +78,9 @@ export class SyncManager {
 
     /** @type {boolean} Whether initial sync has completed. */
     this._initialSyncDone = false;
+
+    /** @type {string|null} The connected Chronicle's version, read on connect. */
+    this._chronicleVersion = null;
 
     /** @type {boolean} Whether we've seen a disconnect since the last (re)sync. */
     this._sawDisconnect = false;
@@ -194,6 +198,11 @@ export class SyncManager {
     console.debug('Chronicle: Sync manager started');
   }
 
+  /** The connected Chronicle's version, or null before it is known. */
+  getChronicleVersion() {
+    return this._chronicleVersion;
+  }
+
   /**
    * Handle a `sync.status` event from the API client and fire the one-time
    * initial sync on the first 'connected'.
@@ -208,7 +217,10 @@ export class SyncManager {
    */
   async _onSyncStatus(msg) {
     const status = msg?.status ?? msg?.payload?.status;
-    if (status === 'connected') this._connectedAt ??= Date.now();
+    if (status === 'connected') {
+      this._connectedAt ??= Date.now();
+      fetchChronicleVersion(getSetting('apiUrl')).then((v) => { this._chronicleVersion = v; });
+    }
     if (status === 'connected' && !this._initialSyncDone) {
       // Latched only on success: a failed first sync is retried on the next
       // 'connected', not skipped until the connection drops.

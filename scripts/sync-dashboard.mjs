@@ -18,6 +18,7 @@ import { getSetting, setSetting, getUserMappings } from './settings.mjs';
 import { SyncHistoryTab } from './sync-history-tab.mjs';
 import { FLAG_SCOPE, REPORT_STORE_FLAG } from './constants.mjs';
 import { confirmDialog, promptDialog } from './_dialogs.mjs';
+import { REMOVED_FOLDER_FLAG } from './_set-aside.mjs';
 import { buildMemberRows, memberKey } from './_member-mapping.mjs';
 import {
   captureActorSnapshot,
@@ -76,6 +77,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       refresh: SyncDashboard.#onRefresh,
       'pull-entity': SyncDashboard.#onPullEntityAction,
       'push-journal': SyncDashboard.#onPushJournalAction,
+      'delete-journal': SyncDashboard.#onDeleteJournalAction,
+      'delete-set-aside': SyncDashboard.#onDeleteSetAsideAction,
       'pull-all': SyncDashboard.#onPullAllAction,
       'push-all': SyncDashboard.#onPushAllAction,
       'toggle-visibility': SyncDashboard.#onToggleVisibilityAction,
@@ -388,6 +391,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       foundryOnlyJournals,
       hasChronicleOnly: entityGroups.some(g => g.entities.some(e => e.status === 'chronicle-only')),
       hasFoundryOnly: foundryOnlyJournals.length > 0,
+      setAsideCount: foundryOnlyJournals.filter((j) => j.setAside).length,
       bulkSelectionCount: this._selectedEntities.size,
 
       // Shops tab.
@@ -456,6 +460,12 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       const eid = j.getFlag(FLAG_SCOPE, 'entityId');
       if (eid) journalsByEntityId.set(eid, j);
     }
+    // Characters sync as actors, not journals, so a linked actor counts too.
+    const actorEntityIds = new Set();
+    for (const a of game.actors?.contents ?? []) {
+      const eid = a.getFlag(FLAG_SCOPE, 'entityId');
+      if (eid) actorEntityIds.add(eid);
+    }
 
     // Build groups.
     const groups = [];
@@ -467,7 +477,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         const journal = journalsByEntityId.get(entity.id);
         const isExcluded = exclusions.excludedEntities.includes(entity.id) || isTypeExcluded;
 
-        let status = 'chronicle-only';
+        let status = actorEntityIds.has(entity.id) ? 'actor' : 'chronicle-only';
         if (journal) {
           const lastSync = journal.getFlag(FLAG_SCOPE, 'lastSync');
           if (lastSync) {
@@ -502,7 +512,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         ? entities.filter(e => e.name.toLowerCase().includes(this._searchFilter.toLowerCase()))
         : entities;
 
-      const syncedCount = filtered.filter(e => e.status === 'synced' || e.status === 'modified').length;
+      const syncedCount = filtered.filter(e => e.status === 'synced' || e.status === 'modified' || e.status === 'actor').length;
       const chronicleOnlyCount = filtered.filter(e => e.status === 'chronicle-only').length;
 
       groups.push({
@@ -529,6 +539,44 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    * @returns {Array}
    * @private
    */
+  /** Whether a journal sits in the "Chronicle: removed" folder or below it. @private */
+  _isSetAside(journal) {
+    for (let f = journal.folder; f; f = f.folder) {
+      if (f.getFlag?.(FLAG_SCOPE, REMOVED_FOLDER_FLAG)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Delete Foundry-only journals the GM picked, after asking. Foundry has no
+   * bin, so the question names how many and that it can't be undone. Only
+   * unlinked journals are ever passed here, so Chronicle is not touched.
+   * @param {string[]} ids
+   * @private
+   */
+  async _onDeleteJournals(ids) {
+    const journals = ids.map((id) => game.journal.get(id))
+      .filter((j) => j && !j.getFlag(FLAG_SCOPE, 'entityId'));
+    if (!journals.length) return;
+    const one = journals.length === 1;
+    const ok = await confirmDialog({
+      title: game.i18n.localize('CHRONICLE.Dashboard.Entities.DeleteTitle'),
+      content: `<p>${one
+        ? game.i18n.format('CHRONICLE.Dashboard.Entities.DeleteOne', { name: noticeText(journals[0].name) })
+        : game.i18n.format('CHRONICLE.Dashboard.Entities.DeleteMany', { count: journals.length })}</p>`,
+      defaultYes: false,
+    });
+    if (!ok) return;
+    try {
+      await JournalEntry.deleteDocuments(journals.map((j) => j.id));
+      this._logActivity('update', `Deleted ${journals.length} Foundry-only journal${one ? '' : 's'}`);
+    } catch (err) {
+      console.error('Chronicle: deleting journals failed', err);
+      ui.notifications.error(game.i18n.localize('CHRONICLE.Dashboard.Entities.DeleteFailed'));
+    }
+    this.render();
+  }
+
   _getFoundryOnlyJournals() {
     const result = [];
     const filter = this._searchFilter?.toLowerCase() || '';
@@ -544,6 +592,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         name: j.name,
         status: 'foundry-only',
         pageCount: j.pages?.size ?? 0,
+        setAside: this._isSetAside(j),
       });
     }
 
@@ -1160,7 +1209,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     el.querySelectorAll('.entity-type-header').forEach((header) => {
       header.addEventListener('click', (e) => {
         // Ignore clicks on the sync toggle button inside the header.
-        if (e.target.closest('.type-sync-toggle')) return;
+        if (e.target.closest('.type-sync-toggle, [data-action]')) return;
 
         const typeId = Number(header.dataset.typeId);
         if (this._collapsedTypes.has(typeId)) {
@@ -1387,6 +1436,16 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   static #onPushJournalAction(event, target) {
     const journalId = target.dataset.journalId;
     this._onPushJournal(journalId);
+  }
+
+  /** Delete one Foundry-only journal, after asking. */
+  static #onDeleteJournalAction(event, target) {
+    this._onDeleteJournals([target.dataset.journalId]);
+  }
+
+  /** Delete every journal set aside in "Chronicle: removed", after asking. */
+  static #onDeleteSetAsideAction() {
+    this._onDeleteJournals(this._getFoundryOnlyJournals().filter((j) => j.setAside).map((j) => j.id));
   }
 
   /** Pull all Chronicle-only entities. */
@@ -1965,6 +2024,12 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
       // Find the JournalSync module.
       const journalSync = this._syncManager?._modules?.find(m => m.constructor?.name === 'JournalSync');
+      // A character pulled as a journal would duplicate its actor, and the
+      // next connect would set that journal aside again.
+      if (journalSync?._isHandledByActorSync(entity)) {
+        ui.notifications.info(game.i18n.format('CHRONICLE.Dashboard.Entities.PullCharacter', { name: noticeText(entity.name) }));
+        return;
+      }
       if (journalSync) {
         await journalSync._createJournalFromEntity(entity);
         this._logActivity('pull', `Pulled "${entity.name}" from Chronicle`);

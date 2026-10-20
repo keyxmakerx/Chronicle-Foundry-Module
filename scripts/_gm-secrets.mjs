@@ -465,11 +465,98 @@ export async function hideSecrets(html, placeholderText, keyOf) {
     const id = `${PLACEHOLDER_ID_PREFIX}${hash}${n ? `-${n}` : ''}`;
     pieces.set(id, content);
     const part = partOf(sec);
-    const tagOpen = part ? `<p ${PART_ATTR}="${part}">` : '<p>';
-    sec.open = withAttr(sec.open, 'id', id);
-    sec.children = [raw(`${tagOpen}${label}</p>`)];
+    sec.open = placeholderOpen(sec.open, id);
+    sec.children = [raw(labelBlock(label, part))];
   }
   return { html: inner(tree), pieces };
+}
+
+const labelBlock = (label, part) => `${part ? `<p ${PART_ATTR}="${part}">` : '<p>'}${label}</p>`;
+
+// Foundry's Reveal button finds its block in the saved page by matching
+// `<section[^i]+id="…"` and swaps the first "secret" in that match, so a
+// placeholder's tag reads `<section class="secret" id="…" …>`: class first,
+// id next, nothing holding an "i" before them.
+function placeholderOpen(open, id) {
+  const rest = withoutAttr(withoutAttr(open, 'id'), 'class').replace(/^<section\b/i, '');
+  return `<section class="${classList(open).join(' ')}" id="${id}"${rest}`;
+}
+
+const placeholderBlocks = (tree) => secretBlocks(tree)
+  .filter((sec) => (getAttr(sec.open, 'id') || '').startsWith(PLACEHOLDER_ID_PREFIX));
+
+/**
+ * Placeholder tags written before Reveal could find them, put right.
+ * @param {string} html
+ * @returns {string|null} the fixed HTML, or null when nothing needed it
+ */
+export function revealableSecrets(html) {
+  const input = String(html || '');
+  if (!input.includes(PLACEHOLDER_ID_PREFIX)) return null;
+  const tree = parse(input);
+  let changed = false;
+  for (const sec of placeholderBlocks(tree)) {
+    const open = placeholderOpen(sec.open, getAttr(sec.open, 'id'));
+    if (open !== sec.open) { sec.open = open; changed = true; }
+  }
+  return changed ? inner(tree) : null;
+}
+
+/**
+ * A revealed placeholder holds its content, so players see what the GM
+ * revealed; hidden again, it goes back to the label. Blocks whose content
+ * isn't known are left alone.
+ * @param {string} html
+ * @param {Map<string, string>} pieces - id → content, from hideSecrets
+ * @param {string} placeholderText
+ * @param {(html: string) => string} [clean] - sanitizer for content going
+ *   into the saved page, where players receive it
+ * @returns {string|null} the new HTML, or null when nothing changed
+ */
+export function applyReveals(html, pieces, placeholderText, clean = (h) => h) {
+  const input = String(html || '');
+  if (!input.includes(PLACEHOLDER_ID_PREFIX)) return null;
+  const tree = parse(input);
+  const labels = placeholderLabels(placeholderText);
+  const label = escapeText(placeholderText || DEFAULT_PLACEHOLDER_TEXT);
+  let changed = false;
+  for (const sec of placeholderBlocks(tree)) {
+    const content = pieces?.get(getAttr(sec.open, 'id'));
+    if (content === undefined) continue;
+    const revealed = classList(sec.open).includes('revealed');
+    const shown = stripParts(inner(sec)).trim();
+    if (revealed && labels.includes(textOf(sec))) {
+      sec.children = [raw(clean(content))];
+      changed = true;
+    } else if (!revealed && (shown === content || shown === clean(content).trim())) {
+      sec.children = [raw(labelBlock(label, partOf(sec)))];
+      changed = true;
+    }
+  }
+  return changed ? inner(tree) : null;
+}
+
+/**
+ * Keep the GM's reveals when a page is pulled again: every placeholder that
+ * was revealed in the page as it was stays revealed in the page as pulled.
+ * @param {string} before - the saved page
+ * @param {string} after - the pulled page, placeholders in
+ * @returns {string}
+ */
+export function carryReveals(before, after) {
+  const prev = String(before || '');
+  if (!prev.includes('revealed')) return after;
+  const shown = new Set(placeholderBlocks(parse(prev))
+    .filter((sec) => classList(sec.open).includes('revealed'))
+    .map((sec) => getAttr(sec.open, 'id')));
+  if (!shown.size) return after;
+  const tree = parse(after);
+  for (const sec of placeholderBlocks(tree)) {
+    const id = getAttr(sec.open, 'id');
+    if (!shown.has(id) || classList(sec.open).includes('revealed')) continue;
+    sec.open = sec.open.replace(/\sclass=(["'])([^"']*)\1/i, (_, q, v) => ` class=${q}${v} revealed${q}`);
+  }
+  return inner(tree);
 }
 
 /**
@@ -481,9 +568,10 @@ export async function hideSecrets(html, placeholderText, keyOf) {
  * @param {string} html
  * @param {Map<string, string>} pieces - id → content, from hideSecrets
  * @param {string} placeholderText
+ * @param {(html: string) => string} [clean] - the sanitizer applyReveals used
  * @returns {{html: string, missing: string[], gmMade: boolean}}
  */
-export function restoreSecrets(html, pieces, placeholderText) {
+export function restoreSecrets(html, pieces, placeholderText, clean = (h) => h) {
   const missing = [];
   let gmMade = false;
   const input = String(html || '');
@@ -508,6 +596,12 @@ export function restoreSecrets(html, pieces, placeholderText) {
     const only = parse(content).children.filter((c) => !isBlank(c));
     if (part && only.length === 1 && only[0].t === 'el' && TEXT_BLOCKS.has(only[0].name)) {
       restored = serialize({ ...only[0], open: withAttr(only[0].open, PART_ATTR, part) });
+    }
+    // A revealed block already shows its content (applyReveals).
+    const shown = stripParts(inner(sec)).trim();
+    if (shown === content || shown === clean(content).trim()) {
+      sec.children = [raw(restored)];
+      continue;
     }
     // The label block gives way to the content. Anything the GM typed (after
     // the label, over it, or in new paragraphs) is kept after it, secret.

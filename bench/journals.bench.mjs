@@ -364,3 +364,27 @@ test('both directions land in one sync history, without the echo', () => scenari
   assert.equal(applied.ok, true);
   assert.deepEqual(rows.filter((r) => r.resourceId === eelId && r.direction === 'to_foundry'), [], 'the module’s own push coming back is not a change');
 }));
+
+test('a page in nested Chronicle folders lands in the same Foundry folders, and a reopen moves nothing', () => scenario('folders-nested', async ({ seed, world }) => {
+  const type = (await seed.chronicle.entityTypes())[0];
+  const outer = await seed.createFolder('Sword Coast', type.id);
+  const inner = await seed.createFolder('Waterdeep', type.id, outer.id);
+  const e = await chroniclePage(seed, 'Yawning Portal');
+  await seed.fileInFolder(e.id, inner.id);
+  await openWorld(world);
+  await JournalSync_resync(world);
+  const j = byEntity(world, e.id);
+  assert.ok(j, 'journal exists');
+  const chain = [];
+  for (let f = j.folder; f; f = f.folder) chain.unshift(f.name);
+  assert.deepEqual(chain, [type.name, 'Sword Coast', 'Waterdeep']);
+  const folderCount = world.game.folders.size;
+  await closeWorld(world);
+  const reqs = await recordRequests(async () => {
+    await openWorld(world);
+    await settle();
+  });
+  assert.equal(world.game.folders.size, folderCount, 'no new folders on reopen');
+  assert.equal(byEntity(world, e.id).folder?.name, 'Waterdeep');
+  assert.deepEqual(writes(reqs).filter((r) => r.url.startsWith('/entities')).map((r) => `${r.method} ${r.url}`), [], 'module wrote nothing back');
+}));

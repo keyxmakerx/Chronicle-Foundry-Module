@@ -12,6 +12,7 @@
  * `tools/test-notes-folder.mjs`, bench `notes.bench.mjs`.
  */
 
+import { flagRemoval } from './_flag-removal.mjs';
 import { LINK_FLAGS, REMOVED_FOLDER_FLAG } from './_set-aside.mjs';
 
 /** Flag on the root "Chronicle Notes" folder, set by the retired note sync. */
@@ -67,9 +68,7 @@ function treeHeight(root, folders) {
 export function unlinkNoteUpdate(journal, scope) {
   const linked = LINK_FLAGS.some((k) => journal.getFlag(scope, k) !== undefined);
   if (!linked && journal.getFlag(scope, OLD_NOTE_FLAG)) return null;
-  const update = { [`flags.${scope}.${OLD_NOTE_FLAG}`]: true };
-  for (const key of LINK_FLAGS) update[`flags.${scope}.-=${key}`] = null;
-  return update;
+  return { [`flags.${scope}.${OLD_NOTE_FLAG}`]: true, ...flagRemoval(scope, ...LINK_FLAGS) };
 }
 
 /**

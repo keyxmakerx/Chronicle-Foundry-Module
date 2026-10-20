@@ -117,12 +117,12 @@
     <section class="dms-leaf dms-leaf-r" data-dms-leaf="r" aria-label="Rules and reveals">
       <div class="dms-tabs" role="tablist">
         {{#if hasRules}}
-          <button type="button" role="tab" aria-selected="true" data-action="tab" data-tab="rules">Rules</button>
+          <button type="button" role="tab" aria-selected="true" data-action="dmsTab" data-tab="rules">Rules</button>
         {{/if}}
-        <button type="button" role="tab" aria-selected="{{#if hasRules}}false{{else}}true{{/if}}" data-action="tab" data-tab="reveal">Reveal</button>
-        <button type="button" role="tab" aria-selected="false" data-action="tab" data-tab="encounters">{{localize "CHRONICLE.Encounters.Tab"}}</button>
-        <button type="button" role="tab" aria-selected="false" data-action="tab" data-tab="cast">{{localize "CHRONICLE.DMScreen.Cast.Tab"}}</button>
-        <button type="button" role="tab" aria-selected="false" data-action="tab" data-tab="party">{{localize "CHRONICLE.DMScreen.Party.Tab"}}</button>
+        <button type="button" role="tab" aria-selected="{{#if hasRules}}false{{else}}true{{/if}}" data-action="dmsTab" data-tab="reveal">Reveal</button>
+        <button type="button" role="tab" aria-selected="false" data-action="dmsTab" data-tab="encounters">{{localize "CHRONICLE.Encounters.Tab"}}</button>
+        <button type="button" role="tab" aria-selected="false" data-action="dmsTab" data-tab="cast">{{localize "CHRONICLE.DMScreen.Cast.Tab"}}</button>
+        <button type="button" role="tab" aria-selected="false" data-action="dmsTab" data-tab="party">{{localize "CHRONICLE.DMScreen.Party.Tab"}}</button>
       </div>
       {{#if hasRules}}
         <div class="dms-blk" data-dms-pane="rules">

@@ -21,6 +21,12 @@ request once without the header and stops sending it for the session
 (`scripts/_module-version.mjs`), so an older server keeps syncing. WebSocket
 connections do not send it.
 
+One endpoint is public and outside the campaign path: `GET /api/version`
+returns `{"version": "<build>"}` (a release tag, a commit, or `unknown`). The
+module reads it on connect without the API key (`scripts/_chronicle-version.mjs`)
+to show which Chronicle it is talking to. Chronicle side:
+`internal/plugins/syncapi/version_handler.go`, routed in `routes.go`.
+
 WebSocket connections authenticate via query parameter at connection time:
 ```
 wss://chronicle.example.com/ws?token=<api-key>
@@ -375,6 +381,18 @@ Lists all entity types in the campaign.
   ]
 }
 ```
+
+#### GET /folders
+The campaign's sidebar folders, for nesting journals the way pages sit in
+Chronicle. Folders in a category the key cannot see are left out.
+
+**Used by:** `journal-sync.mjs` (`_loadTree`, on every connect)
+
+**Response:** `{"data":[{"id":"…","entity_type_id":1,"name":"Waterdeep","parent_id":"…","sort_order":0}],"total":N}`.
+`parent_id` is another folder or a page, absent at the top of the category.
+An older Chronicle answers 404; the module then files pages by category only.
+
+Re-verify by: 2026-11-19 (Chronicle `internal/plugins/syncapi/folders_api.go`; lands with the Chronicle PR on branch `claude/foundry-sync-404-2inm82`)
 
 #### GET /entity-types/:typeId
 Returns a single entity type with field definitions.

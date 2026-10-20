@@ -296,10 +296,12 @@
                 {{#if (eq status "synced")}}<i class="fa-solid fa-check"></i> {{localize "CHRONICLE.Dashboard.Entities.Synced"}}{{/if}}
                 {{#if (eq status "modified")}}<i class="fa-solid fa-bolt"></i> {{localize "CHRONICLE.Dashboard.Entities.Modified"}}{{/if}}
                 {{#if (eq status "chronicle-only")}}{{localize "CHRONICLE.Dashboard.Entities.ChronicleOnly"}}{{/if}}
+                {{#if (eq status "actor")}}<i class="fa-solid fa-user"></i> {{localize "CHRONICLE.Dashboard.Entities.SyncedAsActor"}}{{/if}}
               </span>
 
               {{!-- Action --}}
-              {{#if (eq status "chronicle-only")}}
+              {{#if (eq status "actor")}}
+              {{else if (eq status "chronicle-only")}}
               <button type="button" class="dashboard-btn btn-xs btn-pull" data-action="pull-entity" data-entity-id="{{id}}">
                 <i class="fa-solid fa-download"></i> {{localize "CHRONICLE.Dashboard.Entities.Pull"}}
               </button>
@@ -323,15 +325,22 @@
             <i class="fa-solid fa-file-pen" style="color: #fb923c"></i>
             <span class="type-name">{{localize "CHRONICLE.Dashboard.Entities.FoundryOnlyJournals"}}</span>
             <span class="type-stats">{{foundryOnlyJournals.length}} {{localize "CHRONICLE.Dashboard.Entities.Unlinked"}}</span>
+            {{#if setAsideCount}}
+            <button type="button" class="cs-quiet-word" data-action="delete-set-aside">{{localize "CHRONICLE.Dashboard.Entities.DeleteSetAside" count=setAsideCount}}</button>
+            {{/if}}
           </div>
           <div class="entity-rows">
             {{#each foundryOnlyJournals}}
             <div class="entity-row status-foundry-only">
               <span class="entity-status-dot" title="{{localize 'CHRONICLE.Dashboard.Entities.FoundryOnlyStatus'}}"></span>
               <span class="entity-name">{{name}}</span>
-              <span class="entity-status-label">{{localize "CHRONICLE.Dashboard.Entities.FoundryOnly"}}</span>
+              <span class="entity-status-label">{{#if setAside}}{{localize "CHRONICLE.Dashboard.Entities.SetAside"}}{{else}}{{localize "CHRONICLE.Dashboard.Entities.FoundryOnly"}}{{/if}}</span>
               <button type="button" class="dashboard-btn btn-xs btn-push" data-action="push-journal" data-journal-id="{{id}}">
                 <i class="fa-solid fa-upload"></i> {{localize "CHRONICLE.Dashboard.Entities.Push"}}
+              </button>
+              <button type="button" class="cs-row-icon" data-action="delete-journal" data-journal-id="{{id}}"
+                      title="{{localize 'CHRONICLE.Dashboard.Entities.Delete'}}" aria-label="{{localize 'CHRONICLE.Dashboard.Entities.Delete'}}">
+                <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
               </button>
             </div>
             {{/each}}
