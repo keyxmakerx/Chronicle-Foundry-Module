@@ -546,6 +546,7 @@ The Chronicle Sync window is a left rail of four sections: Overview, Linked
 Player reports and History panes) and Settings (at the foot, set apart).
 
 ### Access
+- [ ] Open the Chronicle group in the scene controls: no button in it looks pressed, and only its buttons appear (no blank slot). Press Chronicle Sync → dashboard opens; press it again after closing → opens again. Click Tokens, then back to the Chronicle group → nothing opens on its own
 - [ ] Click the sidebar status indicator (when connected) or the Chronicle Sync button in the scene controls → dashboard opens (GM only); right-click on the indicator opens it even when disconnected; clicking while disconnected tries to reconnect
 - [ ] With URL, key or campaign ID missing, the window shows "Chronicle Sync is not configured" and the Settings form under it, with no rail
 - [ ] It opens to the last-active section and pane; an unknown saved tab falls back to Overview, and a tab saved by an older version opens where its content now lives (Maps → Linked, Maps; Diagnostics → Problems; Status → Problems, Health; Issues → Linked, Characters)
