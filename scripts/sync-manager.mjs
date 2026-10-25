@@ -8,6 +8,7 @@
 
 import { noticeText } from './_escape-html.mjs';
 import { ChronicleAPI } from './api-client.mjs';
+import { buildMonsterBody } from './monster-report.mjs';
 import { PlayerActivity, PlayerReporter, buildPlayerReport, reasonFromError, WORLD_APPLY_FAILED, REPORT_INTERVAL_MS, EVENT_DEBOUNCE_MS } from './_player-report.mjs';
 import { AvatarSync } from './avatar-sync.mjs';
 import { walkSyncPull, PULL_PAGE_SIZE } from './_sync-pull-walk.mjs';
@@ -27,6 +28,9 @@ const RECONNECT_RESYNC_DEBOUNCE_MS = 3000;
 
 /** How often queued sync-history events are sent to Chronicle. */
 const HISTORY_FLUSH_MS = 15_000;
+
+/** A burst of actor changes (an import, a cleanup) sends one monster report. */
+const MONSTER_DEBOUNCE_MS = 10_000;
 
 export { memberKey };
 
@@ -72,6 +76,21 @@ export class SyncManager {
     this._playerDebounce = null;
     /** @type {Array<[string, Function]>} Foundry hooks to remove on stop. */
     this._playerHooks = [];
+
+    /**
+     * Which monsters this world can place, for Chronicle's AI connection
+     * (see monster-report.mjs). Sent on connect and when actors come, go or
+     * are renamed, only when the list changed.
+     */
+    this._monsters = new PlayerReporter({
+      send: (body) => this.api.reportMonsters(body),
+      build: () => buildMonsterBody(this.api, { fresh: this._monstersFresh }),
+      log: (msg, err) => console.debug(`Chronicle: ${msg}`, err ?? ''),
+      what: 'monster report',
+    });
+    this._monstersFresh = true;
+    /** @type {ReturnType<typeof setTimeout>|null} */
+    this._monsterDebounce = null;
 
     /** @type {Array<object>} Registered sync modules. */
     this._modules = [];
@@ -167,6 +186,8 @@ export class SyncManager {
 
     this._historyTimer ??= setInterval(() => { this._history.flush(); }, HISTORY_FLUSH_MS);
     this._startPlayerReporting();
+    // The system is known now, so the monster list can say what a monster is.
+    this._reportMonsters({ fresh: true });
 
     // Initialize all registered modules.
     for (const mod of this._modules) {
@@ -255,6 +276,7 @@ export class SyncManager {
       this._connectedAt ??= Date.now();
       this._history.flush();
       this._players.report({ force: true });
+      this._reportMonsters({ fresh: true });
     }
     if (state === 'connected' && this._initialSyncDone && this._sawDisconnect) {
       this._scheduleReconnectResync();
@@ -485,6 +507,10 @@ export class SyncManager {
       ['chronicleUserMappingsChanged', soon],
       // A player's request relayed through this GM client, done or failed.
       ['chronicleRelayOutcome', (userId, err) => this.recordUserOutcome(userId, err)],
+      // The monster list changes when actors come, go or are renamed.
+      ['createActor', () => this._scheduleMonsterReport()],
+      ['deleteActor', () => this._scheduleMonsterReport()],
+      ['updateActor', (_doc, change) => { if (change && ('name' in change || 'type' in change)) this._scheduleMonsterReport(); }],
     ]) {
       Hooks.on(name, fn);
       this._playerHooks.push([name, fn]);
@@ -493,6 +519,25 @@ export class SyncManager {
       // Activity changes are picked up here, not one report per synced change.
       this._players.report();
     }, REPORT_INTERVAL_MS);
+  }
+
+  /** Send the monster list; `fresh` reads the compendiums again. @private */
+  async _reportMonsters({ fresh = false } = {}) {
+    this._monstersFresh = fresh;
+    try {
+      await this._monsters.report({ force: fresh });
+    } finally {
+      this._monstersFresh = false;
+    }
+  }
+
+  /** Coalesce a burst of actor changes into one monster report. @private */
+  _scheduleMonsterReport() {
+    if (this._monsterDebounce) clearTimeout(this._monsterDebounce);
+    this._monsterDebounce = setTimeout(() => {
+      this._monsterDebounce = null;
+      this._reportMonsters();
+    }, MONSTER_DEBOUNCE_MS);
   }
 
   /** Coalesce a burst of user events into one report. @private */
@@ -513,6 +558,7 @@ export class SyncManager {
     this._playerHooks = [];
     if (this._playerTimer) { clearInterval(this._playerTimer); this._playerTimer = null; }
     if (this._playerDebounce) { clearTimeout(this._playerDebounce); this._playerDebounce = null; }
+    if (this._monsterDebounce) { clearTimeout(this._monsterDebounce); this._monsterDebounce = null; }
     for (const mod of this._modules) {
       if (typeof mod.destroy === 'function') {
         mod.destroy();

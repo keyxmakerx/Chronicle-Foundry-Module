@@ -10,7 +10,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cellToPoint, combatantHiddenUpdates, expandRows, groupLetters, hiddenTokenIds, layoutItems, occupiedCells,
+  cellToPoint, combatantHiddenUpdates, compendiumFallback, expandRows, groupLetters, hiddenTokenIds, layoutItems, occupiedCells,
   parseEncounter, pickCombat, placedTokenIds, placeHidden, pointToCell, resolveActor, rosterState,
   rowKey, startRows, tokenRef, trackerAdditions, trackerBadge,
 } from '../scripts/_encounter-roster.mjs';
@@ -194,4 +194,15 @@ test('a combatant follows its token\'s hidden flag, and nothing is written when 
   assert.deepEqual(combatantHiddenUpdates(false, [{ id: 'k1', hidden: false }]), []);
   assert.deepEqual(combatantHiddenUpdates(false, [{ id: 'k1', hidden: true }]), [{ _id: 'k1', hidden: false }]);
   assert.deepEqual(combatantHiddenUpdates(true, []), []);
+});
+
+test('a row no world actor answers falls back on a compendium entry by name, the first listed winning', () => {
+  const entries = [
+    { name: 'Skeleton Archer', uuid: 'u1', pack: 'Monsters' },
+    { name: 'skeleton archer', uuid: 'u2', pack: 'Homebrew' },
+  ];
+  assert.deepEqual(compendiumFallback({ baseName: ' Skeleton ARCHER ' }, entries), entries[0]);
+  assert.equal(compendiumFallback({ baseName: 'Wyrm' }, entries), null);
+  assert.equal(compendiumFallback({ baseName: '' }, entries), null);
+  assert.equal(compendiumFallback({ baseName: 'Skeleton Archer' }, undefined), null);
 });

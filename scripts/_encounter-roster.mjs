@@ -166,6 +166,20 @@ export function resolveActor(row, actors) {
   return null;
 }
 
+/**
+ * The compendium entry to bring in for a row no world actor answers, by
+ * name; the first compendium listed wins. Once brought in it is a world
+ * actor, so resolveActor finds it next time and nothing is imported twice.
+ * @param {{baseName: string}} row
+ * @param {Array<{name: string, uuid: string, pack: string}>} entries
+ * @returns {{name: string, uuid: string, pack: string}|null}
+ */
+export function compendiumFallback(row, entries) {
+  const name = norm(row.baseName);
+  if (!name) return null;
+  return (entries ?? []).find((e) => norm(e.name) === name) ?? null;
+}
+
 // ---- Free squares ------------------------------------------------------
 
 const cell = (i, j) => `${i},${j}`;
