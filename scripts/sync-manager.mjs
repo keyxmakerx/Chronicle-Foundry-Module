@@ -9,6 +9,7 @@
 import { noticeText } from './_escape-html.mjs';
 import { ChronicleAPI } from './api-client.mjs';
 import { PlayerActivity, PlayerReporter, buildPlayerReport, reasonFromError, WORLD_APPLY_FAILED, REPORT_INTERVAL_MS, EVENT_DEBOUNCE_MS } from './_player-report.mjs';
+import { buildSceneReport, folderPath, SCENE_HOOKS } from './_scene-report.mjs';
 import { AvatarSync } from './avatar-sync.mjs';
 import { walkSyncPull, PULL_PAGE_SIZE } from './_sync-pull-walk.mjs';
 import { HistoryReporter, activityToEvent, describeMessage, resourceIdOf, resourceNameOf } from './_history-report.mjs';
@@ -72,6 +73,22 @@ export class SyncManager {
     this._playerDebounce = null;
     /** @type {Array<[string, Function]>} Foundry hooks to remove on stop. */
     this._playerHooks = [];
+
+    /**
+     * Which scenes this world has, so Chronicle can tell which maps exist in
+     * Foundry (see _scene-report.mjs). Sent on connect and soon after a
+     * scene or folder changes; an unchanged list is not sent again.
+     */
+    this._scenes = new PlayerReporter({
+      label: 'scene report',
+      send: (body) => this.api.reportScenes(body),
+      build: () => buildSceneReport((game.scenes?.contents ?? []).map((s) => ({
+        id: s.id, name: s.name, folder: folderPath(s.folder), active: s.active, navigation: s.navigation,
+      }))),
+      log: (msg, err) => console.debug(`Chronicle: ${msg}`, err ?? ''),
+    });
+    /** @type {ReturnType<typeof setTimeout>|null} */
+    this._sceneDebounce = null;
 
     /** @type {Array<object>} Registered sync modules. */
     this._modules = [];
@@ -255,6 +272,7 @@ export class SyncManager {
       this._connectedAt ??= Date.now();
       this._history.flush();
       this._players.report({ force: true });
+      this._scenes.report({ force: true });
     }
     if (state === 'connected' && this._initialSyncDone && this._sawDisconnect) {
       this._scheduleReconnectResync();
@@ -489,6 +507,11 @@ export class SyncManager {
       Hooks.on(name, fn);
       this._playerHooks.push([name, fn]);
     }
+    const scenesSoon = () => this._scheduleSceneReport();
+    for (const name of SCENE_HOOKS) {
+      Hooks.on(name, scenesSoon);
+      this._playerHooks.push([name, scenesSoon]);
+    }
     this._playerTimer = setInterval(() => {
       // Activity changes are picked up here, not one report per synced change.
       this._players.report();
@@ -504,6 +527,15 @@ export class SyncManager {
     }, EVENT_DEBOUNCE_MS);
   }
 
+  /** Coalesce a burst of scene edits (an import, a folder drag) into one report. @private */
+  _scheduleSceneReport() {
+    if (this._sceneDebounce) clearTimeout(this._sceneDebounce);
+    this._sceneDebounce = setTimeout(() => {
+      this._sceneDebounce = null;
+      this._scenes.report();
+    }, EVENT_DEBOUNCE_MS);
+  }
+
   /**
    * Stop the sync manager and disconnect.
    */
@@ -513,6 +545,7 @@ export class SyncManager {
     this._playerHooks = [];
     if (this._playerTimer) { clearInterval(this._playerTimer); this._playerTimer = null; }
     if (this._playerDebounce) { clearTimeout(this._playerDebounce); this._playerDebounce = null; }
+    if (this._sceneDebounce) { clearTimeout(this._sceneDebounce); this._sceneDebounce = null; }
     for (const mod of this._modules) {
       if (typeof mod.destroy === 'function') {
         mod.destroy();

@@ -757,6 +757,28 @@ Foundry page shows it as "Players in Foundry".
 
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi`, the players handler)
 
+#### POST /sync/scenes
+The GM's client reports the world's scenes, so the owner and the owner's AI
+can tell which maps already exist in Foundry. Chronicle's AI reads them with
+its `scenes` lookup (Directors only).
+
+**Used by:** `sync-manager.mjs` → `_scenes` (`scripts/_scene-report.mjs`), sent from the GM client only, with the GM's own key
+
+**Body:** `{ "scenes": [ { "id", "name", "folder", "active", "navigation" } ], "truncated": false }`
+
+- A full snapshot, sorted by name, so each report replaces the server's list. At most 2000 scenes; `truncated` is true when the world has more.
+- `name` and `folder` at most 255 chars; `folder` is the folder path, outermost first (`Act 1 / Caves`), `""` at the top level.
+- `active` is the scene players are on; `navigation` is whether it is in the scene bar.
+- No pictures or other scene data are sent.
+
+**Response:** `{ "stored": n }`
+
+**Errors:** 403 when the key is not the owner's or a DM-access key; 404 on an older Chronicle; both stop reporting for the session. 400 is a bad body: logged once, reporting continues.
+
+**When:** on connect, and 2 s after a scene or a folder is made, changed or removed, only when the snapshot changed.
+
+Re-verify by: 2026-11-25 (Chronicle `internal/plugins/syncapi/foundry_scenes.go`, `foundry_scenes_handler.go`)
+
 #### POST /sync
 Generic sync endpoint for batch operations.
 
