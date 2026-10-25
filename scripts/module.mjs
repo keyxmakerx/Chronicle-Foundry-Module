@@ -33,6 +33,7 @@ import { registerHoverArt, registerHoverArtSettings, toggleHoverArt } from './ho
 import { registerCreatureForms } from './creature-forms.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { registerShopRoomSocket, registerShopJournalButton } from './shop-room-window.mjs';
+import { watchMentionLinks } from './mention-links.mjs';
 import { notebookAvailable, openCalendarWindow, registerPlayerNotebook } from './player-notebook.mjs';
 import { openSatchel } from './satchel.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
@@ -199,6 +200,12 @@ Hooks.once('ready', async () => {
     registerQuestBoard(() => syncManager?.api ?? null);
   } catch (err) {
     console.warn('Chronicle Sync | Quest board unavailable', err);
+  }
+  try {
+    // Mentions in synced pages open the mentioned journal, for every user.
+    watchMentionLinks();
+  } catch (err) {
+    console.warn('Chronicle Sync | Mention links unavailable', err);
   }
   try {
     registerMapSheetItems();

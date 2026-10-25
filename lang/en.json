@@ -1,6 +1,9 @@
 {
   "CHRONICLE": {
     "ModuleTitle": "Chronicle Sync",
+    "Mentions": {
+      "OpenInChronicle": "Not in this world yet. Opens in Chronicle."
+    },
     "Secrets": {
       "Placeholder": "GM-only text, kept in Chronicle",
       "NotSent": "Chronicle: your edit of \"{name}\" wasn't sent, because its GM-only text changed in Chronicle. Pull it from the sync dashboard, then edit again."
