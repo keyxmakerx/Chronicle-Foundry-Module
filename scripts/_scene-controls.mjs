@@ -76,7 +76,25 @@ export function addChronicleControls(controls, { isGM, notebook, run, titles }) 
       icon,
       visible: true,
       activeTool: tools[0].name,
-      tools: Object.fromEntries(tools.map(({ run: fn, ...tool }) => [tool.name, { ...tool, onChange: fn }])),
+      tools: Object.fromEntries(tools.map(({ run: fn, ...tool }) => [tool.name, { ...tool, onChange: pressedOnly(tool.name, fn) }])),
     };
   }
+}
+
+/**
+ * Run a button tool only when the GM pressed that button. Foundry v13+ also
+ * calls a group's active tool's onChange when switching control groups and
+ * re-rendering the toolbar, which opened the dashboard on unrelated clicks.
+ * A real press arrives as an event from inside `[data-tool="<name>"]`.
+ * @param {string} name
+ * @param {Function} fn
+ * @returns {Function}
+ */
+export function pressedOnly(name, fn) {
+  return (event, active) => {
+    if (active === false) return undefined;
+    const button = event?.target?.closest?.('[data-tool]');
+    if (button?.dataset?.tool !== name) return undefined;
+    return fn();
+  };
 }

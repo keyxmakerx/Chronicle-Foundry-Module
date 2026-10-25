@@ -1063,12 +1063,22 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       .sort((x, y) => x.name.localeCompare(y.name));
 
     // Fetch the system's declared character fields (same source the adapter uses).
-    let fieldDefs = { fields: [] };
-    try {
-      const resp = await this.api?.get(`/systems/${matchedSystem}/character-fields`);
-      if (resp && Array.isArray(resp.fields)) fieldDefs = resp;
-    } catch (err) {
-      log.warn('Dashboard: capability — failed to load character-fields', err);
+    // Kept until Refresh: a system's fields don't change while the window is open.
+    let fieldDefs = this._cache.characterFields?.[matchedSystem] ?? null;
+    if (!fieldDefs) {
+      fieldDefs = { fields: [] };
+      try {
+        const resp = await this.api?.get(`/systems/${matchedSystem}/character-fields`);
+        if (resp && Array.isArray(resp.fields)) {
+          fieldDefs = resp;
+          this._cache.characterFields = { ...this._cache.characterFields, [matchedSystem]: resp };
+        }
+      } catch (err) {
+        log.warn('Dashboard: capability — failed to load character-fields', err);
+        fieldDefs.loadError = game.i18n.localize(err?.status === 429
+          ? 'CHRONICLE.Dashboard.Health.FieldsRateLimited'
+          : 'CHRONICLE.Dashboard.Health.FieldsFailed');
+      }
     }
 
     const snapshot = captureActorSnapshot(sample, fieldDefs);
@@ -1084,6 +1094,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       source: report.source,
       gaps: this._capabilityGaps(report),
       error: report.ok ? null : report.error,
+      // "0 declared" is otherwise indistinguishable from a system with no fields.
+      fieldsError: fieldDefs.loadError || null,
     };
   }
 

@@ -64,6 +64,13 @@ let _statusIndicatorEl = null;
  * @returns {SyncDashboard|null}
  */
 function openDashboard(tab) {
+  // A first render waits on Chronicle, so `rendered` stays false for a while;
+  // a second press then must not build another window and another burst.
+  const RENDERING = foundry.applications?.api?.ApplicationV2?.RENDER_STATES?.RENDERING ?? 1;
+  if (dashboard && !dashboard.rendered && dashboard.state === RENDERING) {
+    if (typeof tab === 'string') dashboard.openOn(tab);
+    return dashboard;
+  }
   if (dashboard && dashboard.rendered) {
     dashboard.bringToFront?.();
     if (typeof tab === 'string') dashboard.openOn(tab);

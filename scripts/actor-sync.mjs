@@ -1155,10 +1155,12 @@ export class ActorSync {
     const typeIds = [this._characterTypeId];
     if (this._pcSubtypeId) typeIds.push(this._pcSubtypeId);
     const out = [];
+    this._characterListFailed = false;
     for (const typeId of typeIds) {
       try {
         out.push(...(await this._walkTypeEntities(typeId)));
       } catch (err) {
+        this._characterListFailed = true;
         console.warn('Chronicle: failed to list character entities', err);
       }
     }
@@ -1241,6 +1243,9 @@ export class ActorSync {
   async getSyncIssues() {
     if (!this._adapter || !this._characterTypeId) return { issues: [], candidates: [] };
     const entities = await this._listCharacterEntities();
+    // Without the list every linked actor would look missing and be checked
+    // one GET at a time, which is the burst that trips the rate limit.
+    if (this._characterListFailed) throw new Error('Could not list Chronicle characters');
     const ids = new Set(entities.map((e) => e.id));
     const issues = [];
     for (const actor of game.actors.contents) {
