@@ -360,6 +360,16 @@ export class ChronicleAPI {
   }
 
   /**
+   * Report the world's scenes (GM or owner key only; 403 or 404 means the
+   * route is closed to this key or absent on an older Chronicle).
+   * @param {{scenes: Array<object>, truncated: boolean}} body
+   * @returns {Promise<{stored: number}|null>}
+   */
+  async reportScenes(body) {
+    return this.post('/sync/scenes', body);
+  }
+
+  /**
    * PUT request to the Chronicle API.
    * @param {string} path
    * @param {object} body
