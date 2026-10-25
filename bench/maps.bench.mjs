@@ -48,3 +48,33 @@ test('a token dragged in Chronicle moves on the stored map, and an open map is n
   assert.deepEqual(mapReads(quiet, map.id).map((r) => r.url), [], 'an open map is not polled');
   maps.onViewerClose(map.id);
 }, { settings: ON }));
+
+test('the world\'s scenes reach Chronicle on open and again after a rename, with no pictures', () => scenario('chr-maps-scenes', async ({ world }) => {
+  const scenes = world.game.scenes;
+  scenes.set('sc1', { id: 'sc1', name: 'Sunken Crypt', folder: { name: 'Caves', ancestors: [{ name: 'Act 2' }] }, active: false, navigation: true, background: { src: 'crypt.webm' } });
+  scenes.set('sc2', { id: 'sc2', name: "Dragon's Lair", folder: null, active: true, navigation: false });
+  const sceneReports = (reqs) => reqs.filter((r) => r.method === 'POST' && r.url === '/sync/scenes');
+
+  const opened = await recordRequests(async () => { await openWorld(world, MODULES); await settle(); });
+  const first = sceneReports(opened);
+  assert.ok(first.length >= 1, 'a scene report was sent');
+  assert.equal(first.at(-1).status, 200, 'Chronicle stored it');
+  const body = JSON.parse(first.at(-1).body);
+  assert.deepEqual(body.scenes.map((s) => [s.name, s.folder]), [["Dragon's Lair", ''], ['Sunken Crypt', 'Act 2 / Caves']]);
+  assert.doesNotMatch(first.at(-1).body, /crypt\.webm/, 'no picture paths travel');
+
+  const renamed = await recordRequests(async () => {
+    scenes.get('sc1').name = 'Flooded Crypt';
+    world.Hooks.callAll('updateScene', scenes.get('sc1'), { name: 'Flooded Crypt' }, {}, world.game.user.id);
+    await settle();
+  });
+  const again = sceneReports(renamed);
+  assert.equal(again.length, 1, 'one report after the rename');
+  assert.match(again[0].body, /Flooded Crypt/);
+
+  const quiet = await recordRequests(async () => {
+    world.Hooks.callAll('updateScene', scenes.get('sc1'), { darkness: 0.5 }, {}, world.game.user.id);
+    await settle();
+  });
+  assert.deepEqual(sceneReports(quiet), [], 'an unchanged list is not sent again');
+}));

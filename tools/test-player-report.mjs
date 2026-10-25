@@ -222,7 +222,7 @@ test('sync manager records applied changes and failures against the GM', () => {
 test('a reporter whose build has nothing to send, or answers later, still reports once', async () => {
   const sent = [];
   let body = null;
-  const r = new PlayerReporter({ send: async (b) => { sent.push(b); }, build: async () => body, what: 'monster report' });
+  const r = new PlayerReporter({ send: async (b) => { sent.push(b); }, build: async () => body, label: 'monster report' });
   assert.equal(await r.report({ force: true }), 'unchanged');
   body = { monsters: [{ name: 'Stalker' }], truncated: false };
   assert.equal(await r.report(), 'sent');

@@ -174,7 +174,8 @@ export function buildPlayerReport({ users, mappings, activityFor }) {
 /**
  * Sends the snapshot, only when it differs from the last one sent, and stops
  * for the session when Chronicle says the key may not report (403) or does
- * not know the route (404, an older Chronicle).
+ * not know the route (404, an older Chronicle). The scene report reuses it
+ * with its own `label`.
  */
 export class PlayerReporter {
   /**
@@ -182,13 +183,13 @@ export class PlayerReporter {
    * @param {(body: object) => Promise<any>} p.send - POSTs the body.
    * @param {() => object|null|Promise<object|null>} p.build - Builds the current body; null sends nothing.
    * @param {(msg: string, err?: unknown) => void} [p.log] - Debug logger.
-   * @param {string} [p.what] - What the report is, for the log.
+   * @param {string} [p.label] - What the logs call this report.
    */
-  constructor({ send, build, log = () => {}, what = 'player report' }) {
+  constructor({ send, build, log = () => {}, label = 'player report' }) {
+    this._label = label;
     this._send = send;
     this._build = build;
     this._log = log;
-    this._what = what;
     this._lastSent = null;
     this._stopped = false;
     this._warned400 = false;
@@ -218,19 +219,19 @@ export class PlayerReporter {
         const status = Number(err?.status);
         if (status === 403 || status === 404) {
           this._stopped = true;
-          this._log(`${this._what} stopped for this session (HTTP ${status})`);
+          this._log(`${this._label} stopped for this session (HTTP ${status})`);
           return 'stopped';
         }
         if (status === 400 && !this._warned400) {
           this._warned400 = true;
-          this._log(`Chronicle rejected the ${this._what} (HTTP 400)`);
+          this._log(`Chronicle rejected the ${this._label} (HTTP 400)`);
         } else {
-          this._log(`${this._what} failed`, err);
+          this._log(`${this._label} failed`, err);
         }
         return 'failed';
       }
     } catch (err) {
-      this._log(`${this._what} could not be built`, err);
+      this._log(`${this._label} could not be built`, err);
       return 'failed';
     } finally {
       this._inFlight = false;
