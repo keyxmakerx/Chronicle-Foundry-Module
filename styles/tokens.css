@@ -24,6 +24,20 @@
   --cs-surface: #f7f4ee;
   --cs-surface-2: #e8e3d8;
   --cs-line: #c3bcae;
+  /* Chronicle pages (chronicle-sheet.css): Chronicle's Material neutrals,
+     not the tool windows' warm ones, so a page reads like the site. */
+  --cs-page-bg: #f9fafb;
+  --cs-page-panel: #ffffff;
+  --cs-page-tert: #f1f2f6;
+  --cs-page-text: #111827;
+  --cs-page-body: #374151;
+  --cs-page-muted: #6b7280;
+  --cs-page-line: #e5e7eb;
+  --cs-page-accent: #6366f1;
+  --cs-page-accent-soft: #eef2ff;
+  --cs-page-dm: #b45309;
+  --cs-page-dm-soft: #fef6e7;
+  --cs-page-shadow: 0 1px 2px rgba(17, 24, 39, 0.06), 0 1px 3px rgba(17, 24, 39, 0.08);
 }
 
 .theme-dark,
@@ -44,4 +58,16 @@ body:not(.theme-dark):not(.theme-light) #sidebar {
   --cs-surface: #1b1a22;
   --cs-surface-2: #26242f;
   --cs-line: #3a3644;
+  --cs-page-bg: #111827;
+  --cs-page-panel: #1f2937;
+  --cs-page-tert: #273244;
+  --cs-page-text: #f9fafb;
+  --cs-page-body: #d1d5db;
+  --cs-page-muted: #9ca3af;
+  --cs-page-line: #334155;
+  --cs-page-accent: #818cf8;
+  --cs-page-accent-soft: #2a2f5e;
+  --cs-page-dm: #f5b544;
+  --cs-page-dm-soft: #33270d;
+  --cs-page-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.4);
 }

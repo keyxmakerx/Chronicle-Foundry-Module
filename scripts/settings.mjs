@@ -145,6 +145,40 @@ export function registerSettings() {
   // and Foundry's render-time sanitization: see _html-sanitizer.mjs.
   // Default false = sanitization ON; an operator can set true for
   // high-trust deployments where it strips legitimate inline styling.
+  // Synced journals open as Chronicle pages (chronicle-sheet.mjs). Read
+  // when a journal is made and on connect; turning it off gives linked
+  // journals Foundry's sheet back.
+  game.settings.register(MODULE_ID, 'chronicleSheet', {
+    name: game.i18n.localize('CHRONICLE.Sheet.Setting'),
+    hint: game.i18n.localize('CHRONICLE.Sheet.SettingHint'),
+    scope: 'world',
+    config: false,
+    type: Boolean,
+    default: true,
+    onChange: () => {
+      import('./chronicle-sheet.mjs')
+        .then((m) => m.applyChronicleSheetSetting())
+        .catch((err) => console.warn('Chronicle Sync | Could not apply the Chronicle page setting', err));
+    },
+  });
+
+  // "At this table" in the Journal tab (table-view.mjs): each user's own
+  // recent and pinned journals, and whether the tab shows it or the folders.
+  for (const key of ['tableRecent', 'tablePinned']) {
+    game.settings.register(MODULE_ID, key, {
+      scope: 'client',
+      config: false,
+      type: String,
+      default: '[]',
+    });
+  }
+  game.settings.register(MODULE_ID, 'journalTabView', {
+    scope: 'client',
+    config: false,
+    type: String,
+    default: 'table',
+  });
+
   game.settings.register(MODULE_ID, 'skipIncomingSanitization', {
     name: game.i18n.localize('CHRONICLE.Settings.SkipIncomingSanitization.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.SkipIncomingSanitization.Hint'),

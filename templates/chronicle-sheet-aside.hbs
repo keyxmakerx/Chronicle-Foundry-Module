@@ -1,0 +1,19 @@
+<aside class="cs-page-aside">
+  {{#if chronicle}}
+  {{#if chronicle.facts.length}}
+  <dl class="cs-facts">
+    {{#each chronicle.facts}}
+    <div class="cs-fact"><dt>{{label}}</dt><dd>{{value}}</dd></div>
+    {{/each}}
+  </dl>
+  {{/if}}
+  {{#if chronicle.contents.length}}
+  <nav class="cs-contents" aria-labelledby="cs-contents-{{chronicle.id}}">
+    <p class="cs-cap" id="cs-contents-{{chronicle.id}}">{{localize "CHRONICLE.Sheet.OnThisPage"}}</p>
+    {{#each chronicle.contents}}
+    <button type="button" class="cs-toc" data-action="chronicleGoTo" data-page-id="{{pageId}}">{{label}}</button>
+    {{/each}}
+  </nav>
+  {{/if}}
+  {{/if}}
+</aside>

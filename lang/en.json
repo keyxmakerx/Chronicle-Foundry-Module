@@ -1,6 +1,55 @@
 {
   "CHRONICLE": {
     "ModuleTitle": "Chronicle Sync",
+    "Sheet": {
+      "Name": "Chronicle page",
+      "OpenInChronicle": "Open in Chronicle",
+      "UseFoundry": "Use Foundry's sheet for this journal",
+      "OnThisPage": "On this page",
+      "Overview": "Overview",
+      "PlayerNotes": "Player notes",
+      "GMOnly": "Only you see this",
+      "Shown": "Players see this",
+      "ShowPlayers": "Show players",
+      "HideFromPlayers": "Hide from players",
+      "Linked": "Linked to Chronicle",
+      "SyncedNow": "Synced just now",
+      "SyncedMinutes": "Synced {n} min ago",
+      "SyncedHours": "Synced {n} h ago",
+      "SyncedDays": "Synced {n} d ago",
+      "Setting": "Show synced journals as Chronicle pages",
+      "SettingHint": "Synced journals open in Chronicle's page look. Turn it off to give them Foundry's journal sheet back. A journal you set to another sheet keeps it."
+    },
+    "Table": {
+      "Name": "At this table",
+      "Find": "Find a page",
+      "InScene": "In this scene",
+      "Recent": "Recent",
+      "Pinned": "Pinned",
+      "Everything": "Everything",
+      "Matches": "Matches",
+      "OnePage": "1 page",
+      "Pages": "{n} pages",
+      "NoMatch": "No page matches \u201c{q}\u201d. Search looks at names, folders, categories and tags.",
+      "EmptyChip": "No pages here yet.",
+      "Nothing": "Nothing on this scene links to a page yet. Open a page, or pin one, and it shows here.",
+      "Back": "Back to this table",
+      "AllFolders": "All folders",
+      "ShowAll": "Show all {n}",
+      "OnlyFoundry": "Only in Foundry",
+      "SetAside": "Set aside",
+      "Maps": "Maps",
+      "CalendarNotes": "Calendar notes",
+      "WhyScene": "the scene",
+      "WhyNote": "map note",
+      "WhyToken": "token",
+      "WhyTokens": "{n} tokens",
+      "Pin": "Pin to this table",
+      "Unpin": "Unpin"
+    },
+    "Mentions": {
+      "OpenInChronicle": "Not in this world yet. Opens in Chronicle."
+    },
     "Secrets": {
       "Placeholder": "GM-only text, kept in Chronicle",
       "NotSent": "Chronicle: your edit of \"{name}\" wasn't sent, because its GM-only text changed in Chronicle. Pull it from the sync dashboard, then edit again."

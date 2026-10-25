@@ -1,0 +1,73 @@
+/* "At this table" in the Journal tab (scripts/table-view.mjs). A tool in
+   Foundry's sidebar, so it takes the --cs-* tool tokens and Foundry's own
+   accent for group labels, never Chronicle's Director amber. While it is
+   on, Foundry's folder list and its search wait behind "All folders". */
+
+#journal.cs-tv-on .directory-list,
+#journal.cs-tv-on .directory-header search,
+#journal.cs-tv-on .directory-header .header-search { display: none; }
+#journal:not(.cs-tv-on) .cs-tv-search,
+#journal:not(.cs-tv-on) .cs-tv-body { display: none; }
+#journal.cs-tv-on .cs-tv-return { display: none; }
+
+.cs-tv { display: flex; flex-direction: column; min-height: 0; flex: 1; overflow-y: auto; color: var(--cs-text); }
+#journal:not(.cs-tv-on) .cs-tv { flex: 0 0 auto; overflow: visible; }
+.cs-tv-search {
+  display: flex; align-items: center; gap: 8px; margin: 4px 8px 6px; padding: 0 8px;
+  border: 1px solid var(--cs-line); border-radius: 6px; background: var(--cs-surface);
+  color: var(--cs-text-muted);
+}
+.cs-tv-search input { flex: 1; min-width: 0; height: 30px; border: 0; background: none; box-shadow: none; color: var(--cs-text); }
+.cs-tv-search input:focus { outline: none; box-shadow: none; }
+.cs-tv-search:focus-within { border-color: var(--cs-accent); }
+
+.cs-tv-group { padding: 2px 0 8px; }
+.cs-tv-cap {
+  display: flex; align-items: baseline; gap: 6px; margin: 0; padding: 8px 12px 4px; border: 0;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--color-text-accent, var(--cs-accent));
+}
+.cs-tv-cap small { font-size: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--cs-text-muted); }
+.cs-tv-list { margin: 0; padding: 0; list-style: none; }
+.cs-tv-row { display: flex; align-items: center; gap: 6px; padding: 0 6px 0 4px; }
+.cs-tv-row:hover { background: var(--cs-accent-soft); }
+.cs-tv-open {
+  display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; min-height: 36px;
+  margin: 0; padding: 4px 8px; border: 0; border-radius: 0; background: none; box-shadow: none;
+  text-align: left; font: inherit; color: var(--cs-text); cursor: pointer;
+}
+.cs-tv-open:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
+.cs-tv-name { font-size: 13.5px; line-height: 1.3; }
+.cs-tv-where { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--cs-text-muted); }
+.cs-tv-why { flex-shrink: 0; font-size: 11px; color: var(--cs-text-muted); white-space: nowrap; }
+.cs-tv-pin {
+  flex-shrink: 0; width: 28px; height: 28px; min-height: 0; margin: 0; padding: 0; line-height: 1;
+  border: 0; border-radius: 6px; background: none; box-shadow: none; color: var(--cs-text-muted);
+  opacity: 0; cursor: pointer;
+}
+.cs-tv-row:hover .cs-tv-pin, .cs-tv-pin:focus-visible, .cs-tv-pin.is-pinned { opacity: 1; }
+.cs-tv-pin.is-pinned { color: var(--color-text-accent, var(--cs-accent)); }
+.cs-tv-pin:hover { background: var(--cs-surface-2); }
+
+.cs-tv-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 12px 8px; }
+.cs-tv-chip {
+  display: inline-flex; align-items: center; gap: 6px; width: auto; height: auto; min-height: 28px; margin: 0; padding: 2px 10px;
+  border: 1px solid var(--cs-line); border-radius: 999px; background: none; box-shadow: none;
+  font: inherit; font-size: 12px; line-height: 1.2; color: var(--cs-text); cursor: pointer;
+}
+.cs-tv-chip span { color: var(--cs-text-muted); font-variant-numeric: tabular-nums; }
+.cs-tv-chip:hover { border-color: var(--color-text-accent, var(--cs-accent)); }
+.cs-tv-chip:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
+
+.cs-tv-more, .cs-tv-back, .cs-tv-return {
+  width: auto; height: auto; min-height: 28px; margin: 2px 12px; padding: 2px 0;
+  border: 0; background: none; box-shadow: none; font: inherit; font-size: 12.5px;
+  color: var(--cs-accent); cursor: pointer; text-align: left;
+}
+.cs-tv-more:hover, .cs-tv-back:hover, .cs-tv-return:hover { text-decoration: underline; }
+.cs-tv-return { margin: 4px 12px 8px; }
+.cs-tv-empty { margin: 0; padding: 10px 12px; font-size: 12.5px; color: var(--cs-text-muted); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .cs-tv-pin { transition: opacity 120ms ease-out; }
+}

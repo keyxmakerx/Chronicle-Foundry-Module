@@ -19,7 +19,7 @@ const PART_TOGGLES = { journals: 'syncJournals', maps: 'syncMaps', calendar: 'sy
 const DIRECTIONS = new Set(['both', 'pull', 'push']);
 const CONFLICT = new Set(['chronicle', 'foundry', 'newest']);
 const ANNOUNCE = ['calendarAnnounceWeather', 'calendarAnnounceWorldstate', 'calendarAnnounceSeasonEra', 'calendarAnnounceMoon'];
-const FLAGS = ['syncEnabled', 'syncCreatures', 'dmOnlyHidden', 'syncPermissions', 'autoSync', 'skipIncomingSanitization', ...ANNOUNCE];
+const FLAGS = ['syncEnabled', 'syncCreatures', 'chronicleSheet', 'dmOnlyHidden', 'syncPermissions', 'autoSync', 'skipIncomingSanitization', ...ANNOUNCE];
 
 /**
  * @param {object} form - values read from the window
@@ -107,6 +107,7 @@ export function settingsView(current) {
     hasKey: !!current.apiKey,
     syncEnabled: current.syncEnabled !== false,
     syncCreatures: !!current.syncCreatures,
+    chronicleSheet: current.chronicleSheet !== false,
     parts: SYNC_PARTS.map((part) => {
       const dir = directions[part] || 'both';
       return { part, on: dir !== 'off', direction: DIRECTIONS.has(dir) ? dir : 'both' };

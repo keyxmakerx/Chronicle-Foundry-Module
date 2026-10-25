@@ -22,6 +22,8 @@ import {
   applyReveals, carryReveals, revealableSecrets,
 } from './_gm-secrets.mjs';
 import { watchGMSecrets } from './gm-secret-view.mjs';
+import { newJournalSheetFlags } from './chronicle-sheet.mjs';
+import { playerSafeFacts } from './_chronicle-sheet-model.mjs';
 import { defaultLevelForVisibility } from './_ownership.mjs';
 import { isCalendarNoteJournal } from './calendar-sync.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
@@ -38,6 +40,12 @@ import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { collapseChanges } from './_change-feed.mjs';
 import { sharedPictureIds, toFoundryPictures, toChroniclePictures } from './_inline-pictures.mjs';
 import { PictureStore, watchGMPictures } from './picture-store.mjs';
+
+
+/** The facts flag write for a journal update; nothing when facts are unknown. */
+function factsUpdate(facts) {
+  return facts ? { [`flags.${FLAG_SCOPE}.facts`]: facts } : {};
+}
 
 /**
  * Validate and resolve a Chronicle entity's `image_path` to a safe src
@@ -764,6 +772,7 @@ export class JournalSync {
       // copy older versions stored.
       ...flagRemoval(FLAG_SCOPE, 'fields'),
       [`flags.${FLAG_SCOPE}.tags`]: entity.tags || [],
+      ...factsUpdate(this._factsFor(entity)),
       [`flags.${FLAG_SCOPE}.lastSync`]: new Date().toISOString(),
       [`flags.${FLAG_SCOPE}.chronicleUpdatedAt`]: entity.updated_at || '',
     }, syncOptions());
@@ -1074,13 +1083,18 @@ export class JournalSync {
     // Find or create a folder for this entity type.
     const folder = await this._getOrCreateEntityFolder(entity);
 
+    const sheetFlags = newJournalSheetFlags();
+    const facts = this._factsFor(entity);
     const journalData = {
       name: entity.name,
       pages,
       ...(ownership && { ownership }),
       folder: folder?.id || null,
       flags: {
+        ...(sheetFlags.core && { core: sheetFlags.core }),
         [FLAG_SCOPE]: {
+          ...sheetFlags[FLAG_SCOPE],
+          ...(facts && { facts }),
           entityId: entity.id,
           entityType: entity.type_name || '',
           [TYPE_SLUG_FLAG]: entity.type_slug || '',
@@ -1895,6 +1909,22 @@ export class JournalSync {
     // Pictures after the restore, so a GM-only one in restored content or
     // in a block the GM typed leaves marked GM-only.
     return toChronicleSecrets(toChroniclePictures(r.html, getSetting('apiUrl')));
+  }
+
+  /**
+   * The page's facts for the Chronicle sheet: only field values every reader
+   * of the journal may see (playerSafeFacts). Null when they can't be worked
+   * out (no field values in this copy, or the category's fields not loaded),
+   * so the journal keeps what it has.
+   * @param {object} entity
+   * @returns {Array<{label: string, value: string}>|null}
+   * @private
+   */
+  _factsFor(entity) {
+    if (!entity?.fields_data || typeof entity.fields_data !== 'object') return null;
+    const defs = this._tree.types.get(entity.entity_type_id)?.fields;
+    if (!Array.isArray(defs)) return null;
+    return playerSafeFacts(entity.fields_data, defs);
   }
 
   /**
