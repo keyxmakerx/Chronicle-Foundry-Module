@@ -360,6 +360,16 @@ export class ChronicleAPI {
   }
 
   /**
+   * Report the monsters this world can place (GM or owner key only; 403 or
+   * 404 means the route is closed to this key or absent on an older Chronicle).
+   * @param {{monsters: Array<object>, truncated: boolean}} body
+   * @returns {Promise<{stored: number}|null>}
+   */
+  async reportMonsters(body) {
+    return this.post('/sync/monsters', body);
+  }
+
+  /**
    * Report the world's scenes (GM or owner key only; 403 or 404 means the
    * route is closed to this key or absent on an older Chronicle).
    * @param {{scenes: Array<object>, truncated: boolean}} body

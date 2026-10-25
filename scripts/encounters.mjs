@@ -30,8 +30,10 @@ import {
 import {
   ENCOUNTER_TOKEN_FLAG, cellToPoint, combatantHiddenUpdates, expandRows, groupLetters, hiddenTokenIds,
   layoutItems, occupiedCells, parseEncounter, pickCombat, placedTokenIds, placeHidden, pointToCell,
-  resolveActor, rosterState, startRows, tokenRef, trackerAdditions, trackerBadge,
+  compendiumFallback, resolveActor, rosterState, startRows, tokenRef, trackerAdditions, trackerBadge,
 } from './_encounter-roster.mjs';
+import { bringInMonster, compendiumMonsters } from './monster-report.mjs';
+import { rowAsPlayed, unwrapMatches } from './_creature-matches.mjs';
 import {
   afterNotYet, afterStart, newlyDue, parseStages, stageStates,
 } from './_encounter-stages.mjs';
@@ -247,7 +249,8 @@ export class EncountersPane {
     try {
       const enc = parseEncounter(await api.get(encounterPath(id)));
       if (!enc) throw new Error('encounter without an id');
-      this._open = { enc, rows: expandRows(enc.creatures), stages: parseStages(enc.stages, new Set(enc.creatures.map((c) => c.id))), seen: null };
+      const matches = await this._readMatches(api);
+      this._open = { enc, rows: expandRows(enc.creatures), stages: parseStages(enc.stages, new Set(enc.creatures.map((c) => c.id))), seen: null, matches };
     } catch (err) {
       this._open = null;
       this._openError = t(`Error.${encounterErrorKey(err)}`);
@@ -321,20 +324,27 @@ export class EncountersPane {
     const placed = mineIds.size;
     const canStart = !!scene && startRows(state).length > 0;
 
-    const rowHtml = state.map((r) => {
+    const packs = compendiumMonsters();
+    const makesOwn = !!creatureSync()?.canMakeActors;
+    const rowHtml = state.map((shown) => {
+      const r = rowAsPlayed(shown, this._open.matches);
       const found = resolveActor(r, actors);
+      // No world actor yet, but a compendium has one: Place brings it in.
+      const fromPack = found ? null : compendiumFallback(r, packs);
+      // A page playing its own numbers: Place has creature sync make its actor.
+      const fromPage = !found && r.pageOnly && makesOwn;
       const badge = trackerBadge(r, { trackerOn, inCombat });
       const startLabel = t(`Start.${r.start}`);
       const meta = [r.group ? f('Group', { g: r.group }) : '', startLabel].filter(Boolean).join(' · ');
       let actions = '';
       if (r.state === 'out') {
         const armed = this._armed?.kind === 'row' && this._armed.key === r.key;
-        actions = `<button type="button" class="dms-ebtn${armed ? ' dms-eon' : ''}" data-enc-act="place" data-key="${escapeHtml(r.key)}" ${found && scene ? '' : 'disabled'} ${found ? '' : `title="${escapeHtml(t('NoActorTip'))}"`}>${escapeHtml(armed ? t('ClickScene') : t('Place'))}</button>`;
+        actions = `<button type="button" class="dms-ebtn${armed ? ' dms-eon' : ''}" data-enc-act="place" data-key="${escapeHtml(r.key)}" ${(found || fromPack || fromPage) && scene ? '' : 'disabled'} ${found || fromPack || fromPage ? '' : `title="${escapeHtml(t('NoActorTip'))}"`}>${escapeHtml(armed ? t('ClickScene') : t('Place'))}</button>`;
       } else {
         actions = `<button type="button" class="dms-ebtn" data-enc-act="toggle" data-key="${escapeHtml(r.key)}">${escapeHtml(r.state === 'hidden' ? t('Show') : t('Hide'))}</button>`;
       }
       return `<div class="dms-erow" data-state="${r.state}">
-        <span class="dms-en">${escapeHtml(r.name)}<small>${escapeHtml(meta)}${found || r.state !== 'out' ? '' : ` · <em>${escapeHtml(t('NoActor'))}</em>`}</small></span>
+        <span class="dms-en">${escapeHtml(r.name)}<small>${escapeHtml(meta)}${found || r.state !== 'out' ? '' : fromPack ? ` · ${escapeHtml(f('FromCompendium', { pack: fromPack.pack }))}` : fromPage ? ` · ${escapeHtml(t('FromPage'))}` : ` · <em>${escapeHtml(t('NoActor'))}</em>`}</small></span>
         <span class="dms-est dms-est-${r.state}">${escapeHtml(t(`State.${r.state}`))}${badge ? `<small>${escapeHtml(t(`Tracker.${badge}`))}</small>` : ''}</span>
         <span class="dms-eact">${actions}</span>
       </div>`;
@@ -501,6 +511,19 @@ export class EncountersPane {
     return rosterState(this._open.enc.id, this._open.rows, sceneTokens());
   }
 
+  /**
+   * Which creature pages are Foundry's own monsters, read with the fight. An
+   * older Chronicle, or a failed read, places every row as before.
+   */
+  async _readMatches(api) {
+    try {
+      return unwrapMatches(await api.get('/foundry-matches'));
+    } catch (err) {
+      if (err?.status !== 404) log.warn('Encounters: could not read which pages are Foundry monsters', err);
+      return new Map();
+    }
+  }
+
   _armRow(key) {
     if (this._armed?.kind === 'row' && this._armed.key === key) { this._disarm(); this._drawFight(); return; }
     const row = this._open.rows.find((r) => r.key === key);
@@ -576,9 +599,12 @@ export class EncountersPane {
     const grid = gridOf(scene);
     const noActor = [];
     const built = [];
-    for (const row of rows) {
+    for (const shown of rows) {
+      const row = rowAsPlayed(shown, this._open.matches);
       const found = resolveActor(row, actors);
-      const actor = found && game.actors.get(found.actor.id);
+      let actor = found && game.actors.get(found.actor.id);
+      if (!actor && row.pageOnly) actor = await creatureSync()?.ensureActor(row.entityId) ?? null;
+      if (!actor) actor = await this._fromCompendium(row);
       if (!actor) { noActor.push(row.name); continue; }
       const hidden = placeHidden(row);
       const doc = await actor.getTokenDocument({
@@ -611,6 +637,22 @@ export class EncountersPane {
     const hiddenN = created.filter((d) => d.hidden).length;
     await this._joinRunning(created);
     return f('Placed', { n: created.length, hidden: hiddenN });
+  }
+
+  /**
+   * The world actor for a row no world actor answers, brought in once from a
+   * compendium; later rows and fights reuse it. Null when no compendium has
+   * it or bringing it in failed.
+   */
+  async _fromCompendium(row) {
+    const entry = compendiumFallback(row, compendiumMonsters());
+    if (!entry) return null;
+    try {
+      return await bringInMonster(entry);
+    } catch (err) {
+      log.warn(`Encounters: could not bring ${entry.name} in from ${entry.pack}`, err);
+      return null;
+    }
   }
 
   /** Tokens placed while this fight is in an unstarted tracker join it. */

@@ -181,7 +181,7 @@ export class PlayerReporter {
   /**
    * @param {object} p
    * @param {(body: object) => Promise<any>} p.send - POSTs the body.
-   * @param {() => {players: Array<object>}} p.build - Builds the current body.
+   * @param {() => object|null|Promise<object|null>} p.build - Builds the current body; null sends nothing.
    * @param {(msg: string, err?: unknown) => void} [p.log] - Debug logger.
    * @param {string} [p.label] - What the logs call this report.
    */
@@ -207,7 +207,8 @@ export class PlayerReporter {
     if (this._inFlight) return 'busy';
     this._inFlight = true;
     try {
-      const body = this._build();
+      const body = await this._build();
+      if (body == null) return 'unchanged';
       const print = JSON.stringify(body);
       if (!force && print === this._lastSent) return 'unchanged';
       try {

@@ -218,3 +218,14 @@ test('sync manager records applied changes and failures against the GM', () => {
   const journal = readFileSync(new URL('../scripts/journal-sync.mjs', import.meta.url), 'utf8');
   assert.match(journal, /resyncAll failed for entity[^\n]*\n\s*this\._syncManager\?\.recordWorldOutcome\?\.\(false\);/);
 });
+
+test('a reporter whose build has nothing to send, or answers later, still reports once', async () => {
+  const sent = [];
+  let body = null;
+  const r = new PlayerReporter({ send: async (b) => { sent.push(b); }, build: async () => body, label: 'monster report' });
+  assert.equal(await r.report({ force: true }), 'unchanged');
+  body = { monsters: [{ name: 'Stalker' }], truncated: false };
+  assert.equal(await r.report(), 'sent');
+  assert.equal(await r.report(), 'unchanged');
+  assert.deepEqual(sent, [body]);
+});

@@ -757,6 +757,47 @@ Foundry page shows it as "Players in Foundry".
 
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi`, the players handler)
 
+#### POST /sync/monsters
+The GM's client reports the monsters the world can place: its actors of the
+system's creature type and the entries of its Actor compendiums. Chronicle's
+AI connection reads the list (its `foundry_monsters` tool) so it builds fights
+from monsters Foundry has instead of writing copies, and the AI review warns
+when a fight names a creature Foundry can't place.
+
+**Used by:** `sync-manager.mjs` → `_monsters` (`scripts/monster-report.mjs`, pure parts in `scripts/_monster-report.mjs`), GM client only
+
+**Body:** `{ "monsters": [ { "name", "pack", "level", "role", "organization", "ev", "linked", "page" } ], "truncated": false }`
+
+- World actors first, then compendium entries; `pack` is the compendium's label, left out for a world actor. `linked` and `page` (the page's id) are set on an actor creature sync made from a Chronicle page; Chronicle uses `page` to tell a page already in play.
+- `level`, `role`, `organization` and `ev` are read from the paths of the system's creature fields with those keys (`GET /systems/:id/creature-fields`), choices as their localized labels; a field the system lacks is left out. A system with no creature fields sends nothing.
+- At most 5000 entries; past that `truncated` is true. Names and packs are cut to 120 chars, the rest to 40.
+- A full snapshot: each report replaces the server's list.
+
+**Response:** `{ "stored": n }`
+
+**Errors:** 403 when the key is not the owner's or a DM-access key; 404 on an older Chronicle; both stop reporting for the session. 400 is a bad body: logged once.
+
+**When:** on connect (compendium indexes read again then) and 10 s after actors are created, deleted or renamed, only when the list changed.
+
+Re-verify by: 2026-11-08 (Chronicle `internal/plugins/syncapi/foundry_monsters.go`)
+
+#### GET /foundry-matches, GET /entities/:id/foundry-match
+Which monster in Foundry each creature page is. Chronicle matches each
+creature page to the monster of the same name in the latest report (never an
+actor creature sync made), and the DM chooses on the page whose numbers play.
+
+**Used by:** `creature-sync.mjs` (`_loadMatches` on connect, `_refreshMatch` before a page's actor follows an edit, `ensureActor`) and `encounters.mjs` (`_readMatches` when a fight opens); pure parts in `scripts/_creature-matches.mjs`
+
+**Response:** list `{ "data": [match], "total", "truncated", "reportedAt" }`; one page `{ "match": match, "reportedAt" }`. A match is `{ "entityId", "entityName", "state", "monster"?: { "name", "pack", … }, "use"?: "foundry"|"page", "useChosen", "confirmed", "inPlay" }`; `state` is `matched`, `suggested`, `missing`, `none` or `not_reported`.
+
+- `matched` with `use: "foundry"`: creature sync makes and updates no actor for the page (one made earlier is left as it is), and a fight row for it places a world actor of the monster's name that no page made, else brings it in from the monster's compendium (that compendium first).
+- `use: "page"` (`matched` or `missing`): a fight row for it takes only the page's own actor, asking creature sync to make it when missing; never a same-named world or compendium monster.
+- Every other state plays as before matching existed.
+
+**Errors:** 404 on an older Chronicle (or, for one page, a page that is not a creature page): everything plays as before. 403 for a key without owner or DM access. Another failure keeps the last answer (creature sync) or plays as before (a fight).
+
+Re-verify by: 2026-11-08 (Chronicle `internal/plugins/syncapi/foundry_matches.go`)
+
 #### POST /sync/scenes
 The GM's client reports the world's scenes, so the owner and the owner's AI
 can tell which maps already exist in Foundry. Chronicle's AI reads them with
