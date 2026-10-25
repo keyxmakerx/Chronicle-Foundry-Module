@@ -1,6 +1,25 @@
 {
   "CHRONICLE": {
     "ModuleTitle": "Chronicle Sync",
+    "Sheet": {
+      "Name": "Chronicle page",
+      "OpenInChronicle": "Open in Chronicle",
+      "UseFoundry": "Use Foundry's sheet for this journal",
+      "OnThisPage": "On this page",
+      "Overview": "Overview",
+      "PlayerNotes": "Player notes",
+      "GMOnly": "Only you see this",
+      "Shown": "Players see this",
+      "ShowPlayers": "Show players",
+      "HideFromPlayers": "Hide from players",
+      "Linked": "Linked to Chronicle",
+      "SyncedNow": "Synced just now",
+      "SyncedMinutes": "Synced {n} min ago",
+      "SyncedHours": "Synced {n} h ago",
+      "SyncedDays": "Synced {n} d ago",
+      "Setting": "Show synced journals as Chronicle pages",
+      "SettingHint": "Synced journals open in Chronicle's page look. Turn it off to give them Foundry's journal sheet back. A journal you set to another sheet keeps it."
+    },
     "Mentions": {
       "OpenInChronicle": "Not in this world yet. Opens in Chronicle."
     },

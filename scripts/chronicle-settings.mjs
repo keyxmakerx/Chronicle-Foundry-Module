@@ -24,7 +24,7 @@ const TABS = [
 ];
 const PART_ICONS = { journals: 'fa-book', maps: 'fa-map', calendar: 'fa-calendar-days', characters: 'fa-user', shops: 'fa-store' };
 const STEP_ICONS = { check: 'fa-circle-check', xmark: 'fa-circle-xmark', warn: 'fa-triangle-exclamation' };
-const SWITCHES = ['syncEnabled', 'syncCreatures', 'dmOnlyHidden', 'syncPermissions', 'autoSync', 'skipIncomingSanitization',
+const SWITCHES = ['syncEnabled', 'syncCreatures', 'chronicleSheet', 'dmOnlyHidden', 'syncPermissions', 'autoSync', 'skipIncomingSanitization',
   'calendarAnnounceWeather', 'calendarAnnounceWorldstate', 'calendarAnnounceSeasonEra', 'calendarAnnounceMoon'];
 
 const t = (key) => game.i18n.localize(`CHRONICLE.SettingsWindow.${key}`);

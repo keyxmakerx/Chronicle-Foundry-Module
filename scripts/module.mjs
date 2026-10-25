@@ -34,6 +34,7 @@ import { registerCreatureForms } from './creature-forms.mjs';
 import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { registerShopRoomSocket, registerShopJournalButton } from './shop-room-window.mjs';
 import { watchMentionLinks } from './mention-links.mjs';
+import { applyChronicleSheetSetting, registerChronicleSheet } from './chronicle-sheet.mjs';
 import { notebookAvailable, openCalendarWindow, registerPlayerNotebook } from './player-notebook.mjs';
 import { openSatchel } from './satchel.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
@@ -110,6 +111,13 @@ Hooks.once('init', () => {
     makeDefault: false,
     label: 'Chronicle Map Viewer',
   });
+
+  // Synced journals open as Chronicle pages; never the default sheet.
+  try {
+    registerChronicleSheet();
+  } catch (err) {
+    console.warn('Chronicle Sync | Chronicle page sheet unavailable', err);
+  }
 
   // Register Handlebars helpers used by dashboard/shop templates.
   Handlebars.registerHelper('eq', (a, b) => a === b);
@@ -274,6 +282,12 @@ Hooks.once('ready', async () => {
     console.error('Chronicle Sync | Failed to start sync manager', err);
     ui.notifications.error('Chronicle Sync: Connection failed. Open the dashboard to diagnose.');
   }
+
+  // Linked journals made before the Chronicle page sheet get it once (or
+  // lose it when the setting is off). Runs whether or not sync connected.
+  applyChronicleSheetSetting().catch((err) => {
+    console.warn('Chronicle Sync | Could not offer the Chronicle page sheet', err);
+  });
 
   // Fire-and-forget manifest health probe (GM only). Surfaces a sticky
   // `ui.notifications.error` if Foundry's install-time URL no longer

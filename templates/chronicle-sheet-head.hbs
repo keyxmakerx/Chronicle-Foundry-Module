@@ -1,0 +1,12 @@
+<header class="cs-page-head">
+  {{#if chronicle}}
+  {{#if chronicle.eyebrow.length}}
+  <p class="cs-eyebrow">{{#each chronicle.eyebrow}}{{#unless @first}}<span class="cs-sep" aria-hidden="true">/</span>{{/unless}}<span>{{this}}</span>{{/each}}</p>
+  {{/if}}
+  <h1 class="cs-title">{{chronicle.title}}</h1>
+  <div class="cs-rule" aria-hidden="true"></div>
+  {{#if chronicle.tags.length}}
+  <ul class="cs-tags">{{#each chronicle.tags}}<li>{{this}}</li>{{/each}}</ul>
+  {{/if}}
+  {{/if}}
+</header>

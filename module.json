@@ -30,7 +30,8 @@
     "styles/stashes.css",
     "styles/dm-screen.css",
     "styles/quests.css",
-    "styles/sky-clock.css"
+    "styles/sky-clock.css",
+    "styles/chronicle-sheet.css"
   ],
   "languages": [
     {
