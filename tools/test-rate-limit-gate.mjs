@@ -112,3 +112,39 @@ test('after a 429 every request waits on the same pause', async () => {
   assert.equal(sent, 3);
   assert.ok(waits.every((ms) => ms > 29_000), 'each request saw the shared pause');
 });
+
+test('map pictures and uploads wait on the pause, and a 429 on one closes it', async () => {
+  const api = new ChronicleAPI();
+  api.rateLimit.block(30_000);
+  const waits = [];
+  api.rateLimit.wait = async () => { waits.push(api.rateLimit.remaining()); api.rateLimit.until = 0; };
+  globalThis.fetch = async () => reply(429, { retryAfter: '9' });
+  await assert.rejects(api.getBlob('/media/x'), (err) => err.status === 429);
+  assert.ok(waits[0] > 29_000, 'the picture waited for the open pause');
+  const left = api.rateLimit.remaining();
+  assert.ok(left > 8000 && left <= 9000, `picture 429 paused the rest for ${left}ms`);
+  api.rateLimit.until = 0;
+  await assert.rejects(api.uploadMedia(new Blob(['x']), 'a.png'), /Media upload failed: 429/);
+  assert.ok(api.rateLimit.remaining() > 8000, 'an upload 429 pauses the rest too');
+});
+
+// --- retry queue: a replay never sends a stale write ---------------------
+
+test('a newer queued write to the same place replaces the older one', async () => {
+  const api = new ChronicleAPI();
+  api.queueForRetry('PUT', '/entities/a', { entry: 'old' });
+  api.queueForRetry('PUT', '/entities/b', { entry: 'other' });
+  api.queueForRetry('PUT', '/entities/a', { entry: 'new' });
+  assert.deepEqual(api._retryQueue.map((q) => [q.path, JSON.parse(q.body).entry]), [['/entities/b', 'other'], ['/entities/a', 'new']]);
+});
+
+test('a write that went through drops the queued older one, so reconnect does not replay it', async () => {
+  const api = new ChronicleAPI();
+  api.queueForRetry('PUT', '/entities/a', { entry: 'old' });
+  api.clearRetry('PUT', '/entities/a');
+  const sent = [];
+  globalThis.fetch = async (url, opts) => { sent.push(opts.body); return reply(200, { body: '{}' }); };
+  api.rateLimit.wait = async () => {};
+  assert.deepEqual(await api.processRetryQueue(), { success: 0, failed: 0 });
+  assert.equal(sent.length, 0);
+});

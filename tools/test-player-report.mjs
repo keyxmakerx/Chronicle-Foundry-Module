@@ -199,10 +199,28 @@ test('overlapping reports do not double-send', async () => {
   const gate = new Promise((res) => { release = res; });
   const { r, sent } = mk(() => gate);
   const first = r.report();
-  assert.equal(await r.report({ force: true }), 'busy');
+  assert.equal(await r.report(), 'busy');
+  assert.equal(await r.report(), 'busy');
   release();
   assert.equal(await first, 'sent');
+  await new Promise((res) => setTimeout(res, 0));
+  // The calls made while busy ran once afterwards and found nothing new.
   assert.equal(sent.length, 1);
+});
+
+test('a change made while a report is in flight is sent right after it', async () => {
+  let release;
+  const gate = new Promise((res) => { release = res; });
+  let body = { scenes: ['a'] };
+  const sent = [];
+  const r = new PlayerReporter({ send: async (b) => { sent.push(b); if (sent.length === 1) await gate; }, build: () => body });
+  const first = r.report();
+  body = { scenes: ['a', 'b'] };
+  assert.equal(await r.report(), 'busy');
+  release();
+  await first;
+  await new Promise((res) => setTimeout(res, 0));
+  assert.deepEqual(sent, [{ scenes: ['a'] }, { scenes: ['a', 'b'] }]);
 });
 
 // Applying Chronicle's changes runs on the GM's client, so its outcome lands

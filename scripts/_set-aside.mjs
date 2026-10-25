@@ -12,8 +12,8 @@ import { flagRemoval } from './_flag-removal.mjs';
 /** Marks the folder, so it is found again whatever it has been renamed to. */
 export const REMOVED_FOLDER_FLAG = 'removedFolder';
 
-/** The flags that tie a journal to a Chronicle page or note. */
-export const LINK_FLAGS = ['entityId', 'noteId', 'isNote', 'entityType', 'entityTypeSlug', 'fields', 'tags', 'lastSync', 'chronicleUpdatedAt'];
+/** The flags that tie a journal to a Chronicle page or note, and the page's facts, which every client with the journal can read. */
+export const LINK_FLAGS = ['entityId', 'noteId', 'isNote', 'entityType', 'entityTypeSlug', 'fields', 'tags', 'lastSync', 'chronicleUpdatedAt', 'facts'];
 
 /**
  * The update that unlinks a journal and files it in the removed folder.

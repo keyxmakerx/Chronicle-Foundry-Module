@@ -122,18 +122,22 @@ export function pushRecent(list, id) {
   return [id, ...(list || []).filter((x) => x !== id)].slice(0, RECENT_LIMIT);
 }
 
+/** Foundry's CONST.TOKEN_DISPOSITIONS.SECRET, used for disguised and mimic tokens. */
+const SECRET_DISPOSITION = -2;
+
 /**
  * Tokens on a scene, as Chronicle page ids with how many tokens each has.
  * A token counts for its actor's own page and for the page linked to it. A
- * hidden token counts only for the GM, so a player's list never gives it away.
- * @param {Array<{entityId?: string|null, linkedEntityId?: string|null, hidden?: boolean}>} tokens
+ * hidden or Secret-disposition token counts only for the GM, so a player's
+ * list never gives away an ambush or a disguise.
+ * @param {Array<{entityId?: string|null, linkedEntityId?: string|null, hidden?: boolean, disposition?: number}>} tokens
  * @param {boolean} isGM
  * @returns {Array<{entityId: string, count: number}>} most tokens first
  */
 export function tokenPages(tokens, isGM) {
   const counts = new Map();
   for (const t of tokens || []) {
-    if (t?.hidden && !isGM) continue;
+    if (!isGM && (t?.hidden || t?.disposition === SECRET_DISPOSITION)) continue;
     for (const id of new Set([t?.entityId, t?.linkedEntityId].filter(Boolean))) counts.set(id, (counts.get(id) || 0) + 1);
   }
   return [...counts].map(([entityId, count]) => ({ entityId, count })).sort((a, b) => b.count - a.count);

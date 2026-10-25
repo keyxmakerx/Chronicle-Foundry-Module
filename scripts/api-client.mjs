@@ -272,10 +272,9 @@ export class ChronicleAPI {
         this._logError('error', method, path, null, err.message || 'Network error');
         throw err;
       }
-      if (response.status !== 429) break;
+      if (!this._noteRateLimit(response)) break;
       // Chronicle refuses a rate-limited request before running it, so
       // sending it again after the pause is safe for writes too.
-      this.rateLimit.block(parseRetryAfter(response.headers?.get?.('Retry-After')));
       if (attempt >= MAX_RATE_LIMIT_RETRIES) break;
       await response.text().catch(() => {});
     }
@@ -415,6 +414,20 @@ export class ChronicleAPI {
   }
 
   /**
+   * Pause every later request when Chronicle answered 429. Pictures and
+   * uploads are not resent (their callers retry), but they still close the
+   * gate so the rest of a burst waits instead of being refused too.
+   * @param {Response} response
+   * @returns {boolean} whether it was a 429
+   * @private
+   */
+  _noteRateLimit(response) {
+    if (response?.status !== 429) return false;
+    this.rateLimit.block(parseRetryAfter(response.headers?.get?.('Retry-After')));
+    return true;
+  }
+
+  /**
    * GET a binary resource (a picture) from the Chronicle API.
    * @param {string} path - API path relative to the campaign.
    * @returns {Promise<Blob>}
@@ -427,6 +440,7 @@ export class ChronicleAPI {
     const url = `${baseUrl}/api/v1/campaigns/${campaignId}${path}`;
     const headers = { 'Authorization': `Bearer ${apiKey}`, ...moduleVersionHeaders() };
     let response;
+    await this.rateLimit.wait();
     try {
       try {
         response = await fetch(url, { method: 'GET', headers });
@@ -444,6 +458,7 @@ export class ChronicleAPI {
     }
 
     if (!response.ok) {
+      this._noteRateLimit(response);
       this.health.restErrorCount++;
       this.health.lastRestError = Date.now();
       this._logError('error', 'GET', path, response.status, 'Binary fetch failed');
@@ -474,6 +489,7 @@ export class ChronicleAPI {
     const url = `${baseUrl}/api/v1/campaigns/${campaignId}/media`;
     const headers = { 'Authorization': `Bearer ${apiKey}`, ...moduleVersionHeaders() };
     let response;
+    await this.rateLimit.wait();
     try {
       response = await fetch(url, { method: 'POST', headers, body: formData });
     } catch (err) {
@@ -484,6 +500,7 @@ export class ChronicleAPI {
     }
 
     if (!response.ok) {
+      this._noteRateLimit(response);
       this.health.restErrorCount++;
       this.health.lastRestError = Date.now();
       this._logError('error', 'POST', '/media', response.status, 'Media upload failed');
@@ -592,6 +609,9 @@ export class ChronicleAPI {
    */
   queueForRetry(method, path, body = null, maxRetries = 3) {
     if (method === 'GET') return; // Never retry reads.
+    // A newer write to the same place replaces the older one, so a replay
+    // never sends a stale body after (or instead of) a newer one.
+    this.clearRetry(method, path);
     if (this._retryQueue.length >= 50) {
       // Cap queue size to prevent memory issues.
       this._logError('warn', method, path, null, 'Retry queue full, dropping operation');
@@ -611,6 +631,15 @@ export class ChronicleAPI {
    * Process the retry queue. Called after reconnection.
    * @returns {Promise<{success: number, failed: number}>}
    */
+  /**
+   * Drop a queued write once a newer one to the same place has gone through.
+   * @param {string} method
+   * @param {string} path
+   */
+  clearRetry(method, path) {
+    this._retryQueue = this._retryQueue.filter((q) => q.method !== method || q.path !== path);
+  }
+
   async processRetryQueue() {
     if (this._retryProcessing || this._retryQueue.length === 0) {
       return { success: 0, failed: 0 };

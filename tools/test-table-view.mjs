@@ -101,3 +101,9 @@ test('a hidden token is listed for the GM only', () => {
   assert.deepEqual(tokenPages(tokens, false), [{ entityId: 'e-maric', count: 1 }]);
   assert.deepEqual(tokenPages(tokens, true).map((t) => t.entityId).sort(), ['e-ambush', 'e-maric']);
 });
+
+test('a Secret-disposition token (a disguise, a mimic) is listed for the GM only', () => {
+  const tokens = [{ entityId: 'e-mimic', disposition: -2 }, { entityId: 'e-maric', disposition: 0 }];
+  assert.deepEqual(tokenPages(tokens, false), [{ entityId: 'e-maric', count: 1 }]);
+  assert.deepEqual(tokenPages(tokens, true).map((t) => t.entityId).sort(), ['e-maric', 'e-mimic']);
+});

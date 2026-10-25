@@ -59,7 +59,7 @@ function sceneInput() {
   const tokens = [];
   for (const td of scene.tokens ?? []) {
     const actor = td.actor;
-    tokens.push({ entityId: actor?.getFlag?.(FLAG_SCOPE, 'entityId'), linkedEntityId: actor?.getFlag?.(FLAG_SCOPE, LINK_FLAG), hidden: td.hidden === true });
+    tokens.push({ entityId: actor?.getFlag?.(FLAG_SCOPE, 'entityId'), linkedEntityId: actor?.getFlag?.(FLAG_SCOPE, LINK_FLAG), hidden: td.hidden === true, disposition: td.disposition });
   }
   const noteJournalIds = [];
   for (const n of scene.notes ?? []) {
