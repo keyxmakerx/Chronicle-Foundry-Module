@@ -20,7 +20,7 @@
 import { noticeText } from './_escape-html.mjs';
 import { stateBlock } from './_state-block.mjs';
 import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
-import { isShopJournal } from './_shop-journal.mjs';
+import { addJournalDoor, isShopJournal } from './_shop-journal.mjs';
 import { getSetting, getUserMappings } from './settings.mjs';
 import { _isAllowedImageHost } from './_url-validation.mjs';
 import { decryptReply, encryptReply, generateRequestKeys } from './_stash-crypto.mjs';
@@ -149,9 +149,10 @@ export class ShopRoomWindow extends ApplicationV2 {
    * @param {object} [opts.room] - {layout, goods, image} when shown by the GM.
    * @param {boolean} [opts.selfOpened] - A player opened it from the shop's journal, so the GM's "Stop showing" leaves it open.
    * @param {boolean} [opts.closed] - No GM is online to serve the room; the window says the shop is closed.
+   * @param {boolean} [opts.enter] - Walk straight into the room, as from the door on the shop's journal page.
    * @param {Function} [opts.onClose]
    */
-  constructor({ api, campaignId, shopId, name, room, selfOpened, closed, onClose }) {
+  constructor({ api, campaignId, shopId, name, room, selfOpened, closed, enter, onClose }) {
     super({ id: `chronicle-shop-room-${shopId}`, window: { title: name } });
     this._api = api;
     this._campaignId = campaignId;
@@ -161,6 +162,9 @@ export class ShopRoomWindow extends ApplicationV2 {
     this.selfOpened = !!selfOpened;
     this._closed = !!closed;
     this._onCloseCallback = onClose;
+    this._enter = !!enter;
+    this._leaveCloses = false;
+    this._enterObs = null;
     this._host = null;
     this._def = null;
     this._shown = false;
@@ -248,6 +252,43 @@ export class ShopRoomWindow extends ApplicationV2 {
     ds.shopName = this._name;
     if (image) ds.shopImage = image; else delete ds.shopImage;
     this._def.init(this._host);
+    // Entered from the journal's door, leaving the room closes this window
+    // too, so the journal is where the player comes back to. A remount
+    // empties the host first, so its old room closing is not a leave.
+    const dlg = this._host.querySelector('dialog.shr-dlg');
+    dlg?.addEventListener('close', () => {
+      if (this._leaveCloses && this._host?.contains(dlg)) this.close();
+    });
+    this._walkIn();
+  }
+
+  /** Walk into the room now, as the journal's door does; the window opens if needed. */
+  enter() {
+    this._enter = true;
+    this._walkIn();
+  }
+
+  /**
+   * Press the widget's own door once the room has loaded; the widget shows
+   * itself only then, and a press before that has nothing to draw.
+   */
+  _walkIn() {
+    const host = this._host;
+    if (!this._enter || !host) return;
+    const press = () => {
+      const front = host.querySelector('.shr-front');
+      if (host.hidden || !front || host.querySelector('dialog.shr-dlg')?.open) return false;
+      this._enter = false;
+      this._leaveCloses = true;
+      front.click();
+      return true;
+    };
+    if (press()) return;
+    this._enterObs?.disconnect();
+    this._enterObs = new MutationObserver(() => {
+      if (press() || !this._enter) this._enterObs?.disconnect();
+    });
+    this._enterObs.observe(host, { attributes: true, attributeFilter: ['hidden'] });
   }
 
   /** The widget's buying calls: Chronicle directly for the GM, the GM's client for a player. */
@@ -415,6 +456,8 @@ export class ShopRoomWindow extends ApplicationV2 {
       this._shown = false;
       this._emit('hide');
     }
+    this._enterObs?.disconnect();
+    this._leaveCloses = false;
     if (this._host && this._def && this._host.firstChild) this._def.destroy(this._host);
     if (this._onCloseCallback) this._onCloseCallback();
     return super.close(options);
@@ -534,10 +577,11 @@ export function chronicleUserFor(foundryUserId) {
  * serves the room (players have no API key) after checking this user can see
  * that journal; with no GM online the window says the shop is closed.
  */
-export async function openShopFromJournal(shopId, name) {
+export async function openShopFromJournal(shopId, name, { enter = false } = {}) {
   const existing = playerRooms.get(shopId);
   if (existing) {
     existing.bringToFront?.() ?? existing.bringToTop?.();
+    if (enter) existing.enter();
     return;
   }
   const reply = await requestFromGM(shopId, 'open');
@@ -552,17 +596,18 @@ export async function openShopFromJournal(shopId, name) {
   if (playerRooms.has(shopId)) return; // The GM showed it meanwhile.
   const win = new ShopRoomWindow({
     api: null, campaignId: room?.campaignId || '', shopId, name: room?.name || name, room,
-    selfOpened: true, closed, onClose: () => playerRooms.delete(shopId),
+    selfOpened: true, closed, enter, onClose: () => playerRooms.delete(shopId),
   });
   playerRooms.set(shopId, win);
   win.render({ force: true });
 }
 
 /**
- * An "Open shop" button in the title bar of every shop journal the user can
- * see (players: Observer, not Owner). The GM opens the room as from the
- * journal's menu; a player asks the GM's client for it.
- * @param {(shopId: string, name: string) => void} openAsGM
+ * Every shop journal the user can see (players: Observer, not Owner) gets
+ * the shop's door at the top of its page and an "Open shop" button in its
+ * title bar. The GM opens the room as from the journal's menu; a player
+ * asks the GM's client for it.
+ * @param {(shopId: string, name: string, opts?: {enter?: boolean}) => void} openAsGM
  */
 export function registerShopJournalButton(openAsGM) {
   const add = (app, html) => {
@@ -574,6 +619,12 @@ export function registerShopJournalButton(openAsGM) {
     // The GM's client serves players only from entries they can't edit.
     if (!game.user.isGM && journal.testUserPermission(game.user, 'OWNER')) return;
     const root = app.element instanceof HTMLElement ? app.element : app.element?.[0] ?? (html instanceof HTMLElement ? html : html?.[0]);
+    const open = (opts) => (game.user.isGM ? openAsGM(shopId, journal.name, opts) : openShopFromJournal(shopId, journal.name, opts));
+    try {
+      addJournalDoor(root, journal.name, t('StepInside'), () => open({ enter: true }));
+    } catch (err) {
+      console.warn('Chronicle Sync | shop door unavailable', err);
+    }
     const header = app.window?.header ?? root?.querySelector('.window-header');
     if (!header || header.querySelector('.chronicle-shop-open')) return;
     const btn = document.createElement('button');
@@ -584,8 +635,7 @@ export function registerShopJournalButton(openAsGM) {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if (game.user.isGM) openAsGM(shopId, journal.name);
-      else openShopFromJournal(shopId, journal.name);
+      open();
     });
     const close = app.window?.close ?? header.querySelector('[data-action="close"], a.close, .header-button.close');
     header.insertBefore(btn, close?.parentElement === header ? close : null);

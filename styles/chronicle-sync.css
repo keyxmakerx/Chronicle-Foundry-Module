@@ -151,6 +151,61 @@ html[data-cs-motion="off"] :is(.cs-grow, .cs-settle, .cs-peek) {
   color: #a49c8e;
 }
 
+/* The shop's door on its journal page: centred, name and "Step inside" under
+   it. Foundry styles every button, so the box is reset here. */
+button.chronicle-shop-door {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  margin: 24px auto 28px;
+  padding: 12px 24px 10px;
+  line-height: normal;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  color: var(--cs-page-text, var(--cs-text));
+  font: inherit;
+  cursor: pointer;
+}
+
+.chronicle-shop-door .door {
+  display: block;
+  width: 72px;
+  height: 108px;
+  transition: transform 0.3s cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+
+.chronicle-shop-door .door svg { display: block; width: 100%; height: 100%; }
+.chronicle-shop-door .door .leaf { fill: var(--cs-page-panel, var(--cs-surface-2)); }
+.chronicle-shop-door:hover .door { transform: scale(1.05); }
+
+.chronicle-shop-door:focus-visible {
+  outline: 2px solid var(--cs-accent);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.chronicle-shop-door .name {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.chronicle-shop-door .hint {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cs-page-muted, var(--cs-text-muted));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chronicle-shop-door .door { transition: none; }
+}
+
 .chronicle-shop-room .notification.error {
   padding: 16px;
   text-align: center;

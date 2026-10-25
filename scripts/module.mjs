@@ -185,7 +185,7 @@ Hooks.once('ready', async () => {
   // the active GM answers their buying requests.
   registerShopRoomSocket();
   // A shop's journal entry gets an "Open shop" button for anyone who can see it.
-  registerShopJournalButton((id, name) => shopWidget.openShop(id, name));
+  registerShopJournalButton((id, name, opts) => shopWidget.openShop(id, name, opts));
   try {
     registerStashSocket();
     registerStashChat();
