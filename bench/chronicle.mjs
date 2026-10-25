@@ -178,7 +178,20 @@ export async function seedCampaign(label = 'bench') {
     const r = await web.putJSON(`/campaigns/${campaignId}/entities/${entityId}/reorder`, { parent_node_id: nodeId });
     if (r.status >= 300) throw new Error(`file in folder failed: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
   };
-  return { campaignId, moduleKey, displayName, createMap, enableClaiming, assignOwner, createFolder, fileInFolder, chronicle: apiClient(campaignId, otherKey), module: apiClient(campaignId, moduleKey) };
+  // Chronicle refuses a sheet value whose key the category does not declare,
+  // so a scenario declares the keys it writes. Adds only missing keys; the
+  // entity-type editor is a web route (owner only).
+  const declareFields = async (entityTypeId, defs) => {
+    const type = await apiClient(campaignId, otherKey).get(`/entity-types/${entityTypeId}`);
+    const fields = Array.isArray(type?.fields) ? [...type.fields] : [];
+    const have = new Set(fields.map((f) => f.key));
+    const missing = defs.filter((d) => !have.has(d.key));
+    if (!missing.length) return;
+    fields.push(...missing.map((d) => ({ section: 'Bench', options: [], ...d, label: d.label || d.key })));
+    const r = await web.putJSON(`/campaigns/${campaignId}/entity-types/${entityTypeId}`, { fields });
+    if (r.status >= 300) throw new Error(`declare fields failed: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
+  };
+  return { campaignId, moduleKey, displayName, createMap, enableClaiming, assignOwner, createFolder, fileInFolder, declareFields, chronicle: apiClient(campaignId, otherKey), module: apiClient(campaignId, moduleKey) };
 }
 
 /** A REST client scoped to one campaign, for scenario setup and assertions. */
