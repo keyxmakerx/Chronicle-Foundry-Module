@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  CHRONICLE_SHEET_CLASS, MAX_FACTS, playerSafeFacts, sheetClassPlan, sheetModel,
+  CHRONICLE_SHEET_CLASS, MAX_FACTS, pageTitleHidden, playerSafeFacts, sheetClassPlan, sheetModel,
 } from '../scripts/_chronicle-sheet-model.mjs';
 
 const defs = [
@@ -62,6 +62,15 @@ test('the header shows category then folder, once each', () => {
   assert.deepEqual(sheetModel({ pages: [] }, labels).eyebrow, []);
 });
 
+test('the lead text is not listed twice when the page also has an Overview heading', () => {
+  const pages = [
+    { id: 'lead', name: 'Overview', type: 'text', sort: 1 },
+    { id: 'ov', name: 'Overview', type: 'text', sort: 2 },
+    { id: 'rule', name: 'The hidden rule', type: 'text', sort: 3 },
+  ];
+  assert.deepEqual(sheetModel({ pages }, labels).contents.map((c) => c.pageId), ['ov', 'rule']);
+});
+
 test('contents list the text sections in order, and only when there are several', () => {
   const pages = [
     { id: 'p3', name: 'Sayings', type: 'text', sort: 3 },
@@ -108,4 +117,16 @@ test('the sheet id matches its registration', () => {
   assert.equal(scope, JSON.parse(readFileSync(new URL('../module.json', import.meta.url), 'utf8')).id);
   assert.match(src, new RegExp(`class ${name} extends Base`));
   assert.match(src, /registerSheet\(JournalEntry, MODULE_ID, ChronicleJournalSheet/);
+});
+
+test('a page title is left out only where the page text already says it', () => {
+  assert.equal(pageTitleHidden({ name: 'Ways out', html: '<h2>Ways out</h2><p>…</p>' }), true);
+  assert.equal(pageTitleHidden({ name: 'Ways out', html: '<div><h2>Ways <b>out</b></h2></div>' }), true);
+  // The lead text of a synced page: its title is sync's stand-in.
+  assert.equal(pageTitleHidden({ name: 'Overview', html: '<p>Lead</p>', linked: true }), true);
+  // A GM's own page, or one in a journal that isn't synced, keeps its title.
+  assert.equal(pageTitleHidden({ name: 'Overview', html: '<p>Lead</p>', linked: false }), false);
+  assert.equal(pageTitleHidden({ name: 'Session prep', html: '<p>Notes</p>', linked: true }), false);
+  assert.equal(pageTitleHidden({ name: 'Session prep', html: '<h2>Something else</h2>', linked: true }), false);
+  assert.equal(pageTitleHidden({ name: 'Player Notes', html: '<h2>Player Notes</h2>', isPlayerNotes: true }), false);
 });

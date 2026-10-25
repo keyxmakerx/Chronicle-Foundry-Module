@@ -51,6 +51,23 @@ function factValue(v) {
 const UNTITLED = new Set(['Content', 'Overview']);
 
 /**
+ * Whether a text page's own title is left out of the sheet. Sync keeps each
+ * section's heading in its text, so that title would be said twice; the
+ * lead text of a synced page has no heading and its title is sync's
+ * stand-in. Any other page keeps its title: Player Notes, and pages a GM
+ * adds with no heading of their own.
+ * @param {{name: string, html?: string, isPlayerNotes?: boolean, linked?: boolean}} page
+ * @returns {boolean}
+ */
+export function pageTitleHidden({ name, html, isPlayerNotes, linked }) {
+  if (isPlayerNotes) return false;
+  const first = /^\s*(?:<(?!h[1-6]\b)[^>]*>\s*)*<h[1-6]\b[^>]*>([\s\S]*?)<\/h[1-6]>/i.exec(String(html ?? ''));
+  const heading = first ? first[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim() : null;
+  if (heading !== null && heading === String(name ?? '').trim()) return true;
+  return !!linked && heading === null && UNTITLED.has(name);
+}
+
+/**
  * What the sheet shows around the pages.
  * @param {object} j
  * @param {string} [j.category] - flag entityType
@@ -69,8 +86,14 @@ export function sheetModel({ category, folder, tags, facts, pages }, labels) {
     .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
     .map((p) => ({
       pageId: p.id,
+      untitled: !p.isPlayerNotes && UNTITLED.has(p.name),
       label: p.isPlayerNotes ? labels.playerNotes : UNTITLED.has(p.name) ? labels.overview : String(p.name || labels.overview),
-    }));
+    }))
+    // Sync names the text before a page's first heading Overview, so a page
+    // that also has an Overview heading would list two alike; the lead text
+    // sits at the top anyway, so only the later one is listed.
+    .filter((c, i, all) => !c.untitled || !all.slice(i + 1).some((o) => o.label === c.label))
+    .map(({ pageId, label }) => ({ pageId, label }));
   return {
     eyebrow,
     tags: (Array.isArray(tags) ? tags : []).map((t) => String(t ?? '').trim()).filter(Boolean),
