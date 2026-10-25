@@ -31,7 +31,8 @@
     "styles/dm-screen.css",
     "styles/quests.css",
     "styles/sky-clock.css",
-    "styles/chronicle-sheet.css"
+    "styles/chronicle-sheet.css",
+    "styles/table-view.css"
   ],
   "languages": [
     {

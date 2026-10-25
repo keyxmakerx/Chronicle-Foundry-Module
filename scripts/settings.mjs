@@ -162,6 +162,23 @@ export function registerSettings() {
     },
   });
 
+  // "At this table" in the Journal tab (table-view.mjs): each user's own
+  // recent and pinned journals, and whether the tab shows it or the folders.
+  for (const key of ['tableRecent', 'tablePinned']) {
+    game.settings.register(MODULE_ID, key, {
+      scope: 'client',
+      config: false,
+      type: String,
+      default: '[]',
+    });
+  }
+  game.settings.register(MODULE_ID, 'journalTabView', {
+    scope: 'client',
+    config: false,
+    type: String,
+    default: 'table',
+  });
+
   game.settings.register(MODULE_ID, 'skipIncomingSanitization', {
     name: game.i18n.localize('CHRONICLE.Settings.SkipIncomingSanitization.Name'),
     hint: game.i18n.localize('CHRONICLE.Settings.SkipIncomingSanitization.Hint'),

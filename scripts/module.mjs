@@ -35,6 +35,7 @@ import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { registerShopRoomSocket, registerShopJournalButton } from './shop-room-window.mjs';
 import { watchMentionLinks } from './mention-links.mjs';
 import { applyChronicleSheetSetting, registerChronicleSheet } from './chronicle-sheet.mjs';
+import { registerTableView } from './table-view.mjs';
 import { notebookAvailable, openCalendarWindow, registerPlayerNotebook } from './player-notebook.mjs';
 import { openSatchel } from './satchel.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
@@ -208,6 +209,12 @@ Hooks.once('ready', async () => {
     registerQuestBoard(() => syncManager?.api ?? null);
   } catch (err) {
     console.warn('Chronicle Sync | Quest board unavailable', err);
+  }
+  try {
+    // The Journal tab opens on "At this table", for every user.
+    registerTableView();
+  } catch (err) {
+    console.warn('Chronicle Sync | At this table unavailable', err);
   }
   try {
     // Mentions in synced pages open the mentioned journal, for every user.
