@@ -22,7 +22,7 @@
 
 import { FLAG_SCOPE, MODULE_ID, syncOptions } from './constants.mjs';
 import { getSetting } from './settings.mjs';
-import { CHRONICLE_SHEET_CLASS, sheetClassPlan, sheetModel } from './_chronicle-sheet-model.mjs';
+import { CHRONICLE_SHEET_CLASS, pageTitleHidden, sheetClassPlan, sheetModel } from './_chronicle-sheet-model.mjs';
 
 /** Flag recording that the sheet was offered to a journal once. */
 export const SHEET_OFFERED_FLAG = 'chronicleSheetOffered';
@@ -99,6 +99,7 @@ export const ChronicleJournalSheet = Base ? class ChronicleJournalSheet extends 
     await super._onRender(context, options);
     try {
       this.#drawSyncState();
+      this.#markPageTitles();
     } catch (err) {
       console.warn('Chronicle Sync | Chronicle sheet sync state unavailable', err);
     }
@@ -150,7 +151,24 @@ export const ChronicleJournalSheet = Base ? class ChronicleJournalSheet extends 
       open.dataset.tooltip = label;
       el.after(open);
     }
-    open.hidden = !entityUrl(this.document.getFlag(FLAG_SCOPE, 'entityId'));
+    // GM only, like mention links: a player may have no Chronicle account,
+    // and would land on a sign-in page.
+    open.hidden = !game.user.isGM || !entityUrl(this.document.getFlag(FLAG_SCOPE, 'entityId'));
+  }
+
+  /** Leave out the page titles a synced page's own headings already say. */
+  #markPageTitles() {
+    const linked = !!this.document.getFlag(FLAG_SCOPE, 'entityId');
+    for (const article of this.element?.querySelectorAll?.('[data-application-part="pages"] [data-page-id]') ?? []) {
+      const page = this.document.pages.get(article.dataset.pageId);
+      if (page?.type !== 'text') continue;
+      article.classList.toggle('cs-title-hidden', pageTitleHidden({
+        name: page.name,
+        html: page.text?.content,
+        isPlayerNotes: page.getFlag(FLAG_SCOPE, 'isPlayerNotes') === true,
+        linked,
+      }));
+    }
   }
 
   static #goTo(event, target) {
@@ -159,6 +177,7 @@ export const ChronicleJournalSheet = Base ? class ChronicleJournalSheet extends 
   }
 
   static #openInChronicle() {
+    if (!game.user.isGM) return;
     const url = entityUrl(this.document.getFlag(FLAG_SCOPE, 'entityId'));
     // Its own browser window, so the game stays where it was.
     if (url) window.open(url, 'chronicle-page', 'popup,noopener,width=1100,height=850');

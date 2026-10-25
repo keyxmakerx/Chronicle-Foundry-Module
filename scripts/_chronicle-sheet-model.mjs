@@ -51,6 +51,23 @@ function factValue(v) {
 const UNTITLED = new Set(['Content', 'Overview']);
 
 /**
+ * Whether a text page's own title is left out of the sheet. Sync keeps each
+ * section's heading in its text, so that title would be said twice; the
+ * lead text of a synced page has no heading and its title is sync's
+ * stand-in. Any other page keeps its title: Player Notes, and pages a GM
+ * adds with no heading of their own.
+ * @param {{name: string, html?: string, isPlayerNotes?: boolean, linked?: boolean}} page
+ * @returns {boolean}
+ */
+export function pageTitleHidden({ name, html, isPlayerNotes, linked }) {
+  if (isPlayerNotes) return false;
+  const first = /^\s*(?:<(?!h[1-6]\b)[^>]*>\s*)*<h[1-6]\b[^>]*>([\s\S]*?)<\/h[1-6]>/i.exec(String(html ?? ''));
+  const heading = first ? first[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim() : null;
+  if (heading !== null && heading === String(name ?? '').trim()) return true;
+  return !!linked && heading === null && UNTITLED.has(name);
+}
+
+/**
  * What the sheet shows around the pages.
  * @param {object} j
  * @param {string} [j.category] - flag entityType
