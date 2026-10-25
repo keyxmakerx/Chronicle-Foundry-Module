@@ -14,11 +14,15 @@ const ON = { syncCreatures: true };
 const MODULES = { modules: ['creatures'] };
 const actorFor = (world, id) => world.game.actors.find((a) => a.getFlag(FLAG, 'creatureEntityId') === id);
 
+/** The sheet fields these scenarios write, each with a value of its kind. */
+const CREATURE_FIELDS = { challenge_rating: '', hp: 0, abilities_json: '' };
+
 /** A creature page made in Chronicle by someone else. */
 async function chronicleCreature(seed, name, fields) {
   const types = await seed.chronicle.entityTypes();
   const type = types.find((t) => t.slug === 'creature');
   assert.ok(type, 'campaign has a creature type');
+  await seed.declareFields(type.id, CREATURE_FIELDS);
   const e = await seed.chronicle.post('/entities', { name, entity_type_id: type.id, is_private: false });
   if (fields) await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: fields });
   return e;
