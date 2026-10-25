@@ -13,15 +13,11 @@ const ON = { syncCharacters: true };
 const MODULES = { modules: ['journals', 'actors'] };
 const actorFor = (world, id) => world.game.actors.find((a) => a.getFlag(FLAG, 'entityId') === id);
 
-/** The sheet fields these scenarios write, each with a value of its kind. */
-const CHARACTER_FIELDS = { hp: 0, ancestry: '', kit: '' };
-
 /** A character made in Chronicle by someone else. */
 async function chronicleCharacter(seed, name, hp) {
   const types = await seed.chronicle.entityTypes();
   const type = types.find((t) => t.slug === 'character' || /character/i.test(t.name));
   assert.ok(type, 'campaign has a character type');
-  await seed.declareFields(type.id, CHARACTER_FIELDS);
   const e = await seed.chronicle.post('/entities', { name, entity_type_id: type.id, is_private: false });
   if (hp !== undefined) await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: { hp } });
   return e;

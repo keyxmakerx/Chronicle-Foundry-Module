@@ -178,21 +178,7 @@ export async function seedCampaign(label = 'bench') {
     const r = await web.putJSON(`/campaigns/${campaignId}/entities/${entityId}/reorder`, { parent_node_id: nodeId });
     if (r.status >= 300) throw new Error(`file in folder failed: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
   };
-  // Chronicle refuses a fields write naming a key the category doesn't
-  // declare, so a scenario declares the keys it writes first.
-  const declareFields = async (entityTypeId, values) => {
-    const type = (await apiClient(campaignId, otherKey).entityTypes()).find((t) => t.id === entityTypeId);
-    if (!type) throw new Error(`no category ${entityTypeId}`);
-    const fields = [...(type.fields || [])];
-    for (const [key, value] of Object.entries(values)) {
-      if (fields.some((f) => f.key === key)) continue;
-      fields.push({ key, label: key, type: typeof value === 'number' ? 'number' : 'text', section: 'Bench', options: [] });
-    }
-    if (fields.length === (type.fields || []).length) return;
-    const r = await web.putJSON(`/campaigns/${campaignId}/entity-types/${entityTypeId}`, { fields });
-    if (r.status >= 300) throw new Error(`declare fields failed: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
-  };
-  return { campaignId, moduleKey, displayName, createMap, enableClaiming, assignOwner, createFolder, fileInFolder, declareFields, chronicle: apiClient(campaignId, otherKey), module: apiClient(campaignId, moduleKey) };
+  return { campaignId, moduleKey, displayName, createMap, enableClaiming, assignOwner, createFolder, fileInFolder, chronicle: apiClient(campaignId, otherKey), module: apiClient(campaignId, moduleKey) };
 }
 
 /** A REST client scoped to one campaign, for scenario setup and assertions. */
