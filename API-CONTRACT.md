@@ -36,7 +36,7 @@ API keys are scoped to a single campaign. The key determines:
 - Which campaign's data is accessible
 - Permission level: `read` (GET), `write` (POST/PUT/DELETE), `sync` (sync endpoints)
 - A `sync`-level key covers read + write + sync
-- Rate limit: 60 requests/minute (default)
+- Rate limit: 300 requests/minute by default, set per key (Chronicle before this default gave 60). Over it: `429` with `Retry-After` in seconds until the window reopens; the module pauses all REST calls until then and resends the refused one at most twice
 
 ## Connect Line
 

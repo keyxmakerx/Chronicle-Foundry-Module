@@ -877,6 +877,7 @@
             {{/each}}
           </select>
         </div>
+        {{#if capability.fieldsError}}<p class="config-hint">{{capability.fieldsError}}</p>{{/if}}
         <div class="diagnostics-detail">
           <div class="system-info-row"><span class="system-label">{{localize "CHRONICLE.Dashboard.Health.Synced"}}:</span><span class="system-value">{{localize "CHRONICLE.Dashboard.Health.SyncedOfDeclared" synced=capability.summary.synced total=capability.summary.totalDeclared}}</span></div>
           <div class="system-info-row"><span class="system-label">{{localize "CHRONICLE.Dashboard.Health.CollectionMapped"}}:</span><span class="system-value">{{capability.summary.collectionMapped}}</span></div>

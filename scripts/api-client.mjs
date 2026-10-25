@@ -15,6 +15,7 @@ import {
   moduleVersionHeaders,
   shouldRetryWithoutVersionHeader,
 } from './_module-version.mjs';
+import { MAX_RATE_LIMIT_RETRIES, RateLimitGate, parseRetryAfter } from './_rate-limit-gate.mjs';
 
 /**
  * Validate the campaignId setting and abort with a clear notification if
@@ -206,6 +207,9 @@ export class ChronicleAPI {
 
     /** @type {boolean} Whether we're currently processing the retry queue. */
     this._retryProcessing = false;
+
+    /** Shared pause after a 429, so a burst waits instead of failing call by call. */
+    this.rateLimit = new RateLimitGate();
   }
 
   // --- REST API ---
@@ -250,21 +254,30 @@ export class ChronicleAPI {
     };
 
     let response;
-    try {
+    for (let attempt = 0; ; attempt++) {
+      await this.rateLimit.wait();
       try {
-        response = await fetch(url, { ...options, headers });
+        try {
+          response = await fetch(url, { ...options, headers });
+        } catch (err) {
+          if (!shouldRetryWithoutVersionHeader(err, headers)) throw err;
+          markModuleVersionHeaderRefused();
+          const { [MODULE_VERSION_HEADER]: _dropped, ...withoutVersion } = headers;
+          response = await fetch(url, { ...options, headers: withoutVersion });
+        }
       } catch (err) {
-        if (!shouldRetryWithoutVersionHeader(err, headers)) throw err;
-        markModuleVersionHeaderRefused();
-        const { [MODULE_VERSION_HEADER]: _dropped, ...withoutVersion } = headers;
-        response = await fetch(url, { ...options, headers: withoutVersion });
+        // Network error (no response at all).
+        this.health.restErrorCount++;
+        this.health.lastRestError = Date.now();
+        this._logError('error', method, path, null, err.message || 'Network error');
+        throw err;
       }
-    } catch (err) {
-      // Network error (no response at all).
-      this.health.restErrorCount++;
-      this.health.lastRestError = Date.now();
-      this._logError('error', method, path, null, err.message || 'Network error');
-      throw err;
+      if (response.status !== 429) break;
+      // Chronicle refuses a rate-limited request before running it, so
+      // sending it again after the pause is safe for writes too.
+      this.rateLimit.block(parseRetryAfter(response.headers?.get?.('Retry-After')));
+      if (attempt >= MAX_RATE_LIMIT_RETRIES) break;
+      await response.text().catch(() => {});
     }
 
     if (!response.ok) {

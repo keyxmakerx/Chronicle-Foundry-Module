@@ -47,10 +47,8 @@ test('v12 tools use onClick; v13 tools use onChange and name an activeTool', () 
   assert.equal(g.activeTool, 'dashboard');
   assert.equal(g.tools.satchel.title, titles.satchel);
   assert.equal(g.tools.dashboard.title, titles.dashboard);
-  assert.equal(g.tools['dm-screen'].onChange, run.dmScreen);
   assert.equal(g.tools['dm-screen'].title, titles.dmScreen);
   assert.ok(!('run' in g.tools.satchel));
-  assert.equal(g.tools.calendar.onChange, run.calendar);
   assert.equal(g.tools.calendar.title, titles.calendar);
 });
 
@@ -65,7 +63,35 @@ test('the Satchel button is for players and the GM alike', () => {
   for (const isGM of [false, true]) {
     const obj = {};
     addChronicleControls(obj, { isGM, notebook: true, run, titles });
-    assert.equal(obj['chronicle-sync'].tools.satchel.onChange, run.satchel);
+    assert.equal(typeof obj['chronicle-sync'].tools.satchel.onChange, 'function');
     assert.equal(obj['chronicle-sync'].tools.satchel.title, titles.satchel);
   }
+});
+
+/** A stand-in for a click inside a toolbar element carrying data-tool. */
+function pressOn(tool) {
+  const el = { dataset: { tool } };
+  return { target: { closest: (sel) => (sel === '[data-tool]' && tool ? el : null) } };
+}
+
+test('a v13 tool runs only when its own button is pressed', () => {
+  const calls = [];
+  const spy = { dashboard: () => calls.push('dashboard'), dmScreen: () => calls.push('dm-screen'),
+    satchel: () => calls.push('satchel'), calendar: () => calls.push('calendar') };
+  const obj = {};
+  addChronicleControls(obj, { isGM: true, notebook: true, run: spy, titles });
+  const tools = obj['chronicle-sync'].tools;
+
+  tools.dashboard.onChange(pressOn('dashboard'), true);
+  tools['dm-screen'].onChange(pressOn('dm-screen'), true);
+  assert.deepEqual(calls, ['dashboard', 'dm-screen']);
+
+  // Foundry calling the group's active tool when another group or tab is
+  // clicked, or on a toolbar re-render, must not open anything.
+  calls.length = 0;
+  tools.dashboard.onChange(pressOn('tokens'), true);
+  tools.dashboard.onChange(pressOn(null), true);
+  tools.dashboard.onChange(undefined, true);
+  tools.dashboard.onChange(pressOn('dashboard'), false);
+  assert.deepEqual(calls, []);
 });
