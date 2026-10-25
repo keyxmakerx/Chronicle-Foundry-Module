@@ -37,21 +37,23 @@
   container-type: inline-size;
 }
 
-/* Layout: the page list (collapsed), then the page, then facts and contents. */
+/* Layout: the page, then facts and contents. Foundry's own page list is not
+   drawn: the contents panel lists the sections by name, where the collapsed
+   list would show bare page numbers. */
 .chronicle-sheet .window-content {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(180px, 220px);
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 200px);
   grid-template-rows: auto minmax(0, 1fr);
-  column-gap: 24px;
-  padding: 0 20px 0 0;
+  column-gap: 28px;
+  padding: 0 20px 0 28px;
   background: var(--cs-page-bg);
   color: var(--cs-page-body);
   font-family: var(--cs-page-face);
 }
-.chronicle-sheet .window-content > [data-application-part="sidebar"] { grid-column: 1; grid-row: 1 / -1; }
-.chronicle-sheet .window-content > [data-application-part="chronicleHead"] { grid-column: 2; grid-row: 1; }
-.chronicle-sheet .window-content > [data-application-part="pages"] { grid-column: 2; grid-row: 2; min-height: 0; }
-.chronicle-sheet .window-content > [data-application-part="chronicleAside"] { grid-column: 3; grid-row: 1 / span 2; min-height: 0; overflow-y: auto; }
+.chronicle-sheet .window-content > [data-application-part="sidebar"] { display: none; }
+.chronicle-sheet .window-content > [data-application-part="chronicleHead"] { grid-column: 1; grid-row: 1; }
+.chronicle-sheet .window-content > [data-application-part="pages"] { grid-column: 1; grid-row: 2; min-height: 0; }
+.chronicle-sheet .window-content > [data-application-part="chronicleAside"] { grid-column: 2; grid-row: 1 / span 2; min-height: 0; overflow-y: auto; }
 
 /* Header: category and folder over the title, the accent rule, tags. */
 .chronicle-sheet .cs-page-head { padding: 20px 0 4px; }
@@ -156,22 +158,22 @@
 .chronicle-sheet .cs-toc:hover { color: var(--cs-page-text); background: none; }
 .chronicle-sheet .cs-toc:focus-visible { outline: 2px solid var(--cs-page-accent); outline-offset: -2px; }
 
-/* The sync dot in the title bar. */
+/* The sync dot and the Open in Chronicle button in the title bar. */
+.chronicle-sheet .window-header .cs-open[hidden] { display: none; }
 .chronicle-sheet .window-header .cs-sync {
   display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding: 0 6px;
   font-size: 12px; white-space: nowrap; opacity: 0.8;
 }
 .chronicle-sheet .window-header .cs-sync::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--cs-ok); }
 
-/* A narrow window: facts and contents sit above the page, as a strip. */
-@container (max-width: 620px) {
-  .chronicle-sheet .window-content { grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); padding-right: 14px; }
-  .chronicle-sheet .window-content > [data-application-part="chronicleAside"] { grid-column: 2; grid-row: 2; overflow: visible; }
+/* A narrow window gives the page the whole width: facts sit above it as a
+   strip, and the contents list is left out, since the page scrolls in one. */
+@container (max-width: 720px) {
+  .chronicle-sheet .window-content { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); padding: 0 18px; }
+  .chronicle-sheet .window-content > [data-application-part="chronicleAside"] { grid-column: 1; grid-row: 2; overflow: visible; }
   .chronicle-sheet .window-content > [data-application-part="pages"] { grid-row: 3; }
-  .chronicle-sheet .cs-page-aside { flex-direction: row; flex-wrap: wrap; padding: 4px 0 12px; }
+  .chronicle-sheet .cs-page-aside { padding: 4px 0 12px; }
   .chronicle-sheet .cs-facts { flex-direction: row; flex-wrap: wrap; gap: 8px 16px; }
   .chronicle-sheet .cs-fact { border-bottom: 0; padding-bottom: 0; }
-  .chronicle-sheet .cs-contents { flex-direction: row; flex-wrap: wrap; }
-  .chronicle-sheet .cs-cap { display: none; }
-  .chronicle-sheet .cs-toc { width: auto; border-left: 0; border-bottom: 1px solid var(--cs-page-line); }
+  .chronicle-sheet .cs-contents { display: none; }
 }

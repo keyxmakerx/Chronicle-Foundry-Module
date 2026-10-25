@@ -69,8 +69,14 @@ export function sheetModel({ category, folder, tags, facts, pages }, labels) {
     .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
     .map((p) => ({
       pageId: p.id,
+      untitled: !p.isPlayerNotes && UNTITLED.has(p.name),
       label: p.isPlayerNotes ? labels.playerNotes : UNTITLED.has(p.name) ? labels.overview : String(p.name || labels.overview),
-    }));
+    }))
+    // Sync names the text before a page's first heading Overview, so a page
+    // that also has an Overview heading would list two alike; the lead text
+    // sits at the top anyway, so only the later one is listed.
+    .filter((c, i, all) => !c.untitled || !all.slice(i + 1).some((o) => o.label === c.label))
+    .map(({ pageId, label }) => ({ pageId, label }));
   return {
     eyebrow,
     tags: (Array.isArray(tags) ? tags : []).map((t) => String(t ?? '').trim()).filter(Boolean),

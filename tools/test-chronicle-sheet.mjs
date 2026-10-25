@@ -62,6 +62,15 @@ test('the header shows category then folder, once each', () => {
   assert.deepEqual(sheetModel({ pages: [] }, labels).eyebrow, []);
 });
 
+test('the lead text is not listed twice when the page also has an Overview heading', () => {
+  const pages = [
+    { id: 'lead', name: 'Overview', type: 'text', sort: 1 },
+    { id: 'ov', name: 'Overview', type: 'text', sort: 2 },
+    { id: 'rule', name: 'The hidden rule', type: 'text', sort: 3 },
+  ];
+  assert.deepEqual(sheetModel({ pages }, labels).contents.map((c) => c.pageId), ['ov', 'rule']);
+});
+
 test('contents list the text sections in order, and only when there are several', () => {
   const pages = [
     { id: 'p3', name: 'Sayings', type: 'text', sort: 3 },
