@@ -2,7 +2,7 @@
 /** Pins the Chronicle scene-control group (scripts/_scene-controls.mjs). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addChronicleControls } from '../scripts/_scene-controls.mjs';
+import { IDLE_TOOL, addChronicleControls } from '../scripts/_scene-controls.mjs';
 
 const run = { dashboard() {}, dmScreen() {}, satchel() {}, calendar() {} };
 const titles = { dashboard: 'Open Chronicle Sync', dmScreen: 'Open the DM Screen', satchel: 'Open my Satchel', calendar: 'Open the Chronicle calendar' };
@@ -13,7 +13,7 @@ function names(controls) {
     return g ? g.tools.map((t) => t.name) : null;
   }
   const g = controls['chronicle-sync'];
-  return g ? Object.keys(g.tools) : null;
+  return g ? Object.keys(g.tools).filter((n) => n !== IDLE_TOOL) : null;
 }
 
 const CASES = [
@@ -44,7 +44,7 @@ test('v12 tools use onClick; v13 tools use onChange and name an activeTool', () 
   const obj = {};
   addChronicleControls(obj, { isGM: true, notebook: true, run, titles });
   const g = obj['chronicle-sync'];
-  assert.equal(g.activeTool, 'dashboard');
+  assert.equal(g.activeTool, IDLE_TOOL);
   assert.equal(g.tools.satchel.title, titles.satchel);
   assert.equal(g.tools.dashboard.title, titles.dashboard);
   assert.equal(g.tools['dm-screen'].title, titles.dmScreen);
@@ -68,13 +68,22 @@ test('the Satchel button is for players and the GM alike', () => {
   }
 });
 
-/** A stand-in for a click inside a toolbar element carrying data-tool. */
-function pressOn(tool) {
-  const el = { dataset: { tool } };
-  return { target: { closest: (sel) => (sel === '[data-tool]' && tool ? el : null) } };
-}
+test('v13: no real button is the active tool, so none is drawn pressed or dead', () => {
+  for (const isGM of [true, false]) {
+    const obj = {};
+    addChronicleControls(obj, { isGM, notebook: true, run, titles });
+    const g = obj['chronicle-sync'];
+    const idle = g.tools[g.activeTool];
+    assert.equal(g.activeTool, IDLE_TOOL);
+    assert.ok(idle && !idle.button && !idle.toggle, 'active tool must be selectable');
+    assert.equal(idle.visible, true, 'Foundry must find the active tool');
+    for (const [name, tool] of Object.entries(g.tools)) {
+      if (name !== IDLE_TOOL) assert.equal(tool.button, true, `${name} is a button`);
+    }
+  }
+});
 
-test('a v13 tool runs only when its own button is pressed', () => {
+test('v13: a press runs its tool; group switches only reach the placeholder', () => {
   const calls = [];
   const spy = { dashboard: () => calls.push('dashboard'), dmScreen: () => calls.push('dm-screen'),
     satchel: () => calls.push('satchel'), calendar: () => calls.push('calendar') };
@@ -82,16 +91,19 @@ test('a v13 tool runs only when its own button is pressed', () => {
   addChronicleControls(obj, { isGM: true, notebook: true, run: spy, titles });
   const tools = obj['chronicle-sync'].tools;
 
-  tools.dashboard.onChange(pressOn('dashboard'), true);
-  tools['dm-screen'].onChange(pressOn('dm-screen'), true);
-  assert.deepEqual(calls, ['dashboard', 'dm-screen']);
+  for (const name of ['dashboard', 'dm-screen', 'satchel', 'calendar']) tools[name].onChange({}, true);
+  assert.deepEqual(calls, ['dashboard', 'dm-screen', 'satchel', 'calendar']);
 
-  // Foundry calling the group's active tool when another group or tab is
-  // clicked, or on a toolbar re-render, must not open anything.
+  // Foundry calls the active tool on group switches and re-renders.
   calls.length = 0;
-  tools.dashboard.onChange(pressOn('tokens'), true);
-  tools.dashboard.onChange(pressOn(null), true);
-  tools.dashboard.onChange(undefined, true);
-  tools.dashboard.onChange(pressOn('dashboard'), false);
+  tools[IDLE_TOOL].onChange({}, true);
+  tools[IDLE_TOOL].onChange({}, false);
+  tools.dashboard.onChange({}, false);
   assert.deepEqual(calls, []);
+});
+
+test('the placeholder button is hidden by the module stylesheet', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const css = await readFile(new URL('../styles/chronicle-sync.css', import.meta.url), 'utf8');
+  assert.ok(css.includes(`[data-tool="${IDLE_TOOL}"]`));
 });

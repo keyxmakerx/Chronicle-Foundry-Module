@@ -68,33 +68,37 @@ export function addChronicleControls(controls, { isGM, notebook, run, titles }) 
       tools: tools.map(({ run: fn, ...tool }) => ({ ...tool, onClick: fn })),
     });
   } else {
-    // v13 requires activeTool even for button-only controls, and does not
-    // use the v12 `layer` property. See foundryvtt/foundryvtt#12803.
+    // v13+ requires an activeTool, and the active tool is drawn pressed and
+    // never fires on a press of its own button: "a toggle or button cannot be
+    // an active tool" (foundryvtt/foundryvtt#12904). A hidden selectable
+    // placeholder holds that slot, so every real button works and Foundry's
+    // group-switch and re-render calls land on a tool that does nothing.
     controls['chronicle-sync'] = {
       name: 'chronicle-sync',
       title: 'Chronicle Sync',
       icon,
       visible: true,
-      activeTool: tools[0].name,
-      tools: Object.fromEntries(tools.map(({ run: fn, ...tool }) => [tool.name, { ...tool, onChange: pressedOnly(tool.name, fn) }])),
+      activeTool: IDLE_TOOL,
+      tools: {
+        [IDLE_TOOL]: { name: IDLE_TOOL, title: 'Chronicle Sync', icon, order: -1, visible: true, onChange: () => {} },
+        ...Object.fromEntries(tools.map(({ run: fn, ...tool }, i) => [tool.name, { ...tool, order: i, onChange: pressedOnly(fn) }])),
+      },
     };
   }
 }
 
 /**
- * Run a button tool only when the GM pressed that button. Foundry v13+ also
- * calls a group's active tool's onChange when switching control groups and
- * re-rendering the toolbar, which opened the dashboard on unrelated clicks.
- * A real press arrives as an event from inside `[data-tool="<name>"]`.
- * @param {string} name
+ * The group's placeholder active tool. Kept visible so Foundry always finds
+ * it; styles/chronicle-sync.css hides its button.
+ */
+export const IDLE_TOOL = 'chronicle-idle';
+
+/**
+ * Run a button tool on its press. Foundry calls a button's onChange with
+ * `active` true when it is clicked; a deactivation call must not open it.
  * @param {Function} fn
  * @returns {Function}
  */
-export function pressedOnly(name, fn) {
-  return (event, active) => {
-    if (active === false) return undefined;
-    const button = event?.target?.closest?.('[data-tool]');
-    if (button?.dataset?.tool !== name) return undefined;
-    return fn();
-  };
+export function pressedOnly(fn) {
+  return (_event, active) => (active === false ? undefined : fn());
 }

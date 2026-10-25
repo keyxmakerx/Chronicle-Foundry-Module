@@ -2469,3 +2469,11 @@ body.ccal-rest #chronicle-calendar-bar .ccal-sky * { animation-play-state: pause
   text-align: center;
   color: var(--cs-text);
 }
+
+/* The Chronicle toolbar group's placeholder active tool (scripts/_scene-controls.mjs):
+ * Foundry needs one, nobody should see or press it. Unlayered so Foundry's own
+ * toolbar rules cannot show it again. */
+[data-tool="chronicle-idle"],
+li:has(> [data-tool="chronicle-idle"]) {
+  display: none !important;
+}
