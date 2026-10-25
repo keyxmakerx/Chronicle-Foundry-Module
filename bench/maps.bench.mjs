@@ -53,6 +53,9 @@ test('the world\'s scenes reach Chronicle on open and again after a rename, with
   const scenes = world.game.scenes;
   scenes.set('sc1', { id: 'sc1', name: 'Sunken Crypt', folder: { name: 'Caves', ancestors: [{ name: 'Act 2' }] }, active: false, navigation: true, background: { src: 'crypt.webm' } });
   scenes.set('sc2', { id: 'sc2', name: "Dragon's Lair", folder: null, active: true, navigation: false });
+  // Foundry's sidebar tree: folders before loose scenes, so the report reads
+  // Sunken Crypt first although it sorts after Dragon's Lair by name.
+  scenes.tree = { entries: [scenes.get('sc2')], children: [{ entries: [], children: [{ entries: [scenes.get('sc1')], children: [] }] }] };
   const sceneReports = (reqs) => reqs.filter((r) => r.method === 'POST' && r.url === '/sync/scenes');
 
   const opened = await recordRequests(async () => { await openWorld(world, MODULES); await settle(); });
@@ -60,7 +63,7 @@ test('the world\'s scenes reach Chronicle on open and again after a rename, with
   assert.ok(first.length >= 1, 'a scene report was sent');
   assert.equal(first.at(-1).status, 200, 'Chronicle stored it');
   const body = JSON.parse(first.at(-1).body);
-  assert.deepEqual(body.scenes.map((s) => [s.name, s.folder]), [["Dragon's Lair", ''], ['Sunken Crypt', 'Act 2 / Caves']]);
+  assert.deepEqual(body.scenes.map((s) => [s.name, s.folder]), [['Sunken Crypt', 'Act 2 / Caves'], ["Dragon's Lair", '']], 'sidebar order');
   assert.doesNotMatch(first.at(-1).body, /crypt\.webm/, 'no picture paths travel');
 
   const renamed = await recordRequests(async () => {

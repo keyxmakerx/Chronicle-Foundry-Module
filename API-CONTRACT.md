@@ -766,7 +766,7 @@ its `scenes` lookup (Directors only).
 
 **Body:** `{ "scenes": [ { "id", "name", "folder", "active", "navigation" } ], "truncated": false }`
 
-- A full snapshot, sorted by name, so each report replaces the server's list. At most 2000 scenes; `truncated` is true when the world has more.
+- A full snapshot in the order Foundry's Scenes sidebar shows (in each folder its subfolders, then its scenes), which Chronicle keeps; each report replaces the server's list. At most 2000 scenes; `truncated` is true when the world has more.
 - `name` and `folder` at most 255 chars; `folder` is the folder path, outermost first (`Act 1 / Caves`), `""` at the top level.
 - `active` is the scene players are on; `navigation` is whether it is in the scene bar.
 - No pictures or other scene data are sent.

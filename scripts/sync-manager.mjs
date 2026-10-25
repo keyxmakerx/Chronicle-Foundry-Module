@@ -9,7 +9,7 @@
 import { noticeText } from './_escape-html.mjs';
 import { ChronicleAPI } from './api-client.mjs';
 import { PlayerActivity, PlayerReporter, buildPlayerReport, reasonFromError, WORLD_APPLY_FAILED, REPORT_INTERVAL_MS, EVENT_DEBOUNCE_MS } from './_player-report.mjs';
-import { buildSceneReport, folderPath, SCENE_HOOKS } from './_scene-report.mjs';
+import { buildSceneReport, folderPath, sidebarOrder, SCENE_HOOKS } from './_scene-report.mjs';
 import { AvatarSync } from './avatar-sync.mjs';
 import { walkSyncPull, PULL_PAGE_SIZE } from './_sync-pull-walk.mjs';
 import { HistoryReporter, activityToEvent, describeMessage, resourceIdOf, resourceNameOf } from './_history-report.mjs';
@@ -82,7 +82,7 @@ export class SyncManager {
     this._scenes = new PlayerReporter({
       label: 'scene report',
       send: (body) => this.api.reportScenes(body),
-      build: () => buildSceneReport((game.scenes?.contents ?? []).map((s) => ({
+      build: () => buildSceneReport(sidebarOrder(game.scenes).map((s) => ({
         id: s.id, name: s.name, folder: folderPath(s.folder), active: s.active, navigation: s.navigation,
       }))),
       log: (msg, err) => console.debug(`Chronicle: ${msg}`, err ?? ''),

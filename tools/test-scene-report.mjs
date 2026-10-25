@@ -4,11 +4,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  buildSceneReport, folderPath, SCENE_HOOKS, MAX_SCENES, MAX_SCENE_NAME_CHARS,
+  buildSceneReport, folderPath, sidebarOrder, SCENE_HOOKS, MAX_SCENES, MAX_SCENE_NAME_CHARS,
 } from '../scripts/_scene-report.mjs';
 import { PlayerReporter } from '../scripts/_player-report.mjs';
 
-test('body has the contract fields, sorted by name', () => {
+test('body has the contract fields, in the order given', () => {
   const body = buildSceneReport([
     { id: 's2', name: 'Sunken Crypt', folder: 'Act 2', active: false, navigation: true },
     { id: 's1', name: "Dragon's Lair", folder: '', active: true },
@@ -16,8 +16,8 @@ test('body has the contract fields, sorted by name', () => {
     null,
   ]);
   assert.equal(body.truncated, false);
-  assert.deepEqual(body.scenes.map((s) => s.id), ['s1', 's2']);
-  assert.deepEqual(body.scenes[0], { id: 's1', name: "Dragon's Lair", folder: '', active: true, navigation: false });
+  assert.deepEqual(body.scenes.map((s) => s.id), ['s2', 's1']);
+  assert.deepEqual(body.scenes[1], { id: 's1', name: "Dragon's Lair", folder: '', active: true, navigation: false });
   assert.deepEqual(Object.keys(body).sort(), ['scenes', 'truncated']);
 });
 
@@ -27,7 +27,7 @@ test('names are trimmed, folded onto one line and capped', () => {
   assert.equal(body.scenes[0].name.length, MAX_SCENE_NAME_CHARS);
 });
 
-test('a world over the cap sends the first by name and says it is truncated', () => {
+test('a world over the cap sends the first in sidebar order and says it is truncated', () => {
   const many = Array.from({ length: MAX_SCENES + 3 }, (_, i) => ({ id: `s${i}`, name: `Scene ${String(i).padStart(5, '0')}` }));
   const body = buildSceneReport(many);
   assert.equal(body.scenes.length, MAX_SCENES);
@@ -35,9 +35,34 @@ test('a world over the cap sends the first by name and says it is truncated', ()
   assert.equal(body.scenes[0].name, 'Scene 00000');
 });
 
-test('the same scenes in another order build the same body', () => {
-  const a = [{ id: 'a', name: 'Keep' }, { id: 'b', name: 'Cave' }, { id: 'c', name: 'Cave' }];
-  assert.equal(JSON.stringify(buildSceneReport(a)), JSON.stringify(buildSceneReport([...a].reverse())));
+test('sidebar order: subfolders first, then scenes, as the tree sorts them', () => {
+  const sc = (id) => ({ id });
+  const [lair, crypt, caves1, caves2, town, loose] = ['lair', 'crypt', 'c1', 'c2', 'town', 'loose'].map(sc);
+  const scenes = {
+    contents: [town, caves2, lair, loose, crypt, caves1],
+    tree: {
+      entries: [town],
+      children: [
+        { entries: [lair, crypt], children: [{ entries: [caves1, caves2], children: [] }] },
+        { entries: [], children: [] },
+      ],
+    },
+  };
+  assert.deepEqual(sidebarOrder(scenes).map((s) => s.id), ['c1', 'c2', 'lair', 'crypt', 'town', 'loose'],
+    'a scene the tree missed comes last, never dropped');
+  assert.deepEqual(sidebarOrder({ contents: [crypt, lair] }).map((s) => s.id), ['crypt', 'lair'], 'no tree: collection order');
+  assert.deepEqual(sidebarOrder(null), []);
+  // A tree that loops back on itself stops instead of recursing forever.
+  const loop = { entries: [lair], children: [] };
+  loop.children.push(loop);
+  assert.deepEqual(sidebarOrder({ contents: [lair], tree: loop }).map((s) => s.id), ['lair']);
+});
+
+test('the same world builds the same body twice', () => {
+  const world = { contents: [{ id: 'a', name: 'Keep' }, { id: 'b', name: 'Cave' }], tree: { entries: [], children: [] } };
+  world.tree.entries = [world.contents[1], world.contents[0]];
+  assert.equal(JSON.stringify(buildSceneReport(sidebarOrder(world))), JSON.stringify(buildSceneReport(sidebarOrder(world))));
+  assert.deepEqual(buildSceneReport(sidebarOrder(world)).scenes.map((s) => s.name), ['Cave', 'Keep']);
 });
 
 test('folder path reads outermost first', () => {
@@ -70,5 +95,7 @@ test('sync manager wires the scene report to the right route and hooks', () => {
   assert.match(sm, /this\._scenes\.report\(\{ force: true \}\)/);
   assert.match(sm, /for \(const name of SCENE_HOOKS\)/);
   // Pictures never travel: the builder is handed no image fields.
-  assert.doesNotMatch(sm.slice(sm.indexOf('buildSceneReport(('), sm.indexOf('buildSceneReport((') + 300), /background|thumb|img/);
+  const at = sm.indexOf('buildSceneReport(sidebarOrder(game.scenes)');
+  assert.ok(at > 0, 'the report is built in sidebar order');
+  assert.doesNotMatch(sm.slice(at, at + 300), /background|thumb|img/);
 });
