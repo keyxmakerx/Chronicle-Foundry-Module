@@ -921,6 +921,7 @@
       "NoActor": "Not in Foundry yet",
       "NoActorTip": "This creature has no actor in Foundry, and no compendium has one by that name. Turn on creature sync or add an actor with its name.",
       "FromCompendium": "from the {pack} compendium",
+      "FromPage": "made from its Chronicle page",
       "CompendiumFolder": "Chronicle: From compendiums",
       "NothingToPlace": "Nothing to place: everything is already on the scene.",
       "Placed": "Placed {n}. {hidden} of them hidden from the players.",

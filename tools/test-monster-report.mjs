@@ -40,12 +40,12 @@ test('an entry reads its numbers and labels its choices', () => {
     { name: 'Stalker', pack: 'Monsters', level: '3', role: 'Harrier', organization: 'Horde', ev: '5' });
   // A value with no label stays as written; a list or object is left out.
   const odd = npc('Odd', { system: { monster: { level: 2, role: 'skirmisher', organization: ['x'] }, ev: { value: 4 } } });
-  assert.deepEqual(monsterEntry(odd, { paths, labelOf, linked: true }), { name: 'Odd', level: '2', role: 'skirmisher', linked: true });
+  assert.deepEqual(monsterEntry(odd, { paths, labelOf, page: 'p7' }), { name: 'Odd', level: '2', role: 'skirmisher', linked: true, page: 'p7' });
 });
 
 test('the report lists world actors first, then compendium entries, of the creature type only', () => {
   const r = buildMonsterReport({
-    actors: [{ doc: npc('Captain Vex'), linked: false }, { doc: { name: 'Ash', type: 'hero' }, linked: false }, { doc: npc('Goblin'), linked: true }],
+    actors: [{ doc: npc('Captain Vex'), page: '' }, { doc: { name: 'Ash', type: 'hero' }, page: '' }, { doc: npc('Goblin'), page: 'p1' }],
     packs: [{ label: 'Monsters', entries: [npc('Stalker'), { name: 'Sword', type: 'weapon' }, npc('')] }],
     actorType: 'npc', paths, labelOf,
   });

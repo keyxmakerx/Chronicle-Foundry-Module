@@ -58,9 +58,9 @@ function words(raw, choices, labelOf) {
  * @param {Object<string, {path: string, choices: string|null}>} p.paths
  * @param {(choicesPath: string, value: *) => string|null} p.labelOf
  * @param {string} [p.pack] - The compendium's label; empty for a world actor.
- * @param {boolean} [p.linked] - Made by creature sync from a Chronicle page.
+ * @param {string} [p.page] - The Chronicle page creature sync made it from.
  */
-export function monsterEntry(src, { paths, labelOf, pack = '', linked = false }) {
+export function monsterEntry(src, { paths, labelOf, pack = '', page = '' }) {
   const out = { name: String(src?.name ?? '').trim() };
   if (pack) out.pack = pack;
   for (const key of KEYS) {
@@ -69,7 +69,10 @@ export function monsterEntry(src, { paths, labelOf, pack = '', linked = false })
     const v = words(readPath(src, p.path), p.choices, labelOf);
     if (v) out[key] = v;
   }
-  if (linked) out.linked = true;
+  if (page) {
+    out.linked = true;
+    out.page = page;
+  }
   return out;
 }
 
@@ -77,7 +80,7 @@ export function monsterEntry(src, { paths, labelOf, pack = '', linked = false })
  * The whole report body. World actors come first, since Foundry places
  * those first; entries of the wrong type and nameless ones are left out.
  * @param {object} p
- * @param {Array<{doc: object, linked: boolean}>} p.actors
+ * @param {Array<{doc: object, page: string}>} p.actors - `page` is the Chronicle page creature sync made it from, else empty.
  * @param {Array<{label: string, entries: Array<object>}>} p.packs
  * @param {string} p.actorType - The system's creature actor type ("npc").
  * @param {Object<string, {path: string, choices: string|null}>} p.paths
@@ -95,7 +98,7 @@ export function buildMonsterReport({ actors, packs, actorType, paths, labelOf, m
   };
   for (const a of actors) {
     if (a.doc?.type !== actorType) continue;
-    add(monsterEntry(a.doc, { paths, labelOf, linked: a.linked }));
+    add(monsterEntry(a.doc, { paths, labelOf, page: a.page }));
   }
   for (const pk of packs) {
     for (const e of pk.entries) {

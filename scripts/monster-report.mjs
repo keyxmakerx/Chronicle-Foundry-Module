@@ -81,7 +81,7 @@ export async function buildMonsterBody(api, { fresh = false } = {}) {
   if (fresh || !state.packs) state.packs = await readPacks(indexFields(paths));
   const packs = state.packs;
   state.choices = compendiumChoices(packs, actorType);
-  const actors = (game.actors?.contents ?? []).map((a) => ({ doc: a, linked: !!a.getFlag(FLAG_SCOPE, CREATURE_FLAG) }));
+  const actors = (game.actors?.contents ?? []).map((a) => ({ doc: a, page: a.getFlag(FLAG_SCOPE, CREATURE_FLAG) || '' }));
   return buildMonsterReport({ actors, packs, actorType, paths, labelOf });
 }
 

@@ -12,7 +12,10 @@
  * system the page's abilities become the actor's ability items
  * (_creature-abilities.mjs), so the system rolls and applies them. A page
  * with other forms (_creature-forms.mjs) puts its actor in one form at a time;
- * the GM changes it from the token (creature-forms.mjs).
+ * the GM changes it from the token (creature-forms.mjs). A page Chronicle
+ * matched to a monster Foundry already has, set to play with Foundry's
+ * numbers (_creature-matches.mjs), makes no actor: Foundry's own monster is
+ * that creature, so nothing is made twice.
  */
 
 import { flagRemoval } from './_flag-removal.mjs';
@@ -24,6 +27,7 @@ import {
   creatureUpdate, planCreatureApply, creaturePull, sendBackOn, changedPull, seedPull,
 } from './_creature-fields.mjs';
 import { isAnsweringGM } from './_stash-relay.mjs';
+import { playsFoundry, unwrapMatches } from './_creature-matches.mjs';
 import { sameValue } from './_actor-apply-plan.mjs';
 import { log } from './logger.mjs';
 import { PictureStore } from './picture-store.mjs';
@@ -72,11 +76,18 @@ export class CreatureSync {
     this._hooked = false;
     this._pictures = null;
     this._formsCache = new Map();
+    /** @type {Map<string, object>} Chronicle's match per page, from the last read. */
+    this._matches = new Map();
   }
 
   get _active() {
     // Every GM client runs sync; only the active one may create actors.
     return !!(this._defs && getSetting('syncCreatures') && isAnsweringGM(game.user, game.users?.activeGM));
+  }
+
+  /** True when this client makes creature actors, so a fight can ask for one. */
+  get canMakeActors() {
+    return this._active;
   }
 
   get _pullKeys() { return this._defs?.foundry_pull_fields || []; }
@@ -140,8 +151,49 @@ export class CreatureSync {
     this._known.clear();
     this._inFlight.clear();
     this._formsCache.clear();
+    this._matches.clear();
     this._folderPromise = null;
     this._defs = null;
+  }
+
+  /**
+   * Every page's match, read again on connect. An older Chronicle has no
+   * matching (404) and every page makes its actor, as before; a failed read
+   * keeps the last answer rather than making copies of matched monsters.
+   */
+  async _loadMatches() {
+    try {
+      this._matches = unwrapMatches(await this._api.get('/foundry-matches'));
+    } catch (err) {
+      if (err?.status === 404) this._matches = new Map();
+      else log.warn('Creature sync: could not read which pages are Foundry monsters', err);
+    }
+  }
+
+  /** One page's match, read again before its actor follows an edit. */
+  async _refreshMatch(entityId) {
+    try {
+      const body = await this._api.get(`/entities/${entityId}/foundry-match`);
+      if (body?.match) this._matches.set(entityId, body.match);
+    } catch (err) {
+      if (err?.status === 404) this._matches.delete(entityId);
+      else log.debug(`Creature sync: could not read the match for ${entityId}`, err);
+    }
+  }
+
+  /**
+   * The actor a fight places for a creature page: the one creature sync
+   * made, made now if it is missing. Null when creature sync is off here,
+   * the page plays Foundry's own monster, or making it failed.
+   * @param {string} entityId
+   * @returns {Promise<Actor|null>}
+   */
+  async ensureActor(entityId) {
+    if (!this._active || !entityId) return null;
+    await this._refreshMatch(entityId);
+    if (playsFoundry(this._matches.get(entityId))) return null;
+    if (!this._findActor(entityId)) await this._upsert({ id: entityId });
+    return this._findActor(entityId);
   }
 
   /** Brings every creature page in on connect; actors already current are left alone. */
@@ -149,6 +201,7 @@ export class CreatureSync {
     if (!this._active) return;
     // A missed system_state message must not leave an old answer in place.
     this._sendBack.clear();
+    await this._loadMatches();
     const walked = await walkEntityPages(
       (page, perPage) => this._api.get(`/entities?type_id=${this._typeId}&per_page=${perPage}&page=${page}`),
       unwrapEntityList,
@@ -190,6 +243,7 @@ export class CreatureSync {
     }
     if (entity.entity_type_id && entity.entity_type_id !== this._typeId) return;
     if (!entity.entity_type_id && entity.type_slug !== this._defs.preset_slug) return;
+    await this._refreshMatch(entity.id);
     await this._upsert(entity);
   }
 
@@ -233,6 +287,9 @@ export class CreatureSync {
   }
 
   async _upsertNow(entity) {
+    // Foundry's own monster is this creature; an actor made earlier, before
+    // the DM chose, is left as it is.
+    if (playsFoundry(this._matches.get(entity.id))) return true;
     try {
       if (!entity.fields_data) entity = await this._api.get(`/entities/${entity.id}`);
       const before = this._known.get(entity.id);

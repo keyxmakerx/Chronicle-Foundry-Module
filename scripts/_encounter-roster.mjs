@@ -147,15 +147,24 @@ const norm = (s) => str(s).trim().toLowerCase();
 /**
  * The actor to place for a creature row. In order: the actor creature sync
  * linked to the creature's Chronicle page, then an actor of the same name in
- * the creatures folder, then any world actor of that name.
- * @param {{entityId: string, baseName: string}} row
+ * the creatures folder, then any world actor of that name. A row whose page
+ * plays Foundry's numbers (`foundryMonster`, see _creature-matches.mjs) takes
+ * a world actor of that monster's name that no page made; one whose page
+ * plays its own numbers (`pageOnly`) takes only the page's actor.
+ * @param {{entityId: string, baseName: string, foundryMonster?: {name: string}, pageOnly?: boolean}} row
  * @param {Array<{id: string, name: string, linkedEntityId?: string, inCreatureFolder?: boolean}>} actors
- * @returns {{actor: object, via: 'linked'|'folder'|'name'}|null}
+ * @returns {{actor: object, via: 'linked'|'folder'|'name'|'foundry'}|null}
  */
 export function resolveActor(row, actors) {
+  if (row.foundryMonster) {
+    const name = norm(row.foundryMonster.name);
+    const own = actors.find((a) => !a.linkedEntityId && norm(a.name) === name);
+    return own ? { actor: own, via: 'foundry' } : null;
+  }
   if (row.entityId) {
     const linked = actors.find((a) => a.linkedEntityId === row.entityId);
     if (linked) return { actor: linked, via: 'linked' };
+    if (row.pageOnly) return null;
   }
   const name = norm(row.baseName);
   if (!name) return null;
@@ -168,16 +177,21 @@ export function resolveActor(row, actors) {
 
 /**
  * The compendium entry to bring in for a row no world actor answers, by
- * name; the first compendium listed wins. Once brought in it is a world
+ * name; the first compendium listed wins, except that a row playing
+ * Foundry's monster takes that monster's own compendium first. A row whose
+ * page plays its own numbers takes none. Once brought in it is a world
  * actor, so resolveActor finds it next time and nothing is imported twice.
- * @param {{baseName: string}} row
+ * @param {{baseName: string, foundryMonster?: {name: string, pack: string}, pageOnly?: boolean}} row
  * @param {Array<{name: string, uuid: string, pack: string}>} entries
  * @returns {{name: string, uuid: string, pack: string}|null}
  */
 export function compendiumFallback(row, entries) {
-  const name = norm(row.baseName);
+  if (row.pageOnly) return null;
+  const name = norm(row.foundryMonster?.name ?? row.baseName);
   if (!name) return null;
-  return (entries ?? []).find((e) => norm(e.name) === name) ?? null;
+  const same = (entries ?? []).filter((e) => norm(e.name) === name);
+  const pack = row.foundryMonster?.pack;
+  return (pack && same.find((e) => e.pack === pack)) || same[0] || null;
 }
 
 // ---- Free squares ------------------------------------------------------
