@@ -31,14 +31,18 @@
 .cs-tv-list { margin: 0; padding: 0; list-style: none; }
 .cs-tv-row { display: flex; align-items: center; gap: 6px; padding: 0 6px 0 4px; }
 .cs-tv-row:hover { background: var(--cs-accent-soft); }
+/* Foundry gives every button a fixed height; the row has to grow with its
+   two lines instead, or the column squeezes the folder line and its own
+   overflow clip cuts the words in half. */
 .cs-tv-open {
-  display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; min-height: 36px;
+  display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px;
+  width: auto; height: auto; min-height: 36px; overflow: visible;
   margin: 0; padding: 4px 8px; border: 0; border-radius: 0; background: none; box-shadow: none;
-  text-align: left; font: inherit; color: var(--cs-text); cursor: pointer;
+  text-align: left; font: inherit; line-height: 1.3; color: var(--cs-text); cursor: pointer;
 }
 .cs-tv-open:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
-.cs-tv-name { font-size: 13.5px; line-height: 1.3; }
-.cs-tv-where { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--cs-text-muted); }
+.cs-tv-name { flex-shrink: 0; max-width: 100%; font-size: 13.5px; line-height: 1.3; overflow-wrap: anywhere; }
+.cs-tv-where { flex-shrink: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; line-height: 1.35; color: var(--cs-text-muted); }
 .cs-tv-why { flex-shrink: 0; font-size: 11px; color: var(--cs-text-muted); white-space: nowrap; }
 .cs-tv-pin {
   flex-shrink: 0; width: 28px; height: 28px; min-height: 0; margin: 0; padding: 0; line-height: 1;
