@@ -206,3 +206,12 @@ test('fix5: update uses PUT /relations/:relationId with an object metadata body'
   assert.equal(api.calls[0].body.metadata.quantity, 5);
   assert.equal(api.calls[0].body.metadata.equipped, true);
 });
+
+test('an item change that touches neither quantity nor equipped sends nothing', async () => {
+  const api = recordingApi();
+  const is = makeItemSync(api);
+  const item = makeItem({ flags: { relationId: 42 }, system: { quantity: 5, equipped: true } }, { entityId: 'actor-1' });
+  await is._handleUpdateItem(item, { system: { uses: { spent: 1 } } }, {}, 'u1');
+  await is._handleUpdateItem(item, { system: { equipped: false } }, {}, 'u1');
+  assert.equal(api.calls.length, 1, 'only the equipped change was sent');
+});

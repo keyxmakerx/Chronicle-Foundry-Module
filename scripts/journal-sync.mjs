@@ -1367,6 +1367,9 @@ export class JournalSync {
         throw err;
       }
 
+      // An older failed push of this page must not be replayed over this one.
+      this._api.clearRetry?.('PUT', `/entities/${entityId}`);
+
       // Push ownership changes as Chronicle permission updates.
       if (changed?.ownership) {
         await this._pushPermissions(entityId, journal.ownership, isPrivate, journal.name, journal);
@@ -1390,6 +1393,10 @@ export class JournalSync {
       }, changed);
       const entry = await this._entryForPush(journal, entityId, { fetch: false }).catch(() => undefined);
       if (entry !== undefined) retry.entry = entry;
+      // Keep the conflict check, so a replay never overwrites a Chronicle
+      // edit made while this push waited.
+      const retryVersion = journal.getFlag(FLAG_SCOPE, 'chronicleUpdatedAt');
+      if (retryVersion) retry.expected_updated_at = retryVersion;
       this._api.queueForRetry?.('PUT', `/entities/${entityId}`, retry);
       ui.notifications?.warn?.(`Chronicle: Failed to push update for "${noticeText(journal.name)}" — queued for retry. See the sync dashboard.`);
     }

@@ -2027,9 +2027,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   /**
    * Pull a single entity from Chronicle into Foundry.
    * @param {string} entityId
+   * @param {{quiet?: boolean}} [opts] - quiet: Pull all redraws once at the end,
+   *   since each redraw re-reads the whole campaign from Chronicle.
    * @private
    */
-  async _onPullEntity(entityId) {
+  async _onPullEntity(entityId, { quiet = false } = {}) {
     try {
       const entity = await this.api.get(`/entities/${entityId}`);
       if (!entity) return;
@@ -2047,6 +2049,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         this._logActivity('pull', `Pulled "${entity.name}" from Chronicle`);
       }
 
+      if (quiet) return;
       this._cache.entities = null; // Invalidate cache.
       this.render({ force: true });
     } catch (err) {
@@ -2058,9 +2061,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   /**
    * Push a Foundry journal to Chronicle as a new entity.
    * @param {string} journalId
+   * @param {{quiet?: boolean}} [opts] - quiet: Push all redraws once at the end.
    * @private
    */
-  async _onPushJournal(journalId) {
+  async _onPushJournal(journalId, { quiet = false } = {}) {
     const journal = game.journal.get(journalId);
     if (!journal) return;
 
@@ -2090,6 +2094,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         this._logActivity('push', `Pushed "${journal.name}" to Chronicle`);
       }
 
+      if (quiet) return;
       this._cache.entities = null;
       this.render({ force: true });
     } catch (err) {
@@ -2149,11 +2154,13 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     for (const group of data.entityGroups) {
       for (const entity of group.entities) {
         if (entity.status === 'chronicle-only') {
-          await this._onPullEntity(entity.id);
+          await this._onPullEntity(entity.id, { quiet: true });
           count++;
         }
       }
     }
+    this._cache.entities = null;
+    this.render({ force: true });
     ui.notifications.info(`Chronicle: Pulled ${count} entities.`);
   }
 
@@ -2176,9 +2183,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const journals = this._getFoundryOnlyJournals();
     let count = 0;
     for (const j of journals) {
-      await this._onPushJournal(j.id);
+      await this._onPushJournal(j.id, { quiet: true });
       count++;
     }
+    this._cache.entities = null;
+    this.render({ force: true });
     ui.notifications.info(`Chronicle: Pushed ${count} journals.`);
   }
 

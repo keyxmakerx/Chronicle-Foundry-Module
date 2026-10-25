@@ -2359,6 +2359,9 @@ body.ccal-rest #chronicle-calendar-bar .ccal-sky * { animation-play-state: pause
 
 /* The journal header's "Open shop" button, tinted like the shop's coin. */
 .chronicle-shop-open { width: auto; gap: 4px; padding: 0 6px; color: #e0b44a; }
+/* "Open quest" carries words too; Foundry 13+ sizes header controls for an
+   icon alone, which cut it off. */
+.chronicle-quest-open { width: auto; gap: 4px; padding: 0 6px; }
 
 /* Satchel: the notebook, quest board and stash windows drawn as tabs of one
    window in the module look. The hosted windows keep their own styles; the

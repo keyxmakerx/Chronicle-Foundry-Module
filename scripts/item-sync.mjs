@@ -390,7 +390,9 @@ export class ItemSync {
   async _handleUpdateItem(item, change, options, userId) {
     if (this._syncing || options?.[APPLY_OPTION]) return;
     if (userId !== game.user.id) return;
-    if (!change.system) return; // Only system data changes matter.
+    // Only the two values sent below matter; a rest or a use that changes
+    // charges on many items must not send one write per item.
+    if (!change.system || !('quantity' in change.system || 'equipped' in change.system)) return;
 
     const relationId = item.getFlag(FLAG_SCOPE, 'relationId');
     if (!relationId) return;

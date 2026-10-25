@@ -194,6 +194,8 @@ export class PlayerReporter {
     this._stopped = false;
     this._warned400 = false;
     this._inFlight = false;
+    /** @type {{force: boolean}|null} A report asked for while one was in flight. */
+    this._again = null;
   }
 
   get stopped() { return this._stopped; }
@@ -204,7 +206,12 @@ export class PlayerReporter {
    */
   async report({ force = false } = {}) {
     if (this._stopped) return 'stopped';
-    if (this._inFlight) return 'busy';
+    if (this._inFlight) {
+      // A send can wait out a rate limit for a minute or more; what changed
+      // meanwhile is sent right after it rather than lost.
+      this._again = { force: force || !!this._again?.force };
+      return 'busy';
+    }
     this._inFlight = true;
     try {
       const body = await this._build();
@@ -235,6 +242,9 @@ export class PlayerReporter {
       return 'failed';
     } finally {
       this._inFlight = false;
+      const again = this._again;
+      this._again = null;
+      if (again && !this._stopped) this.report(again);
     }
   }
 }

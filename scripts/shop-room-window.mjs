@@ -451,6 +451,8 @@ export function registerShopRoomSocket() {
       return;
     }
     if (current) {
+      // A window opened while no GM was there showed the closed door.
+      current._closed = false;
       current._room = msg;
       current._name = msg.name;
       current.refresh();

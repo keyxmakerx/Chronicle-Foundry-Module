@@ -35,9 +35,11 @@ async function loadDefs(api) {
   try {
     state.defs = await api.get(`/systems/${system}/creature-fields`);
   } catch (err) {
-    // An older Chronicle has no creature-fields route.
-    if (err?.status !== 404) log.warn('Monster report: could not read creature fields', err);
-    state.defs = null;
+    // An older Chronicle has no creature-fields route: stop asking. Anything
+    // else (a rate limit, a restart) is asked again on the next report.
+    if (err?.status === 404) state.defs = null;
+    else log.warn('Monster report: could not read creature fields', err);
+    return null;
   }
   return state.defs;
 }
