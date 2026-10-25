@@ -136,7 +136,8 @@ export class ShopRoomWindow extends ApplicationV2 {
   static DEFAULT_OPTIONS = {
     classes: ['chronicle-shop-room-window'],
     window: { title: 'Shop', icon: 'fa-solid fa-store', resizable: true },
-    position: { width: 760, height: 640 },
+    // Closed, the window holds just the shop's door; the room inside fills the screen.
+    position: { width: 380, height: 'auto' },
   };
 
   /**

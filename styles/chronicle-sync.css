@@ -129,15 +129,26 @@ html[data-cs-motion="off"] :is(.cs-grow, .cs-settle, .cs-peek) {
 }
 
 /* Shop room window. The room itself is Chronicle's widget with its own
-   injected styles; this only sizes the window and lifts the widget's
-   tooltip, speech bubble and picker above Foundry's windows. */
+   injected styles. Closed, the window holds the shop's door on a dark
+   ground in every Foundry theme, so the light door drawing always shows;
+   inside, the room fills the screen from its own dialog. */
 .chronicle-shop-room-window {
-  min-width: 420px;
+  min-width: 320px;
 }
 
 .chronicle-shop-room-window .window-content {
-  padding: 8px;
+  padding: 16px 8px;
   overflow: auto;
+  background: #0d0d10;
+}
+
+.chronicle-shop-room .shr .shr-front {
+  --color-bg-primary: #2b2219;
+  color: #efe7da;
+}
+
+.chronicle-shop-room .shr-front .hint {
+  color: #a49c8e;
 }
 
 .chronicle-shop-room .notification.error {
@@ -146,21 +157,12 @@ html[data-cs-motion="off"] :is(.cs-grow, .cs-settle, .cs-peek) {
   color: #f87171;
 }
 
-.shr-tip,
-.shr-say,
-.shr-pick {
-  z-index: 10000 !important;
-}
-
 /* The widget colours its text and panels from Chronicle's theme variables.
    Foundry defines some of the same names for its own (often dark) theme but
    not the panel ones, which left light text on the widget's white fallback
-   panels. Pin Chronicle's light palette wherever the widget draws: in the
-   window, and on the tooltip, speech bubble and picker it adds to the page. */
-.chronicle-shop-room,
-.shr-tip,
-.shr-say,
-.shr-pick {
+   panels. Pin Chronicle's light palette wherever the widget draws; its room,
+   tooltip, speech bubble and picker all sit inside the window's element. */
+.chronicle-shop-room {
   --color-bg-primary: #f9fafb;
   --color-bg-tertiary: #f3f4f6;
   --color-text-primary: #111827;
