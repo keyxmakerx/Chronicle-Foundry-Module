@@ -90,12 +90,14 @@ export class ShopWidget {
    * Open a shop window for a Chronicle shop entity.
    * @param {string} entityId
    * @param {string} shopName
+   * @param {{enter?: boolean}} [opts] - enter: walk straight into the room, as the journal's door does.
    */
-  async openShop(entityId, shopName) {
+  async openShop(entityId, shopName, { enter = false } = {}) {
     // Don't open duplicate windows.
     if (this._openWindows.has(entityId)) {
       const open = this._openWindows.get(entityId);
       open.bringToFront?.() ?? open.bringToTop?.();
+      if (enter) open.enter();
       return;
     }
 
@@ -104,6 +106,7 @@ export class ShopWidget {
       campaignId: getSetting('campaignId'),
       shopId: entityId,
       name: shopName,
+      enter,
       onClose: () => this._openWindows.delete(entityId),
     });
 
