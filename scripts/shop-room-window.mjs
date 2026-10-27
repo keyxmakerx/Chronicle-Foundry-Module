@@ -96,7 +96,7 @@ async function requestFromGM(shopId, action, body) {
 function loadShopRoomWidget() {
   if (widgetLoad) return widgetLoad;
   widgetLoad = (async () => {
-    shim = await loadVendored(['shop_room_icons.js', 'shop_room_paper.js', 'shop_room.js']);
+    shim = await loadVendored(['shop_room_icons.js', 'shop_room_paper.js', 'shop_room_counter.js', 'shop_room.js']);
     const def = shim.widgets.get('shop_room');
     if (!def) throw new Error('shop room widget did not register');
     return def;
