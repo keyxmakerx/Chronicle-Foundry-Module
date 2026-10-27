@@ -15,7 +15,6 @@ import { mediaId, TOKEN_FIELD } from './_creature-pictures.mjs';
 /** Actor flag: the id of the form the actor is in; absent for the first form. */
 export const FORM_FLAG = 'creatureForm';
 export const FORMS_KEY = 'forms';
-export const STAMINA_MODES = ['carry', 'fresh'];
 
 const ID_RE = /^[a-z0-9]{1,24}$/;
 const MAX_FORMS = 12;

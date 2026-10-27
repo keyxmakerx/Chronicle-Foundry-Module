@@ -9,6 +9,10 @@
  * avoided.
  */
 
+import { escapeHtml } from './_escape-html.mjs';
+
+export { escapeHtml };
+
 /** Card states stored in the message flag. */
 export const CARD_STATE = Object.freeze({
   PENDING: 'pending',
@@ -24,19 +28,6 @@ const STATUS_TO_STATE = Object.freeze({
   declined: CARD_STATE.DECLINED,
   failed: CARD_STATE.FAILED,
 });
-
-/**
- * @param {any} s
- * @returns {string}
- */
-export function escapeHtml(s) {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 /**
  * Map a server move status to a card state.

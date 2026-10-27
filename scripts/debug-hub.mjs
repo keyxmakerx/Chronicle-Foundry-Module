@@ -13,7 +13,7 @@
  * writes to Chronicle or to an actor.
  */
 
-import { noticeText } from './_escape-html.mjs';
+import { escapeHtml as esc, noticeText } from './_escape-html.mjs';
 import { FLAG_SCOPE, MODULE_ID, REPORT_STORE_FLAG, syncOptions } from './constants.mjs';
 import { getSetting } from './settings.mjs';
 import { SOCKET_CHANNEL, getStashSync } from './stash-sync.mjs';
@@ -26,7 +26,7 @@ import { compareSideBySide, findMoneyField } from './_debug-compare.mjs';
 import { buildModuleInfo, buildSyncLog, sanitizeSnapshot } from './_debug-snapshot.mjs';
 import {
   ACK_TIMEOUT_MS, DEBUG_MSG, acceptReport, appendReport, intakeReport, isDebugMessage,
-  markDone, normalizeReports, pruneReports, unreadCount,
+  markDone, normalizeReports, pruneReports,
 } from './_debug-reports.mjs';
 import { decryptReply, encryptReply, generateRequestKeys, isPublicJwk } from './_stash-crypto.mjs';
 
@@ -57,8 +57,6 @@ export function bindDebugHub(syncManagerGetter) {
 }
 
 const manager = () => getSyncManager?.() ?? null;
-
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // --- Stored reports -------------------------------------------------------
 
@@ -106,11 +104,6 @@ export function getReports() {
   } catch {
     return [];
   }
-}
-
-/** @returns {number} how many stored reports are new. */
-export function getUnreadCount() {
-  return unreadCount(getReports());
 }
 
 function writeReports(update) {
