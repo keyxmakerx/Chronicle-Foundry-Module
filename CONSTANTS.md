@@ -1,9 +1,6 @@
 # Chronicle Sync — Constants & Magic Values
 
-Reference for all hardcoded values, thresholds, and behavioral constants in the
-module. Useful when debugging sync behavior or tuning performance.
-
----
+Hardcoded values and thresholds in the module.
 
 ## Timing & Debounce
 

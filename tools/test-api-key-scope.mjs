@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * FM-SEC-KEY-SCOPE: the Chronicle API key must never be a world-scoped
+ * The Chronicle API key must never be a world-scoped
  * Foundry setting, and the one-time migration must move a legacy world value
  * into client scope AND delete the world document.
  *

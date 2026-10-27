@@ -2,7 +2,7 @@
 /**
  * Map catch-up from the change feed: fog names its map, an item is placed on
  * the map that holds it, an item nobody can place refreshes every map, a
- * full catch-up refreshes nothing beyond the old behaviour, and a failed
+ * full catch-up refreshes no items, and a failed
  * refresh throws so the cursor stays.
  */
 import test from 'node:test';

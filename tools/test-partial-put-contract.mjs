@@ -115,8 +115,8 @@ test('the contract is documented where the endpoints are described', () => {
   for (const phrase of [
     'The partial-update contract',
     'an explicit `null`',
-    'published a hidden character entity to every player',
-    '`parent_id` was not on the request struct at all',
+    'writes zero values for absent fields',
+    'publish a hidden character',
   ]) {
     assert.ok(
       doc.includes(phrase),

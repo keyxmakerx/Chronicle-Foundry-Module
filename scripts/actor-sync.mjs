@@ -2,7 +2,7 @@
  * Chronicle Sync - Actor/Character Sync
  *
  * Bidirectional sync between Chronicle character entities and Foundry Actors.
- * Only active when a matching game system is detected (F-3) and the
+ * Only active when a matching game system is detected and the
  * syncCharacters setting is enabled.
  *
  * Sync flow:
@@ -1168,8 +1168,7 @@ export class ActorSync {
   }
 
   /**
-   * Every entity of one type, paged to the end (a campaign with more than
-   * one page of characters used to be cut off at the first).
+   * Every entity of one type, paged to the end.
    * @param {number} typeId
    * @returns {Promise<Array<object>>}
    * @private

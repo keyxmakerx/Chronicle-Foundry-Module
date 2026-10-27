@@ -137,7 +137,7 @@ test('api-client.mjs::fetch validates campaignId at the call boundary', () => {
   assert.ok(fetchMatch, 'fetch method body could not be located');
   assert.ok(
     /_validateCampaignIdOrThrow\s*\(\s*getSetting\(['"]campaignId['"]\)\s*\)/.test(fetchMatch[1]),
-    'fetch must call _validateCampaignIdOrThrow(getSetting(\'campaignId\')) — otherwise P-7 regression',
+    'fetch must call _validateCampaignIdOrThrow(getSetting(\'campaignId\')) — an unvalidated campaignId reaches the URL',
   );
 });
 
@@ -147,6 +147,6 @@ test('api-client.mjs::uploadMedia validates campaignId at the call boundary', ()
   assert.ok(uploadMatch, 'uploadMedia method body could not be located');
   assert.ok(
     /_validateCampaignIdOrThrow\s*\(\s*getSetting\(['"]campaignId['"]\)\s*\)/.test(uploadMatch[1]),
-    'uploadMedia must call _validateCampaignIdOrThrow(getSetting(\'campaignId\')) — otherwise P-7 regression',
+    'uploadMedia must call _validateCampaignIdOrThrow(getSetting(\'campaignId\')) — an unvalidated campaignId reaches the URL',
   );
 });

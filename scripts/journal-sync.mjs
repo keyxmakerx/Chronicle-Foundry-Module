@@ -464,8 +464,8 @@ export class JournalSync {
   /**
    * Re-fetch every Chronicle entity and apply it to Foundry. Unlike
    * `_onPullAll` (which only creates journals for chronicle-only entities),
-   * this also updates existing journals — refreshing content, name, and
-   * ownership — the fix for journals that synced before a permission change.
+   * this also updates existing journals (content, name, ownership), so it
+   * repairs journals that synced before a permission change.
    *
    * Paginated fetch of all entities; for each, update if a journal exists
    * (re-running `_buildOwnership`) or create it otherwise. Sequential, not
@@ -498,10 +498,9 @@ export class JournalSync {
       }
     }
 
-    // Paginated fetch — shares the walk with the dashboard's
-    // _buildEntityGroups (scripts/_entity-page-walk.mjs). Both used to stop
-    // after five pages, so a campaign past 500 entities resynced only its
-    // first 500 and reported a clean finish.
+    // Shares the walk with the dashboard's _buildEntityGroups
+    // (_entity-page-walk.mjs). A walk cut short must report `truncated`, not
+    // a clean finish.
     let allEntities = [];
     let truncated = false;
     this._lastWalk = null;

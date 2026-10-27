@@ -82,8 +82,8 @@ test('an empty campaign yields nothing and is not reported as truncated', async 
 });
 
 test('hitting the safety bound REPORTS truncation instead of swallowing it', async () => {
-  // A server that always answers with a full page — the runaway case the
-  // bound exists for. The old loop hit its bound and said nothing.
+  // A server that always answers with a full page: the runaway case the
+  // bound exists for.
   const alwaysFull = async (page, perPage) => ({
     data: Array.from({ length: perPage }, (_, i) => ({ id: `p${page}-${i}` })),
   });

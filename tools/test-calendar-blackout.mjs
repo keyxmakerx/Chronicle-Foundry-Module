@@ -213,7 +213,7 @@ test('the api-client attaches status and code so nobody has to regex prose', asy
 });
 
 // ---------------------------------------------------------------------------
-// The honesty fixes: what the GM is TOLD during the blackout.
+// What the GM is told during the blackout.
 // ---------------------------------------------------------------------------
 
 test('the Overview reports the rebuild as info, never as a structure mismatch', async () => {

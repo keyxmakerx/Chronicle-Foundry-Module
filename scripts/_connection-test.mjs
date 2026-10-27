@@ -2,7 +2,7 @@
  * The "Test connection" check, shared by the Chronicle settings window and
  * the dashboard. Pure apart from the injected fetch: it returns steps as
  * codes plus data, and the caller localizes them (stepText), so no
- * Chronicle-side string is ever treated as markup. tools/test-connection-test.mjs.
+ * Chronicle-side string is ever treated as markup. Pinned by tools/test-settings-form.mjs.
  */
 
 /**
