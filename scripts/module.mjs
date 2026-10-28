@@ -28,6 +28,7 @@ import { initEncounterHooks } from './encounters.mjs';
 import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs';
 import { registerNpcPresence, npcSpotlightRelay } from './npc-presence.mjs';
 import { negotiationMirror } from './negotiation-mirror.mjs';
+import { rollRelay } from './roll-relay.mjs';
 import { registerMapSheetItems } from './map-sheet-items.mjs';
 import { registerHoverArt, registerHoverArtSettings, toggleHoverArt } from './hover-art.mjs';
 import { registerCreatureForms } from './creature-forms.mjs';
@@ -174,6 +175,7 @@ Hooks.once('ready', async () => {
   syncManager.registerModule(new StashSync());
   syncManager.registerModule(npcSpotlightRelay);
   syncManager.registerModule(negotiationMirror);
+  syncManager.registerModule(rollRelay);
   syncManager.registerModule(questLive);
 
   // Create UI first so it's always available, even if start() fails.
