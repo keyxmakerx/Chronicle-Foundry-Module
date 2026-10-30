@@ -606,8 +606,11 @@ export class ChronicleAPI {
    * @param {string} path - API path.
    * @param {object|null} body - Request body (will be JSON-stringified).
    * @param {number} [maxRetries=3] - Maximum retry attempts.
+   * @param {{onConflict?: (body: object|null) => Promise<void>}} [opts] -
+   *   `onConflict` takes a 409 on replay (the page changed in Chronicle
+   *   meanwhile) the way a live push would; without it a 409 is final.
    */
-  queueForRetry(method, path, body = null, maxRetries = 3) {
+  queueForRetry(method, path, body = null, maxRetries = 3, { onConflict } = {}) {
     if (method === 'GET') return; // Never retry reads.
     // A newer write to the same place replaces the older one, so a replay
     // never sends a stale body after (or instead of) a newer one.
@@ -623,14 +626,14 @@ export class ChronicleAPI {
       body: body ? JSON.stringify(body) : null,
       retries: 0,
       maxRetries,
+      // The write belongs to the campaign it was made in; the path alone
+      // would land on whichever campaign is set when it replays.
+      campaignId: getSetting('campaignId'),
+      onConflict: typeof onConflict === 'function' ? onConflict : null,
     });
     console.debug(`Chronicle: Queued ${method} ${path} for retry (${this._retryQueue.length} pending)`);
   }
 
-  /**
-   * Process the retry queue. Called after reconnection.
-   * @returns {Promise<{success: number, failed: number}>}
-   */
   /**
    * Drop a queued write once a newer one to the same place has gone through.
    * @param {string} method
@@ -640,6 +643,10 @@ export class ChronicleAPI {
     this._retryQueue = this._retryQueue.filter((q) => q.method !== method || q.path !== path);
   }
 
+  /**
+   * Process the retry queue. Called after reconnection.
+   * @returns {Promise<{success: number, failed: number}>}
+   */
   async processRetryQueue() {
     if (this._retryProcessing || this._retryQueue.length === 0) {
       return { success: 0, failed: 0 };
@@ -654,6 +661,12 @@ export class ChronicleAPI {
     this._retryQueue = [];
 
     for (const item of pending) {
+      if (item.campaignId !== getSetting('campaignId')) {
+        failed++;
+        this._logError('warn', item.method, item.path, null,
+          'Dropped a queued write: the campaign changed since it was made');
+        continue;
+      }
       try {
         await this.fetch(item.path, {
           method: item.method,
@@ -661,6 +674,19 @@ export class ChronicleAPI {
         });
         success++;
       } catch (err) {
+        if (err instanceof ConflictError) {
+          // Retrying the same version check can only 409 again.
+          try {
+            if (!item.onConflict) throw err;
+            await item.onConflict(item.body ? JSON.parse(item.body) : null);
+            success++;
+          } catch (conflictErr) {
+            failed++;
+            this._logError('error', item.method, item.path, 409,
+              `Changed in Chronicle while queued; not replayed: ${conflictErr.message}`);
+          }
+          continue;
+        }
         item.retries++;
         if (item.retries < item.maxRetries) {
           this._retryQueue.push(item);

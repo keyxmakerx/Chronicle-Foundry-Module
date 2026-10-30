@@ -56,5 +56,8 @@ test('ActorSync applies through the plan, with the apply option', () => {
   // A stale copy still returns before anything is planned or written.
   assert.ok(apply.indexOf('_olderThanRecorded') < apply.indexOf('planActorApply'));
   assert.match(apply, /actor\.update\(changes, syncOptions\(\{ \[APPLY_OPTION\]: true \}\)\)/);
-  assert.match(src, /if \(this\._syncing \|\| options\?\.\[APPLY_OPTION\]\) return;/);
+  // Echoes are recognised by the write's own option, never a shared flag.
+  assert.match(src, /async _handleUpdateActor[^{]*\{\n    if \(options\?\.\[APPLY_OPTION\]\) return;/);
+  assert.match(src, /async _handleCreateActor[^{]*\{\n    if \(options\?\.\[APPLY_OPTION\]\) return;/);
+  assert.doesNotMatch(src, /_syncing/);
 });

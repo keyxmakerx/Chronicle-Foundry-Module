@@ -9,7 +9,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CHRONICLE_URL } from './chronicle.mjs';
-import { openWorld, closeWorld, settle, recordRequests, waitFor } from './world.mjs';
+import { openWorld, closeWorld, settle, recordRequests, waitFor, traffic } from './world.mjs';
 import { FLAG, linked, byEntity, writes, pageText, chroniclePage, scenario } from './scenario.mjs';
 
 test('a journal made in Foundry becomes exactly one page, with its text', () => scenario('fvtt-create', async ({ seed, world }) => {
@@ -269,6 +269,35 @@ test('the same page edited on both sides at once ends the same on both sides', (
   assert.equal(world.game.journal.filter((x) => x.name.startsWith('Crossroads')).length, 1);
 }));
 
+test('an edit queued while Chronicle was unreachable meets a Chronicle edit made meanwhile through the conflict setting, not a blind retry', () => scenario('retry-conflict', async ({ seed, world }) => {
+  const e = await chroniclePage(seed, 'Old Mill', '<p>As it was.</p>');
+  await openWorld(world);
+  await JournalSync_resync(world);
+  const j = byEntity(world, e.id);
+  const api = world.syncManager.api;
+  const connect = api._doConnect.bind(api);
+  let hold = true;
+  api._doConnect = () => (hold ? setTimeout(() => api._doConnect(), 100) : connect());
+  api._ws.close();
+  await waitFor(() => api._ws === null || api._ws.readyState !== 1, 5000, 'socket to drop');
+
+  traffic.offline = true;
+  const page = j.pages.contents.find((p) => p.type === 'text');
+  await page.update({ 'text.content': '<p>Rebuilt by the Foundry GM.</p>' });
+  await waitFor(() => api.getRetryQueueSize() === 1, 10000, 'the failed push to be queued');
+  traffic.offline = false;
+  await seed.chronicle.put(`/entities/${e.id}`, { entry: '<p>Burned down, says Chronicle.</p>' });
+
+  hold = false;
+  await waitFor(() => api._ws?.readyState === 1, 30000, 'reconnect');
+  await settle();
+  // "Foundry wins" is this world's setting, so the replay's 409 keeps the
+  // Foundry text on both sides instead of retrying the stale check.
+  assert.equal(api.getRetryQueueSize(), 0, 'nothing left queued');
+  assert.match((await seed.chronicle.get(`/entities/${e.id}`)).entry_html || '', /Rebuilt by the Foundry GM/);
+  assert.match(pageText(byEntity(world, e.id)), /Rebuilt by the Foundry GM/);
+}, { settings: { conflictResolution: 'foundry' } }));
+
 // Two tiny, different PNGs: Chronicle gives identical bytes one media id.
 const PNGS = [
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
@@ -387,4 +416,48 @@ test('a page in nested Chronicle folders lands in the same Foundry folders, and 
   assert.equal(world.game.folders.size, folderCount, 'no new folders on reopen');
   assert.equal(byEntity(world, e.id).folder?.name, 'Waterdeep');
   assert.deepEqual(writes(reqs).filter((r) => r.url.startsWith('/entities')).map((r) => `${r.method} ${r.url}`), [], 'module wrote nothing back');
+}));
+
+test('categories that share a name share one folder; an older world\'s twin folders merge, its empty ones go, and nothing else is touched', () => scenario('folders-twins', async ({ seed, world }) => {
+  const types = (await seed.chronicle.entityTypes()).filter((t) => !/character/i.test(`${t.slug} ${t.name}`));
+  const first = types[0];
+  const other = types[1];
+  const twin = await seed.chronicle.post('/entity-types', { name: first.name, name_plural: `${first.name} (more)` });
+  const a = await seed.chronicle.post('/entities', { name: 'The Emerald Way', entity_type_id: first.id, is_private: false });
+  const b = await seed.chronicle.post('/entities', { name: 'The Adventurers Guild', entity_type_id: twin.id, is_private: false });
+
+  // What an older version left: a folder per category, two of them with one
+  // name, one with nothing in it, and a folder of the GM's own.
+  const flagged = (name, typeId) => Folder.create({ name, type: 'JournalEntry', flags: { [FLAG]: { entityTypeId: typeId } } });
+  const fa = await flagged(first.name, first.id);
+  const fb = await flagged(first.name, twin.id);
+  const stale = await flagged(other.name, other.id);
+  const mine = await Folder.create({ name: 'GM notes', type: 'JournalEntry' });
+  const journal = (e, folder) => JournalEntry.create({
+    name: e.name, folder: folder.id, flags: { [FLAG]: { entityId: e.id } },
+    pages: [{ name: e.name, type: 'text', text: { content: '' } }],
+  });
+  await journal(a, fa);
+  await journal(b, fb);
+
+  await openWorld(world);
+  const shared = world.game.folders.filter((f) => f.name === first.name);
+  assert.equal(shared.length, 1, 'one folder for the two same-named categories');
+  assert.equal(byEntity(world, a.id).folder?.id, shared[0].id);
+  assert.equal(byEntity(world, b.id).folder?.id, shared[0].id);
+  assert.equal(world.game.folders.get(stale.id), null, 'the empty category folder sync made is gone');
+  assert.ok(world.game.folders.get(mine.id), 'the GM\'s own folder stays');
+  assert.equal(world.game.journal.size, 2, 'no journal deleted');
+
+  // A new page in the second category lands in the shared folder too.
+  const c = await seed.chronicle.post('/entities', { name: 'Ninth Lantern', entity_type_id: twin.id, is_private: false });
+  await waitFor(() => byEntity(world, c.id), 15000, 'journal for the new page');
+  await settle();
+  assert.equal(byEntity(world, c.id).folder?.id, shared[0].id);
+  assert.equal(world.game.folders.filter((f) => f.name === first.name).length, 1);
+
+  const count = world.game.folders.size;
+  await closeWorld(world);
+  await openWorld(world);
+  assert.equal(world.game.folders.size, count, 'a reopen makes no folder');
 }));
