@@ -1,10 +1,10 @@
 # Foundry VTT Sync Module - E2E Testing Checklist
 
-Manual testing checklist for the Chronicle-Foundry bidirectional sync module.
-Requires a running Chronicle instance and Foundry VTT (v14) with the chronicle-sync module installed.
+Live checklist for the sync module. Needs a running Chronicle and Foundry VTT
+(v14) with chronicle-sync installed.
 
-Automated checks (no Foundry needed): `node --test tools/test-*.mjs` from the
-repo root. There is no `package.json`.
+Automated checks (no Foundry): `node --test tools/test-*.mjs` from the repo
+root. There is no `package.json`.
 
 ## Prerequisites
 
@@ -87,25 +87,16 @@ Needs a player client that can see the journal but does not own its page.
 - [ ] Custom visibility with no player grant → default NONE
 - [ ] Changing journal ownership in Foundry pushes is_private to Chronicle
 - [ ] Changing journal ownership pushes visibility/permissions to Chronicle API
-- [ ] **(fail-closed)** Permission API failure on a `custom`-visibility
-      entity → ownership defaults to **NONE** (GM-only), even when `is_private=false`.
-      It must NOT fall open to OBSERVER. To reproduce: stop Chronicle (or block the
-      `/permissions` endpoint) while a custom-visibility entity syncs; confirm players
-      cannot see it.
+- [ ] **Fail closed:** a permissions API failure on a `custom`-visibility entity
+      gives ownership **NONE** (GM-only), even when `is_private=false`, never OBSERVER.
+      Stop Chronicle (or block `/permissions`) while it syncs; players must not see it.
 
 ### Visibility Settings (Chronicle Sync → Settings → Players)
 These controls drive journal ownership:
-- [ ] **dmOnlyHidden ON (default):** a DM-only / private Chronicle entity → players have NO
-      access to the journal (ownership NONE). Confirm as a player: the journal is hidden.
-- [ ] **dmOnlyHidden OFF:** re-sync (edit the entity on Chronicle so it re-pulls). The same
-      DM-only entity now appears to players at the default-ownership level. Players gain the
-      dm-only content. Toggle back ON → players lose it again on the next sync.
-- [ ] **defaultOwnership = Owner:** a player-visible entity → journal default ownership is OWNER
-      (players can edit). Set it to **None** → public entities sync as GM-only.
-- [ ] Per-user Chronicle grant: an entity shared with a specific
-      Chronicle user (linked to a Foundry user in Chronicle Sync → Settings → Players) → that Foundry
-      user gets per-user OWNER/OBSERVER ownership; unmapped Chronicle users are dropped (the
-      entity under-shares — no leak to the wrong player).
+- [ ] **dmOnlyHidden ON (default):** a DM-only / private entity gives players no access (NONE); the journal is hidden from a player
+- [ ] **dmOnlyHidden OFF:** edit the entity in Chronicle so it re-pulls: players now get it at the default-ownership level. Toggle back ON: they lose it on the next sync
+- [ ] **defaultOwnership = Owner:** a player-visible entity's journal default is OWNER (players can edit). **None:** public entities sync as GM-only
+- [ ] Per-user grant: an entity shared with one Chronicle user (linked in Settings → Players) gives that Foundry user per-user OWNER/OBSERVER; unmapped users are dropped (under-shares, no leak)
 
 ### Edge Cases
 - [ ] Rapid successive edits don't create duplicate entities
@@ -166,7 +157,7 @@ test player Observer on the map journal.
 - [ ] Right-click on a marker as the player does nothing (no config dialog); the Place Chronicle marker tool is absent
 - [ ] Change a visible marker to `DM only` in Chronicle while the player has the map open → it vanishes from the player's view and from the page flags after the next sync
 - [ ] Change it back to Everyone → it reappears for the player
-- [ ] Marker JSON from a map saved by an older module version that already carried a DM-only marker in flags: **Resync All Maps** strips it from the flags
+- [ ] A map whose page flags already hold a DM-only marker: **Resync All Maps** strips it
 
 ### Marker icons and the map's look
 - [ ] A map set to a frame or pin shape in Chronicle shows that frame and pin shape in the viewer
@@ -189,13 +180,9 @@ test player Observer on the map journal.
 
 ## Calendar Sync
 
-Chronicle's date and event routes are live; the old structure, settings,
-import, export and advance routes answer `410 calendar_route_retired` (the
-module calls none of them). An older Chronicle answers those with
-`503 calendar_rebuilding`, which pauses date pushes for 30 seconds and shows one
-GM notice. See API-CONTRACT.md.
-
-Chronicle brings its own calendar; no Foundry calendar module is used.
+Chronicle owns the calendar; no Foundry calendar module is used. Retired
+routes answer 410; an older Chronicle's `503 calendar_rebuilding` pauses date
+pushes for 30 seconds with one GM notice (API-CONTRACT.md).
 
 ### Calendar window
 - [ ] Chronicle scene controls -> **Calendar** button (player and GM) -> first time, Chronicle's Allow window asks about "notes and calendar"; press Allow -> a Foundry window opens with Chronicle's own calendar page: the sky moving, day weather, moons, events
@@ -212,7 +199,7 @@ Chronicle brings its own calendar; no Foundry calendar module is used.
 - [ ] Configure Settings -> Show Chronicle's calendar on (Calendar look: Strip) -> a thin strip sits at the top centre: date, time and a weather icon over a small sky coloured for the hour; snow, rain or night stars move in it to match Chronicle
 - [ ] Hover the strip -> it widens to show season, temperature and moons
 - [ ] Drag the strip by its dots anywhere -> it stays there after a reload, and each player's spot is their own
-- [ ] Click the lock on the strip -> the dots disappear and the strip (or its small globe) cannot be dragged; click it again -> dragging works. The lock survives a reload and is per player
+- [ ] Click the lock on the strip -> the dots disappear and the strip (or its small globe) cannot be dragged; click again to unlock. Per player, survives a reload
 - [ ] Click the shrink button -> the strip shrinks to a small still globe showing the day; click the globe -> the strip comes back with the month open
 - [ ] Leave the mouse still for 20 seconds -> the sky's motion stops; move it -> it starts again
 - [ ] Click the date -> the calendar window opens (as above). Not connected and "Not now" -> the small month opens under the strip instead; days up to today show their sky colour and weather icon, later days are plain; event days have a dot and the month's events are listed below; ‹ › flips months; click outside or Esc closes it
@@ -227,10 +214,10 @@ Chronicle brings its own calendar; no Foundry calendar module is used.
 - [ ] Configure Settings -> Calendar temperature unit °F -> only your strip switches to °F
 
 ### Built-in calendar (Sky Clock)
-- [ ] Configure Settings -> Calendar look -> **Sky Clock** -> the strip is replaced by a round glass globe in the top-right corner, left of the sidebar: Chronicle's sky for the hour inside it, the day of the month as a dark weathered stone number on the hill, the month name under it. The other players still see whatever look they picked
+- [ ] Configure Settings -> Calendar look -> **Sky Clock** -> a round glass globe replaces the strip in the top-right corner, left of the sidebar: Chronicle's sky for the hour, the day as a weathered stone number, the month name under it. Other players keep their own look
 - [ ] The sky in the globe matches Chronicle's calendar page at the same hour: sun or stars, moons and their phases, the day's weather. A blood moon or eclipse day in Chronicle shows it
 - [ ] Snow or rain in Chronicle -> it falls in front of the stone number; fog drifts over it; a storm flashes now and then
-- [ ] Rain in Chronicle -> a few faint drops land round the edge of the glass, linger, slide a little and fade, never over the number. Blood rain -> the drops are reddish; acid rain -> greenish. Clear or fog -> no drops
+- [ ] Rain in Chronicle -> a few faint drops land round the glass rim, slide and fade, never over the number; blood rain reddish, acid rain greenish; clear or fog none
 - [ ] Weather on the stone: clear -> plain dry stone with no pale spots; rain -> darker, shiny stone with drops running down; snow -> snow on the tops; fog -> glinting dew; a sandstorm -> sand on the tops; autumn leaves -> a few leaves resting on it; a magic weather (Luminous sky) -> its colour glowing in the cracks. Change the weather in Chronicle -> the old marks fade out as the new ones arrive
 - [ ] Drag the globe and let go anywhere -> it swirls and slides into the nearest corner, never under the sidebar, scene controls, player list, hotbar or scene tabs. It is in the same corner after a reload; each player's corner is their own
 - [ ] Hover the globe -> a lock and a shrink button appear. Lock -> it can no longer be dragged. Shrink -> it becomes a small still globe; click that -> the full globe comes back
@@ -288,7 +275,7 @@ Chronicle brings its own calendar; no Foundry calendar module is used.
 - [ ] Maps / actors / items / notes still sync while the calendar is down
 - [ ] Disabled maps addon -> Maps API returns 404
 - [ ] Private entities hidden from non-owner API keys
-- [ ] Rate limiting enforced (60 req/min default)
+- [ ] Rate limiting enforced (300 req/min default); a 429 pauses the module's REST calls until `Retry-After`
 
 ## Character Sync (Actor ↔ Entity)
 
@@ -517,10 +504,8 @@ Needs a GM client and a player client, on each of Foundry v12, v13 and v14.
 - [ ] Invalid API key shows clear error message
 - [ ] Network timeout during sync doesn't corrupt state
 - [ ] Partial sync failure (one entity fails) doesn't block others
-- [ ] Module gracefully handles Chronicle server restart
-- [ ] A failed Foundry→Chronicle push (e.g. Chronicle down)
-      surfaces a `ui.notifications.warn` to the GM and appears in the dashboard error log
-      (not console-only). Journal/note *updates* are queued for retry and re-push on reconnect.
+- [ ] A Chronicle restart reconnects without a reload
+- [ ] A failed Foundry→Chronicle push (Chronicle down) shows a `ui.notifications.warn` to the GM and an error-log row; journal updates are queued and re-pushed on reconnect
 
 ### Catch-up after a closed world
 - [ ] Close Foundry, edit a page and a character in Chronicle, change a character's inventory there, then reopen the world -> the page, the character and the inventory change appear without Resync All
@@ -530,14 +515,9 @@ Needs a GM client and a player client, on each of Foundry v12, v13 and v14.
 
 ### Reconnect re-pull
 Edits made on Chronicle while Foundry was disconnected arrive after reconnect, without a world reload.
-- [ ] With Foundry connected, **disconnect** (stop Chronicle, or pull the network) so the status
-      pill goes red/yellow.
-- [ ] While disconnected, **edit an entity on Chronicle** (e.g. rename it, change its content).
-- [ ] **Reconnect** (restart Chronicle / restore network). After the connection settles
-      (~3 s debounce), the change appears in Foundry automatically — no world reload needed.
-      The activity log shows "Reconnected — re-pulled changes made during the disconnect".
-- [ ] **Flapping** connection (rapid disconnect/reconnect cycles) triggers only ONE re-pull
-      once the link stabilizes, not a re-pull per reconnect (no re-pull storm).
+- [ ] Disconnect (stop Chronicle or pull the network) until the status pill goes red/yellow, then rename an entity or change its content in Chronicle
+- [ ] Reconnect: after about 3 s the change appears in Foundry with no reload, and the activity log reads "Reconnected — re-pulled changes made during the disconnect"
+- [ ] Rapid disconnect/reconnect cycles trigger one re-pull once the link settles, not one per reconnect
 
 ## Sync Dashboard
 
@@ -555,13 +535,12 @@ Player reports and History panes) and Settings (at the foot, set apart).
 - [ ] A tab that fails to load shows a "Some data failed to load" banner naming the tab, with **Retry**
 
 ### Tabs
-- [ ] **Overview:** connection banner (green/yellow/red) with **Reconnect** when not connected; stat tiles for Entities Synced, Characters Synced (n/total) and Maps Linked, each jumps to its tab on click; "Needs Attention" lists only real problems (each row jumps to the fixing tab) or says "Everything's in sync"; **Sync Everything Now**, **Problems** and **Refresh** work; below them, the DM-only note when any were hidden, the last sync time, Recent Activity and **Clear Log**
-- [ ] **Entities:** entity list grouped by type with sync status dots, Pull/Push per row, Pull All / Push All, Resync All Journals, visibility toggle, search filter, bulk select (Make Public / Private / Delete / Change Type), **Create Type**
-- [ ] **Characters:** when any character can't be matched, a "Needs a match" list comes first and the rail shows its count; each row offers a "Match to existing…" dropdown with **Match**, and **Create new**, and resolving a row links it and removes it. Below: system badge, synced and unlinked actors, Push / Push All / Re-sync (see Character Sync)
-- [ ] **Calendar:** shows Chronicle's date and time and the world-state panel (weather, season, era, moons); the tab explains why when sync is disabled, no calendar is configured, or the calendar is rebuilding or unreachable
-- [ ] **Shops:** shop entities with type, keeper, private lock, "Synced" badge and an **Open** button that opens the Shop window; empty states say whether the "Shop" entity type is missing or just has no shops
-- [ ] **Maps:** per-map rows with the map's picture (a shadowed map shows the players' copy), marker / drawing / token counts, **Open in Foundry**, external-link icon; **Resync All Maps**, **Open Chronicle Maps Folder**; summary row and dismissible error list (see Map Sync)
-- [ ] **Problems:** a Health / Player reports / History switch; the badge counts new player reports. Health: Game System (Foundry and Chronicle system, Character Sync), Connection, Field Mapping, Sync Capability (pick an actor to inspect; **Copy** report and JSON), Error Log, Diagnostic Bundle copy and System Debug Export copy. Player reports and History as below
+Details for Characters, Maps, Shops and Calendar are under their own sections.
+- [ ] **Overview:** connection banner (green/yellow/red) with **Reconnect** when not connected; stat tiles (Entities Synced, Characters Synced n/total, Maps Linked) each jump to their tab; "Needs Attention" lists only real problems, each row jumping to the fixing tab, or says "Everything's in sync"; **Sync Everything Now**, **Problems** and **Refresh** work; below: the DM-only note when any were hidden, last sync time, Recent Activity, **Clear Log**
+- [ ] **Entities:** list grouped by type with status dots, Pull/Push per row, Pull All / Push All, Resync All Journals, visibility toggle, search, bulk select (Make Public / Private / Delete / Change Type), **Create Type**
+- [ ] **Characters:** a "Needs a match" list comes first when any character can't be matched (the rail shows its count); each row offers "Match to existing…" with **Match**, and **Create new**, and resolving a row links it and removes it
+- [ ] **Calendar**, **Shops**, **Maps:** as in their sections; the Calendar pane explains why when sync is off, no calendar exists, or it is rebuilding or unreachable; Shops empty states say whether the "Shop" type is missing or has no shops
+- [ ] **Problems:** Health / Player reports / History switch; the badge counts new player reports. Health: Game System, Connection, Field Mapping, Sync Capability (pick an actor; **Copy** report and JSON), Error Log, Diagnostic Bundle and System Debug Export copy
 
 ### Layout Persistence
 - [ ] Switch to Linked → Maps, close the window, reopen -> Linked → Maps still open

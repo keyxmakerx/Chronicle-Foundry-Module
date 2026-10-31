@@ -103,7 +103,6 @@ test('_logError calls _scrubAuthHeaders on the message before storing', () => {
   const body = match[1];
   assert.ok(
     /_scrubAuthHeaders\s*\(/.test(body),
-    '_logError must call _scrubAuthHeaders on the message — otherwise P-8 regression. '
-    + 'See FM-SEC-CHUNK-4 + reports/foundry/2026-05-22-fm-security-audit.md §2 P-8.',
+    '_logError must call _scrubAuthHeaders on the message — error logs would leak bearer tokens.',
   );
 });

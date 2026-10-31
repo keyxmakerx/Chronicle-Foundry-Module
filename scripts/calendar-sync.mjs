@@ -27,8 +27,7 @@ import {
 } from './_calendar-subresources.mjs';
 
 /**
- * Canonical wire-visibility values per the calendar-sync wire contract
- * (cordinator/decisions/2026-05-17-calendar-sync-wire-contract.md).
+ * Canonical wire-visibility values (API-CONTRACT.md, Calendar).
  * Chronicle's internal storage uses `'gm_only'` (underscore); its API
  * handler translates to/from wire `'gm-only'` (kebab) at the boundary.
  * This module emits and consumes only the wire (kebab) form.

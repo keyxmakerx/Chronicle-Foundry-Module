@@ -2,9 +2,8 @@
 
 Runs the module's real sync code against a real Chronicle and checks that
 both sides end up agreeing. Unit tests in `tools/` check one function at a
-time; the bench checks the whole round trip, which is where most past sync
-bugs lived (a field Chronicle refused, a delete that came back, an edit that
-never left Foundry).
+time; the bench checks the whole round trip (a field Chronicle refuses, a
+delete that comes back, an edit that never leaves Foundry).
 
 - `fake-foundry.mjs` is an in-memory Foundry world: journals, pages, actors
   and their items, folders, settings and hooks, with Foundry's semantics where sync bugs hide

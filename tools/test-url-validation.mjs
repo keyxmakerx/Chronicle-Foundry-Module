@@ -50,7 +50,7 @@ test('_isAllowedImageHost: trailing slash on apiUrl tolerated', () => {
 });
 
 // ---------------------------------------------------------------------
-// Cross-host rejection — the M-2 attack shape
+// Cross-host rejection — the cross-host attack shape
 // ---------------------------------------------------------------------
 
 test('_isAllowedImageHost: attacker host → false', () => {
@@ -186,11 +186,11 @@ test('scripts/map-viewer.mjs: _prepareToken references the host check', () => {
   );
 });
 
-// F-1 static-source pin: journal-sync's entity image-page src must flow
+// Static-source pin: journal-sync's entity image-page src must flow
 // through the host-allowlist validator; a new type:'image' page src added
 // without validation fails this check.
 
-test('scripts/journal-sync.mjs imports from ./_url-validation.mjs (F-1 pin)', () => {
+test('scripts/journal-sync.mjs imports from ./_url-validation.mjs', () => {
   const source = readFileSync(resolve(REPO_ROOT, 'scripts/journal-sync.mjs'), 'utf8');
   assert.ok(
     /from\s+['"][.][/]_url-validation\.mjs['"]/.test(source),
@@ -202,7 +202,7 @@ test('scripts/journal-sync.mjs imports from ./_url-validation.mjs (F-1 pin)', ()
   );
 });
 
-test('scripts/journal-sync.mjs: entity Image page src is not set directly from entity.image_path (F-1 pin)', () => {
+test('scripts/journal-sync.mjs: entity Image page src is not set directly from entity.image_path', () => {
   // Guard: the entity.image_path must not appear as a bare literal in a
   // type:'image' page object — it must flow through the validator.
   // This regex matches the dangerous pattern: `src: entity.image_path`
@@ -210,11 +210,11 @@ test('scripts/journal-sync.mjs: entity Image page src is not set directly from e
   const source = readFileSync(resolve(REPO_ROOT, 'scripts/journal-sync.mjs'), 'utf8');
   assert.ok(
     !(/src\s*:\s*entity\.image_path/.test(source)),
-    'journal-sync.mjs must NOT assign entity.image_path directly to image page src — route through _resolveEntityImageSrc (F-1)',
+    'journal-sync.mjs must NOT assign entity.image_path directly to image page src — route through _resolveEntityImageSrc',
   );
 });
 
-test('scripts/journal-sync.mjs: _resolveEntityImageSrc validates full URLs via _isAllowedImageHost (F-1 pin)', () => {
+test('scripts/journal-sync.mjs: _resolveEntityImageSrc validates full URLs via _isAllowedImageHost', () => {
   // The resolver function body must contain the host-check call.
   const source = readFileSync(resolve(REPO_ROOT, 'scripts/journal-sync.mjs'), 'utf8');
   const fnMatch = source.match(/function\s+_resolveEntityImageSrc\s*\([^)]*\)\s*\{[\s\S]*?\n\}/);
@@ -225,7 +225,7 @@ test('scripts/journal-sync.mjs: _resolveEntityImageSrc validates full URLs via _
   );
 });
 
-// F-2: _setNestedValue prototype-pollution guard. It's module-private, and
+// _setNestedValue prototype-pollution guard. It's module-private, and
 // actor-sync references game.* which doesn't exist in Node, so this tests
 // a lightweight inline reimplementation that mirrors the guard exactly.
 
@@ -244,14 +244,14 @@ function _setNestedValueForTest(obj, path, value) {
   return 'OK';
 }
 
-test('_setNestedValue: normal path writes correctly (F-2 guard baseline)', () => {
+test('_setNestedValue: normal path writes correctly', () => {
   const obj = {};
   const result = _setNestedValueForTest(obj, 'system.abilities.str.value', 10);
   assert.equal(result, 'OK');
   assert.deepEqual(obj, { system: { abilities: { str: { value: 10 } } } });
 });
 
-test('_setNestedValue: __proto__ segment is rejected (F-2)', () => {
+test('_setNestedValue: __proto__ segment is rejected', () => {
   const obj = {};
   const result = _setNestedValueForTest(obj, '__proto__.polluted', true);
   assert.equal(result, 'REJECTED', '__proto__ path must be rejected');
@@ -259,28 +259,28 @@ test('_setNestedValue: __proto__ segment is rejected (F-2)', () => {
   assert.equal(({}).polluted, undefined, 'Object.prototype must not be polluted');
 });
 
-test('_setNestedValue: prototype segment is rejected (F-2)', () => {
+test('_setNestedValue: prototype segment is rejected', () => {
   const result = _setNestedValueForTest({}, 'constructor.prototype.polluted', true);
   assert.equal(result, 'REJECTED', 'prototype segment must be rejected');
 });
 
-test('_setNestedValue: constructor segment is rejected (F-2)', () => {
+test('_setNestedValue: constructor segment is rejected', () => {
   const result = _setNestedValueForTest({}, 'constructor.name', 'evil');
   assert.equal(result, 'REJECTED', 'constructor segment must be rejected');
 });
 
-test('_setNestedValue: mid-path __proto__ is rejected (F-2)', () => {
+test('_setNestedValue: mid-path __proto__ is rejected', () => {
   const result = _setNestedValueForTest({}, 'system.__proto__.evil', 'x');
   assert.equal(result, 'REJECTED', '__proto__ anywhere in path must be rejected');
 });
 
 // Static-source: actor-sync.mjs must contain the guard.
-test('scripts/actor-sync.mjs: _setNestedValue contains prototype-segment guard (F-2 pin)', () => {
+test('scripts/actor-sync.mjs: _setNestedValue contains prototype-segment guard', () => {
   const source = readFileSync(resolve(REPO_ROOT, 'scripts/actor-sync.mjs'), 'utf8');
   const fnMatch = source.match(/function\s+_setNestedValue\s*\([^)]*\)\s*\{[\s\S]*?\n\}/);
   assert.ok(fnMatch, 'expected to find _setNestedValue function body in actor-sync.mjs');
   assert.ok(
     /PROTO_BLOCKED/.test(fnMatch[0]) || /__proto__/.test(fnMatch[0]),
-    '_setNestedValue must guard against __proto__/prototype/constructor path segments (F-2)',
+    '_setNestedValue must guard against __proto__/prototype/constructor path segments',
   );
 });

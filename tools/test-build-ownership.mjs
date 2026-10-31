@@ -352,12 +352,12 @@ test('pin: journal-sync custom-visibility catch fails closed (no is_private fall
   // OBSERVER for non-private entities on a permissions error.
   assert.ok(
     !/catch[\s\S]*?entity\.is_private\s*\?/.test(body),
-    'custom-visibility catch must not branch on is_private — that is the FM-SYNC-HARDENING §3 fail-open regression',
+    'custom-visibility catch must not branch on is_private — that would fail open',
   );
   // And it must reference the shared helper for the default-visibility path.
   assert.ok(
     /defaultLevelForVisibility\(/.test(body),
-    '_buildOwnership must use defaultLevelForVisibility (FM-SYNC-HARDENING §1)',
+    '_buildOwnership must use defaultLevelForVisibility',
   );
 });
 
