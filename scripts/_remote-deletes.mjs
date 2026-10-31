@@ -8,6 +8,7 @@
  */
 
 import { confirmDialog } from './_dialogs.mjs';
+import { escapeHtml } from './_escape-html.mjs';
 
 /** How long after the last delete the question waits for more to arrive. */
 export const REMOTE_DELETE_WAIT_MS = 400;
@@ -58,10 +59,6 @@ export function createRemoteDeleteBatch({ ask, onDone = () => {}, delayMs = REMO
     },
     flush,
   };
-}
-
-function escapeHtml(s) {
-  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 /** At most this many names are listed; the rest are counted. */

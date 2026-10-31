@@ -16,6 +16,8 @@
  * `tools/test-creature-abilities.mjs`.
  */
 
+import { escapeHtml } from './_escape-html.mjs';
+
 /** Bump when the conversion changes, so existing actors are rebuilt once. */
 export const CONVERTER_VERSION = 1;
 
@@ -235,10 +237,6 @@ function potencyText(potency) {
   if (!potency) return '';
   const letter = Object.keys(CHARACTERISTICS).find((k) => CHARACTERISTICS[k] === potency.characteristic);
   return `${letter} < ${potency.value} `;
-}
-
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 /** "2d10 + 2" → "2"; no roll → no power roll (the tiers stay as text). */
