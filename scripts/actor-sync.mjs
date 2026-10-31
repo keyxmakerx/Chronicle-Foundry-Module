@@ -895,7 +895,7 @@ export class ActorSync {
         this._pushingChanges.delete(actor.id);
         const entity = await this._api.get(`/entities/${entityId}`);
         if (entity) await this._updateActorFromEntity(actor, entity);
-        ui.notifications.warn(`Chronicle: Conflict on "${noticeText(actor.name)}" — kept Chronicle version.`);
+        ui.notifications.warn(game.i18n.format('CHRONICLE.Notifications.ConflictKeptChronicle', { name: noticeText(actor.name) }));
         return false;
       }
       // Force push.
@@ -904,7 +904,7 @@ export class ActorSync {
       if (forced?.updated_at) {
         await this._setActorFlag(actor, 'chronicleUpdatedAt', forced.updated_at);
       }
-      ui.notifications.warn(`Chronicle: Conflict on "${noticeText(actor.name)}" — kept Foundry version.`);
+      ui.notifications.warn(game.i18n.format('CHRONICLE.Notifications.ConflictKeptFoundry', { name: noticeText(actor.name) }));
       return true;
     }
   }
