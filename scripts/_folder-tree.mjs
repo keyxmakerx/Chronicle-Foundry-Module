@@ -57,7 +57,8 @@ export function folderChain(entity, { types, folders, parents }, maxDepth = 4) {
 
 /**
  * A short fingerprint of the folder layout, so a connect knows when the
- * journals need placing again.
+ * journals need placing again. Its prefix changes with the placing rules,
+ * so every world is placed once under new ones.
  * @param {object} tree - as for folderChain
  * @returns {string}
  */
@@ -67,6 +68,6 @@ export function layoutFingerprint({ types, folders }) {
     ...[...folders.values()].map((f) => `f${f.id}:${f.entity_type_id}:${f.parent_id ?? ''}:${f.name}`),
   ].sort();
   let h = 0x811c9dc5;
-  for (const ch of `v1|${rows.join('|')}`) h = Math.imul(h ^ ch.codePointAt(0), 0x01000193) >>> 0;
+  for (const ch of `v2|${rows.join('|')}`) h = Math.imul(h ^ ch.codePointAt(0), 0x01000193) >>> 0;
   return h.toString(16);
 }

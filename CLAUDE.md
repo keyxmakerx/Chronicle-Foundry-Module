@@ -37,7 +37,9 @@ Each is pinned by the test named in `.ai.md`; read it there before changing one.
   read-only for dates. Retired calendar routes answer 410; only a 503 saying
   `calendar_rebuilding` arms the blackout guard.
 - Connect catch-up reads `GET /sync/changes`; replays must be harmless.
-- `_syncing` is the boolean guard against sync loops.
+- Sync loops are stopped per write: sync's own writes carry `syncOptions()`
+  (actors and items also `APPLY_OPTION`) and the hooks skip those. Never a
+  shared flag held across awaits; it drops GM edits and overlapping syncs clear it.
 
 ## Working with this project
 

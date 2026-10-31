@@ -24,10 +24,14 @@ const realFetch = globalThis.fetch;
 globalThis.fetch = async (url, init = {}) => {
   const isModule = String(init?.headers?.Authorization || init?.headers?.authorization || '').includes(traffic.moduleKey || '\u0000');
   if (!isModule) return realFetch(url, init);
+  // "Chronicle can't be reached": the request never leaves, as on a dropped network.
+  if (traffic.offline) throw new TypeError('fetch failed');
   traffic.inflight += 1;
   traffic.last = Date.now();
   const entry = { method: init.method || 'GET', url: String(url).replace(CHRONICLE_URL, '').replace(/^\/api\/v1\/campaigns\/[^/]+/, ''), body: init.body, status: 0 };
   traffic.requests.push(entry);
+  // A scenario can act at the moment a request leaves, while it is in flight.
+  traffic.onSend?.(entry);
   try {
     const res = await realFetch(url, init);
     entry.status = res.status;
