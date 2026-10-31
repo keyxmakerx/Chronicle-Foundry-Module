@@ -4,7 +4,7 @@
  */
 
 /** The Satchel's tabs, in the order they are drawn. */
-export const SATCHEL_TABS = ['notebook', 'quests', 'stash'];
+export const SATCHEL_TABS = ['notebook', 'quests', 'stash', 'crafting'];
 
 /** A known tab, or the notebook for anything else. */
 export function satchelTab(tab) {
@@ -12,9 +12,9 @@ export function satchelTab(tab) {
 }
 
 /**
- * Whose stash the Stash tab shows: the player's assigned character when it
- * is a synced one they may open, else their first such actor by name, so
- * the choice is the same every time.
+ * Whose stash the Stash tab (and whose crafting the Crafting tab) shows: the
+ * player's assigned character when it is a synced one they may open, else
+ * their first such actor by name, so the choice is the same every time.
  * @param {{character?: object|null}} user
  * @param {object[]} actors
  * @param {{linked: (a: object) => boolean, allowed: (a: object) => boolean}} test

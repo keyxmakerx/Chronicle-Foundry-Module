@@ -2,11 +2,14 @@
  * Chronicle Sync - Satchel
  *
  * The player's own things in one window: the notebook (Chronicle's Journal
- * in a frame), the quest board and their character's stash. Each tab is the
- * module's existing window drawn inside the Satchel rather than a copy of
- * it, so the board's live refresh, the stash's moves and the notebook's
- * Connect step all keep working unchanged. Tabs load the first time they are
- * shown. Every user gets one; the GM's Stash tab points at the DM Screen.
+ * in a frame), the quest board, their character's stash and their hero's
+ * crafting. Each tab is the module's existing window drawn inside the
+ * Satchel rather than a copy of it, so the board's live refresh, the stash's
+ * moves and the notebook's Connect step all keep working unchanged. Tabs
+ * load the first time they are shown; Crafting reloads each time, so the
+ * spoils tray is never stale. Every user gets one; the GM's Stash tab points
+ * at the DM Screen, and the GM's Crafting tab shows the hero whose sheet
+ * button opened it.
  */
 
 import { FLAG_SCOPE } from './constants.mjs';
@@ -16,6 +19,8 @@ import { QuestBoardWindow, QuestSheetWindow } from './quest-board.mjs';
 import { StashesWindow } from './stash-window.mjs';
 import { canOpenStashes, stashesAvailable } from './stash-client.mjs';
 import { satchelTab, SATCHEL_TABS, stashActor } from './_satchel.mjs';
+import { craftingAvailable } from './crafting-relay.mjs';
+import { mountCraftingTab } from './crafting-tab.mjs';
 
 const { ApplicationV2 } = foundry.applications.api;
 
@@ -86,6 +91,11 @@ class SatchelWindow extends ApplicationV2 {
     this._board = null;
     this._sheet = null;
     this._stash = null;
+    this._crafting = null;
+    /** @type {Actor|null} the hero a sheet's Crafting button asked for */
+    this.craftActor = null;
+    this._craftSeq = 0;
+    this._gmHook = null;
   }
 
   /** @override */
@@ -140,6 +150,7 @@ class SatchelWindow extends ApplicationV2 {
     if (this.tab === 'notebook') this._showNotebook(noteId);
     else if (this.tab === 'quests' && !this._board && !this._sheet) this._showBoard();
     else if (this.tab === 'stash' && !this._stash) this._showStash();
+    else if (this.tab === 'crafting') this._showCrafting();
   }
 
   _showNotebook(noteId) {
@@ -197,8 +208,49 @@ class SatchelWindow extends ApplicationV2 {
     this._stash.load();
   }
 
+  async _showCrafting() {
+    const pane = this._panes.crafting;
+    const seq = ++this._craftSeq;
+    this._closeCrafting();
+    const message = (icon, key) => pane.replaceChildren(stateBlock(icon, t(`${key}Title`), t(key)));
+    if (!craftingAvailable()) return message('flask', 'CraftingOff');
+    const actor = this.craftActor ?? (game.user.isGM ? null : stashActor(game.user, game.actors?.contents ?? [], {
+      linked: (a) => !!a.getFlag(FLAG_SCOPE, 'entityId'),
+      allowed: (a) => a.testUserPermission(game.user, 'OWNER'),
+    }));
+    if (!actor) return game.user.isGM ? message('flask', 'CraftingGM') : message('user', 'CraftingNoCharacter');
+    if (!game.user.isGM && !game.users.activeGM) {
+      message('hourglass-half', 'CraftingNoGM');
+      // Opens by itself once a GM connects.
+      this._gmHook ??= Hooks.on('userConnected', (user, connected) => {
+        if (connected && user?.isGM && this.tab === 'crafting') this._showCrafting();
+      });
+      return;
+    }
+    try {
+      const tab = await mountCraftingTab(pane, actor.getFlag(FLAG_SCOPE, 'entityId'));
+      // Another show or a close came first; this one is no longer wanted.
+      if (seq !== this._craftSeq || !this._root) return tab.destroy();
+      this._crafting = tab;
+    } catch (err) {
+      console.warn('Chronicle: the Crafting tab could not load', err);
+      if (seq === this._craftSeq) pane.replaceChildren(stateBlock('triangle-exclamation', t('CraftingFailedTitle'), t('CraftingFailed'), true));
+    }
+  }
+
+  _closeCrafting() {
+    this._crafting?.destroy();
+    this._crafting = null;
+    if (this._gmHook !== null) {
+      Hooks.off('userConnected', this._gmHook);
+      this._gmHook = null;
+    }
+  }
+
   /** @override */
   _onClose(options) {
+    this._craftSeq++;
+    this._closeCrafting();
     this._notebook?.destroy();
     this._notebook = null;
     for (const child of [this._board, this._sheet, this._stash]) child?.close();
@@ -213,17 +265,20 @@ class SatchelWindow extends ApplicationV2 {
 
 /**
  * Open the Satchel, or bring it forward, on a tab.
- * @param {string} [tab] - notebook, quests or stash; the last one shown when left out
- * @param {{noteId?: string}} [opts] - a note to show in the notebook
+ * @param {string} [tab] - notebook, quests, stash or crafting; the last one shown when left out
+ * @param {{noteId?: string, actor?: Actor}} [opts] - a note to show in the
+ *   notebook; the hero whose crafting to show (a sheet's Crafting button)
  */
-export async function openSatchel(tab, { noteId = '' } = {}) {
+export async function openSatchel(tab, { noteId = '', actor = null } = {}) {
   if (satchel?.rendered) {
+    if (actor) satchel.craftActor = actor;
     satchel.bringToFront?.();
     satchel.show(tab ?? satchel.tab, { noteId });
     return satchel;
   }
   if (tab) lastTab = satchelTab(tab);
   satchel = new SatchelWindow();
+  if (actor) satchel.craftActor = actor;
   await satchel.render({ force: true });
   if (noteId) satchel.show('notebook', { noteId });
   return satchel;

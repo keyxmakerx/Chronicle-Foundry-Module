@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * The Satchel: the notebook, quest board and stash in one window. Its tabs
- * are the module's existing windows drawn inside it, so these pin that each
- * one is drawn frameless into its tab, that a notice opens in place, that
- * closing the Satchel closes them, and whose stash the Stash tab shows.
+ * The Satchel: the notebook, quest board, stash and crafting in one window.
+ * Its tabs are the module's existing windows drawn inside it, so these pin
+ * that each one is drawn frameless into its tab, that a notice opens in
+ * place, that closing the Satchel closes them, whose stash the Stash tab
+ * shows, and how the Crafting tab picks its hero and waits for a GM.
  */
 
 import test from 'node:test';
@@ -13,8 +14,9 @@ import { satchelTab, SATCHEL_TABS, stashActor } from '../scripts/_satchel.mjs';
 
 const read = (p) => readFile(new URL(`../${p}`, import.meta.url), 'utf8');
 
-test('three tabs, and an unknown one falls back to the notebook', () => {
-  assert.deepEqual(SATCHEL_TABS, ['notebook', 'quests', 'stash']);
+test('four tabs, and an unknown one falls back to the notebook', () => {
+  assert.deepEqual(SATCHEL_TABS, ['notebook', 'quests', 'stash', 'crafting']);
+  assert.equal(satchelTab('crafting'), 'crafting');
   assert.equal(satchelTab('stash'), 'stash');
   assert.equal(satchelTab('nope'), 'notebook');
   assert.equal(satchelTab(undefined), 'notebook');
@@ -76,4 +78,17 @@ test('every Satchel string is in en.json', async () => {
     assert.equal(typeof lang[key], 'string', key);
     assert.equal(typeof lang[`${key}Title`], 'string', `${key}Title`);
   }
+});
+
+test('the Crafting tab reloads each time, waits for a GM, and is closed with the Satchel', async () => {
+  const src = await read('scripts/satchel.mjs');
+  assert.match(src, /else if \(this\.tab === 'crafting'\) this\._showCrafting\(\);/);
+  // A sheet's button names the hero; otherwise the player's own, as for the stash.
+  assert.match(src, /const actor = this\.craftActor \?\? \(game\.user\.isGM \? null : stashActor\(/);
+  assert.match(src, /if \(!game\.user\.isGM && !game\.users\.activeGM\) \{\s*message\('hourglass-half', 'CraftingNoGM'\);/);
+  assert.match(src, /Hooks\.on\('userConnected', \(user, connected\) => \{\s*if \(connected && user\?\.isGM && this\.tab === 'crafting'\) this\._showCrafting\(\);/);
+  assert.match(src, /_onClose\(options\) \{\s*this\._craftSeq\+\+;\s*this\._closeCrafting\(\);/);
+  assert.match(src, /Hooks\.off\('userConnected', this\._gmHook\);/);
+  const button = await read('scripts/crafting-button.mjs');
+  assert.match(button, /openSatchel\('crafting', \{ actor \}\)/);
 });
