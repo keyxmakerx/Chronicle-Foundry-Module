@@ -24,7 +24,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
 const SCRIPTS = resolve(REPO_ROOT, 'scripts');
 
-const { confirmDialog, promptDialog } = await import('../scripts/_dialogs.mjs');
+const { choiceDialog, confirmDialog, promptDialog } = await import('../scripts/_dialogs.mjs');
 
 function clearGlobals() {
   delete globalThis.foundry;
@@ -124,6 +124,53 @@ test('promptDialog: DialogV2.prompt throws → falls back to V1 Dialog.prompt', 
 test('promptDialog: neither API present → null', async () => {
   clearGlobals();
   assert.equal(await promptDialog({ title: 'T', callback: () => 'x' }), null);
+});
+
+// ---------------------------------------------------------------------
+// choiceDialog — several buttons
+// ---------------------------------------------------------------------
+const BUTTONS = [{ action: 'later', label: 'Not now' }, { action: 'put', label: 'Put', default: true }];
+
+test('choiceDialog: DialogV2.wait → the pressed button and what read() took from the root', async () => {
+  clearGlobals();
+  const fakeRoot = { id: 'root' };
+  let recorded;
+  setDialogV2({
+    wait: async (opts) => {
+      recorded = opts;
+      const put = opts.buttons.find((b) => b.action === 'put');
+      return put.callback({}, {}, { element: fakeRoot });
+    },
+  });
+  const out = await choiceDialog({ title: 'T', content: 'C', buttons: BUTTONS, read: (root) => root.id });
+  assert.deepEqual(out, { action: 'put', value: 'root' });
+  assert.deepEqual(recorded.window, { title: 'T' });
+  assert.equal(recorded.rejectClose, false);
+  assert.deepEqual(recorded.buttons.map((b) => [b.action, b.default]), [['later', false], ['put', true]]);
+});
+
+test('choiceDialog: dismissed → null', async () => {
+  clearGlobals();
+  setDialogV2({ wait: async () => null });
+  assert.equal(await choiceDialog({ buttons: BUTTONS }), null);
+});
+
+test('choiceDialog: no DialogV2 → V1 Dialog; a button answers once, closing alone is null', async () => {
+  clearGlobals();
+  let made;
+  globalThis.Dialog = class {
+    constructor(opts) { made = opts; }
+    render() { made.buttons.later.callback([{ id: 'v1root' }]); made.close(); }
+  };
+  assert.deepEqual(await choiceDialog({ buttons: BUTTONS, read: (root) => root.id }), { action: 'later', value: 'v1root' });
+  assert.equal(made.default, 'put');
+  globalThis.Dialog = class {
+    constructor(opts) { made = opts; }
+    render() { made.close(); }
+  };
+  assert.equal(await choiceDialog({ buttons: BUTTONS }), null);
+  clearGlobals();
+  assert.equal(await choiceDialog({ buttons: BUTTONS }), null);
 });
 
 // ---------------------------------------------------------------------
