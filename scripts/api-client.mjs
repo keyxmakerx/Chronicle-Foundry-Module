@@ -842,6 +842,11 @@ export class ChronicleAPI {
     this._doConnect();
   }
 
+  /** Whether the client means to be connected; false after disconnect(). */
+  get wantsConnection() {
+    return this._shouldConnect;
+  }
+
   /**
    * Disconnect from the Chronicle WebSocket server.
    */

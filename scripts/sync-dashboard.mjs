@@ -1202,9 +1202,13 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     // Saving the connection on the first-run screen marks the rest of the
     // setup to open once Foundry has reloaded and connected.
     const firstSave = context.configured === false;
-    wireSettingsForm(el.querySelector('[data-settings-form]'), this._settings, async () => {
+    wireSettingsForm(el.querySelector('[data-settings-form]'), this._settings, async (result) => {
       if (firstSave) await setSetting('firstRunPending', true).catch(() => {});
-      this.render({ force: true });
+      await this.render({ force: true });
+      // A new connection is tested straight away, so a wrong key shows now
+      // rather than as a silent dot later.
+      const button = result?.connectionChanged && this.element?.querySelector('[data-action="testConnection"]');
+      if (button) testConnection(this.element, button).catch((err) => console.warn('Chronicle Sync | Connection test failed to run', err));
     });
     this._historyTab.mount(el, this._historyShown());
 
@@ -2265,7 +2269,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       ui.notifications[ok ? 'info' : 'warn'](ok ? 'Chronicle: Matched and synced.' : 'Chronicle: Match failed.');
     } catch (err) {
       console.error('Chronicle Dashboard: match failed', err);
-      ui.notifications.error('Chronicle: Match failed — see console.');
+      ui.notifications.error(game.i18n.format('CHRONICLE.Notifications.MatchFailed', { message: noticeText(err?.message ?? '') }));
     }
     this.render({ force: true });
   }
@@ -2281,7 +2285,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       ui.notifications[ok ? 'info' : 'warn'](ok ? 'Chronicle: Created and linked.' : 'Chronicle: Create failed.');
     } catch (err) {
       console.error('Chronicle Dashboard: create failed', err);
-      ui.notifications.error('Chronicle: Create failed — see console.');
+      ui.notifications.error(game.i18n.format('CHRONICLE.Notifications.CreateFailed', { message: noticeText(err?.message ?? '') }));
     }
     this.render({ force: true });
   }
@@ -2297,7 +2301,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       ui.notifications[ok ? 'info' : 'warn'](ok ? 'Chronicle: Re-synced to Chronicle.' : 'Chronicle: Re-sync failed.');
     } catch (err) {
       console.error('Chronicle Dashboard: re-sync failed', err);
-      ui.notifications.error('Chronicle: Re-sync failed — see console.');
+      ui.notifications.error(game.i18n.format('CHRONICLE.Notifications.ResyncFailed', { message: noticeText(err?.message ?? '') }));
     }
     this.render({ force: true });
   }

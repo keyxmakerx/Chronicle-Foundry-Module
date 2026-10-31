@@ -215,7 +215,24 @@
       "Disconnected": "Disconnected from Chronicle",
       "Reconnecting": "Reconnecting to Chronicle...",
       "Error": "Chronicle sync error",
-      "SyncPaused": "Sync paused — changes are queued"
+      "SyncPaused": "Sync paused — changes are queued",
+      "Indicator": {
+        "connected": "Chronicle: Connected",
+        "connecting": "Chronicle: Connecting…",
+        "reconnecting": "Chronicle: Reconnecting…",
+        "disconnected": "Chronicle: Disconnected"
+      },
+      "Tooltip": {
+        "connected": "Connected to Chronicle. Click to open the dashboard.",
+        "connecting": "Connecting to Chronicle…",
+        "reconnecting": "Connection lost. Reconnecting automatically…",
+        "disconnected": "Disconnected from Chronicle. Click to reconnect. Right-click for the dashboard."
+      },
+      "LastChange": "Last change from Chronicle: {when}.",
+      "NoChangeYet": "No changes from Chronicle since connecting.",
+      "Lost": "Chronicle: Connection lost. Reconnecting automatically…",
+      "Back": "Chronicle: Reconnected.",
+      "ReconnectingNow": "Chronicle: Reconnecting…"
     },
     "Notifications": {
       "JournalSynced": "Journal synced from Chronicle: {name}",
@@ -225,6 +242,10 @@
       "ConflictKeptFoundry": "Conflict on \"{name}\" — kept Foundry version.",
       "ConflictNewerChronicle": "Conflict on \"{name}\" — Chronicle version was newer.",
       "ConflictNewerFoundry": "Conflict on \"{name}\" — Foundry version was newer.",
+      "InitialSyncFailed": "Chronicle: The first sync failed ({message}). The dashboard's History tab lists what happened.",
+      "MatchFailed": "Chronicle: Match failed: {message}",
+      "CreateFailed": "Chronicle: Create failed: {message}",
+      "ResyncFailed": "Chronicle: Re-sync failed: {message}",
       "MembersMatched": "Auto-matched {count} Chronicle members to Foundry users.",
       "ConnectionLost": "Lost connection to Chronicle. Retrying...",
       "ConnectionRestored": "Connection to Chronicle restored"
@@ -1361,6 +1382,11 @@
         "foundry": "Foundry wins",
         "newest": "Newest wins"
       },
+      "ConflictHint": {
+        "chronicle": "Your edit in Foundry is replaced by the Chronicle version.",
+        "foundry": "The edit made in Chronicle is overwritten by your Foundry version.",
+        "newest": "Whichever side was saved last is kept; the other edit is replaced."
+      },
       "AutoSync": "Sync changes as they happen",
       "AutoSyncHint": "Off means changes wait until you press Sync now in the dashboard.",
       "ExcludeTags": "Leave out pages tagged",
@@ -1373,7 +1399,7 @@
       "Save": "Save",
       "Saved": "Chronicle settings saved.",
       "SaveFailed": "Chronicle settings weren't saved: {message}",
-      "ReloadToConnect": "Connection changed. Reload Foundry to connect with it."
+      "ReloadForCampaign": "Campaign changed. Reload Foundry to switch to it."
     }
   }
 }

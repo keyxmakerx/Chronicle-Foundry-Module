@@ -47,6 +47,7 @@ import { questLive, registerQuestBoard } from './quest-board.mjs';
 import { retireNotesFolder } from './_notes-folder.mjs';
 import { FLAG_SCOPE, MODULE_ID, syncOptions } from './constants.mjs';
 import { removedFolder } from './_set-aside.mjs';
+import { stateKey, statusLabel, statusTooltip, isChronicleChange } from './_status-dot.mjs';
 
 /** @type {SyncManager|null} */
 let syncManager = null;
@@ -442,41 +443,35 @@ function _addStatusIndicator() {
   text.textContent = 'Chronicle';
   indicator.append(dot, text);
 
+  const localize = (key) => game.i18n.localize(key);
+  const format = (key, data) => game.i18n.format(key, data);
+  // When Chronicle last sent a change, for the tooltip.
+  let lastChangeAt = null;
+  const tooltip = (state) => statusTooltip(state ?? syncManager.api.state, {
+    lastChangeAt, now: Date.now(), lang: game.i18n.lang, localize, format,
+  });
+
   // Update indicator based on WebSocket state.
   const updateState = (state) => {
     if (!state) state = syncManager.api.state;
-    indicator.className = `chronicle-sync-status ${state}`;
-    indicator.title = _statusTooltip(state);
-
-    const text = indicator.querySelector('.status-text');
-    switch (state) {
-      case 'connected':
-        text.textContent = 'Chronicle: Connected';
-        break;
-      case 'connecting':
-        text.textContent = 'Chronicle: Connecting...';
-        break;
-      case 'reconnecting':
-        text.textContent = 'Chronicle: Reconnecting...';
-        break;
-      default:
-        text.textContent = 'Chronicle: Disconnected';
-    }
+    indicator.className = `chronicle-sync-status ${stateKey(state)}`;
+    indicator.title = tooltip(state);
+    indicator.querySelector('.status-text').textContent = statusLabel(state, localize);
   };
+  // "3 minutes ago" goes stale, so the tooltip is worked out again on hover.
+  indicator.addEventListener('mouseenter', () => { indicator.title = tooltip(); });
 
   // Event-driven state updates (no polling).
   let wasConnected = false;
   syncManager.api.onStateChange((state) => {
     updateState(state);
-    // Notify on disconnect (only if we were previously connected).
-    if (state === 'disconnected' && wasConnected) {
-      ui.notifications.warn('Chronicle: Connection lost. Reconnecting automatically...');
+    // A drop the client didn't ask for; a reconnect after saving new
+    // settings disconnects on purpose and says nothing here.
+    if (state === 'disconnected' && wasConnected && syncManager.api.wantsConnection) {
+      ui.notifications.warn(localize('CHRONICLE.Status.Lost'));
     }
     if (state === 'connected') {
-      if (wasConnected) {
-        // Reconnected after a disconnect.
-        ui.notifications.info('Chronicle: Reconnected.');
-      }
+      if (wasConnected) ui.notifications.info(localize('CHRONICLE.Status.Back'));
       wasConnected = true;
     }
   });
@@ -486,7 +481,7 @@ function _addStatusIndicator() {
   indicator.addEventListener('click', () => {
     if (syncManager.api.state === 'disconnected') {
       syncManager.api.connect();
-      ui.notifications.info('Chronicle: Reconnecting...');
+      ui.notifications.info(localize('CHRONICLE.Status.ReconnectingNow'));
     } else {
       openDashboard();
     }
@@ -501,7 +496,8 @@ function _addStatusIndicator() {
   // Flash the dot briefly when a WS message arrives (activity indicator).
   // Throttled to avoid excessive DOM manipulation under high message volume.
   let activityThrottled = false;
-  syncManager.api.on('*', () => {
+  syncManager.api.on('*', (msg) => {
+    if (isChronicleChange(msg)) lastChangeAt = Date.now();
     if (activityThrottled) return;
     activityThrottled = true;
     const dot = indicator.querySelector('.status-dot');
@@ -544,25 +540,6 @@ Hooks.on('renderSidebar', () => {
     console.debug('Chronicle Sync | status-indicator re-attach skipped', err);
   }
 });
-
-/**
- * Return tooltip text for the connection status indicator.
- * @param {string} state
- * @returns {string}
- * @private
- */
-function _statusTooltip(state) {
-  switch (state) {
-    case 'connected':
-      return 'Connected to Chronicle. Click to open dashboard.';
-    case 'connecting':
-      return 'Connecting to Chronicle...';
-    case 'reconnecting':
-      return 'Connection lost. Reconnecting automatically...';
-    default:
-      return 'Disconnected from Chronicle. Click to reconnect. Right-click for dashboard.';
-  }
-}
 
 /**
  * Expose the sync manager globally for debugging and integration.

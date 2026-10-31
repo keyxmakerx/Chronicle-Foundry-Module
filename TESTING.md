@@ -18,6 +18,12 @@ root. There is no `package.json`.
 - [ ] Status indicator shows green dot when connected
 - [ ] Status indicator shows yellow during reconnection
 - [ ] Status indicator shows red when disconnected
+- [ ] Hover the indicator while connected: the tooltip ends "Last change from Chronicle: N minutes ago" (or "No changes from Chronicle since connecting"), and the time moves on between hovers
+- [ ] Settings → Connection: change the API key to a wrong one and Save -> no reload asked; Test connection runs by itself and its steps show the key refused. Put the right key back and Save -> the steps go green and the dot turns green without a reload, with no "Connection lost" toast
+- [ ] On a world that was never connected, paste a connect line and Save -> sync starts without a reload (journals pull in)
+- [ ] Change the campaign to another one and Save -> a toast asks to reload Foundry to switch campaigns
+- [ ] Settings → Advanced → When both sides changed: each choice shows one line under it saying which edit is replaced
+- [ ] Edit the same journal in Chronicle and Foundry with "Newest wins" -> no toast; Chronicle Sync → History shows the conflict and which side was kept. With "Chronicle wins" or "Foundry wins" -> a toast names the journal and the side kept
 - [ ] WebSocket auto-reconnects after network interruption (wait 30s)
 - [ ] Message queue drains after reconnection
 

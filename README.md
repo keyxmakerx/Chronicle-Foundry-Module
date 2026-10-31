@@ -89,7 +89,7 @@ version your campaign's update choice gives.
 
 1. Enable the module in your world's **Module Management**
 2. Open **Game Settings → Configure Settings → Chronicle Sync → Chronicle settings → Open Chronicle Sync settings**
-3. On **Connection**, paste the **Connect line** from Chronicle (your campaign → **Manage → Foundry**, **Connection** card → **Make a connect line**) and save; it fills in the URL, API key and campaign ID, then reload Foundry. Or open **Enter details by hand**
+3. On **Connection**, paste the **Connect line** from Chronicle (your campaign → **Manage → Foundry**, **Connection** card → **Make a connect line**) and save; it fills in the URL, API key and campaign ID, connects straight away and runs **Test connection** for you. Only switching to a different campaign asks you to reload Foundry. Or open **Enter details by hand**
 4. On **What syncs**, switch on the parts you want (Journals, Maps, Calendar, Characters, Shops) and pick a direction for each
 
 The module runs sync for the GM only. Players receive updates passively through Foundry.

@@ -18,6 +18,7 @@ import { walkChangeFeed, cursorFor, feedForArea, FEED_PAGE_SIZE, FEED_SETTLE_MS 
 import { getSetting, setSetting, isConfigured, getSyncDirections, getExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
 import { memberKey } from './_member-mapping.mjs';
 import { fetchChronicleVersion } from './_chronicle-version.mjs';
+import { connectionAction } from './_connection-change.mjs';
 
 /**
  * How long the connection must stay continuously connected after a reconnect
@@ -115,6 +116,13 @@ export class SyncManager {
     /** @type {boolean} Whether initial sync has completed. */
     this._initialSyncDone = false;
 
+    /** @type {boolean} Whether start() got as far as connecting. */
+    this._started = false;
+    /** @type {string|null} The campaign the running sync was started for. */
+    this._startedCampaign = null;
+    /** @type {Promise<void>|null} A start in progress, so two never overlap. */
+    this._startPromise = null;
+
     /** @type {string|null} The connected Chronicle's version, read on connect. */
     this._chronicleVersion = null;
 
@@ -175,9 +183,40 @@ export class SyncManager {
 
   /**
    * Start the sync manager. Connects to Chronicle and performs initial sync.
-   * Only runs for GMs when the module is configured.
+   * Only runs for GMs when the module is configured. Safe to call again: a
+   * start that stopped early (not set up, sync off) runs afresh, and one
+   * that got as far as connecting is never repeated, since repeating it
+   * would initialise every part twice.
    */
   async start() {
+    if (this._started) return;
+    this._startPromise ??= this._startOnce().finally(() => { this._startPromise = null; });
+    return this._startPromise;
+  }
+
+  /**
+   * Pick up a connection saved in Settings without reloading Foundry.
+   * @returns {Promise<'started'|'reconnected'|'reload'|'off'>} 'off' when
+   *   sync didn't start (not set up, switched off, or not the GM)
+   */
+  async applyConnection() {
+    if (!game.user.isGM) return 'off';
+    const action = connectionAction({
+      started: this._started, startedCampaign: this._startedCampaign, campaign: getSetting('campaignId'),
+    });
+    if (action === 'reload') return 'reload';
+    if (action === 'start') {
+      await this.start();
+      return this._started ? 'started' : 'off';
+    }
+    this.api.disconnect();
+    this.api.connect();
+    this.logActivity('connect', 'Reconnected with the connection saved in Settings');
+    return 'reconnected';
+  }
+
+  /** The body of start(); see there. @private */
+  async _startOnce() {
     if (!game.user.isGM) {
       console.debug('Chronicle: Non-GM user, skipping sync');
       return;
@@ -229,6 +268,9 @@ export class SyncManager {
     // after a drop, so changes made on Chronicle during the disconnect
     // window aren't lost until a world reload.
     this.api.onStateChange((state) => this._onConnectionStateChange(state));
+
+    this._started = true;
+    this._startedCampaign = getSetting('campaignId');
 
     // Connect WebSocket.
     this.api.connect();
@@ -600,6 +642,8 @@ export class SyncManager {
     this._modules = [];
     this._initialSyncDone = false;
     this._sawDisconnect = false;
+    this._started = false;
+    this._startedCampaign = null;
     if (this._historyTimer) {
       clearInterval(this._historyTimer);
       this._historyTimer = null;
@@ -852,13 +896,13 @@ export class SyncManager {
       // The first page's server_time, so changes made mid-walk are re-read.
       await setSetting('lastSyncTime', result.serverTime || new Date().toISOString());
 
+      // A routine success: History has it, no toast.
       this.logActivity('connect', `Initial sync complete (${result.mappings.length} mappings)`);
-      ui.notifications.info('Chronicle: Initial sync complete');
       return true;
     } catch (err) {
       console.error('Chronicle: Initial sync failed', err);
       this.logActivity('error', `Initial sync failed: ${err.message || 'Unknown error'}`);
-      ui.notifications.error('Chronicle: Initial sync failed. Check console for details.');
+      ui.notifications.error(game.i18n.format('CHRONICLE.Notifications.InitialSyncFailed', { message: noticeText(err?.message || 'Unknown error') }));
       return false;
     }
   }
