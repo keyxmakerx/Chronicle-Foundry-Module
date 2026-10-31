@@ -3,7 +3,7 @@
  * (Chronicle's PUT /entities/:id/fields is a partial merge: anything absent
  * keeps its stored value, including fields only Chronicle edits).
  *
- * Pure — see tools/test-actor-field-diff.mjs.
+ * Pure — see tools/test-actor-push.mjs.
  */
 
 import { removesKey } from './_flag-removal.mjs';

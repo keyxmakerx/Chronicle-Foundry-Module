@@ -16,6 +16,15 @@ const T1 = '2026-10-03T04:00:01Z';
 const T2 = '2026-10-03T04:00:02Z';
 const ch = (seq, resourceId, op = 'updated') => ({ seq, type: 'entity', resourceId, op });
 
+/** What Foundry does with an update's flag keys: set them, or remove a `-=` one. */
+function applyFlags(flags, data) {
+  for (const [k, v] of Object.entries(data || {})) {
+    const m = k.match(/^flags\.chronicle-sync\.(-=)?(.+)$/);
+    if (!m) continue;
+    if (m[1]) delete flags[m[2]]; else flags[m[2]] = v;
+  }
+}
+
 function actor(id, entityId, version, over = {}) {
   const flags = { entityId, chronicleUpdatedAt: version };
   const a = {
@@ -23,7 +32,7 @@ function actor(id, entityId, version, over = {}) {
     getFlag: (_s, k) => flags[k],
     setFlag: async (_s, k, v) => { flags[k] = v; a.writes.push(`flag ${k}`); },
     unsetFlag: async (_s, k) => { delete flags[k]; a.writes.push(`unset ${k}`); },
-    update: async (d) => { a.writes.push(`update ${JSON.stringify(d)}`); },
+    update: async (d) => { applyFlags(flags, d); a.writes.push(`update ${JSON.stringify(d)}`); },
     ...over,
   };
   return a;

@@ -53,7 +53,7 @@ const SAVE_ACTION = ChronicleMarkerConfigDialog.DEFAULT_OPTIONS.actions['save-ma
 
 /**
  * A marker exactly as Chronicle serves it: the editable fields, the three
- * optional columns the bug dropped, plus the read-only/joined keys.
+ * optional columns, plus the read-only/joined keys.
  */
 function storedMarker(overrides = {}) {
   return {

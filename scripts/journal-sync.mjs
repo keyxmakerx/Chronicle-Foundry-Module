@@ -464,8 +464,8 @@ export class JournalSync {
   /**
    * Re-fetch every Chronicle entity and apply it to Foundry. Unlike
    * `_onPullAll` (which only creates journals for chronicle-only entities),
-   * this also updates existing journals — refreshing content, name, and
-   * ownership — the fix for journals that synced before a permission change.
+   * this also updates existing journals (content, name, ownership), so it
+   * repairs journals that synced before a permission change.
    *
    * Paginated fetch of all entities; for each, update if a journal exists
    * (re-running `_buildOwnership`) or create it otherwise. Sequential, not
@@ -498,10 +498,9 @@ export class JournalSync {
       }
     }
 
-    // Paginated fetch — shares the walk with the dashboard's
-    // _buildEntityGroups (scripts/_entity-page-walk.mjs). Both used to stop
-    // after five pages, so a campaign past 500 entities resynced only its
-    // first 500 and reported a clean finish.
+    // Shares the walk with the dashboard's _buildEntityGroups
+    // (_entity-page-walk.mjs). A walk cut short must report `truncated`, not
+    // a clean finish.
     let allEntities = [];
     let truncated = false;
     this._lastWalk = null;
@@ -843,47 +842,6 @@ export class JournalSync {
   }
 
   /**
-   * Find or create a Foundry folder for an entity type.
-   * Uses enriched entity type data (color, sort_order) when available.
-   * @param {object} entity - Entity with type_name, entity_type_id, type_color.
-   * @returns {Promise<Folder|null>}
-   * @private
-   */
-  async _getOrCreateEntityFolder(entity) {
-    const typeName = entity.type_name;
-    if (!typeName) return null;
-
-    // Check for existing folder with this entity type ID.
-    let folder = game.folders.find(
-      (f) => f.type === 'JournalEntry' && f.getFlag(FLAG_SCOPE, 'entityTypeId') === entity.entity_type_id
-    );
-    if (folder) return folder;
-
-    // Check by name fallback.
-    folder = game.folders.find(
-      (f) => f.type === 'JournalEntry' && f.name === typeName
-    );
-    if (folder) {
-      // Tag the existing folder with the entity type ID.
-      await folder.setFlag(FLAG_SCOPE, 'entityTypeId', entity.entity_type_id);
-      if (entity.type_color && !folder.color) {
-        await folder.update({ color: entity.type_color });
-      }
-      return folder;
-    }
-
-    // Create a new folder with entity type enrichment.
-    const folderData = {
-      name: typeName,
-      type: 'JournalEntry',
-      flags: { [FLAG_SCOPE]: { entityTypeId: entity.entity_type_id } },
-    };
-    if (entity.type_color) folderData.color = entity.type_color;
-
-    return Folder.create(folderData, syncOptions());
-  }
-
-  /**
    * The Foundry folder a page's journal belongs in: its category inside any
    * parent category, then its Chronicle folders. Made as needed.
    * @param {object} entity
@@ -892,6 +850,13 @@ export class JournalSync {
    */
   async _getOrCreateEntityFolder(entity) {
     this._rememberEntity(entity);
+    // Without Chronicle's categories the page lands by its own category
+    // only; forget the recorded layout so the next connect that reads them
+    // nests it properly.
+    if (!this._treeLoaded && !this._layoutForgotten) {
+      this._layoutForgotten = true;
+      await setSetting('folderLayout', '');
+    }
     const depth = globalThis.CONST?.FOLDER_MAX_DEPTH ?? 4;
     let parent = null;
     for (const level of folderChain(entity, this._tree, depth)) {
@@ -910,14 +875,22 @@ export class JournalSync {
    * One level of the chain: found by its flag (a category folder from older
    * versions also by name), else made. A folder sync made follows Chronicle's
    * nesting and names unless the GM filed it inside a folder of their own.
+   * Categories that share a name and a place share one folder: its own
+   * category is `entityTypeId`, the others are listed in `entityTypeIds`.
    * @private
    */
   async _folderForLevel(level, parent) {
     const flag = level.kind === 'type' ? 'entityTypeId' : 'folderNodeId';
+    const parentId = parent?.id ?? null;
     let folder = game.folders.find((f) => f.type === 'JournalEntry' && f.getFlag(FLAG_SCOPE, flag) === level.id);
     if (!folder && level.kind === 'type') {
+      folder = this._typeTwin(level, parentId);
+      if (folder) {
+        await this._addTwinType(folder, level.id);
+        return folder;
+      }
       folder = game.folders.find((f) => f.type === 'JournalEntry' && f.name === level.name
-        && !this._isSyncFolder(f) && (f.folder?.id ?? null) === (parent?.id ?? null));
+        && !this._isSyncFolder(f) && (f.folder?.id ?? null) === parentId);
       if (folder) await folder.setFlag(FLAG_SCOPE, 'entityTypeId', level.id);
     }
     if (folder) {
@@ -931,8 +904,14 @@ export class JournalSync {
       if (Object.keys(updates).length) await folder.update(updates, syncOptions());
       return folder;
     }
-    const making = this._folderMaking.get(level.key);
-    if (making) return making;
+    // Same-named categories in one place wait on one create.
+    const makingKey = level.kind === 'type' ? `type:${parentId}:${level.name}` : level.key;
+    const making = this._folderMaking.get(makingKey);
+    if (making) {
+      const made = await making;
+      if (level.kind === 'type' && made && made.getFlag(FLAG_SCOPE, 'entityTypeId') !== level.id) await this._addTwinType(made, level.id);
+      return made;
+    }
     const data = {
       name: level.name,
       type: 'JournalEntry',
@@ -940,9 +919,76 @@ export class JournalSync {
       flags: { [FLAG_SCOPE]: { [flag]: level.id } },
     };
     if (level.color) data.color = level.color;
-    const run = Folder.create(data, syncOptions()).finally(() => this._folderMaking.delete(level.key));
-    this._folderMaking.set(level.key, run);
+    const run = Folder.create(data, syncOptions()).finally(() => this._folderMaking.delete(makingKey));
+    this._folderMaking.set(makingKey, run);
     return run;
+  }
+
+  /**
+   * A category folder sync made for another category with this one's name,
+   * in the same place: the folder this category shares.
+   * @private
+   */
+  _typeTwin(level, parentId) {
+    return game.folders.find((f) => f.type === 'JournalEntry' && f.name === level.name
+      && f.getFlag(FLAG_SCOPE, 'entityTypeId') != null
+      && (f.folder?.id ?? null) === parentId) ?? null;
+  }
+
+  /** Record that a category shares this folder. @private */
+  async _addTwinType(folder, typeId) {
+    const ids = folder.getFlag(FLAG_SCOPE, 'entityTypeIds') ?? [];
+    if (folder.getFlag(FLAG_SCOPE, 'entityTypeId') === typeId || ids.includes(typeId)) return;
+    await folder.update({ [`flags.${FLAG_SCOPE}.entityTypeIds`]: [...ids, typeId] }, syncOptions());
+  }
+
+  /** Journal folders sync made (a category's or a Chronicle folder's). @private */
+  _syncFolders() {
+    return game.folders.filter((f) => f.type === 'JournalEntry' && this._isSyncFolder(f));
+  }
+
+  /**
+   * Fold category folders that share a name and a place into one, so two
+   * Chronicle categories with one name show as one folder. What a twin
+   * held moves into the folder kept; no journal is deleted.
+   * @private
+   */
+  async _mergeTwinFolders() {
+    const groups = new Map();
+    for (const f of this._syncFolders()) {
+      if (f.getFlag(FLAG_SCOPE, 'entityTypeId') == null) continue;
+      const key = `${f.folder?.id ?? ''}|${f.name}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(f);
+    }
+    for (const [keep, ...twins] of groups.values()) {
+      for (const twin of twins) {
+        for (const j of game.journal.filter((x) => x.folder?.id === twin.id)) {
+          await j.update({ folder: keep.id }, syncOptions());
+        }
+        for (const child of game.folders.filter((x) => x.folder?.id === twin.id)) {
+          await child.update({ folder: keep.id }, syncOptions());
+        }
+        await this._addTwinType(keep, twin.getFlag(FLAG_SCOPE, 'entityTypeId'));
+        for (const id of twin.getFlag(FLAG_SCOPE, 'entityTypeIds') ?? []) await this._addTwinType(keep, id);
+        await twin.delete(syncOptions());
+      }
+    }
+  }
+
+  /**
+   * Remove folders sync made that hold nothing, innermost first: a category
+   * or Chronicle folder with no journal here. A folder the GM made is never
+   * touched, nor one holding anything.
+   * @private
+   */
+  async _removeEmptySyncFolders() {
+    for (;;) {
+      const empty = this._syncFolders().filter((f) => !game.journal.some((j) => j.folder?.id === f.id)
+        && !game.folders.some((c) => c.folder?.id === f.id));
+      if (!empty.length) return;
+      for (const f of empty) await f.delete(syncOptions());
+    }
   }
 
   /** Note where a page sits, for its own place and its sub-pages'. @private */
@@ -996,6 +1042,12 @@ export class JournalSync {
   async _placeAll(entities) {
     for (const e of entities) this._rememberEntity(e);
     let failed = 0;
+    try {
+      await this._mergeTwinFolders();
+    } catch (err) {
+      failed++;
+      console.warn('Chronicle: could not merge same-named category folders', err);
+    }
     for (const entity of entities) {
       const journal = this._findJournal(entity?.id);
       if (!journal || this._isHandledByActorSync(entity)) continue;
@@ -1006,7 +1058,15 @@ export class JournalSync {
         console.warn(`Chronicle: could not move "${journal.name}" to its folder`, err);
       }
     }
-    if (!failed && this._pendingLayout) await setSetting('folderLayout', this._pendingLayout);
+    if (failed) return;
+    // Every journal is where its page is, so a folder sync made that holds
+    // nothing now has no page here to hold.
+    try {
+      await this._removeEmptySyncFolders();
+    } catch (err) {
+      console.warn('Chronicle: could not remove empty folders', err);
+    }
+    if (this._pendingLayout) await setSetting('folderLayout', this._pendingLayout);
   }
 
   _createJournalFromEntity(entity, forceId) {
@@ -1382,9 +1442,7 @@ export class JournalSync {
       // The debounce has no hook userId; the hooks only schedule this for the local user's own edits.
       this._syncManager?.recordUserOutcome?.(game.user.id);
     } catch (err) {
-      // Surface the failure and queue the (idempotent) update for retry on
-      // reconnect; a stale expected_updated_at surfaces as a conflict on
-      // the next pull rather than corrupting data.
+      // Surface the failure and queue the update for retry on reconnect.
       console.error('Chronicle: Failed to push journal update', err);
       this._syncManager?.recordUserOutcome?.(game.user.id, err);
       const retry = changedJournalFields({
@@ -1394,10 +1452,18 @@ export class JournalSync {
       const entry = await this._entryForPush(journal, entityId, { fetch: false }).catch(() => undefined);
       if (entry !== undefined) retry.entry = entry;
       // Keep the conflict check, so a replay never overwrites a Chronicle
-      // edit made while this push waited.
+      // edit made while this push waited; a 409 then goes through the same
+      // conflict setting a live push uses.
       const retryVersion = journal.getFlag(FLAG_SCOPE, 'chronicleUpdatedAt');
       if (retryVersion) retry.expected_updated_at = retryVersion;
-      this._api.queueForRetry?.('PUT', `/entities/${entityId}`, retry);
+      const journalId = journal.id;
+      this._api.queueForRetry?.('PUT', `/entities/${entityId}`, retry, undefined, {
+        onConflict: async (body) => {
+          const current = game.journal.get(journalId);
+          if (current?.getFlag(FLAG_SCOPE, 'entityId') !== entityId) return;
+          await this._handleConflict(current, entityId, body);
+        },
+      });
       ui.notifications?.warn?.(`Chronicle: Failed to push update for "${noticeText(journal.name)}" — queued for retry. See the sync dashboard.`);
     }
   }

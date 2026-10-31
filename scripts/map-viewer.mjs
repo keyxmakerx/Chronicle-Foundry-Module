@@ -415,7 +415,7 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
     const cur = Number(t.current_hp) || 0;
     const hpPct = max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : null;
     // Token image surfaces in the overlay as `<img src="{{image}}">`.
-    // Apply M-2 host-allowlist: a full URL must match apiUrl's host;
+    // Host allowlist: a full URL must match apiUrl's host;
     // anything else (relative path, empty) passes through unchanged.
     const rawImage = t.image || t.image_url || '';
     let image = rawImage;

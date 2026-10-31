@@ -20,6 +20,7 @@ import {
   GLOBE, MINI, clearOf, cornerByKey, cornerOf, cornerSpots, cradleLayout, figureLight,
   framesPerSecond, frontOf, frontWeather, glassDrops, mixWeather, nearestCorner, plainRecipe, skyCalendar, skyEvents, skyWeather, stoneWeather,
 } from './_sky-clock.mjs';
+import { escapeHtml as esc } from './_escape-html.mjs';
 
 /** Chronicle's sky, in the order its files depend on each other. */
 const SKY_FILES = ['sky_world.js', 'sky_looks.js', 'sky_moon.js', 'sky_events.js', 'sky_2d.js', 'sky_shaders.js', 'sky_gl.js', 'sky_pane.js'];
@@ -52,10 +53,6 @@ function srgb(lin) {
     const c = clamp(v, 0, 1);
     return 255 * (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
   });
-}
-
-function esc(s) {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function reducedMotion() {

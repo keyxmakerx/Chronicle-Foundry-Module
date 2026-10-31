@@ -2105,8 +2105,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /**
    * Re-fetch every Chronicle entity and apply it to Foundry, updating existing
-   * journals (name, content, AND permissions) as well as creating missing ones.
-   * This is the correct fix for journals with stale permissions.
+   * journals (name, content and permissions) as well as creating missing ones;
+   * this refreshes journals with stale permissions.
    * @private
    */
   async _onResyncAllJournals() {

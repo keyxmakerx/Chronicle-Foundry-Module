@@ -169,7 +169,7 @@ test('pin: start() registers an onStateChange listener for reconnect', () => {
   const src = readFileSync(resolve(REPO_ROOT, 'scripts/sync-manager.mjs'), 'utf8');
   assert.ok(
     /this\.api\.onStateChange\(\(state\)\s*=>\s*this\._onConnectionStateChange\(state\)\)/.test(src),
-    'start() must wire api.onStateChange → _onConnectionStateChange (FM-SYNC-HARDENING §2)',
+    'start() must wire api.onStateChange → _onConnectionStateChange',
   );
 });
 

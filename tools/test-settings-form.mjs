@@ -181,7 +181,7 @@ test('the dashboard no longer carries its own Config and Members tabs', async ()
   const { readFileSync } = await import('node:fs');
   const hbs = readFileSync(new URL('../templates/sync-dashboard.hbs', import.meta.url), 'utf8');
   assert.doesNotMatch(hbs, /data-tab="config"|data-tab="members"/);
-  // The old Config tab put the saved key into the page.
+  // The saved key must never be rendered into the page.
   assert.doesNotMatch(hbs, /config\.apiKey/);
   const win = readFileSync(new URL('../templates/chronicle-settings.hbs', import.meta.url), 'utf8');
   assert.match(win, /data-member-key=/);

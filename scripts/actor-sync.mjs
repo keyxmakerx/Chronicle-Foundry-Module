@@ -2,7 +2,7 @@
  * Chronicle Sync - Actor/Character Sync
  *
  * Bidirectional sync between Chronicle character entities and Foundry Actors.
- * Only active when a matching game system is detected (F-3) and the
+ * Only active when a matching game system is detected and the
  * syncCharacters setting is enabled.
  *
  * Sync flow:
@@ -19,6 +19,7 @@ import { getSetting, getUserMappings } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
 import { createGenericAdapter } from './adapters/generic-adapter.mjs';
 import { FLAG_SCOPE, syncOptions, APPLY_OPTION } from './constants.mjs';
+import { flagRemoval } from './_flag-removal.mjs';
 import { planClaimOwnership } from './_claim-ownership-plan.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { walkEntityPages, unwrapEntityList } from './_entity-page-walk.mjs';
@@ -44,8 +45,6 @@ export class ActorSync {
     /** @type {import('./sync-manager.mjs').SyncManager|null} */
     this._syncManager = null;
 
-    /** @type {boolean} Suppress hook processing during sync-initiated changes. */
-    this._syncing = false;
     /** Chronicle claimants already reported as having no Foundry user, so the GM hears once a session. */
     this._unmappedNoticed = new Set();
 
@@ -73,6 +72,8 @@ export class ActorSync {
     // merged so the push knows every field it touched.
     /** @type {Map<string, object>} Merged update diffs awaiting a push. */
     this._pendingChanges = new Map();
+    /** @type {Map<string, object>} Diffs whose push is in flight, by actor id. */
+    this._pushingChanges = new Map();
     this._actorPushDebouncer = new JournalPushDebouncer(
       (actor, entityId) => { this._pushActorUpdate(actor, entityId); }
     );
@@ -283,8 +284,8 @@ export class ActorSync {
 
   /**
    * Give the Foundry user mapped to a character's Chronicle owner OWNER on
-   * the actor. Runs inside the caller's `_syncing` guard on the GM's client
-   * only; the write carries the sync options so no hook reports it back. It
+   * the actor. Runs on the GM's client only; the write carries the apply
+   * option so no hook reports it back. It
    * only ever adds access (see `planClaimOwnership`), and never throws.
    * @param {Actor} actor
    * @param {string|null} ownerId - Chronicle's owner_user_id now.
@@ -337,9 +338,7 @@ export class ActorSync {
       if (actor.type !== this._actorType || !actor.getFlag(FLAG_SCOPE, 'entityId')) continue;
       const owner = actor.getFlag(FLAG_SCOPE, 'chronicleOwnerUserId') ?? null;
       if (!owner) continue;
-      this._syncing = true;
-      try { await this._applyClaimOwnership(actor, owner, owner); }
-      finally { this._syncing = false; }
+      await this._applyClaimOwnership(actor, owner, owner);
     }
   }
 
@@ -410,8 +409,6 @@ export class ActorSync {
     }
 
     try {
-      this._syncing = true;
-
       const actorData = {
         name: entity.name,
         type: this._actorType,
@@ -434,7 +431,7 @@ export class ActorSync {
         }
       }
 
-      const actor = await Actor.create(actorData);
+      const actor = await Actor.create(actorData, applyOptions());
       await this._applyIdentityItems(actor, entity);
       await this._applyClaimOwnership(actor, entity.owner_user_id ?? null, null);
 
@@ -452,8 +449,6 @@ export class ActorSync {
       console.debug(`Chronicle: Created actor "${entity.name}" from character entity`);
     } catch (err) {
       console.error('Chronicle: Failed to create actor from entity', err);
-    } finally {
-      this._syncing = false;
     }
   }
 
@@ -472,9 +467,9 @@ export class ActorSync {
 
   /**
    * Swap the actor's ancestry/culture/career/kit items to the ones Chronicle
-   * names. Runs inside the caller's `_syncing` guard; the writes also carry
-   * the apply options so the item hooks do not push them back. Only the GM's
-   * client does it, and a failure is one notice, never a thrown error.
+   * names. The writes carry the apply options so the item hooks do not push
+   * them back. Only the GM's client does it, and a failure is one notice,
+   * never a thrown error.
    * @param {Actor} actor
    * @param {object} entity
    * @private
@@ -587,21 +582,18 @@ export class ActorSync {
       return true;
     }
     try {
-      this._syncing = true;
-
       // Only values that differ are written, marked as ours so the update
       // hook does not push them back.
       const changes = planActorApply({
         update: this._adapter.fromChronicleFields(entity),
         actor,
       });
-      // A field with a local edit still waiting in the push debounce keeps
-      // that edit: the incoming value predates it, and writing it would be
-      // pushed back as the new truth.
-      const pending = this._pendingChanges.get(actor.id);
-      if (pending) {
+      // A field with a local edit still waiting in the push debounce, or
+      // being pushed, keeps that edit: the incoming value predates it.
+      for (const local of [this._pendingChanges.get(actor.id), this._pushingChanges.get(actor.id)]) {
+        if (!local) continue;
         for (const path of Object.keys(changes)) {
-          if (changeTouchesPath(pending, path)) delete changes[path];
+          if (changeTouchesPath(local, path)) delete changes[path];
         }
       }
       if (Object.keys(changes).length > 0) {
@@ -615,16 +607,16 @@ export class ActorSync {
       const shouldBeHidden = entity.is_private === true;
       if (actor.hidden !== shouldBeHidden) {
         // Update the actor's default token hidden state and active tokens.
-        await actor.update({ 'prototypeToken.hidden': shouldBeHidden });
+        await actor.update({ 'prototypeToken.hidden': shouldBeHidden }, applyOptions());
         console.debug(
           `Chronicle: ${shouldBeHidden ? 'Hid' : 'Revealed'} actor "${actor.name}" (visibility sync)`
         );
       }
 
       // Update sync timestamp and Chronicle updated_at for conflict detection.
-      await actor.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
+      await this._setActorFlag(actor, 'lastSync', new Date().toISOString());
       if (entity.updated_at) {
-        await actor.setFlag(FLAG_SCOPE, 'chronicleUpdatedAt', entity.updated_at);
+        await this._setActorFlag(actor, 'chronicleUpdatedAt', entity.updated_at);
       }
       // Cache claim status for the actor-sheet indicator; falls through
       // `null` when unclaimed so the indicator shows "Unclaimed" rather
@@ -632,7 +624,7 @@ export class ActorSync {
       if (Object.prototype.hasOwnProperty.call(entity, 'owner_user_id')) {
         const previousOwner = actor.getFlag(FLAG_SCOPE, 'chronicleOwnerUserId') ?? null;
         const nextOwner = entity.owner_user_id ?? null;
-        await actor.setFlag(FLAG_SCOPE, 'chronicleOwnerUserId', nextOwner);
+        await this._setActorFlag(actor, 'chronicleOwnerUserId', nextOwner);
         await this._applyClaimOwnership(actor, nextOwner, previousOwner);
       }
 
@@ -641,8 +633,6 @@ export class ActorSync {
     } catch (err) {
       console.error(`Chronicle: Failed to update actor "${actor.name}"`, err);
       return false;
-    } finally {
-      this._syncing = false;
     }
   }
 
@@ -662,14 +652,10 @@ export class ActorSync {
     if (!actor) return;
 
     try {
-      this._syncing = true;
-      await actor.unsetFlag(FLAG_SCOPE, 'entityId');
-      await actor.unsetFlag(FLAG_SCOPE, 'lastSync');
+      await actor.update(flagRemoval(FLAG_SCOPE, 'entityId', 'lastSync'), applyOptions());
       console.debug(`Chronicle: Unlinked actor "${actor.name}" (entity deleted)`);
     } catch (err) {
       console.error('Chronicle: Failed to unlink actor after entity deletion', err);
-    } finally {
-      this._syncing = false;
     }
   }
 
@@ -686,7 +672,7 @@ export class ActorSync {
    * @private
    */
   async _handleCreateActor(actor, options, userId) {
-    if (this._syncing) return;
+    if (options?.[APPLY_OPTION]) return;
     if (userId !== game.user.id) return;
     if (actor.type !== this._actorType) return;
     if (!this._adapter || !this._characterTypeId) return;
@@ -729,17 +715,14 @@ export class ActorSync {
       const entity = await this._api.post('/entities', payload);
 
       if (entity) {
-        try {
-          this._syncing = true;
-          await actor.setFlag(FLAG_SCOPE, 'entityId', entity.id);
-          await actor.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
-          // Cache owner for the claim-status indicator; prefer the server's
-          // value if returned, else fall back to what we sent.
-          const cachedOwner = entity.owner_user_id ?? ownerUserId ?? null;
-          await actor.setFlag(FLAG_SCOPE, 'chronicleOwnerUserId', cachedOwner);
-        } finally {
-          this._syncing = false;
-        }
+        // Cache owner for the claim-status indicator; prefer the server's
+        // value if returned, else fall back to what we sent.
+        const cachedOwner = entity.owner_user_id ?? ownerUserId ?? null;
+        await actor.update({
+          [`flags.${FLAG_SCOPE}.entityId`]: entity.id,
+          [`flags.${FLAG_SCOPE}.lastSync`]: new Date().toISOString(),
+          [`flags.${FLAG_SCOPE}.chronicleOwnerUserId`]: cachedOwner,
+        }, applyOptions());
 
         // Create sync mapping (idempotent — handles the case where the
         // Foundry-originated POST raced a Chronicle-side mapping created
@@ -773,7 +756,7 @@ export class ActorSync {
    * @private
    */
   async _handleUpdateActor(actor, change, options, userId) {
-    if (this._syncing || options?.[APPLY_OPTION]) return;
+    if (options?.[APPLY_OPTION]) return;
     if (userId !== game.user.id) return;
     if (actor.type !== this._actorType) return;
     if (!this._adapter) return;
@@ -829,6 +812,9 @@ export class ActorSync {
   async _pushActorUpdate(actor, entityId) {
     const change = this._pendingChanges.get(actor.id) || {};
     this._pendingChanges.delete(actor.id);
+    // Until the push lands and the version is re-read, a Chronicle copy
+    // arriving meanwhile still predates this edit (see _updateActorFromEntity).
+    this._pushingChanges.set(actor.id, mergeChanges(this._pushingChanges.get(actor.id), change));
 
     try {
       if (change.name !== undefined) {
@@ -855,6 +841,8 @@ export class ActorSync {
     } catch (err) {
       console.error('Chronicle: Failed to push actor update to Chronicle', err);
       this._syncManager?.recordUserOutcome?.(game.user.id, err);
+    } finally {
+      this._pushingChanges.delete(actor.id);
     }
   }
 
@@ -902,7 +890,9 @@ export class ActorSync {
       if (!(err instanceof ConflictError)) throw err;
       const strategy = getSetting('conflictResolution');
       if (strategy === 'chronicle') {
-        // Re-pull from Chronicle.
+        // Re-pull from Chronicle; this burst is dropped, so its paths no
+        // longer hold Chronicle's values back.
+        this._pushingChanges.delete(actor.id);
         const entity = await this._api.get(`/entities/${entityId}`);
         if (entity) await this._updateActorFromEntity(actor, entity);
         ui.notifications.warn(`Chronicle: Conflict on "${noticeText(actor.name)}" — kept Chronicle version.`);
@@ -938,15 +928,16 @@ export class ActorSync {
     await this._setActorFlag(actor, 'chronicleUpdatedAt', null);
   }
 
-  /** Set a sync flag without the update hook treating it as a user edit. @private */
+  /**
+   * Set a sync flag, marked so the actor hooks do not treat it as a user
+   * edit. Marked per write rather than behind a shared flag: a GM edit to
+   * any actor while sync writes still pushes, and overlapping writes never
+   * lift each other's guard. `null` removes the flag.
+   * @private
+   */
   async _setActorFlag(actor, key, value) {
-    this._syncing = true;
-    try {
-      if (value === null) await actor.unsetFlag(FLAG_SCOPE, key);
-      else await actor.setFlag(FLAG_SCOPE, key, value);
-    } finally {
-      this._syncing = false;
-    }
+    const data = value === null ? flagRemoval(FLAG_SCOPE, key) : { [`flags.${FLAG_SCOPE}.${key}`]: value };
+    await actor.update(data, applyOptions());
   }
 
   /**
@@ -958,7 +949,7 @@ export class ActorSync {
    * @private
    */
   async _handleDeleteActor(actor, options, userId) {
-    if (this._syncing) return;
+    if (options?.[APPLY_OPTION]) return;
     if (userId !== game.user.id) return;
 
     // A push still pending would aim at an actor that is gone.
@@ -1168,8 +1159,7 @@ export class ActorSync {
   }
 
   /**
-   * Every entity of one type, paged to the end (a campaign with more than
-   * one page of characters used to be cut off at the first).
+   * Every entity of one type, paged to the end.
    * @param {number} typeId
    * @returns {Promise<Array<object>>}
    * @private
@@ -1306,9 +1296,7 @@ export class ActorSync {
     const entityId = actor?.getFlag(FLAG_SCOPE, 'entityId');
     if (!actor || !entityId || !this._adapter) return false;
     await this._putFieldsMerged(entityId, this._adapter.toChronicleFields(actor));
-    this._syncing = true;
-    try { await actor.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString()); }
-    finally { this._syncing = false; }
+    await this._setActorFlag(actor, 'lastSync', new Date().toISOString());
     console.debug(`Chronicle: Re-pushed actor "${actor.name}" → entity ${entityId}`);
     return true;
   }
@@ -1323,9 +1311,7 @@ export class ActorSync {
   async matchActorToEntity(actorId, entityId) {
     const actor = game.actors.get(actorId);
     if (!actor || !entityId || !this._adapter) return false;
-    this._syncing = true;
-    try { await actor.setFlag(FLAG_SCOPE, 'entityId', entityId); }
-    finally { this._syncing = false; }
+    await this._setActorFlag(actor, 'entityId', entityId);
     return this.repushActor(actorId);
   }
 
@@ -1340,9 +1326,7 @@ export class ActorSync {
     const actor = game.actors.get(actorId);
     if (!actor) return false;
     if (actor.getFlag(FLAG_SCOPE, 'entityId')) {
-      this._syncing = true;
-      try { await actor.unsetFlag(FLAG_SCOPE, 'entityId'); }
-      finally { this._syncing = false; }
+      await this._setActorFlag(actor, 'entityId', null);
     }
     await this._handleCreateActor(actor, {}, game.user.id);
     return !!actor.getFlag(FLAG_SCOPE, 'entityId');
@@ -1374,6 +1358,11 @@ export class ActorSync {
 
 /** Prototype-pollution guard for _setNestedValue path segments. */
 const PROTO_BLOCKED = new Set(['__proto__', 'prototype', 'constructor']);
+
+/** Options marking an actor write as sync's own, a fresh object per write (Foundry writes into it). */
+function applyOptions() {
+  return syncOptions({ [APPLY_OPTION]: true });
+}
 
 /**
  * Set a nested value on an object using dot-notation key.

@@ -113,5 +113,4 @@ test('reconcile: honours cached claims once and is idempotent', async () => {
   await s._reconcileClaimOwnership();
   assert.equal(fresh.calls.length, 1);
   assert.equal(done.calls.length, 0);
-  assert.equal(s._syncing, false);
 });

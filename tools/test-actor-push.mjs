@@ -20,6 +20,15 @@ const FIELD_DEFS = { fields: [
   { key: 'inventory', foundry_collection: 'items', type: 'json' },
 ] };
 
+/** What Foundry does with an update's flag keys: set them, or remove a `-=` one. */
+function applyFlags(flags, data) {
+  for (const [k, v] of Object.entries(data || {})) {
+    const m = k.match(/^flags\.chronicle-sync\.(-=)?(.+)$/);
+    if (!m) continue;
+    if (m[1]) delete flags[m[2]]; else flags[m[2]] = v;
+  }
+}
+
 const actorDoc = (over = {}) => {
   const flags = { entityId: 'ent-1', chronicleUpdatedAt: 'V1', ...(over.flags || {}) };
   return {
@@ -28,6 +37,7 @@ const actorDoc = (over = {}) => {
     getFlag: (_s, k) => flags[k],
     setFlag: async (_s, k, v) => { flags[k] = v; },
     unsetFlag: async (_s, k) => { delete flags[k]; },
+    update: async (d) => { applyFlags(flags, d); },
     ...over,
   };
 };
@@ -178,6 +188,27 @@ test('a Chronicle update does not overwrite a field with a local edit still wait
 
   const entity = { id: 'ent-1', updated_at: 'V2', fields_data: { hp: 11, bio: 'new bio' } };
   assert.equal(await sync._updateActorFromEntity(actor, entity), true);
-  assert.deepEqual(writes, [{ 'system.details.biography': 'new bio' }]);
+  assert.deepEqual(writes.filter((w) => !Object.keys(w).every((k) => k.startsWith('flags.'))), [{ 'system.details.biography': 'new bio' }]);
   sync._actorPushDebouncer.flushAll?.();
+});
+
+test('a Chronicle update does not overwrite a field whose push is still in flight, and does once it has landed', async () => {
+  const { sync } = await harness();
+  const writes = [];
+  const actor = actorDoc({ update: async (changes) => { writes.push(changes); }, hidden: false });
+  let land;
+  sync._api.put = (p) => new Promise((r) => { land = () => r(p.endsWith('/fields') ? { status: 'ok' } : { updated_at: 'V2' }); });
+  await sync._handleUpdateActor(actor, { system: { attributes: { hp: { value: 15 } } } }, {}, game.user.id);
+  sync._actorPushDebouncer.flush('a1');
+  await new Promise((r) => setImmediate(r));
+  assert.ok(land, 'the fields push is in flight');
+
+  const data = (w) => w.filter((c) => !Object.keys(c).every((k) => k.startsWith('flags.')));
+  await sync._updateActorFromEntity(actor, { id: 'ent-1', updated_at: 'V1', fields_data: { hp: 11 } });
+  assert.deepEqual(data(writes), [], 'hp kept while its push is in flight');
+
+  land();
+  await new Promise((r) => setImmediate(r));
+  await sync._updateActorFromEntity(actor, { id: 'ent-1', updated_at: 'V3', fields_data: { hp: 11 } });
+  assert.deepEqual(data(writes), [{ 'system.attributes.hp.value': 11 }], 'a later Chronicle change applies');
 });

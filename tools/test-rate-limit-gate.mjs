@@ -148,3 +148,34 @@ test('a write that went through drops the queued older one, so reconnect does no
   assert.deepEqual(await api.processRetryQueue(), { success: 0, failed: 0 });
   assert.equal(sent.length, 0);
 });
+
+test('a queued write replays only into the campaign it was made in', async () => {
+  const api = new ChronicleAPI();
+  api.queueForRetry('PUT', '/entities/a', { entry: 'x' });
+  const was = SETTINGS.campaignId;
+  SETTINGS.campaignId = '22222222-2222-4222-8222-222222222222';
+  const sent = [];
+  globalThis.fetch = async (url) => { sent.push(url); return reply(200, { body: '{}' }); };
+  api.rateLimit.wait = async () => {};
+  try {
+    assert.deepEqual(await api.processRetryQueue(), { success: 0, failed: 1 });
+  } finally {
+    SETTINGS.campaignId = was;
+  }
+  assert.deepEqual(sent, [], 'nothing sent to the new campaign');
+  assert.equal(api.getRetryQueueSize(), 0);
+});
+
+test('a 409 on replay goes to the conflict handler once, and is never retried', async () => {
+  const api = new ChronicleAPI();
+  const seen = [];
+  api.queueForRetry('PUT', '/entities/a', { entry: 'x', expected_updated_at: 'V1' }, 3, { onConflict: async (body) => { seen.push(body); } });
+  api.queueForRetry('PUT', '/entities/b', { entry: 'y', expected_updated_at: 'V1' });
+  let calls = 0;
+  globalThis.fetch = async () => { calls++; return reply(409, { body: '{"message":"stale"}' }); };
+  api.rateLimit.wait = async () => {};
+  assert.deepEqual(await api.processRetryQueue(), { success: 1, failed: 1 });
+  assert.equal(calls, 2);
+  assert.deepEqual(seen, [{ entry: 'x', expected_updated_at: 'V1' }]);
+  assert.equal(api.getRetryQueueSize(), 0, 'a 409 without a handler is final, not retried');
+});

@@ -12,9 +12,6 @@ import {
   addDays, monthDays, monthCount, weekdayCol, weekLen, shiftMonth,
 } from './_chronicle-caldate.mjs';
 
-/** Steps the GM can move the date by. */
-export const STEP_UNITS = Object.freeze(['hour', 'day', 'week']);
-
 /** Snapshot format; a player client ignores any other version. */
 export const SNAPSHOT_VERSION = 1;
 
@@ -90,14 +87,6 @@ export function formatTime(cal, date) {
   if (!date) return '';
   const width = String(minutesPerHour(cal) - 1).length;
   return `${String(date.hour ?? 0).padStart(2, '0')}:${String(date.minute ?? 0).padStart(Math.max(width, 2), '0')}`;
-}
-
-/** Weekday name for a date, or '' on a festival day outside the week. */
-export function weekdayName(cal, date) {
-  if (!date) return '';
-  const col = weekdayCol(cal, date.year, date.month, date.day);
-  if (col < 0) return '';
-  return cal?.weekdays?.[col]?.name || '';
 }
 
 /**
@@ -401,12 +390,6 @@ export function eventsOn(events, year, month, day) {
 export function isUsableSnapshot(s) {
   return !!s && s.v === SNAPSHOT_VERSION && !s.hidden && !!s.calendar && !!s.date
     && Array.isArray(s.calendar.months) && s.calendar.months.length > 0;
-}
-
-/** Same date to the minute? */
-export function sameDate(a, b) {
-  return !!a && !!b && a.year === b.year && a.month === b.month && a.day === b.day
-    && (a.hour ?? 0) === (b.hour ?? 0) && (a.minute ?? 0) === (b.minute ?? 0);
 }
 
 /** Temperature label in the reader's unit. */

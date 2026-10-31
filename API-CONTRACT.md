@@ -9,23 +9,18 @@ All REST requests include a Bearer token:
 Authorization: Bearer <api-key>
 ```
 
-REST requests through the API client also carry the module's manifest version, so Chronicle
-can tell an owner when the module is out of date:
+REST requests also carry the module's manifest version so Chronicle can tell
+an owner when the module is out of date:
 ```
 X-Chronicle-Module-Version: <module.json version>
 ```
-The header is omitted when the version cannot be read. A Chronicle that
-records it lists it in its CORS `Access-Control-Allow-Headers`; an older one
-doesn't, so the browser refuses the preflight. The module then retries that
-request once without the header and stops sending it for the session
-(`scripts/_module-version.mjs`), so an older server keeps syncing. WebSocket
-connections do not send it.
+Omitted when unreadable. An older Chronicle's CORS refuses the header; the
+module retries that request once without it and stops sending it for the
+session (`scripts/_module-version.mjs`). WebSocket connections do not send it.
 
-One endpoint is public and outside the campaign path: `GET /api/version`
-returns `{"version": "<build>"}` (a release tag, a commit, or `unknown`). The
-module reads it on connect without the API key (`scripts/_chronicle-version.mjs`)
-to show which Chronicle it is talking to. Chronicle side:
-`internal/plugins/syncapi/version_handler.go`, routed in `routes.go`.
+`GET /api/version` is public and outside the campaign path: `{"version": "<build>"}`
+(a release tag, a commit, or `unknown`). The module reads it on connect without
+the key (`scripts/_chronicle-version.mjs`).
 
 WebSocket connections authenticate via query parameter at connection time:
 ```
@@ -36,7 +31,7 @@ API keys are scoped to a single campaign. The key determines:
 - Which campaign's data is accessible
 - Permission level: `read` (GET), `write` (POST/PUT/DELETE), `sync` (sync endpoints)
 - A `sync`-level key covers read + write + sync
-- Rate limit: 300 requests/minute by default, set per key (Chronicle before this default gave 60). Over it: `429` with `Retry-After` in seconds until the window reopens; the module pauses all REST calls until then and resends the refused one at most twice
+- Rate limit: 300 requests/minute by default, set per key. Over it: `429` with `Retry-After` in seconds; the module pauses all REST calls until then and resends the refused one at most twice
 
 ## Connect Line
 
@@ -224,7 +219,7 @@ session and leaves made items name-only.
 
 **Used by:** `actor-sync.mjs` `_campaignEntries`, `_campaign-entry-item.mjs`
 
-Re-verify by: 2026-11-18 (Chronicle `internal/plugins/syncapi/system_entries_api.go`; lands with the Chronicle PR on branch `claude/custom-ancestries-foundry-1l665k`)
+Re-verify by: 2026-11-18 (Chronicle `internal/plugins/syncapi/system_entries_api.go`)
 
 ---
 
@@ -290,19 +285,11 @@ Every JSON update endpoint in Chronicle reads a request body three ways:
 | present with a **value** | replaced |
 | present and **explicitly `null`** | cleared (nullable columns only) |
 
-The distinction is real on the server: request structs bind `patch.Field[T]`,
-which records presence during JSON decoding, so absent and `null` differ.
-Non-nullable columns have no cleared state, so an explicit `null` there
-preserves rather than writing a zero.
-
-Before this contract, value-typed fields wrote their zero when absent. Two
-consequences hit this module's own traffic: `actor-sync.mjs`'s `{name}`-only
-rename bound `is_private = false` and **published a hidden character entity
-to every player** in the campaign, and **`parent_id` was not on the request
-struct at all**, so every update detached the entity from the hierarchy.
-Both are fixed on the server. Send only the fields you mean to change.
-
-Send only the fields you mean to change.
+Request structs bind `patch.Field[T]`, which records presence, so absent and
+`null` differ. Non-nullable columns have no cleared state: an explicit `null`
+there preserves. A server without this contract writes zero values for absent
+fields (a `{name}`-only rename would set `is_private = false` and publish a
+hidden character), so send only the fields you mean to change.
 
 **Request:** any subset of `name`, `type_label`, `parent_id`, `is_private`,
 `entry` (HTML), `player_notes`, `fields_data` and `expected_updated_at`:
@@ -316,16 +303,15 @@ Send only the fields you mean to change.
 ```
 &nbsp;&nbsp;↑ explicitly unparents. Omitting `parent_id` leaves the parent alone.
 
-> **Version skew.** A pre-partial-update Chronicle does whole-replace instead.
-> `ChronicleMarkerConfigDialog.#onSave` still spreads the stored marker under
-> edited fields for this reason: harmless on a merging server, load-bearing
-> on an older one.
+> **Version skew.** A pre-partial-update Chronicle replaces the whole row.
+> `ChronicleMarkerConfigDialog.#onSave` spreads the stored marker under the
+> edited fields: harmless on a merging server, load-bearing on an older one.
 
 #### DELETE /entities/:entityId
 Deletes an entity.
 
 #### PUT /entities/:entityId/fields
-Updates only the `fields_data` on an entity. Chronicle with keyxmakerx/Chronicle#927 merges the sent keys into the stored set (`null` removes a key); older Chronicle replaces the whole set, so the module always sends the stored set with its changes laid over it.
+Updates only `fields_data`. Chronicle with keyxmakerx/Chronicle#927 merges the sent keys into the stored set (`null` removes a key); an older one replaces the whole set, so the module always sends the stored set with its changes laid over it.
 
 **Used by:** `actor-sync.mjs` → push character stats to Chronicle
 
@@ -354,10 +340,9 @@ version move backwards.
 Re-verify by: 2026-11-03 (Chronicle `entities/service.go` `SetEntityPermissions`)
 
 #### POST /entities/:entityId/reveal
-Toggles entity reveal state (NPC reveal to players). Body is exactly
-`{ "is_private": <bool> }` (a `*bool`); a matching value is a no-op. Use this
-route, not a bare `PUT /entities/:id`, to flip visibility — it works against
-every Chronicle version this module supports.
+Flips an entity's visibility (NPC reveal). Body is exactly
+`{ "is_private": <bool> }`; a matching value is a no-op. Use this route, not a
+bare `PUT /entities/:id`, which works on every Chronicle version the module supports.
 
 **Request:**
 ```json
@@ -392,7 +377,7 @@ Chronicle. Folders in a category the key cannot see are left out.
 `parent_id` is another folder or a page, absent at the top of the category.
 An older Chronicle answers 404; the module then files pages by category only.
 
-Re-verify by: 2026-11-19 (Chronicle `internal/plugins/syncapi/folders_api.go`; lands with the Chronicle PR on branch `claude/foundry-sync-404-2inm82`)
+Re-verify by: 2026-11-19 (Chronicle `internal/plugins/syncapi/folders_api.go`)
 
 #### GET /entity-types/:typeId
 Returns a single entity type with field definitions.
@@ -504,17 +489,11 @@ Bulk update entity type for multiple entities.
 Lists predefined relation types for the campaign. Types are immutable
 forward/reverse string pairs (17 built-in pairs like "parent of" / "child of").
 
-**Used by:** `import-wizard.mjs` → future relation creation support
+**Used by:** nothing (`ChronicleAPI.getRelationTypes` has no caller)
 
-**Response:**
+**Response:** `{"data": [...], "total": 17}`
 ```json
-{
-  "data": [
-    { "forward": "parent of", "reverse": "child of" },
-    { "forward": "has item", "reverse": "owned by" },
-    { "forward": "member of", "reverse": "has member" }
-  ]
-}
+{ "data": [ { "forward": "parent of", "reverse": "child of" }, { "forward": "owns", "reverse": "owned by" } ], "total": 17 }
 ```
 
 #### POST /entities/:entityId/relations
@@ -539,16 +518,14 @@ List all relations on an entity.
 
 #### DELETE /relations/:relationId
 Delete a relation (and its reverse). `relationId` is the numeric relation id.
-The route is flat — `DELETE /relations/:relationId` (`syncapi/routes.go`),
-never nested under `/entities`.
+The route is flat, never nested under `/entities`.
 
 **Used by:** `item-sync.mjs` → remove item from actor inventory
 
 #### PUT /relations/:relationId
 Update relation metadata (e.g., item quantity, equipped state). Body is
 `{ "metadata": { ... } }` only (`json.RawMessage`); relation type and target
-are immutable via this route. Flat route, no `/metadata` suffix
-(`syncapi/routes.go`).
+are immutable via this route. Flat route, no `/metadata` suffix.
 
 **Used by:** `item-sync.mjs` → update inventory item metadata
 
@@ -561,26 +538,85 @@ Lists campaign members with their display names and roles.
 
 **Used by:** `sync-manager.mjs` → auto-match Chronicle users to Foundry users by display name
 
-**Response:** a bare array. The sync API sends no email address.
+**Response:** a bare array. The sync API sends no email address. `character_entity_id` and `character_name` appear only for a member with a character.
 ```json
 [
   {
     "campaign_id": "uuid", "user_id": "uuid", "role": 1, "display_name": "Alice",
+    "character_entity_id": "uuid", "character_name": "Vex",
     "joined_at": "2026-01-01T00:00:00Z",
     "avatar_url": "/media/<uuid>/thumb/300?expires=...&sig=...&campaign=<campaign id>"
   }
 ]
 ```
-`avatar_url` is a signed 300px thumbnail path of the member's profile picture,
-valid for 15 minutes and only while that member belongs to the key's campaign;
-absent when the member has no picture. The path holds the picture's media id,
-which changes whenever the picture does. Fetch it cookieless, without
-redirects, on the `apiUrl` host.
+`avatar_url` is a signed 300px thumbnail path, valid 15 minutes and only while
+the member belongs to the key's campaign; absent without a picture. The path
+holds the picture's media id, which changes with the picture. Fetch it
+cookieless, without redirects, on the `apiUrl` host.
 
 **Used by (avatar):** `avatar-sync.mjs` → copies the picture into the world's
 files and sets it as the matched Foundry user's avatar.
 
 Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/api_handler.go` `ListMembers`, `plugins/media/handler.go` `avatarLinkAllowed`)
+
+---
+
+### Shared rolls
+
+#### POST /rolls
+Records a roll made in Foundry chat so Chronicle shows it. Bearer key with
+write permission. One request per roll.
+
+```json
+{ "originId": "<chat message id>", "foundryUserId": "<Foundry user id of the roller>",
+  "rollerName": "<speaker alias or user name>", "label": "<flavor, may be empty>",
+  "formula": "<roll.formula>", "dice": [{"sides": 20, "value": 14}],
+  "total": 17, "mode": "public" }
+```
+
+`dice` is every die result still counting toward the total (not discarded or
+rerolled away): `sides` 2 to 1000, `value` 1 to `sides`, at most 100.
+`mode` is `public`, `gm` or `blind`; the module never sends `self` (Chronicle
+answers 400 to it) and leaves out rolls it cannot describe in these terms
+(no dice, a die outside those limits, more than 100 dice, a non-whole total).
+A message with several rolls sends `originId` `<messageId>` for the first and
+`<messageId>:<index>` for later ones. Chronicle maps `foundryUserId` to a
+member through the players the module reports with `POST /sync/players`.
+
+Answers `201 {"id", "duplicate": false}`, or `200 {"id", "duplicate": true}`
+when that `originId` was already recorded, so a replay is harmless. `400` is a
+refusal (logged, never retried); `404` means this Chronicle has no route, and
+the module stops sending rolls for the session.
+
+**Used by:** `roll-relay.mjs`, rules in `_roll-relay.mjs`
+
+#### WebSocket `roll.made`
+Envelope `{type, campaignId, resourceId: <roll id>, payload}`, payload:
+
+```json
+{ "id": "<uuid>", "origin": "chronicle|foundry", "originId": "<only when origin is foundry>",
+  "source": "table|crafting|foundry", "rollerId": "<Chronicle user id or empty>",
+  "rollerName": "Mara", "label": "Brutal Slam", "formula": "2d10+2",
+  "dice": [{"sides": 10, "value": 7}, {"sides": 10, "value": 9}], "modifier": 2,
+  "total": 18, "outcome": "Tier 3", "why": "", "from": "",
+  "mode": "public|gm|blind|self", "hidden": true, "createdAt": "<RFC3339>" }
+```
+
+Chronicle filters the audience: the module's socket gets public, gm and blind
+rolls in full, and self rolls only when the key's owner made them. `hidden`
+marks a blind roller's own stub (no dice, modifier, total or outcome). Rolls
+are not in `/sync/changes`, so a reconnect never replays them. The allowlist
+includes the `roll.` prefix. On the **active GM's client only**, a roll with
+`origin` `chronicle`, not `hidden` and not `self` is posted to chat as a real
+Roll built from the given dice (never re-rolled, so Dice So Nice animates
+it), speaker `rollerName`, flavor `label` (and `outcome`), flag
+`flags["chronicle-sync"].roll = {id, origin: "chronicle"}`. `public` is an
+ordinary public message; `gm` is whispered to the GM users and the Foundry
+user linked to `rollerId`; `blind` is a blind whisper to the GM users. Each
+roll id posts once (a bounded in-memory set, and an existing message with the
+flag). `tools/test-roll-relay.mjs`.
+
+Re-verify by: 2027-01-28 (Chronicle's rolls route and `roll.made` broadcast; keyxmakerx/Chronicle-Foundry-Module#240)
 
 ---
 
@@ -1031,13 +1067,12 @@ Creates the campaign's calendar. Answers `201 {"created": …, "warnings": […]
 `409` when the campaign already has a calendar. The module does not call it.
 
 #### POST /calendar/date/confirm
-**Optional** (newer Chronicle deployments only). Confirms Foundry *applied* a
-date pulled from Chronicle to a local calendar, not merely fetched it — drives the sync chip's "SAW" vs.
-"APPLIED" distinction (SAW = the `GET /calendar/date` beacon).
+**Optional** (newer Chronicle only). Confirms Foundry *applied* a pulled date to
+a local calendar, not merely fetched it; drives the sync chip's "SAW" (the
+`GET /calendar/date` beacon) vs "APPLIED".
 
-**Used by:** `scripts/_applied-date-confirm.mjs`, for a caller that applied
-a date to a Foundry calendar; never sent on a bare fetch or an apply failure.
-No Foundry calendar is integrated, so nothing calls it yet (TODO(#95)).
+**Used by:** `_applied-date-confirm.mjs`, only after a date was applied to a Foundry
+calendar. No Foundry calendar is integrated, so nothing calls it yet (TODO(#95)).
 
 **Request:**
 ```json
@@ -1046,11 +1081,10 @@ No Foundry calendar is integrated, so nothing calls it yet (TODO(#95)).
 
 **Response:** `204 No Content`
 
-**Graceful degradation:** a Chronicle predating this endpoint returns 404 or
-405; the module tolerates both silently (one `console.debug`, no retries).
-Any other failure is debug-logged and swallowed — a missed confirmation only
-leaves the applied-beacon stale, never blocks sync. See
-`scripts/_applied-date-confirm.mjs::isConfirmNotSupported`.
+A Chronicle without the endpoint returns 404 or 405; the module tolerates both
+(one `console.debug`, no retries). Any other failure is debug-logged and
+swallowed: a missed confirmation only leaves the applied beacon stale
+(`_applied-date-confirm.mjs::isConfirmNotSupported`).
 
 #### POST /calendar/advance — retired
 Answers `410 {"error":"calendar_route_retired"}`.
@@ -1177,17 +1211,16 @@ Deletes a media file.
 ### Relations (Shops/Inventory)
 
 #### GET /entities/:entityId/relations
-Lists relations for an entity (used for shop inventory).
+Lists an entity's relations, minus those naming a page the key cannot view.
 
-**Response:**
+**Response:** a bare array of camelCase rows (the module also accepts `{data}`):
 ```json
-{
-  "data": [
-    { "id": "relation-uuid", "source_id": "shop-entity-uuid", "target_id": "item-entity-uuid",
-      "relation_type_id": 1, "metadata": { "quantity": 5, "equipped": false },
-      "target": { "id": "item-uuid", "name": "Longsword", "fields_data": {} } }
-  ]
-}
+[
+  { "id": 12, "campaignId": "uuid", "sourceEntityId": "char-uuid", "targetEntityId": "item-uuid",
+    "relationType": "Has Item", "reverseRelationType": "In Inventory Of",
+    "metadata": { "quantity": 5, "equipped": false }, "dmOnly": false,
+    "targetEntityName": "Longsword", "createdAt": "…", "createdBy": "uuid" }
+]
 ```
 
 #### GET /armory/shops/:entityId/room
@@ -1401,15 +1434,11 @@ strings:
 - `error` — code from the catalog below. **Opaque**, logs/debugging only.
   Foundry MUST NOT branch on it — that couples Foundry to Chronicle's
   internal naming. Branch on `category` instead.
-- `category` — snake_case bucket, one of `auth`, `config`, `not_found`,
-  `validation`, `internal`. Pinned by cordinator
-  `decisions/2026-05-17-error-catalog-wire-contract.md`; canonical wire field
-  (`json:"category"`) — `update-info.mjs`'s `chronicleCategory` is a local
-  rename, not the wire field.
+- `category` — one of `auth`, `config`, `not_found`, `validation`, `internal`
+  (wire field `category`; `update-info.mjs`'s `chronicleCategory` is a local rename).
 - `message` — human-readable, operator-actionable. Render verbatim.
 
-**Authoritative catalog:** `error-catalog.json` at the Chronicle repo, pinned
-by the wire-contract decision above:
+**Authoritative catalog:** `error-catalog.json` in the Chronicle repo:
 
 ```
 https://raw.githubusercontent.com/keyxmakerx/Chronicle/main/internal/plugins/foundry_vtt/error-catalog.json
@@ -1566,7 +1595,7 @@ character.
 Lists are unwrapped defensively (`{history}`/`{requests}`/`{data}` or a bare
 array): `scripts/_stash-model.mjs`.
 
-Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/stash_api_handler.go`, `internal/plugins/armory/stash_api.go`, `docs/api/openapi.yaml` Stashes tag; the routes are on Chronicle PR #1022 and unreleased as of 2026-10-03)
+Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/stash_api_handler.go`, `internal/plugins/armory/stash_api.go`, `docs/api/openapi.yaml` Stashes tag; Chronicle PR #1022)
 
 ### Quests
 
@@ -1620,11 +1649,10 @@ Re-verify by: 2026-11-04 (Chronicle `internal/widgets/notes/app_grants_handler.g
 
 ## WebSocket Protocol
 
-> **Every `calendar.*` message type below is DORMANT.** Chronicle's calendar
-> event publisher was deleted with the plugin, so none reach the wire. A
-> structure-mismatch pause from before the blackout can't be cleared by its
-> recovery path (`calendar.structure.updated`) until V5 — reload the world.
-> **Re-verify by: when calendar V5 ships.**
+> **Every `calendar.*` message type below is dormant:** Chronicle's calendar
+> event publisher is gone, so none reach the wire. A structure-mismatch pause
+> cannot be cleared by its recovery path (`calendar.structure.updated`) until
+> V5; reload the world. **Re-verify by: when calendar V5 ships.**
 
 ### Connection
 ```
@@ -1637,11 +1665,11 @@ If the token is invalid, the server rejects the upgrade.
 
 ### Message Format (Server → Client)
 ```json
-{
-  "type": "entity.updated",
-  "data": { }
-}
+{ "type": "entity.updated", "campaignId": "uuid", "resourceId": "uuid", "senderId": "…", "payload": { }, "seq": 12 }
 ```
+`resourceId`, `senderId`, `payload` and `seq` are optional. The "Data Payload"
+column below describes `payload`. A type whose prefix is not in the client's
+allowlist (`api-client.mjs`) is ignored.
 
 ### Message Types
 
@@ -1688,11 +1716,12 @@ If the token is invalid, the server rejects the upgrade.
 | `system_state.updated` | `{ systemId, key }`; `resourceId` is the page's entity id; DM-equivalent sockets only | A system widget saved a page's per-system state (Draw Steel negotiation tracker: `systemId` `drawsteel`, `key` `negotiation`) |
 | `quest.updated` | `{ version }`; `resourceId` is the quest page's id. Sent only to DM sockets when the change is DM-only | A quest sheet was saved; open quest windows refetch |
 | `notice_boards.updated` | `{ home }` (`page` or `category`); `resourceId` is the page id or the type id | A home's boards changed; open board windows refetch |
+| `roll.made` | A roll (see "Shared rolls" below); `resourceId` is the roll id. Public, gm and blind rolls in full; a self roll only to its owner's key | A roll was made at Chronicle's table or crafting, or recorded from Foundry |
 | `sync.status` | `{ connected: bool }` | Connection state change |
 | `sync.error` | `{ message }` | Synchronization error |
 | `sync.conflict` | Conflict details | Data conflict detected |
 
-Every `calendar.*` message goes to DM-equivalent sockets only (the GM's key). An event Chronicle stores as `dm_only` goes out with `visibility: "gm-only"`; other values pass through as stored, and the module treats anything but `"gm-only"` as public. Players get the calendar from the GM client's republished snapshot.
+Every `calendar.*` message goes to DM-equivalent sockets only. An event Chronicle stores as `dm_only` goes out with `visibility: "gm-only"`; the module treats anything but `"gm-only"` as public. Players get the calendar from the GM client's republished snapshot.
 
 `relation.*` messages go to the owner's socket and sockets of members the owner has
 given DM access only (a relation can
@@ -1790,18 +1819,15 @@ Re-verify by: 2026-11-03 (Chronicle `internal/plugins/systemstate`, `internal/pl
 
 ### What the module does with `note.*`
 
-Nothing. The player notebook shows Chronicle's own Journal and Jot pages in
-frames, so notes never become Foundry journals and no sync module reads
-`note.*`. The old "Chronicle Notes" folder from the retired note sync is set
-aside on the GM's world load (`scripts/_notes-folder.mjs`).
+Nothing reads them. The player notebook frames Chronicle's own Journal and Jot
+pages, so notes never become Foundry journals. A leftover "Chronicle Notes"
+folder is set aside on the GM's world load (`_notes-folder.mjs`).
 
 ### What the module does with each `calendar.*` type
 
-Handled in `scripts/calendar-sync.mjs` `onMessage` + `scripts/_calendar-subresources.mjs`.
-**Display-level and non-destructive**: no Foundry calendar module is
-integrated, and no branch writes into Foundry. Chat announcements are **GM
-whispers only** — never public, so a DM-gated payload is never laundered into
-a player-visible one.
+Handled in `calendar-sync.mjs` `onMessage` and `_calendar-subresources.mjs`.
+Display-only: no branch writes into Foundry. Chat announcements are GM
+whispers only, so a DM-gated payload never becomes player-visible.
 
 | Type | Module behavior |
 |---|---|
@@ -1815,15 +1841,10 @@ a player-visible one.
 | `calendar.structure.updated`, `calendar.cycle.changed`, `calendar.festival.changed` | Refetches `GET /calendar` into the cache |
 | any other `calendar.*` | `default:` logs one `console.debug` line **per type per session** — no silent drops |
 
-Every cross-repo claim here carries a `Re-verify by:` line.
-
 ### Reconnection
 
-The API client automatically reconnects on WebSocket disconnection:
-- Initial retry delay: 1 second
-- Max retry delay: 30 seconds (exponential backoff)
-- Infinite retries (never gives up)
-- Queued messages are replayed on reconnection
+The client reconnects forever with exponential backoff (1 s start, 30 s cap)
+and replays queued messages.
 
 ---
 

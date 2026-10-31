@@ -130,7 +130,7 @@ test('a copy dragged from another actor keeps its item and the original keeps it
   is._api.delete = async (...a) => calls.push(['delete', ...a]);
   await is.onMessage({ type: 'relation.created', resourceId: 'hero', payload: hasItem(7, 'shield') });
   assert.deepEqual(hero.writes, ['update i1 {"flags.chronicle-sync.-=relationId":null,"flags.chronicle-sync.unlinkedRelationId":5}']);
-  // Deleting the copy afterwards no longer touches the original's relation.
+  // Deleting the copy leaves the original's relation alone.
   const copy = hero.items.get('i1');
   await is._handleDeleteItem({ ...copy, parent: hero }, {}, globalThis.game.user.id);
   assert.deepEqual(calls, []);

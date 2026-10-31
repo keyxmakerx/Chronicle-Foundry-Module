@@ -630,14 +630,6 @@ export function getSyncExclusions() {
 }
 
 /**
- * Save sync exclusions.
- * @param {{ excludedTypes: number[], excludedEntities: string[] }} exclusions
- */
-export async function setSyncExclusions(exclusions) {
-  await setSetting('syncExclusions', JSON.stringify(exclusions));
-}
-
-/**
  * Check if the module is properly configured (URL + key + campaign).
  * @returns {boolean}
  */
@@ -668,14 +660,6 @@ export function getSyncDirections() {
 }
 
 /**
- * Save sync directions config.
- * @param {object} directions
- */
-export async function setSyncDirections(directions) {
-  await setSetting('syncDirections', JSON.stringify(directions));
-}
-
-/**
  * Get excluded tags list.
  * @returns {string[]}
  */
@@ -685,14 +669,6 @@ export function getExcludedTags() {
   } catch {
     return [];
   }
-}
-
-/**
- * Save excluded tags list.
- * @param {string[]} tags
- */
-export async function setExcludedTags(tags) {
-  await setSetting('excludedTags', JSON.stringify(tags));
 }
 
 /**

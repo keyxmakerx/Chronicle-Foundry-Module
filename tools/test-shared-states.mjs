@@ -2,7 +2,7 @@
 /**
  * Every window draws "nothing here yet", "loading" and "can't reach
  * Chronicle" with the shared cs-state / cs-loading markup, so these checks
- * walk the templates for the shape and for the old one-off classes.
+ * walk the templates for the shape and for one-off state classes.
  */
 
 import test from 'node:test';

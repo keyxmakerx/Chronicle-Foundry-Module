@@ -14,7 +14,7 @@
  * Foundry document.
  */
 
-import { noticeText } from './_escape-html.mjs';
+import { escapeHtml as esc, noticeText } from './_escape-html.mjs';
 import { getSetting, setSetting } from './settings.mjs';
 import { promptDialog } from './_dialogs.mjs';
 import { openCalendarWindow } from './player-notebook.mjs';
@@ -28,12 +28,6 @@ import {
 const t = (key, data) => (data
   ? game.i18n.format(`CHRONICLE.CalendarBar.${key}`, data)
   : game.i18n.localize(`CHRONICLE.CalendarBar.${key}`));
-
-function esc(s) {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
 
 /** Time without a pointer or key before the mini sky comes to rest. */
 const REST_AFTER_MS = 20000;

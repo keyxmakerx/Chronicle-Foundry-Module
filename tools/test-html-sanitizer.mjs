@@ -77,10 +77,8 @@ test('_sanitizeIncomingHTML: prefers v13 over v12 when both present', () => {
   assert.equal(_sanitizeIncomingHTML('input'), 'v13');
 });
 
-// v14 relocated cleanHTML onto foundry.applications.ux.TextEditor.implementation.
-// This is the shape that regressed in production (the resolver previously only
-// probed the namespace object + the deprecated global, so it found neither and
-// silently skipped ingress sanitization on v14.364).
+// v14 relocates cleanHTML onto foundry.applications.ux.TextEditor.implementation.
+// The resolver must find it there, or ingress sanitization is silently skipped.
 
 test('_sanitizeIncomingHTML: delegates to v14 TextEditor.implementation.cleanHTML', () => {
   clearCleanHTML();

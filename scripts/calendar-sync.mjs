@@ -9,6 +9,7 @@
  * date moves and new events go back through `pushDate` and `addEvent`.
  */
 
+import { escapeHtml } from './_escape-html.mjs';
 import { getSetting, setSetting } from './settings.mjs';
 import { buildPlayerSnapshot, clampDate, shiftMonth, stepDate } from './_calendar-view-model.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
@@ -26,8 +27,7 @@ import {
 } from './_calendar-subresources.mjs';
 
 /**
- * Canonical wire-visibility values per the calendar-sync wire contract
- * (cordinator/decisions/2026-05-17-calendar-sync-wire-contract.md).
+ * Canonical wire-visibility values (API-CONTRACT.md, Calendar).
  * Chronicle's internal storage uses `'gm_only'` (underscore); its API
  * handler translates to/from wire `'gm-only'` (kebab) at the boundary.
  * This module emits and consumes only the wire (kebab) form.
@@ -94,23 +94,6 @@ function hasVisibilityRules(raw) {
   if (typeof rules !== 'object' || Array.isArray(rules)) return true;
   const named = (list) => Array.isArray(list) && list.length > 0;
   return named(rules.allowed_users) || named(rules.denied_users);
-}
-
-/**
- * Escape a plain-text line for safe interpolation into a ChatMessage body.
- * Chronicle-authored strings (weather descriptions, season names) arrive
- * over the wire and land in innerHTML-rendered chat, so they must be
- * escaped at this boundary like every other ingress in this module.
- * @param {string} s
- * @returns {string}
- */
-function escapeChatHtml(s) {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }
 
 /**
@@ -614,7 +597,7 @@ export class CalendarSync {
     try {
       const gmIds = globalThis.ChatMessage?.getWhisperRecipients?.('GM')?.map((u) => u.id) ?? [];
       globalThis.ChatMessage?.create?.({
-        content: `<p>${escapeChatHtml(line)}</p>`,
+        content: `<p>${escapeHtml(line)}</p>`,
         whisper: gmIds,
         speaker: { alias: 'Chronicle' },
       });
