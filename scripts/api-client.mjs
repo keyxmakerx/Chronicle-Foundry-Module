@@ -58,6 +58,7 @@ const ALLOWED_WS_TYPE_PREFIXES = Object.freeze([
   'downtime.',
   'npc.',
   'system_state.',
+  'roll.',
 ]);
 
 /**

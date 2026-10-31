@@ -584,6 +584,65 @@ Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/api_handler.go` `L
 
 ---
 
+### Shared rolls
+
+#### POST /rolls
+Records a roll made in Foundry chat so Chronicle shows it. Bearer key with
+write permission. One request per roll.
+
+```json
+{ "originId": "<chat message id>", "foundryUserId": "<Foundry user id of the roller>",
+  "rollerName": "<speaker alias or user name>", "label": "<flavor, may be empty>",
+  "formula": "<roll.formula>", "dice": [{"sides": 20, "value": 14}],
+  "total": 17, "mode": "public" }
+```
+
+`dice` is every die result still counting toward the total (not discarded or
+rerolled away): `sides` 2 to 1000, `value` 1 to `sides`, at most 100.
+`mode` is `public`, `gm` or `blind`; the module never sends `self` (Chronicle
+answers 400 to it) and leaves out rolls it cannot describe in these terms
+(no dice, a die outside those limits, more than 100 dice, a non-whole total).
+A message with several rolls sends `originId` `<messageId>` for the first and
+`<messageId>:<index>` for later ones. Chronicle maps `foundryUserId` to a
+member through the players the module reports with `POST /sync/players`.
+
+Answers `201 {"id", "duplicate": false}`, or `200 {"id", "duplicate": true}`
+when that `originId` was already recorded, so a replay is harmless. `400` is a
+refusal (logged, never retried); `404` means this Chronicle has no route, and
+the module stops sending rolls for the session.
+
+**Used by:** `roll-relay.mjs`, rules in `_roll-relay.mjs`
+
+#### WebSocket `roll.made`
+Envelope `{type, campaignId, resourceId: <roll id>, payload}`, payload:
+
+```json
+{ "id": "<uuid>", "origin": "chronicle|foundry", "originId": "<only when origin is foundry>",
+  "source": "table|crafting|foundry", "rollerId": "<Chronicle user id or empty>",
+  "rollerName": "Mara", "label": "Brutal Slam", "formula": "2d10+2",
+  "dice": [{"sides": 10, "value": 7}, {"sides": 10, "value": 9}], "modifier": 2,
+  "total": 18, "outcome": "Tier 3", "why": "", "from": "",
+  "mode": "public|gm|blind|self", "hidden": true, "createdAt": "<RFC3339>" }
+```
+
+Chronicle filters the audience: the module's socket gets public, gm and blind
+rolls in full, and self rolls only when the key's owner made them. `hidden`
+marks a blind roller's own stub (no dice, modifier, total or outcome). Rolls
+are not in `/sync/changes`, so a reconnect never replays them. The allowlist
+includes the `roll.` prefix. On the **active GM's client only**, a roll with
+`origin` `chronicle`, not `hidden` and not `self` is posted to chat as a real
+Roll built from the given dice (never re-rolled, so Dice So Nice animates
+it), speaker `rollerName`, flavor `label` (and `outcome`), flag
+`flags["chronicle-sync"].roll = {id, origin: "chronicle"}`. `public` is an
+ordinary public message; `gm` is whispered to the GM users and the Foundry
+user linked to `rollerId`; `blind` is a blind whisper to the GM users. Each
+roll id posts once (a bounded in-memory set, and an existing message with the
+flag). `tools/test-roll-relay.mjs`.
+
+Re-verify by: 2027-01-28 (Chronicle's rolls route and `roll.made` broadcast; keyxmakerx/Chronicle-Foundry-Module#240)
+
+---
+
 ### Sync Mappings
 
 #### GET /sync/mappings
@@ -1688,6 +1747,7 @@ If the token is invalid, the server rejects the upgrade.
 | `system_state.updated` | `{ systemId, key }`; `resourceId` is the page's entity id; DM-equivalent sockets only | A system widget saved a page's per-system state (Draw Steel negotiation tracker: `systemId` `drawsteel`, `key` `negotiation`) |
 | `quest.updated` | `{ version }`; `resourceId` is the quest page's id. Sent only to DM sockets when the change is DM-only | A quest sheet was saved; open quest windows refetch |
 | `notice_boards.updated` | `{ home }` (`page` or `category`); `resourceId` is the page id or the type id | A home's boards changed; open board windows refetch |
+| `roll.made` | A roll (see "Shared rolls" below); `resourceId` is the roll id. Public, gm and blind rolls in full; a self roll only to its owner's key | A roll was made at Chronicle's table or crafting, or recorded from Foundry |
 | `sync.status` | `{ connected: bool }` | Connection state change |
 | `sync.error` | `{ message }` | Synchronization error |
 | `sync.conflict` | Conflict details | Data conflict detected |
