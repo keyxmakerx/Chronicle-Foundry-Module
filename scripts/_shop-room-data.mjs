@@ -39,15 +39,44 @@ export function shopEndpoints(campaignId, shopId) {
  * data the window already holds, and hands its two buying calls to the
  * window's `onAction(kind, body)`, which answers `{status, body, goods?}`.
  * A shop with no `onAction` has no buyers, so the widget shows no basket.
+ *
+ * `setRoute(prefix, handler)` hands every call under a path prefix to
+ * `handler(url, method, body)`, which answers `{status, body}`; the Crafting
+ * tab routes its block's calls this way. `mountWidget` starts a registered
+ * widget on an element, as Chronicle's page does for a widget one widget
+ * places inside another; for one not loaded here it fires a bubbling
+ * `chronicle:missing-widget` event so the host can say where it lives.
  */
 export function createChronicleShim() {
   const widgets = new Map();
   const data = new Map();
   const actions = new Map();
+  const routes = new Map();
   const answer = (status, body) => Promise.resolve({ ok: status < 400, status, json: () => Promise.resolve(body) });
   return {
     widgets,
     register(slug, def) { widgets.set(slug, def); },
+    setRoute(prefix, handler) {
+      if (handler) routes.set(prefix, handler);
+      else routes.delete(prefix);
+    },
+    mountWidget(el) {
+      const slug = el?.getAttribute?.('data-widget') || '';
+      const def = widgets.get(slug);
+      if (!def) {
+        el?.dispatchEvent?.(new CustomEvent('chronicle:missing-widget', { bubbles: true, detail: { widget: slug } }));
+        return;
+      }
+      const cfg = {};
+      for (const [k, v] of Object.entries(el.dataset || {})) cfg[k] = v;
+      def.init(el, cfg);
+      el._chronicleWidget = def;
+    },
+    destroyWidget(el) {
+      const def = el?._chronicleWidget;
+      if (def?.destroy) def.destroy(el);
+      if (el) el._chronicleWidget = null;
+    },
     setShop(campaignId, shopId, room, onAction) {
       const ep = shopEndpoints(campaignId, shopId);
       data.set(ep.room, { layout: room.layout ?? null });
@@ -62,6 +91,12 @@ export function createChronicleShim() {
     },
     async apiFetch(url, opts = {}) {
       const method = (opts.method || 'GET').toUpperCase();
+      for (const [prefix, handler] of routes) {
+        if (typeof url === 'string' && url.startsWith(prefix)) {
+          const res = await handler(url, method, opts.body);
+          return answer(res?.status || 502, res?.body ?? {});
+        }
+      }
       const act = actions.get(url);
       if (act && method === (url.endsWith('/buy') ? 'POST' : 'GET')) {
         const res = await act(opts.body);

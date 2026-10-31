@@ -18,6 +18,8 @@ import { CreatureSync } from './creature-sync.mjs';
 import { ItemSync } from './item-sync.mjs';
 import { StashSync } from './stash-sync.mjs';
 import { registerStashSocket } from './stash-client.mjs';
+import { CraftingSync, registerCraftingSocket } from './crafting-relay.mjs';
+import { registerCraftingButton } from './crafting-button.mjs';
 import { registerStashChat } from './stash-chat.mjs';
 import { registerStashButton } from './stash-window.mjs';
 import { bindDebugHub, registerDebugHub } from './debug-hub.mjs';
@@ -173,6 +175,7 @@ Hooks.once('ready', async () => {
   syncManager.registerModule(creatureSync);
   syncManager.registerModule(new ItemSync());
   syncManager.registerModule(new StashSync());
+  syncManager.registerModule(new CraftingSync());
   syncManager.registerModule(npcSpotlightRelay);
   syncManager.registerModule(negotiationMirror);
   syncManager.registerModule(rollRelay);
@@ -194,6 +197,12 @@ Hooks.once('ready', async () => {
     registerStashButton();
   } catch (err) {
     console.warn('Chronicle Sync | Stashes unavailable', err);
+  }
+  try {
+    registerCraftingSocket();
+    registerCraftingButton();
+  } catch (err) {
+    console.warn('Chronicle Sync | Crafting unavailable', err);
   }
   try {
     bindDebugHub(() => syncManager);

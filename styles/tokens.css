@@ -18,6 +18,11 @@
   --cs-attention: #b4530f;
   --cs-bad: #b4302a;
   --cs-info: #1f5fae;
+  /* The status colours as bare channels, for Chronicle's vendored styles,
+     which mix their own transparency in with rgb(var(--…) / a). */
+  --cs-ok-rgb: 35 122 59;
+  --cs-warn-rgb: 154 91 0;
+  --cs-bad-rgb: 180 48 42;
   --cs-text: #1f1c17;
   --cs-text-2: #4a453c;
   --cs-text-muted: #6f695e;
@@ -52,6 +57,9 @@ body:not(.theme-dark):not(.theme-light) #sidebar {
   --cs-attention: #f59a5b;
   --cs-bad: #f07a72;
   --cs-info: #7fb3f5;
+  --cs-ok-rgb: 111 209 140;
+  --cs-warn-rgb: 240 184 74;
+  --cs-bad-rgb: 240 122 114;
   --cs-text: #ece6da;
   --cs-text-2: #c9c2b5;
   --cs-text-muted: #9a9387;

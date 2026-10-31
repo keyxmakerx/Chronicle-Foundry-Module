@@ -743,7 +743,8 @@
       "Tab": {
         "notebook": "Notebook",
         "quests": "Quests",
-        "stash": "Stash"
+        "stash": "Stash",
+        "crafting": "Crafting"
       },
       "BackToBoard": "Back to the board",
       "StashGMTitle": "Your stash lives on a character",
@@ -751,7 +752,32 @@
       "StashOffTitle": "Stashes are off",
       "StashOff": "This campaign doesn't use stashes in Chronicle.",
       "StashNoCharacterTitle": "No character yet",
-      "StashNoCharacter": "Your stash shows here once your GM gives you a character from Chronicle."
+      "StashNoCharacter": "Your stash shows here once your GM gives you a character from Chronicle.",
+      "CraftingOffTitle": "Crafting is off",
+      "CraftingOff": "This campaign doesn't use crafting in Chronicle.",
+      "CraftingNoCharacterTitle": "No character yet",
+      "CraftingNoCharacter": "Your hero's crafting shows here once your GM gives you a character from Chronicle.",
+      "CraftingGMTitle": "Crafting lives on each hero",
+      "CraftingGM": "Open a hero's crafting with the Crafting button on their sheet. Drop lists, recipes and the spoils tray are on Chronicle's Crafting page.",
+      "CraftingNoGMTitle": "Crafting waits for your GM",
+      "CraftingNoGM": "Taking, studying and rolling go through the GM's Foundry, the same as buying in a shop. This opens once your GM is connected.",
+      "CraftingFailedTitle": "Crafting couldn't load",
+      "CraftingFailed": "Close the Satchel and open it again to try again."
+    },
+    "Crafting": {
+      "Button": "Crafting",
+      "ButtonTitle": "Open this hero's crafting",
+      "NoGM": "Crafting waits for your GM: no GM is connected.",
+      "GMNotReady": "Chronicle isn't connected on the GM's Foundry yet. Try again in a moment.",
+      "NoAnswer": "The GM's Foundry didn't answer. Try again.",
+      "NoAnswerWrite": "The GM's Foundry didn't answer in time. It may still have gone through: open the tab again to check before you try again.",
+      "Failed": "Chronicle couldn't do that. Try again.",
+      "NoSender": "Foundry didn't say who asked, so nothing was done.",
+      "NoMapping": "Your Foundry user isn't matched to a Chronicle member yet. Ask your GM to match you in Chronicle Sync.",
+      "NotOwner": "That isn't your character.",
+      "OnChronicle": "That is done on Chronicle's Crafting page.",
+      "BenchOnChronicle": "The bench and its steps are on Chronicle for now. Rolling here works without it.",
+      "OpenBench": "Work at the bench on Chronicle"
     },
     "Quests": {
       "BoardTitle": "Quest Board",
