@@ -1020,7 +1020,8 @@
       out.sort(function (a, b) { return key(a) - key(b); });
       var lights = [], s = defs() + (sq ? shell(N) : shellShape(N)) + sign(N) + wallDecor(N, rec, rng(S.seeds.deco * 3301 + S.key * 7), level, function (l) { lights.push(l); });
       function piece(o) {
-        var p = o.p, g = '<g class="piece' + (p.pinned ? ' pinned' : '') + '" data-p="' + p.id + '"><g class="body">' + o.d.pre + '</g>';
+        var p = o.p, g = '<g class="piece' + (p.pinned ? ' pinned' : '') + '" data-p="' + p.id + '"' +
+          (S.mode === 'arr' ? ' tabindex="0" role="button" aria-label="' + (KIND_LABEL[p.kind] || p.kind) + '. Arrow keys move it."' : '') + '><g class="body">' + o.d.pre + '</g>';
         o.decos.forEach(function (d) { g += '<g class="udeco" data-up="' + p.id + '" data-ua="' + d[0] + '">' + decoSvg(o.d.a[d[0]], d[1]) + '</g>'; });
         o.goods.forEach(function (gd) { g += itemSvg(o.d.a[gd[0]], gd[1]); });
         g += '<g class="body">' + o.d.post + '</g>';
@@ -1084,6 +1085,9 @@
   // A stable number from the shop id, so two shops with the same seeds still differ.
   function keyOf(id) { var h = 7; for (var i = 0; i < String(id).length; i++) h = (h * 31 + String(id).charCodeAt(i)) | 0; return Math.abs(h) % 100000; }
 
+  // Where the paper keeper can stand behind the counter. Must match
+  // shopRoomKeeperSpots in internal/plugins/armory/shop_room_validate.go.
+  var KEEPER_SPOTS = { left: 1, middle: 1, right: 1 };
   // The layout as saved on the server, from the room state, and back.
   function toLayout(S) {
     return {
@@ -1097,8 +1101,21 @@
         return o;
       }),
       decor: (S.decor || []).filter(function (d) { return S.pieces.some(function (p) { return p.id === d.piece; }); }).map(function (d) { return { piece: d.piece, spot: d.spot, icon: d.icon }; }),
-      items: S.ov, portrait: S.portrait ? { left: S.portrait[0], top: S.portrait[1] } : null, lines: S.lines.slice()
+      items: S.ov, portrait: S.portrait ? { left: S.portrait[0], top: S.portrait[1] } : null, lines: S.lines.slice(),
+      manner: S.manner || '', moments: keptMoments(S.moments), keeperSpot: KEEPER_SPOTS[S.keeperSpot] ? S.keeperSpot : ''
     };
+  }
+  // Only moments with lines are saved; an empty one falls back to the manner.
+  function keptMoments(m) {
+    var out = {}; Object.keys(m || {}).forEach(function (k) { if (m[k] && m[k].length) out[k] = m[k].slice(); });
+    return out;
+  }
+  // A room with no saved layout, or one the AI connection changed, has its
+  // furniture laid out on opening; any other draws as it was saved.
+  function openRoom(S, room, L) {
+    if (!fromLayout(S, L) || S.furnish === 'room') room.generate();
+    else if (S.furnish === 'mood') room.applyMood();
+    else room.geometry();
   }
   function fromLayout(S, L) {
     if (!L) return false;
@@ -1125,6 +1142,13 @@
     S.ov = L.items || {};
     S.portrait = L.portrait ? [L.portrait.left, L.portrait.top] : null;
     S.lines = (L.lines || []).slice();
+    var KP = window.ShopRoomKeeper;
+    S.manner = KP && KP.MANNERS[L.manner] ? L.manner : '';
+    S.moments = keptMoments(L.moments);
+    S.keeperSpot = KEEPER_SPOTS[L.keeperSpot] ? L.keeperSpot : '';
+    // Set when the AI connection changed what the room is: lay out the
+    // furniture for it on opening. toLayout never writes it back.
+    S.furnish = L.furnish === 'room' || L.furnish === 'mood' ? L.furnish : '';
     return true;
   }
 
@@ -1208,7 +1232,7 @@
     };
   }
 
-  window.ShopRoom = { signLines: signLines, MOODS: MOODS, MOOD_ORDER: MOOD_ORDER, MOOD_KIND: MOOD_KIND, moodEfx: moodEfx, createRoom: createRoom, toLayout: toLayout, fromLayout: fromLayout, shopItems: shopItems, basketSummary: basketSummary, defaultPayer: defaultPayer, formatPurse: formatPurse, keyOf: keyOf, ROOM_TYPES: ROOM_TYPES };
+  window.ShopRoom = { signLines: signLines, MOODS: MOODS, MOOD_ORDER: MOOD_ORDER, MOOD_KIND: MOOD_KIND, moodEfx: moodEfx, createRoom: createRoom, toLayout: toLayout, fromLayout: fromLayout, openRoom: openRoom, shopItems: shopItems, basketSummary: basketSummary, defaultPayer: defaultPayer, formatPurse: formatPurse, keyOf: keyOf, ROOM_TYPES: ROOM_TYPES };
   if (!window.Chronicle || !window.document) return;
 
   var FX_KEY = 'chronicle.shopRoom.fx';
@@ -1269,6 +1293,9 @@
     '.shr-grain svg{display:block}',
     '.shr.fxlight .shr-grain{display:none}',
     '.shr.arr .piece{cursor:grab}',
+    // Finger-sized on touch screens; the room's own controls are smaller for a mouse.
+    '@media (pointer:coarse){.shr-out,.shr-cart,.shr-x,.shr-ib{width:44px;height:44px}}',
+    '.shr .piece:focus{outline:none}.shr .piece:focus-visible .body{filter:drop-shadow(0 0 2px var(--shr-acc)) drop-shadow(0 0 2px var(--shr-acc))}',
     '.shr.arr .piece:hover>.body{filter:brightness(1.12)}',
     '.shr .it{cursor:pointer}.shr .it:focus{outline:none}',
     '.shr .it:hover use,.shr .it:focus-visible use{filter:brightness(1.25)}',
@@ -1316,7 +1343,7 @@
     '.shr-panel.nag .shr-warn{box-shadow:inset 0 0 0 2px var(--color-warning,#d97706)}',
     '.shr-ph{display:flex;align-items:center;gap:8px;padding:12px 14px 10px;border-bottom:1px dashed var(--color-border,#e5e7eb)}',
     '.shr-ph h3{flex:1;margin:0;font-size:.66rem;font-weight:700;line-height:1;letter-spacing:.12em;text-transform:uppercase;color:var(--color-text-secondary,#6b7280)}',
-    '.shr-x{border:0;background:transparent;color:var(--color-text-secondary,#6b7280);cursor:pointer;width:28px;height:28px;border-radius:6px;font-size:1rem;line-height:1}',
+    '.shr-x{border:0;background:transparent;color:var(--color-text-secondary,#6b7280);cursor:pointer;width:32px;height:32px;border-radius:6px;font-size:1rem;line-height:1}',
     '.shr-x:hover{background:var(--color-bg-tertiary,#f3f4f6);color:var(--color-text-primary,#111827)}',
     '.shr-pb{flex:1;min-height:0;overflow:auto;padding:12px 14px 6px;display:grid;gap:10px;align-content:start}',
     '.shr-pf{display:flex;justify-content:flex-end;gap:8px;padding:10px 14px;border-top:1px solid var(--color-border,#e5e7eb)}',
@@ -1327,8 +1354,8 @@
     '.shr-hint{font-size:.72rem;color:var(--color-text-secondary,#6b7280)}',
     '.shr-field>span{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted,#9ca3af)}',
     '.shr-field select,.shr-field textarea{width:100%;min-width:0;border:1px solid var(--color-input-border,#d1d5db);border-radius:6px;padding:6px 8px;background:var(--color-input-bg,#fff);color:var(--color-text-primary,#111827);font:inherit}',
-    // A shorthand background here used to wipe the site's dropdown chevron, so
-    // the selects read as text boxes; they draw their own, the same as Chronicle's.
+    // A shorthand background would wipe the site's dropdown chevron, so the
+    // selects draw their own, the same as Chronicle's.
     '.shr-field select{-webkit-appearance:none;appearance:none;background-color:var(--color-input-bg,#fff);background-image:url("data:image/svg+xml,%3csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3e%3cpath stroke=%27%236b7280%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3e%3c/svg%3e");background-repeat:no-repeat;background-position:right .5rem center;background-size:1.25em 1.25em;padding:8px 2.25rem 8px 10px;border-radius:8px;cursor:pointer}',
     '.shr-field select:hover{border-color:var(--color-text-muted,#9ca3af)}',
     '.shr-field .shr-seg{display:grid}',
@@ -1360,7 +1387,7 @@
     '.shr.arr .shr-bin{left:calc((100% - min(320px,100%)) / 2)}',
     '.shr.dragging .shr-bin{transform:translate(-50%,0);opacity:1}.shr-bin.hot{background:#b91c1c;transform:translate(-50%,0) scale(1.08)}',
     '.shr.arr .udeco{cursor:grab}',
-    '.shr-ib{width:30px;height:30px;border:0;border-radius:8px;display:inline-grid;place-items:center;background:transparent;color:var(--color-text-body,#374151);cursor:pointer;transition:background .15s,color .15s}',
+    '.shr-ib{width:32px;height:32px;border:0;border-radius:8px;display:inline-grid;place-items:center;background:transparent;color:var(--color-text-body,#374151);cursor:pointer;transition:background .15s,color .15s}',
     '.shr-ib:hover:not(:disabled){background:var(--color-bg-tertiary,#f3f4f6);color:var(--color-text-primary,#111827)}',
     '.shr-ib:disabled{opacity:.35;cursor:default}',
     '.shr-ib[aria-pressed="true"]{color:oklch(.62 .12 75);background:oklch(.9 .07 85/.45)}',
@@ -1403,6 +1430,7 @@
     '.shr-front:hover::before,.shr-front.opening::before{opacity:1}',
     '.shr-front:hover .shr-dr{transform:scale(1.05)}',
     '.shr-front .nm{font-family:var(--font-heading,Georgia,serif);font-size:1.15rem;font-weight:600;max-width:28rem;overflow-wrap:anywhere}',
+    '.shr-front .hint.bye{font:italic .85rem/1.35 Georgia,serif;letter-spacing:0;text-transform:none;max-width:22rem}',
     '.shr-front .hint{font-size:.68rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--color-text-secondary,#a49c8e)}',
     '.shr-dr{position:relative;flex:none;width:96px;height:144px;perspective:520px;transform-origin:50% 55%;transition:transform .5s cubic-bezier(.3,.7,.3,1)}.shr-dr>span{position:absolute;inset:0}.shr-dr svg{display:block;width:100%;height:100%}',
     '.shr-dr .lf{transform-origin:7% 50%;transition:transform .65s cubic-bezier(.45,.05,.3,1)}.shr-front.opening .lf{transform:rotateY(-110deg)}',
@@ -1477,7 +1505,7 @@
       var eid = (ds.roomEndpoint || '').split('/shops/')[1] || '';
       var buyersEndpoint = (ds.roomEndpoint || '').replace(/\/room$/, '/buyers'), buyEndpoint = (ds.roomEndpoint || '').replace(/\/room$/, '/buy');
       var S = { roomType: 'general', pal: 'oak', mood: '', efx: null, setting: 'room', look: 'lit', fx: readFx(), size: 'm', full: 'normal', deco: 'some', keep: true,
-        seeds: { room: 1, goods: 1, deco: 1 }, pieces: [], decor: [], ov: {}, portrait: null, lines: [], mode: 'shop', its: [],
+        seeds: { room: 1, goods: 1, deco: 1 }, pieces: [], decor: [], ov: {}, portrait: null, lines: [], manner: '', moments: {}, mode: 'shop', its: [],
         key: keyOf(eid), name: ds.shopName || 'Shop', dark: document.documentElement.classList.contains('dark') };
       var campaignId = (campaignUrl.match(/\/campaigns\/([^/]+)/) || [])[1] || '', words = {};
       var room = createRoom(S), ICONS = room.ICONS, rels = [], relsOk = false, buy = null, basket = {}, payer = '', busy = false, note = '', tab = 'All', open = false, line = 0, dirty = false, busySave = false, savedLayout = null, partKeep = { room: false, goods: false, deco: false };
@@ -1531,7 +1559,7 @@
         // which stays underneath to keep the scene's size.
         var paper = paperOn();
         root.classList.toggle('paper', paper);
-        if (paper) window.ShopRoomPaper.render(pel, { view: view, its: S.its, name: S.name, image: ds.shopImage, icons: ICONS, fx: S.fx, mood: view.mood, efx: view.efx, arr: S.mode === 'arr', shut: root.classList.contains('cold') });
+        if (paper) window.ShopRoomPaper.render(pel, { view: view, its: S.its, name: S.name, image: ds.shopImage, icons: ICONS, fx: S.fx, mood: view.mood, efx: view.efx, arr: S.mode === 'arr', keeperSpot: S.keeperSpot, kindLabel: KIND_LABEL, shut: root.classList.contains('cold') });
         else pel.innerHTML = '';
         // The counter look draws only while the shop is open: lighting it bakes images.
         var counter = counterOn();
@@ -1539,6 +1567,18 @@
         if (counter && dlg.open) window.ShopRoomCounter.render(cel, counterModel(), counterHooks);
         else if (!counter && window.ShopRoomCounter) window.ShopRoomCounter.destroy(cel);
         markGhost();
+        keepTime();
+      }
+      /* A redraw makes every flame, ember and glow afresh, and fresh CSS loops
+         start from their first frame, so each drag step or purchase made them
+         all jump. Setting every loop to one shared clock lets a new drawing
+         carry on where the old one was. */
+      function keepTime() {
+        if (!svg.getAnimations) return;
+        var now = window.MotionRest ? window.MotionRest.now() * 1000 : performance.now();
+        svg.getAnimations({ subtree: true }).concat(pel.getAnimations({ subtree: true })).forEach(function (a) {
+          if (a.effect && a.effect.getComputedTiming().iterations === Infinity && Math.abs(a.currentTime - now) > 1) a.currentTime = now;
+        });
       }
       function paperOn() { return S.look === 'paper' && !!window.ShopRoomPaper; }
       function counterOn() { return S.look === 'counter' && !!window.ShopRoomCounter; }
@@ -1557,7 +1597,7 @@
       var counterHooks = {
         canAdd: function (id) { return !addable(id); },
         why: addable,
-        add: function (id) { if (addable(id)) return false; basket[String(id)] = (basket[String(id)] || 0) + 1; note = ''; renderList(); return true; },
+        add: function (id) { if (addable(id)) return false; basket[String(id)] = (basket[String(id)] || 0) + 1; note = ''; renderList(); picked(); return true; },
         remove: function (id) { var k = String(id); if (!basket[k]) return; if (!--basket[k]) delete basket[k]; note = ''; renderList(); },
         basketEl: function () { return cartBtn; },
         openList: function () { setOpen(true); },
@@ -1640,7 +1680,10 @@
         });
       }
       function loadGoods() {
-        return Chronicle.apiFetch(ds.relationsEndpoint).then(function (r) { if (r.ok) { relsOk = true; return r.json(); } return []; }).catch(function () { return []; }).then(function (j) {
+        // A failed read keeps the wares already shown and says so, rather
+        // than drawing an empty shop the player can't tell from a sold-out one.
+        return Chronicle.apiFetch(ds.relationsEndpoint).then(function (r) { if (r.ok) { relsOk = true; return r.json(); } return null; }).catch(function () { return null; }).then(function (j) {
+          if (j === null) { note = (note ? note + ' ' : '') + 'The wares couldn’t be loaded just now. Close the shop and open it again to try again.'; return; }
           rels = (Array.isArray(j) ? j : (j && j.data) || []).filter(function (r) { return r.relationType === 'sells'; }).map(function (r) {
             if (typeof r.metadata === 'string') { try { r.metadata = JSON.parse(r.metadata); } catch (e) { r.metadata = {}; } }
             r.metadata = r.metadata || {}; return r;
@@ -1652,6 +1695,7 @@
         var items = S.its.filter(function (it) { return basket[String(it.id)] && !it.out; }).map(function (it) { return { relationId: it.id, quantity: basket[String(it.id)] }; });
         if (!items.length || busy) return;
         busy = true; note = ''; renderBasket();
+        var bought = false;
         Chronicle.apiFetch(buyEndpoint, { method: 'POST', body: { buyerEntityId: payer, items: items }, csrfToken: ds.csrfToken }).then(function (r) {
           return r.json().catch(function () { return {}; }).then(function (j) {
             if (!r.ok) throw new Error((j && (j.message || j.error)) || 'That didn’t go through. Try again.');
@@ -1666,9 +1710,14 @@
               note = 'Bought ' + what + ' for ' + j.spent + ' ' + localCoin(words, j.currency).text + '. ' + name + ' has ' + left + ' left.' + (j.change ? ' Change: ' + j.change + '.' : '');
             }
             basket = {};
+            if (j.status !== 'requested') bought = true;
             return Promise.all([loadGoods(), loadBuyers()]);
           });
-        }).catch(function (e) { note = e.message; }).then(function () { busy = false; draw(); renderList(); });
+        }).catch(function (e) {
+          // A network failure's own text ("Failed to fetch") means nothing
+          // to a player; the server's refusals are already in plain words.
+          note = e instanceof TypeError ? 'The shop couldn’t be reached. Nothing was bought; try again.' : e.message;
+        }).then(function () { busy = false; draw(); renderList(); if (bought) speak('buy'); });
       }
       // The basket's count, and its peek: what's in it and the total, or how to start.
       function renderPeek() {
@@ -1698,10 +1747,10 @@
         tip.style.top = Math.max(8, r.top - tip.offsetHeight - 8) + 'px';
       }
       var typeT = 0, sayT = 0;
-      function talk(anchor) {
-        if (!S.lines.length) return;
-        var kEl = anchor || (paperOn() && pel.querySelector('.srp-keeper')) || keeper, kc = kEl.querySelector('.srp-cd') || kEl;
-        var text = S.lines[line++ % S.lines.length], n = 0, r = kc.getBoundingClientRect();
+      function talk(anchor, said) {
+        if (!said && !S.lines.length) return;
+        var kEl = anchor || keeperEl(), kc = kEl.querySelector('.srp-cd') || kEl;
+        var text = said || S.lines[line++ % S.lines.length], n = 0, r = kc.getBoundingClientRect();
         kEl.classList.remove('talk'); void kEl.offsetWidth; kEl.classList.add('talk');
         clearInterval(typeT); clearTimeout(sayT);
         say.textContent = '“' + text + '”'; say.classList.add('on');
@@ -1713,6 +1762,20 @@
         }
         sayT = setTimeout(function () { say.classList.remove('on'); }, 4000);
       }
+
+      // Where the keeper stands in the look on show.
+      function keeperEl() { return (counterOn() && cel.querySelector('[data-k="keeper"]')) || (paperOn() && pel.querySelector('.srp-keeper')) || keeper; }
+      // The keeper's line for a moment of the visit (shop_room_keeper.js), never while arranging.
+      // Picking things says something at most every few seconds, so a full basket isn't a monologue.
+      var lookAt = 0;
+      function speak(moment) {
+        var KP = window.ShopRoomKeeper; if (!KP || S.mode === 'arr' || !dlg.open) return;
+        if (moment === 'look' || moment === 'poor') { var now = Date.now(); if (now - lookAt < 8000) return; lookAt = now; }
+        var text = KP.pick(S.manner, S.moments, moment);
+        if (text) talk(null, text);
+      }
+      // After something goes on the pile: the keeper remarks on it, or on the purse coming up short.
+      function picked() { speak(basketSummary(basket, S.its, buyer()).short ? 'poor' : 'look'); }
 
       // ---- Saving (owners only). Changes in Arrange wait for "Save room";
       // Cancel or Discard puts the room back as it was last saved. ----
@@ -1796,7 +1859,7 @@
       function onPaperDown(e) {
         if (S.mode !== 'arr') return;
         var h = window.ShopRoomPaper.hit(pel, e.clientX, e.clientY) || e.target;
-        if (h.closest('.it,.srp-keeper')) return;
+        if (h.closest('.it,.srp-keeper,.srp-kspot')) return;
         var dc = h.closest('.srp-deco');
         if (dc) { pickDeco(e, +dc.getAttribute('data-up'), +dc.getAttribute('data-ua')); return; }
         var g = e.target.closest('.srp-pc'), p = g && byId(+g.getAttribute('data-p')), f = p && floorFrom(e);
@@ -1815,8 +1878,18 @@
         moveTo(p, nx, ny);
       }
       function onPaperClick(e) {
+        var ks = e.target.closest('.srp-kspot') || (window.ShopRoomPaper.hit(pel, e.clientX, e.clientY) || e.target).closest('.srp-kspot');
+        if (ks) { setKeeperSpot(ks.getAttribute('data-ks')); return; }
         var h = window.ShopRoomPaper.hit(pel, e.clientX, e.clientY) || e.target, g = h.closest('.it'); if (g) { useItem(g); return; }
         if (h.closest('.srp-keeper')) onKeeperClick();
+      }
+      // Arranging the paper look, a mark on the counter moves the keeper there.
+      function setKeeperSpot(v) {
+        if (S.mode !== 'arr' || !KEEPER_SPOTS[v]) return;
+        S.keeperSpot = v === 'middle' ? '' : v;
+        draw(); save();
+        var b = pel.querySelector('.srp-kspot[data-ks="' + v + '"]'); if (b) b.focus();
+        status('The keeper now stands ' + (v === 'middle' ? 'in the middle of' : 'at the ' + v + ' of') + ' the counter.');
       }
       function onPaperKey(e) { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('.srp-keeper')) { e.preventDefault(); onKeeperClick(); return; } onSvgKey(e); }
       function moveTo(p, nx, ny) {
@@ -1919,7 +1992,27 @@
         var g = e.target.closest('.it'); if (!g) return;
         useItem(g);
       }
-      function onSvgKey(e) { var g = e.target.closest('.it'); if (g && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); useItem(g); } }
+      // Arranging by keyboard: Tab to a piece, arrows nudge it a quarter
+      // square, Shift with an arrow a whole one. The keys come from the focused
+      // piece itself, so they never fire while typing in the panel.
+      var ARROWS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+      function nudge(e) {
+        var g = e.target.closest('[data-p]'), d = ARROWS[e.key];
+        if (S.mode !== 'arr' || !g || !d || e.altKey || e.ctrlKey || e.metaKey) return false;
+        var p = byId(+g.getAttribute('data-p')); if (!p) return false;
+        e.preventDefault();
+        var st = e.shiftKey ? 1 : .25, dx = d[0] * st, dy = d[1] * st, was = { x: p.x, y: p.y, off: p.off };
+        // A wall piece slides along its wall with any arrow, the same way a drag moves it.
+        if (room.isWall(p.kind)) { if (p.wall === 'Y') { dx = dx || dy; dy = 0; } else { dy = dy || (paperOn() ? dx : -dx); dx = 0; } }
+        p.x = room.snap(p.x + dx); p.y = room.snap(p.y + dy);
+        var out = (room.isWall(p.kind) && !room.hug(p)) || room.clashes(p, [], room.size()), blocked = !out && room.clashes(p, S.pieces, room.size());
+        if (out || blocked) { p.x = was.x; p.y = was.y; p.off = was.off; status(out ? 'It can’t go further that way.' : 'Something is in the way.'); return true; }
+        p.pinned = true;
+        draw(); save();
+        var again = root.querySelector((paperOn() ? '.srp-pc' : '.piece') + '[data-p="' + p.id + '"]'); if (again) again.focus({ preventScroll: true });
+        return true;
+      }
+      function onSvgKey(e) { if (nudge(e)) return; var g = e.target.closest('.it'); if (g && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); useItem(g); } }
       function onSvgOver(e) { var g = e.target.closest('.it'); if (g) showTip(g); }
       function onSvgOut(e) { if (e.target.closest('.it')) tip.classList.remove('on'); }
       function useItem(g) {
@@ -1959,6 +2052,7 @@
         // on Escape) listening further up never sees it.
         e.stopPropagation();
         if (picking !== null) { closePicker(); return; }
+        var fp = document.activeElement; if (S.mode === 'arr' && fp && root.contains(fp) && fp.matches('[data-p]')) { fp.blur(); return; }
         say.classList.remove('on');
         if (S.mode === 'arr') { tryLeave(); return; }
         if (open) { setOpen(false); cartBtn.focus({ preventScroll: true }); return; }
@@ -2017,6 +2111,26 @@
         }
         return room.KINDS.filter(function (k) { return !MOOD_KIND[k]; }).map(tile).join('');
       }
+      // The Keeper section: a manner, the lines for each moment of a visit, and the lines said when pressed.
+      var momTab = 'hello';
+      function keeperSum() {
+        var KP = window.ShopRoomKeeper, m = KP && KP.MANNERS[S.manner];
+        var own = Object.keys(S.moments).length, n = S.lines.length;
+        var parts = [m ? m.name : '', own ? own + (own === 1 ? ' moment' : ' moments') + ' in your words' : '', n ? n + (n === 1 ? ' line' : ' lines') : ''].filter(Boolean);
+        return parts.length ? parts.join(' · ') : 'No lines yet';
+      }
+      function keeperBody() {
+        var KP = window.ShopRoomKeeper, h = '';
+        if (KP) {
+          var mans = [['', 'None']].concat(KP.ORDER.map(function (k) { return [k, KP.MANNERS[k].name]; }));
+          h += '<div class="shr-field"><span>Manner</span><span class="shr-chips" role="group" aria-label="The keeper’s manner">' + mans.map(function (m) { return '<button type="button" class="shr-chip" data-manner="' + m[0] + '" aria-pressed="' + (S.manner === m[0]) + '">' + esc(m[1]) + '</button>'; }).join('') + '</span></div>';
+          h += '<div class="shr-field"><span>When</span><span class="shr-chips" role="group" aria-label="Moment of the visit">' + KP.MOMENTS.map(function (m) { return '<button type="button" class="shr-chip" data-moment="' + m[0] + '" aria-pressed="' + (momTab === m[0]) + '">' + esc(m[1]) + (S.moments[m[0]] ? ' ·' : '') + '</button>'; }).join('') + '</span></div>';
+          var start = KP.linesFor(S.manner, null, momTab);
+          h += '<label class="shr-field"><span>What the keeper says then (one line each, up to five)</span><textarea rows="3" data-moment-lines="1" maxlength="1100" placeholder="' + esc(start.length ? start.join('\n') : 'Pick a manner for lines to start from, or write your own.') + '"></textarea></label>' +
+            '<small class="shr-hint">' + (start.length ? 'Leave it empty and the keeper uses the manner’s lines, shown faintly above.' : 'Leave it empty and the keeper says nothing then.') + '</small>';
+        }
+        return h + '<label class="shr-field"><span>When someone presses the keeper (one line each)</span><textarea rows="3" data-lines="1" maxlength="2200"></textarea></label>';
+      }
       function renderPanel() {
         if (!panel) return;
         var pins = S.pieces.filter(function (p) { return p.pinned; }).length, mood = MOODS[S.mood] ? S.mood : 'cozy', M = MOODS[mood], e = efxNow();
@@ -2034,7 +2148,7 @@
             : '<div class="shr-field"><span>Colours</span><span class="shr-chips">' + room.PALS.map(function (p) { return '<button type="button" class="shr-chip" data-k="pal" data-v="' + p[0] + '" aria-pressed="' + (S.pal === p[0]) + '"><span class="shr-sw" style="background:' + p[2] + '"></span>' + p[1] + '</button>'; }).join('') + '</span></div>');
         var add1 = '<span class="shr-seg" role="group" style="display:grid"><button type="button" data-addtab="m" aria-pressed="' + (addTab === 'm') + '">Mood pieces</button><button type="button" data-addtab="f" aria-pressed="' + (addTab === 'f') + '">Furniture</button><button type="button" data-addtab="d" aria-pressed="' + (addTab === 'd') + '">Decorations</button></span>' +
           '<div class="shr-addl' + (addTab === 'd' ? ' dec' : '') + '">' + addTiles() + '</div>' +
-          '<small class="shr-hint">' + (addTab === 'd' ? 'Drop a decoration on a shelf, table or wall spot.' : 'Drag a piece onto the floor.') + ' Drag anything in the room onto the bin to remove it.</small>';
+          '<small class="shr-hint">' + (addTab === 'd' ? 'Drop a decoration on a shelf, table or wall spot.' : 'Drag a piece onto the floor.') + ' Drag anything in the room onto the bin to remove it. With a keyboard, Tab to a piece and move it with the arrow keys; Shift moves it further.' + (S.look === 'paper' ? ' The marks over the counter choose where the keeper stands.' : '') + '</small>';
         var rng = function (k, label) { return '<label class="shr-rng"><span>' + label + '</span><input type="range" min="0" max="250" step="5" data-efx="' + k + '" value="' + e[k] + '"><output>' + e[k] + '%</output></label>'; };
         var tg = function (k, label) { return '<button type="button" data-eft="' + k + '" aria-pressed="' + !!e[k] + '">' + label + '</button>'; };
         var es = function (k, opts) { return '<span class="shr-seg" role="group" style="display:grid">' + opts.map(function (o) { return '<button type="button" data-efs="' + k + '" data-v="' + o[0] + '" aria-pressed="' + (e[k] === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</span>'; };
@@ -2054,11 +2168,12 @@
           sec('add', 'fa-plus', 'Add pieces', 'Drag into the room', add1) +
           sec('fine', 'fa-sliders', 'Fine-tune', fineSum, fine1) +
           sec('gen', 'fa-dice', 'Generate', 'Reroll parts', gen1) +
-          sec('keeper', 'fa-comment', 'Keeper', S.lines.length ? S.lines.length + (S.lines.length === 1 ? ' line' : ' lines') : 'No lines yet', '<label class="shr-field"><span>What the keeper says (one line each)</span><textarea rows="3" data-lines="1" maxlength="2200"></textarea></label>') +
-          '<span class="shr-status" aria-live="polite">' + (S.portrait ? 'Portrait placed by hand.' : '') + '</span></div>' +
+          sec('keeper', 'fa-comment', 'Keeper', keeperSum(), keeperBody()) +
+          '<span class="shr-status" aria-live="polite">' + (S.look === 'paper' ? (S.keeperSpot ? 'The keeper stands at the ' + S.keeperSpot + ' of the counter.' : '') : S.portrait ? 'Portrait placed by hand.' : '') + '</span></div>' +
           '<div class="shr-warn" role="alert"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>Not saved yet</span><button type="button" data-discard="1">Discard</button></div>' +
           '<div class="shr-pf"><button type="button" data-discard="1">Cancel</button><button type="button" class="shr-save" data-saveroom="1"' + (dirty ? '' : ' disabled') + '>Save room</button></div>';
         panel.querySelector('[data-lines]').value = S.lines.join('\n');
+        var ml = panel.querySelector('[data-moment-lines]'); if (ml) ml.value = (S.moments[momTab] || []).join('\n');
       }
       // Fold: animate to the body's real height, then let it size itself; Calm and Off open at once.
       function fold(id) {
@@ -2079,6 +2194,8 @@
         var b = e.target.closest('button'); if (!b) return;
         if (b.dataset.enter) { enter(); return; }
         if (b.dataset.addtab) { addTab = b.dataset.addtab; renderPanel(); return; }
+        if (b.dataset.manner !== undefined) { S.manner = b.dataset.manner; renderPanel(); save(); return; }
+        if (b.dataset.moment) { momTab = b.dataset.moment; renderPanel(); return; }
         if (b.dataset.sec) { fold(b.dataset.sec); return; }
         if (b.dataset.mode) { if (b.dataset.mode === 'shop') tryLeave(); else if (S.mode !== 'arr') { S.mode = 'arr'; setMode(); } return; }
         if (b.dataset.leave) { tryLeave(); return; }
@@ -2088,7 +2205,7 @@
         if (b.dataset.saveroom) { saveRoom(); return; }
         if (b.dataset.fx) { S.fx = b.dataset.fx; saveFx(S.fx); root.classList.toggle('fxlight', S.fx !== 'full'); draw(); renderList(); return; }
         if (b.dataset.tab) { tab = b.dataset.tab; renderList(); return; }
-        if (b.dataset.add) { basket[b.dataset.add] = (basket[b.dataset.add] || 0) + 1; note = ''; renderList(); return; }
+        if (b.dataset.add) { basket[b.dataset.add] = (basket[b.dataset.add] || 0) + 1; note = ''; renderList(); picked(); return; }
         if (b.dataset.empty) { basket = {}; note = ''; renderList(); return; }
         if (b.dataset.buy) { doBuy(); return; }
         if (b === keeper) { onKeeperClick(); return; }
@@ -2120,6 +2237,11 @@
         if (t.dataset.efx) { renderPanel(); return; }
         if (t.dataset.payer) { payer = t.value; note = ''; renderBasket(); return; }
         if (t.dataset.sel) { S[t.dataset.sel] = t.value; if (t.dataset.sel === 'setting') S.portrait = null; room.generate(); draw(); renderPanel(); save(); }
+        else if (t.dataset.momentLines) {
+          var ls = t.value.split('\n').map(function (x) { return x.trim().slice(0, 200); }).filter(Boolean).slice(0, 5);
+          if (ls.length) S.moments[momTab] = ls; else delete S.moments[momTab];
+          renderPanel(); save();
+        }
         else if (t.dataset.lines) { S.lines = t.value.split('\n').map(function (s) { return s.trim().slice(0, 200); }).filter(Boolean).slice(0, 10); save(); }
       }
       function setMode() {
@@ -2136,7 +2258,7 @@
       }
       // ---- Opening and closing ----
       var front = root.querySelector('.shr-front'), dark = root.querySelector('.shr-dark');
-      var walkT = 0, hole = null;
+      var walkT = 0, hole = null, greet = false;
       // Calm, Off and a device asking for less motion skip the walk; the room is simply there.
       function still() { return matchMedia('(prefers-reduced-motion: reduce)').matches || /^(calm|off)$/.test(document.documentElement.getAttribute('data-motion') || ''); }
       function showRoom() {
@@ -2149,7 +2271,8 @@
       function enter() {
         if (!root.classList.contains('closed') || front.classList.contains('opening')) return;
         front.setAttribute('aria-expanded', 'true');
-        if (still()) { showRoom(); return; }
+        greet = true;
+        if (still()) { showRoom(); greet = false; setTimeout(function () { speak('hello'); }, 50); return; }
         front.classList.add('opening');
         walkT = setTimeout(walkIn, 650);
       }
@@ -2179,9 +2302,22 @@
       function settle() {
         root.classList.remove('cold'); dropHole(); dark.className = 'shr-dark';
         placeKeeper();
+        if (greet) { greet = false; speak('hello'); }
+      }
+      // The keeper's farewell is said under the door, since the room has gone by
+      // the time it could be read; the door's own hint comes back after it.
+      var byeT = 0;
+      function farewell() {
+        var KP = window.ShopRoomKeeper, hint = front.querySelector('.hint');
+        if (!KP || !hint || S.mode === 'arr') return;
+        var text = KP.pick(S.manner, S.moments, 'bye'); if (!text) return;
+        if (!hint.dataset.usual) hint.dataset.usual = hint.textContent;
+        clearTimeout(byeT); hint.classList.add('bye'); hint.textContent = '“' + text + '”';
+        byeT = setTimeout(function () { hint.classList.remove('bye'); hint.textContent = hint.dataset.usual; }, 4500);
       }
       // Leaving shrinks the room back into the doorway it came out of, and the door swings shut.
       function leave() {
+        greet = false; farewell();
         clearTimeout(walkT); settle(); alive(false); tilt(0, 0); setOpen(false); peek(false);
         var shut = function () {
           if (dlg.open) dlg.close();
@@ -2208,7 +2344,9 @@
           var MR = window.MotionRest, sp = MR ? MR.speed() : 1;
           svg.getAnimations({ subtree: true }).concat(pel.getAnimations({ subtree: true }), cel.getAnimations({ subtree: true })).forEach(function (a) {
             if (sp === 0) { if (a.playState === 'running') a.pause(); return; }
-            a.playbackRate = Math.max(.02, sp); if (a.playState === 'paused') a.play();
+            // Setting a rate restarts the animation's timing in some browsers, so only when it changes.
+            var r = Math.max(.02, sp); if (a.playbackRate !== r) a.playbackRate = r;
+            if (a.playState === 'paused') a.play();
           });
         }, 250);
       }
@@ -2285,7 +2423,7 @@
         loadBuyers(),
         window.Chronicle && Chronicle.localWords ? Chronicle.localWords(campaignId, eid).then(function (w) { words = w || {}; }) : null
       ]).then(function (res) {
-        if (fromLayout(S, res[0] && res[0].layout)) room.geometry(); else room.generate();
+        openRoom(S, room, res[0] && res[0].layout);
         savedLayout = toLayout(S);
         el.hidden = false;
         draw(); renderList();
