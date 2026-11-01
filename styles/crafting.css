@@ -27,6 +27,11 @@
   container-type: inline-size;
 }
 
+/* The bench itself lives on Chronicle, so the block's desk/journal switch
+   under it has nothing to switch here. A dressed moment's look plays only
+   on Chronicle too; its words still show in the result. */
+.cs-craft .crp-look { display: none; }
+
 /* A Foundry window can be narrow on a wide screen, where Chronicle's own
    phone rules (viewport media queries in the vendored stylesheets) never
    apply. These are the block's rules from those queries, applied on the
