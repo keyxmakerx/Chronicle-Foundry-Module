@@ -31,6 +31,8 @@ export const DEFAULT_STRINGS = {
   NoSystem: 'No matching game system — character fields may not sync.',
   ErrorsOne: '{count} recent sync error — see Problems.',
   ErrorsMany: '{count} recent sync errors — see Problems.',
+  SetAsideOne: '{count} page removed in Chronicle was set aside. Keep it, send it back, or delete it.',
+  SetAsideMany: '{count} pages removed in Chronicle were set aside. Keep them, send them back, or delete them.',
 };
 
 /** Default translator: the English map above with `{name}` substitution. */
@@ -55,6 +57,7 @@ function defaultT(key, data) {
  * @param {number} [p.errorCount]    - recent REST/sync errors
  * @param {string|null} [p.matchedSystem] - matched Chronicle system slug, or null
  * @param {string} [p.lastSyncTime]  - last successful sync, human string
+ * @param {number} [p.setAsideCount] - journals in the "Chronicle: removed" folder
  * @param {(key:string, data?:object)=>string} [p.t] - translator for full
  *   `CHRONICLE.Dashboard.Overview.*` keys; defaults to the English map
  * @returns {{connection:object, stats:Array, attention:Array, allClear:boolean}}
@@ -76,6 +79,7 @@ export function buildOverviewModel(p = {}) {
     errorCount = 0,
     matchedSystem = null,
     lastSyncTime,
+    setAsideCount = 0,
     t = defaultT,
   } = p;
   const tr = (k, d) => t(PREFIX + k, d);
@@ -159,6 +163,16 @@ export function buildOverviewModel(p = {}) {
       icon: 'fa-circle-question',
       text: tr('NoSystem'),
       tab: 'problems:health',
+    });
+  }
+  // Info: nothing is broken, but a removal in Chronicle otherwise passes
+  // without a word, and only the GM can decide what the journal is worth.
+  if (setAsideCount > 0) {
+    attention.push({
+      severity: 'info',
+      icon: 'fa-box-archive',
+      text: tr(setAsideCount === 1 ? 'SetAsideOne' : 'SetAsideMany', { count: setAsideCount }),
+      tab: 'linked:pages',
     });
   }
   if (errorCount > 0) {
