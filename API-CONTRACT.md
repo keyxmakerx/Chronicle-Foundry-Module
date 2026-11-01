@@ -1621,6 +1621,44 @@ saved with `handedOut: true` (and `status: "done"` when asked).
 
 Re-verify by: 2026-11-09 (Chronicle `internal/plugins/syncapi/quest_api_handler.go`, `internal/app/quests_api_adapter.go`, `internal/plugins/quests/model.go`)
 
+### Crafting
+
+A hero's crafting and the spoils tray, for the Satchel's Crafting tab. Every
+route needs the crafting addon; an older Chronicle answers **404** and a
+campaign with the addon off answers **403** `{"error":"addon_disabled"}`. The
+module probes `GET /crafting/spoils` once per session, shares a definitive
+answer in world setting `craftingAvailable`, and keeps those answers out of the
+error log; any other failure leaves the stored answer alone.
+
+**Used by:** `scripts/crafting-relay.mjs` (GM client), reached by players
+through the module socket. The tab runs Chronicle's own Crafting block
+(`vendor/chronicle/crafting_block.js`), so the answers below are exactly what
+the block reads on the hero's Chronicle page.
+
+**Acting member.** As for Stashes: `actingUserId` goes in the query on GET and
+DELETE, in the body on POST, only when relaying for a player, and is taken from
+the socket sender's member link, never the request. Chronicle then applies
+crafting's own rules: a player reads and works only on characters they claimed
+(404 for any other), the server rolls every die, and only the Owner or a co-DM
+reads the tray or ends a fight (403). Bodies are at most 32 KiB.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/crafting/characters/:entityId` | The block's view of one hero: `{character, pack, projects, recipes, benches, settings, spoils, director, …}`. |
+| POST | `/crafting/characters/:entityId/projects` | `{recipeId, picks:{"<slot>":"<itemId>"}}` → the new project (201). 422 when a pick is missing or wrong. |
+| POST | `/crafting/projects/:projectId/roll` | `{work, bench, version}`; `work` is `clean`, `botched`, `steady`, or `skipped` for a roll made without the bench; `bench` is `""` or a bench id. → `{project:{status, name, makes, hero, version, …}, dice, total, finished, made?, …}`. 409 when `version` is stale or the project has no roll ready; 422 for a bad `work`. |
+| DELETE | `/crafting/projects/:projectId` | Sets the project aside (204). 409 when it is already over. |
+| GET | `/crafting/spoils` | The Director's tray. The module reads it only as the probe. |
+| POST | `/crafting/spoil-lines/:lineId/take` | `{characterId}` → `{hero, item, got, qty, dice?, total?, tier, …}`; `dice` is present when the take was a harvest test. 409 when someone took it first; 422 while the find is unidentified. |
+| POST | `/crafting/spoil-lines/:lineId/study` | `{characterId}` → `{hero, dice, total, tier, known, lost?, item?, …}`. 409 when the hero studied it since the last respite. |
+| POST | `/crafting/fights` | `{name, creatures:[{pageId, name, down, copies}]}` → `{lines, spoils}`. Each call drops again, so the module sends one per combat, after the GM confirms. Not called yet: TODO(#283). |
+
+Errors carry `{message}`; the tab shows it as the block does. A take, start or
+finished project re-reads the hero's actor (`refreshCharacters`); the GMs get a
+whispered line for each take, harvest, study and finished project.
+
+Re-verify by: 2026-11-14 (Chronicle `internal/plugins/syncapi/crafting_api_handler.go`, `internal/app/crafting_sync_adapter.go`, `internal/plugins/crafting/spoils.go`, `projects.go`, `docs/api/openapi.yaml` Crafting tag; Chronicle issue #1915)
+
 ### Player notebook pages
 
 Not part of the REST API: the notebook (`scripts/player-notebook.mjs`,

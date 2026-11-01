@@ -209,3 +209,23 @@ test('the creatures switch is a plain on/off saved to syncCreatures', () => {
   assert.deepEqual(plan.writes.filter(([k]) => k === 'syncCreatures'), [['syncCreatures', true]]);
   assert.ok(SETTINGS_KEYS.includes('syncCreatures'));
 });
+
+test('each conflict choice has an English label and a hint saying what is overwritten', async () => {
+  const { readFileSync } = await import('node:fs');
+  const en = JSON.parse(readFileSync(new URL('../lang/en.json', import.meta.url), 'utf8'));
+  const win = en.CHRONICLE.SettingsWindow;
+  for (const choice of ['chronicle', 'foundry', 'newest']) {
+    assert.equal(typeof win.Conflict[choice], 'string', choice);
+    assert.match(win.ConflictHint[choice], /replaced|overwritten/, choice);
+  }
+  const hbs = readFileSync(new URL('../templates/chronicle-settings.hbs', import.meta.url), 'utf8');
+  assert.match(hbs, /data-hint="\{\{hint\}\}"/);
+  assert.match(hbs, /data-conflict-hint/);
+});
+
+test('a saved connection is applied in place, not left for a reload', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../scripts/chronicle-settings.mjs', import.meta.url), 'utf8');
+  assert.match(src, /applyConnection\(\)/);
+  assert.doesNotMatch(src, /ReloadToConnect/);
+});

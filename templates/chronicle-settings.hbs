@@ -185,9 +185,10 @@
       <div class="cs-field">
         <label for="cs-conflict">{{localize "CHRONICLE.SettingsWindow.WhenBoth"}}</label>
         <div class="cs-ctl">
-          <select id="cs-conflict" name="conflictResolution">
-            {{#each conflict}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+          <select id="cs-conflict" name="conflictResolution" aria-describedby="cs-conflict-hint">
+            {{#each conflict}}<option value="{{value}}" data-hint="{{hint}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
           </select>
+          <p class="cs-hint" id="cs-conflict-hint" data-conflict-hint aria-live="polite">{{conflictHint}}</p>
         </div>
       </div>
       <div class="cs-field cs-inline">

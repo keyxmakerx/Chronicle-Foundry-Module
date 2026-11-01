@@ -2185,7 +2185,8 @@ export class JournalSync {
         if (entity) {
           await this._onEntityUpdated(entity);
         }
-        ui.notifications.warn(`Chronicle: Conflict on "${noticeText(journal.name)}" — kept Chronicle version.`);
+        ui.notifications.warn(game.i18n.format('CHRONICLE.Notifications.ConflictKeptChronicle', { name: noticeText(journal.name) }));
+        this._syncManager?.logActivity?.('update', `Conflict on "${journal.name}": kept the Chronicle version`);
         break;
       }
       case 'foundry': {
@@ -2194,12 +2195,14 @@ export class JournalSync {
         const result = await this._api.put(`/entities/${entityId}`, body);
         await this._recordPush(journal, result);
         await this._hidePushedSecrets(journal, result);
-        ui.notifications.warn(`Chronicle: Conflict on "${noticeText(journal.name)}" — kept Foundry version.`);
+        ui.notifications.warn(game.i18n.format('CHRONICLE.Notifications.ConflictKeptFoundry', { name: noticeText(journal.name) }));
+        this._syncManager?.logActivity?.('update', `Conflict on "${journal.name}": kept the Foundry version`);
         break;
       }
       case 'newest':
       default: {
-        // Compare timestamps, keep newest.
+        // Compare timestamps, keep newest. This is the rule doing what the
+        // GM picked, so it is written to History rather than a toast.
         const remote = await this._api.get(`/entities/${entityId}`);
         const localUpdatedAt = journal.getFlag(FLAG_SCOPE, 'lastSync') || '1970-01-01';
         if (remote && new Date(localUpdatedAt) > new Date(remote.updated_at)) {
@@ -2208,11 +2211,11 @@ export class JournalSync {
           const result = await this._api.put(`/entities/${entityId}`, body);
           await this._recordPush(journal, result);
           await this._hidePushedSecrets(journal, result);
-          ui.notifications.info(`Chronicle: Conflict on "${noticeText(journal.name)}" — Foundry version was newer.`);
+          this._syncManager?.logActivity?.('update', `Conflict on "${journal.name}": the Foundry version was newer and was kept`);
         } else if (remote) {
           // Remote is newer — re-pull.
           await this._onEntityUpdated(remote);
-          ui.notifications.info(`Chronicle: Conflict on "${noticeText(journal.name)}" — Chronicle version was newer.`);
+          this._syncManager?.logActivity?.('update', `Conflict on "${journal.name}": the Chronicle version was newer and was kept`);
         }
         break;
       }

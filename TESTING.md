@@ -18,6 +18,12 @@ root. There is no `package.json`.
 - [ ] Status indicator shows green dot when connected
 - [ ] Status indicator shows yellow during reconnection
 - [ ] Status indicator shows red when disconnected
+- [ ] Hover the indicator while connected: the tooltip ends "Last change from Chronicle: N minutes ago" (or "No changes from Chronicle since connecting"), and the time moves on between hovers
+- [ ] Settings → Connection: change the API key to a wrong one and Save -> no reload asked; Test connection runs by itself and its steps show the key refused. Put the right key back and Save -> the steps go green and the dot turns green without a reload, with no "Connection lost" toast
+- [ ] On a world that was never connected, paste a connect line and Save -> sync starts without a reload (journals pull in)
+- [ ] Change the campaign to another one and Save -> a toast asks to reload Foundry to switch campaigns
+- [ ] Settings → Advanced → When both sides changed: each choice shows one line under it saying which edit is replaced
+- [ ] Edit the same journal in Chronicle and Foundry with "Newest wins" -> no toast; Chronicle Sync → History shows the conflict and which side was kept. With "Chronicle wins" or "Foundry wins" -> a toast names the journal and the side kept
 - [ ] WebSocket auto-reconnects after network interruption (wait 30s)
 - [ ] Message queue drains after reconnection
 
@@ -468,6 +474,21 @@ Needs a Chronicle with quest boards (a category or a place page with at least on
 - [ ] As a player, the board shows only what Chronicle shows a player: no hidden notices, no hidden steps (a "More steps the party has yet to learn" line instead), no ledger
 - [ ] A journal synced from a Chronicle quest page has an **Open quest** button in its header
 - [ ] With no GM connected, a player's board says it needs the GM to be connected
+
+## Crafting
+
+Needs Chronicle's crafting addon on, a character linked to an actor, and a player linked to a Chronicle member (Chronicle Sync → Settings → Players). Have something in the Director's spoils tray on Chronicle (the Crafting page → Put in the tray), one find identified and one not.
+
+- [ ] A **Crafting** button (flask) is in the title bar of a linked character sheet (players on characters they own, the GM on all); with the crafting addon off, or on a Chronicle without crafting routes, it is absent and the Satchel's **Crafting** tab says crafting is off
+- [ ] The button opens the Satchel on **Crafting** showing the same block as the hero's Chronicle page: spoils to take, projects in progress, recipes to start
+- [ ] As a player, **Take** an identified find -> the result shows under it, the item lands on the Foundry sheet, and the GM gets a whispered line "<hero> (<player>) took …"
+- [ ] **Harvest** a find -> the dice and the tier show, the sheet gets what the roll gave, and the GM's whisper says what was rolled
+- [ ] **Study it** on an unidentified find -> the test shows; on a pass the find is named for everyone; a second study before the next respite is greyed out with "tries again after the next respite"
+- [ ] Start a recipe, then roll it after a respite was logged on Chronicle -> the points go up; a roll that finishes it puts the item on the sheet and the GM gets "finished …"
+- [ ] **Work at the bench** says the bench is on Chronicle and links to the hero's page there
+- [ ] Make the window narrow -> the rows stack (name, then chips, then buttons) without overlapping, in light and dark
+- [ ] With no GM connected, a player's tab says crafting waits for the GM, and fills in by itself once the GM joins
+- [ ] A player cannot reach another player's hero: the tab only ever shows the character they own
 
 ## Satchel and notebook
 

@@ -75,7 +75,10 @@ export async function settingsContext(state) {
       hint: key === 'calendarAnnounceMoon' ? `${t('AnnounceHint')} ${t('MoonHint')}` : t('AnnounceHint'),
     })),
     ownership: [2, 1, 0, 3].map((value) => ({ value, label: t(`Ownership.${value}`), selected: value === view.defaultOwnership })),
-    conflict: ['chronicle', 'foundry', 'newest'].map((value) => ({ value, label: t(`Conflict.${value}`), selected: value === view.conflictResolution })),
+    conflict: ['chronicle', 'foundry', 'newest'].map((value) => ({
+      value, label: t(`Conflict.${value}`), hint: t(`ConflictHint.${value}`), selected: value === view.conflictResolution,
+    })),
+    conflictHint: t(`ConflictHint.${view.conflictResolution}`),
   };
 }
 
@@ -106,10 +109,16 @@ export function wireSettingsForm(form, state, onSaved) {
   form.addEventListener('reset', () => { state.draft.clear(); setTimeout(greyParts, 0); });
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
-    const saved = await saveSettingsForm(form);
-    if (!saved) return;
+    const result = await saveSettingsForm(form);
+    if (!result.saved) return;
     state.draft.clear();
-    onSaved?.();
+    onSaved?.(result);
+  });
+  // The hint under "When both sides changed" follows the option picked.
+  const conflict = form.querySelector('[name="conflictResolution"]');
+  const conflictHint = form.querySelector('[data-conflict-hint]');
+  conflict?.addEventListener('change', () => {
+    if (conflictHint) conflictHint.textContent = conflict.selectedOptions[0]?.dataset.hint ?? '';
   });
 }
 
@@ -147,9 +156,10 @@ export async function refreshMembers(button) {
 }
 
 /**
- * Save the form.
+ * Save the form. A changed connection is picked up at once (see
+ * SyncManager.applyConnection); only a different campaign asks for a reload.
  * @param {HTMLFormElement} form
- * @returns {Promise<boolean>} whether it saved
+ * @returns {Promise<{ saved: boolean, connectionChanged: boolean }>}
  */
 export async function saveSettingsForm(form) {
   const data = readForm(form);
@@ -178,12 +188,16 @@ export async function saveSettingsForm(form) {
       reconnect = (await applyConnectLine(plan.connectLine)) || reconnect;
     }
     ui.notifications.info(t('Saved'));
-    if (reconnect) ui.notifications.warn(t('ReloadToConnect'));
-    return true;
+    if (reconnect) {
+      const syncManager = game.modules.get(MODULE_ID)?.api?.syncManager;
+      const outcome = syncManager?.applyConnection ? await syncManager.applyConnection() : 'reload';
+      if (outcome === 'reload') ui.notifications.warn(t('ReloadForCampaign'));
+    }
+    return { saved: true, connectionChanged: reconnect };
   } catch (err) {
     console.error('Chronicle Sync | Saving settings failed:', err?.message);
     ui.notifications.error(game.i18n.format('CHRONICLE.SettingsWindow.SaveFailed', { message: noticeText(err?.message ?? '') }));
-    return false;
+    return { saved: false, connectionChanged: false };
   }
 }
 

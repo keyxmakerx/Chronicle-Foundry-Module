@@ -360,6 +360,16 @@ export function registerSettings() {
     default: false,
   });
 
+  // Internal: whether Chronicle offers crafting here (the routes exist and
+  // the crafting addon is on). The GM client probes and writes it; players
+  // read it for the Satchel's Crafting tab and the sheet's Crafting button.
+  game.settings.register(MODULE_ID, 'craftingAvailable', {
+    scope: 'world',
+    config: false,
+    type: Boolean,
+    default: false,
+  });
+
   // Internal: Chronicle user → Foundry user ID mapping (not shown in settings UI).
   // Stored as JSON: { "chronicle-user-uuid": "foundry-user-id", ... }
   game.settings.register(MODULE_ID, 'userMappings', {
