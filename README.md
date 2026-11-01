@@ -44,8 +44,8 @@ flowchart LR
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <b>Shops and stashes</b><br>
-      Chronicle's shop rooms open in Foundry, and players buy with the character they pick. Stashes move items and money between characters, with the GM approving requests from a chat card.
+      <b>Shops, stashes and crafting</b><br>
+      Chronicle's shop rooms open in Foundry, and players buy with the character they pick. Stashes move items and money between characters, with the GM approving requests from a chat card. Each hero's crafting (spoils to take, harvest or study, and projects to roll) sits in the Satchel.
     </td>
     <td width="50%" valign="top">
       <b>DM Screen, notebook and NPCs</b><br>

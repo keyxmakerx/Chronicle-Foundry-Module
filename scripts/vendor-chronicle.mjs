@@ -1,11 +1,12 @@
 /**
  * Chronicle Sync - Chronicle's own scripts, vendored
  *
- * Loads files from vendor/chronicle/ (Chronicle's page scripts, copied
- * unchanged) into the Foundry page, once each and in order. Those scripts
- * register themselves on a page global named Chronicle; one stand-in serves
- * every vendored widget (the shop room and the Sky Clock's sky), and one
- * that something else put there is never replaced.
+ * Loads files from vendor/chronicle/ (Chronicle's page scripts and
+ * stylesheets, copied unchanged) into the Foundry page, once each and in
+ * order. Those scripts register themselves on a page global named Chronicle;
+ * one stand-in serves every vendored widget (the shop room, the Sky Clock's
+ * sky and the Crafting block), and one that something else put there is
+ * never replaced.
  */
 
 import { MODULE_ID } from './constants.mjs';
@@ -48,4 +49,31 @@ export async function loadVendored(files) {
   const s = chronicleShim();
   for (const file of files) await loadOne(file);
   return s;
+}
+
+const styleLoads = new Map();
+
+/**
+ * Add vendored stylesheets to the page, each once; resolves when they have
+ * loaded. A failed one is tried again next time.
+ */
+export async function loadVendoredStyles(files) {
+  for (const file of files) {
+    if (!styleLoads.has(file)) {
+      const p = new Promise((resolve, reject) => {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = `${VENDOR}/${file}`;
+        link.onload = resolve;
+        link.onerror = () => {
+          link.remove();
+          reject(new Error(`could not load ${file}`));
+        };
+        document.head.appendChild(link);
+      });
+      p.catch(() => styleLoads.delete(file));
+      styleLoads.set(file, p);
+    }
+    await styleLoads.get(file);
+  }
 }
