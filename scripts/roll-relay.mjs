@@ -5,13 +5,15 @@
  * animates it; and a roll made in Foundry chat is posted to Chronicle. The
  * rules are in _roll-relay.mjs.
  *
- * Loop guard: messages made here carry the roll flag and are posted inside
- * `_syncing`; the hook skips both. Chronicle also answers a repeated originId
+ * Loop guard: messages made here carry the roll flag and are created with
+ * syncOptions(); the hook skips either, per message, so two rolls relayed at
+ * once cannot clear each other's guard. Chronicle also answers a repeated originId
  * with `duplicate`, so a replay is harmless. Failures are logged, never shown
  * to players.
  */
 
 import { log } from './logger.mjs';
+import { syncOptions } from './constants.mjs';
 import {
   ROLL_MESSAGE_TYPE,
   SeenRolls,
@@ -32,7 +34,6 @@ export const rollRelay = {
   _api: null,
   _syncManager: null,
   _hookId: null,
-  _syncing: false,
   _seen: new SeenRolls(),
   _routeMissing: false,
 
@@ -40,7 +41,8 @@ export const rollRelay = {
     this._api = api;
     this._routeMissing = false;
     if (this._hookId === null) {
-      this._hookId = Hooks.on('createChatMessage', (message, _options, userId) => {
+      this._hookId = Hooks.on('createChatMessage', (message, options, userId) => {
+        if (options?.chronicleSync) return;
         this._onChatMessage(message, userId);
       });
     }
@@ -76,12 +78,7 @@ export const rollRelay = {
       // The Roll class rebuilds each term from its saved results, so nothing is rolled again.
       data.rolls = data.rolls.map((r) => Roll.fromData(r));
       data.sound = CONFIG.sounds?.dice;
-      this._syncing = true;
-      try {
-        await ChatMessage.create(data);
-      } finally {
-        this._syncing = false;
-      }
+      await ChatMessage.create(data, syncOptions());
     } catch (err) {
       log.warn('Could not show a Chronicle roll in chat', err);
     }
@@ -89,7 +86,7 @@ export const rollRelay = {
 
   /** A chat message was made somewhere in the world. */
   async _onChatMessage(message, userId) {
-    if (this._syncing || !this._api || this._routeMissing) return;
+    if (!this._api || this._routeMissing) return;
     if (!_isActiveGM() || this._api.state !== 'connected') return;
     if (!message?.rolls?.length) return;
     const author = game.users.get(userId);

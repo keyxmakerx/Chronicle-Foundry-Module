@@ -42,13 +42,6 @@ export class ItemSync {
     /** @type {import('./sync-manager.mjs').SyncManager|null} */
     this._syncManager = null;
 
-    /**
-     * Kept for callers that pause pushes wholesale; this module's own
-     * writes are marked per write with APPLY_OPTION instead.
-     * @type {boolean}
-     */
-    this._syncing = false;
-
     /** @type {object|null} Item field definitions from API. */
     this._itemFields = null;
 
@@ -282,7 +275,7 @@ export class ItemSync {
    * @private
    */
   async _handleCreateItem(item, options, userId) {
-    if (this._syncing || options?.[APPLY_OPTION]) return;
+    if (options?.[APPLY_OPTION]) return;
     if (userId !== game.user.id) return;
     if (!item.parent || !(item.parent instanceof Actor)) return;
 
@@ -350,7 +343,7 @@ export class ItemSync {
    * @private
    */
   async _handleDeleteItem(item, options, userId) {
-    if (this._syncing || options?.[APPLY_OPTION]) return;
+    if (options?.[APPLY_OPTION]) return;
     if (userId !== game.user.id) return;
 
     const relationId = item.getFlag(FLAG_SCOPE, 'relationId');
@@ -388,7 +381,7 @@ export class ItemSync {
    * @private
    */
   async _handleUpdateItem(item, change, options, userId) {
-    if (this._syncing || options?.[APPLY_OPTION]) return;
+    if (options?.[APPLY_OPTION]) return;
     if (userId !== game.user.id) return;
     // Only the two values sent below matter; a rest or a use that changes
     // charges on many items must not send one write per item.

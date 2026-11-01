@@ -117,7 +117,6 @@ test('fix4: _onBulkSetVisibility POSTs /reveal for each selected entity', async 
 function makeItemSync(api) {
   const is = new ItemSync();
   is._api = api;
-  is._syncing = false;
   return is;
 }
 
