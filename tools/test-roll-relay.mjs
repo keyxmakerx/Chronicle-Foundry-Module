@@ -149,7 +149,9 @@ test('wiring: roll. is allowed, the relay is registered, and gated to the active
   assert.match(read('scripts/module.mjs'), /registerModule\(rollRelay\)/);
   const src = read('scripts/roll-relay.mjs');
   assert.match(src, /activeGM\?\.isSelf/);
-  assert.match(src, /this\._syncing/);
+  assert.doesNotMatch(src, /_syncing/);
+  assert.match(src, /ChatMessage\.create\(data, syncOptions\(\)\)/);
+  assert.match(src, /options\?\.chronicleSync\) return/);
   assert.match(src, /_routeMissing/);
   assert.ok(JSON.parse(read('lang/en.json')).CHRONICLE.Rolls.FallbackName);
 });

@@ -337,7 +337,7 @@ module pushes only when the body differs from the last one sent for that
 journal, reads the page back afterwards, and never lets a journal's recorded
 version move backwards.
 
-Re-verify by: 2026-11-03 (Chronicle `entities/service.go` `SetEntityPermissions`)
+Re-verify by: 2026-12-01 (Chronicle `entities/service.go` `SetEntityPermissions`)
 
 #### POST /entities/:entityId/reveal
 Flips an entity's visibility (NPC reveal). Body is exactly
@@ -557,7 +557,7 @@ cookieless, without redirects, on the `apiUrl` host.
 **Used by (avatar):** `avatar-sync.mjs` → copies the picture into the world's
 files and sets it as the matched Foundry user's avatar.
 
-Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/api_handler.go` `ListMembers`, `plugins/media/handler.go` `avatarLinkAllowed`)
+Re-verify by: 2026-12-01 (Chronicle `internal/plugins/syncapi/api_handler.go` `ListMembers`, `plugins/media/handler.go` `avatarLinkAllowed`)
 
 ---
 
@@ -752,7 +752,7 @@ Chronicle (404).
 
 - `reportedBy: "chronicle"` rows are every write a sync key made, recorded by
   Chronicle with its result; `"client"` rows are what the module reported.
-- `nextBefore` is present when an older page exists.
+- `nextBefore` is present whenever the page is full, so one extra, possibly empty, read can follow.
 
 #### POST /sync/history
 The module reports what only it sees: changes it applied in Foundry
@@ -768,7 +768,7 @@ The module reports what only it sees: changes it applied in Foundry
 - 403 or 404 stops reporting for the session; other failures retry on the
   next flush.
 
-Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/sync_history_handler.go`, `sync_history_recorder.go`)
+Re-verify by: 2026-12-01 (Chronicle `internal/plugins/syncapi/sync_history_handler.go`, `sync_history_recorder.go`)
 
 #### POST /sync/players
 The GM's client reports the world's Foundry users. Chronicle sees only the
@@ -791,7 +791,7 @@ Foundry page shows it as "Players in Foundry".
 
 **When:** on connect, shortly after a Foundry user logs in or out or is edited, or the mappings change, and otherwise at most every 5 min while connected, only when the snapshot changed.
 
-Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi`, the players handler)
+Re-verify by: 2026-12-01 (Chronicle `internal/plugins/syncapi`, the players handler)
 
 #### POST /sync/monsters
 The GM's client reports the monsters the world can place: its actors of the
@@ -872,17 +872,18 @@ Lists all maps in the campaign.
 > are editable and pushed back.
 
 `player_image_url` is set on every map row (list and single) whose map has a
-picture and at least one shadow area, whatever the key's role:
+picture and either a shadow area or hex fog that hides part of it, whatever
+the key's role:
 `/api/v1/campaigns/:id/maps/:mapId/player-image?v=<version>`. That route
-returns the picture as JPEG with the shadowed areas smudged in; the version
-changes whenever the picture or a shadow does. The owner's key still gets the
+returns the picture as JPEG with the shadowed and fogged areas smudged in; the
+version changes whenever the picture, a shadow or the fog does. The owner's key still gets the
 original in `image_id`/`image_url`, so the module fetches the player copy,
 stores it in Foundry, and points the page every player reads at that file
-only (`scripts/_map-player-image.mjs`). A missing field means no shadows
-(also what an older Chronicle sends). `drawing_type` also includes `shadow`
+only (`scripts/_map-player-image.mjs`). A missing field means nothing is
+hidden (also what an older Chronicle sends). `drawing_type` also includes `shadow`
 (exactly two corner points).
 
-Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/map_api_handler.go` `PlayerImage`, `playerImageAPIURL`)
+Re-verify by: 2026-12-01 (Chronicle `internal/plugins/syncapi/map_api_handler.go` `PlayerImage`, `playerImageAPIURL`; `internal/plugins/maps/player_image_service.go` `PlayerImageVersion`)
 
 Each map row carries `display_settings` (nullable object): the map's own
 look. The module reads `frame.style`/`frame.tint` and `pins.style`
@@ -901,7 +902,7 @@ viewer draws any well-formed `fa-` class and falls back to `default_icon`.
 The marker dialog's icon picker offers `icons` grouped by `category` and
 sends only an `id` from that list; without the list (older Chronicle) the
 picker is hidden and a marker keeps its icon.
-Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/map_api_look.go`, keyxmakerx/Chronicle#1017)
+Re-verify by: 2026-12-01 (Chronicle `internal/plugins/syncapi/map_api_look.go`, keyxmakerx/Chronicle#1017)
 
 #### GET /maps/:mapId/drawings
 All coordinates are percentage-based (0–100), not pixels. `drawing_type` is
@@ -1259,7 +1260,7 @@ Refusals are `{"message": "..."}`: 400 (empty basket, no coin field, a Wealth
 sheet, not enough coin, mixed currencies), 403 (not their character), 404
 (shop or good hidden), 409 (prices changed, or the item could not be added).
 
-Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/shop_api_handler.go`)
+Re-verify by: 2026-12-01 (Chronicle `internal/plugins/syncapi/shop_api_handler.go`)
 
 ---
 
@@ -1580,7 +1581,7 @@ request body.
 |---|---|---|
 | GET | `/stashes/view?characterId=&actingUserId=` | `{downtimeOpen, canApprove, character:{id,name,moneyKey,money,items:[{itemId,name,quantity}]}, stashes:[{id,name,money,items}], destinations:[{kind,id,name}]}`. `characterId` is the Chronicle entity id (the actor's `entityId` flag). `moneyKey` is empty when the system has no money field. |
 | POST | `/stashes/moves` | Body `{actingUserId, kind:"item"\|"money", itemId, quantity, amount, from:{kind,id}, to:{kind,id}}`, endpoint kinds `character`\|`stash`. Items send `itemId`+integer `quantity`; money sends a number `amount` (at most two decimals). Answer `{status:"applied"\|"pending", move}`. 403 not your character, 404 unseen stash, 409 not enough / not applicable. |
-| GET | `/stashes/history?characterId=&actingUserId=` | `{history:[line]}`, newest first, at most 50. A line has `id, kind, status, quantity, amount, itemName, fromName, toName, requesterName, summary, createdAt`; a sheet money edit has both ends the same character and reads e.g. "Wealth changed 2 → 3 · in Foundry". |
+| GET | `/stashes/history?characterId=&actingUserId=` | Exactly one of `characterId` or `stashId` (else 400). `{history:[line]}`, newest first, at most 50. A line has `id, kind, status, quantity, amount, itemName, fromName, toName, requesterName, summary, createdAt`; a sheet money edit has both ends the same character and reads e.g. "Wealth changed 2 → 3 · in Foundry". |
 | GET | `/stashes/requests` | `{requests:[line]}`, pending only; the actor must be able to approve. |
 | POST | `/stashes/requests/:moveId/approve`, `/decline` | Body `{actingUserId}` optional; the actor must be able to approve. Answer `{status, move}` (`applied`, `declined` or `failed`). |
 | GET | `/stashes/downtime` | `{open}`. |
@@ -1595,7 +1596,7 @@ character.
 Lists are unwrapped defensively (`{history}`/`{requests}`/`{data}` or a bare
 array): `scripts/_stash-model.mjs`.
 
-Re-verify by: 2026-11-03 (Chronicle `internal/plugins/syncapi/stash_api_handler.go`, `internal/plugins/armory/stash_api.go`, `docs/api/openapi.yaml` Stashes tag; Chronicle PR #1022)
+Re-verify by: 2026-12-01 (Chronicle `internal/plugins/syncapi/stash_api_handler.go`, `internal/plugins/armory/stash_api.go`, `docs/api/openapi.yaml` Stashes tag; Chronicle PR #1022)
 
 ### Quests
 
@@ -1768,7 +1769,7 @@ as "reconcile this character's inventory" (`scripts/_inventory-plan.mjs`),
 so a missed or repeated message cannot leave it wrong. A removed relation
 only unlinks its Foundry item; the module deletes it only when a stash
 move the GM just applied took it off that character. Re-verify by:
-2026-11-03 (Chronicle `internal/widgets/relations/service.go`,
+2026-12-01 (Chronicle `internal/widgets/relations/service.go`,
 `internal/app/routes.go` `relationEventPublisherAdapter`; sent since
 keyxmakerx/Chronicle#1025).
 
@@ -1779,7 +1780,7 @@ Handled in `scripts/stash-sync.mjs` `onMessage`, by the **active GM client
 only** (`game.users.activeGM`), and only once the Stashes probe said yes. The
 module's WebSocket allowlist includes the `stash.` and `downtime.` prefixes.
 
-Re-verify by: 2026-11-03 (Chronicle `internal/websocket/.ai.md`, `internal/plugins/armory/stash_events.go`)
+Re-verify by: 2026-12-01 (Chronicle `internal/websocket/.ai.md`, `internal/plugins/armory/stash_events.go`)
 
 ### What the module does with map items
 
@@ -1792,11 +1793,15 @@ token positions are rewritten once the drag settles. Chronicle answers an
 empty item list as `null`, which the module reads as an empty list; only a
 failed fetch leaves the drawings, and so the shadows, unknown.
 
-Chronicle sends no message for a map row itself (`map.*` is not published),
-so every connect still reads `GET /maps`. On connect the change feed also
+Chronicle also sends `map.items.changed` `{map_id, kind}` (`kind` is
+`markers`, `drawings` or `shadows`) just before each marker or drawing event,
+and `hex.changed` `{map_id, version, party_path?}` for hex-layer writes; the
+module does not handle either yet, since the per-item events above already
+refetch. Chronicle sends no message for a map row itself (`map.updated` is
+defined but never published), so every connect still reads `GET /maps`. On connect the change feed also
 names map items changed while Foundry was closed: fog entries name their
 map, other entries name the item, which the module places from what it has
-stored, refreshing every map once when it cannot. Re-verify by: 2026-11-03
+stored, refreshing every map once when it cannot. Re-verify by: 2026-12-01
 (Chronicle `internal/app/routes.go` `mapEventPublisherAdapter`,
 `internal/plugins/syncapi/map_api_handler.go`).
 
@@ -1811,7 +1816,7 @@ on the GM's current scene linked to that page (shown before hidden) and runs
 the same spotlight as the token HUD star. No such token, or a hidden one,
 only tells the GM. `tools/test-npc-presence.mjs`.
 
-Re-verify by: 2026-11-03 (Chronicle `internal/plugins/foundry_vtt/npc_spotlight.go`, `internal/app/npc_spotlight_adapters.go`; keyxmakerx/Chronicle#1039)
+Re-verify by: 2026-12-01 (Chronicle `internal/plugins/foundry_vtt/npc_spotlight.go`, `internal/app/npc_spotlight_adapters.go`; keyxmakerx/Chronicle#1039)
 
 ### What the module does with `system_state.updated`
 
@@ -1853,7 +1858,7 @@ Changing form at the table writes only public halves:
 The PUT needs an owner-level key; an older Chronicle without it answers 404 or
 405 and the module only logs (`tools/test-creature-forms.mjs`).
 
-Re-verify by: 2026-11-03 (Chronicle `internal/plugins/systemstate`, `internal/plugins/syncapi/system_state_api.go`; keyxmakerx/Chronicle#1051)
+Re-verify by: 2026-12-01 (Chronicle `internal/plugins/systemstate`, `internal/plugins/syncapi/system_state_api.go`; keyxmakerx/Chronicle#1051)
 
 ### What the module does with `note.*`
 

@@ -1,6 +1,5 @@
 {
   "CHRONICLE": {
-    "ModuleTitle": "Chronicle Sync",
     "Sheet": {
       "Name": "Chronicle page",
       "OpenInChronicle": "Open in Chronicle",
@@ -211,11 +210,7 @@
       }
     },
     "Status": {
-      "Connected": "Connected to Chronicle",
-      "Disconnected": "Disconnected from Chronicle",
       "Reconnecting": "Reconnecting to Chronicle...",
-      "Error": "Chronicle sync error",
-      "SyncPaused": "Sync paused — changes are queued",
       "Indicator": {
         "connected": "Chronicle: Connected",
         "connecting": "Chronicle: Connecting…",
@@ -235,32 +230,22 @@
       "ReconnectingNow": "Chronicle: Reconnecting…"
     },
     "Notifications": {
-      "JournalSynced": "Journal synced from Chronicle: {name}",
-      "MapSynced": "Map synced from Chronicle: {name}",
-      "SyncConflict": "Sync conflict detected for: {name}",
       "ConflictKeptChronicle": "Conflict on \"{name}\" — kept Chronicle version.",
       "ConflictKeptFoundry": "Conflict on \"{name}\" — kept Foundry version.",
-      "ConflictNewerChronicle": "Conflict on \"{name}\" — Chronicle version was newer.",
-      "ConflictNewerFoundry": "Conflict on \"{name}\" — Foundry version was newer.",
       "InitialSyncFailed": "Chronicle: The first sync failed ({message}). The dashboard's History tab lists what happened.",
       "MatchFailed": "Chronicle: Match failed: {message}",
       "CreateFailed": "Chronicle: Create failed: {message}",
-      "ResyncFailed": "Chronicle: Re-sync failed: {message}",
-      "MembersMatched": "Auto-matched {count} Chronicle members to Foundry users.",
-      "ConnectionLost": "Lost connection to Chronicle. Retrying...",
-      "ConnectionRestored": "Connection to Chronicle restored"
+      "ResyncFailed": "Chronicle: Re-sync failed: {message}"
     },
     "Creatures": {
       "Folder": "Chronicle: Creatures"
     },
     "ActorSync": {
-      "EnableClaimingHint": "Chronicle: Enable the \"Player Character Claiming\" addon in your Chronicle campaign to sync which players own their characters.",
       "PreviousOwnerKept": "Chronicle: {player} is no longer the owner of {actor} in Chronicle, but still owns the actor in Foundry. Change this in the actor's Ownership settings if you want.",
       "ClaimantUnmapped": "Chronicle: a player owns {actor} in Chronicle but has no Foundry user mapped, so Foundry ownership was not changed. Link them in Chronicle Sync, under Settings, Players.",
       "IdentityItemFailed": "Chronicle: Could not update {actor}'s ancestry, culture, career or kit item ({fields}). The sheet was left as it was; see the console for details."
     },
     "Dashboard": {
-      "Title": "Chronicle Sync",
       "OpenSettings": "Open Settings",
       "FirstRun": {
         "Title": "Set up Chronicle in this world",
@@ -277,7 +262,6 @@
       "Common": {
         "Loading": "Loading...",
         "LoadFailed": "Some data failed to load from Chronicle:",
-        "Retry": "Retry",
         "Refresh": "Refresh"
       },
       "Overview": {
@@ -437,12 +421,7 @@
         "OpenInFoundry": "Open in Foundry",
         "OpenInFoundryHint": "Open the materialized journal entry for this map",
         "OpenInChronicle": "Open in Chronicle",
-        "Status": "Status",
-        "MaterializedAs": "Materialized as journal entry",
         "NotMaterialized": "Not yet materialized",
-        "MarkerCount": "{count} markers",
-        "DrawingCount": "{count} drawings",
-        "TokenCount": "{count} tokens",
         "NoMaps": "No maps found in this Chronicle campaign.",
         "ResyncAll": "Resync All Maps",
         "ResyncAllHint": "Re-fetch every map from Chronicle and re-materialize the journal entries",
@@ -504,21 +483,13 @@
         "NoActorsHint": "Create character actors in Foundry or character entities in Chronicle.",
         "Disabled": "Character sync is disabled.",
         "DisabledHint": "Turn on Characters in Settings, under What syncs, to sync actors with Chronicle.",
-        "NoSystem": "Character sync requires a matching game system.",
-        "NoSystemHint": "Your Foundry system must match a Chronicle game system with character field templates.",
         "NeedMatch": "Needs a match"
       },
       "StatusTab": {
-        "Connection": "Connection",
-        "EntitiesSynced": "Entities Synced",
-        "MapsLinked": "Maps Linked",
         "LastSync": "Last sync",
         "GameSystem": "Game System",
         "FoundrySystem": "Foundry System",
         "ChronicleSystem": "Chronicle System",
-        "SystemMatched": "Matched",
-        "SystemNoMatch": "No Match",
-        "SystemNone": "None detected",
         "CharacterSync": "Character Sync",
         "CharacterSyncEnabled": "Enabled",
         "CharacterSyncDisabled": "Disabled",
@@ -527,7 +498,6 @@
         "RecentActivity": "Recent Activity",
         "NoActivity": "No recent activity.",
         "ClearLog": "Clear Log",
-        "Settings": "Settings",
         "Reconnect": "Reconnect"
       }
     },
@@ -547,8 +517,6 @@
       "FromChronicle": "From Chronicle · opens the live map"
     },
     "MapViewer": {
-      "SheetLabel": "Chronicle Map Viewer",
-      "PlacePin": "Click map to place pin",
       "PinConfig": "Configure Pin",
       "PinLabel": "Label",
       "PinType": "Type",
@@ -593,7 +561,6 @@
       },
       "ZoomIn": "Zoom In",
       "ZoomOut": "Zoom Out",
-      "ZoomReset": "Reset Zoom",
       "FitView": "Fit to View",
       "ToggleLabels": "Toggle Labels",
       "PinTypes": {
@@ -666,9 +633,6 @@
     },
     "UpdateInfo": {
       "Title": "Update Source",
-      "MenuLabel": "Update Source & Manual Check",
-      "MenuHint": "Show the install-time manifest URL Foundry uses for updates and check Chronicle for the latest version.",
-      "MenuButton": "Open",
       "SourceHeader": "Update Source",
       "SourceChronicle": "Connected to Chronicle",
       "SourceGithub": "Updates from GitHub — reinstall via Chronicle for version-pinned updates",
@@ -1095,7 +1059,6 @@
     "Removed": {
       "FolderName": "Chronicle: removed",
       "Entity": "\"{name}\" was deleted in Chronicle. Its journal is kept, unlinked, in the \"Chronicle: removed\" folder.",
-      "Note": "The note \"{name}\" was deleted in Chronicle, or is no longer shared with this world. Its journal is kept, unlinked, in the \"Chronicle: removed\" folder.",
       "Duplicates": "{count} journal entries repeated characters that now sync as actors. They were moved, unlinked, to the \"Chronicle: removed\" folder."
     },
     "RemoteDelete": {

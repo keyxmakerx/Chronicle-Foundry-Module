@@ -124,6 +124,8 @@ async function onDiceReady(dice3d) {
  * The Dice So Nice look for one die, for a chat roll built from a Chronicle
  * roll. Null when Dice So Nice isn't running here or the set didn't register;
  * the die then keeps the viewer's own look.
+ * TODO(#247): not called yet; the roll relay applies it once Chronicle's
+ * roll carries each die's set and colour.
  * @param {{set?: string, colour?: string}} pick
  */
 export function diceAppearance(pick) {
@@ -134,6 +136,8 @@ export function diceAppearance(pick) {
 /**
  * The Dice So Nice `sfx` option for one die of a Chronicle roll, or null when
  * it doesn't crit or the crit trigger didn't register here.
+ * TODO(#246): not called yet; the roll relay applies it once Chronicle's
+ * roll carries each die's crit pick.
  * @param {{crit?: string|null, succ?: string, fail?: string}} die
  */
 export function diceCritSfx(die) {
