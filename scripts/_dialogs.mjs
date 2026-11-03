@@ -51,6 +51,56 @@ export async function confirmDialog({ title = '', content = '', defaultYes = tru
 }
 
 /**
+ * A dialog with several buttons. Resolves to `{action, value}` for the button
+ * pressed, where `value` is `read(root)` (the dialog's root HTMLElement), or
+ * null when dismissed.
+ * @param {{title?: string, content?: string, buttons: Array<{action: string, label: string, icon?: string, default?: boolean}>, read?: (root: any) => any}} opts
+ * @returns {Promise<{action: string, value: any}|null>}
+ */
+export async function choiceDialog({ title = '', content = '', buttons = [], read } = {}) {
+  const DialogV2 = _DialogV2();
+  if (DialogV2?.wait) {
+    try {
+      const res = await DialogV2.wait({
+        window: { title },
+        content,
+        rejectClose: false,
+        // DialogV2.wait resolves to the pressed button's callback result.
+        buttons: buttons.map((b) => ({
+          action: b.action,
+          label: b.label,
+          icon: b.icon,
+          default: !!b.default,
+          callback: (_event, _button, dialog) => ({ action: b.action, value: read?.(dialog?.element ?? dialog) }),
+        })),
+      });
+      return res && typeof res === 'object' ? res : null;
+    } catch (err) {
+      console.warn('Chronicle Sync [dialogs]: DialogV2.wait failed; falling back to V1 Dialog', err);
+    }
+  }
+  const Dialog = globalThis.Dialog;
+  if (!Dialog) return null;
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (v) => { if (!done) { done = true; resolve(v); } };
+    try {
+      new Dialog({
+        title,
+        content,
+        buttons: Object.fromEntries(buttons.map((b) => [b.action, {
+          label: b.label,
+          icon: b.icon ? `<i class="${b.icon}"></i>` : undefined,
+          callback: (html) => finish({ action: b.action, value: read?.(html?.[0] ?? html) }),
+        }])),
+        default: buttons.find((b) => b.default)?.action,
+        close: () => finish(null),
+      }).render({ force: true }); // V1 takes any truthy first argument as force
+    } catch { finish(null); }
+  });
+}
+
+/**
  * Prompt with custom form content. Resolves to the callback's return value, or
  * null/undefined if dismissed. The callback receives the dialog's root
  * HTMLElement (so existing `root.querySelector('form')` logic keeps working).

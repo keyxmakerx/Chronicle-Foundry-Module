@@ -44,6 +44,11 @@ export function craftingAvailable() {
   }
 }
 
+/** The GM side's sync module, once the sync manager has started it. */
+export function getCraftingSync() {
+  return instance;
+}
+
 /**
  * Make one of the Crafting tab's calls. `req` is `{action, characterId,
  * projectId?, lineId?, body?}`; the answer is `{status, body}` as the
