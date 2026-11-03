@@ -96,3 +96,16 @@ test('defensive: empty input does not throw and reports disconnected', () => {
   // No matchedSystem → the "no system" info alert is present.
   assert.ok(m.attention.some((a) => a.text.includes('No matching game system')));
 });
+
+test('journals set aside after a Chronicle removal raise one info row that opens the pages list', () => {
+  const none = buildOverviewModel({ connectionState: 'connected', matchedSystem: 'x' });
+  assert.equal(none.attention.find((a) => a.icon === 'fa-box-archive'), undefined, 'silent when nothing is set aside');
+  const one = buildOverviewModel({ connectionState: 'connected', matchedSystem: 'x', setAsideCount: 1 });
+  const row = one.attention.find((a) => a.icon === 'fa-box-archive');
+  assert.equal(row.severity, 'info');
+  assert.equal(row.tab, 'linked:pages');
+  assert.match(row.text, /^1 page removed in Chronicle was set aside\./);
+  const three = buildOverviewModel({ connectionState: 'connected', matchedSystem: 'x', setAsideCount: 3 });
+  assert.match(three.attention.find((a) => a.icon === 'fa-box-archive').text, /^3 pages removed in Chronicle were set aside\./);
+  assert.equal(three.allClear, false);
+});

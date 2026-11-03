@@ -581,6 +581,7 @@ Details for Characters, Maps, Shops and Calendar are under their own sections.
 - [ ] **What syncs:** the new-journal page type lists Chronicle's page types; pick one, **Save**, then make a journal in Foundry -> the Chronicle page has that type
 - [ ] **Connection:** **Setup Wizard** shows the import wizard in the same window; the API key field is always empty, with "Saved in this browser" when a key exists
 - [ ] Overview -> "campaign member(s) not mapped" opens Settings → Players
+- [ ] Delete a synced page in Chronicle -> its journal moves to "Chronicle: removed", and Overview shows "1 page removed in Chronicle was set aside"; the row opens Linked → Entities, where the journal is listed as Set aside with Push and Delete
 - [ ] A dashboard last left on the old Config or Members tab opens on Overview
 
 ### Test Connection (Multi-step, Chronicle Sync → Settings → Connection)

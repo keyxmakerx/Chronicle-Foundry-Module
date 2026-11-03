@@ -355,6 +355,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       errorCount: statusData.errorLog?.length ?? 0,
       matchedSystem: statusData.matchedSystem,
       lastSyncTime: statusData.lastSyncTime,
+      // Counted over every journal, not the search-filtered list.
+      setAsideCount: game.journal.contents.filter((j) => !j.getFlag(FLAG_SCOPE, 'entityId') && this._isSetAside(j)).length,
       t: (k, d) => (d ? game.i18n.format(k, d) : game.i18n.localize(k)),
     });
 
