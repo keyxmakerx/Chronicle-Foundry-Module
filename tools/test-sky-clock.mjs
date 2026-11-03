@@ -18,7 +18,7 @@ import * as SC from '../scripts/_sky-clock.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const VENDOR = join(REPO_ROOT, 'vendor', 'chronicle');
-const SKY_FILES = ['sky_world.js', 'sky_looks.js', 'sky_moon.js', 'sky_events.js', 'sky_2d.js', 'sky_shaders.js', 'sky_gl.js', 'sky_pane.js'];
+const SKY_FILES = ['sky_world.js', 'sky_looks.js', 'sky_moon.js', 'sky_events.js', 'sky_2d.js', 'sky_shaders.js', 'gl_shared.js', 'sky_gl.js', 'sky_pane.js'];
 const free = { left: 50, top: 0, right: 1000, bottom: 800 };
 
 test('corners sit inside the free screen, clear of the sidebar and tool bar', () => {
