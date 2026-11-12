@@ -289,7 +289,9 @@
         "CalendarOutOfSync": "Calendar date is out of sync with Chronicle.",
         "NoSystem": "No matching game system — character fields may not sync.",
         "ErrorsOne": "{count} recent sync error — see Problems.",
-        "ErrorsMany": "{count} recent sync errors — see Problems."
+        "ErrorsMany": "{count} recent sync errors — see Problems.",
+        "SetAsideOne": "{count} page removed in Chronicle was set aside. Keep it, send it back, or delete it.",
+        "SetAsideMany": "{count} pages removed in Chronicle were set aside. Keep them, send them back, or delete them."
       },
       "Health": {
         "NoneValue": "None",
