@@ -117,3 +117,64 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* The GM's end-of-combat spoils prompt (spoils-prompt.mjs), inside a
+   Foundry dialog: a row per creature with its checkbox, what its drop list
+   leaves, and how many went down. Rows that can't drop are dimmed. */
+.cs-spoils {
+  color: var(--cs-text);
+}
+
+.cs-spoils > p {
+  margin: 0 0 8px;
+}
+
+.cs-spoils-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 2px;
+  border-top: 1px solid var(--cs-line);
+  cursor: pointer;
+}
+
+.cs-spoils > p + .cs-spoils-row {
+  border-top: 0;
+}
+
+.cs-spoils-row input {
+  margin: 0;
+  accent-color: var(--cs-accent);
+}
+
+.cs-spoils-row.is-off {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.cs-spoils-what b {
+  display: block;
+  font-weight: 500;
+}
+
+.cs-spoils-what small {
+  display: block;
+  color: var(--cs-text-muted);
+  font-size: 12px;
+}
+
+.cs-spoils-pill {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--cs-surface-2);
+  color: var(--cs-text-2);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.cs-spoils .cs-spoils-fine {
+  margin: 10px 0 0;
+  color: var(--cs-text-muted);
+  font-size: 12px;
+}

@@ -493,6 +493,18 @@ Needs Chronicle's crafting addon on, a character linked to an actor, and a playe
 - [ ] With no GM connected, a player's tab says crafting waits for the GM, and fills in by itself once the GM joins
 - [ ] A player cannot reach another player's hero: the tab only ever shows the character they own
 
+### The end-of-combat spoils prompt
+
+Needs a drop list on two creature pages in Chronicle (Crafting → Spoils tab → Edit), their actors in Foundry from creature sync, and a planned encounter with one stage for the second half.
+
+- [ ] Start a combat with both creatures, a third token with no Chronicle page and a player's character. Bring both creatures and the third token to 0 (or mark them defeated), then **End Combat** -> one window "The fight is over" lists both creatures with what their drop lists leave and "1 down"; the token with no page is greyed out; the character is not listed
+- [ ] Untick one creature and press **Put in the tray** -> only the ticked one's spoils appear in the players' Satchel → Crafting and on Chronicle's Spoils tab, named "<scene> (Foundry)"; you get a toast and a whispered "Spoils from …" line
+- [ ] End another combat and press **Not now** (or close the window) -> nothing appears in the tray
+- [ ] Place the encounter from the DM Screen, defeat a creature, and end the combat before its stage starts -> "Is the whole fight over?" asks first; **Hold for the next stage** sends nothing. Start the stage, end the next combat of that encounter -> the spoils window lists the held creature too, counted once even if its token was in both combats
+- [ ] Same again, but press **The whole fight is over** -> the spoils window opens at once
+- [ ] A campaign with no drop lists, or with the crafting addon off, gets no window when a combat ends
+- [ ] With two GMs connected, only one gets the window
+
 ## Satchel and notebook
 
 - [ ] Every user (GM and players) has an **Open my Satchel** button (briefcase) in the Chronicle scene controls and a **Jot notes** tab in the bottom-right corner while the world is connected to Chronicle
