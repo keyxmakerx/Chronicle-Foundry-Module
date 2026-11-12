@@ -125,6 +125,7 @@ campaign with at least one map that has an image, markers (some `Everyone`, one
 - [ ] The summary row shows Materialized count, Open viewers and Last sync (not "never")
 - [ ] Click **Open in Foundry** → the map opens in the Chronicle Map Viewer (image plus overlays, zoom % bottom corner)
 - [ ] A map with no image does not break the Resync (a row appears under recent errors instead, **Dismiss** clears it)
+- [ ] After a Resync, wait 20 minutes, then open a map as a player who has never opened it -> the picture shows (it is a copy in the world's `chronicle-media` folder, not a Chronicle link)
 - [ ] Press **Resync All Maps** twice → no duplicate journals or folders
 
 ### Chronicle -> Foundry (viewer open)

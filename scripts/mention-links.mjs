@@ -36,7 +36,12 @@ function siteBase() {
 function drawn(a) {
   const target = mentionTarget(
     { id: a.getAttribute('data-mention-id'), text: a.textContent, href: a.getAttribute('href') },
-    { journalFor, isGM: game.user?.isGM === true, siteBase: siteBase() },
+    {
+      journalFor,
+      isGM: game.user?.isGM === true,
+      siteBase: siteBase(),
+      hiddenLabel: game.i18n.localize('CHRONICLE.Mentions.Hidden'),
+    },
   );
   if (target.kind === 'journal') {
     const journal = game.journal.get(target.journalId);

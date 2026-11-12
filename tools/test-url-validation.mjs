@@ -186,6 +186,14 @@ test('scripts/map-viewer.mjs: _prepareToken references the host check', () => {
   );
 });
 
+test('scripts/map-viewer.mjs: _prepareToken reads hit points from Chronicle\'s bar 1', () => {
+  // Chronicle's Token sends bar1_value/bar1_max; there is no max_hp field.
+  const source = readFileSync(resolve(REPO_ROOT, 'scripts/map-viewer.mjs'), 'utf8');
+  const fnMatch = source.match(/_prepareToken\s*\([^)]*\)\s*\{[\s\S]*?\n {2}\}/);
+  assert.match(fnMatch[0], /t\.bar1_max/);
+  assert.match(fnMatch[0], /t\.bar1_value/);
+});
+
 // Static-source pin: journal-sync's entity image-page src must flow
 // through the host-allowlist validator; a new type:'image' page src added
 // without validation fails this check.

@@ -10,7 +10,7 @@
  */
 
 import { flagRemoval } from './_flag-removal.mjs';
-import { noticeText } from './_escape-html.mjs';
+import { noticeText, escapeHtml } from './_escape-html.mjs';
 import { getSetting, setSetting, getSyncExclusions } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
 import { FLAG_SCOPE, syncOptions } from './constants.mjs';
@@ -121,6 +121,11 @@ function startsWithHeading(content) {
  */
 /** Journals re-pulled per connect to hide GM-only text an older version stored. */
 const STORED_SECRET_PULLS_PER_CONNECT = 20;
+
+/** Page names sync gives text that has no heading of its own. */
+const LEAD_CONTENT = 'Content';
+const LEAD_OVERVIEW = 'Overview';
+const LEAD_PAGE_NAMES = new Set([LEAD_CONTENT, LEAD_OVERVIEW]);
 
 function secretPlaceholderText() {
   const key = 'CHRONICLE.Secrets.Placeholder';
@@ -1853,7 +1858,7 @@ export class JournalSync {
    * @private
    */
   _splitByHeadings(html) {
-    if (!html) return [{ title: 'Content', content: '' }];
+    if (!html) return [{ title: LEAD_CONTENT, content: '' }];
 
     // Match h1 or h2 tags to use as page break points.
     // A heading inside a GM secret block is not a break: its text would
@@ -1866,7 +1871,7 @@ export class JournalSync {
 
     // No headings found — return as single page.
     if (matches.length === 0) {
-      return [{ title: 'Content', content: html }];
+      return [{ title: LEAD_CONTENT, content: html }];
     }
 
     const sections = [];
@@ -1874,7 +1879,7 @@ export class JournalSync {
     // Content before the first heading (if any).
     const preContent = html.substring(0, matches[0].start).trim();
     if (preContent) {
-      sections.push({ title: 'Overview', content: preContent });
+      sections.push({ title: LEAD_OVERVIEW, content: preContent });
     }
 
     // Each heading starts a new section, ending at the next heading or end of string.
@@ -1912,13 +1917,16 @@ export class JournalSync {
 
     // Multiple pages: concatenate with the page name as a heading separator.
     return textPages
-      .map((page) => {
+      .map((page, i) => {
         const content = page.text?.content || '';
         // If the page content already starts with a heading, use it as-is
         // (a GM-only start of that heading may come first).
         if (startsWithHeading(content)) return content;
+        // A first page sync named for the text before any heading goes back
+        // as that lead text; a heading here would add a section to Chronicle.
+        if (i === 0 && LEAD_PAGE_NAMES.has(page.name)) return content;
         // Otherwise, wrap the page name as an h2 heading.
-        return `<h2>${page.name}</h2>\n${content}`;
+        return `<h2>${escapeHtml(page.name)}</h2>\n${content}`;
       })
       .join('\n');
   }

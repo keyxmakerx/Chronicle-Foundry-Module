@@ -440,7 +440,9 @@ Hooks.on('closeGame', () => {
  * @private
  */
 function _addStatusIndicator() {
-  if (!syncManager) return;
+  // Only the GM's client connects, so a player's dot would always read
+  // "disconnected", and clicking it would open a socket with no key.
+  if (!syncManager || !game.user?.isGM) return;
 
   const indicator = document.createElement('div');
   indicator.className = 'chronicle-sync-status disconnected';

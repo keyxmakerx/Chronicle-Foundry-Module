@@ -38,15 +38,38 @@ export function identityFieldTypes(fieldDefs) {
 }
 
 /**
+ * Chronicle's pick for each eligible field, trimmed; empty picks left out.
+ * Stored on the actor after an apply, so the next one can tell whether
+ * Chronicle changed the pick or Foundry did.
+ * @param {Array<object>} fieldDefs
+ * @param {object} fieldsData
+ * @returns {Record<string, string>}
+ */
+export function identityPicks(fieldDefs, fieldsData) {
+  const data = fieldsData && typeof fieldsData === 'object' ? fieldsData : {};
+  const out = {};
+  for (const def of identityFieldDefs(fieldDefs)) {
+    const raw = data[def.key];
+    if (typeof raw === 'string' && raw.trim()) out[def.key] = raw.trim();
+  }
+  return out;
+}
+
+/**
  * @param {object} args
  * @param {Array<{id: string, name: string, type: string}>} args.items - the actor's embedded items
  * @param {Array<object>} args.fieldDefs - mapped character field defs
  * @param {object} args.fieldsData - Chronicle `fields_data`
+ * @param {Record<string, string>} [args.applied] - the picks last applied to
+ *   this actor. A field whose pick hasn't changed since is left alone: a
+ *   different item there is the GM's own swap in Foundry, which the next
+ *   field push carries to Chronicle, and replacing it would delete it.
  * @returns {Array<{fieldKey: string, itemType: string, wantName: string, removeIds: string[]}>}
  */
-export function planIdentityItems({ items, fieldDefs, fieldsData }) {
+export function planIdentityItems({ items, fieldDefs, fieldsData, applied }) {
   const list = Array.isArray(items) ? items : [];
   const data = fieldsData && typeof fieldsData === 'object' ? fieldsData : {};
+  const last = applied && typeof applied === 'object' ? applied : {};
   const plan = [];
   for (const def of identityFieldDefs(fieldDefs)) {
     const raw = data[def.key];
@@ -54,6 +77,7 @@ export function planIdentityItems({ items, fieldDefs, fieldsData }) {
     const wantName = raw.trim();
     // An empty pick never removes the actor's item: sync does not delete without asking.
     if (!wantName) continue;
+    if (typeof last[def.key] === 'string' && norm(last[def.key]) === norm(wantName)) continue;
     const itemType = singleType(def);
     const current = list.filter((it) => it && it.type === itemType);
     // The adapter reads the first item of the type, so that is the one compared.

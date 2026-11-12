@@ -189,6 +189,59 @@ test('no player_image_url (no shadow, or an older server): the original is used 
   assert.equal(page.getFlag(FLAG_SCOPE, 'chronicleMapMeta').player_image, false);
 });
 
+// --- A map's own picture is copied into the world: Chronicle's address expires ---
+
+const PIC_ID = '0b5e8c1a-1111-4222-8333-944455556666';
+const STORED_OWN = `worlds/w1/chronicle-media/${PIC_ID}.png`;
+
+function withPictureServer(ms, { ok = true } = {}, fn) {
+  globalThis.game.world = { id: 'w1' };
+  const realFetch = globalThis.fetch;
+  const fetched = [];
+  globalThis.fetch = async (url, init) => {
+    fetched.push({ url, init });
+    if (!ok) return { ok: false, status: 403 };
+    return { ok: true, status: 200, blob: async () => new Blob(['png'], { type: 'image/png' }) };
+  };
+  const realGet = ms._api.get;
+  ms._api.get = async (path) => (path === `/media/${PIC_ID}`
+    ? { url: `/media/${PIC_ID}?expires=1&sig=x`, mime_type: 'image/png', file_size: 3 }
+    : realGet(path));
+  return fn(fetched).finally(() => { globalThis.fetch = realFetch; ms._api.get = realGet; });
+}
+
+test('unshadowed map: the picture is copied into the world, fetched without cookies', async () => {
+  const page = makePage({ src: '' });
+  const ms = makeSync(page);
+  ms._resolveMediaUrl = async () => ORIGINAL;
+  await withPictureServer(ms, {}, async (fetched) => {
+    await ms._materializeMap({ id: 'map-1', name: 'Test Map', image_id: PIC_ID });
+    assert.equal(fetched.length, 1);
+    assert.equal(fetched[0].url, `http://localhost:8080/media/${PIC_ID}?expires=1&sig=x`);
+    assert.equal(fetched[0].init.credentials, 'omit');
+  });
+  assert.equal(page.src, STORED_OWN);
+  assert.equal(page.getFlag(FLAG_SCOPE, 'chronicleMapMeta').image_url, STORED_OWN);
+});
+
+test('unshadowed map: a viewer open leaves a stored copy alone', async () => {
+  const page = makePage({ src: STORED_OWN, meta: { image_id: PIC_ID, image_url: STORED_OWN } });
+  const ms = makeSync(page);
+  ms._resolveMediaUrl = async () => { throw new Error('must not resolve'); };
+  await ms._refreshMapImage('map-1');
+  assert.deepEqual(page.updates, []);
+});
+
+test('unshadowed map: a failed copy keeps the address, and a viewer open copies it then', async () => {
+  const page = makePage({ src: '' });
+  const ms = makeSync(page);
+  ms._resolveMediaUrl = async () => ORIGINAL;
+  await withPictureServer(ms, { ok: false }, () => ms._materializeMap({ id: 'map-1', name: 'Test Map', image_id: PIC_ID }));
+  assert.equal(page.src, ORIGINAL);
+  await withPictureServer(ms, {}, () => ms._refreshMapImage('map-1'));
+  assert.equal(page.src, STORED_OWN);
+});
+
 test('_refreshMapImage never writes the original onto a shadowed page', async () => {
   const page = makePage();
   const ms = makeSync(page);

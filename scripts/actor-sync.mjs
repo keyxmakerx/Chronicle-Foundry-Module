@@ -27,12 +27,15 @@ import { JournalPushDebouncer } from './_journal-push-debounce.mjs';
 import { mergeChanges, changeTouchesPath } from './_actor-field-diff.mjs';
 import { collapseChanges } from './_change-feed.mjs';
 import { planActorApply } from './_actor-apply-plan.mjs';
-import { planIdentityItems, identityFieldTypes } from './_identity-item-plan.mjs';
+import { planIdentityItems, identityFieldTypes, identityPicks } from './_identity-item-plan.mjs';
 import { applyIdentityPlan, applyEntryRefresh } from './_identity-item-apply.mjs';
 import { planEntryRefresh } from './_campaign-entry-item.mjs';
 
 /** How long a read of the campaign's pick-list entries is reused. */
 const ENTRY_CACHE_MS = 30_000;
+
+/** Actor flag: the identity picks (ancestry, kit, …) Chronicle last had when applied. */
+const IDENTITY_APPLIED_FLAG = 'identityApplied';
 
 /**
  * ActorSync handles character entity ↔ Actor synchronization.
@@ -479,7 +482,8 @@ export class ActorSync {
     try {
       const items = actor.items?.contents ?? Array.from(actor.items ?? []);
       const fieldDefs = this._adapter.identityFields ?? [];
-      const plan = planIdentityItems({ items, fieldDefs, fieldsData: entity?.fields_data });
+      const applied = actor.getFlag?.(FLAG_SCOPE, IDENTITY_APPLIED_FLAG) ?? null;
+      const plan = planIdentityItems({ items, fieldDefs, fieldsData: entity?.fields_data, applied });
       // Campaign entries are read only for a field that may make an item, or
       // whose item sync made earlier and may need its text refreshed.
       const planned = new Set(plan.map((step) => step.fieldKey));
@@ -488,13 +492,26 @@ export class ActorSync {
         const first = items.find((it) => it?.type === itemType);
         return !!first?.flags?.[FLAG_SCOPE]?.chronicleMade;
       });
-      if (!plan.length && !madeFields.length) return;
+      const picks = identityPicks(fieldDefs, entity?.fields_data);
+      const recordPicks = async (failedKeys) => {
+        // A failed swap keeps the older pick, so the next apply tries again.
+        const next = { ...(applied ?? {}) };
+        for (const [key, name] of Object.entries(picks)) if (!failedKeys.includes(key)) next[key] = name;
+        if (JSON.stringify(next) !== JSON.stringify(applied ?? {})) {
+          await this._setActorFlag(actor, IDENTITY_APPLIED_FLAG, next);
+        }
+      };
+      if (!plan.length && !madeFields.length) {
+        await recordPicks([]);
+        return;
+      }
       const entriesByField = await this._campaignEntries([...planned, ...madeFields.map((f) => f.fieldKey)]);
 
       const failed = [];
       if (plan.length) {
         failed.push(...(await applyIdentityPlan(actor, plan, game, entriesByField)).failed);
       }
+      await recordPicks(failed);
       const refresh = planEntryRefresh({ items, fields: madeFields, fieldsData: entity?.fields_data, entriesByField });
       try {
         await applyEntryRefresh(actor, refresh);

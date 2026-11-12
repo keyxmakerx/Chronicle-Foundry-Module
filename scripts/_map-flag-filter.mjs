@@ -84,6 +84,18 @@ export function isTokenSafeForPlayerFlags(token) {
 }
 
 /**
+ * True when a layer row may go to every observer. The owner's key gets the
+ * map's GM layer too, which Chronicle leaves out of a player's listing; its
+ * name is the GM's, so it fails closed.
+ * @param {object} layer
+ * @returns {boolean}
+ */
+export function isLayerSafeForPlayerFlags(layer) {
+  if (!layer || typeof layer !== 'object') return false;
+  return typeof layer.layer_type === 'string' && layer.layer_type !== 'gm';
+}
+
+/**
  * Parse the wire-format `visibility_rules` value into an object.
  * @param {*} raw
  * @returns {object|null|undefined} the parsed object, `null` when there is

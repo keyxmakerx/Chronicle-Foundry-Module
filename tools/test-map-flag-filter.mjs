@@ -72,6 +72,7 @@ const {
   isMarkerSafeForPlayerFlags,
   isDrawingSafeForPlayerFlags,
   isTokenSafeForPlayerFlags,
+  isLayerSafeForPlayerFlags,
   shadowAreasOf,
   isMarkerUnderShadow,
   isDrawingUnderShadow,
@@ -232,6 +233,15 @@ test('isDrawingSafeForPlayerFlags: visibility_rules as an array (string or parse
 // FALSE`; no per-user visibility_rules on tokens)
 // ---------------------------------------------------------------------
 
+test('isLayerSafeForPlayerFlags: the GM layer and unknown rows stay out', () => {
+  for (const t of ['background', 'drawing', 'token', 'fog']) {
+    assert.equal(isLayerSafeForPlayerFlags({ layer_type: t, name: 'x' }), true, t);
+  }
+  for (const bad of [{ layer_type: 'gm', name: 'Ambush spots' }, {}, null, 'gm']) {
+    assert.equal(isLayerSafeForPlayerFlags(bad), false, JSON.stringify(bad));
+  }
+});
+
 test('isTokenSafeForPlayerFlags: is_hidden true is unsafe', () => {
   assert.equal(isTokenSafeForPlayerFlags({ is_hidden: true }), false);
 });
@@ -337,15 +347,16 @@ test('_refreshPageFlags: restricted markers, drawings, and hidden tokens are all
   );
 });
 
-test('_refreshPageFlags: layers are written through unfiltered (names/display settings only)', async () => {
+test('_refreshPageFlags: layers are written without the GM layer', async () => {
   const ms = new MapSync();
   const page = makeFakePage();
   ms.findPageByMapId = () => page;
 
-  const layers = [{ id: 'ly-1', name: 'Background' }];
+  const bg = { id: 'ly-1', name: 'Background', layer_type: 'background' };
+  const layers = [bg, { id: 'ly-2', name: 'Ambush spots', layer_type: 'gm' }];
   await ms._refreshPageFlags('map-1', { markers: [], drawings: [], tokens: [], layers });
 
-  assert.deepEqual(page.getFlag(FLAG_SCOPE, 'chronicleLayers'), layers);
+  assert.deepEqual(page.getFlag(FLAG_SCOPE, 'chronicleLayers'), [bg]);
 });
 
 // ---------------------------------------------------------------------

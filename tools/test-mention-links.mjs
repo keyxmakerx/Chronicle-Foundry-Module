@@ -28,11 +28,15 @@ test('a mention of a page with a readable journal links to that journal', () => 
   }
 });
 
-test('a player never gets a link to a journal they cannot read, nor a Chronicle link', () => {
+test('a player never gets a link to a journal they cannot read, nor a Chronicle link, nor its name', () => {
   for (const id of ['hidden', 'missing']) {
     assert.deepEqual(
       mentionTarget({ id, text: '@Aðr', href: href(id) }, { journalFor, isGM: false, siteBase: SITE }),
-      { kind: 'text', label: 'Aðr' },
+      { kind: 'text', label: 'a hidden page' },
+    );
+    assert.deepEqual(
+      mentionTarget({ id, text: '@Aðr', href: href(id) }, { journalFor, isGM: false, siteBase: SITE, hiddenLabel: 'versteckt' }),
+      { kind: 'text', label: 'versteckt' },
     );
   }
 });
@@ -61,7 +65,7 @@ test('the GM with no usable Chronicle address gets plain text', () => {
     { kind: 'text', label: 'Memoria' },
   );
   assert.deepEqual(
-    mentionTarget({ id: '', text: '@Memoria', href: href('m') }, { journalFor, isGM: false, siteBase: SITE }),
+    mentionTarget({ id: '', text: '@Memoria', href: href('m') }, { journalFor, isGM: true, siteBase: '' }),
     { kind: 'text', label: 'Memoria' },
   );
 });

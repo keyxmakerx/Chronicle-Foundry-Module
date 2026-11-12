@@ -47,7 +47,8 @@
       "Unpin": "Unpin"
     },
     "Mentions": {
-      "OpenInChronicle": "Not in this world yet. Opens in Chronicle."
+      "OpenInChronicle": "Not in this world yet. Opens in Chronicle.",
+      "Hidden": "a hidden page"
     },
     "Secrets": {
       "Placeholder": "GM-only text, kept in Chronicle",
@@ -1260,13 +1261,15 @@
     },
     "ConnectionTest": {
       "Missing": "Fill in the Chronicle address, API key and campaign first, or paste a connect line.",
-      "Cors": "Chronicle is refusing requests from this Foundry address. Ask your Chronicle admin to allow {origin}.",
+      "Cors": "Foundry couldn't reach Chronicle. Check the address and that Chronicle is running. If Foundry opens with https://, Chronicle's address must start with https:// too. If both are right, ask your Chronicle admin to allow {origin}.",
       "Unreachable": "Chronicle isn't answering at {url}. Check the address and that Chronicle is running.",
       "Reachable": "Chronicle answers",
       "AuthOk": "Key accepted",
       "AuthFailed": "The API key was refused. Make a new connect line in Chronicle.",
       "Forbidden": "The API key is missing a permission. It needs Read, Write and Sync.",
       "CampaignMissing": "No campaign with the id {campaignId}.",
+      "WrongCampaign": "This API key belongs to a different campaign than {campaignId}. Paste the connect line from the campaign you want.",
+      "NotChronicle": "Something other than Chronicle answered at {url}, perhaps a sign-in page in front of it. Check the address.",
       "RateLimited": "Chronicle is limiting requests right now. Try again in a moment.",
       "HttpError": "Chronicle answered {status} {statusText}.",
       "CampaignOk": "Campaign found",

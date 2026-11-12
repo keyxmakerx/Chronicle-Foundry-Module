@@ -926,8 +926,10 @@ export class ChronicleAPI {
 
     this._setState('connecting');
 
+    let ws;
     try {
-      this._ws = new WebSocket(wsUrl);
+      ws = new WebSocket(wsUrl);
+      this._ws = ws;
     } catch (err) {
       console.error('Chronicle: WebSocket creation failed', err);
       this._logError('error', 'WS', '/ws', null, err.message || 'WebSocket creation failed');
@@ -935,7 +937,13 @@ export class ChronicleAPI {
       return;
     }
 
-    this._ws.onopen = async () => {
+    // Each handler acts only while its socket is still the current one. Saving
+    // new settings closes the old socket and opens a new one at once; the old
+    // one's close arrives later and must not clear or reconnect the new one.
+    const current = () => this._ws === ws;
+
+    ws.onopen = async () => {
+      if (!current()) return;
       console.debug('Chronicle: WebSocket connected');
 
       this._setState('connected');
@@ -945,7 +953,7 @@ export class ChronicleAPI {
       // Flush queued messages.
       while (this._messageQueue.length > 0) {
         const msg = this._messageQueue.shift();
-        this._ws.send(JSON.stringify(msg));
+        ws.send(JSON.stringify(msg));
       }
 
       // Process retry queue on reconnect.
@@ -956,12 +964,14 @@ export class ChronicleAPI {
         }
       }
 
-      // Notify listeners.
+      // Notify listeners, unless the socket was replaced during the retries.
+      if (!current()) return;
       this._emit('sync.status', { status: 'connected' });
     };
 
-    this._ws.onclose = (event) => {
+    ws.onclose = (event) => {
       console.debug(`Chronicle: WebSocket closed (code=${event.code})`);
+      if (!current()) return;
       this._ws = null;
 
       // Track connected time.
@@ -977,13 +987,14 @@ export class ChronicleAPI {
       }
     };
 
-    this._ws.onerror = (error) => {
+    ws.onerror = (error) => {
       console.error('Chronicle: WebSocket error', error);
       this._logError('error', 'WS', '/ws', null, 'WebSocket connection error');
       // onclose will fire after onerror, triggering reconnect.
     };
 
-    this._ws.onmessage = (event) => {
+    ws.onmessage = (event) => {
+      if (!current()) return;
       try {
         const msg = JSON.parse(event.data);
         if (!msg.type || !_isAllowedMessageType(msg.type)) {

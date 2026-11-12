@@ -38,6 +38,9 @@ function text(kind) {
   return FALLBACK[kind];
 }
 
+/** Chronicle's real-time refusal: "this calendar tracks real-world time; …". */
+const REAL_TIME_REFUSAL = /real.?(world.?)?time|tracks_real_time/i;
+
 /**
  * Classify a failed date push. A 422 whose body names real-time tracking is
  * the real-time guard's, not a calendar-shape rejection.
@@ -48,7 +51,7 @@ export function classifyDatePushRefusal(err) {
   const status = statusOf(err);
   if (status === 403) return /addon_disabled/.test(String(err?.message || '')) ? 'disabled' : 'forbidden';
   if (status === 400) return 'rejected';
-  if (status === 422 && !/real.?time/i.test(String(err?.message || ''))) return 'rejected';
+  if (status === 422 && !REAL_TIME_REFUSAL.test(String(err?.message || ''))) return 'rejected';
   return null;
 }
 

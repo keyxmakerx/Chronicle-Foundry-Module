@@ -411,8 +411,9 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
   _prepareToken(t, layersById) {
     const layer = t.layer_id ? layersById.get(t.layer_id) : null;
     const size = typeof t.size === 'number' ? Math.max(1, Math.min(40, t.size)) : 4;
-    const max = Number(t.max_hp) || 0;
-    const cur = Number(t.current_hp) || 0;
+    // Chronicle's tokens carry hit points as bar 1 (`bar1_value`/`bar1_max`).
+    const max = Number(t.bar1_max ?? t.max_hp) || 0;
+    const cur = Number(t.bar1_value ?? t.current_hp) || 0;
     const hpPct = max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : null;
     // Token image surfaces in the overlay as `<img src="{{image}}">`.
     // Host allowlist: a full URL must match apiUrl's host;

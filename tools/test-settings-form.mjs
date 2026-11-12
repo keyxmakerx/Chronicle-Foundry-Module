@@ -107,7 +107,11 @@ function fakeFetch(routes) {
     if (!r) throw new Error(`unexpected ${url}`);
     const v = r[1];
     if (v instanceof Error) throw v;
-    return { ok: v.status < 400, status: v.status, statusText: '', json: async () => v.body };
+    return {
+      ok: v.status < 400, status: v.status, statusText: '', json: async () => v.body,
+      text: async () => (typeof v.body === 'string' ? v.body : JSON.stringify(v.body ?? {})),
+      headers: { get: (h) => (h.toLowerCase() === 'content-type' ? (v.type ?? 'application/json') : null) },
+    };
   };
 }
 const args = { baseUrl: 'https://c.example/', apiKey: 'k', campaignId: 'c1', foundrySystemId: 'dnd5e', origin: 'https://vtt.example' };
@@ -133,6 +137,13 @@ test('connection test: each refusal names its cause', async () => {
   }
 });
 
+test('connection test: a key for another campaign, and a page that is not Chronicle', async () => {
+  const wrong = await runConnectionTest({ ...args, fetchImpl: fakeFetch({ '/entity-types': { status: 403, body: { error: 'forbidden', message: 'api key not authorized for this campaign' } } }) });
+  assert.deepEqual(wrong.map((s) => s.code), ['Reachable', 'AuthOk', 'WrongCampaign']);
+  const login = await runConnectionTest({ ...args, fetchImpl: fakeFetch({ '/entity-types': { status: 200, body: '<html>Sign in</html>', type: 'text/html; charset=utf-8' } }) });
+  assert.deepEqual(login.map((s) => s.code), ['NotChronicle']);
+});
+
 test('connection test: success then the game system check', async () => {
   const ok = { '/entity-types': { status: 200, body: {} } };
   const matched = await runConnectionTest({ ...args, fetchImpl: fakeFetch({ ...ok, '/systems': { status: 200, body: { data: [{ foundry_system_id: 'dnd5e', enabled: true, name: 'D&D 5e' }] } } }) });
@@ -153,7 +164,8 @@ test('every step code has an English string', async () => {
   const en = JSON.parse(readFileSync(new URL('../lang/en.json', import.meta.url), 'utf8'));
   const strings = en.CHRONICLE?.ConnectionTest ?? {};
   for (const code of ['Missing', 'Cors', 'Unreachable', 'Reachable', 'AuthOk', 'AuthFailed', 'Forbidden', 'CampaignMissing',
-    'RateLimited', 'HttpError', 'CampaignOk', 'SystemMatched', 'SystemDisabled', 'SystemNoMatch', 'NoSystems']) {
+    'RateLimited', 'HttpError', 'CampaignOk', 'SystemMatched', 'SystemDisabled', 'SystemNoMatch', 'NoSystems',
+    'WrongCampaign', 'NotChronicle']) {
     assert.equal(typeof strings[code], 'string', code);
   }
 });

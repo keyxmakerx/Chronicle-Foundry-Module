@@ -153,6 +153,36 @@ test('a Chronicle ancestry pick swaps the actor\'s ancestry item from a compendi
   await closeWorld(world);
 }, { settings: ON }));
 
+test('a kit the GM swaps in Foundry survives a later Chronicle edit to another field', () => scenario('chr-identity-gm-swap', async ({ seed, world }) => {
+  const modules = { modules: ['journals', 'actors', 'items'] };
+  await openWorld(world, modules);
+  const e = await chronicleCharacter(seed, 'Brann', 10);
+  await waitFor(() => actorFor(world, e.id), 10000, 'actor created');
+  await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: { kit: 'Old Kit' } });
+  const actor = actorFor(world, e.id);
+  await waitFor(() => actor.items.find((i) => i.type === 'kit'), 10000, 'kit item made');
+  await settle();
+
+  // The GM swaps the kit by hand: the item hooks push nothing for it.
+  const old = actor.items.find((i) => i.type === 'kit');
+  await actor.createEmbeddedDocuments('Item', [{ name: 'New Kit', type: 'kit' }]);
+  await actor.deleteEmbeddedDocuments('Item', [old.id]);
+  await settle();
+
+  // Someone edits another field in Chronicle; its copy still says Old Kit.
+  await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: { hp: 6 } });
+  await waitFor(() => actor.system.hp === 6, 10000, 'hp applied');
+  await settle();
+  assert.deepEqual(actor.items.filter((i) => i.type === 'kit').map((i) => i.name), ['New Kit'], 'the GM\'s kit stays');
+
+  // A new pick made in Chronicle still replaces it.
+  await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: { kit: 'Chosen Kit' } });
+  await waitFor(() => actor.items.some((i) => i.name === 'Chosen Kit'), 10000, 'Chronicle\'s new pick applied');
+  await settle();
+  assert.deepEqual(actor.items.filter((i) => i.type === 'kit').map((i) => i.name), ['Chosen Kit']);
+  await closeWorld(world);
+}, { settings: ON }));
+
 test('a character claimed in Chronicle gives the mapped Foundry player Owner on the actor, unclaiming changes nothing, and nothing is sent back', () => scenario('chr-claim-owner', async ({ seed, world }) => {
   // The campaign's only member is the GM who made it; the mapping table
   // points that member at a separate Foundry player (the GM user already
@@ -265,7 +295,11 @@ test('two Chronicle changes applied at once push neither one back', () => scenar
   const ea = await seed.chronicle.get(`/entities/${a.id}`);
   const eb = await seed.chronicle.get(`/entities/${b.id}`);
   // Put back what the live events applied, so both applies have work to do.
-  const undo = { 'system.hp': 10, 'prototypeToken.hidden': false, 'flags.chronicle-sync.chronicleUpdatedAt': null };
+  // The recorded kit pick goes too, so the kit counts as Chronicle's new one.
+  const undo = {
+    'system.hp': 10, 'prototypeToken.hidden': false,
+    'flags.chronicle-sync.chronicleUpdatedAt': null, 'flags.chronicle-sync.identityApplied': null,
+  };
   await actorFor(world, a.id).update(undo, { chronicleSyncApply: true });
   await actorFor(world, b.id).update(undo, { chronicleSyncApply: true });
   const kits = actorFor(world, b.id).items.filter((i) => i.type === 'kit').map((i) => i.id);

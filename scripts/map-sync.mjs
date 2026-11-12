@@ -35,12 +35,14 @@ import {
   PLAYER_IMAGE_DIR, parsePlayerImageUrl, playerImageFileName,
   shadowSignature,
 } from './_map-player-image.mjs';
+import { PictureStore } from './picture-store.mjs';
 import { mapsToRefresh } from './_map-feed.mjs';
 import {
   playerSafeMapItems,
   shadowAreasOf,
   flagListsToWrite,
   isTokenSafeForPlayerFlags,
+  isLayerSafeForPlayerFlags,
 } from './_map-flag-filter.mjs';
 
 /** Folder name for materialized Chronicle maps. */
@@ -336,6 +338,7 @@ export class MapSync {
    */
   async init(api) {
     this._api = api;
+    this._pictures = null;
     if (!getSetting('syncMaps')) return;
     console.debug('Chronicle: Map sync initialized (Path B, journal-backed)');
   }
@@ -675,7 +678,11 @@ export class MapSync {
     const mediaId = meta?.image_id;
     if (!mediaId) return;
 
-    const fresh = await this._resolveMediaUrl(mediaId, { forceFresh: true });
+    // A stored copy never expires; only an address needs refreshing, and
+    // copying the picture now replaces it for good.
+    if (page.src && !/^https?:/i.test(page.src)) return;
+    let fresh = await this._storeMapImage(mediaId);
+    if (!fresh) fresh = await this._resolveMediaUrl(mediaId, { forceFresh: true });
     if (!fresh) return;
 
     const updates = {};
@@ -732,6 +739,23 @@ export class MapSync {
     } catch (err) {
       return fail(`Fetching the player picture for map ${mapData.id} failed: ${err.message || err}`, err);
     }
+  }
+
+  /**
+   * Copy a map's own picture (no shadow) into the world's files, as page
+   * pictures are (`picture-store.mjs`). Chronicle's picture addresses expire
+   * within minutes, so a page that kept one would show anyone who opens the
+   * map later a broken picture. Copied once per picture id.
+   * @param {string|null|undefined} imageId
+   * @returns {Promise<string>} the stored path, or '' (too big, not a
+   *   picture, or the copy failed) to keep the address for now
+   * @private
+   */
+  async _storeMapImage(imageId) {
+    if (!imageId || !this._api) return '';
+    this._pictures ??= new PictureStore({ api: this._api });
+    const id = String(imageId);
+    return (await this._pictures.ensure([id])).get(id) || '';
   }
 
   /**
@@ -1011,6 +1035,7 @@ export class MapSync {
       imageSrc = mapData.player_image_url ? await this._storePlayerImage(mapData, page) : '';
     } else {
       this._gmImages.delete(mapData.id);
+      if (imageSrc && mapData.image_id) imageSrc = (await this._storeMapImage(mapData.image_id)) || imageSrc;
     }
 
     const meta = this._buildMapMeta(mapData, imageSrc, { shadowed });
@@ -1251,9 +1276,8 @@ export class MapSync {
   /**
    * Write the player-safe subset of sub-resource data to the JournalEntry
    * page flags. DM-only, per-user-restricted, hidden and shadowed data is
-   * filtered out (`_map-flag-filter.mjs`) and stays only in GM memory.
-   * Layers carry no restricted content (names and display settings only)
-   * and are written through unfiltered.
+   * filtered out (`_map-flag-filter.mjs`) and stays only in GM memory,
+   * and so does the GM layer row.
    * @param {string} mapId
    * @param {{ markers: object[], drawings: object[], tokens: object[], layers: object[], drawingsKnown?: boolean }} data
    *   `drawingsKnown: false` (the drawing fetch failed) leaves the stored
@@ -1271,7 +1295,7 @@ export class MapSync {
     });
     const updates = {};
     if (write.tokens) updates[`flags.${FLAG_SCOPE}.chronicleTokens`] = (tokens || []).filter(isTokenSafeForPlayerFlags);
-    if (write.layers) updates[`flags.${FLAG_SCOPE}.chronicleLayers`] = layers || [];
+    if (write.layers) updates[`flags.${FLAG_SCOPE}.chronicleLayers`] = (layers || []).filter(isLayerSafeForPlayerFlags);
     if (write.markers || write.drawings) {
       const safe = playerSafeMapItems(markers, drawings);
       if (write.markers) updates[`flags.${FLAG_SCOPE}.chronicleMarkers`] = safe.markers;
