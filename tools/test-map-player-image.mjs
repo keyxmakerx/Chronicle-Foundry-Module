@@ -37,12 +37,13 @@ globalThis.game = globalThis.game || {
 
 const uploads = [];
 let uploadFails = false;
+let listed = [];
 globalThis.FilePicker = {
-  browse: async () => ({ files: [] }),
+  browse: async () => ({ files: listed }),
   createDirectory: async () => { throw new Error('EEXIST'); },
   upload: async (source, dir, file) => {
     if (uploadFails) throw new Error('disk full');
-    uploads.push({ source, dir, name: file.name });
+    uploads.push({ source, dir, name: file.name, type: file.type, size: file.size });
     return { status: 'success', path: `${dir}/${file.name}` };
   },
 };
@@ -57,10 +58,14 @@ const ORIGINAL = 'http://localhost:8080/media/orig.png?sig=abc';
 const PLAYER_URL = '/api/v1/campaigns/camp-1/maps/map-1/player-image?v=0123abcd0123abcd';
 const STORED = 'chronicle-sync/maps/map-1-0123abcd0123abcd.jpg';
 
-function makePage({ src = ORIGINAL, meta = {} } = {}) {
+globalThis.game.users = [{ id: 'gm1', isGM: true }, { id: 'p1', isGM: false }];
+
+function makePage({ src = ORIGINAL, meta = {}, shared = true, retired } = {}) {
   const flags = { [FLAG_SCOPE]: { mapId: 'map-1', chronicleMapMeta: meta } };
+  if (retired) flags[FLAG_SCOPE].retiredPictures = retired;
   const page = {
-    id: 'page-1', name: 'Test Map', src,
+    id: 'page-1', name: 'Test Map', src, shared,
+    testUserPermission: (user, level) => user.isGM || (page.shared && level === 'LIMITED'),
     parent: { id: 'entry-1', name: 'Test Map', update: async () => {} },
     updates: [],
     getFlag: (scope, key) => flags[scope]?.[key],
@@ -340,4 +345,105 @@ test('removing the last shadow brings the original back', async () => {
   await ms._noteShadows('map-1', []);
   assert.equal(page.src, ORIGINAL);
   assert.equal(page.getFlag(FLAG_SCOPE, 'chronicleMapMeta').player_image, false);
+});
+
+// --- The world copy follows who may see it: shared journals only, blanked on a shadow ---
+
+test('unshadowed map no player can open: no copy, the short-lived link stays', async () => {
+  const page = makePage({ src: '', shared: false });
+  const ms = makeSync(page);
+  ms._resolveMediaUrl = async () => ORIGINAL;
+  await withPictureServer(ms, {}, async (fetched) => {
+    await ms._materializeMap({ id: 'map-1', name: 'Test Map', image_id: PIC_ID });
+    assert.equal(fetched.length, 0);
+  });
+  assert.equal(page.src, ORIGINAL);
+});
+
+test('sharing the map journal with a player copies the picture then', async () => {
+  settings.syncMaps = true;
+  const hooks = [];
+  const realHooks = globalThis.Hooks;
+  globalThis.Hooks = { ...realHooks, on: (name, fn) => hooks.push([name, fn]), off: () => {} };
+  try {
+    const page = makePage({ src: ORIGINAL, shared: false, meta: { image_id: PIC_ID, image_url: ORIGINAL } });
+    const ms = makeSync(page);
+    await ms.init(ms._api);
+    const onEntry = hooks.find(([n]) => n === 'updateJournalEntry')[1];
+    page.shared = true;
+    await withPictureServer(ms, {}, async (fetched) => {
+      onEntry({ documentName: 'JournalEntry', pages: { contents: [page] } }, { name: 'renamed' });
+      await new Promise((r) => setTimeout(r, 0));
+      assert.equal(fetched.length, 0, 'a change that is not to ownership does nothing');
+      onEntry({ documentName: 'JournalEntry', pages: { contents: [page] } }, { ownership: { p1: 2 } });
+      for (let i = 0; i < 5 && page.src !== STORED_OWN; i++) await new Promise((r) => setTimeout(r, 0));
+    });
+    assert.equal(page.src, STORED_OWN);
+  } finally {
+    globalThis.Hooks = realHooks;
+    delete settings.syncMaps;
+  }
+});
+
+test('a new shadow blanks the stored full picture under the same name', async () => {
+  uploads.length = 0;
+  const page = makePage({ src: STORED_OWN, meta: { image_id: PIC_ID, image_url: STORED_OWN } });
+  const ms = makeSync(page);
+  ms._resolveMediaUrl = async () => 'http://localhost:8080/media/fresh.png?sig=gm';
+  ms._shadowSigs.set('map-1', '');
+  ms._refreshMapRow = async () => {};
+  await withPictureServer(ms, {}, () =>
+    ms._noteShadows('map-1', [{ drawing_type: 'shadow', points: [{ x: 1, y: 1 }, { x: 5, y: 5 }] }]));
+  const blank = uploads.find((u) => u.name === `${PIC_ID}.png`);
+  assert.ok(blank, 'the stored copy is overwritten');
+  assert.equal(blank.dir, 'worlds/w1/chronicle-media');
+  assert.equal(blank.type, 'image/png');
+  assert.ok(blank.size < 200, 'with a blank picture');
+  assert.deepEqual(page.getFlag(FLAG_SCOPE, 'retiredPictures'), [PIC_ID]);
+  assert.equal(page.src, '');
+  assert.equal(ms.getMapData(page).meta.image_url, 'http://localhost:8080/media/fresh.png?sig=gm',
+    'the GM sees the original from a link, not the blanked file');
+});
+
+test('a shadowed row for a page on a stored copy blanks it too', async () => {
+  uploads.length = 0;
+  const page = makePage({ src: STORED_OWN, meta: { image_id: PIC_ID, image_url: STORED_OWN } });
+  const ms = makeSync(page);
+  await withPictureServer(ms, {}, () => ms._materializeMap(SHADOWED_ROW));
+  assert.ok(uploads.some((u) => u.name === `${PIC_ID}.png` && u.size < 200));
+  assert.equal(page.src, STORED);
+  assert.deepEqual(page.getFlag(FLAG_SCOPE, 'retiredPictures'), [PIC_ID]);
+});
+
+test('a blank that fails to upload is reported and not recorded', async () => {
+  const page = makePage({ src: STORED_OWN, meta: { image_id: PIC_ID, image_url: STORED_OWN } });
+  const ms = makeSync(page);
+  ms._resolveMediaUrl = async () => ORIGINAL;
+  uploadFails = true;
+  try {
+    await withPictureServer(ms, {}, () => ms._blankPageImage('map-1'));
+  } finally {
+    uploadFails = false;
+  }
+  assert.equal(page.getFlag(FLAG_SCOPE, 'retiredPictures'), undefined);
+  assert.ok(ms._recentErrors.some((e) => /still open it/.test(e.message)));
+});
+
+test('shadow gone in a later session: the blanked copy is written again', async () => {
+  uploads.length = 0;
+  listed = [`worlds/w1/chronicle-media/${PIC_ID}.png`];
+  try {
+    const page = makePage({ src: STORED, meta: { player_image: true, image_url: STORED }, retired: [PIC_ID] });
+    const ms = makeSync(page);
+    ms._resolveMediaUrl = async () => ORIGINAL;
+    await withPictureServer(ms, {}, async (fetched) => {
+      await ms._materializeMap({ id: 'map-1', name: 'Test Map', image_id: PIC_ID });
+      assert.equal(fetched.length, 1, 'the listed blank file is not taken as the copy');
+    });
+    assert.ok(uploads.some((u) => u.name === `${PIC_ID}.png` && u.size > 0));
+    assert.equal(page.src, STORED_OWN);
+    assert.deepEqual(page.getFlag(FLAG_SCOPE, 'retiredPictures'), []);
+  } finally {
+    listed = [];
+  }
 });

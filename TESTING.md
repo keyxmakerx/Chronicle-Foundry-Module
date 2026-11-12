@@ -126,6 +126,8 @@ campaign with at least one map that has an image, markers (some `Everyone`, one
 - [ ] Click **Open in Foundry** → the map opens in the Chronicle Map Viewer (image plus overlays, zoom % bottom corner)
 - [ ] A map with no image does not break the Resync (a row appears under recent errors instead, **Dismiss** clears it)
 - [ ] After a Resync, wait 20 minutes, then open a map as a player who has never opened it -> the picture shows (it is a copy in the world's `chronicle-media` folder, not a Chronicle link)
+- [ ] Share a map's journal with a player, open it as the GM and note its picture address (right-click the image -> copy image address; it ends in `chronicle-media/<id>.<ext>`). Add a shadow to the map in Chronicle. Open that address in a private browser window -> a blank page or one transparent pixel, not the map. Broken: the full map still shows
+- [ ] A map whose journal no player can open: its picture address stays a Chronicle link (`/media/...?sig=...`), not a `chronicle-media` file
 - [ ] Press **Resync All Maps** twice → no duplicate journals or folders
 
 ### Chronicle -> Foundry (viewer open)
