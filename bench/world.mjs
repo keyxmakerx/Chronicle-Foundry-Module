@@ -78,6 +78,8 @@ export const benchAdapter = {
   identityFields: ['ancestry', 'kit'].map((key) => ({
     key, type: 'string', foundry_collection: 'items', foundry_item_type: [key], foundry_item_single: true,
   })),
+  // `hp` is the one mapped scalar, so it is what a layer's effect can change.
+  fieldDefs: [{ key: 'hp', type: 'number', foundry_path: 'system.hp' }],
   fromChronicleFields(entity) {
     const out = {};
     if (entity?.name) out.name = entity.name;

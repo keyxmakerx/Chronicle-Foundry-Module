@@ -191,7 +191,36 @@ export async function seedCampaign(label = 'bench') {
     const r = await web.putJSON(`/campaigns/${campaignId}/entity-types/${entityTypeId}`, { fields });
     if (r.status >= 300) throw new Error(`declare fields failed: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
   };
-  return { campaignId, moduleKey, displayName, createMap, enableClaiming, assignOwner, createFolder, fileInFolder, declareFields, chronicle: apiClient(campaignId, otherKey), module: apiClient(campaignId, moduleKey) };
+  // Transformation layers are the Director's, through the sheet's web
+  // routes, with the campaign's transformations add-on on; the sync API
+  // only reads them.
+  const enableTransformations = async () => {
+    const list = await (await web.get(`/campaigns/${campaignId}/addons`)).json();
+    const t = list.find((a) => a.addon_slug === 'transformations');
+    if (!t) throw new Error('no transformations add-on');
+    if (!t.enabled) {
+      const r = await fetch(`${CHRONICLE_URL}/campaigns/${campaignId}/addons/${t.addon_id}/toggle`, {
+        method: 'PUT', redirect: 'manual',
+        headers: { cookie: web.cookie(), 'content-type': 'application/x-www-form-urlencoded', 'x-csrf-token': web.csrf() },
+        body: 'action=enable',
+      });
+      if (r.status >= 400) throw new Error(`transformations add-on not enabled: HTTP ${r.status}`);
+    }
+  };
+  const putOnLayer = async (entityId, layer) => {
+    const r = await web.postJSON(`/campaigns/${campaignId}/pages/${entityId}/layers`, layer);
+    const text = await r.text();
+    if (r.status >= 300) throw new Error(`layer put on failed: HTTP ${r.status} ${text.slice(0, 200)}`);
+    return JSON.parse(text);
+  };
+  const takeOffLayer = async (layerId) => {
+    const r = await fetch(`${CHRONICLE_URL}/campaigns/${campaignId}/layers/${layerId}`, {
+      method: 'DELETE', redirect: 'manual',
+      headers: { cookie: web.cookie(), 'x-csrf-token': web.csrf() },
+    });
+    if (r.status >= 300) throw new Error(`layer take off failed: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
+  };
+  return { campaignId, moduleKey, displayName, createMap, enableClaiming, assignOwner, createFolder, fileInFolder, declareFields, enableTransformations, putOnLayer, takeOffLayer, chronicle: apiClient(campaignId, otherKey), module: apiClient(campaignId, moduleKey) };
 }
 
 /** A REST client scoped to one campaign, for scenario setup and assertions. */
