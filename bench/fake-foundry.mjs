@@ -168,7 +168,7 @@ class BenchDocument {
 
   _refresh() {
     for (const [k, v] of Object.entries(this._source)) {
-      if (k === '_id' || k === 'folder' || k === 'pages' || k === 'items') continue;
+      if (k === '_id' || k === 'folder' || k === 'pages' || k === 'items' || k === 'effects') continue;
       this[k] = v;
     }
   }
@@ -306,10 +306,13 @@ class BenchJournal extends BenchDocument {
   }
 }
 
-/** Embedded item: lives in its actor's `items`, fires Item hooks with `parent` set. */
+/**
+ * Embedded item or effect: lives in its actor's `items` or `effects`, fires
+ * that document's hooks with `parent` set.
+ */
 class BenchItem extends BenchDocument {
-  constructor(world, parent, data) {
-    super(world, 'Item', { type: 'equipment', system: {}, ...data });
+  constructor(world, parent, data, documentName = 'Item') {
+    super(world, documentName, documentName === 'Item' ? { type: 'equipment', system: {}, ...data } : { ...data });
     this._parent = parent;
     this.parent = parent;
   }
@@ -321,16 +324,16 @@ class BenchItem extends BenchDocument {
     if (!Object.keys(change).length) return this;
     mergeInto(this._source, change);
     this._refresh();
-    this._world.log.writes.push({ op: 'update', type: 'Item', id: this.id, parent: this.parent.id, change, options });
+    this._world.log.writes.push({ op: 'update', type: this.documentName, id: this.id, parent: this.parent.id, change, options });
     change._id = this.id;
-    this._world.Hooks.callAll('updateItem', this, change, options, this._world.game.user.id);
+    this._world.Hooks.callAll(`update${this.documentName}`, this, change, options, this._world.game.user.id);
     return this;
   }
 
   async delete(options = {}) {
 
     stampOperation(options, this._parent ?? null);
-    return (await this.parent.deleteEmbeddedDocuments('Item', [this.id], options))[0];
+    return (await this.parent.deleteEmbeddedDocuments(this.documentName, [this.id], options))[0];
   }
 }
 
@@ -339,6 +342,7 @@ class BenchActor extends BenchDocument {
     const { items = [], ...rest } = data;
     super(world, 'Actor', { type: 'character', system: {}, img: '', prototypeToken: {}, ...rest });
     this.items = new Collection();
+    this.effects = new Collection();
     for (const i of items) {
       const item = new BenchItem(world, this, i);
       this.items.set(item.id, item);
@@ -349,16 +353,21 @@ class BenchActor extends BenchDocument {
     return { ...clone(this._source), items: this.items.map((i) => i.toObject()) };
   }
 
+  _embedded(type) {
+    return type === 'ActiveEffect' ? this.effects : this.items;
+  }
+
   async createEmbeddedDocuments(type, list, options = {}) {
 
     stampOperation(options, this);
     const made = [];
+    const docName = type === 'ActiveEffect' ? 'ActiveEffect' : 'Item';
     for (const data of list) {
-      const item = new BenchItem(this._world, this, data);
-      this.items.set(item.id, item);
-      made.push(item);
-      this._world.log.writes.push({ op: 'create', type: 'Item', id: item.id, parent: this.id, options });
-      this._world.Hooks.callAll('createItem', item, options, this._world.game.user.id);
+      const doc = new BenchItem(this._world, this, data, docName);
+      this._embedded(type).set(doc.id, doc);
+      made.push(doc);
+      this._world.log.writes.push({ op: 'create', type: docName, id: doc.id, parent: this.id, options });
+      this._world.Hooks.callAll(`create${docName}`, doc, options, this._world.game.user.id);
     }
     return made;
   }
@@ -368,8 +377,8 @@ class BenchActor extends BenchDocument {
     stampOperation(options, this);
     const out = [];
     for (const data of list) {
-      const item = this.items.get(data._id);
-      if (item) out.push(await item.update(data, options));
+      const doc = this._embedded(type).get(data._id);
+      if (doc) out.push(await doc.update(data, options));
     }
     return out;
   }
@@ -378,13 +387,14 @@ class BenchActor extends BenchDocument {
 
     stampOperation(options, this);
     const out = [];
+    const docName = type === 'ActiveEffect' ? 'ActiveEffect' : 'Item';
     for (const id of ids) {
-      const item = this.items.get(id);
-      if (!item) continue;
-      this.items.delete(id);
-      out.push(item);
-      this._world.log.writes.push({ op: 'delete', type: 'Item', id, parent: this.id, options });
-      this._world.Hooks.callAll('deleteItem', item, options, this._world.game.user.id);
+      const doc = this._embedded(type).get(id);
+      if (!doc) continue;
+      this._embedded(type).delete(id);
+      out.push(doc);
+      this._world.log.writes.push({ op: 'delete', type: docName, id, parent: this.id, options });
+      this._world.Hooks.callAll(`delete${docName}`, doc, options, this._world.game.user.id);
     }
     return out;
   }

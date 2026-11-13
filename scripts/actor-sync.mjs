@@ -17,7 +17,7 @@
 import { noticeText } from './_escape-html.mjs';
 import { getSetting, getUserMappings } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
-import { createGenericAdapter } from './adapters/generic-adapter.mjs';
+import { createGenericAdapter, buildChronicleFields } from './adapters/generic-adapter.mjs';
 import { FLAG_SCOPE, syncOptions, APPLY_OPTION } from './constants.mjs';
 import { flagRemoval } from './_flag-removal.mjs';
 import { planClaimOwnership } from './_claim-ownership-plan.mjs';
@@ -30,6 +30,7 @@ import { planActorApply } from './_actor-apply-plan.mjs';
 import { planIdentityItems, identityFieldTypes, identityPicks } from './_identity-item-plan.mjs';
 import { applyIdentityPlan, applyEntryRefresh } from './_identity-item-apply.mjs';
 import { planEntryRefresh } from './_campaign-entry-item.mjs';
+import { planLayerEffects, layeredFieldKeys, storedLayers, LAYER_FLAG } from './_layer-effects.mjs';
 
 /** How long a read of the campaign's pick-list entries is reused. */
 const ENTRY_CACHE_MS = 30_000;
@@ -137,6 +138,11 @@ export class ActorSync {
   async onMessage(msg) {
     if (!this._adapter || !getSetting('syncCharacters')) return;
 
+    if (msg.type === 'hero_layers.changed') {
+      await this._onLayersChanged(msg.resourceId);
+      return;
+    }
+
     // Only handle entity events.
     if (!msg.type?.startsWith('entity.')) return;
 
@@ -238,6 +244,7 @@ export class ActorSync {
     }
 
     await this._reconcileClaimOwnership();
+    await this._syncAllLayers(feed?.mode === 'delta' ? feed.changes : null);
 
     // Surface unresolved character links (broken / missing) so the GM can
     // fix them in the dashboard's Characters section rather than silently desyncing.
@@ -368,6 +375,132 @@ export class ActorSync {
   }
 
   /**
+   * The actor's effects that sync made for Chronicle layers.
+   * @returns {{id: string, flag: object}[]}
+   * @private
+   */
+  _layerEffects(actor) {
+    const out = [];
+    for (const e of actor?.effects?.contents ?? []) {
+      const flag = e.getFlag?.(FLAG_SCOPE, LAYER_FLAG);
+      if (flag) out.push({ id: e.id, flag });
+    }
+    return out;
+  }
+
+  /**
+   * The hero's level for a layer's `"@level"`: the actor's own when the
+   * adapter maps one (Foundry leads it), else Chronicle's.
+   * @private
+   */
+  _heroLevel(actor, fields) {
+    const def = (this._adapter?.fieldDefs ?? []).find((f) => f.key === 'level');
+    const own = def ? Number(buildChronicleFields(actor, [def]).level) : NaN;
+    if (Number.isFinite(own) && own > 0) return own;
+    const chr = Number(fields?.level);
+    return Number.isFinite(chr) ? chr : 0;
+  }
+
+  /**
+   * Make the actor carry one effect per layer. The writes are marked as
+   * sync's own, and only effects sync made are changed or removed.
+   * @private
+   */
+  async _applyLayers(actor, layers, level) {
+    const plan = planLayerEffects({
+      layers, fieldDefs: this._adapter?.fieldDefs ?? [], level, existing: this._layerEffects(actor), scope: FLAG_SCOPE,
+    });
+    if (plan.remove.length) await actor.deleteEmbeddedDocuments('ActiveEffect', plan.remove, syncOptions({ [APPLY_OPTION]: true }));
+    if (plan.update.length) await actor.updateEmbeddedDocuments('ActiveEffect', plan.update, syncOptions({ [APPLY_OPTION]: true }));
+    if (plan.create.length) await actor.createEmbeddedDocuments('ActiveEffect', plan.create, syncOptions({ [APPLY_OPTION]: true }));
+  }
+
+  /**
+   * Read a hero's layers from Chronicle and redraw its effects. A 403
+   * `addon_disabled` means the add-on is off and a 404 that this Chronicle
+   * has none (an owner key sees every page); either way reads stop until
+   * Chronicle next says a layer changed, and the answer is kept out of the
+   * dashboard's error log because it is expected.
+   * @returns {Promise<boolean>} false when the read or a write failed
+   * @private
+   */
+  async _syncLayers(actor, entityId) {
+    if (this._layersOff) return true;
+    let res;
+    try {
+      res = await this._api.get(`/entities/${entityId}/layers`);
+    } catch (err) {
+      if (err?.status === 404 || (err?.status === 403 && err?.code === 'addon_disabled')) {
+        this._api.dropLastErrorLogEntry?.({ path: `/entities/${entityId}/layers`, status: [403, 404] });
+        this._layersOff = true;
+        return true;
+      }
+      console.warn(`Chronicle: could not read the transformations on "${actor.name}"`, err);
+      return false;
+    }
+    try {
+      await this._applyLayers(actor, Array.isArray(res?.layers) ? res.layers : [], this._heroLevel(actor, null));
+      return true;
+    } catch (err) {
+      console.error(`Chronicle: could not update the transformation effects on "${actor.name}"`, err);
+      return false;
+    }
+  }
+
+  /** Chronicle put a layer on a page or took one off. @private */
+  async _onLayersChanged(entityId) {
+    if (!entityId) return;
+    const actor = this._findLinkedActor(entityId);
+    if (!actor || actor.type !== this._actorType) return;
+    this._layersOff = false;
+    await this._syncLayers(actor, entityId);
+  }
+
+  /**
+   * Connect-time read of layers changed while Foundry was closed: with the
+   * change feed, only the heroes it lists under `hero_layers`; without it,
+   * every linked hero. A failure is logged and does not hold the feed
+   * cursor back, because the next change or connect reads that hero again.
+   * @param {object[]|null} changes - the feed's changes, or null for a full read
+   * @private
+   */
+  async _syncAllLayers(changes) {
+    this._layersOff = false;
+    const listed = changes ? new Set(collapseChanges(changes, 'hero_layers').keys()) : null;
+    for (const actor of game.actors?.contents ?? []) {
+      if (this._layersOff) return;
+      const entityId = actor.type === this._actorType && actor.getFlag(FLAG_SCOPE, 'entityId');
+      if (entityId && (!listed || listed.has(entityId))) await this._syncLayers(actor, entityId);
+    }
+  }
+
+  /**
+   * Redraw the layer effects from the layers they were made from, after a
+   * Chronicle copy is applied, so a `"@level"` follows the hero's level
+   * without another read.
+   * @private
+   */
+  async _replanLayers(actor, entity) {
+    const existing = this._layerEffects(actor);
+    if (existing.length === 0) return;
+    await this._applyLayers(actor, storedLayers(existing), this._heroLevel(actor, entity?.fields_data));
+  }
+
+  /**
+   * Fields with a layer effect on them are left out of a push (see
+   * layeredFieldKeys).
+   * @private
+   */
+  _withoutLayered(actor, fields) {
+    if (!fields) return fields;
+    const keys = layeredFieldKeys(this._layerEffects(actor));
+    if (keys.size === 0) return fields;
+    const out = {};
+    for (const [k, v] of Object.entries(fields)) if (!keys.has(k)) out[k] = v;
+    return out;
+  }
+
+  /**
    * Clean up hooks on destroy.
    */
   destroy() {
@@ -436,6 +569,7 @@ export class ActorSync {
 
       const actor = await Actor.create(actorData, applyOptions());
       await this._applyIdentityItems(actor, entity);
+      await this._syncLayers(actor, entity.id);
       await this._applyClaimOwnership(actor, entity.owner_user_id ?? null, null);
 
       // Create sync mapping (idempotent — tolerates a pre-existing
@@ -618,6 +752,7 @@ export class ActorSync {
       }
 
       await this._applyIdentityItems(actor, entity);
+      await this._replanLayers(actor, entity);
 
       // Sync visibility: Chronicle is_private → Foundry actor hidden.
       // A private entity means the NPC is hidden from players.
@@ -841,9 +976,9 @@ export class ActorSync {
 
       // Only the mapped fields this burst touched. Without an adapter helper
       // fall back to the full set, but only when system data changed.
-      const fields = typeof this._adapter.toChronicleFieldsChanged === 'function'
+      const fields = this._withoutLayered(actor, typeof this._adapter.toChronicleFieldsChanged === 'function'
         ? this._adapter.toChronicleFieldsChanged(actor, change)
-        : (change.system ? this._adapter.toChronicleFields(actor) : null);
+        : (change.system ? this._adapter.toChronicleFields(actor) : null));
 
       if (fields && Object.keys(fields).length > 0) {
         await this._putFieldsMerged(entityId, fields);
@@ -1312,7 +1447,7 @@ export class ActorSync {
     const actor = game.actors.get(actorId);
     const entityId = actor?.getFlag(FLAG_SCOPE, 'entityId');
     if (!actor || !entityId || !this._adapter) return false;
-    await this._putFieldsMerged(entityId, this._adapter.toChronicleFields(actor));
+    await this._putFieldsMerged(entityId, this._withoutLayered(actor, this._adapter.toChronicleFields(actor)));
     await this._setActorFlag(actor, 'lastSync', new Date().toISOString());
     console.debug(`Chronicle: Re-pushed actor "${actor.name}" → entity ${entityId}`);
     return true;

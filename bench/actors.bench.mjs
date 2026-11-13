@@ -347,3 +347,70 @@ test('a Chronicle copy that arrives while a Foundry HP push is on its way does n
   assert.equal(actor.system.hp, 12, 'the Foundry edit is kept');
   assert.equal((await seed.chronicle.get(`/entities/${e.id}`)).fields_data?.hp, 12, 'and is in Chronicle');
 }, { settings: ON }));
+
+const layerEffects = (actor) => actor.effects.filter((fx) => fx.getFlag(FLAG, 'layer'));
+
+test('a layer put on in Chronicle becomes one effect on the actor, a layered field is not pushed back, and taking it off removes only that effect', () => scenario('chr-layer-effect', async ({ seed, world }) => {
+  await seed.enableTransformations();
+  await openWorld(world, MODULES);
+  const e = await chronicleCharacter(seed, 'Mirela', 20);
+  await waitFor(() => actorFor(world, e.id), 10000, 'actor created');
+  await settle();
+  const actor = actorFor(world, e.id);
+  await actor.createEmbeddedDocuments('ActiveEffect', [{ name: 'Bless', changes: [] }]);
+
+  let layer;
+  const reqs = await recordRequests(async () => {
+    layer = await seed.putOnLayer(e.id, { name: 'Withered', source: '', note: '', changes: [
+      { field: 'hp', op: 'add', value: -5 },
+      { field: 'features_json', op: 'append', value: { name: 'Tough But Withered' }, label: 'Tough But Withered' },
+    ] });
+    await waitFor(() => layerEffects(actor).length === 1, 10000, 'layer effect made');
+    await settle();
+  });
+  const fx = layerEffects(actor)[0];
+  assert.equal(fx.name, 'Withered');
+  assert.deepEqual(fx.changes, [{ key: 'system.hp', mode: 2, value: '-5' }]);
+  assert.match(fx.description, /Adds Tough But Withered/);
+  assert.deepEqual(writes(reqs).map((r) => `${r.method} ${r.url}`), [], 'nothing sent back');
+  assert.equal(actor.system.hp, 20, "the actor's own HP is untouched");
+
+  // A Foundry edit to a layered field stays in Foundry while the layer is on.
+  const edit = await recordRequests(async () => {
+    await actor.update({ 'system.hp': 14 });
+    await settle();
+  });
+  assert.equal(writes(edit).filter((r) => r.url === `/entities/${e.id}/fields`).length, 0, 'layered field not pushed');
+  assert.equal((await seed.chronicle.get(`/entities/${e.id}`)).fields_data?.hp, 20);
+
+  await seed.takeOffLayer(layer.id);
+  await waitFor(() => layerEffects(actor).length === 0, 10000, 'layer effect removed');
+  await settle();
+  assert.deepEqual(actor.effects.map((x) => x.name), ['Bless'], "the GM's own effect stays");
+  await closeWorld(world);
+}, { settings: ON }));
+
+test('a layer put on while Foundry was closed arrives on open from the feed, and a second open writes nothing', () => scenario('chr-layer-offline', async ({ seed, world }) => {
+  await seed.enableTransformations();
+  await openWorld(world, MODULES);
+  const e = await chronicleCharacter(seed, 'Oskar', 20);
+  await waitFor(() => actorFor(world, e.id), 10000, 'actor created');
+  await settle();
+  const actor = actorFor(world, e.id);
+  await closeWorld(world);
+
+  await seed.putOnLayer(e.id, { name: 'Vampire Scion', source: 'drawsteel:vampire-scion', note: '', changes: [
+    { field: 'hp', op: 'set', value: 30 },
+  ] });
+  await openWorld(world, MODULES);
+  await waitFor(() => layerEffects(actor).length === 1, 10000, 'layer effect made on open');
+  await settle();
+  assert.deepEqual(layerEffects(actor)[0].changes, [{ key: 'system.hp', mode: 5, value: '30' }]);
+  await closeWorld(world);
+
+  const before = world.log.writes.length;
+  await openWorld(world, MODULES);
+  await settle();
+  assert.deepEqual(world.log.writes.slice(before).filter((w) => w.type === 'ActiveEffect'), [], 'an unchanged layer writes nothing');
+  await closeWorld(world);
+}, { settings: ON }));
