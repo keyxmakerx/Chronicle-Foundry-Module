@@ -47,19 +47,21 @@ export function chronicleMentionUrl(href, siteBase) {
 /**
  * Decide how one mention is drawn for this user.
  * - The mentioned page has a journal here the user may read: a Foundry link to it.
- * - Otherwise, for the GM: a link that opens the page in Chronicle.
- * - Otherwise: the name as plain text, so a player never gets a dead link
- *   or a hint of a page they can't see.
+ * - Otherwise, for the GM: a link that opens the page in Chronicle, or the
+ *   name as plain text.
+ * - Otherwise, for a player: `hiddenLabel` as plain text, never the name,
+ *   as Chronicle shows a page the viewer can't open.
  * @param {{id: string, text: string, href?: string|null}} mention
  * @param {object} ctx
  * @param {(entityId: string) => ({id: string, canRead: boolean}|null)} ctx.journalFor
  * @param {boolean} ctx.isGM
  * @param {string|null} [ctx.siteBase]
+ * @param {string} [ctx.hiddenLabel] - what a player sees instead of the name
  * @returns {{kind: 'journal', label: string, journalId: string}
  *   | {kind: 'chronicle', label: string, url: string}
  *   | {kind: 'text', label: string}}
  */
-export function mentionTarget(mention, { journalFor, isGM, siteBase }) {
+export function mentionTarget(mention, { journalFor, isGM, siteBase, hiddenLabel = 'a hidden page' }) {
   const label = mentionLabel(mention?.text);
   const id = String(mention?.id ?? '').trim();
   const journal = id ? journalFor(id) : null;
@@ -67,6 +69,7 @@ export function mentionTarget(mention, { journalFor, isGM, siteBase }) {
   if (isGM) {
     const url = chronicleMentionUrl(mention?.href, siteBase);
     if (url) return { kind: 'chronicle', label, url };
+    return { kind: 'text', label };
   }
-  return { kind: 'text', label };
+  return { kind: 'text', label: hiddenLabel };
 }

@@ -35,12 +35,15 @@ import {
   PLAYER_IMAGE_DIR, parsePlayerImageUrl, playerImageFileName,
   shadowSignature,
 } from './_map-player-image.mjs';
+import { PictureStore } from './picture-store.mjs';
+import { PICTURE_DIR_NAME } from './_inline-pictures.mjs';
 import { mapsToRefresh } from './_map-feed.mjs';
 import {
   playerSafeMapItems,
   shadowAreasOf,
   flagListsToWrite,
   isTokenSafeForPlayerFlags,
+  isLayerSafeForPlayerFlags,
 } from './_map-flag-filter.mjs';
 
 /** Folder name for materialized Chronicle maps. */
@@ -57,6 +60,15 @@ const MAP_VIEWER_SHEET_CLASS = 'chronicle-sync.MapViewerSheet';
 
 /** Maximum entries retained in `_recentErrors` (FIFO). */
 const MAX_RECENT_ERRORS = 50;
+
+/** A map picture copied into the world's files by `_storeMapImage`. */
+const STORED_COPY_RE = new RegExp(`(?:^|/)${PICTURE_DIR_NAME}/[0-9a-f-]{36}\\.[a-z0-9]+(?:[?#].*)?$`, 'i');
+
+/**
+ * Page flag listing the media ids whose world copy was blanked when the map
+ * gained a shadow, so a later copy writes the picture back over the blank.
+ */
+const RETIRED_FLAG = 'retiredPictures';
 
 /** Debounce window for coalescing WS-driven viewer re-renders. */
 const NOTIFY_DEBOUNCE_MS = 200;
@@ -336,7 +348,25 @@ export class MapSync {
    */
   async init(api) {
     this._api = api;
+    this._pictures = null;
     if (!getSetting('syncMaps')) return;
+    // A map picture is copied into the world only once a player can open
+    // its journal, so sharing one is the moment to copy it.
+    this._onOwnershipChange ??= (doc, change) => {
+      if (!change || !('ownership' in change) || !game.user?.isGM) return;
+      const pages = doc?.documentName === 'JournalEntryPage' ? [doc] : (doc?.pages?.contents || []);
+      for (const page of pages) {
+        const mapId = page?.getFlag?.(FLAG_SCOPE, 'mapId');
+        if (!mapId) continue;
+        this._refreshMapImage(mapId).catch((err) =>
+          console.warn(`Chronicle: Image refresh failed for map ${mapId}`, err)
+        );
+      }
+    };
+    Hooks.off('updateJournalEntry', this._onOwnershipChange);
+    Hooks.off('updateJournalEntryPage', this._onOwnershipChange);
+    Hooks.on('updateJournalEntry', this._onOwnershipChange);
+    Hooks.on('updateJournalEntryPage', this._onOwnershipChange);
     console.debug('Chronicle: Map sync initialized (Path B, journal-backed)');
   }
 
@@ -404,6 +434,10 @@ export class MapSync {
     this._notifyTimers.clear();
     this._cache.clear();
     this._openCounts.clear();
+    if (this._onOwnershipChange) {
+      Hooks.off('updateJournalEntry', this._onOwnershipChange);
+      Hooks.off('updateJournalEntryPage', this._onOwnershipChange);
+    }
   }
 
   /** Change-feed area (see SyncManager._performInitialSync). */
@@ -675,7 +709,12 @@ export class MapSync {
     const mediaId = meta?.image_id;
     if (!mediaId) return;
 
-    const fresh = await this._resolveMediaUrl(mediaId, { forceFresh: true });
+    // A stored copy never expires; only an address needs refreshing, and
+    // copying the picture now (once a player can open the map) replaces it
+    // for good.
+    if (page.src && !/^https?:/i.test(page.src)) return;
+    let fresh = this._playersCanSee(page) ? await this._storeMapImage(mediaId, page) : '';
+    if (!fresh) fresh = await this._resolveMediaUrl(mediaId, { forceFresh: true });
     if (!fresh) return;
 
     const updates = {};
@@ -731,6 +770,89 @@ export class MapSync {
       return path;
     } catch (err) {
       return fail(`Fetching the player picture for map ${mapData.id} failed: ${err.message || err}`, err);
+    }
+  }
+
+  /**
+   * Copy a map's own picture (no shadow) into the world's files, as page
+   * pictures are (`picture-store.mjs`). Chronicle's picture addresses expire
+   * within minutes, so a page that kept one would show anyone who opens the
+   * map later a broken picture. Copied once per picture id; a copy blanked
+   * when the map was shadowed is copied again.
+   * Callers copy only for a page a player can open (`_playersCanSee`): world
+   * files are served to anyone with the address, so a map the GM keeps to
+   * themself stays on Chronicle's short-lived link.
+   * @param {string|null|undefined} imageId
+   * @param {JournalEntryPage|null} [page]
+   * @returns {Promise<string>} the stored path, or '' (too big, not a
+   *   picture, or the copy failed) to keep the address for now
+   * @private
+   */
+  async _storeMapImage(imageId, page = null) {
+    if (!imageId || !this._api) return '';
+    this._pictures ??= new PictureStore({ api: this._api });
+    const id = String(imageId).toLowerCase();
+    const retired = page?.getFlag(FLAG_SCOPE, RETIRED_FLAG) || [];
+    const refresh = retired.includes(id) ? [id] : [];
+    const path = (await this._pictures.ensure([id], { refresh })).get(id) || '';
+    if (path && refresh.length) {
+      await page.update({ [`flags.${FLAG_SCOPE}.${RETIRED_FLAG}`]: retired.filter((r) => r !== id) });
+    }
+    return path;
+  }
+
+  /**
+   * Whether any player can open this map's journal page.
+   * @param {JournalEntryPage|null} page
+   * @returns {boolean}
+   * @private
+   */
+  _playersCanSee(page) {
+    if (!page?.testUserPermission) return false;
+    for (const user of globalThis.game?.users ?? []) {
+      if (!user.isGM && page.testUserPermission(user, 'LIMITED')) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Blank the world copy of a map's full picture once the map has a shadow:
+   * world files are served to anyone with the address, so the copy would
+   * keep showing what the GM has since hidden. The page records the id so a
+   * later session, which finds the blank file, copies it again if the
+   * shadow goes.
+   * @param {JournalEntryPage|null} page
+   * @private
+   */
+  async _retireStoredOriginal(page) {
+    if (!page) return;
+    const meta = page.getFlag(FLAG_SCOPE, 'chronicleMapMeta') || {};
+    const paths = [page.src, meta.image_url].filter((p) => typeof p === 'string' && STORED_COPY_RE.test(p));
+    if (paths.length === 0) return;
+    this._pictures ??= new PictureStore({ api: this._api });
+    const retired = new Set(page.getFlag(FLAG_SCOPE, RETIRED_FLAG) || []);
+    const before = retired.size;
+    let failed = false;
+    for (const path of new Set(paths)) {
+      const id = await this._pictures.retire(path);
+      if (id) retired.add(id);
+      else failed = true;
+    }
+    if (retired.size !== before) {
+      await page.update({ [`flags.${FLAG_SCOPE}.${RETIRED_FLAG}`]: [...retired] });
+    }
+    if (failed) {
+      const mapId = page.getFlag(FLAG_SCOPE, 'mapId');
+      this._logError({
+        kind: 'player_image',
+        mapId,
+        message: `Could not blank the stored full picture of shadowed map ${mapId}; anyone with its address can still open it.`,
+      });
+      this._toastOnce(
+        `retire:${mapId}`,
+        'warn',
+        `Chronicle: the full picture of map "${noticeText(page.name || mapId)}" is still in this world's files after the shadow. The next sync tries again.`
+      );
     }
   }
 
@@ -796,8 +918,14 @@ export class MapSync {
     if (!page) return;
     const meta = page.getFlag(FLAG_SCOPE, 'chronicleMapMeta') || {};
     if (!this._gmImages.has(mapId) && !meta.player_image && meta.image_url) {
-      this._gmImages.set(mapId, { imageId: meta.image_id || null, url: meta.image_url });
+      // A stored copy is about to be blanked; the GM's view takes a link.
+      let url = meta.image_url;
+      if (STORED_COPY_RE.test(url)) {
+        url = meta.image_id ? await this._resolveMediaUrl(meta.image_id, { forceFresh: true }) : '';
+      }
+      if (url) this._gmImages.set(mapId, { imageId: meta.image_id || null, url });
     }
+    await this._retireStoredOriginal(page);
     if (page.src === '' && meta.player_image && !meta.image_url) return;
     await page.update({
       src: '',
@@ -1008,9 +1136,13 @@ export class MapSync {
     if (mapData.player_image_url || knownShadows) {
       shadowed = true;
       if (imageSrc) this._gmImages.set(mapData.id, { imageId: mapData.image_id || null, url: imageSrc });
+      await this._retireStoredOriginal(page);
       imageSrc = mapData.player_image_url ? await this._storePlayerImage(mapData, page) : '';
     } else {
       this._gmImages.delete(mapData.id);
+      if (imageSrc && mapData.image_id && this._playersCanSee(page)) {
+        imageSrc = (await this._storeMapImage(mapData.image_id, page)) || imageSrc;
+      }
     }
 
     const meta = this._buildMapMeta(mapData, imageSrc, { shadowed });
@@ -1251,9 +1383,8 @@ export class MapSync {
   /**
    * Write the player-safe subset of sub-resource data to the JournalEntry
    * page flags. DM-only, per-user-restricted, hidden and shadowed data is
-   * filtered out (`_map-flag-filter.mjs`) and stays only in GM memory.
-   * Layers carry no restricted content (names and display settings only)
-   * and are written through unfiltered.
+   * filtered out (`_map-flag-filter.mjs`) and stays only in GM memory,
+   * and so does the GM layer row.
    * @param {string} mapId
    * @param {{ markers: object[], drawings: object[], tokens: object[], layers: object[], drawingsKnown?: boolean }} data
    *   `drawingsKnown: false` (the drawing fetch failed) leaves the stored
@@ -1271,7 +1402,7 @@ export class MapSync {
     });
     const updates = {};
     if (write.tokens) updates[`flags.${FLAG_SCOPE}.chronicleTokens`] = (tokens || []).filter(isTokenSafeForPlayerFlags);
-    if (write.layers) updates[`flags.${FLAG_SCOPE}.chronicleLayers`] = layers || [];
+    if (write.layers) updates[`flags.${FLAG_SCOPE}.chronicleLayers`] = (layers || []).filter(isLayerSafeForPlayerFlags);
     if (write.markers || write.drawings) {
       const safe = playerSafeMapItems(markers, drawings);
       if (write.markers) updates[`flags.${FLAG_SCOPE}.chronicleMarkers`] = safe.markers;

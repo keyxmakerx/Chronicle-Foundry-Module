@@ -6,7 +6,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { planIdentityItems, identityFieldDefs } from '../scripts/_identity-item-plan.mjs';
+import { planIdentityItems, identityFieldDefs, identityPicks } from '../scripts/_identity-item-plan.mjs';
 import { findIdentityItem, applyIdentityItem, applyIdentityPlan } from '../scripts/_identity-item-apply.mjs';
 
 const single = (key, type) => ({ key, type: 'string', foundry_collection: 'items', foundry_item_type: [type], foundry_item_single: true });
@@ -26,6 +26,24 @@ const DEFS = [
 
 test('only ancestry, culture, career and kit are eligible', () => {
   assert.deepEqual(identityFieldDefs(DEFS).map((d) => d.key), ['ancestry', 'culture', 'career', 'kit']);
+});
+
+test('a pick Chronicle has not changed since the last apply leaves the GM\'s own swap alone', () => {
+  const items = [{ id: 'k2', name: 'Panther', type: 'kit' }, { id: 'a1', name: 'Human', type: 'ancestry' }];
+  const fieldsData = { kit: 'Shining Armor', ancestry: 'Dwarf' };
+  // The GM swapped the kit in Foundry; Chronicle still has the old one.
+  const plan = planIdentityItems({ items, fieldDefs: DEFS, fieldsData, applied: { kit: 'shining armor ', ancestry: 'Human' } });
+  assert.deepEqual(plan, [{ fieldKey: 'ancestry', itemType: 'ancestry', wantName: 'Dwarf', removeIds: ['a1'] }]);
+  // With nothing recorded (first apply), Chronicle's pick is applied as before.
+  assert.equal(planIdentityItems({ items, fieldDefs: DEFS, fieldsData }).length, 2);
+});
+
+test('the recorded picks are the trimmed, non-empty eligible ones', () => {
+  assert.deepEqual(
+    identityPicks(DEFS, { kit: ' Panther ', ancestry: '', class: 'Censor', culture: 3, career: 'Sage' }),
+    { kit: 'Panther', career: 'Sage' },
+  );
+  assert.deepEqual(identityPicks(DEFS, null), {});
 });
 
 test('a differing pick plans a swap that removes the old item of that type only', () => {

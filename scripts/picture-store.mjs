@@ -22,6 +22,7 @@ import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
 import {
   MEDIA_ID_RE, PICTURE_DIR_NAME, extensionForMime, chronicleSrcFor,
 } from './_inline-pictures.mjs';
+import { blankPicture } from './_blank-picture.mjs';
 
 /** A copy larger than this is skipped; Chronicle's own upload limit is lower. */
 export const MAX_PICTURE_BYTES = 25 * 1024 * 1024;
@@ -69,13 +70,16 @@ export class PictureStore {
    * Make sure each id has a local copy. Never throws: a picture that can't
    * be copied keeps its Chronicle path and is retried on the next pull.
    * @param {string[]} ids
+   * @param {{refresh?: string[]}} [opts] ids to copy again even though a
+   *   file is there: ones `retire` blanked in an earlier session
    * @returns {Promise<Map<string, string>>} id → local path, for the ids copied
    */
-  async ensure(ids) {
+  async ensure(ids, { refresh = [] } = {}) {
     const out = new Map();
     const wanted = (ids || []).filter((id) => MEDIA_ID_RE.test(id));
     if (wanted.length === 0) return out;
     await this._listExisting();
+    for (const id of refresh) this._known.delete(String(id).toLowerCase());
     for (const id of wanted) {
       const path = await this._ensureOne(id);
       if (path) out.set(id, path);
@@ -156,6 +160,35 @@ export class PictureStore {
     const path = up?.path || '';
     if (path) this._known?.set(id, path);
     return path;
+  }
+
+  /**
+   * Make a copy unreachable: overwrite it with a blank picture of the same
+   * name (Foundry can't delete files, but an upload replaces one) and forget
+   * it, so the next `ensure` for that id copies it again.
+   * @param {string} path a copy's path, as `ensure` returned it
+   * @returns {Promise<string|null>} the media id blanked, or null when the
+   *   path is not a copy in this store's folder or the upload failed
+   */
+  async retire(path) {
+    const plain = decodeURIComponent(String(path || '').split(/[?#]/)[0]);
+    const dir = this.dir;
+    if (!plain.startsWith(`${dir}/`)) return null;
+    const m = /^([0-9a-f-]{36})\.([a-z0-9]+)$/i.exec(plain.slice(dir.length + 1));
+    if (!m || !MEDIA_ID_RE.test(m[1])) return null;
+    const blank = blankPicture(m[2]);
+    if (!blank) return null;
+    const id = m[1].toLowerCase();
+    try {
+      const file = new File([blank.bytes], `${m[1]}.${m[2]}`, { type: blank.mime });
+      const up = await this._picker()?.upload?.('data', dir, file, {}, { notify: false });
+      if (!up?.path) return null;
+    } catch (err) {
+      console.warn(`Chronicle: could not blank the stored picture ${id}`, err);
+      return null;
+    }
+    this._known?.delete(id);
+    return id;
   }
 
   /**

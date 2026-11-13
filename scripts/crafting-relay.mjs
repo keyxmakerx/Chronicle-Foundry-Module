@@ -20,9 +20,13 @@ import { SOCKET_CHANNEL, getStashSync } from './stash-sync.mjs';
 import { PendingRequests, chronicleUserFor, isAnsweringGM } from './_stash-relay.mjs';
 import { decryptReply, encryptReply, generateRequestKeys } from './_stash-crypto.mjs';
 import { shouldStoreVerdict } from './_stash-probe.mjs';
+import { makeAskLimiter } from './_quest-relay.mjs';
 import {
   CRAFT_MESSAGE, changesPack, craftingProbeVerdict, describeCraft, planCraftCall, sanitizeCraftReply, sanitizeCraftRequest,
 } from './_craft-relay.mjs';
+
+/** Each request spends the GM's key and rate budget; a looping client is cut off. */
+const askLimit = makeAskLimiter();
 
 const t = (key) => game.i18n.localize(`CHRONICLE.Crafting.${key}`);
 
@@ -42,6 +46,11 @@ export function craftingAvailable() {
   } catch {
     return false;
   }
+}
+
+/** The GM side's sync module, once the sync manager has started it. */
+export function getCraftingSync() {
+  return instance;
 }
 
 /**
@@ -158,6 +167,7 @@ export class CraftingSync {
     const reply = (res) => this._reply(senderId, req, res);
     const user = game.users.get(senderId);
     if (!user || user.isGM) return reply({ status: 403, body: { message: t('NoSender') } });
+    if (!askLimit(senderId)) return;
     if (!this._api) return reply({ status: 503, body: { message: t('GMNotReady') } });
     const acting = chronicleUserFor(getUserMappings(), senderId);
     if (!acting) return reply({ status: 403, body: { message: t('NoMapping') } });

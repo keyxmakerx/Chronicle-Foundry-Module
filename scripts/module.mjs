@@ -20,6 +20,7 @@ import { StashSync } from './stash-sync.mjs';
 import { registerStashSocket } from './stash-client.mjs';
 import { CraftingSync, registerCraftingSocket } from './crafting-relay.mjs';
 import { registerCraftingButton } from './crafting-button.mjs';
+import { registerSpoilsPrompt } from './spoils-prompt.mjs';
 import { registerStashChat } from './stash-chat.mjs';
 import { registerStashButton } from './stash-window.mjs';
 import { bindDebugHub, registerDebugHub } from './debug-hub.mjs';
@@ -202,6 +203,7 @@ Hooks.once('ready', async () => {
   try {
     registerCraftingSocket();
     registerCraftingButton();
+    registerSpoilsPrompt();
   } catch (err) {
     console.warn('Chronicle Sync | Crafting unavailable', err);
   }
@@ -440,7 +442,9 @@ Hooks.on('closeGame', () => {
  * @private
  */
 function _addStatusIndicator() {
-  if (!syncManager) return;
+  // Only the GM's client connects, so a player's dot would always read
+  // "disconnected", and clicking it would open a socket with no key.
+  if (!syncManager || !game.user?.isGM) return;
 
   const indicator = document.createElement('div');
   indicator.className = 'chronicle-sync-status disconnected';

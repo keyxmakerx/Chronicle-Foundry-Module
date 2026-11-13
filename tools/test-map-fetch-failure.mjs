@@ -25,7 +25,7 @@ const { flagListsToWrite } = await import("../scripts/_map-flag-filter.mjs");
 
 const MARKER = { id: 'mk1', name: 'Inn', x: 10, y: 10, visibility: 'everyone' };
 const TOKEN = { id: 'tk1', name: 'Hero', x: 5, y: 5, is_hidden: false };
-const LAYER = { id: 'ly1', name: 'Ground' };
+const LAYER = { id: 'ly1', name: 'Ground', layer_type: 'background' };
 
 /**
  * A MapSync whose API answers each list from `answers` (an Error rejects

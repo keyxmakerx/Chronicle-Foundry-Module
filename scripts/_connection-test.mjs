@@ -41,10 +41,19 @@ export async function runConnectionTest({ baseUrl, apiKey, campaignId, foundrySy
   const reached = { icon: 'check', code: 'Reachable' };
   const authOk = { icon: 'check', code: 'AuthOk' };
   if (resp.status === 401) return [reached, { icon: 'xmark', code: 'AuthFailed' }];
-  if (resp.status === 403) return [reached, { icon: 'xmark', code: 'Forbidden' }];
+  if (resp.status === 403) {
+    // Chronicle refuses a key made for another campaign with this message.
+    const body = await resp.text?.().catch(() => '') ?? '';
+    const other = /not authorized for this campaign/i.test(body);
+    return [reached, authOk, { icon: 'xmark', code: other ? 'WrongCampaign' : 'Forbidden', data: { campaignId: camp } }];
+  }
   if (resp.status === 404) return [reached, authOk, { icon: 'xmark', code: 'CampaignMissing', data: { campaignId: camp } }];
   if (resp.status === 429) return [reached, { icon: 'xmark', code: 'RateLimited' }];
   if (!resp.ok) return [reached, { icon: 'xmark', code: 'HttpError', data: { status: resp.status, statusText: resp.statusText || '' } }];
+
+  // A sign-in page in front of Chronicle also answers 200, with HTML.
+  const type = resp.headers?.get?.('content-type') || '';
+  if (type && !/json/i.test(type)) return [{ icon: 'xmark', code: 'NotChronicle', data: { url } }];
 
   const steps = [reached, authOk, { icon: 'check', code: 'CampaignOk' }];
   if (!foundrySystemId) return steps;

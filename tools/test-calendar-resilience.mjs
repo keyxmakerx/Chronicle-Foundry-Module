@@ -136,6 +136,8 @@ test('once paused, later date pushes cost no request', async () => {
 
 test('a 422 about real-time tracking keeps the real-time notice, not the calendar-shape one', () => {
   assert.equal(refusal.handleDatePushRefusal(apiError(422, '{"message":"real-time calendar is read-only"}')), false);
+  // Chronicle's own wording for the refusal.
+  assert.equal(refusal.classifyDatePushRefusal(apiError(422, '{"error":"validation_error","message":"this calendar tracks real-world time; its date cannot be set by hand"}')), null);
 });
 
 test('a 403 addon_disabled says the calendar is switched off, not that the key is wrong', () => {

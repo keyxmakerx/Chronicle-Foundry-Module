@@ -179,6 +179,25 @@ test('a heading that starts GM-only stays one page and comes back with no extra 
   assert.equal(back, `<h2>${S('True name:')} Bob</h2><p>body</p>\n<h2>Later</h2><p>z</p>`);
 });
 
+test('lead text before the first heading goes back with no added heading', async () => {
+  await import('./_journal-test-env.mjs');
+  const { JournalSync } = await import('../scripts/journal-sync.mjs');
+  const js = Object.create(JournalSync.prototype);
+  const toPages = (sections) => sections.map((p, n) => ({
+    name: p.title, type: 'text', sort: n, text: { content: p.content }, getFlag: () => undefined,
+  }));
+  const html = '<p>Intro text</p><h2>History</h2><p>old</p>';
+  const sections = js._splitByHeadings(html);
+  assert.deepEqual(sections.map((p) => p.title), ['Overview', 'History']);
+  assert.equal(js._joinTextPages({ pages: toPages(sections) }), '<p>Intro text</p>\n<h2>History</h2><p>old</p>');
+  // A GM adds a second page to a journal sync made as one "Content" page.
+  const added = [{ title: 'Content', content: '<p>all of it</p>' }, { title: 'Rumours & <lies>', content: '<p>new</p>' }];
+  assert.equal(js._joinTextPages({ pages: toPages(added) }), '<p>all of it</p>\n<h2>Rumours &amp; &lt;lies&gt;</h2>\n<p>new</p>');
+  // Only the first page is lead text; a later "Overview" page is a section.
+  const later = [{ title: 'Start', content: '<p>a</p>' }, { title: 'Overview', content: '<p>b</p>' }];
+  assert.equal(js._joinTextPages({ pages: toPages(later) }), '<h2>Start</h2>\n<p>a</p>\n<h2>Overview</h2>\n<p>b</p>');
+});
+
 // --- Placeholders: the saved page never holds GM-only content ---
 
 const LABEL = 'GM-only text, kept in Chronicle';

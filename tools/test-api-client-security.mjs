@@ -286,6 +286,33 @@ test('WS connect: URL hits /ws path, not a /api/ subpath', () => {
   } finally { uninstallWebSocketStub(); }
 });
 
+test('WS reconnect: the old socket closing late leaves the new one in charge', async () => {
+  installWebSocketStub();
+  try {
+    const api = makeApi();
+    api.connect();
+    const old = wsInstances[0];
+    // Saving settings: disconnect then connect at once, as applyConnection does.
+    api.disconnect();
+    api.connect();
+    const fresh = wsInstances[1];
+    await fresh.onopen();
+    assert.equal(api.state, 'connected');
+    // The old socket's close (and a stray message) arrive afterwards.
+    let seen = 0;
+    api.on('entity.updated', () => { seen++; });
+    old.onmessage({ data: JSON.stringify({ type: 'entity.updated' }) });
+    old.onclose({ code: 1006 });
+    assert.equal(api.state, 'connected', 'a stale close must not mark the live socket disconnected');
+    assert.equal(api._ws, fresh, 'a stale close must not drop the live socket');
+    assert.equal(api._reconnectTimer, null, 'a stale close must not schedule a reconnect');
+    assert.equal(seen, 0, 'a replaced socket delivers nothing');
+    fresh.onmessage({ data: JSON.stringify({ type: 'entity.updated' }) });
+    assert.equal(seen, 1);
+    api.disconnect();
+  } finally { uninstallWebSocketStub(); }
+});
+
 // =====================================================================
 // G-S3: WebSocket message dispatch — allowlist enforcement
 // =====================================================================

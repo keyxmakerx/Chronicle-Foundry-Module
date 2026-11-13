@@ -25,10 +25,14 @@ import { getSetting, getUserMappings } from './settings.mjs';
 import { _isAllowedImageHost } from './_url-validation.mjs';
 import { decryptReply, encryptReply, generateRequestKeys } from './_stash-crypto.mjs';
 import { loadVendored } from './vendor-chronicle.mjs';
+import { makeAskLimiter } from './_quest-relay.mjs';
 import {
   describeSale, sanitizeShopBuyReply, sanitizeShopBuyRequest,
   sanitizeShopRoomMessage, shopEndpoints, MAX_ROOM_REPLY_CHARS, SHOP_ROOM_MESSAGE,
 } from './_shop-room-data.mjs';
+
+/** Each buying request spends the GM's key and rate budget; a looping client is cut off. */
+const buyLimit = makeAskLimiter();
 
 const SOCKET_CHANNEL = `module.${MODULE_ID}`;
 
@@ -552,6 +556,7 @@ async function onBuyRequest(data, senderId) {
     answer({ status: 404, body: { message: t('NotShown') } });
     return;
   }
+  if (!buyLimit(senderId)) return;
   try {
     const result = await buyRelay(user, req);
     // Bookkeeping only, keyed on the socket sender; runAction reports a failed

@@ -1632,7 +1632,8 @@ answer in world setting `craftingAvailable`, and keeps those answers out of the
 error log; any other failure leaves the stored answer alone.
 
 **Used by:** `scripts/crafting-relay.mjs` (GM client), reached by players
-through the module socket. The tab runs Chronicle's own Crafting block
+through the module socket, and `scripts/spoils-prompt.mjs` (the active GM's
+end-of-combat prompt). The tab runs Chronicle's own Crafting block
 (`vendor/chronicle/crafting_block.js`), so the answers below are exactly what
 the block reads on the hero's Chronicle page.
 
@@ -1652,7 +1653,7 @@ reads the tray or ends a fight (403). Bodies are at most 32 KiB.
 | GET | `/crafting/spoils` | The Director's tray. The module reads it only as the probe. |
 | POST | `/crafting/spoil-lines/:lineId/take` | `{characterId}` → `{hero, item, got, qty, dice?, total?, tier, …}`; `dice` is present when the take was a harvest test. 409 when someone took it first; 422 while the find is unidentified. |
 | POST | `/crafting/spoil-lines/:lineId/study` | `{characterId}` → `{hero, dice, total, tier, known, lost?, item?, …}`. 409 when the hero studied it since the last respite. |
-| POST | `/crafting/fights` | `{name, creatures:[{pageId, name, down, copies}]}` → `{lines, spoils}`. Each call drops again, so the module sends one per combat, after the GM confirms. Not called yet: TODO(#283). |
+| POST | `/crafting/fights` | `{name, creatures:[{pageId, name, down, copies}]}` → `{lines, spoils}`. Each call drops again, so the module sends one per confirmed prompt and never retries a failed one (`scripts/spoils-prompt.mjs`). The drop lists the prompt shows come from `GET /crafting/spoils` (`drops[{pageId, page, alsoName, lines[{itemId, mode, qty, study}]}]`, `items[{id, name}]`). |
 
 Errors carry `{message}`; the tab shows it as the block does. A take, start or
 finished project re-reads the hero's actor (`refreshCharacters`); the GMs get a

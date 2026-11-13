@@ -32,6 +32,7 @@ import {
 } from './_stash-relay.mjs';
 import { encryptReply, isPublicJwk } from './_stash-crypto.mjs';
 import { removalFromMove } from './_stash-reconcile.mjs';
+import { makeAskLimiter } from './_quest-relay.mjs';
 import {
   CARD_STATE,
   collectCardMoveIds,
@@ -205,6 +206,9 @@ export class StashSync {
    */
   async handleRequest(msg, senderId) {
     if (!this._isActive() || typeof msg?.requestId !== 'string') return;
+    // Each request spends the GM's key and rate budget; a looping client is cut off.
+    this._askLimit ??= makeAskLimiter();
+    if (!this._askLimit(senderId)) return;
     // No usable key to encrypt the answer to: nothing is sent.
     if (!isPublicJwk(msg.publicKey)) return;
     const reply = (body) => this._reply(senderId, msg.requestId, msg.publicKey, body);

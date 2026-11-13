@@ -23,7 +23,7 @@ import {
 import { escapeHtml as esc } from './_escape-html.mjs';
 
 /** Chronicle's sky, in the order its files depend on each other. */
-const SKY_FILES = ['sky_world.js', 'sky_looks.js', 'sky_moon.js', 'sky_events.js', 'sky_2d.js', 'sky_shaders.js', 'sky_gl.js', 'sky_pane.js'];
+const SKY_FILES = ['sky_world.js', 'sky_looks.js', 'sky_moon.js', 'sky_events.js', 'sky_2d.js', 'sky_shaders.js', 'gl_shared.js', 'sky_gl.js', 'sky_pane.js'];
 
 /** Time without a pointer or key before the globe comes to rest. */
 const REST_AFTER_MS = 20000;
