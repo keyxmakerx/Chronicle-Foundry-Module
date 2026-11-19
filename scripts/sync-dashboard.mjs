@@ -32,6 +32,13 @@ import { buildDiagnosticBundle } from './sync-diagnostic-bundle.mjs';
 import { checkDiceFiles, diceSoNiceReport } from './dice-so-nice.mjs';
 import { buildOverviewModel } from './_overview-model.mjs';
 import { buildHealthChecks, describeWaiting } from './_health-checks.mjs';
+import {
+  catchUpPlan, groupStats, matchesSearch, pageDetails, pageMenu, pageStatus, pageTrouble,
+  rowAction, rowHasMenu, rowState, sendAgainPlan, stateLabelKey, typeMenu,
+} from './_page-rows.mjs';
+import {
+  applyPagesSearch, markCatchingUp, openPagesMenu, togglePagesFold, wirePagesList,
+} from './pages-list.mjs';
 import { log, getLogBuffer } from './logger.mjs';
 import { walkEntityPages } from './_entity-page-walk.mjs';
 import { mapThumbSrc } from './_map-look.mjs';
@@ -119,6 +126,16 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'debug-report-row': SyncDashboard.#onDebugReportRowAction,
       'debug-report-send': SyncDashboard.#onDebugReportSendAction,
       'debug-report-cancel': SyncDashboard.#onDebugReportCancelAction,
+      'pages-menu': SyncDashboard.#onPagesMenuAction,
+      'pages-type-menu': SyncDashboard.#onPagesTypeMenuAction,
+      'pages-fold': SyncDashboard.#onPagesFoldAction,
+      'pages-select': SyncDashboard.#onPagesSelectAction,
+      'pages-sync-one': SyncDashboard.#onPagesSyncOneAction,
+      'pages-retry': SyncDashboard.#onPagesRetryAction,
+      'pages-send-waiting': SyncDashboard.#onPagesSendWaitingAction,
+      'pages-toggle-sync': SyncDashboard.#onPagesToggleSyncAction,
+      'pages-toggle-type': SyncDashboard.#onPagesToggleTypeAction,
+      'pages-copy-details': SyncDashboard.#onPagesCopyDetailsAction,
       'health-row': SyncDashboard.#onHealthRowAction,
       'health-send-waiting': SyncDashboard.#onHealthSendWaitingAction,
     },
@@ -191,6 +208,23 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     /** @type {Set<string>} Currently selected entity IDs for bulk operations. */
     this._selectedEntities = new Set();
+    /** Pages list: whether the checkboxes of select mode are showing. */
+    this._selecting = false;
+    /** @type {Map<string, object>} Pages list rows as last drawn, by page id. */
+    this._pageRows = new Map();
+    /** @type {Array<object>} Pages list groups as last drawn. */
+    this._pageGroups = [];
+    /** @type {Set<string>} Pages being brought up to date right now. */
+    this._catchingUp = new Set();
+    /** @type {Set<string>} Pages the list has already tried to bring up to date by itself. */
+    this._catchUpTried = new Set();
+    /** The loaded page list the last automatic catch-up looked at; one pass per load. */
+    this._catchUpList = null;
+    this._catchUpRunning = false;
+    /** @type {Map<string, {message: string, at: number}>} Fixes made from the list that failed, by page id. */
+    this._pageFailures = new Map();
+    /** @type {Set<string>} Waiting changes the list has already sent again by itself. */
+    this._sendAgainTried = new Set();
 
     // Player reports state (per window, like _capabilityActorId).
     /** @type {string|null} Actor id picked for the side by side. */
@@ -207,6 +241,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @override */
   _onFirstRender(context, options) {
     super._onFirstRender?.(context, options);
+    // Each time the window opens, the list may try its fixes afresh.
+    this._catchUpTried.clear();
+    this._catchUpList = null;
+    this._sendAgainTried.clear();
     Hooks.on(REPORTS_CHANGED_HOOK, this._onReportsChanged);
     if (context.configured && getSetting('firstRunPending')) this.startFirstRun();
   }
@@ -214,6 +252,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @override */
   _onClose(options) {
     Hooks.off(REPORTS_CHANGED_HOOK, this._onReportsChanged);
+    // What Chronicle holds is read again the next time the window opens.
+    this._cache = { entityTypes: null, entities: null, maps: null, calendar: null };
     super._onClose?.(options);
   }
 
@@ -395,7 +435,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       // Issues (resolver) tab.
       issues: issuesData,
 
-      // Entities tab.
+      // Pages list.
       entityGroups: entityGroups.map(g => ({
         ...g,
         entities: g.entities.map(e => ({
@@ -405,10 +445,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       })),
       entityTypes: entityGroups.map(g => ({ id: g.typeId, name: g.typeNamePlural })),
       foundryOnlyJournals,
-      hasChronicleOnly: entityGroups.some(g => g.entities.some(e => e.status === 'chronicle-only')),
-      hasFoundryOnly: foundryOnlyJournals.length > 0,
+      pages: this._buildPagesListData(entityGroups, foundryOnlyJournals),
       setAsideCount: foundryOnlyJournals.filter((j) => j.setAside).length,
-      bulkSelectionCount: this._selectedEntities.size,
 
       // Shops tab.
       ...shopData,
@@ -467,6 +505,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       );
       this._cache.entities = walked.entities;
       this._cache.entitiesTruncated = walked.truncated;
+      this._cache.entitiesAt = Date.now();
       if (walked.truncated) {
         console.warn(`Chronicle: dashboard entity list stopped at ${walked.entities.length}; the campaign has more.`);
       }
@@ -486,7 +525,15 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       if (eid) actorEntityIds.add(eid);
     }
 
-    // Build groups.
+    const t = (key, data) => (data
+      ? game.i18n.format(`CHRONICLE.Dashboard.Pages.${key}`, data)
+      : game.i18n.localize(`CHRONICLE.Dashboard.Pages.${key}`));
+    const waiting = this.api.getRetryQueue?.() ?? [];
+    const errors = this.api.getErrorLog?.() ?? [];
+    const searching = !!this._searchFilter.trim();
+
+    // Build groups. Every page is listed; the search only hides rows, so the
+    // box can filter what is on screen without another draw.
     const groups = [];
     for (const type of types) {
       const typeEntities = chronicleEntities.filter(e => e.entity_type_id === type.id);
@@ -494,58 +541,75 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
       const entities = typeEntities.map(entity => {
         const journal = journalsByEntityId.get(entity.id);
-        const isExcluded = exclusions.excludedEntities.includes(entity.id) || isTypeExcluded;
-
-        let status = actorEntityIds.has(entity.id) ? 'actor' : 'chronicle-only';
-        if (journal) {
-          const lastSync = journal.getFlag(FLAG_SCOPE, 'lastSync');
-          if (lastSync) {
-            const syncTime = new Date(lastSync).getTime();
-            const updateTime = new Date(entity.updated_at).getTime();
-            if (Math.abs(updateTime - syncTime) < 5000) {
-              status = 'synced';
-            } else if (updateTime > syncTime) {
-              status = 'modified';
-            } else {
-              status = 'synced';
-            }
-          } else {
-            status = 'synced';
-          }
-        }
+        const pageExcluded = exclusions.excludedEntities.includes(entity.id);
+        const lastSync = journal?.getFlag(FLAG_SCOPE, 'lastSync') || '';
+        const recordedVersion = journal?.getFlag(FLAG_SCOPE, 'chronicleUpdatedAt') || '';
+        const status = pageStatus({
+          linked: !!journal,
+          isActor: actorEntityIds.has(entity.id),
+          recordedVersion,
+          lastSync,
+          updatedAt: entity.updated_at,
+        });
+        const trouble = journal ? pageTrouble({
+          entityId: entity.id,
+          lastSync,
+          sentAt: this.api.getReplayedAt?.('PUT', `/entities/${entity.id}`) ?? 0,
+          waiting,
+          errors,
+          local: this._pageFailures.get(entity.id) ?? null,
+        }) : null;
+        const state = rowState(status, {
+          excluded: pageExcluded || isTypeExcluded,
+          trouble,
+          catchingUp: this._catchingUp.has(entity.id),
+        });
+        const action = rowAction(state);
+        let stateTitle = '';
+        if (state === 'waiting') stateTitle = t('WaitingHint');
+        if (state === 'failed') stateTitle = t(trouble.direction === 'out' ? 'FailedOut' : 'FailedIn', { reason: trouble.message });
 
         return {
           id: entity.id,
           name: entity.name,
           typeName: type.name,
           status,
+          state,
+          stateLabel: t(stateLabelKey(state)),
+          stateTitle,
+          trouble,
+          action: action ? { action: action.action, label: t(action.labelKey) } : null,
+          hasMenu: rowHasMenu(state),
+          menuLabel: t('MoreFor', { name: entity.name }),
           isPrivate: entity.is_private ?? false,
-          isExcluded,
+          isExcluded: pageExcluded || isTypeExcluded,
+          pageExcluded,
+          typeExcluded: isTypeExcluded,
           journalId: journal?.id ?? null,
           updatedAt: entity.updated_at,
+          recordedVersion,
+          lastSync,
+          hidden: !matchesSearch(entity.name, this._searchFilter),
         };
       });
 
-      // Apply search filter.
-      const filtered = this._searchFilter
-        ? entities.filter(e => e.name.toLowerCase().includes(this._searchFilter.toLowerCase()))
-        : entities;
-
-      const syncedCount = filtered.filter(e => e.status === 'synced' || e.status === 'modified' || e.status === 'actor').length;
-      const chronicleOnlyCount = filtered.filter(e => e.status === 'chronicle-only').length;
-
+      const typeNamePlural = type.name_plural || type.name + 's';
+      const isCollapsed = this._collapsedTypes.has(type.id);
+      const matches = entities.filter((e) => !e.hidden).length;
       groups.push({
         typeId: type.id,
         typeName: type.name,
-        typeNamePlural: type.name_plural || type.name + 's',
+        typeNamePlural,
         typeIcon: type.icon || 'fa-solid fa-file',
-        typeColor: type.color || '#888',
-        isCollapsed: this._collapsedTypes.has(type.id),
+        isCollapsed,
         isTypeExcluded,
-        entities: filtered,
-        syncedCount,
-        chronicleOnlyCount,
-        totalCount: filtered.length,
+        entities,
+        statsText: groupStats(entities, { typeExcluded: isTypeExcluded })
+          .map((part) => t(part.key, { count: part.count })).join(', '),
+        menuLabel: t('MoreFor', { name: typeNamePlural }),
+        hidden: searching && matches === 0,
+        rowsHidden: isCollapsed && !searching,
+        totalCount: entities.length,
       });
     }
 
@@ -598,13 +662,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
   _getFoundryOnlyJournals() {
     const result = [];
-    const filter = this._searchFilter?.toLowerCase() || '';
 
     for (const j of game.journal.contents) {
       if (j.getFlag(FLAG_SCOPE, 'entityId')) continue;
       if (j.getFlag(FLAG_SCOPE, REPORT_STORE_FLAG)) continue;
-
-      if (filter && !j.name.toLowerCase().includes(filter)) continue;
 
       result.push({
         id: j.id,
@@ -612,10 +673,49 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         status: 'foundry-only',
         pageCount: j.pages?.size ?? 0,
         setAside: this._isSetAside(j),
+        hidden: !matchesSearch(j.name, this._searchFilter),
       });
     }
 
     return result;
+  }
+
+  /**
+   * What the Pages list shows around its rows: the counts on its quiet
+   * words, whether select mode is on, and the lines it adds when the list
+   * is cut short or page sync is off. Also keeps the rows for the menus.
+   * @private
+   */
+  _buildPagesListData(groups, foundryOnly) {
+    this._pageGroups = groups;
+    this._pageRows = new Map(groups.flatMap((g) => g.entities.map((e) => [e.id, e])));
+    const rows = [...this._pageRows.values()];
+    const searching = !!this._searchFilter.trim();
+    const foundryMatches = foundryOnly.filter((j) => !j.hidden).length;
+    const anyMatch = groups.some((g) => !g.hidden) || foundryMatches > 0;
+    const loaded = this._cache.entities?.length ?? 0;
+    return {
+      selecting: this._selecting,
+      selectedLabel: this._selectedLabel(this._selectedEntities.size),
+      nothingSelected: this._selectedEntities.size === 0,
+      bringInCount: rows.filter((r) => r.state === 'chronicle-only').length,
+      sendCount: foundryOnly.length,
+      foundryOnlyHidden: searching && foundryMatches === 0,
+      noMatch: searching && !anyMatch,
+      empty: groups.length === 0 && foundryOnly.length === 0,
+      truncatedText: this._cache.entitiesTruncated
+        ? game.i18n.format('CHRONICLE.Dashboard.Pages.Truncated', { count: loaded })
+        : '',
+      readText: this._cache.entitiesAt
+        ? game.i18n.format('CHRONICLE.Dashboard.Pages.ReadAt', { time: this._healthClock(this._cache.entitiesAt) })
+        : game.i18n.localize('CHRONICLE.Dashboard.Pages.ReadNow'),
+      syncOff: !getSetting('syncJournals'),
+    };
+  }
+
+  /** "3 selected", for select mode's bar. @private */
+  _selectedLabel(count) {
+    return game.i18n.format('CHRONICLE.Dashboard.Pages.Selected', { count });
   }
 
   // ---------------------------------------------------------------------------
@@ -1222,11 +1322,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // --- Tab navigation ---
     this._initTabs(el);
-    // Saving the connection on the first-run screen marks the rest of the
-    // setup to open once Foundry has reloaded and connected.
-    const firstSave = context.configured === false;
     wireSettingsForm(el.querySelector('[data-settings-form]'), this._settings, async (result) => {
-      if (firstSave) await setSetting('firstRunPending', true).catch(() => {});
       await this.render({ force: true });
       // A new connection is tested straight away, so a wrong key shows now
       // rather than as a silent dot later.
@@ -1235,76 +1331,14 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     });
     this._historyTab.mount(el, this._historyShown());
 
-    // --- Search input ---
-    const search = el.querySelector('.dashboard-search');
-    if (search) {
-      search.addEventListener('input', (e) => {
-        this._searchFilter = e.target.value;
-        this.render({ force: true });
-      });
-    }
-
-    // --- Entity type header collapse/expand ---
-    el.querySelectorAll('.entity-type-header').forEach((header) => {
-      header.addEventListener('click', (e) => {
-        // Ignore clicks on the sync toggle button inside the header.
-        if (e.target.closest('.type-sync-toggle, [data-action]')) return;
-
-        const typeId = Number(header.dataset.typeId);
-        if (this._collapsedTypes.has(typeId)) {
-          this._collapsedTypes.delete(typeId);
-        } else {
-          this._collapsedTypes.add(typeId);
-        }
-        setSetting('dashboardCollapsedTypes', JSON.stringify([...this._collapsedTypes]));
-        this.render({ force: true });
-      });
+    // --- Pages list: search, folding, menus and select mode ---
+    wirePagesList(el, {
+      getSearch: () => this._searchFilter,
+      setSearch: (value) => { this._searchFilter = value; },
+      selected: this._selectedEntities,
+      selectedLabel: (count) => this._selectedLabel(count),
     });
-
-    // --- Type sync toggle ---
-    el.querySelectorAll('.type-sync-toggle').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const typeId = Number(btn.dataset.typeId);
-        this._onToggleType(typeId);
-      });
-    });
-
-    // --- Entity sync checkbox ---
-    el.querySelectorAll('.entity-sync-toggle').forEach((checkbox) => {
-      checkbox.addEventListener('change', (e) => {
-        const entityId = e.currentTarget.dataset.entityId;
-        this._onToggleEntity(entityId, e.currentTarget.checked);
-      });
-    });
-
-    // --- Bulk selection checkboxes ---
-    el.querySelectorAll('.bulk-entity-checkbox').forEach((checkbox) => {
-      checkbox.addEventListener('change', (e) => {
-        const entityId = e.currentTarget.dataset.entityId;
-        if (e.currentTarget.checked) {
-          this._selectedEntities.add(entityId);
-        } else {
-          this._selectedEntities.delete(entityId);
-        }
-        this.render({ force: true });
-      });
-    });
-
-    // --- Bulk select all checkbox ---
-    const selectAllCb = el.querySelector('.bulk-select-all-checkbox');
-    if (selectAllCb) {
-      selectAllCb.addEventListener('change', (e) => {
-        if (e.currentTarget.checked) {
-          el.querySelectorAll('.bulk-entity-checkbox').forEach((cb) => {
-            this._selectedEntities.add(cb.dataset.entityId);
-          });
-        } else {
-          this._selectedEntities.clear();
-        }
-        this.render({ force: true });
-      });
-    }
+    this._fixPagesByItself();
 
     // --- Bulk change type select ---
     const bulkTypeSelect = el.querySelector('.bulk-type-select');
@@ -1466,6 +1500,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Refresh button: invalidate caches and re-render. */
   static #onRefresh() {
     this._cache = { entityTypes: null, entities: null, maps: null, calendar: null };
+    this._catchUpTried.clear();
+    this._pageFailures.clear();
     this._settings.pageTypesTried = false;
     this.render({ force: true });
   }
@@ -1624,6 +1660,230 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     return { rows, drawerOpen: this._healthDrawerOpen };
   }
 
+  // ---------------------------------------------------------------------------
+  // Pages list
+  // ---------------------------------------------------------------------------
+
+  /** A page row's "more" button. */
+  static #onPagesMenuAction(_event, target) {
+    const row = this._pageRows.get(target.dataset.entityId);
+    if (!row) return;
+    openPagesMenu(this.element, target, pageMenu(row).map((item) => ({
+      action: item.action,
+      label: game.i18n.localize(`CHRONICLE.Dashboard.Pages.${item.labelKey}`),
+      data: { entityId: row.id, ...item.data },
+    })));
+  }
+
+  /** A type heading's "more" button. */
+  static #onPagesTypeMenuAction(_event, target) {
+    const group = this._pageGroups.find((g) => String(g.typeId) === target.dataset.typeId);
+    if (!group) return;
+    const collapsed = this._collapsedTypes.has(group.typeId);
+    openPagesMenu(this.element, target, typeMenu({ typeExcluded: group.isTypeExcluded, collapsed }).map((item) => ({
+      action: item.action,
+      label: game.i18n.localize(`CHRONICLE.Dashboard.Pages.${item.labelKey}`),
+      data: { typeId: String(group.typeId) },
+    })));
+  }
+
+  /** Fold or unfold one type's rows, and remember it for this GM. */
+  static #onPagesFoldAction(_event, target) {
+    const group = this._pageGroups.find((g) => String(g.typeId) === target.dataset.typeId);
+    if (!group) return;
+    if (togglePagesFold(this.element, group.typeId)) this._collapsedTypes.add(group.typeId);
+    else this._collapsedTypes.delete(group.typeId);
+    applyPagesSearch(this.element, this._searchFilter);
+    setSetting('dashboardCollapsedTypes', JSON.stringify([...this._collapsedTypes]));
+  }
+
+  /** Enter or leave select mode. Leaving forgets what was ticked. */
+  static #onPagesSelectAction() {
+    this._selecting = !this._selecting;
+    if (!this._selecting) this._selectedEntities.clear();
+    this.render({ force: true });
+  }
+
+  static #onPagesSyncOneAction(_event, target) {
+    this._runCatchUp([target.dataset.entityId]);
+  }
+
+  static #onPagesRetryAction(_event, target) {
+    this._retryPage(target.dataset.entityId);
+  }
+
+  static #onPagesSendWaitingAction() {
+    this._sendWaiting();
+  }
+
+  static async #onPagesToggleSyncAction(_event, target) {
+    await this._onToggleEntity(target.dataset.entityId, target.dataset.enable === 'true');
+    this.render({ force: true });
+  }
+
+  static #onPagesToggleTypeAction(_event, target) {
+    const group = this._pageGroups.find((g) => String(g.typeId) === target.dataset.typeId);
+    if (group) this._onToggleType(group.typeId);
+  }
+
+  static #onPagesCopyDetailsAction(_event, target) {
+    this._copyPageDetails(target.dataset.entityId);
+  }
+
+  /** The module that syncs pages with journals, if it is running. @private */
+  _journalSync() {
+    return this._syncManager?._modules?.find((m) => m.constructor?.name === 'JournalSync') ?? null;
+  }
+
+  /**
+   * Bring one page's journal up to date with Chronicle's copy, by the same
+   * path a live change takes, so sync being off for the page, a newer local
+   * version and an unsent Foundry edit are all still respected. A failure is
+   * kept for the row to show.
+   * @param {string} entityId
+   * @returns {Promise<boolean>} whether it worked
+   * @private
+   */
+  async _catchUpPage(entityId) {
+    try {
+      const journalSync = this._journalSync();
+      if (!journalSync) throw new Error(game.i18n.localize('CHRONICLE.Dashboard.Pages.NotRunning'));
+      const entity = await this.api.get(`/entities/${entityId}`);
+      if (!entity?.id) throw new Error(game.i18n.localize('CHRONICLE.Dashboard.Pages.NoAnswer'));
+      await journalSync._onEntityUpdated(entity);
+      this._pageFailures.delete(entityId);
+      return true;
+    } catch (err) {
+      log.warn(`Dashboard: could not bring page ${entityId} up to date`, err);
+      this._pageFailures.set(entityId, { message: err?.message || String(err), at: Date.now() });
+      return false;
+    }
+  }
+
+  /**
+   * Bring these pages up to date one after another, showing each as
+   * "Catching up" meanwhile, then draw once.
+   * @param {string[]} ids
+   * @private
+   */
+  async _runCatchUp(ids) {
+    const todo = ids.filter((id) => id && !this._catchingUp.has(id));
+    if (!todo.length) return;
+    for (const id of todo) this._catchingUp.add(id);
+    markCatchingUp(this.element, todo, game.i18n.localize('CHRONICLE.Dashboard.Pages.CatchingUp'));
+    let done = 0;
+    for (const id of todo) {
+      if (await this._catchUpPage(id)) done++;
+      this._catchingUp.delete(id);
+    }
+    if (done) this._logActivity('pull', `Brought ${done} page${done === 1 ? '' : 's'} up to date with Chronicle`);
+    if (this.rendered) this.render({ force: true });
+  }
+
+  /**
+   * What the list fixes without being asked, after each draw: pages that
+   * Chronicle changed are brought up to date, and changes still waiting to
+   * be sent are sent again. Both are bounded so a fix that keeps failing is
+   * shown on its row, never repeated in a loop: a page is tried once per
+   * loaded list, a waiting change once per window.
+   * @private
+   */
+  _fixPagesByItself() {
+    if (this.api?.state !== 'connected') return;
+
+    const waiting = this.api.getRetryQueue?.() ?? [];
+    const send = sendAgainPlan({ connected: true, waiting, tried: this._sendAgainTried });
+    if (send.length && !this._healthSending) {
+      for (const key of send) this._sendAgainTried.add(key);
+      this._sendWaiting();
+    }
+
+    if (this._catchUpRunning || this._catchUpList === this._cache.entities) return;
+    if (!this._cache.entities || !getSetting('syncJournals') || !this._journalSync()) return;
+    this._catchUpList = this._cache.entities;
+    const ids = catchUpPlan({ rows: [...this._pageRows.values()], tried: this._catchUpTried });
+    if (!ids.length) return;
+    for (const id of ids) this._catchUpTried.add(id);
+    this._catchUpRunning = true;
+    this._runCatchUp(ids).finally(() => { this._catchUpRunning = false; });
+  }
+
+  /**
+   * "Try again" on a row that could not sync. A change of the GM's own that
+   * was not sent is sent again, by the path an edit takes, so a clash with
+   * Chronicle is still settled by the conflict setting. Anything else is
+   * fetched again from Chronicle.
+   * @param {string} entityId
+   * @private
+   */
+  async _retryPage(entityId) {
+    const row = this._pageRows.get(entityId);
+    const journal = row?.journalId ? game.journal.get(row.journalId) : null;
+    const journalSync = this._journalSync();
+    if (row?.trouble?.direction === 'out' && journal && journalSync) {
+      this._catchingUp.add(entityId);
+      markCatchingUp(this.element, [entityId], game.i18n.localize('CHRONICLE.Dashboard.Pages.Sending'));
+      try {
+        await journalSync._pushJournalUpdate(journal, entityId);
+      } catch (err) {
+        log.warn(`Dashboard: could not send page ${entityId} again`, err);
+      }
+      this._catchingUp.delete(entityId);
+      if (this.rendered) this.render({ force: true });
+      return;
+    }
+    await this._runCatchUp([entityId]);
+  }
+
+  /**
+   * Send the waiting changes again now. The queue tries each once per pass,
+   * drops the ones that fail for good (their rows then say so), and keeps
+   * the rest for the next pass.
+   * @private
+   */
+  async _sendWaiting() {
+    if (this._healthSending) return;
+    this._healthSending = true;
+    try {
+      await this.api?.processRetryQueue();
+    } catch (err) {
+      log.warn('Dashboard: sending the waiting changes failed', err);
+    }
+    this._healthSending = false;
+    if (this.rendered) this.render({ force: true });
+  }
+
+  /**
+   * Copy what someone helping would need to know about one page: ids, the
+   * versions on each side, its state and its recent errors. Never the
+   * page's text, the key or the connect line.
+   * @param {string} entityId
+   * @private
+   */
+  async _copyPageDetails(entityId) {
+    const row = this._pageRows.get(entityId);
+    if (!row) return;
+    const text = pageDetails({
+      row,
+      typeName: row.typeName,
+      trouble: row.trouble,
+      versions: {
+        'Chronicle Sync': game.modules.get('chronicle-sync')?.version ?? '',
+        Foundry: game.version ?? '',
+        'Game system': game.system?.id ? `${game.system.id} ${game.system.version ?? ''}`.trim() : '',
+        Connection: this.api?.state ?? '',
+      },
+      errors: this.api?.getErrorLog?.() ?? [],
+    });
+    try {
+      await navigator.clipboard.writeText(text);
+      ui.notifications.info(game.i18n.format('CHRONICLE.Dashboard.Pages.DetailsCopied', { name: noticeText(row.name) }));
+    } catch (err) {
+      log.warn('Dashboard: copying page details failed', err);
+      ui.notifications.warn(game.i18n.localize('CHRONICLE.Dashboard.Pages.DetailsNotCopied'));
+    }
+  }
+
   /** A checklist row's quiet word. The kind says what it does; most reuse an existing action. */
   static async #onHealthRowAction(event, target) {
     switch (target?.dataset?.kind) {
@@ -1652,15 +1912,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   static async #onHealthSendWaitingAction() {
     if (this._healthSending) return;
-    this._healthSending = true;
+    const sending = this._sendWaiting();
     this.render({ force: true });
-    try {
-      await this.api?.processRetryQueue();
-    } catch (err) {
-      log.warn('Dashboard: sending the waiting changes failed', err);
-    }
-    this._healthSending = false;
-    this.render({ force: true });
+    await sending;
   }
 
   // ---------------------------------------------------------------------------

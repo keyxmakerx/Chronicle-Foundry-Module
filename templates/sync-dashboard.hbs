@@ -194,174 +194,130 @@
     {{!-- ================================================================= --}}
     {{!-- ENTITIES TAB                                                      --}}
     {{!-- ================================================================= --}}
-    <div class="cs-pane" role="tabpanel" data-subpane="linked:pages">
-      <div class="dashboard-toolbar">
-        <div class="toolbar-actions">
-          {{#if hasChronicleOnly}}
-          <button type="button" data-action="pull-all" class="dashboard-btn btn-sm" title="{{localize 'CHRONICLE.Dashboard.Entities.PullAllHint'}}">
-            <i class="fa-solid fa-download"></i> {{localize "CHRONICLE.Dashboard.Entities.PullAll"}}
-          </button>
-          {{/if}}
-          {{#if hasFoundryOnly}}
-          <button type="button" data-action="push-all" class="dashboard-btn btn-sm" title="{{localize 'CHRONICLE.Dashboard.Entities.PushAllHint'}}">
-            <i class="fa-solid fa-upload"></i> {{localize "CHRONICLE.Dashboard.Entities.PushAll"}}
-          </button>
-          {{/if}}
-          <button type="button" data-action="resync-all-journals" class="dashboard-btn btn-sm"
-                  title="{{localize 'CHRONICLE.Dashboard.Entities.ResyncAllJournalsHint'}}">
-            <i class="fa-solid fa-rotate"></i> {{localize "CHRONICLE.Dashboard.Entities.ResyncAllJournals"}}
-          </button>
-          <button type="button" data-action="create-entity-type" class="dashboard-btn btn-sm"
-                  title="{{localize "CHRONICLE.Dashboard.Entities.CreateType"}}">
-            <i class="fa-solid fa-plus"></i> {{localize "CHRONICLE.Dashboard.Entities.CreateType"}}
-          </button>
-          <button type="button" data-action="refresh" class="dashboard-btn btn-sm" title="{{localize 'CHRONICLE.Dashboard.Entities.RefreshData'}}" aria-label="{{localize 'CHRONICLE.Dashboard.Entities.RefreshData'}}">
-            <i class="fa-solid fa-arrows-rotate"></i>
-          </button>
-        </div>
-        <input type="text" class="dashboard-search" placeholder="{{localize 'CHRONICLE.Dashboard.Entities.SearchPlaceholder'}}" value="{{searchFilter}}"/>
+    <div class="cs-pane cs-pages" role="tabpanel" data-subpane="linked:pages">
+      <input type="search" name="pagesSearch" class="cs-pages-search" data-pages-search autocomplete="off"
+             placeholder="{{localize 'CHRONICLE.Dashboard.Pages.Search'}}" aria-label="{{localize 'CHRONICLE.Dashboard.Pages.Search'}}" value="{{searchFilter}}">
+
+      <div class="cs-pages-words">
+        {{#if pages.bringInCount}}
+        <button type="button" class="cs-quiet" data-action="pull-all" title="{{localize 'CHRONICLE.Dashboard.Entities.PullAllHint'}}">{{localize "CHRONICLE.Dashboard.Pages.BringInAll" count=pages.bringInCount}}</button>
+        {{/if}}
+        {{#if pages.sendCount}}
+        <button type="button" class="cs-quiet" data-action="push-all" title="{{localize 'CHRONICLE.Dashboard.Entities.PushAllHint'}}">{{localize "CHRONICLE.Dashboard.Pages.SendAll" count=pages.sendCount}}</button>
+        {{/if}}
+        <button type="button" class="cs-quiet" data-action="resync-all-journals" title="{{localize 'CHRONICLE.Dashboard.Entities.ResyncAllJournalsHint'}}">{{localize "CHRONICLE.Dashboard.Entities.ResyncAllJournals"}}</button>
+        <button type="button" class="cs-quiet" data-action="create-entity-type" title="{{localize 'CHRONICLE.Dashboard.Entities.CreateTypeTitle'}}">{{localize "CHRONICLE.Dashboard.Pages.NewType"}}</button>
+        <button type="button" class="cs-quiet cs-pages-select" data-action="pages-select" aria-pressed="{{#if pages.selecting}}true{{else}}false{{/if}}">{{#if pages.selecting}}{{localize "CHRONICLE.Dashboard.Pages.SelectDone"}}{{else}}{{localize "CHRONICLE.Dashboard.Pages.Select"}}{{/if}}</button>
       </div>
 
-      {{!-- Bulk actions toolbar (visible when entities are selected) --}}
-      <div class="bulk-toolbar {{#if bulkSelectionCount}}visible{{/if}}">
-        <div class="bulk-toolbar-left">
-          <label class="bulk-select-all-label">
-            <input type="checkbox" class="bulk-select-all-checkbox" />
+      {{#if pages.syncOff}}
+      <p class="cs-pages-note">{{localize "CHRONICLE.Dashboard.Pages.SyncIsOff"}}
+        <button type="button" class="cs-quiet" data-action="open-settings" data-settings-tab="sync">{{localize "CHRONICLE.Dashboard.Pages.OpenSettings"}}</button></p>
+      {{/if}}
+
+      {{!-- Select mode: what to do with the ticked pages. --}}
+      {{#if pages.selecting}}
+      <div class="cs-pages-bulk">
+        <div class="cs-pages-bulk-top">
+          <label class="cs-pages-bulk-all">
+            <input type="checkbox" data-pages-select-all>
+            <span>{{localize "CHRONICLE.Dashboard.Pages.SelectAll"}}</span>
           </label>
-          <span class="bulk-count-badge">{{bulkSelectionCount}} {{localize "CHRONICLE.Dashboard.Bulk.Selected"}}</span>
+          <span data-pages-selected-count>{{pages.selectedLabel}}</span>
         </div>
-        <div class="bulk-toolbar-actions">
-          <select class="bulk-type-select" title="{{localize "CHRONICLE.Dashboard.Bulk.ChangeType"}}">
-            <option value="">{{localize "CHRONICLE.Dashboard.Bulk.ChangeType"}}</option>
-            {{#each entityTypes}}
-            <option value="{{id}}">{{name}}</option>
-            {{/each}}
-          </select>
-          <button type="button" class="dashboard-btn btn-xs" data-action="bulk-set-public"
-                  title="{{localize "CHRONICLE.Dashboard.Bulk.MakePublic"}}" aria-label="{{localize "CHRONICLE.Dashboard.Bulk.MakePublic"}}">
-            <i class="fa-solid fa-lock-open"></i>
-          </button>
-          <button type="button" class="dashboard-btn btn-xs" data-action="bulk-set-private"
-                  title="{{localize "CHRONICLE.Dashboard.Bulk.MakePrivate"}}" aria-label="{{localize "CHRONICLE.Dashboard.Bulk.MakePrivate"}}">
-            <i class="fa-solid fa-lock"></i>
-          </button>
-          <button type="button" class="dashboard-btn btn-xs btn-danger" data-action="bulk-delete"
-                  title="{{localize "CHRONICLE.Dashboard.Bulk.Delete"}}" aria-label="{{localize "CHRONICLE.Dashboard.Bulk.Delete"}}">
-            <i class="fa-solid fa-trash"></i>
-          </button>
-        </div>
+        <select class="bulk-type-select" data-pages-needs-selection aria-label="{{localize 'CHRONICLE.Dashboard.Bulk.ChangeType'}}" {{#if pages.nothingSelected}}disabled{{/if}}>
+          <option value="">{{localize "CHRONICLE.Dashboard.Bulk.ChangeType"}}</option>
+          {{#each entityTypes}}
+          <option value="{{id}}">{{name}}</option>
+          {{/each}}
+        </select>
+        <button type="button" class="cs-quiet" data-action="bulk-set-public" data-pages-needs-selection {{#if pages.nothingSelected}}disabled{{/if}}>{{localize "CHRONICLE.Dashboard.Pages.MenuShow"}}</button>
+        <button type="button" class="cs-quiet" data-action="bulk-set-private" data-pages-needs-selection {{#if pages.nothingSelected}}disabled{{/if}}>{{localize "CHRONICLE.Dashboard.Pages.MenuHide"}}</button>
+        <button type="button" class="cs-quiet cs-quiet-danger" data-action="bulk-delete" data-pages-needs-selection title="{{localize 'CHRONICLE.Dashboard.Pages.DeleteInChronicle'}}" {{#if pages.nothingSelected}}disabled{{/if}}>{{localize "CHRONICLE.Dashboard.Bulk.Delete"}}</button>
       </div>
+      {{/if}}
 
-      <div class="entity-list">
+      <div class="cs-pages-list" data-pages-list>
         {{#each entityGroups}}
-        <div class="entity-type-group">
-          {{!-- Type header --}}
-          <div class="entity-type-header" data-type-id="{{typeId}}">
-            <i class="fa-solid {{#if isCollapsed}}fa-chevron-right{{else}}fa-chevron-down{{/if}} collapse-icon"></i>
-            <i class="{{typeIcon}}" style="color: {{typeColor}}"></i>
-            <span class="type-name">{{typeNamePlural}}</span>
-            <span class="type-stats">
-              {{localize 'CHRONICLE.Dashboard.Entities.SyncedCount' count=syncedCount}}{{#if chronicleOnlyCount}}{{localize 'CHRONICLE.Dashboard.Entities.ChronicleOnlyCount' count=chronicleOnlyCount}}{{/if}}
-            </span>
-            <button type="button" class="type-sync-toggle dashboard-btn btn-xs" data-type-id="{{typeId}}"
-                    title="{{#if isTypeExcluded}}{{localize 'CHRONICLE.Dashboard.Entities.EnableSync'}}{{else}}{{localize 'CHRONICLE.Dashboard.Entities.DisableSync'}}{{/if}}" aria-label="{{#if isTypeExcluded}}{{localize 'CHRONICLE.Dashboard.Entities.EnableSync'}}{{else}}{{localize 'CHRONICLE.Dashboard.Entities.DisableSync'}}{{/if}}">
-              {{#if isTypeExcluded}}
-              <i class="fa-solid fa-toggle-off"></i>
-              {{else}}
-              <i class="fa-solid fa-toggle-on"></i>
-              {{/if}}
+        <section class="cs-pages-group" data-page-group data-type-id="{{typeId}}" data-folded="{{#if isCollapsed}}true{{else}}false{{/if}}" {{#if hidden}}hidden{{/if}}>
+          <div class="cs-pages-cap">
+            <button type="button" class="cs-pages-fold" data-action="pages-fold" data-type-id="{{typeId}}" aria-expanded="{{#if isCollapsed}}false{{else}}true{{/if}}">
+              <i class="{{typeIcon}}" aria-hidden="true"></i><span>{{typeNamePlural}}</span>
+            </button>
+            <small title="{{statsText}}">{{statsText}}</small>
+            <button type="button" class="cs-row-icon" data-action="pages-type-menu" data-type-id="{{typeId}}"
+                    aria-haspopup="menu" aria-expanded="false" title="{{menuLabel}}" aria-label="{{menuLabel}}">
+              <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
             </button>
           </div>
 
-          {{!-- Entity rows --}}
-          {{#unless isCollapsed}}
-          <div class="entity-rows">
+          <div class="cs-pages-rows" data-page-rows {{#if rowsHidden}}hidden{{/if}}>
             {{#each entities}}
-            <div class="entity-row status-{{status}} {{#if isSelected}}bulk-selected{{/if}}">
-              <input type="checkbox" class="bulk-entity-checkbox" data-entity-id="{{id}}" {{#if isSelected}}checked{{/if}} />
-              <span class="entity-status-dot" title="{{status}}"></span>
-              <span class="entity-name">{{name}}</span>
-
-              {{!-- Visibility badge --}}
-              {{#if journalId}}
-              <button type="button" class="visibility-badge" data-action="toggle-visibility"
-                      data-entity-id="{{id}}" data-is-private="{{isPrivate}}"
-                      title="{{#if isPrivate}}{{localize 'CHRONICLE.Dashboard.Entities.PrivateClickPublic'}}{{else}}{{localize 'CHRONICLE.Dashboard.Entities.PublicClickPrivate'}}{{/if}}" aria-label="{{#if isPrivate}}{{localize 'CHRONICLE.Dashboard.Entities.PrivateClickPublic'}}{{else}}{{localize 'CHRONICLE.Dashboard.Entities.PublicClickPrivate'}}{{/if}}">
-                {{#if isPrivate}}<i class="fa-solid fa-lock"></i>{{else}}<i class="fa-solid fa-lock-open"></i>{{/if}}
-              </button>
+            <div class="cs-page-row is-{{state}}{{#if isSelected}} is-selected{{/if}}" data-page-row data-page-id="{{id}}" data-page-name="{{name}}" {{#if hidden}}hidden{{/if}}>
+              {{#if @root.pages.selecting}}
+              <input type="checkbox" class="cs-page-select" data-page-select data-entity-id="{{id}}" aria-label="{{name}}" {{#if isSelected}}checked{{/if}}>
               {{/if}}
-
-              {{!-- Status label --}}
-              <span class="entity-status-label">
-                {{#if (eq status "synced")}}<i class="fa-solid fa-check"></i> {{localize "CHRONICLE.Dashboard.Entities.Synced"}}{{/if}}
-                {{#if (eq status "modified")}}<i class="fa-solid fa-bolt"></i> {{localize "CHRONICLE.Dashboard.Entities.Modified"}}{{/if}}
-                {{#if (eq status "chronicle-only")}}{{localize "CHRONICLE.Dashboard.Entities.ChronicleOnly"}}{{/if}}
-                {{#if (eq status "actor")}}<i class="fa-solid fa-user"></i> {{localize "CHRONICLE.Dashboard.Entities.SyncedAsActor"}}{{/if}}
-              </span>
-
-              {{!-- Action --}}
-              {{#if (eq status "actor")}}
-              {{else if (eq status "chronicle-only")}}
-              <button type="button" class="dashboard-btn btn-xs btn-pull" data-action="pull-entity" data-entity-id="{{id}}">
-                <i class="fa-solid fa-download"></i> {{localize "CHRONICLE.Dashboard.Entities.Pull"}}
+              <span class="cs-page-dot" aria-hidden="true"></span>
+              <span class="cs-page-name">{{name}}</span>
+              {{#if isPrivate}}
+              <i class="fa-solid fa-lock cs-page-lock" role="img" title="{{localize 'CHRONICLE.Dashboard.Pages.HiddenFromPlayers'}}" aria-label="{{localize 'CHRONICLE.Dashboard.Pages.HiddenFromPlayers'}}"></i>
+              {{/if}}
+              <span class="cs-page-state" {{#if stateTitle}}title="{{stateTitle}}"{{/if}}>{{stateLabel}}</span>
+              {{#if action}}
+              <button type="button" class="cs-page-btn" data-action="{{action.action}}" data-entity-id="{{id}}">{{action.label}}</button>
+              {{/if}}
+              {{#if hasMenu}}
+              <button type="button" class="cs-row-icon" data-action="pages-menu" data-entity-id="{{id}}"
+                      aria-haspopup="menu" aria-expanded="false" title="{{menuLabel}}" aria-label="{{menuLabel}}">
+                <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
               </button>
-              {{else}}
-              <label class="entity-sync-checkbox" title="{{#if isExcluded}}{{localize 'CHRONICLE.Dashboard.Entities.SyncDisabled'}}{{else}}{{localize 'CHRONICLE.Dashboard.Entities.SyncEnabled'}}{{/if}}">
-                <input type="checkbox" class="entity-sync-toggle" data-entity-id="{{id}}" {{#unless isExcluded}}checked{{/unless}}/>
-              </label>
               {{/if}}
             </div>
             {{/each}}
           </div>
-          {{/unless}}
-        </div>
+        </section>
         {{/each}}
 
-        {{!-- Foundry-only journals --}}
+        {{!-- Journals with no Chronicle page --}}
         {{#if foundryOnlyJournals.length}}
-        <div class="entity-type-group foundry-only-group">
-          <div class="entity-type-header">
-            <i class="fa-solid fa-chevron-down collapse-icon"></i>
-            <i class="fa-solid fa-file-pen" style="color: #fb923c"></i>
-            <span class="type-name">{{localize "CHRONICLE.Dashboard.Entities.FoundryOnlyJournals"}}</span>
-            <span class="type-stats">{{foundryOnlyJournals.length}} {{localize "CHRONICLE.Dashboard.Entities.Unlinked"}}</span>
+        <section class="cs-pages-group" data-page-group data-folded="false" {{#if pages.foundryOnlyHidden}}hidden{{/if}}>
+          <div class="cs-pages-cap">
+            <span class="cs-pages-fold"><i class="fa-solid fa-file-pen" aria-hidden="true"></i><span>{{localize "CHRONICLE.Dashboard.Entities.FoundryOnlyJournals"}}</span></span>
+            <small>{{localize "CHRONICLE.Dashboard.Pages.NotLinked" count=foundryOnlyJournals.length}}</small>
             {{#if setAsideCount}}
-            <button type="button" class="cs-quiet-word" data-action="delete-set-aside">{{localize "CHRONICLE.Dashboard.Entities.DeleteSetAside" count=setAsideCount}}</button>
+            <button type="button" class="cs-quiet cs-quiet-danger" data-action="delete-set-aside">{{localize "CHRONICLE.Dashboard.Entities.DeleteSetAside" count=setAsideCount}}</button>
             {{/if}}
           </div>
-          <div class="entity-rows">
+          <div class="cs-pages-rows" data-page-rows>
             {{#each foundryOnlyJournals}}
-            <div class="entity-row status-foundry-only">
-              <span class="entity-status-dot" title="{{localize 'CHRONICLE.Dashboard.Entities.FoundryOnlyStatus'}}"></span>
-              <span class="entity-name">{{name}}</span>
-              <span class="entity-status-label">{{#if setAside}}{{localize "CHRONICLE.Dashboard.Entities.SetAside"}}{{else}}{{localize "CHRONICLE.Dashboard.Entities.FoundryOnly"}}{{/if}}</span>
-              <button type="button" class="dashboard-btn btn-xs btn-push" data-action="push-journal" data-journal-id="{{id}}">
-                <i class="fa-solid fa-upload"></i> {{localize "CHRONICLE.Dashboard.Entities.Push"}}
-              </button>
-              <button type="button" class="cs-row-icon" data-action="delete-journal" data-journal-id="{{id}}"
+            <div class="cs-page-row is-foundry-only" data-page-row data-page-name="{{name}}" {{#if hidden}}hidden{{/if}}>
+              <span class="cs-page-dot" aria-hidden="true"></span>
+              <span class="cs-page-name">{{name}}</span>
+              <span class="cs-page-state">{{#if setAside}}{{localize "CHRONICLE.Dashboard.Entities.SetAside"}}{{else}}{{localize "CHRONICLE.Dashboard.Entities.FoundryOnlyStatus"}}{{/if}}</span>
+              <button type="button" class="cs-page-btn" data-action="push-journal" data-journal-id="{{id}}">{{localize "CHRONICLE.Dashboard.Entities.Push"}}</button>
+              <button type="button" class="cs-row-icon cs-row-icon-danger" data-action="delete-journal" data-journal-id="{{id}}"
                       title="{{localize 'CHRONICLE.Dashboard.Entities.Delete'}}" aria-label="{{localize 'CHRONICLE.Dashboard.Entities.Delete'}}">
                 <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
               </button>
             </div>
             {{/each}}
           </div>
-        </div>
+        </section>
         {{/if}}
 
-        {{!-- Empty / no results states --}}
-        {{#unless entityGroups.length}}
-        {{#unless foundryOnlyJournals.length}}
+        <p class="cs-pages-note" data-pages-nomatch {{#unless pages.noMatch}}hidden{{/unless}}>{{localize "CHRONICLE.Dashboard.Pages.NoMatch"}}</p>
+        {{#if pages.truncatedText}}
+        <p class="cs-pages-note">{{pages.truncatedText}}</p>
+        {{/if}}
+        <p class="cs-pages-note cs-pages-read">{{pages.readText}}
+          <button type="button" class="cs-quiet" data-action="refresh">{{localize "CHRONICLE.Dashboard.Pages.CheckAgain"}}</button></p>
+
+        {{#if pages.empty}}
         <div class="cs-state dashboard-empty-tab">
-          {{#if searchFilter}}
-          <i class="fa-solid fa-search" aria-hidden="true"></i>
-          <b>{{localize "CHRONICLE.Dashboard.Entities.NoMatch" search=searchFilter}}</b>
-          {{else}}
           <i class="fa-solid fa-book-open" aria-hidden="true"></i>
           <b>{{localize "CHRONICLE.Dashboard.Entities.EmptyState"}}</b>
-          {{/if}}
         </div>
-        {{/unless}}
-        {{/unless}}
+        {{/if}}
       </div>
     </div>
 

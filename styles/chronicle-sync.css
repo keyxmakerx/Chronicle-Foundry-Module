@@ -613,83 +613,132 @@ button.chronicle-shop-door {
   gap: 4px;
 }
 
-/* --- Bulk actions toolbar --- */
+/* ----- Pages list: quiet rows under small-caps type headings ----- */
 
-.bulk-toolbar {
-  display: none;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 10px;
-  margin-bottom: 6px;
-  background: color-mix(in srgb, var(--cs-info) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--cs-info) 20%, transparent);
-  border-radius: 4px;
+.cs-pages { font-size: 13px; }
+
+.chronicle-dashboard input.cs-pages-search {
+  display: block; width: 100%; height: 30px; margin: 0 0 8px; padding: 0 10px;
+  border: 1px solid var(--cs-line); border-radius: 4px;
+  background: color-mix(in srgb, var(--cs-text) 4%, transparent);
+  color: var(--cs-text); font-size: 13px;
 }
+.chronicle-dashboard input.cs-pages-search::placeholder { color: var(--cs-text-muted); }
+.chronicle-dashboard input.cs-pages-search:focus { border-color: var(--cs-accent); outline: none; box-shadow: none; }
+.chronicle-dashboard input.cs-pages-search:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
 
-.bulk-toolbar.visible {
-  display: flex;
-}
+/* The list's commands, as quiet words on one line; "Select" sits at the far end. */
+.cs-pages-words { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin: 0 0 6px; }
+.cs-pages-words .cs-pages-select { margin-left: auto; }
+.cs-quiet.cs-quiet-danger:hover,
+.cs-quiet.cs-quiet-danger:focus-visible { color: var(--cs-bad); }
 
-.bulk-toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+.cs-pages-note { margin: 8px 2px; font-size: 12px; color: var(--cs-text-muted); }
+.cs-pages-read { margin-top: 14px; }
 
-.bulk-count-badge {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--cs-info);
-}
-
-.bulk-toolbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.bulk-type-select {
-  padding: 3px 6px;
-  font-size: 11px;
-  border: 1px solid color-mix(in srgb, var(--cs-text) 15%, transparent);
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.2);
-  color: inherit;
-  max-width: 160px;
-}
-
-.bulk-type-select:focus {
-  border-color: var(--cs-info);
-  outline: none;
-}
-
-.bulk-entity-checkbox {
-  flex-shrink: 0;
-  margin: 0;
-  cursor: pointer;
-}
-
-.entity-row.bulk-selected {
-  background: color-mix(in srgb, var(--cs-info) 6%, transparent);
-}
-
-/* Wide enough to type in: beside the buttons when they leave room, else on its own row. */
-.dashboard-search {
-  flex: 1 1 180px;
-  min-width: 180px;
-  padding: 4px 8px;
-  border: 1px solid color-mix(in srgb, var(--cs-text) 15%, transparent);
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.2);
-  color: inherit;
+/* Select mode: what to do with the ticked pages. */
+.cs-pages-bulk {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
+  margin: 0 0 6px; padding: 6px 8px;
+  border: 1px solid var(--cs-line); border-radius: 4px;
+  background: color-mix(in srgb, var(--cs-text) 4%, transparent);
   font-size: 12px;
 }
-
-.dashboard-search:focus {
-  border-color: var(--cs-info);
-  outline: none;
+.cs-pages-bulk-top { flex: 1 0 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--cs-text-2); }
+.cs-pages-bulk-all { display: inline-flex; align-items: center; gap: 6px; margin: 0; cursor: pointer; }
+.cs-pages-bulk input[type="checkbox"],
+.cs-page-row input.cs-page-select { flex: none; width: 14px; height: 14px; margin: 0; cursor: pointer; }
+.chronicle-dashboard select.bulk-type-select {
+  width: auto; max-width: 160px; height: 24px; padding: 0 6px;
+  border: 1px solid var(--cs-line); border-radius: 4px;
+  background: color-mix(in srgb, var(--cs-text) 4%, transparent);
+  color: var(--cs-text); font-size: 12px;
 }
+.chronicle-dashboard select.bulk-type-select:disabled { color: var(--cs-text-muted); }
+
+.cs-pages-group[hidden],
+.cs-pages-rows[hidden],
+.cs-page-row[hidden],
+.cs-page-row [hidden] { display: none; }
+
+/* A type's heading: small caps over a hairline. Pressing its name folds the rows. */
+.cs-pages-cap {
+  display: flex; align-items: center; gap: 8px;
+  min-height: 28px; margin: 12px 0 2px; padding: 0 2px 2px;
+  border-bottom: 1px solid var(--cs-line);
+}
+.cs-pages-cap > small { flex: 1; min-width: 0; font-size: 11px; color: var(--cs-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chronicle-dashboard .cs-pages-fold {
+  flex: none; display: inline-flex; align-items: center; gap: 8px;
+  width: auto; height: auto; min-height: 0; margin: 0; padding: 2px 0;
+  background: none; border: 0; border-radius: 3px; box-shadow: none;
+  color: var(--cs-text-2); font-size: 11px; font-weight: 700; line-height: 1.4;
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.chronicle-dashboard button.cs-pages-fold { cursor: pointer; }
+.chronicle-dashboard button.cs-pages-fold:hover { color: var(--cs-text); }
+.chronicle-dashboard button.cs-pages-fold:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
+.cs-pages-fold > i { width: 14px; text-align: center; font-size: 12px; letter-spacing: 0; }
+.cs-pages-group[data-folded="true"] .cs-pages-fold { color: var(--cs-text-muted); }
+
+.cs-page-row {
+  display: flex; align-items: center; gap: 8px;
+  min-height: 34px; padding: 4px 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--cs-line) 45%, transparent);
+}
+.cs-page-row.is-selected { background: color-mix(in srgb, var(--cs-accent) 8%, transparent); }
+.cs-page-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-page-lock { flex: none; font-size: 13px; color: var(--cs-text); }
+.cs-page-state { flex: none; font-size: 12px; color: var(--cs-text-muted); white-space: nowrap; }
+.cs-page-row.is-failed .cs-page-state { color: var(--cs-bad); }
+
+.cs-page-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--cs-ok); }
+.cs-page-row.is-modified .cs-page-dot,
+.cs-page-row.is-catching-up .cs-page-dot,
+.cs-page-row.is-waiting .cs-page-dot { background: var(--cs-warn); }
+.cs-page-row.is-chronicle-only .cs-page-dot { background: var(--cs-info); }
+.cs-page-row.is-foundry-only .cs-page-dot { background: var(--cs-attention); }
+.cs-page-row.is-failed .cs-page-dot { background: var(--cs-bad); }
+.cs-page-row.is-off .cs-page-dot { background: none; box-shadow: inset 0 0 0 1px var(--cs-text-muted); }
+
+/* A row's one real command. */
+.chronicle-dashboard .cs-page-btn {
+  flex: none; width: auto; height: 26px; min-height: 0; margin: 0; padding: 0 10px;
+  border: 1px solid var(--cs-line); border-radius: 4px; box-shadow: none;
+  background: color-mix(in srgb, var(--cs-text) 6%, transparent);
+  color: var(--cs-text); font-size: 12px; line-height: 1; white-space: nowrap; cursor: pointer;
+}
+.chronicle-dashboard .cs-page-btn:hover { background: color-mix(in srgb, var(--cs-text) 12%, transparent); }
+.chronicle-dashboard .cs-page-btn:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
+
+/* Row-end icon: one colour, framed only on hover or focus. */
+.chronicle-dashboard .cs-row-icon {
+  flex: none; width: 26px; height: 26px; min-height: 0; padding: 0; margin: 0;
+  display: inline-grid; place-items: center;
+  background: none; border: 1px solid transparent; border-radius: 4px; box-shadow: none;
+  color: var(--cs-text-muted); font-size: 12px; line-height: 1; cursor: pointer;
+}
+.chronicle-dashboard .cs-row-icon:hover,
+.chronicle-dashboard .cs-row-icon:focus-visible,
+.chronicle-dashboard .cs-row-icon[aria-expanded="true"] { border-color: var(--cs-line); color: var(--cs-text); }
+.chronicle-dashboard .cs-row-icon.cs-row-icon-danger:hover,
+.chronicle-dashboard .cs-row-icon.cs-row-icon-danger:focus-visible { color: var(--cs-bad); }
+.chronicle-dashboard .cs-row-icon:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
+
+/* The "more" menu of a row or a type. It lies over the list and is gone on any press outside it. */
+.chronicle-dashboard .cs-pages-menu {
+  position: absolute; z-index: 5; min-width: 200px; max-width: 280px; padding: 4px;
+  border: 1px solid var(--cs-line); border-radius: 6px;
+  background: var(--cs-surface); color: var(--cs-text);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+}
+.chronicle-dashboard .cs-pages-menu > button {
+  display: block; width: 100%; height: auto; min-height: 30px; margin: 0; padding: 6px 10px;
+  background: none; border: 0; border-radius: 4px; box-shadow: none;
+  color: inherit; font-size: 13px; line-height: 1.3; text-align: left; white-space: normal; cursor: pointer;
+}
+.chronicle-dashboard .cs-pages-menu > button:hover,
+.chronicle-dashboard .cs-pages-menu > button:focus-visible { background: color-mix(in srgb, var(--cs-text) 9%, transparent); outline: none; }
 
 /* Dashboard buttons */
 .dashboard-btn {
@@ -738,158 +787,6 @@ button.chronicle-shop-door {
 .dashboard-btn.btn-push {
   border-color: color-mix(in srgb, var(--cs-attention) 40%, transparent);
   color: var(--cs-attention);
-}
-
-/* Entity type groups */
-.entity-type-group {
-  margin-bottom: 4px;
-}
-
-.entity-type-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  background: rgba(0, 0, 0, 0.15);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.entity-type-header:hover {
-  background: rgba(0, 0, 0, 0.25);
-}
-
-.entity-type-header .collapse-icon {
-  font-size: 10px;
-  width: 12px;
-  text-align: center;
-  color: var(--cs-text-muted);
-}
-
-.entity-type-header .type-name {
-  flex: 1;
-}
-
-.entity-type-header .type-stats {
-  font-size: 11px;
-  color: var(--cs-text-muted);
-  font-weight: normal;
-}
-
-.type-sync-toggle {
-  padding: 1px 4px !important;
-  border: none !important;
-  background: none !important;
-  cursor: pointer;
-  color: var(--cs-text-muted);
-  transition: color 0.15s;
-}
-
-.type-sync-toggle:hover {
-  color: color-mix(in srgb, var(--cs-text) 80%, transparent);
-}
-
-.type-sync-toggle i {
-  font-size: 14px;
-}
-
-/* Entity rows */
-.entity-rows {
-  padding: 2px 0 2px 20px;
-}
-
-.entity-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-radius: 3px;
-  font-size: 12px;
-  transition: background 0.1s;
-}
-
-.entity-row:hover {
-  background: color-mix(in srgb, var(--cs-text) 3%, transparent);
-}
-
-/* Row-end icon: monochrome, framed only on hover or focus. */
-.entity-row .cs-row-icon {
-  flex: none; width: 22px; height: 22px; padding: 0; margin: 0;
-  display: inline-grid; place-items: center;
-  background: none; border: 1px solid transparent; border-radius: 4px;
-  color: var(--cs-text-muted); font-size: 11px; line-height: 1; cursor: pointer;
-}
-.entity-row .cs-row-icon:hover,
-.entity-row .cs-row-icon:focus-visible { border-color: var(--cs-line); color: var(--cs-bad); }
-.entity-row .cs-row-icon:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
-
-/* Quiet word: no border, reads as part of the header line. */
-.entity-type-header .cs-quiet-word {
-  flex: none; width: auto; margin: 0 0 0 auto; padding: 0 4px; height: auto; line-height: 1.4;
-  background: none; border: 0; box-shadow: none;
-  color: var(--cs-text-muted); font-size: 11px; text-decoration: underline dotted; cursor: pointer;
-}
-.entity-type-header .cs-quiet-word:hover,
-.entity-type-header .cs-quiet-word:focus-visible { color: var(--cs-bad); }
-
-/* Status dots */
-.entity-status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.entity-row.status-synced .entity-status-dot,
-.entity-row.status-actor .entity-status-dot { background: var(--cs-ok); }
-.entity-row.status-modified .entity-status-dot { background: var(--cs-warn); }
-.entity-row.status-chronicle-only .entity-status-dot { background: var(--cs-info); }
-.entity-row.status-foundry-only .entity-status-dot { background: var(--cs-attention); }
-.entity-row.status-conflict .entity-status-dot { background: var(--cs-bad); }
-
-.entity-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Visibility badge */
-.visibility-badge {
-  background: none;
-  border: none;
-  padding: 2px 4px;
-  cursor: pointer;
-  color: var(--cs-text-muted);
-  font-size: 11px;
-}
-
-.visibility-badge:hover {
-  color: color-mix(in srgb, var(--cs-text) 70%, transparent);
-}
-
-/* Status label */
-.entity-status-label {
-  font-size: 11px;
-  color: var(--cs-text-muted);
-  white-space: nowrap;
-}
-
-.entity-row.status-synced .entity-status-label,
-.entity-row.status-actor .entity-status-label { color: var(--cs-ok); }
-.entity-row.status-modified .entity-status-label { color: var(--cs-warn); }
-.entity-row.status-chronicle-only .entity-status-label { color: var(--cs-info); }
-.entity-row.status-foundry-only .entity-status-label { color: var(--cs-attention); }
-
-/* Sync checkbox */
-.entity-sync-checkbox {
-  cursor: pointer;
-}
-
-.entity-sync-toggle {
-  cursor: pointer;
 }
 
 /* Section heading */
@@ -1486,12 +1383,6 @@ button.chronicle-shop-door {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-}
-
-/* Foundry-only group styling */
-.foundry-only-group .entity-type-header {
-  border-top: 1px solid color-mix(in srgb, var(--cs-text) 6%, transparent);
-  margin-top: 8px;
 }
 
 /* ================================================================= */

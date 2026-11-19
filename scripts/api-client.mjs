@@ -208,6 +208,8 @@ export class ChronicleAPI {
 
     /** @type {boolean} Whether we're currently processing the retry queue. */
     this._retryProcessing = false;
+    /** When each waiting write last went through on a later try, by `METHOD path`. */
+    this._replayedAt = new Map();
 
     /** Shared pause after a 429, so a burst waits instead of failing call by call. */
     this.rateLimit = new RateLimitGate();
@@ -673,6 +675,7 @@ export class ChronicleAPI {
           method: item.method,
           body: item.body,
         });
+        this._replayedAt.set(`${item.method} ${item.path}`, Date.now());
         success++;
       } catch (err) {
         if (err instanceof ConflictError) {
@@ -680,6 +683,7 @@ export class ChronicleAPI {
           try {
             if (!item.onConflict) throw err;
             await item.onConflict(item.body ? JSON.parse(item.body) : null);
+            this._replayedAt.set(`${item.method} ${item.path}`, Date.now());
             success++;
           } catch (conflictErr) {
             failed++;
@@ -724,6 +728,18 @@ export class ChronicleAPI {
    */
   getRetryQueue() {
     return this._retryQueue.map(({ method, path, retries, maxRetries }) => ({ method, path, retries, maxRetries }));
+  }
+
+  /**
+   * When a waiting write last went through on a later try, or 0. The error
+   * log keeps the failure that queued it, so this is how a reader tells that
+   * failure was made good.
+   * @param {string} method
+   * @param {string} path
+   * @returns {number} epoch ms
+   */
+  getReplayedAt(method, path) {
+    return this._replayedAt.get(`${method} ${path}`) ?? 0;
   }
 
   // --- Health & error log ---
