@@ -312,6 +312,7 @@ const hbs = read('templates/sync-dashboard.hbs');
 const pane = hbs.slice(hbs.indexOf('data-subpane="linked:pages"'), hbs.indexOf('data-subpane="linked:shops"'));
 const dash = read('scripts/sync-dashboard.mjs');
 const list = read('scripts/pages-list.mjs');
+const css = read('styles/chronicle-sync.css');
 
 test('the list is quiet: a search box, words, small-caps headings and one button a row', () => {
   assert.match(pane, /<input type="search" name="pagesSearch"[^>]*data-pages-search/);
@@ -330,9 +331,11 @@ test('the list is quiet: a search box, words, small-caps headings and one button
   assert.match(pane, /\{\{#if isPrivate\}\}\s*<i class="fa-solid fa-lock cs-page-lock" role="img"[^>]*aria-label=/);
   // No inline colours: the tokens decide.
   assert.doesNotMatch(pane, /style="/);
-  // A heading has no icon in front of its words, and a row starts with its state mark and name.
-  assert.doesNotMatch(pane, /class="cs-pages-fold"[^>]*>\s*<i /);
-  assert.doesNotMatch(pane, /typeIcon/);
+  // A heading keeps its icon, in the heading's own colour; a worded button or menu row has none.
+  assert.match(pane, /class="cs-pages-fold"[^>]*>\s*<i class="\{\{typeIcon\}\}" aria-hidden="true"><\/i>/);
+  assert.match(pane, /<span class="cs-pages-fold"><i class="fa-solid fa-file-pen" aria-hidden="true"><\/i>/);
+  assert.match(css, /\.cs-pages-fold > i \{[^}]*color: inherit/);
+  assert.doesNotMatch(pane, /class="cs-(quiet|page-btn)[^"]*"[^>]*>\s*<i /);
 });
 
 test('rows the search hides stay in the page, so the box filters without a redraw', () => {
