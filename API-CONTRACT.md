@@ -1754,6 +1754,7 @@ allowlist (`api-client.mjs`) is ignored.
 | `downtime.changed` | `{ open }` | Downtime was opened or closed; relayed to players' open windows |
 | `npc.spotlight` | none; `resourceId` is the NPC's entity id | "Show in Foundry" pressed on a Chronicle NPC page |
 | `system_state.updated` | `{ systemId, key }`; `resourceId` is the page's entity id; DM-equivalent sockets only | A system widget saved a page's per-system state (Draw Steel negotiation tracker: `systemId` `drawsteel`, `key` `negotiation`) |
+| `hero_layers.changed` | no payload; `resourceId` is the page's entity id; DM-equivalent sockets only; recorded in the change feed as `hero_layers` | The Director put a transformation layer on that page or took one off |
 | `quest.updated` | `{ version }`; `resourceId` is the quest page's id. Sent only to DM sockets when the change is DM-only | A quest sheet was saved; open quest windows refetch |
 | `notice_boards.updated` | `{ home }` (`page` or `category`); `resourceId` is the page id or the type id | A home's boards changed; open board windows refetch |
 | `roll.made` | A roll (see "Shared rolls" below); `resourceId` is the roll id. Public, gm and blind rolls in full; a self roll only to its owner's key | A roll was made at Chronicle's table or crafting, or recorded from Foundry |
@@ -1860,6 +1861,31 @@ The PUT needs an owner-level key; an older Chronicle without it answers 404 or
 405 and the module only logs (`tools/test-creature-forms.mjs`).
 
 Re-verify by: 2026-12-01 (Chronicle `internal/plugins/systemstate`, `internal/plugins/syncapi/system_state_api.go`; keyxmakerx/Chronicle#1051)
+
+### What the module does with `hero_layers.changed`
+
+A transformation layer (a vampire's bite, rising as a revenant) changes a
+hero's sheet fields in Chronicle without writing them. The module's
+allowlist includes the `hero_layers.` prefix; `scripts/actor-sync.mjs`
+reads, for the hero actor linked to that page,
+
+`GET /entities/:entityId/layers` →
+`{ "layers": [ { "id", "entityId", "name", "source", "note", "changes": [ { "field", "op", "value", "label"? } ], "createdAt" } ], "canEdit" }`
+
+(oldest first; `op` is `set`, `add`, `append` or `remove`; `"@level"` in a
+value is the hero's level) and keeps exactly one Active Effect per layer on
+the actor (`scripts/_layer-effects.mjs`). A `set` or `add` on a field with a
+`foundry_path` under `system.` becomes an override or an add on that path; a
+`set` of an object becomes one override per member; anything else is listed
+in the effect's description. Effects carry the flag `layer`; only those are
+ever changed or deleted. Fields an effect changes are left out of pushes
+while it is on. At connect the module reads the layers of the heroes the
+change feed lists under `hero_layers`, or every linked hero without the
+feed. A 403 `addon_disabled` (the campaign's Transformations add-on is off)
+or a 404 (an older Chronicle) stops the reads until the next message.
+`tools/test-layer-effects.mjs`, bench `chr-layer-effect`, `chr-layer-offline`.
+
+Re-verify by: 2026-12-15 (Chronicle `internal/plugins/transformations`, `internal/plugins/syncapi/layers_api.go`; keyxmakerx/Chronicle#2025)
 
 ### What the module does with `note.*`
 
