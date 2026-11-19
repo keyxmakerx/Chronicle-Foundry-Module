@@ -225,6 +225,9 @@ test('the list is quiet: a search box, words, small-caps headings and one button
   assert.match(pane, /\{\{#if isPrivate\}\}\s*<i class="fa-solid fa-lock cs-page-lock" role="img"[^>]*aria-label=/);
   // No inline colours: the tokens decide.
   assert.doesNotMatch(pane, /style="/);
+  // A heading has no icon in front of its words, and a row starts with its state mark and name.
+  assert.doesNotMatch(pane, /class="cs-pages-fold"[^>]*>\s*<i /);
+  assert.doesNotMatch(pane, /typeIcon/);
 });
 
 test('rows the search hides stay in the page, so the box filters without a redraw', () => {

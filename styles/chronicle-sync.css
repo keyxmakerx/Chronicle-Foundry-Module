@@ -678,7 +678,6 @@ button.chronicle-shop-door {
 .chronicle-dashboard button.cs-pages-fold { cursor: pointer; }
 .chronicle-dashboard button.cs-pages-fold:hover { color: var(--cs-text); }
 .chronicle-dashboard button.cs-pages-fold:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
-.cs-pages-fold > i { width: 14px; text-align: center; font-size: 12px; letter-spacing: 0; }
 .cs-pages-group[data-folded="true"] .cs-pages-fold { color: var(--cs-text-muted); }
 
 .cs-page-row {

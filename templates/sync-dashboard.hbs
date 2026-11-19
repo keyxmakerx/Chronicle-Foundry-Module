@@ -242,7 +242,7 @@
         <section class="cs-pages-group" data-page-group data-type-id="{{typeId}}" data-folded="{{#if isCollapsed}}true{{else}}false{{/if}}" {{#if hidden}}hidden{{/if}}>
           <div class="cs-pages-cap">
             <button type="button" class="cs-pages-fold" data-action="pages-fold" data-type-id="{{typeId}}" aria-expanded="{{#if isCollapsed}}false{{else}}true{{/if}}">
-              <i class="{{typeIcon}}" aria-hidden="true"></i><span>{{typeNamePlural}}</span>
+              <span>{{typeNamePlural}}</span>
             </button>
             <small title="{{statsText}}">{{statsText}}</small>
             <button type="button" class="cs-row-icon" data-action="pages-type-menu" data-type-id="{{typeId}}"
@@ -282,7 +282,7 @@
         {{#if foundryOnlyJournals.length}}
         <section class="cs-pages-group" data-page-group data-folded="false" {{#if pages.foundryOnlyHidden}}hidden{{/if}}>
           <div class="cs-pages-cap">
-            <span class="cs-pages-fold"><i class="fa-solid fa-file-pen" aria-hidden="true"></i><span>{{localize "CHRONICLE.Dashboard.Entities.FoundryOnlyJournals"}}</span></span>
+            <span class="cs-pages-fold"><span>{{localize "CHRONICLE.Dashboard.Entities.FoundryOnlyJournals"}}</span></span>
             <small>{{localize "CHRONICLE.Dashboard.Pages.NotLinked" count=foundryOnlyJournals.length}}</small>
             {{#if setAsideCount}}
             <button type="button" class="cs-quiet cs-quiet-danger" data-action="delete-set-aside">{{localize "CHRONICLE.Dashboard.Entities.DeleteSetAside" count=setAsideCount}}</button>
@@ -750,7 +750,7 @@
 
         <div class="cs-health-copy">
           <button type="button" class="cs-health-btn" data-action="copy-diagnostic-bundle">
-            <i class="fa-solid fa-clipboard-check" aria-hidden="true"></i> {{localize "CHRONICLE.Dashboard.HealthChecks.CopyReport"}}
+            {{localize "CHRONICLE.Dashboard.HealthChecks.CopyReport"}}
           </button>
           <span class="cs-health-muted">{{localize "CHRONICLE.Dashboard.HealthChecks.CopyReportHint"}}</span>
           <span class="debug-copy-result" data-bundle-result role="status"></span>

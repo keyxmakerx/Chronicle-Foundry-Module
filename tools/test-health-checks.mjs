@@ -226,7 +226,8 @@ test('the Health pane is a checklist, one copy button and a closed drawer', () =
   assert.match(pane, /<b>\{\{title\}\}<\/b>/);
   assert.ok(!/\{\{\{/.test(pane), 'row text is escaped');
   assert.match(pane, /data-action="copy-diagnostic-bundle"/);
-  assert.match(pane, /fa-clipboard-check/);
+  // A button with a word carries no icon.
+  assert.doesNotMatch(pane, /fa-clipboard-check/);
   const drawerAt = pane.indexOf('<details class="cs-health-drawer"');
   assert.ok(drawerAt > pane.indexOf('copy-diagnostic-bundle'), 'the button sits above the drawer');
   assert.match(pane, /\{\{#if health\.drawerOpen\}\} open\{\{\/if\}\}/);

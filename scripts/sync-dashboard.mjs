@@ -600,7 +600,6 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         typeId: type.id,
         typeName: type.name,
         typeNamePlural,
-        typeIcon: type.icon || 'fa-solid fa-file',
         isCollapsed,
         isTypeExcluded,
         entities,
