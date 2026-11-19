@@ -14,7 +14,7 @@
       <li>{{localize "CHRONICLE.Dashboard.FirstRun.StepReview"}}</li>
     </ol>
   </section>
-  {{> "modules/chronicle-sync/templates/chronicle-settings.hbs" settings}}
+  {{> "modules/chronicle-sync/templates/first-connect.hbs"}}
   {{else if firstRun}}
   {{!-- First run, once connected: the import wizard's steps fill the window. --}}
   <header class="cs-firstrun cs-firstrun-head">

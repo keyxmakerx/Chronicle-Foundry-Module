@@ -250,7 +250,7 @@
       "OpenSettings": "Open Settings",
       "FirstRun": {
         "Title": "Set up Chronicle in this world",
-        "ConnectFirst": "First, connect: paste the connect line from your Chronicle campaign, test it and save. After Foundry reloads, Chronicle Sync opens on the rest of the setup.",
+        "ConnectFirst": "First, connect: paste the connect line from your Chronicle campaign.",
         "StepConnect": "Connect",
         "StepScan": "Scan this world",
         "StepTypes": "Choose page types and tags",
@@ -259,6 +259,13 @@
         "NothingSent": "Nothing is sent to Chronicle until you press Start Import.",
         "Skip": "Skip setup",
         "Done": "Done"
+      },
+      "FirstConnect": {
+        "Connect": "Connect and continue",
+        "Connecting": "Connecting…",
+        "NothingSent": "Nothing is sent to Chronicle yet.",
+        "BadLine": "That is not a connect line. Copy it again from Chronicle: your campaign, then Manage, Foundry, Connection.",
+        "Connected": "Chronicle is connected. Reload Foundry to carry on with the setup."
       },
       "Common": {
         "Loading": "Loading...",

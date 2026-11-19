@@ -14,6 +14,7 @@ import {
   newSettingsState, settingsContext, wireSettingsForm, testConnection, refreshMembers,
 } from './chronicle-settings.mjs';
 import { ImportWizard } from './import-wizard.mjs';
+import { wireFirstConnect } from './first-connect.mjs';
 import { getSetting, setSetting, getUserMappings } from './settings.mjs';
 import { SyncHistoryTab } from './sync-history-tab.mjs';
 import { FLAG_SCOPE, REPORT_STORE_FLAG } from './constants.mjs';
@@ -128,6 +129,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       template: 'modules/chronicle-sync/templates/sync-dashboard.hbs',
       templates: [
         'modules/chronicle-sync/templates/chronicle-settings.hbs',
+        'modules/chronicle-sync/templates/first-connect.hbs',
         'modules/chronicle-sync/templates/import-wizard.hbs',
       ],
     },
@@ -277,7 +279,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     // Before a campaign is connected the window is the first-run screen's
     // first step, the connection settings.
     if (!this._syncManager || !this.api) {
-      return { configured: false, settings: { ...(await settingsContext(this._settings)), firstRun: true } };
+      return { configured: false };
     }
     if (this._firstRun) {
       return { configured: true, firstRun: await this._firstRun._prepareContext() };
@@ -1211,6 +1213,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!el) return;
     if (context.firstRun) {
       this._firstRun?._onRender(context.firstRun, options);
+      return;
+    }
+    if (context.configured === false) {
+      wireFirstConnect(el, { onConnected: () => this.startFirstRun() });
       return;
     }
 

@@ -105,6 +105,8 @@ test('Chronicle Sync wires the first-run screen', async () => {
   assert.match(dash, /if \(firstSave\) await setSetting\('firstRunPending', true\)/);
   assert.match(dash, /context\.configured && getSetting\('firstRunPending'\)\) this\.startFirstRun\(\)/);
   assert.match(settings, /register\(MODULE_ID, 'firstRunPending'/);
-  // Unconfigured: the steps and the settings; connected and in setup: the wizard.
-  assert.match(hbs, /\{\{#unless configured\}\}[\s\S]*cs-firstrun-steps[\s\S]*chronicle-settings\.hbs" settings\}\}\s*\{\{else if firstRun\}\}[\s\S]*import-wizard\.hbs" firstRun\}\}\s*\{\{else\}\}/);
+  // Unconfigured: the steps and the connect screen; connected and in setup: the wizard.
+  assert.match(hbs, /\{\{#unless configured\}\}[\s\S]*cs-firstrun-steps[\s\S]*first-connect\.hbs"\}\}\s*\{\{else if firstRun\}\}[\s\S]*import-wizard\.hbs" firstRun\}\}\s*\{\{else\}\}/);
+  const unconfigured = hbs.slice(hbs.indexOf('{{#unless configured}}'), hbs.indexOf('{{else if firstRun}}'));
+  assert.doesNotMatch(unconfigured, /chronicle-settings\.hbs/);
 });

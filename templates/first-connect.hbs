@@ -1,0 +1,27 @@
+{{!-- First-run connect screen: one pasted line, checked as it arrives; no settings tabs. --}}
+<div class="cs-connect" data-first-connect>
+  <label class="cs-connect-label" for="cs-first-line">{{localize "CHRONICLE.SettingsWindow.ConnectLine"}}</label>
+  <input class="cs-connect-input" id="cs-first-line" data-field="line" type="password" autocomplete="off" spellcheck="false">
+  <div class="cs-connect-checks" data-connect-checks aria-live="polite"><p class="cs-hint">{{localize "CHRONICLE.SettingsWindow.ConnectLineHint"}}</p></div>
+
+  <div class="cs-connect-act">
+    <button type="button" class="cs-connect-go" data-connect-go disabled>{{localize "CHRONICLE.Dashboard.FirstConnect.Connect"}}</button>
+    <span class="cs-connect-note">{{localize "CHRONICLE.Dashboard.FirstConnect.NothingSent"}}</span>
+  </div>
+
+  <details class="cs-by-hand cs-connect-hand">
+    <summary><i class="fa-solid fa-chevron-right" aria-hidden="true"></i>{{localize "CHRONICLE.SettingsWindow.ByHand"}}</summary>
+    <div class="cs-field">
+      <label for="cs-first-url">{{localize "CHRONICLE.SettingsWindow.Address"}}</label>
+      <div class="cs-ctl"><input id="cs-first-url" data-field="apiUrl" type="url" placeholder="https://chronicle.example.com" autocomplete="off" spellcheck="false"></div>
+    </div>
+    <div class="cs-field">
+      <label for="cs-first-key">{{localize "CHRONICLE.SettingsWindow.ApiKey"}}</label>
+      <div class="cs-ctl"><input id="cs-first-key" data-field="apiKey" type="password" autocomplete="off" spellcheck="false"></div>
+    </div>
+    <div class="cs-field">
+      <label for="cs-first-campaign">{{localize "CHRONICLE.SettingsWindow.Campaign"}}</label>
+      <div class="cs-ctl"><input id="cs-first-campaign" data-field="campaignId" type="text" autocomplete="off" spellcheck="false"></div>
+    </div>
+  </details>
+</div>
