@@ -263,7 +263,7 @@
 }
 
 .chronicle-ask-real {
-  color: var(--cs-bad);
+  color: var(--cs-warn);
 }
 
 .chronicle-ask-actions {
