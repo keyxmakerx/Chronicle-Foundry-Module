@@ -50,7 +50,7 @@ test('unknown names fall back to the overview', () => {
 });
 
 test('the rail, sections and pane strips match the four sections', () => {
-  const hbs = read('templates/sync-dashboard.hbs') + read('templates/chronicle-settings.hbs');
+  const hbs = read('templates/sync-dashboard.hbs') + read('templates/chronicle-settings.hbs') + read('templates/first-connect.hbs');
   const rail = [...hbs.matchAll(/<a class="item[^"]*" data-tab="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(rail, DASHBOARD_TABS);
   const panels = [...hbs.matchAll(/<div class="tab" data-tab="([^"]+)"/g)].map((m) => m[1]);
@@ -64,14 +64,15 @@ test('the rail, sections and pane strips match the four sections', () => {
   assert.match(hbs, /data-subtab="settings:\{\{id\}\}"/);
 });
 
-test('the Settings section is the settings form, and shows alone before a campaign is connected', () => {
+test('the Settings section is the settings form; before a campaign is connected the connect screen shows instead', () => {
   const hbs = read('templates/sync-dashboard.hbs');
   const partial = '{{> "modules/chronicle-sync/templates/chronicle-settings.hbs" settings}}';
-  assert.equal(hbs.split(partial).length - 1, 2);
-  assert.ok(hbs.indexOf(partial) < hbs.indexOf('{{else}}'), 'the unconnected state shows the form');
+  assert.equal(hbs.split(partial).length - 1, 1);
+  assert.ok(hbs.indexOf(partial) > hbs.indexOf('{{else}}'), 'the unconnected state does not show the form');
+  assert.ok(hbs.indexOf('first-connect.hbs"}}') < hbs.indexOf('{{else}}'), 'the unconnected state shows the connect screen');
   const src = read('scripts/sync-dashboard.mjs');
   assert.match(src, /templates: \[\s*'modules\/chronicle-sync\/templates\/chronicle-settings\.hbs',/);
-  assert.match(src, /return \{ configured: false, settings: \{ \.\.\.\(await settingsContext\(this\._settings\)\), firstRun: true \} \}/);
+  assert.match(src, /return \{ configured: false \};/);
 });
 
 test('every overview jump target resolves to a real section', () => {
@@ -83,7 +84,7 @@ test('every overview jump target resolves to a real section', () => {
 });
 
 test('every localize key in the dashboard and settings templates resolves in lang/en.json', () => {
-  const hbs = read('templates/sync-dashboard.hbs') + read('templates/chronicle-settings.hbs');
+  const hbs = read('templates/sync-dashboard.hbs') + read('templates/chronicle-settings.hbs') + read('templates/first-connect.hbs');
   const lang = JSON.parse(read('lang/en.json'));
   const keys = [...hbs.matchAll(/localize\s+(["'])([^"']+)\1/g)].map((m) => m[2]);
   assert.ok(keys.length > 100, 'expected the template to localize its labels');

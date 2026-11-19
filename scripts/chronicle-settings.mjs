@@ -24,6 +24,7 @@ const TABS = [
 ];
 const PART_ICONS = { journals: 'fa-book', maps: 'fa-map', calendar: 'fa-calendar-days', characters: 'fa-user', shops: 'fa-store' };
 const STEP_ICONS = { check: 'fa-circle-check', xmark: 'fa-circle-xmark', warn: 'fa-triangle-exclamation' };
+const CONNECTION_KEYS = ['apiUrl', 'apiKey', 'campaignId'];
 const SWITCHES = ['syncEnabled', 'syncCreatures', 'chronicleSheet', 'dmOnlyHidden', 'syncPermissions', 'autoSync', 'skipIncomingSanitization',
   'calendarAnnounceWeather', 'calendarAnnounceWorldstate', 'calendarAnnounceSeasonEra', 'calendarAnnounceMoon'];
 
@@ -202,6 +203,26 @@ export async function saveSettingsForm(form) {
 }
 
 /**
+ * Save only the connection, by the rules the Settings form uses: a pasted
+ * line goes through applyConnectLine, by-hand values through planSettingsSave
+ * with the three connection writes kept. The API key is a client setting, so
+ * it never reaches a world setting. Throws when a write fails.
+ * @param {{ connectLine?: string, apiUrl?: string, apiKey?: string, campaignId?: string }} values
+ * @returns {Promise<boolean>} false when the connect line was not applied (it has already told the GM why)
+ */
+export async function saveConnectionFields(values) {
+  const plan = planSettingsSave(values, readCurrent());
+  if (plan.connectLine) {
+    const { applyConnectLine } = await import('./settings.mjs');
+    return applyConnectLine(plan.connectLine);
+  }
+  for (const [key, value] of plan.writes) {
+    if (CONNECTION_KEYS.includes(key)) await game.settings.set(MODULE_ID, key, value);
+  }
+  return true;
+}
+
+/**
  * Foundry's Configure Settings menu entry. Foundry renders the class it is
  * given; this one opens the Chronicle Sync window at Settings instead of a
  * window of its own.
@@ -286,7 +307,7 @@ function readCurrent() {
 }
 
 /** One test step as a list item; the text goes in as text, never markup. */
-function stepItem(icon, text, order = 0) {
+export function stepItem(icon, text, order = 0) {
   const li = document.createElement('li');
   li.className = `cs-step cs-step-${icon} cs-peek`;
   // The results land together; a small stagger reads them in as one by one.
