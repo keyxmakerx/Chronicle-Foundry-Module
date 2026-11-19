@@ -33,7 +33,7 @@ async function typed(seed, name, pattern) {
 test('a journal a player makes becomes a page, and deleting it moves the page to the Trash', () => scenario('fvtt-player-journal', async ({ seed, world }) => {
   await openWorld(world, MODULES);
   await mapPlayer(seed, world);
-  const journal = await world.asPlayer(() => world.game.JournalEntry.create({
+  const journal = await world.asPlayer(() => JournalEntry.create({
     name: 'Mira\'s Diary', ownership: { default: 0, [PLAYER]: 3 },
   }));
   await waitFor(() => journal.getFlag(FLAG, 'entityId'), 10000, 'page created');
