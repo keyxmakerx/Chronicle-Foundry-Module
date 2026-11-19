@@ -536,7 +536,7 @@ are immutable via this route. Flat route, no `/metadata` suffix.
 #### GET /members
 Lists campaign members with their display names and roles.
 
-**Used by:** `sync-manager.mjs` → auto-match Chronicle users to Foundry users by display name
+**Used by:** `sync-manager.mjs` → auto-match Chronicle users to Foundry users (`_member-match.mjs`: display name, and `character_entity_id` with the Foundry owner of that character's actor)
 
 **Response:** a bare array. The sync API sends no email address. `character_entity_id` and `character_name` appear only for a member with a character.
 ```json

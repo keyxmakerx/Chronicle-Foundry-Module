@@ -17,6 +17,8 @@ import { HistoryReporter, activityToEvent, describeMessage, resourceIdOf, resour
 import { walkChangeFeed, cursorFor, feedForArea, FEED_PAGE_SIZE, FEED_SETTLE_MS } from './_change-feed.mjs';
 import { getSetting, setSetting, isConfigured, getSyncDirections, getExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
 import { memberKey } from './_member-mapping.mjs';
+import { planMemberMatches } from './_member-match.mjs';
+import { FLAG_SCOPE } from './constants.mjs';
 import { fetchChronicleVersion } from './_chronicle-version.mjs';
 import { connectionAction } from './_connection-change.mjs';
 import { pushGate, pullGate, parseHeld, holdChange, dropHeld } from './_held-changes.mjs';
@@ -37,6 +39,11 @@ const HISTORY_FLUSH_MS = 15_000;
 
 /** A burst of actor changes (an import, a cleanup) sends one monster report. */
 const MONSTER_DEBOUNCE_MS = 10_000;
+
+/** A Foundry user added or renamed is matched to members after this pause. */
+const REMATCH_DEBOUNCE_MS = 1_000;
+/** Members are read again for a claimant with no Foundry user at most this often. */
+const MEMBER_REFRESH_MIN_MS = 120_000;
 
 export { memberKey };
 
@@ -392,58 +399,23 @@ export class SyncManager {
   }
 
   /**
-   * Fetch campaign members from Chronicle and auto-match to Foundry users.
-   * Stores mappings in the `userMappings` setting.
+   * Fetch campaign members from Chronicle and auto-match them to Foundry
+   * users (`_member-match.mjs`), storing new links in `userMappings`.
    *
    * After the auto-match, any Chronicle member that could NOT be linked to a
    * Foundry user is surfaced — a `ui.notifications.warn` + a dashboard
    * `warning` activity entry listing each unmatched member — and cached on
    * `_unmatchedMembers` for Chronicle settings (Players). This must stay visible:
    * an unmatched member's per-user permission grants are silently dropped on
-   * both push and pull. Members already mapped by hand are not reported as
-   * unmatched.
+   * both push and pull.
    */
   async fetchAndCacheMembers() {
     try {
       const result = await this.api.get('/members');
       const members = result?.data || result || [];
       this._members = Array.isArray(members) ? members : [];
-
-      // Auto-match by display_name → Foundry user name. A mapping grants
-      // access (notes, stashes, a claimed character's actor), so only a name
-      // that is unique on both sides is matched; anything ambiguous is left
-      // for the GM to link under Players in Chronicle settings.
-      const mappings = getUserMappings();
-      let newMappings = 0;
-      const unmatched = [];
-      const lc = (v) => (v || '').toLowerCase();
-      const memberNameCount = new Map();
-      for (const m of this._members) {
-        const n = lc(m.display_name);
-        if (n) memberNameCount.set(n, (memberNameCount.get(n) || 0) + 1);
-      }
-      for (const member of this._members) {
-        const key = memberKey(member);
-        if (!key) continue;
-        if (mappings[key]) continue; // Already mapped (auto or manual).
-        const name = lc(member.display_name);
-        const candidates = name ? game.users.filter((u) => lc(u.name) === name) : [];
-        const foundryUser = candidates.length === 1 && memberNameCount.get(name) === 1
-          ? candidates[0] : null;
-        if (foundryUser) {
-          mappings[key] = foundryUser.id;
-          newMappings++;
-        } else {
-          unmatched.push(member);
-        }
-      }
-      if (newMappings > 0) {
-        await setUserMappings(mappings);
-        this.logActivity('connect', `Auto-matched ${newMappings} Chronicle members to Foundry users`);
-      }
-
-      this._unmatchedMembers = unmatched;
-      this._reportUnmatchedMembers(unmatched);
+      this._membersReadAt = Date.now();
+      const mappings = await this._matchMembers();
 
       // A cosmetic extra: never held up or failed by it.
       this._avatars.apply(this._members, mappings, memberKey)
@@ -458,6 +430,121 @@ export class SyncManager {
       this._unmatchedMembers = [];
       this.logActivity('warning', 'Failed to fetch campaign members — per-user permission mapping is unavailable this session');
       ui.notifications?.warn?.('Chronicle: Could not fetch campaign members. Per-player permission mapping is unavailable — see the sync dashboard.');
+    }
+  }
+
+  /**
+   * Link the cached members that have no live Foundry user yet, save any new
+   * links, and report who is still unlinked. `quiet` skips the pop-up when
+   * nothing new was found (a re-match after a user edit).
+   * @param {{quiet?: boolean}} [opts]
+   * @returns {Promise<Object<string,string>>} the mappings now saved
+   * @private
+   */
+  async _matchMembers({ quiet = false } = {}) {
+    const mappings = getUserMappings();
+    const users = (game.users?.contents ?? Array.from(game.users ?? []))
+      .map((u) => ({ id: u.id, name: u.name, isGM: !!u.isGM }));
+    const { add, how, unmatched } = planMemberMatches({
+      members: this._members || [],
+      mappings,
+      users,
+      keyOf: memberKey,
+      evidence: this._memberEvidence(),
+    });
+    const keys = Object.keys(add);
+    if (keys.length > 0) {
+      Object.assign(mappings, add);
+      await setUserMappings(mappings);
+      const fromSetup = keys.filter((k) => how[k] === 'setup').length;
+      const detail = fromSetup ? ` (${fromSetup} from who owns their character in Foundry)` : '';
+      this.logActivity('connect', `Auto-matched ${keys.length} Chronicle member${keys.length === 1 ? '' : 's'} to Foundry users${detail}`);
+    }
+    const before = new Set((this._unmatchedMembers || []).map(memberKey));
+    this._unmatchedMembers = unmatched;
+    if (!quiet || unmatched.some((m) => !before.has(memberKey(m)))) this._reportUnmatchedMembers(unmatched);
+    return mappings;
+  }
+
+  /**
+   * Per member, the players the GM already gave that member's character to
+   * in Foundry: explicit Owner on the linked actor, or the actor as their
+   * assigned character. An actor everyone owns says nothing about anyone.
+   * @returns {Map<string, Set<string>>}
+   * @private
+   */
+  _memberEvidence() {
+    const out = new Map();
+    const owner = CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
+    const users = game.users?.contents ?? Array.from(game.users ?? []);
+    const players = users.filter((u) => !u.isGM);
+    const byCharacter = new Map();
+    for (const m of this._members || []) {
+      if (m?.character_entity_id && memberKey(m)) byCharacter.set(m.character_entity_id, memberKey(m));
+    }
+    for (const actor of game.actors?.contents ?? []) {
+      const entityId = actor.getFlag?.(FLAG_SCOPE, 'entityId');
+      if (!entityId) continue;
+      const cached = actor.getFlag?.(FLAG_SCOPE, 'chronicleOwnerUserId');
+      const key = cached ? String(cached) : byCharacter.get(entityId);
+      if (!key) continue;
+      const ids = out.get(key) ?? new Set();
+      const ownership = actor.ownership ?? {};
+      if ((ownership.default ?? 0) < owner) {
+        for (const u of players) if ((ownership[u.id] ?? 0) >= owner) ids.add(u.id);
+      }
+      for (const u of players) if (u.character?.id === actor.id) ids.add(u.id);
+      if (ids.size) out.set(key, ids);
+    }
+    return out;
+  }
+
+  /**
+   * Match members again after a Foundry user was added or renamed, or a GM
+   * changed a link, then give claimed characters to their players. Uses the
+   * members already read; coalesces a burst into one pass.
+   * @private
+   */
+  _rematchSoon() {
+    if (!this._members) return;
+    if (this._rematchTimer) clearTimeout(this._rematchTimer);
+    this._rematchTimer = setTimeout(async () => {
+      this._rematchTimer = null;
+      try {
+        await this._matchMembers({ quiet: true });
+        await this._reconcileOwnership();
+      } catch (err) {
+        console.warn('Chronicle: could not match members again', err);
+      }
+    }, REMATCH_DEBOUNCE_MS);
+  }
+
+  /**
+   * A character's Chronicle owner has no Foundry user: they may have joined
+   * the campaign since connect. Read the members again (at most every two
+   * minutes), match, and apply claims.
+   * @returns {Promise<void>}
+   */
+  async refreshMembersForClaim() {
+    if (this._memberRefresh) return this._memberRefresh;
+    if (Date.now() - (this._membersReadAt ?? 0) < MEMBER_REFRESH_MIN_MS) return undefined;
+    this._memberRefresh = (async () => {
+      const before = JSON.stringify(getUserMappings());
+      await this.fetchAndCacheMembers();
+      if (JSON.stringify(getUserMappings()) !== before) await this._reconcileOwnership();
+    })().finally(() => { this._memberRefresh = null; });
+    return this._memberRefresh;
+  }
+
+  /** Every module that applies Chronicle claims re-applies them. @private */
+  async _reconcileOwnership() {
+    for (const mod of this._modules) {
+      if (typeof mod.reconcileOwnership !== 'function') continue;
+      try {
+        await mod.reconcileOwnership();
+      } catch (err) {
+        console.warn(`Chronicle: ${mod.constructor.name} could not apply owners`, err);
+      }
     }
   }
 
@@ -578,6 +665,11 @@ export class SyncManager {
       ['createUser', soon],
       ['deleteUser', soon],
       ['chronicleUserMappingsChanged', soon],
+      // A player added or renamed may now match a member; a GM's own link
+      // gives that member's claimed character to them now, not next connect.
+      ['createUser', () => this._rematchSoon()],
+      ['updateUser', (_user, change) => { if (change && ('name' in change || 'character' in change)) this._rematchSoon(); }],
+      ['chronicleUserMappingsChanged', () => this._rematchSoon()],
       // A player's request relayed through this GM client, done or failed.
       ['chronicleRelayOutcome', (userId, err) => this.recordUserOutcome(userId, err)],
       // The monster list changes when actors come, go or are renamed.
@@ -647,6 +739,7 @@ export class SyncManager {
     if (this._playerDebounce) { clearTimeout(this._playerDebounce); this._playerDebounce = null; }
     if (this._monsterDebounce) { clearTimeout(this._monsterDebounce); this._monsterDebounce = null; }
     if (this._sceneDebounce) { clearTimeout(this._sceneDebounce); this._sceneDebounce = null; }
+    if (this._rematchTimer) { clearTimeout(this._rematchTimer); this._rematchTimer = null; }
     for (const mod of this._modules) {
       if (typeof mod.destroy === 'function') {
         mod.destroy();

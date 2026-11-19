@@ -64,12 +64,15 @@ export function identityPicks(fieldDefs, fieldsData) {
  *   this actor. A field whose pick hasn't changed since is left alone: a
  *   different item there is the GM's own swap in Foundry, which the next
  *   field push carries to Chronicle, and replacing it would delete it.
+ *   With no record at all, picks only fill empty slots, for the same reason.
  * @returns {Array<{fieldKey: string, itemType: string, wantName: string, removeIds: string[]}>}
  */
 export function planIdentityItems({ items, fieldDefs, fieldsData, applied }) {
   const list = Array.isArray(items) ? items : [];
   const data = fieldsData && typeof fieldsData === 'object' ? fieldsData : {};
-  const last = applied && typeof applied === 'object' ? applied : {};
+  // No record at all: sync has never applied identity picks to this actor.
+  const firstApply = !(applied && typeof applied === 'object');
+  const last = firstApply ? {} : applied;
   const plan = [];
   for (const def of identityFieldDefs(fieldDefs)) {
     const raw = data[def.key];
@@ -82,6 +85,12 @@ export function planIdentityItems({ items, fieldDefs, fieldsData, applied }) {
     const current = list.filter((it) => it && it.type === itemType);
     // The adapter reads the first item of the type, so that is the one compared.
     if (current.length && norm(current[0].name) === norm(wantName)) continue;
+    // Sync has never applied picks to this actor, and it already has one:
+    // that item is the sheet's own, built in Foundry, perhaps with the
+    // system's advancements. Replacing it would delete it unasked; it stays,
+    // and the actor's next push carries its name to Chronicle, as linking an
+    // actor does.
+    if (firstApply && current.length) continue;
     // Only that first item is replaced; any others of the type (a second kit)
     // are the GM's and stay, since sync never deletes without asking.
     plan.push({ fieldKey: def.key, itemType, wantName, removeIds: current.length ? [current[0].id] : [] });
