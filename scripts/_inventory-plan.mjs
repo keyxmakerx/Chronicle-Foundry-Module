@@ -15,6 +15,24 @@ import { FLAG_SCOPE } from './constants.mjs';
 
 export const HAS_ITEM = 'Has Item';
 
+/**
+ * Body of `POST /entities/:id/relations` for an item added in Foundry. The
+ * write binding is snake_case; metadata is a raw object, not a JSON string.
+ * @param {{targetEntityId: string, quantity?: number, equipped?: boolean, name?: string}} p
+ */
+export function hasItemBody({ targetEntityId, quantity, equipped, name }) {
+  return {
+    target_entity_id: targetEntityId,
+    relation_type: HAS_ITEM,
+    reverse_relation_type: 'In Inventory Of',
+    metadata: {
+      quantity: quantity ?? 1,
+      equipped: equipped ?? false,
+      foundry_item_name: name,
+    },
+  };
+}
+
 /** A relation's metadata as an object, whether Chronicle sent it parsed or as a string. */
 export function relationMeta(rel) {
   const m = rel?.metadata;

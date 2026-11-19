@@ -12,8 +12,8 @@ const PREFIX = 'CHRONICLE.Dashboard.Overview.';
  * so headless callers (tests) get readable text without Foundry's i18n.
  */
 export const DEFAULT_STRINGS = {
-  StatEntities: 'Entities Synced',
-  StatCharacters: 'Characters Synced',
+  StatEntities: 'Pages in sync',
+  StatCharacters: 'Characters in sync',
   StatMaps: 'Maps Linked',
   Disconnected: 'Disconnected',
   Never: 'Never',

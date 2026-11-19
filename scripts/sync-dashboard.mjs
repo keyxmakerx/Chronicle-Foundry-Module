@@ -11,12 +11,13 @@
 
 import { noticeText } from './_escape-html.mjs';
 import {
-  newSettingsState, settingsContext, wireSettingsForm, testConnection, refreshMembers,
+  newSettingsState, settingsContext, wireSettingsForm, testConnection, refreshMembers, syncNow,
 } from './chronicle-settings.mjs';
 import { ImportWizard } from './import-wizard.mjs';
+import { wireFirstConnect } from './first-connect.mjs';
 import { getSetting, setSetting, getUserMappings } from './settings.mjs';
 import { SyncHistoryTab } from './sync-history-tab.mjs';
-import { FLAG_SCOPE, REPORT_STORE_FLAG } from './constants.mjs';
+import { FLAG_SCOPE, KEEP_LOCAL_FLAG, REPORT_STORE_FLAG, syncOptions } from './constants.mjs';
 import { confirmDialog, promptDialog } from './_dialogs.mjs';
 import { REMOVED_FOLDER_FLAG } from './_set-aside.mjs';
 import { buildMemberRows, memberKey } from './_member-mapping.mjs';
@@ -30,6 +31,17 @@ import {
 import { buildDiagnosticBundle } from './sync-diagnostic-bundle.mjs';
 import { checkDiceFiles, diceSoNiceReport } from './dice-so-nice.mjs';
 import { buildOverviewModel } from './_overview-model.mjs';
+import { buildHealthChecks, describeWaiting } from './_health-checks.mjs';
+import {
+  CATCH_UP_LIMIT, bringInPlan, catchUpPlan, groupStats, journalAction, journalDetails, journalLabelKey,
+  journalMenu, journalState, linkKeeps, matchesSearch, nameClashes, pageDetails, pageMenu, pageStatus,
+  pageTrouble, rowAction, rowHasMenu, rowState, sendAgainPlan, sendPlan, stateLabelKey, typeMenu,
+} from './_page-rows.mjs';
+import { isMapJournal } from './_journal-ownership.mjs';
+import { isOldNotesJournal } from './_notes-folder.mjs';
+import {
+  applyPagesSearch, markCatchingUp, openPagesMenu, togglePagesFold, wirePagesList,
+} from './pages-list.mjs';
 import { log, getLogBuffer } from './logger.mjs';
 import { walkEntityPages } from './_entity-page-walk.mjs';
 import { mapThumbSrc } from './_map-look.mjs';
@@ -43,6 +55,11 @@ import { resolveDashboardTab, SECTION_PANES } from './_dashboard-tabs.mjs';
 import { MAX_TEXT, relativeAge, splitReports, unreadCount } from './_debug-reports.mjs';
 import { reportToMarkdown } from './_debug-markdown.mjs';
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+
+/** Page rows "Bring in all" covers: a held page (sync off, same name, a character) is left out. */
+const BRING_IN_ALL = ['chronicle-only', 'failed'];
+/** Journal rows "Send all" covers: one set aside, with sync off or of a clashing name is left out. */
+const SEND_ALL = ['foundry-only', 'failed'];
 
 /**
  * SyncDashboard is the main sync management UI.
@@ -93,6 +110,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'open-settings': SyncDashboard.#onOpenSettingsAction,
       testConnection: SyncDashboard.#onTestConnectionAction,
       refreshMembers: SyncDashboard.#onRefreshMembersAction,
+      'sync-now': SyncDashboard.#onSyncNowAction,
       startImport: SyncDashboard.#onStartImportAction,
       ...Object.fromEntries(ImportWizard.ACTION_NAMES.map((name) => [name, SyncDashboard.#onWizardAction])),
       'open-shop': SyncDashboard.#onOpenShopAction,
@@ -117,6 +135,22 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'debug-report-row': SyncDashboard.#onDebugReportRowAction,
       'debug-report-send': SyncDashboard.#onDebugReportSendAction,
       'debug-report-cancel': SyncDashboard.#onDebugReportCancelAction,
+      'pages-menu': SyncDashboard.#onPagesMenuAction,
+      'pages-type-menu': SyncDashboard.#onPagesTypeMenuAction,
+      'pages-fold': SyncDashboard.#onPagesFoldAction,
+      'pages-select': SyncDashboard.#onPagesSelectAction,
+      'pages-sync-one': SyncDashboard.#onPagesSyncOneAction,
+      'pages-retry': SyncDashboard.#onPagesRetryAction,
+      'pages-send-waiting': SyncDashboard.#onPagesSendWaitingAction,
+      'pages-toggle-sync': SyncDashboard.#onPagesToggleSyncAction,
+      'pages-toggle-type': SyncDashboard.#onPagesToggleTypeAction,
+      'pages-copy-details': SyncDashboard.#onPagesCopyDetailsAction,
+      'pages-journal-menu': SyncDashboard.#onPagesJournalMenuAction,
+      'pages-journal-sync': SyncDashboard.#onPagesJournalSyncAction,
+      'pages-copy-journal': SyncDashboard.#onPagesCopyJournalAction,
+      'pages-link': SyncDashboard.#onPagesLinkAction,
+      'health-row': SyncDashboard.#onHealthRowAction,
+      'health-send-waiting': SyncDashboard.#onHealthSendWaitingAction,
     },
   };
 
@@ -125,6 +159,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       template: 'modules/chronicle-sync/templates/sync-dashboard.hbs',
       templates: [
         'modules/chronicle-sync/templates/chronicle-settings.hbs',
+        'modules/chronicle-sync/templates/first-connect.hbs',
         'modules/chronicle-sync/templates/import-wizard.hbs',
       ],
     },
@@ -159,6 +194,13 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
      */
     this._capabilityActorId = null;
 
+    /** Health pane: whether the troubleshooting drawer is open. Kept here so a re-render does not close it. */
+    this._healthDrawerOpen = false;
+    /** Health pane: whether the list of waiting changes is shown. */
+    this._healthWaitingOpen = false;
+    /** Health pane: true while "Send them now" is running. */
+    this._healthSending = false;
+
     // The saved tab may be a name an older version used; it opens where that
     // content lives now. Defaults to the Overview, a calm summary.
     const saved = resolveDashboardTab(getSetting('dashboardActiveTab') || 'overview');
@@ -179,6 +221,31 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     /** @type {Set<string>} Currently selected entity IDs for bulk operations. */
     this._selectedEntities = new Set();
+    /** Pages list: whether the checkboxes of select mode are showing. */
+    this._selecting = false;
+    /** @type {Map<string, object>} Pages list rows as last drawn, by page id. */
+    this._pageRows = new Map();
+    /** @type {Array<object>} Pages list groups as last drawn. */
+    this._pageGroups = [];
+    /** @type {Set<string>} Pages being brought up to date right now. */
+    this._catchingUp = new Set();
+    /** @type {Set<string>} Pages the list has already tried to bring up to date by itself. */
+    this._catchUpTried = new Set();
+    this._catchUpRunning = false;
+    /** @type {Map<string, object>} "Only in Foundry" rows as last drawn, by journal id. */
+    this._journalRows = new Map();
+    /** @type {Set<string>} Journals being sent right now. */
+    this._sendingJournals = new Set();
+    /** @type {Set<string>} Journals the list has already tried to send by itself. */
+    this._sendTried = new Set();
+    /** @type {Map<string, {message: string, at: number}>} Sends from the list that failed, by journal id. */
+    this._journalFailures = new Map();
+    /** Same-name clashes as last worked out, for the rows and the Link button. */
+    this._clashes = { pages: new Map(), journals: new Map() };
+    /** @type {Map<string, {message: string, at: number}>} Fixes made from the list that failed, by page id. */
+    this._pageFailures = new Map();
+    /** @type {Set<string>} Waiting changes the list has already sent again by itself. */
+    this._sendAgainTried = new Set();
 
     // Player reports state (per window, like _capabilityActorId).
     /** @type {string|null} Actor id picked for the side by side. */
@@ -195,6 +262,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @override */
   _onFirstRender(context, options) {
     super._onFirstRender?.(context, options);
+    // Each time the window opens, the list may try its fixes afresh.
+    this._catchUpTried.clear();
+    this._sendTried.clear();
+    this._sendAgainTried.clear();
     Hooks.on(REPORTS_CHANGED_HOOK, this._onReportsChanged);
     if (context.configured && getSetting('firstRunPending')) this.startFirstRun();
   }
@@ -202,6 +273,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @override */
   _onClose(options) {
     Hooks.off(REPORTS_CHANGED_HOOK, this._onReportsChanged);
+    // What Chronicle holds is read again the next time the window opens.
+    this._cache = { entityTypes: null, entities: null, maps: null, calendar: null };
     super._onClose?.(options);
   }
 
@@ -267,7 +340,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     // Before a campaign is connected the window is the first-run screen's
     // first step, the connection settings.
     if (!this._syncManager || !this.api) {
-      return { configured: false, settings: { ...(await settingsContext(this._settings)), firstRun: true } };
+      return { configured: false };
     }
     if (this._firstRun) {
       return { configured: true, firstRun: await this._firstRun._prepareContext() };
@@ -283,6 +356,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     try {
       entityGroups = await this._buildEntityGroups(exclusions);
       foundryOnlyJournals = this._getFoundryOnlyJournals();
+      this._journalRows = new Map(foundryOnlyJournals.map((j) => [j.id, j]));
     } catch (err) {
       console.error('Chronicle Dashboard: Failed to load entities', err);
       loadErrors.push({ tab: 'entities', message: err.message || 'Failed to load entities' });
@@ -326,6 +400,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       log.error('Dashboard: Failed to build sync capability', err);
       loadErrors.push({ tab: 'problems', message: err.message || 'Failed to build sync capability' });
     }
+
+    const dice = this._buildDiceData();
 
     // Build characters tab data.
     const characterData = this._buildCharacterData();
@@ -381,7 +457,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       // Issues (resolver) tab.
       issues: issuesData,
 
-      // Entities tab.
+      // Pages list.
       entityGroups: entityGroups.map(g => ({
         ...g,
         entities: g.entities.map(e => ({
@@ -391,10 +467,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       })),
       entityTypes: entityGroups.map(g => ({ id: g.typeId, name: g.typeNamePlural })),
       foundryOnlyJournals,
-      hasChronicleOnly: entityGroups.some(g => g.entities.some(e => e.status === 'chronicle-only')),
-      hasFoundryOnly: foundryOnlyJournals.length > 0,
+      pages: this._buildPagesListData(entityGroups, foundryOnlyJournals),
       setAsideCount: foundryOnlyJournals.filter((j) => j.setAside).length,
-      bulkSelectionCount: this._selectedEntities.size,
 
       // Shops tab.
       ...shopData,
@@ -415,7 +489,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       capability: capabilityData,
 
       // Diagnostics, Health pane: Dice So Nice as this client sees it.
-      dice: this._buildDiceData(),
+      dice,
+
+      // Diagnostics, Health pane: the plain checklist and its drawer.
+      health: this._buildHealthData(statusData, capabilityData, dice),
 
       // Diagnostics, Player reports pane.
       debug: debugData,
@@ -450,6 +527,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       );
       this._cache.entities = walked.entities;
       this._cache.entitiesTruncated = walked.truncated;
+      this._cache.entitiesAt = Date.now();
       if (walked.truncated) {
         console.warn(`Chronicle: dashboard entity list stopped at ${walked.entities.length}; the campaign has more.`);
       }
@@ -469,7 +547,30 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       if (eid) actorEntityIds.add(eid);
     }
 
-    // Build groups.
+    const t = (key, data) => (data
+      ? game.i18n.format(`CHRONICLE.Dashboard.Pages.${key}`, data)
+      : game.i18n.localize(`CHRONICLE.Dashboard.Pages.${key}`));
+    const journalSync = this._journalSync();
+    const isExcluded = (entity) => exclusions.excludedEntities.includes(entity.id)
+      || exclusions.excludedTypes.includes(entity.entity_type_id);
+    // A page and a journal of one name, neither linked, are held for the GM
+    // instead of being copied across as two more.
+    this._clashes = nameClashes({
+      rows: chronicleEntities.map((entity) => ({
+        id: entity.id,
+        name: entity.name,
+        status: journalsByEntityId.has(entity.id) || actorEntityIds.has(entity.id) ? 'linked' : 'chronicle-only',
+        excluded: isExcluded(entity),
+      })),
+      journals: this._unlinkedJournals().filter((j) => !j.setAside && !j.keepLocal),
+      linkedNames: [...journalsByEntityId.values()].map((j) => j.name),
+    });
+    const waiting = this.api.getRetryQueue?.() ?? [];
+    const errors = this.api.getErrorLog?.() ?? [];
+    const searching = !!this._searchFilter.trim();
+
+    // Build groups. Every page is listed; the search only hides rows, so the
+    // box can filter what is on screen without another draw.
     const groups = [];
     for (const type of types) {
       const typeEntities = chronicleEntities.filter(e => e.entity_type_id === type.id);
@@ -477,58 +578,85 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
       const entities = typeEntities.map(entity => {
         const journal = journalsByEntityId.get(entity.id);
-        const isExcluded = exclusions.excludedEntities.includes(entity.id) || isTypeExcluded;
-
-        let status = actorEntityIds.has(entity.id) ? 'actor' : 'chronicle-only';
-        if (journal) {
-          const lastSync = journal.getFlag(FLAG_SCOPE, 'lastSync');
-          if (lastSync) {
-            const syncTime = new Date(lastSync).getTime();
-            const updateTime = new Date(entity.updated_at).getTime();
-            if (Math.abs(updateTime - syncTime) < 5000) {
-              status = 'synced';
-            } else if (updateTime > syncTime) {
-              status = 'modified';
-            } else {
-              status = 'synced';
-            }
-          } else {
-            status = 'synced';
-          }
-        }
+        const pageExcluded = exclusions.excludedEntities.includes(entity.id);
+        const lastSync = journal?.getFlag(FLAG_SCOPE, 'lastSync') || '';
+        const recordedVersion = journal?.getFlag(FLAG_SCOPE, 'chronicleUpdatedAt') || '';
+        const status = pageStatus({
+          linked: !!journal,
+          isActor: actorEntityIds.has(entity.id),
+          recordedVersion,
+          lastSync,
+          updatedAt: entity.updated_at,
+        });
+        // A page with no journal has no sync history to read: only a try
+        // made from this list can have failed for it.
+        const local = this._pageFailures.get(entity.id) ?? null;
+        const trouble = journal ? pageTrouble({
+          entityId: entity.id,
+          lastSync,
+          sentAt: this.api.getReplayedAt?.('PUT', `/entities/${entity.id}`) ?? 0,
+          waiting,
+          errors,
+          local,
+        }) : (local && { kind: 'failed', direction: 'in', message: local.message, at: local.at });
+        const clashWith = this._clashes.pages.get(entity.id);
+        const state = rowState(status, {
+          excluded: pageExcluded || isTypeExcluded,
+          trouble,
+          catchingUp: this._catchingUp.has(entity.id),
+          clash: this._clashes.pages.has(entity.id),
+          character: status === 'chronicle-only' && !!journalSync?._isHandledByActorSync?.(entity),
+        });
+        const action = rowAction(state, { paired: !!clashWith });
+        let stateTitle = '';
+        if (state === 'waiting') stateTitle = t('WaitingHint');
+        if (state === 'failed') stateTitle = t(trouble.direction === 'out' ? 'FailedOut' : 'FailedIn', { reason: trouble.message });
+        if (state === 'clash') stateTitle = t(clashWith ? 'ClashPairHint' : 'ClashHint');
+        if (state === 'character') stateTitle = t('CharacterHint');
+        if (state === 'chronicle-only-off') stateTitle = t('OnlyChronicleOffHint');
 
         return {
           id: entity.id,
           name: entity.name,
           typeName: type.name,
           status,
+          state,
+          stateLabel: t(stateLabelKey(state)),
+          stateTitle,
+          trouble,
+          action: action ? { action: action.action, label: t(action.labelKey) } : null,
+          clashJournalId: clashWith ?? null,
+          hasMenu: rowHasMenu(state),
+          menuLabel: t('MoreFor', { name: entity.name }),
           isPrivate: entity.is_private ?? false,
-          isExcluded,
+          isExcluded: pageExcluded || isTypeExcluded,
+          pageExcluded,
+          typeExcluded: isTypeExcluded,
           journalId: journal?.id ?? null,
           updatedAt: entity.updated_at,
+          recordedVersion,
+          lastSync,
+          hidden: !matchesSearch(entity.name, this._searchFilter),
         };
       });
 
-      // Apply search filter.
-      const filtered = this._searchFilter
-        ? entities.filter(e => e.name.toLowerCase().includes(this._searchFilter.toLowerCase()))
-        : entities;
-
-      const syncedCount = filtered.filter(e => e.status === 'synced' || e.status === 'modified' || e.status === 'actor').length;
-      const chronicleOnlyCount = filtered.filter(e => e.status === 'chronicle-only').length;
-
+      const typeNamePlural = type.name_plural || type.name + 's';
+      const isCollapsed = this._collapsedTypes.has(type.id);
+      const matches = entities.filter((e) => !e.hidden).length;
       groups.push({
         typeId: type.id,
         typeName: type.name,
-        typeNamePlural: type.name_plural || type.name + 's',
+        typeNamePlural,
         typeIcon: type.icon || 'fa-solid fa-file',
-        typeColor: type.color || '#888',
-        isCollapsed: this._collapsedTypes.has(type.id),
+        isCollapsed,
         isTypeExcluded,
-        entities: filtered,
-        syncedCount,
-        chronicleOnlyCount,
-        totalCount: filtered.length,
+        entities,
+        statsText: groupStats(entities, { typeExcluded: isTypeExcluded })
+          .map((part) => t(part.key, { count: part.count })).join(', '),
+        menuLabel: t('MoreFor', { name: typeNamePlural }),
+        hidden: searching && matches === 0,
+        rowsHidden: isCollapsed && !searching,
+        totalCount: entities.length,
       });
     }
 
@@ -571,7 +699,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!ok) return;
     try {
       await JournalEntry.deleteDocuments(journals.map((j) => j.id));
-      this._logActivity('update', `Deleted ${journals.length} Foundry-only journal${one ? '' : 's'}`);
+      this._logActivity('update', `Deleted ${journals.length} journal${one ? '' : 's'} that ${one ? 'was' : 'were'} only in Foundry`);
     } catch (err) {
       console.error('Chronicle: deleting journals failed', err);
       ui.notifications.error(game.i18n.localize('CHRONICLE.Dashboard.Entities.DeleteFailed'));
@@ -579,26 +707,146 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this.render();
   }
 
-  _getFoundryOnlyJournals() {
-    const result = [];
-    const filter = this._searchFilter?.toLowerCase() || '';
+  /** Whether another part of the module owns this journal, so it is not a page. @private */
+  _notAPage(journal) {
+    const sync = this._journalSync();
+    if (sync?._ownedElsewhere) return sync._ownedElsewhere(journal);
+    return isMapJournal(journal, FLAG_SCOPE) || isOldNotesJournal(journal, FLAG_SCOPE);
+  }
 
+  /**
+   * Journals that could be pages and have none: not linked, and not a map,
+   * a calendar note or the report store, which sync their own way.
+   * @returns {Array<{id: string, name: string, setAside: boolean, keepLocal: boolean, sending: boolean, pageCount: number}>}
+   * @private
+   */
+  _unlinkedJournals() {
+    const result = [];
+    const beingSent = this._journalSync()?._inFlightCreates;
     for (const j of game.journal.contents) {
       if (j.getFlag(FLAG_SCOPE, 'entityId')) continue;
       if (j.getFlag(FLAG_SCOPE, REPORT_STORE_FLAG)) continue;
-
-      if (filter && !j.name.toLowerCase().includes(filter)) continue;
-
+      if (this._notAPage(j)) continue;
       result.push({
         id: j.id,
         name: j.name,
-        status: 'foundry-only',
-        pageCount: j.pages?.size ?? 0,
         setAside: this._isSetAside(j),
+        keepLocal: j.getFlag(FLAG_SCOPE, KEEP_LOCAL_FLAG) === true,
+        // A journal just made is on its way up already.
+        sending: this._sendingJournals.has(j.id) || !!beingSent?.has(j.id),
+        pageCount: j.pages?.size ?? 0,
       });
     }
-
     return result;
+  }
+
+  /**
+   * The "Only in Foundry" rows: each journal's state, its one button and
+   * whether it has a menu. Reads the clashes the page rows worked out.
+   * @returns {Array<object>}
+   * @private
+   */
+  _getFoundryOnlyJournals() {
+    const t = (key, data) => (data
+      ? game.i18n.format(`CHRONICLE.Dashboard.Pages.${key}`, data)
+      : game.i18n.localize(`CHRONICLE.Dashboard.Pages.${key}`));
+    return this._unlinkedJournals().map((j) => {
+      const clash = !j.setAside && !j.keepLocal ? (this._clashes.journals.get(j.id) ?? null) : null;
+      const failure = this._journalFailures.get(j.id) ?? null;
+      const state = journalState({
+        setAside: j.setAside,
+        keepLocal: j.keepLocal,
+        clash,
+        sending: j.sending,
+        failure,
+      });
+      const action = journalAction(state, { paired: !!clash?.entityId });
+      let stateTitle = '';
+      if (state === 'failed') stateTitle = t('FailedOut', { reason: failure.message });
+      if (state === 'clash') stateTitle = t(clash.entityId ? 'ClashPairHint' : 'ClashHint');
+      if (state === 'off') stateTitle = t('JournalOffHint');
+      return {
+        ...j,
+        status: 'foundry-only',
+        state,
+        stateLabel: t(journalLabelKey(state)),
+        stateTitle,
+        clash,
+        failure,
+        action: action ? { action: action.action, label: t(action.labelKey) } : null,
+        clashEntityId: clash?.entityId ?? null,
+        sending: state === 'sending',
+        menuLabel: t('MoreFor', { name: j.name }),
+        hidden: !matchesSearch(j.name, this._searchFilter),
+      };
+    });
+  }
+
+  /**
+   * What the Pages list shows around its rows: the counts on its quiet
+   * words, whether select mode is on, and the lines it adds when the list
+   * is cut short or page sync is off. Also keeps the rows for the menus.
+   * @private
+   */
+  _buildPagesListData(groups, foundryOnly) {
+    this._pageGroups = groups;
+    this._pageRows = new Map(groups.flatMap((g) => g.entities.map((e) => [e.id, e])));
+    const rows = [...this._pageRows.values()];
+    const searching = !!this._searchFilter.trim();
+    const foundryMatches = foundryOnly.filter((j) => !j.hidden).length;
+    const anyMatch = groups.some((g) => !g.hidden) || foundryMatches > 0;
+    const loaded = this._cache.entities?.length ?? 0;
+    return {
+      selecting: this._selecting,
+      selectedLabel: this._selectedLabel(this._selectedEntities.size),
+      nothingSelected: this._selectedEntities.size === 0,
+      bringInCount: rows.filter((r) => BRING_IN_ALL.includes(r.state) && !r.journalId).length,
+      sendCount: foundryOnly.filter((j) => SEND_ALL.includes(j.state)).length,
+      foundryOnlyHidden: searching && foundryMatches === 0,
+      noMatch: searching && !anyMatch,
+      empty: groups.length === 0 && foundryOnly.length === 0,
+      truncatedText: this._cache.entitiesTruncated
+        ? game.i18n.format('CHRONICLE.Dashboard.Pages.Truncated', { count: loaded })
+        : '',
+      readText: this._cache.entitiesAt
+        ? game.i18n.format('CHRONICLE.Dashboard.Pages.ReadAt', { time: this._healthClock(this._cache.entitiesAt) })
+        : game.i18n.localize('CHRONICLE.Dashboard.Pages.ReadNow'),
+      syncNote: this._pagesNote(),
+    };
+  }
+
+  /**
+   * Which way the list may move pages without being asked. Nothing moves
+   * while "Sync changes as they happen" is off, and a one-way direction
+   * for pages stops the other way.
+   * @returns {{in: boolean, out: boolean}}
+   * @private
+   */
+  _pagesMayMove() {
+    const live = !!getSetting('syncJournals') && getSetting('autoSync') !== false;
+    const manager = this._syncManager;
+    return {
+      in: live && (manager?.canPull?.('journals') ?? true),
+      out: live && (manager?.canPush?.('journals') ?? true),
+    };
+  }
+
+  /** The line above the list that says what does not sync by itself, if anything. @private */
+  _pagesNote() {
+    const may = this._pagesMayMove();
+    if (may.in && may.out) return '';
+    let key = 'SyncIsOff';
+    if (getSetting('syncJournals')) {
+      if (getSetting('autoSync') === false) key = 'LiveIsOff';
+      else if (may.in) key = 'OnlyFromChronicle';
+      else if (may.out) key = 'OnlyFromFoundry';
+    }
+    return game.i18n.localize(`CHRONICLE.Dashboard.Pages.${key}`);
+  }
+
+  /** "3 selected", for select mode's bar. @private */
+  _selectedLabel(count) {
+    return game.i18n.format('CHRONICLE.Dashboard.Pages.Selected', { count });
   }
 
   // ---------------------------------------------------------------------------
@@ -868,6 +1116,19 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     return { characters, hasUnlinkedCharacters, pcClaimingHint };
   }
 
+  /**
+   * Whether a part's direction rules out a button that sends to Chronicle
+   * ('push') or fetches from it ('pull'). Tells the GM when it does.
+   * @private
+   */
+  _directionRefuses(part, way) {
+    const gate = way === 'push' ? this._syncManager?.pushGate?.(part) : this._syncManager?.pullGate?.(part);
+    if (gate !== 'drop') return false;
+    const key = way === 'push' ? 'CHRONICLE.SettingsWindow.DirectionNoPush' : 'CHRONICLE.SettingsWindow.DirectionNoPull';
+    ui.notifications.warn(game.i18n.localize(key));
+    return true;
+  }
+
   /** @returns {object|null} the live ActorSync module, if active. @private */
   _actorSync() {
     return this._syncManager?._modules?.find((m) => m.constructor?.name === 'ActorSync') || null;
@@ -1128,7 +1389,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       gaps.push({ status: 'available-unmapped', label: `…and ${availCount - AVAIL_CAP} more available paths`, detail: '' });
     }
     for (const c of report.collections) {
-      gaps.push({ status: c.status, label: c.source, detail: `${c.count} item(s) [${c.types.join(', ')}] — ${c.note}` });
+      gaps.push({ status: c.status, label: c.source, detail: `${c.count} items [${c.types.join(', ')}] — ${c.note}` });
     }
     return gaps;
   }
@@ -1198,14 +1459,14 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       this._firstRun?._onRender(context.firstRun, options);
       return;
     }
+    if (context.configured === false) {
+      wireFirstConnect(el, { onConnected: () => this.startFirstRun() });
+      return;
+    }
 
     // --- Tab navigation ---
     this._initTabs(el);
-    // Saving the connection on the first-run screen marks the rest of the
-    // setup to open once Foundry has reloaded and connected.
-    const firstSave = context.configured === false;
     wireSettingsForm(el.querySelector('[data-settings-form]'), this._settings, async (result) => {
-      if (firstSave) await setSetting('firstRunPending', true).catch(() => {});
       await this.render({ force: true });
       // A new connection is tested straight away, so a wrong key shows now
       // rather than as a silent dot later.
@@ -1214,76 +1475,14 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     });
     this._historyTab.mount(el, this._historyShown());
 
-    // --- Search input ---
-    const search = el.querySelector('.dashboard-search');
-    if (search) {
-      search.addEventListener('input', (e) => {
-        this._searchFilter = e.target.value;
-        this.render({ force: true });
-      });
-    }
-
-    // --- Entity type header collapse/expand ---
-    el.querySelectorAll('.entity-type-header').forEach((header) => {
-      header.addEventListener('click', (e) => {
-        // Ignore clicks on the sync toggle button inside the header.
-        if (e.target.closest('.type-sync-toggle, [data-action]')) return;
-
-        const typeId = Number(header.dataset.typeId);
-        if (this._collapsedTypes.has(typeId)) {
-          this._collapsedTypes.delete(typeId);
-        } else {
-          this._collapsedTypes.add(typeId);
-        }
-        setSetting('dashboardCollapsedTypes', JSON.stringify([...this._collapsedTypes]));
-        this.render({ force: true });
-      });
+    // --- Pages list: search, folding, menus and select mode ---
+    wirePagesList(el, {
+      getSearch: () => this._searchFilter,
+      setSearch: (value) => { this._searchFilter = value; },
+      selected: this._selectedEntities,
+      selectedLabel: (count) => this._selectedLabel(count),
     });
-
-    // --- Type sync toggle ---
-    el.querySelectorAll('.type-sync-toggle').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const typeId = Number(btn.dataset.typeId);
-        this._onToggleType(typeId);
-      });
-    });
-
-    // --- Entity sync checkbox ---
-    el.querySelectorAll('.entity-sync-toggle').forEach((checkbox) => {
-      checkbox.addEventListener('change', (e) => {
-        const entityId = e.currentTarget.dataset.entityId;
-        this._onToggleEntity(entityId, e.currentTarget.checked);
-      });
-    });
-
-    // --- Bulk selection checkboxes ---
-    el.querySelectorAll('.bulk-entity-checkbox').forEach((checkbox) => {
-      checkbox.addEventListener('change', (e) => {
-        const entityId = e.currentTarget.dataset.entityId;
-        if (e.currentTarget.checked) {
-          this._selectedEntities.add(entityId);
-        } else {
-          this._selectedEntities.delete(entityId);
-        }
-        this.render({ force: true });
-      });
-    });
-
-    // --- Bulk select all checkbox ---
-    const selectAllCb = el.querySelector('.bulk-select-all-checkbox');
-    if (selectAllCb) {
-      selectAllCb.addEventListener('change', (e) => {
-        if (e.currentTarget.checked) {
-          el.querySelectorAll('.bulk-entity-checkbox').forEach((cb) => {
-            this._selectedEntities.add(cb.dataset.entityId);
-          });
-        } else {
-          this._selectedEntities.clear();
-        }
-        this.render({ force: true });
-      });
-    }
+    this._fixPagesByItself();
 
     // --- Bulk change type select ---
     const bulkTypeSelect = el.querySelector('.bulk-type-select');
@@ -1329,6 +1528,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // Map tab handlers are wired via the `open-map-journal` action above;
     // no additional select listeners are needed.
+
+    // Health drawer: `toggle` does not bubble and is not a click, so it is
+    // read here and kept on the instance for the next render.
+    const healthDrawer = el.querySelector('[data-health-drawer]');
+    healthDrawer?.addEventListener('toggle', () => { this._healthDrawerOpen = healthDrawer.open; });
   }
 
   /**
@@ -1440,6 +1644,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Refresh button: invalidate caches and re-render. */
   static #onRefresh() {
     this._cache = { entityTypes: null, entities: null, maps: null, calendar: null };
+    this._catchUpTried.clear();
+    this._pageFailures.clear();
+    this._sendTried.clear();
+    this._journalFailures.clear();
     this._settings.pageTypesTried = false;
     this.render({ force: true });
   }
@@ -1493,6 +1701,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** Trigger a verbose full map resync. */
   static async #onResyncAllMapsAction() {
+    if (this._directionRefuses('maps', 'pull')) return;
     const mapSync = this._syncManager?._modules?.find(
       (m) => m.constructor?.name === 'MapSync'
     );
@@ -1552,6 +1761,528 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   static #onReconnectAction() {
     this.api?.connect();
     setTimeout(() => this.render({ force: true }), 1000);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Health pane checklist
+  // ---------------------------------------------------------------------------
+
+  /** Clock time as the GM reads it, or '' for a missing or invalid time. @private */
+  _healthClock(ms) {
+    if (!ms) return '';
+    const d = new Date(ms);
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  /**
+   * The checklist rows, the waiting changes and the drawer state, from values
+   * the pane already computes. Reads only what is in memory.
+   * @private
+   */
+  _buildHealthData(statusData, capabilityData, dice) {
+    const t = (k, d) => (d ? game.i18n.format(k, d) : game.i18n.localize(k));
+    const health = this.api?.health ?? {};
+    const errorLog = statusData.errorLog ?? [];
+    const newest = errorLog[0];
+    const waitingItems = this.api?.getRetryQueue?.() ?? [];
+    const waiting = waitingItems.map((item) => describeWaiting(item, t));
+    const rows = buildHealthChecks({
+      connectionState: statusData.connectionState,
+      since: this._healthClock(health.connectedSince),
+      reconnects: health.reconnectAttempts ?? null,
+      lastAnswer: this._healthClock(health.lastRestSuccess),
+      waiting: waitingItems.length,
+      errorCount: errorLog.length,
+      newestError: newest ? { time: this._healthClock(newest.time), message: newest.message } : null,
+      dice,
+      systemMatched: statusData.systemMatched,
+      matchedSystem: statusData.matchedSystem,
+      foundrySystem: statusData.foundrySystem,
+      syncCharacters: statusData.syncCharacters,
+      capability: capabilityData,
+      t,
+    }).map((row) => (row.id === 'waiting' && this._healthWaitingOpen
+      ? { ...row, expanded: true, waiting, sending: this._healthSending }
+      : row));
+    return { rows, drawerOpen: this._healthDrawerOpen };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pages list
+  // ---------------------------------------------------------------------------
+
+  /** A page row's "more" button. */
+  static #onPagesMenuAction(_event, target) {
+    const row = this._pageRows.get(target.dataset.entityId);
+    if (!row) return;
+    openPagesMenu(this.element, target, pageMenu(row).map((item) => ({
+      action: item.action,
+      label: game.i18n.localize(`CHRONICLE.Dashboard.Pages.${item.labelKey}`),
+      data: { entityId: row.id, ...item.data },
+    })));
+  }
+
+  /** A type heading's "more" button. */
+  static #onPagesTypeMenuAction(_event, target) {
+    const group = this._pageGroups.find((g) => String(g.typeId) === target.dataset.typeId);
+    if (!group) return;
+    const collapsed = this._collapsedTypes.has(group.typeId);
+    openPagesMenu(this.element, target, typeMenu({ typeExcluded: group.isTypeExcluded, collapsed }).map((item) => ({
+      action: item.action,
+      label: game.i18n.localize(`CHRONICLE.Dashboard.Pages.${item.labelKey}`),
+      data: { typeId: String(group.typeId) },
+    })));
+  }
+
+  /** Fold or unfold one type's rows, and remember it for this GM. */
+  static #onPagesFoldAction(_event, target) {
+    const group = this._pageGroups.find((g) => String(g.typeId) === target.dataset.typeId);
+    if (!group) return;
+    if (togglePagesFold(this.element, group.typeId)) this._collapsedTypes.add(group.typeId);
+    else this._collapsedTypes.delete(group.typeId);
+    applyPagesSearch(this.element, this._searchFilter);
+    setSetting('dashboardCollapsedTypes', JSON.stringify([...this._collapsedTypes]));
+  }
+
+  /** Enter or leave select mode. Leaving forgets what was ticked. */
+  static #onPagesSelectAction() {
+    this._selecting = !this._selecting;
+    if (!this._selecting) this._selectedEntities.clear();
+    this.render({ force: true });
+  }
+
+  static #onPagesSyncOneAction(_event, target) {
+    if (this._directionRefuses('journals', 'pull')) return;
+    this._runCatchUp([target.dataset.entityId]);
+  }
+
+  static #onPagesRetryAction(_event, target) {
+    this._retryPage(target.dataset.entityId);
+  }
+
+  static #onPagesSendWaitingAction() {
+    this._sendWaiting();
+  }
+
+  static async #onPagesToggleSyncAction(_event, target) {
+    await this._onToggleEntity(target.dataset.entityId, target.dataset.enable === 'true');
+    this.render({ force: true });
+  }
+
+  static #onPagesToggleTypeAction(_event, target) {
+    const group = this._pageGroups.find((g) => String(g.typeId) === target.dataset.typeId);
+    if (group) this._onToggleType(group.typeId);
+  }
+
+  static #onPagesCopyDetailsAction(_event, target) {
+    this._copyPageDetails(target.dataset.entityId);
+  }
+
+  /** An "Only in Foundry" row's "more" button. */
+  static #onPagesJournalMenuAction(_event, target) {
+    const row = this._journalRows.get(target.dataset.journalId);
+    if (!row) return;
+    openPagesMenu(this.element, target, journalMenu({ ...row, paired: !!row.clashEntityId }).map((item) => ({
+      action: item.action,
+      label: game.i18n.localize(`CHRONICLE.Dashboard.Pages.${item.labelKey}`),
+      data: { journalId: row.id, ...item.data },
+    })));
+  }
+
+  /** Turn sync off or on for one journal that has no page. Off, the list never sends it. */
+  static async #onPagesJournalSyncAction(_event, target) {
+    const journal = game.journal.get(target.dataset.journalId);
+    if (!journal) return;
+    try {
+      await journal.update(
+        { [`flags.${FLAG_SCOPE}.${KEEP_LOCAL_FLAG}`]: target.dataset.enable !== 'true' },
+        syncOptions(),
+      );
+      // Turning it on again is a fresh start: the list may try it once more.
+      this._sendTried.delete(journal.id);
+      this._journalFailures.delete(journal.id);
+    } catch (err) {
+      log.warn(`Dashboard: could not change sync for journal ${journal.id}`, err);
+    }
+    this.render({ force: true });
+  }
+
+  static #onPagesCopyJournalAction(_event, target) {
+    this._copyJournalDetails(target.dataset.journalId);
+  }
+
+  /** "Link" on either row of a same-name pair. */
+  static #onPagesLinkAction(_event, target) {
+    const { entityId, journalId } = target.dataset;
+    const pageId = entityId || this._journalRows.get(journalId)?.clashEntityId;
+    const otherId = journalId || this._pageRows.get(entityId)?.clashJournalId;
+    if (pageId && otherId) this._linkPair(pageId, otherId);
+  }
+
+  /** The module that syncs pages with journals, if it is running. @private */
+  _journalSync() {
+    return this._syncManager?._modules?.find((m) => m.constructor?.name === 'JournalSync') ?? null;
+  }
+
+  /**
+   * Bring one page's journal up to date with Chronicle's copy, by the same
+   * path a live change takes, so sync being off for the page, a newer local
+   * version and an unsent Foundry edit are all still respected. A failure is
+   * kept for the row to show.
+   * @param {string} entityId
+   * @returns {Promise<boolean>} whether it worked
+   * @private
+   */
+  async _catchUpPage(entityId) {
+    try {
+      const journalSync = this._journalSync();
+      if (!journalSync) throw new Error(game.i18n.localize('CHRONICLE.Dashboard.Pages.NotRunning'));
+      const entity = await this.api.get(`/entities/${entityId}`);
+      if (!entity?.id) throw new Error(game.i18n.localize('CHRONICLE.Dashboard.Pages.NoAnswer'));
+      await journalSync._onEntityUpdated(entity);
+      // Page sync leaves some pages without a journal on purpose (sync off,
+      // a character). Nothing failed, and the row says which it is.
+      this._pageFailures.delete(entityId);
+      return true;
+    } catch (err) {
+      log.warn(`Dashboard: could not bring page ${entityId} up to date`, err);
+      this._pageFailures.set(entityId, { message: err?.message || String(err), at: Date.now() });
+      return false;
+    }
+  }
+
+  /**
+   * Bring these pages up to date one after another, showing each as
+   * "Catching up" (or "Bringing in", when it has no journal yet) meanwhile,
+   * then draw once.
+   * @param {string[]} ids
+   * @param {{draw?: boolean}} [opts] - false when more work follows before the draw
+   * @private
+   */
+  async _runCatchUp(ids, { draw = true } = {}) {
+    const todo = ids.filter((id) => id && !this._catchingUp.has(id));
+    if (!todo.length) return;
+    for (const id of todo) this._catchingUp.add(id);
+    const fresh = todo.filter((id) => !this._pageRows.get(id)?.journalId);
+    const stale = todo.filter((id) => !fresh.includes(id));
+    markCatchingUp(this.element, stale, game.i18n.localize('CHRONICLE.Dashboard.Pages.CatchingUp'));
+    markCatchingUp(this.element, fresh, game.i18n.localize('CHRONICLE.Dashboard.Pages.BringingIn'));
+    let updated = 0;
+    let broughtIn = 0;
+    for (const id of todo) {
+      const ok = await this._catchUpPage(id);
+      if (ok && fresh.includes(id)) broughtIn++;
+      else if (ok) updated++;
+      this._catchingUp.delete(id);
+    }
+    if (updated) this._logActivity('pull', `Brought ${updated} page${updated === 1 ? '' : 's'} up to date with Chronicle`);
+    if (broughtIn) this._logActivity('pull', `Brought in ${broughtIn} page${broughtIn === 1 ? '' : 's'} that had no journal`);
+    if (draw && this.rendered) this.render({ force: true });
+  }
+
+  /**
+   * What the list fixes without being asked, after each draw: pages that
+   * Chronicle changed are brought up to date, pages with no journal are
+   * brought in, journals with no page are sent, and changes still waiting
+   * to be sent are sent again. Each page, journal and waiting change is
+   * tried once per window, so a fix that keeps failing is shown on its row,
+   * never repeated in a loop; a pass takes a bounded number and the draw
+   * that ends it starts the next. Nothing runs while Chronicle is away,
+   * page sync or "Sync changes as they happen" is off, or the first-run
+   * setup has not finished choosing what to import; a one-way direction
+   * for pages stops the other way.
+   * @private
+   */
+  _fixPagesByItself() {
+    if (this.api?.state !== 'connected') return;
+
+    const waiting = this.api.getRetryQueue?.() ?? [];
+    const send = sendAgainPlan({ connected: true, waiting, tried: this._sendAgainTried });
+    if (send.length && !this._healthSending) {
+      for (const key of send) this._sendAgainTried.add(key);
+      this._sendWaiting();
+    }
+
+    if (this._catchUpRunning) return;
+    if (!this._cache.entities || !getSetting('syncJournals') || !this._journalSync()) return;
+    if (getSetting('firstRunPending')) return;
+    const may = this._pagesMayMove();
+    const rows = may.in ? [...this._pageRows.values()] : [];
+    const stale = catchUpPlan({ rows, tried: this._catchUpTried });
+    const fresh = bringInPlan({ rows, tried: this._catchUpTried, limit: CATCH_UP_LIMIT - stale.length });
+    // A list cut short cannot rule out a page of the same name further on,
+    // so nothing is sent from it unasked.
+    const journals = !may.out || this._cache.entitiesTruncated ? [] : sendPlan({
+      journals: [...this._journalRows.values()],
+      tried: this._sendTried,
+      limit: CATCH_UP_LIMIT - stale.length - fresh.length,
+    });
+    const ids = [...stale, ...fresh];
+    if (!ids.length && !journals.length) return;
+    for (const id of ids) this._catchUpTried.add(id);
+    for (const id of journals) this._sendTried.add(id);
+    this._catchUpRunning = true;
+    (async () => {
+      try {
+        if (ids.length) await this._runCatchUp(ids, { draw: false });
+        if (journals.length) await this._sendJournals(journals, { draw: false });
+      } catch (err) {
+        log.warn('Dashboard: the page list could not finish its own fixes', err);
+      }
+      // Cleared before the draw, whose own pass takes the next batch.
+      this._catchUpRunning = false;
+      if (this.rendered) this.render({ force: true });
+    })();
+  }
+
+  /**
+   * Send one journal that has no page, by the path a new journal takes, so
+   * its text, its secrets and who may see it are handled the same way. A
+   * failure is kept for the row to show.
+   * @param {string} journalId
+   * @returns {Promise<boolean>} whether a page was made
+   * @private
+   */
+  async _sendJournal(journalId) {
+    const journal = game.journal.get(journalId);
+    if (!journal || journal.getFlag(FLAG_SCOPE, 'entityId')) return false;
+    try {
+      const journalSync = this._journalSync();
+      if (!journalSync) throw new Error(game.i18n.localize('CHRONICLE.Dashboard.Pages.NotRunning'));
+      const sent = await journalSync._sendJournalAsPage(journal);
+      if (!sent) throw new Error(game.i18n.localize('CHRONICLE.Dashboard.Pages.NoPageTypes'));
+      this._journalFailures.delete(journalId);
+      return true;
+    } catch (err) {
+      log.warn(`Dashboard: could not send journal ${journalId}`, err);
+      // A page was made but its text or permissions did not follow: the
+      // journal is linked now, and its page row carries the trouble.
+      if (!journal.getFlag(FLAG_SCOPE, 'entityId')) {
+        this._journalFailures.set(journalId, { message: err?.message || String(err), at: Date.now() });
+      }
+      return false;
+    }
+  }
+
+  /**
+   * Send these journals one after another, showing each as "Sending"
+   * meanwhile. The list is read again afterwards, since Chronicle has new
+   * pages.
+   * @param {string[]} ids
+   * @param {{byHand?: boolean, draw?: boolean}} [opts] - byHand: the GM asked, so
+   *   say how it went; draw false when the caller draws
+   * @returns {Promise<number>} how many were sent
+   * @private
+   */
+  async _sendJournals(ids, { byHand = false, draw = true } = {}) {
+    const todo = ids.filter((id) => id && !this._sendingJournals.has(id));
+    if (!todo.length) return 0;
+    for (const id of todo) this._sendingJournals.add(id);
+    markCatchingUp(this.element, todo, game.i18n.localize('CHRONICLE.Dashboard.Pages.Sending'), 'journal');
+    let done = 0;
+    let linked = 0;
+    for (const id of todo) {
+      if (await this._sendJournal(id)) done++;
+      if (game.journal.get(id)?.getFlag(FLAG_SCOPE, 'entityId')) linked++;
+      this._sendingJournals.delete(id);
+    }
+    if (done) this._logActivity('push', `Sent ${done} journal${done === 1 ? '' : 's'} that had no page to Chronicle${byHand ? '' : ' by itself'}`);
+    // Sending is the one thing the list does unasked that leaves Foundry, so it says so.
+    if (done && !byHand) ui.notifications.info(game.i18n.format('CHRONICLE.Dashboard.Pages.SentByItself', { count: done }));
+    const failures = todo.length - done;
+    if (byHand && failures) ui.notifications.warn(game.i18n.format('CHRONICLE.Dashboard.Pages.SendFailed', { count: failures }));
+    if (linked) this._cache.entities = null;
+    if (draw && this.rendered) this.render({ force: true });
+    return done;
+  }
+
+  /**
+   * Link a page that has no journal and a journal that has no page, of the
+   * same name, after asking. One side's text replaces the other's, so the
+   * question says whose is kept: what the conflict setting picks.
+   * @param {string} entityId
+   * @param {string} journalId
+   * @private
+   */
+  async _linkPair(entityId, journalId) {
+    const journal = game.journal.get(journalId);
+    const journalSync = this._journalSync();
+    if (!journal) return;
+    if (!journalSync) {
+      ui.notifications.warn(game.i18n.localize('CHRONICLE.Dashboard.Pages.NotRunning'));
+      return;
+    }
+    try {
+      const entity = await this.api.get(`/entities/${entityId}`);
+      if (!entity?.id) throw new Error(game.i18n.localize('CHRONICLE.Dashboard.Pages.NoAnswer'));
+      const changedAt = Math.max(
+        journal._stats?.modifiedTime ?? 0,
+        ...[...(journal.pages ?? [])].map((page) => page._stats?.modifiedTime ?? 0),
+      );
+      // A part set to one direction keeps the side it syncs from, as a conflict does.
+      const oneWay = this._syncManager?.pullGate?.('journals') === 'drop' ? 'foundry'
+        : (this._syncManager?.pushGate?.('journals') === 'drop' ? 'chronicle' : null);
+      const keep = oneWay ?? linkKeeps({
+        strategy: getSetting('conflictResolution'),
+        journalChangedAt: changedAt,
+        pageUpdatedAt: entity.updated_at,
+      });
+      const ok = await confirmDialog({
+        title: game.i18n.localize('CHRONICLE.Dashboard.Pages.LinkTitle'),
+        content: `<p>${game.i18n.format(
+          keep === 'foundry' ? 'CHRONICLE.Dashboard.Pages.LinkKeepFoundry' : 'CHRONICLE.Dashboard.Pages.LinkKeepChronicle',
+          { name: noticeText(journal.name) },
+        )}</p>`,
+        defaultYes: false,
+      });
+      if (!ok) return;
+      await journalSync._linkJournalToPage(journal, entity, keep);
+      this._pageFailures.delete(entityId);
+      this._journalFailures.delete(journalId);
+      this._logActivity('update', `Linked "${journal.name}" to the Chronicle page of the same name; kept the ${keep === 'foundry' ? 'Foundry' : 'Chronicle'} text`);
+    } catch (err) {
+      log.warn(`Dashboard: could not link journal ${journalId} to page ${entityId}`, err);
+      ui.notifications.error(game.i18n.format('CHRONICLE.Dashboard.Pages.LinkFailed', { reason: noticeText(err?.message ?? '') }));
+    }
+    if (this.rendered) this.render({ force: true });
+  }
+
+  /**
+   * "Try again" on a row that could not sync. A change of the GM's own that
+   * was not sent is sent again, by the path an edit takes, so a clash with
+   * Chronicle is still settled by the conflict setting. Anything else is
+   * fetched again from Chronicle.
+   * @param {string} entityId
+   * @private
+   */
+  async _retryPage(entityId) {
+    const row = this._pageRows.get(entityId);
+    const journal = row?.journalId ? game.journal.get(row.journalId) : null;
+    const journalSync = this._journalSync();
+    if (row?.trouble?.direction === 'out' && journal && journalSync) {
+      if (this._directionRefuses('journals', 'push')) return;
+      this._catchingUp.add(entityId);
+      markCatchingUp(this.element, [entityId], game.i18n.localize('CHRONICLE.Dashboard.Pages.Sending'));
+      try {
+        await journalSync._pushJournalUpdate(journal, entityId);
+      } catch (err) {
+        log.warn(`Dashboard: could not send page ${entityId} again`, err);
+      }
+      this._catchingUp.delete(entityId);
+      if (this.rendered) this.render({ force: true });
+      return;
+    }
+    if (this._directionRefuses('journals', 'pull')) return;
+    await this._runCatchUp([entityId]);
+  }
+
+  /**
+   * Send the waiting changes again now. The queue tries each once per pass,
+   * drops the ones that fail for good (their rows then say so), and keeps
+   * the rest for the next pass.
+   * @private
+   */
+  async _sendWaiting() {
+    if (this._healthSending) return;
+    this._healthSending = true;
+    try {
+      await this.api?.processRetryQueue();
+    } catch (err) {
+      log.warn('Dashboard: sending the waiting changes failed', err);
+    }
+    this._healthSending = false;
+    if (this.rendered) this.render({ force: true });
+  }
+
+  /**
+   * Copy what someone helping would need to know about one page: ids, the
+   * versions on each side, its state and its recent errors. Never the
+   * page's text, the key or the connect line.
+   * @param {string} entityId
+   * @private
+   */
+  async _copyPageDetails(entityId) {
+    const row = this._pageRows.get(entityId);
+    if (!row) return;
+    const text = pageDetails({
+      row,
+      typeName: row.typeName,
+      trouble: row.trouble,
+      versions: {
+        'Chronicle Sync': game.modules.get('chronicle-sync')?.version ?? '',
+        Foundry: game.version ?? '',
+        'Game system': game.system?.id ? `${game.system.id} ${game.system.version ?? ''}`.trim() : '',
+        Connection: this.api?.state ?? '',
+      },
+      errors: this.api?.getErrorLog?.() ?? [],
+    });
+    try {
+      await navigator.clipboard.writeText(text);
+      ui.notifications.info(game.i18n.format('CHRONICLE.Dashboard.Pages.DetailsCopied', { name: noticeText(row.name) }));
+    } catch (err) {
+      log.warn('Dashboard: copying page details failed', err);
+      ui.notifications.warn(game.i18n.localize('CHRONICLE.Dashboard.Pages.DetailsNotCopied'));
+    }
+  }
+
+  /**
+   * "Copy details for help" for a journal that has no page. Never its text.
+   * @param {string} journalId
+   * @private
+   */
+  async _copyJournalDetails(journalId) {
+    const row = this._journalRows.get(journalId);
+    if (!row) return;
+    const text = journalDetails({
+      journal: row,
+      clash: row.clash,
+      failure: row.failure,
+      versions: {
+        'Chronicle Sync': game.modules.get('chronicle-sync')?.version ?? '',
+        Foundry: game.version ?? '',
+        Connection: this.api?.state ?? '',
+      },
+    });
+    try {
+      await navigator.clipboard.writeText(text);
+      ui.notifications.info(game.i18n.format('CHRONICLE.Dashboard.Pages.DetailsCopied', { name: noticeText(row.name) }));
+    } catch (err) {
+      log.warn('Dashboard: copying journal details failed', err);
+      ui.notifications.warn(game.i18n.localize('CHRONICLE.Dashboard.Pages.DetailsNotCopied'));
+    }
+  }
+
+  /** A checklist row's quiet word. The kind says what it does; most reuse an existing action. */
+  static async #onHealthRowAction(event, target) {
+    switch (target?.dataset?.kind) {
+      case 'reconnect':
+        return SyncDashboard.#onReconnectAction.call(this);
+      case 'open-settings':
+        return SyncDashboard.#onOpenSettingsAction.call(this, event, { dataset: { settingsTab: 'sync' } });
+      case 'check-dice':
+        return SyncDashboard.#onCheckDiceFilesAction.call(this);
+      case 'toggle-waiting':
+        this._healthWaitingOpen = !this._healthWaitingOpen;
+        return this.render({ force: true });
+      case 'open-drawer':
+        this._healthDrawerOpen = true;
+        await this.render({ force: true });
+        return this.element?.querySelector('[data-health-drawer]')?.scrollIntoView?.({ block: 'nearest' });
+      default:
+        return undefined;
+    }
+  }
+
+  /**
+   * Send the waiting changes again now. The queue retries each once per
+   * pass, drops the ones that fail for good (the error log says which), and
+   * keeps the rest for the next pass.
+   */
+  static async #onHealthSendWaitingAction() {
+    if (this._healthSending) return;
+    const sending = this._sendWaiting();
+    this.render({ force: true });
+    await sending;
   }
 
   // ---------------------------------------------------------------------------
@@ -1748,6 +2479,12 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Settings > Players: fetch Chronicle's members again. */
   static async #onRefreshMembersAction(_event, target) {
     await refreshMembers(target);
+    this.render({ force: true });
+  }
+
+  /** Settings: send what is waiting and fetch Chronicle's changes. */
+  static async #onSyncNowAction(_event, target) {
+    await syncNow(target);
     this.render({ force: true });
   }
 
@@ -1983,12 +2720,12 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     try {
       await this.api.createEntityType(result);
-      ui.notifications.info(`Entity type "${noticeText(result.name)}" created.`);
+      ui.notifications.info(`Page type "${noticeText(result.name)}" created.`);
       this._cache.entityTypes = null;
       this._cache.entities = null;
       this.render({ force: true });
     } catch (err) {
-      ui.notifications.error(`Failed to create entity type: ${noticeText(err.message)}`);
+      ui.notifications.error(`Failed to create page type: ${noticeText(err.message)}`);
     }
   }
 
@@ -2038,6 +2775,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    * @private
    */
   async _onPullEntity(entityId, { quiet = false } = {}) {
+    if (this._directionRefuses('journals', 'pull')) return;
     try {
       const entity = await this.api.get(`/entities/${entityId}`);
       if (!entity) return;
@@ -2052,7 +2790,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       }
       if (journalSync) {
         await journalSync._createJournalFromEntity(entity);
-        this._logActivity('pull', `Pulled "${entity.name}" from Chronicle`);
+        this._pageFailures.delete(entityId);
+        this._logActivity('pull', `Brought in "${entity.name}" from Chronicle`);
+        // Bringing a page in by hand says the GM wants it here, so its own
+        // sync switch goes back on. A type that is off stays off.
+        if (this._getExclusions().excludedEntities.includes(entityId)) await this._onToggleEntity(entityId, true);
       }
 
       if (quiet) return;
@@ -2060,53 +2802,18 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       this.render({ force: true });
     } catch (err) {
       console.error('Chronicle Dashboard: Pull failed', err);
-      ui.notifications.error(`Failed to pull entity: ${noticeText(err.message)}`);
+      ui.notifications.error(`Failed to bring in page: ${noticeText(err.message)}`);
     }
   }
 
   /**
-   * Push a Foundry journal to Chronicle as a new entity.
+   * "Send" on a journal that has no page.
    * @param {string} journalId
-   * @param {{quiet?: boolean}} [opts] - quiet: Push all redraws once at the end.
    * @private
    */
-  async _onPushJournal(journalId, { quiet = false } = {}) {
-    const journal = game.journal.get(journalId);
-    if (!journal) return;
-
-    try {
-      const textPage = journal.pages.find(p => p.type === 'text');
-      const entity = await this.api.post('/entities', {
-        name: journal.name,
-        entity_type_id: 0,
-        is_private: (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER,
-        entry: textPage?.text?.content || '',
-      });
-
-      if (entity) {
-        await journal.setFlag(FLAG_SCOPE, 'entityId', entity.id);
-        await journal.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
-
-        // Idempotent — tolerates pre-existing mapping (e.g., dashboard
-        // re-push or race with a concurrent server-side create).
-        await this._syncManager?.ensureMapping({
-          chronicle_type: 'entity',
-          chronicle_id: entity.id,
-          external_system: 'foundry',
-          external_id: journal.id,
-          sync_direction: 'both',
-        });
-
-        this._logActivity('push', `Pushed "${journal.name}" to Chronicle`);
-      }
-
-      if (quiet) return;
-      this._cache.entities = null;
-      this.render({ force: true });
-    } catch (err) {
-      console.error('Chronicle Dashboard: Push failed', err);
-      ui.notifications.error(`Failed to push journal: ${noticeText(err.message)}`);
-    }
+  async _onPushJournal(journalId) {
+    if (this._directionRefuses('journals', 'push')) return;
+    await this._sendJournals([journalId], { byHand: true });
   }
 
   /**
@@ -2116,6 +2823,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    * @private
    */
   async _onResyncAllJournals() {
+    if (this._directionRefuses('journals', 'pull')) return;
     let confirmed;
     try {
       confirmed = await confirmDialog({
@@ -2144,11 +2852,12 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    * @private
    */
   async _onPullAll() {
+    if (this._directionRefuses('journals', 'pull')) return;
     let confirmed;
     try {
       confirmed = await confirmDialog({
-        title: 'Pull All from Chronicle',
-        content: '<p>Pull all Chronicle entities that don\'t have a Foundry journal yet?</p>',
+        title: 'Bring in all from Chronicle',
+        content: `<p>${game.i18n.localize('CHRONICLE.Dashboard.Pages.BringInAllAsk')}</p>`,
       });
     } catch {
       return; // User closed dialog.
@@ -2159,7 +2868,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     let count = 0;
     for (const group of data.entityGroups) {
       for (const entity of group.entities) {
-        if (entity.status === 'chronicle-only') {
+        if (!entity.journalId && BRING_IN_ALL.includes(entity.state)) {
           await this._onPullEntity(entity.id, { quiet: true });
           count++;
         }
@@ -2167,7 +2876,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     }
     this._cache.entities = null;
     this.render({ force: true });
-    ui.notifications.info(`Chronicle: Pulled ${count} entities.`);
+    ui.notifications.info(`Chronicle: pages brought in: ${count}`);
   }
 
   /**
@@ -2175,26 +2884,21 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    * @private
    */
   async _onPushAll() {
+    if (this._directionRefuses('journals', 'push')) return;
     let confirmed;
     try {
       confirmed = await confirmDialog({
-        title: 'Push All to Chronicle',
-        content: '<p>Push all Foundry journals that aren\'t linked to Chronicle yet?</p>',
+        title: 'Send all to Chronicle',
+        content: `<p>${game.i18n.localize('CHRONICLE.Dashboard.Pages.SendAllAsk')}</p>`,
       });
     } catch {
       return; // User closed dialog.
     }
     if (!confirmed) return;
 
-    const journals = this._getFoundryOnlyJournals();
-    let count = 0;
-    for (const j of journals) {
-      await this._onPushJournal(j.id, { quiet: true });
-      count++;
-    }
-    this._cache.entities = null;
-    this.render({ force: true });
-    ui.notifications.info(`Chronicle: Pushed ${count} journals.`);
+    const journals = this._getFoundryOnlyJournals().filter((j) => SEND_ALL.includes(j.state));
+    const count = await this._sendJournals(journals.map((j) => j.id), { byHand: true });
+    ui.notifications.info(`Chronicle: journals sent: ${count}`);
   }
 
   /**
@@ -2236,6 +2940,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    * @private
    */
   async _onPushActor(actorId) {
+    if (this._directionRefuses('characters', 'push')) return;
     const actor = game.actors.get(actorId);
     if (!actor) return;
 
@@ -2250,11 +2955,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     try {
       // Trigger the create flow by calling the hook handler directly.
       await actorSync._handleCreateActor(actor, {}, game.user.id);
-      this._logActivity('push', `Pushed actor "${actor.name}" to Chronicle`);
+      this._logActivity('push', `Sent actor "${actor.name}" to Chronicle`);
       this.render({ force: true });
     } catch (err) {
       console.error('Chronicle Dashboard: Push actor failed', err);
-      ui.notifications.error(`Failed to push actor: ${noticeText(err.message)}`);
+      ui.notifications.error(`Failed to send actor: ${noticeText(err.message)}`);
     }
   }
 
@@ -2278,6 +2983,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** Create a new Chronicle character (the system's type) for an orphaned actor. */
   async _onResolveCreate(target) {
+    if (this._directionRefuses('characters', 'push')) return;
     const actorId = target?.dataset?.actorId;
     if (!actorId) return;
     const actorSync = this._actorSync();
@@ -2294,13 +3000,14 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** Re-push a linked actor's current data to Chronicle (the stranded-data fix). */
   async _onResolveRepush(target) {
+    if (this._directionRefuses('characters', 'push')) return;
     const actorId = target?.dataset?.actorId;
     if (!actorId) return;
     const actorSync = this._actorSync();
     if (!actorSync) { ui.notifications.warn('Chronicle: Character sync not active.'); return; }
     try {
       const ok = await actorSync.repushActor(actorId);
-      ui.notifications[ok ? 'info' : 'warn'](ok ? 'Chronicle: Re-synced to Chronicle.' : 'Chronicle: Re-sync failed.');
+      ui.notifications[ok ? 'info' : 'warn'](ok ? 'Chronicle: Synced again to Chronicle.' : 'Chronicle: Sync again failed.');
     } catch (err) {
       console.error('Chronicle Dashboard: re-sync failed', err);
       ui.notifications.error(game.i18n.format('CHRONICLE.Notifications.ResyncFailed', { message: noticeText(err?.message ?? '') }));
@@ -2309,6 +3016,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   async _onPushAllActors() {
+    if (this._directionRefuses('characters', 'push')) return;
     const actorSync = this._syncManager?._modules?.find(
       (m) => m.constructor?.name === 'ActorSync'
     );
@@ -2321,15 +3029,15 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const unlinked = characters.filter((c) => !c.synced);
 
     if (unlinked.length === 0) {
-      ui.notifications.info('Chronicle: All characters are already synced.');
+      ui.notifications.info('Chronicle: All characters are already in sync.');
       return;
     }
 
     let confirmed;
     try {
       confirmed = await confirmDialog({
-        title: 'Push All Actors to Chronicle',
-        content: `<p>Push ${unlinked.length} unlinked actor(s) to Chronicle?</p>`,
+        title: 'Send all actors to Chronicle',
+        content: `<p>Send the actors that are not linked to Chronicle yet? Actors to send: ${unlinked.length}</p>`,
       });
     } catch {
       return; // User closed dialog.
@@ -2349,8 +3057,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       }
     }
 
-    this._logActivity('push', `Pushed ${count} actors to Chronicle`);
-    ui.notifications.info(`Chronicle: Pushed ${count} actor(s) to Chronicle.`);
+    this._logActivity('push', `Sent ${count} actors to Chronicle`);
+    ui.notifications.info(`Chronicle: actors sent to Chronicle: ${count}`);
     this.render({ force: true });
   }
 
@@ -2370,29 +3078,31 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     try {
       confirmed = await confirmDialog({
         title: 'Sync Everything Now',
-        content: '<p>Re-sync <strong>all</strong> journals, linked characters, and maps with Chronicle?</p>'
-          + '<p class="hint">Foundry is the source of truth for characters — their current data is pushed up.</p>',
+        content: '<p>Sync <strong>all</strong> journals, linked characters, and maps with Chronicle again?</p>'
+          + '<p class="hint">Foundry is the source of truth for characters — their current data is sent to Chronicle.</p>',
       });
     } catch {
       return; // User dismissed the dialog.
     }
     if (!confirmed) return;
 
-    ui.notifications.info('Chronicle: Re-syncing everything…');
-    const mods = this._syncManager?._modules || [];
+    ui.notifications.info('Chronicle: Syncing everything again…');
+    const sm = this._syncManager;
+    // A part set to one direction is left out of the half that runs against it.
+    const mods = sm?._modules || [];
     const find = (name) => mods.find((m) => m.constructor?.name === name);
     const done = [];
 
     // 1. Journals (verbose=false to avoid a flood of per-entry toasts mid-sweep).
     const journalSync = find('JournalSync');
-    if (journalSync?.resyncAll) {
+    if (journalSync?.resyncAll && sm?.pullGate?.('journals') !== 'drop') {
       try { await journalSync.resyncAll({ verbose: false }); done.push('journals'); }
       catch (err) { console.error('Chronicle: journal resync failed', err); }
     }
 
     // 2. Characters — re-push every LINKED actor so stale fields refresh.
     const actorSync = find('ActorSync');
-    if (actorSync?.repushActor) {
+    if (actorSync?.repushActor && sm?.pushGate?.('characters') !== 'drop') {
       const chars = actorSync.getSyncedActors?.() ?? [];
       let pushed = 0;
       for (const c of chars) {
@@ -2400,21 +3110,21 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         try { if (await actorSync.repushActor(c.id)) pushed++; }
         catch (err) { console.error(`Chronicle: re-push failed for "${c.name}"`, err); }
       }
-      if (pushed) done.push(`${pushed} character(s)`);
+      if (pushed) done.push(`characters: ${pushed}`);
     }
 
     // 3. Maps.
     const mapSync = find('MapSync');
-    if (mapSync?.resyncAll) {
+    if (mapSync?.resyncAll && sm?.pullGate?.('maps') !== 'drop') {
       try { await mapSync.resyncAll({ verbose: false }); done.push('maps'); }
       catch (err) { console.error('Chronicle: map resync failed', err); }
     }
 
     this._cache.maps = null;
     this._cache.entities = null;
-    this._logActivity('push', `Re-synced everything (${done.join(', ') || 'nothing'})`);
+    this._logActivity('push', `Synced everything again (${done.join(', ') || 'nothing'})`);
     this.render({ force: true });
-    ui.notifications.info(`Chronicle: Re-sync complete — ${done.join(', ') || 'nothing to sync'}.`);
+    ui.notifications.info(`Chronicle: Sync again complete — ${done.join(', ') || 'nothing to sync'}.`);
   }
 
   // ---------------------------------------------------------------------------
@@ -2660,7 +3370,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       });
       this._selectedEntities.clear();
       this._cache.entities = null;
-      this._logActivity('update', `Bulk changed type for ${count} entities`);
+      this._logActivity('update', `Changed the page type of ${count} pages`);
       this.render({ force: true });
     } catch (err) {
       console.error('Chronicle Dashboard: Bulk change type failed', err);
@@ -2703,7 +3413,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this._selectedEntities.clear();
     this._cache.entities = null;
     const label = makePrivate ? 'private' : 'public';
-    this._logActivity('update', `Set ${succeeded} entities to ${label}`);
+    this._logActivity('update', `Set ${succeeded} pages to ${label}`);
     this.render({ force: true });
   }
 
@@ -2738,7 +3448,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     this._selectedEntities.clear();
     this._cache.entities = null;
-    this._logActivity('update', `Deleted ${succeeded} entities from Chronicle`);
+    this._logActivity('update', `Deleted ${succeeded} pages from Chronicle`);
     this.render({ force: true });
   }
 

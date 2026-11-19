@@ -14,7 +14,7 @@
       <li>{{localize "CHRONICLE.Dashboard.FirstRun.StepReview"}}</li>
     </ol>
   </section>
-  {{> "modules/chronicle-sync/templates/chronicle-settings.hbs" settings}}
+  {{> "modules/chronicle-sync/templates/first-connect.hbs"}}
   {{else if firstRun}}
   {{!-- First run, once connected: the import wizard's steps fill the window. --}}
   <header class="cs-firstrun cs-firstrun-head">
@@ -194,174 +194,138 @@
     {{!-- ================================================================= --}}
     {{!-- ENTITIES TAB                                                      --}}
     {{!-- ================================================================= --}}
-    <div class="cs-pane" role="tabpanel" data-subpane="linked:pages">
-      <div class="dashboard-toolbar">
-        <div class="toolbar-actions">
-          {{#if hasChronicleOnly}}
-          <button type="button" data-action="pull-all" class="dashboard-btn btn-sm" title="{{localize 'CHRONICLE.Dashboard.Entities.PullAllHint'}}">
-            <i class="fa-solid fa-download"></i> {{localize "CHRONICLE.Dashboard.Entities.PullAll"}}
-          </button>
-          {{/if}}
-          {{#if hasFoundryOnly}}
-          <button type="button" data-action="push-all" class="dashboard-btn btn-sm" title="{{localize 'CHRONICLE.Dashboard.Entities.PushAllHint'}}">
-            <i class="fa-solid fa-upload"></i> {{localize "CHRONICLE.Dashboard.Entities.PushAll"}}
-          </button>
-          {{/if}}
-          <button type="button" data-action="resync-all-journals" class="dashboard-btn btn-sm"
-                  title="{{localize 'CHRONICLE.Dashboard.Entities.ResyncAllJournalsHint'}}">
-            <i class="fa-solid fa-rotate"></i> {{localize "CHRONICLE.Dashboard.Entities.ResyncAllJournals"}}
-          </button>
-          <button type="button" data-action="create-entity-type" class="dashboard-btn btn-sm"
-                  title="{{localize "CHRONICLE.Dashboard.Entities.CreateType"}}">
-            <i class="fa-solid fa-plus"></i> {{localize "CHRONICLE.Dashboard.Entities.CreateType"}}
-          </button>
-          <button type="button" data-action="refresh" class="dashboard-btn btn-sm" title="{{localize 'CHRONICLE.Dashboard.Entities.RefreshData'}}">
-            <i class="fa-solid fa-arrows-rotate"></i>
-          </button>
-        </div>
-        <input type="text" class="dashboard-search" placeholder="{{localize 'CHRONICLE.Dashboard.Entities.SearchPlaceholder'}}" value="{{searchFilter}}"/>
+    <div class="cs-pane cs-pages" role="tabpanel" data-subpane="linked:pages">
+      <input type="search" name="pagesSearch" class="cs-pages-search" data-pages-search autocomplete="off"
+             placeholder="{{localize 'CHRONICLE.Dashboard.Pages.Search'}}" aria-label="{{localize 'CHRONICLE.Dashboard.Pages.Search'}}" value="{{searchFilter}}">
+
+      <div class="cs-pages-words">
+        {{#if pages.bringInCount}}
+        <button type="button" class="cs-quiet" data-action="pull-all" title="{{localize 'CHRONICLE.Dashboard.Entities.PullAllHint'}}">{{localize "CHRONICLE.Dashboard.Pages.BringInAll" count=pages.bringInCount}}</button>
+        {{/if}}
+        {{#if pages.sendCount}}
+        <button type="button" class="cs-quiet" data-action="push-all" title="{{localize 'CHRONICLE.Dashboard.Entities.PushAllHint'}}">{{localize "CHRONICLE.Dashboard.Pages.SendAll" count=pages.sendCount}}</button>
+        {{/if}}
+        <button type="button" class="cs-quiet" data-action="resync-all-journals" title="{{localize 'CHRONICLE.Dashboard.Entities.ResyncAllJournalsHint'}}">{{localize "CHRONICLE.Dashboard.Entities.ResyncAllJournals"}}</button>
+        <button type="button" class="cs-quiet" data-action="create-entity-type" title="{{localize 'CHRONICLE.Dashboard.Entities.CreateTypeTitle'}}">{{localize "CHRONICLE.Dashboard.Pages.NewType"}}</button>
+        <button type="button" class="cs-quiet cs-pages-select" data-action="pages-select" aria-pressed="{{#if pages.selecting}}true{{else}}false{{/if}}">{{#if pages.selecting}}{{localize "CHRONICLE.Dashboard.Pages.SelectDone"}}{{else}}{{localize "CHRONICLE.Dashboard.Pages.Select"}}{{/if}}</button>
       </div>
 
-      {{!-- Bulk actions toolbar (visible when entities are selected) --}}
-      <div class="bulk-toolbar {{#if bulkSelectionCount}}visible{{/if}}">
-        <div class="bulk-toolbar-left">
-          <label class="bulk-select-all-label">
-            <input type="checkbox" class="bulk-select-all-checkbox" />
+      {{#if pages.syncNote}}
+      <p class="cs-pages-note">{{pages.syncNote}}
+        <button type="button" class="cs-quiet" data-action="open-settings" data-settings-tab="sync">{{localize "CHRONICLE.Dashboard.Pages.OpenSettings"}}</button></p>
+      {{/if}}
+
+      {{!-- Select mode: what to do with the ticked pages. --}}
+      {{#if pages.selecting}}
+      <div class="cs-pages-bulk">
+        <div class="cs-pages-bulk-top">
+          <label class="cs-pages-bulk-all">
+            <input type="checkbox" data-pages-select-all>
+            <span>{{localize "CHRONICLE.Dashboard.Pages.SelectAll"}}</span>
           </label>
-          <span class="bulk-count-badge">{{bulkSelectionCount}} {{localize "CHRONICLE.Dashboard.Bulk.Selected"}}</span>
+          <span data-pages-selected-count>{{pages.selectedLabel}}</span>
         </div>
-        <div class="bulk-toolbar-actions">
-          <select class="bulk-type-select" title="{{localize "CHRONICLE.Dashboard.Bulk.ChangeType"}}">
-            <option value="">{{localize "CHRONICLE.Dashboard.Bulk.ChangeType"}}</option>
-            {{#each entityTypes}}
-            <option value="{{id}}">{{name}}</option>
-            {{/each}}
-          </select>
-          <button type="button" class="dashboard-btn btn-xs" data-action="bulk-set-public"
-                  title="{{localize "CHRONICLE.Dashboard.Bulk.MakePublic"}}">
-            <i class="fa-solid fa-lock-open"></i>
-          </button>
-          <button type="button" class="dashboard-btn btn-xs" data-action="bulk-set-private"
-                  title="{{localize "CHRONICLE.Dashboard.Bulk.MakePrivate"}}">
-            <i class="fa-solid fa-lock"></i>
-          </button>
-          <button type="button" class="dashboard-btn btn-xs btn-danger" data-action="bulk-delete"
-                  title="{{localize "CHRONICLE.Dashboard.Bulk.Delete"}}">
-            <i class="fa-solid fa-trash"></i>
-          </button>
-        </div>
+        <select class="bulk-type-select" data-pages-needs-selection aria-label="{{localize 'CHRONICLE.Dashboard.Bulk.ChangeType'}}" {{#if pages.nothingSelected}}disabled{{/if}}>
+          <option value="">{{localize "CHRONICLE.Dashboard.Bulk.ChangeType"}}</option>
+          {{#each entityTypes}}
+          <option value="{{id}}">{{name}}</option>
+          {{/each}}
+        </select>
+        <button type="button" class="cs-quiet" data-action="bulk-set-public" data-pages-needs-selection {{#if pages.nothingSelected}}disabled{{/if}}>{{localize "CHRONICLE.Dashboard.Pages.MenuShow"}}</button>
+        <button type="button" class="cs-quiet" data-action="bulk-set-private" data-pages-needs-selection {{#if pages.nothingSelected}}disabled{{/if}}>{{localize "CHRONICLE.Dashboard.Pages.MenuHide"}}</button>
+        <button type="button" class="cs-quiet cs-quiet-danger" data-action="bulk-delete" data-pages-needs-selection title="{{localize 'CHRONICLE.Dashboard.Pages.DeleteInChronicle'}}" {{#if pages.nothingSelected}}disabled{{/if}}>{{localize "CHRONICLE.Dashboard.Bulk.Delete"}}</button>
       </div>
+      {{/if}}
 
-      <div class="entity-list">
+      <div class="cs-pages-list" data-pages-list>
         {{#each entityGroups}}
-        <div class="entity-type-group">
-          {{!-- Type header --}}
-          <div class="entity-type-header" data-type-id="{{typeId}}">
-            <i class="fa-solid {{#if isCollapsed}}fa-chevron-right{{else}}fa-chevron-down{{/if}} collapse-icon"></i>
-            <i class="{{typeIcon}}" style="color: {{typeColor}}"></i>
-            <span class="type-name">{{typeNamePlural}}</span>
-            <span class="type-stats">
-              {{localize 'CHRONICLE.Dashboard.Entities.SyncedCount' count=syncedCount}}{{#if chronicleOnlyCount}}{{localize 'CHRONICLE.Dashboard.Entities.ChronicleOnlyCount' count=chronicleOnlyCount}}{{/if}}
-            </span>
-            <button type="button" class="type-sync-toggle dashboard-btn btn-xs" data-type-id="{{typeId}}"
-                    title="{{#if isTypeExcluded}}{{localize 'CHRONICLE.Dashboard.Entities.EnableSync'}}{{else}}{{localize 'CHRONICLE.Dashboard.Entities.DisableSync'}}{{/if}}">
-              {{#if isTypeExcluded}}
-              <i class="fa-solid fa-toggle-off"></i>
-              {{else}}
-              <i class="fa-solid fa-toggle-on"></i>
-              {{/if}}
+        <section class="cs-pages-group" data-page-group data-type-id="{{typeId}}" data-folded="{{#if isCollapsed}}true{{else}}false{{/if}}" {{#if hidden}}hidden{{/if}}>
+          <div class="cs-pages-cap">
+            <button type="button" class="cs-pages-fold" data-action="pages-fold" data-type-id="{{typeId}}" aria-expanded="{{#if isCollapsed}}false{{else}}true{{/if}}">
+              <i class="{{typeIcon}}" aria-hidden="true"></i><span>{{typeNamePlural}}</span>
+            </button>
+            <small title="{{statsText}}">{{statsText}}</small>
+            <button type="button" class="cs-row-icon" data-action="pages-type-menu" data-type-id="{{typeId}}"
+                    aria-haspopup="menu" aria-expanded="false" title="{{menuLabel}}" aria-label="{{menuLabel}}">
+              <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
             </button>
           </div>
 
-          {{!-- Entity rows --}}
-          {{#unless isCollapsed}}
-          <div class="entity-rows">
+          <div class="cs-pages-rows" data-page-rows {{#if rowsHidden}}hidden{{/if}}>
             {{#each entities}}
-            <div class="entity-row status-{{status}} {{#if isSelected}}bulk-selected{{/if}}">
-              <input type="checkbox" class="bulk-entity-checkbox" data-entity-id="{{id}}" {{#if isSelected}}checked{{/if}} />
-              <span class="entity-status-dot" title="{{status}}"></span>
-              <span class="entity-name">{{name}}</span>
-
-              {{!-- Visibility badge --}}
-              {{#if journalId}}
-              <button type="button" class="visibility-badge" data-action="toggle-visibility"
-                      data-entity-id="{{id}}" data-is-private="{{isPrivate}}"
-                      title="{{#if isPrivate}}{{localize 'CHRONICLE.Dashboard.Entities.PrivateClickPublic'}}{{else}}{{localize 'CHRONICLE.Dashboard.Entities.PublicClickPrivate'}}{{/if}}">
-                {{#if isPrivate}}<i class="fa-solid fa-lock"></i>{{else}}<i class="fa-solid fa-lock-open"></i>{{/if}}
-              </button>
+            <div class="cs-page-row is-{{state}}{{#if isSelected}} is-selected{{/if}}" data-page-row data-page-id="{{id}}" data-page-name="{{name}}" {{#if hidden}}hidden{{/if}}>
+              {{#if @root.pages.selecting}}
+              <input type="checkbox" class="cs-page-select" data-page-select data-entity-id="{{id}}" aria-label="{{name}}" {{#if isSelected}}checked{{/if}}>
               {{/if}}
-
-              {{!-- Status label --}}
-              <span class="entity-status-label">
-                {{#if (eq status "synced")}}<i class="fa-solid fa-check"></i> {{localize "CHRONICLE.Dashboard.Entities.Synced"}}{{/if}}
-                {{#if (eq status "modified")}}<i class="fa-solid fa-bolt"></i> {{localize "CHRONICLE.Dashboard.Entities.Modified"}}{{/if}}
-                {{#if (eq status "chronicle-only")}}{{localize "CHRONICLE.Dashboard.Entities.ChronicleOnly"}}{{/if}}
-                {{#if (eq status "actor")}}<i class="fa-solid fa-user"></i> {{localize "CHRONICLE.Dashboard.Entities.SyncedAsActor"}}{{/if}}
-              </span>
-
-              {{!-- Action --}}
-              {{#if (eq status "actor")}}
-              {{else if (eq status "chronicle-only")}}
-              <button type="button" class="dashboard-btn btn-xs btn-pull" data-action="pull-entity" data-entity-id="{{id}}">
-                <i class="fa-solid fa-download"></i> {{localize "CHRONICLE.Dashboard.Entities.Pull"}}
+              <span class="cs-page-dot" aria-hidden="true"></span>
+              <span class="cs-page-name">{{name}}</span>
+              {{#if isPrivate}}
+              <i class="fa-solid fa-lock cs-page-lock" role="img" title="{{localize 'CHRONICLE.Dashboard.Pages.HiddenFromPlayers'}}" aria-label="{{localize 'CHRONICLE.Dashboard.Pages.HiddenFromPlayers'}}"></i>
+              {{/if}}
+              <span class="cs-page-state" {{#if stateTitle}}title="{{stateTitle}}"{{/if}}>{{stateLabel}}</span>
+              {{#if action}}
+              <button type="button" class="cs-page-btn" data-action="{{action.action}}" data-entity-id="{{id}}">{{action.label}}</button>
+              {{/if}}
+              {{#if hasMenu}}
+              <button type="button" class="cs-row-icon" data-action="pages-menu" data-entity-id="{{id}}"
+                      aria-haspopup="menu" aria-expanded="false" title="{{menuLabel}}" aria-label="{{menuLabel}}">
+                <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
               </button>
-              {{else}}
-              <label class="entity-sync-checkbox" title="{{#if isExcluded}}{{localize 'CHRONICLE.Dashboard.Entities.SyncDisabled'}}{{else}}{{localize 'CHRONICLE.Dashboard.Entities.SyncEnabled'}}{{/if}}">
-                <input type="checkbox" class="entity-sync-toggle" data-entity-id="{{id}}" {{#unless isExcluded}}checked{{/unless}}/>
-              </label>
               {{/if}}
             </div>
             {{/each}}
           </div>
-          {{/unless}}
-        </div>
+        </section>
         {{/each}}
 
-        {{!-- Foundry-only journals --}}
+        {{!-- Journals with no Chronicle page --}}
         {{#if foundryOnlyJournals.length}}
-        <div class="entity-type-group foundry-only-group">
-          <div class="entity-type-header">
-            <i class="fa-solid fa-chevron-down collapse-icon"></i>
-            <i class="fa-solid fa-file-pen" style="color: #fb923c"></i>
-            <span class="type-name">{{localize "CHRONICLE.Dashboard.Entities.FoundryOnlyJournals"}}</span>
-            <span class="type-stats">{{foundryOnlyJournals.length}} {{localize "CHRONICLE.Dashboard.Entities.Unlinked"}}</span>
+        <section class="cs-pages-group" data-page-group data-folded="false" {{#if pages.foundryOnlyHidden}}hidden{{/if}}>
+          <div class="cs-pages-cap">
+            <span class="cs-pages-fold"><i class="fa-solid fa-file-pen" aria-hidden="true"></i><span>{{localize "CHRONICLE.Dashboard.Entities.FoundryOnlyJournals"}}</span></span>
+            <small>{{localize "CHRONICLE.Dashboard.Pages.NotLinked" count=foundryOnlyJournals.length}}</small>
             {{#if setAsideCount}}
-            <button type="button" class="cs-quiet-word" data-action="delete-set-aside">{{localize "CHRONICLE.Dashboard.Entities.DeleteSetAside" count=setAsideCount}}</button>
+            <button type="button" class="cs-quiet cs-quiet-danger" data-action="delete-set-aside">{{localize "CHRONICLE.Dashboard.Entities.DeleteSetAside" count=setAsideCount}}</button>
             {{/if}}
           </div>
-          <div class="entity-rows">
+          <div class="cs-pages-rows" data-page-rows>
             {{#each foundryOnlyJournals}}
-            <div class="entity-row status-foundry-only">
-              <span class="entity-status-dot" title="{{localize 'CHRONICLE.Dashboard.Entities.FoundryOnlyStatus'}}"></span>
-              <span class="entity-name">{{name}}</span>
-              <span class="entity-status-label">{{#if setAside}}{{localize "CHRONICLE.Dashboard.Entities.SetAside"}}{{else}}{{localize "CHRONICLE.Dashboard.Entities.FoundryOnly"}}{{/if}}</span>
-              <button type="button" class="dashboard-btn btn-xs btn-push" data-action="push-journal" data-journal-id="{{id}}">
-                <i class="fa-solid fa-upload"></i> {{localize "CHRONICLE.Dashboard.Entities.Push"}}
-              </button>
-              <button type="button" class="cs-row-icon" data-action="delete-journal" data-journal-id="{{id}}"
+            <div class="cs-page-row is-{{state}}" data-page-row data-journal-row="{{id}}" data-page-name="{{name}}" {{#if hidden}}hidden{{/if}}>
+              <span class="cs-page-dot" aria-hidden="true"></span>
+              <span class="cs-page-name">{{name}}</span>
+              <span class="cs-page-state" {{#if stateTitle}}title="{{stateTitle}}"{{/if}}>{{stateLabel}}</span>
+              {{#if action}}
+              <button type="button" class="cs-page-btn" data-action="{{action.action}}" data-journal-id="{{id}}">{{action.label}}</button>
+              {{/if}}
+              {{#unless sending}}
+              <button type="button" class="cs-row-icon cs-row-icon-danger" data-action="delete-journal" data-journal-id="{{id}}"
                       title="{{localize 'CHRONICLE.Dashboard.Entities.Delete'}}" aria-label="{{localize 'CHRONICLE.Dashboard.Entities.Delete'}}">
                 <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
               </button>
+              <button type="button" class="cs-row-icon" data-action="pages-journal-menu" data-journal-id="{{id}}"
+                      aria-haspopup="menu" aria-expanded="false" title="{{menuLabel}}" aria-label="{{menuLabel}}">
+                <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+              </button>
+              {{/unless}}
             </div>
             {{/each}}
           </div>
-        </div>
+        </section>
         {{/if}}
 
-        {{!-- Empty / no results states --}}
-        {{#unless entityGroups.length}}
-        {{#unless foundryOnlyJournals.length}}
+        <p class="cs-pages-note" data-pages-nomatch {{#unless pages.noMatch}}hidden{{/unless}}>{{localize "CHRONICLE.Dashboard.Pages.NoMatch"}}</p>
+        {{#if pages.truncatedText}}
+        <p class="cs-pages-note">{{pages.truncatedText}}</p>
+        {{/if}}
+        <p class="cs-pages-note cs-pages-read">{{pages.readText}}
+          <button type="button" class="cs-quiet" data-action="refresh">{{localize "CHRONICLE.Dashboard.Pages.CheckAgain"}}</button></p>
+
+        {{#if pages.empty}}
         <div class="cs-state dashboard-empty-tab">
-          {{#if searchFilter}}
-          <i class="fa-solid fa-search" aria-hidden="true"></i>
-          <b>{{localize "CHRONICLE.Dashboard.Entities.NoMatch" search=searchFilter}}</b>
-          {{else}}
           <i class="fa-solid fa-book-open" aria-hidden="true"></i>
           <b>{{localize "CHRONICLE.Dashboard.Entities.EmptyState"}}</b>
-          {{/if}}
         </div>
-        {{/unless}}
-        {{/unless}}
+        {{/if}}
       </div>
     </div>
 
@@ -428,7 +392,7 @@
     {{!-- ================================================================= --}}
     <div class="cs-pane" role="tabpanel" data-subpane="linked:maps">
       <div class="dashboard-toolbar">
-        <button type="button" data-action="refresh" class="dashboard-btn btn-sm" title="{{localize 'CHRONICLE.Dashboard.Common.Refresh'}}">
+        <button type="button" data-action="refresh" class="dashboard-btn btn-sm" title="{{localize 'CHRONICLE.Dashboard.Common.Refresh'}}" aria-label="{{localize 'CHRONICLE.Dashboard.Common.Refresh'}}">
           <i class="fa-solid fa-arrows-rotate"></i>
         </button>
         <button type="button" data-action="resync-all-maps" class="dashboard-btn btn-sm"
@@ -462,7 +426,7 @@
         <div class="map-status-errors">
           <div class="map-status-errors-header">
             <span><i class="fa-solid fa-triangle-exclamation"></i>
-              {{mapSyncStatus.errorCount}} {{localize "CHRONICLE.Dashboard.Maps.RecentErrors"}}</span>
+              {{localize "CHRONICLE.Dashboard.Maps.RecentErrors"}}: {{mapSyncStatus.errorCount}}</span>
             <button type="button" data-action="dismiss-map-errors" class="dashboard-btn btn-xs"
                     title="{{localize 'CHRONICLE.Dashboard.Maps.DismissErrorsHint'}}">
               {{localize "CHRONICLE.Dashboard.Maps.DismissErrors"}}
@@ -583,7 +547,7 @@
         {{#if pcClaimingHint}}
         <div class="dashboard-hint">
           <i class="fa-solid fa-circle-info"></i>
-          {{{localize "CHRONICLE.Dashboard.Characters.ClaimingHint"}}}
+          <span>{{{localize "CHRONICLE.Dashboard.Characters.ClaimingHint"}}}</span>
         </div>
         {{/if}}
         <div class="dashboard-toolbar">
@@ -596,7 +560,7 @@
               <i class="fa-solid fa-upload"></i> {{localize "CHRONICLE.Dashboard.Entities.PushAll"}}
             </button>
             {{/if}}
-            <button type="button" data-action="refresh" class="dashboard-btn btn-sm" title="{{localize 'CHRONICLE.Dashboard.Common.Refresh'}}">
+            <button type="button" data-action="refresh" class="dashboard-btn btn-sm" title="{{localize 'CHRONICLE.Dashboard.Common.Refresh'}}" aria-label="{{localize 'CHRONICLE.Dashboard.Common.Refresh'}}">
               <i class="fa-solid fa-arrows-rotate"></i>
             </button>
           </div>
@@ -697,9 +661,7 @@
           </div>
         </div>
 
-        {{!-- FM-SYNC-SUBRESOURCES-P1: Chronicle world state. Weather, season,
-              era and moon phases folded from the WebSocket stream this
-              session. Read-only. --}}
+        {{!-- Weather, season, era and moon phases as Chronicle has sent them this session. Read-only. --}}
         <div class="calendar-worldstate">
           <div class="worldstate-title">
             <i class="fa-solid fa-cloud-sun"></i>
@@ -776,199 +738,219 @@
       </div>
 
       <div class="cs-pane" role="tabpanel" data-subpane="problems:health">
-      <div class="status-panel">
-        {{!-- Game system detection --}}
-        <div class="system-detection">
-          <h3 class="section-heading">{{localize "CHRONICLE.Dashboard.StatusTab.GameSystem"}}</h3>
-          <div class="system-info-grid">
-            <div class="system-info-row">
-              <span class="system-label">{{localize "CHRONICLE.Dashboard.StatusTab.FoundrySystem"}}:</span>
-              <span class="system-value">{{#if foundrySystem}}{{foundrySystem}}{{else}}<em>{{localize "CHRONICLE.Dashboard.Health.NoneValue"}}</em>{{/if}}</span>
-            </div>
-            <div class="system-info-row">
-              <span class="system-label">{{localize "CHRONICLE.Dashboard.StatusTab.ChronicleSystem"}}:</span>
-              {{#if systemMatched}}
-              <span class="system-value system-matched">
-                <i class="fa-solid fa-check-circle"></i> {{localize "CHRONICLE.Dashboard.Health.MatchedLine" system=matchedSystem}}
-              </span>
-              {{else}}
-              <span class="system-value system-no-match">
-                <i class="fa-solid fa-circle-xmark"></i> {{localize "CHRONICLE.Dashboard.Health.NoMatchLine"}}
-              </span>
-              {{/if}}
-            </div>
-            <div class="system-info-row">
-              <span class="system-label">{{localize "CHRONICLE.Dashboard.StatusTab.CharacterSync"}}:</span>
-              {{#if characterSyncAvailable}}
-                {{#if syncCharacters}}
-                <span class="system-value system-matched"><i class="fa-solid fa-toggle-on"></i> {{localize "CHRONICLE.Dashboard.StatusTab.CharacterSyncEnabled"}}</span>
-                {{else}}
-                <span class="system-value"><i class="fa-solid fa-toggle-off"></i> {{localize "CHRONICLE.Dashboard.StatusTab.CharacterSyncDisabled"}}</span>
-                {{/if}}
-              {{else}}
-              <span class="system-value hint">{{localize "CHRONICLE.Dashboard.StatusTab.CharacterSyncNoSystem"}}</span>
-              {{/if}}
-            </div>
-          </div>
+      <div class="cs-health">
+        {{!-- The checklist: plain sentences, problems first, built in scripts/_health-checks.mjs --}}
+        {{#each health.rows}}
+        <div class="cs-health-row is-{{level}}">
+          <i class="fa-solid {{#if (eq level 'bad')}}fa-circle-xmark{{else if (eq level 'warn')}}fa-triangle-exclamation{{else}}fa-circle-check{{/if}}" aria-hidden="true"></i>
+          <div class="cs-health-text"><b>{{title}}</b>{{#if detail}}<span>{{detail}}</span>{{/if}}</div>
+          {{#if action}}<button type="button" class="cs-quiet" data-action="health-row" data-kind="{{action.kind}}"{{#if (eq action.kind 'toggle-waiting')}} aria-expanded="{{#if expanded}}true{{else}}false{{/if}}"{{/if}}>{{action.label}}</button>{{/if}}
+        </div>
+        {{#if expanded}}
+        <div class="cs-health-waiting" role="group" aria-label="{{localize "CHRONICLE.Dashboard.HealthChecks.WaitingListLabel"}}">
+          {{#each waiting}}
+          <div class="cs-health-wait"><span>{{text}}</span>{{#if tried}}<span class="cs-health-muted">{{tried}}</span>{{/if}}</div>
+          {{/each}}
+          <button type="button" class="cs-quiet" data-action="health-send-waiting"{{#if sending}} disabled{{/if}}>{{localize "CHRONICLE.Dashboard.HealthChecks.SendThemNow"}}</button>
+        </div>
+        {{/if}}
+        {{/each}}
+
+        <div class="cs-health-copy">
+          <button type="button" class="cs-health-btn" data-action="copy-diagnostic-bundle">
+            {{localize "CHRONICLE.Dashboard.HealthChecks.CopyReport"}}
+          </button>
+          <span class="cs-health-muted">{{localize "CHRONICLE.Dashboard.HealthChecks.CopyReportHint"}}</span>
+          <span class="debug-copy-result" data-bundle-result role="status"></span>
         </div>
 
-        {{!-- Diagnostics section (F-QoL) --}}
-        <h3 class="section-heading">{{localize "CHRONICLE.Dashboard.Diagnostics.Connection"}}</h3>
-        <div class="diagnostics-grid">
-          <div class="stat-box">
-            <div class="stat-value">{{healthMetrics.uptimePercent}}%</div>
-            <div class="stat-label">{{localize "CHRONICLE.Dashboard.Health.Uptime"}}</div>
+        {{!-- Everything a developer could read here before, kept for troubleshooting --}}
+        <details class="cs-health-drawer" data-health-drawer{{#if health.drawerOpen}} open{{/if}}>
+          <summary class="cs-health-cap"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i> <span>{{localize "CHRONICLE.Dashboard.HealthChecks.Drawer"}}</span> <small>{{localize "CHRONICLE.Dashboard.HealthChecks.DrawerHint"}}</small></summary>
+          <div class="status-panel">
+          {{!-- Game system detection --}}
+          <div class="system-detection">
+            <h3 class="section-heading">{{localize "CHRONICLE.Dashboard.StatusTab.GameSystem"}}</h3>
+            <div class="system-info-grid">
+              <div class="system-info-row">
+                <span class="system-label">{{localize "CHRONICLE.Dashboard.StatusTab.FoundrySystem"}}:</span>
+                <span class="system-value">{{#if foundrySystem}}{{foundrySystem}}{{else}}<em>{{localize "CHRONICLE.Dashboard.Health.NoneValue"}}</em>{{/if}}</span>
+              </div>
+              <div class="system-info-row">
+                <span class="system-label">{{localize "CHRONICLE.Dashboard.StatusTab.ChronicleSystem"}}:</span>
+                {{#if systemMatched}}
+                <span class="system-value system-matched">
+                  <i class="fa-solid fa-check-circle"></i> {{localize "CHRONICLE.Dashboard.Health.MatchedLine" system=matchedSystem}}
+                </span>
+                {{else}}
+                <span class="system-value system-no-match">
+                  <i class="fa-solid fa-circle-xmark"></i> {{localize "CHRONICLE.Dashboard.Health.NoMatchLine"}}
+                </span>
+                {{/if}}
+              </div>
+              <div class="system-info-row">
+                <span class="system-label">{{localize "CHRONICLE.Dashboard.StatusTab.CharacterSync"}}:</span>
+                {{#if characterSyncAvailable}}
+                  {{#if syncCharacters}}
+                  <span class="system-value system-matched"><i class="fa-solid fa-toggle-on"></i> {{localize "CHRONICLE.Dashboard.StatusTab.CharacterSyncEnabled"}}</span>
+                  {{else}}
+                  <span class="system-value"><i class="fa-solid fa-toggle-off"></i> {{localize "CHRONICLE.Dashboard.StatusTab.CharacterSyncDisabled"}}</span>
+                  {{/if}}
+                {{else}}
+                <span class="system-value hint">{{localize "CHRONICLE.Dashboard.StatusTab.CharacterSyncNoSystem"}}</span>
+                {{/if}}
+              </div>
+            </div>
           </div>
-          <div class="stat-box">
-            <div class="stat-value">{{healthMetrics.restSuccessCount}}</div>
-            <div class="stat-label">{{localize "CHRONICLE.Dashboard.Health.ApiOk"}}</div>
+
+          {{!-- Diagnostics section (F-QoL) --}}
+          <h3 class="section-heading">{{localize "CHRONICLE.Dashboard.Diagnostics.Connection"}}</h3>
+          <div class="diagnostics-grid">
+            <div class="stat-box">
+              <div class="stat-value">{{healthMetrics.uptimePercent}}%</div>
+              <div class="stat-label">{{localize "CHRONICLE.Dashboard.Health.Uptime"}}</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value">{{healthMetrics.restSuccessCount}}</div>
+              <div class="stat-label">{{localize "CHRONICLE.Dashboard.Health.ApiOk"}}</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value {{#if healthMetrics.restErrorCount}}error-value{{/if}}">{{healthMetrics.restErrorCount}}</div>
+              <div class="stat-label">{{localize "CHRONICLE.Dashboard.Health.ApiErrors"}}</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value">{{healthMetrics.reconnectAttempts}}</div>
+              <div class="stat-label">{{localize "CHRONICLE.Dashboard.Health.Reconnects"}}</div>
+            </div>
           </div>
-          <div class="stat-box">
-            <div class="stat-value {{#if healthMetrics.restErrorCount}}error-value{{/if}}">{{healthMetrics.restErrorCount}}</div>
-            <div class="stat-label">{{localize "CHRONICLE.Dashboard.Health.ApiErrors"}}</div>
+          <div class="diagnostics-detail">
+            <div class="system-info-row">
+              <span class="system-label">{{localize "CHRONICLE.Dashboard.Health.LastSuccess"}}:</span>
+              <span class="system-value">{{healthMetrics.lastRestSuccess}}</span>
+            </div>
+            <div class="system-info-row">
+              <span class="system-label">{{localize "CHRONICLE.Dashboard.Health.LastError"}}:</span>
+              <span class="system-value {{#if (neq healthMetrics.lastRestError 'None')}}error-text{{/if}}">{{healthMetrics.lastRestError}}</span>
+            </div>
+            {{#if healthMetrics.retryQueueSize}}
+            <div class="system-info-row">
+              <span class="system-label">{{localize "CHRONICLE.Dashboard.Health.PendingRetries"}}:</span>
+              <span class="system-value error-text">{{localize "CHRONICLE.Dashboard.Health.OperationsQueued" count=healthMetrics.retryQueueSize}}</span>
+            </div>
+            {{/if}}
           </div>
-          <div class="stat-box">
-            <div class="stat-value">{{healthMetrics.reconnectAttempts}}</div>
-            <div class="stat-label">{{localize "CHRONICLE.Dashboard.Health.Reconnects"}}</div>
-          </div>
-        </div>
-        <div class="diagnostics-detail">
-          <div class="system-info-row">
-            <span class="system-label">{{localize "CHRONICLE.Dashboard.Health.LastSuccess"}}:</span>
-            <span class="system-value">{{healthMetrics.lastRestSuccess}}</span>
-          </div>
-          <div class="system-info-row">
-            <span class="system-label">{{localize "CHRONICLE.Dashboard.Health.LastError"}}:</span>
-            <span class="system-value {{#if (neq healthMetrics.lastRestError 'None')}}error-text{{/if}}">{{healthMetrics.lastRestError}}</span>
-          </div>
-          {{#if healthMetrics.retryQueueSize}}
-          <div class="system-info-row">
-            <span class="system-label">{{localize "CHRONICLE.Dashboard.Health.PendingRetries"}}:</span>
-            <span class="system-value error-text">{{localize "CHRONICLE.Dashboard.Health.OperationsQueued" count=healthMetrics.retryQueueSize}}</span>
+
+          {{!-- Field mapping debug info --}}
+          {{#if fieldMappingInfo}}
+          <h3 class="section-heading">{{localize "CHRONICLE.Dashboard.Health.FieldMapping"}}</h3>
+          <div class="diagnostics-detail">
+            <div class="system-info-row">
+              <span class="system-label">{{localize "CHRONICLE.Dashboard.Health.Adapter"}}:</span>
+              <span class="system-value">{{fieldMappingInfo.adapterType}} ({{fieldMappingInfo.systemId}})</span>
+            </div>
+            <div class="system-info-row">
+              <span class="system-label">{{localize "CHRONICLE.Dashboard.Health.CharacterType"}}:</span>
+              <span class="system-value">{{fieldMappingInfo.characterTypeSlug}}</span>
+            </div>
           </div>
           {{/if}}
-        </div>
 
-        {{!-- Field mapping debug info --}}
-        {{#if fieldMappingInfo}}
-        <h3 class="section-heading">{{localize "CHRONICLE.Dashboard.Health.FieldMapping"}}</h3>
-        <div class="diagnostics-detail">
-          <div class="system-info-row">
-            <span class="system-label">{{localize "CHRONICLE.Dashboard.Health.Adapter"}}:</span>
-            <span class="system-value">{{fieldMappingInfo.adapterType}} ({{fieldMappingInfo.systemId}})</span>
+          {{!-- Sync Capability — what CAN pull vs what DOES (WS-4) --}}
+          {{#if capability}}
+          <h3 class="section-heading">{{localize "CHRONICLE.Dashboard.Health.SyncCapability"}}</h3>
+          {{#if capability.available}}
+          <p class="config-hint">{{localize "CHRONICLE.Dashboard.Health.CapabilityIntro"}}{{#if capability.autoPicked}} {{localize "CHRONICLE.Dashboard.Health.AutoPickedLead"}} <strong>{{capability.source.actorName}}</strong> {{localize "CHRONICLE.Dashboard.Health.AutoPickedMid"}} <code>{{capability.source.actorType}}</code> {{localize "CHRONICLE.Dashboard.Health.AutoPickedTail"}}{{else}} {{localize "CHRONICLE.Dashboard.Health.InspectingLead"}} <strong>{{capability.source.actorName}}</strong> {{localize "CHRONICLE.Dashboard.Health.InspectingMid"}} <code>{{capability.source.actorType}}</code>{{localize "CHRONICLE.Dashboard.Health.InspectingTail"}}{{/if}}</p>
+          <div class="capability-actor-picker">
+            <label for="capability-actor-select">{{localize "CHRONICLE.Dashboard.Health.InspectActor"}}:</label>
+            <select id="capability-actor-select" class="config-select capability-actor-select">
+              {{#each capability.actors}}
+              <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}{{#if linked}} {{localize "CHRONICLE.Dashboard.Health.SyncedMark"}}{{/if}}</option>
+              {{/each}}
+            </select>
           </div>
-          <div class="system-info-row">
-            <span class="system-label">{{localize "CHRONICLE.Dashboard.Health.CharacterType"}}:</span>
-            <span class="system-value">{{fieldMappingInfo.characterTypeSlug}}</span>
+          {{#if capability.fieldsError}}<p class="config-hint">{{capability.fieldsError}}</p>{{/if}}
+          <div class="diagnostics-detail">
+            <div class="system-info-row"><span class="system-label">{{localize "CHRONICLE.Dashboard.Health.Synced"}}:</span><span class="system-value">{{localize "CHRONICLE.Dashboard.Health.SyncedOfDeclared" synced=capability.summary.synced total=capability.summary.totalDeclared}}</span></div>
+            <div class="system-info-row"><span class="system-label">{{localize "CHRONICLE.Dashboard.Health.CollectionMapped"}}:</span><span class="system-value">{{capability.summary.collectionMapped}}</span></div>
+            <div class="system-info-row"><span class="system-label">{{localize "CHRONICLE.Dashboard.Health.DeclaredUnmapped"}}:</span><span class="system-value">{{capability.summary.declaredUnmapped}}</span></div>
+            <div class="system-info-row"><span class="system-label">{{localize "CHRONICLE.Dashboard.Health.MappedMissing"}}:</span><span class="system-value">{{capability.summary.mappedMissing}}</span></div>
+            <div class="system-info-row"><span class="system-label">{{localize "CHRONICLE.Dashboard.Health.AvailableUnmapped"}}:</span><span class="system-value">{{capability.summary.availableUnmapped}}</span></div>
+            <div class="system-info-row"><span class="system-label">{{localize "CHRONICLE.Dashboard.Health.Collections"}}:</span><span class="system-value">{{capability.summary.collectionsAvailable}}</span></div>
           </div>
-        </div>
-        {{/if}}
-
-        {{!-- Sync Capability — what CAN pull vs what DOES (WS-4) --}}
-        {{#if capability}}
-        <h3 class="section-heading">{{localize "CHRONICLE.Dashboard.Health.SyncCapability"}}</h3>
-        {{#if capability.available}}
-        <p class="config-hint">{{localize "CHRONICLE.Dashboard.Health.CapabilityIntro"}}{{#if capability.autoPicked}} {{localize "CHRONICLE.Dashboard.Health.AutoPickedLead"}} <strong>{{capability.source.actorName}}</strong> {{localize "CHRONICLE.Dashboard.Health.AutoPickedMid"}} <code>{{capability.source.actorType}}</code> {{localize "CHRONICLE.Dashboard.Health.AutoPickedTail"}}{{else}} {{localize "CHRONICLE.Dashboard.Health.InspectingLead"}} <strong>{{capability.source.actorName}}</strong> {{localize "CHRONICLE.Dashboard.Health.InspectingMid"}} <code>{{capability.source.actorType}}</code>{{localize "CHRONICLE.Dashboard.Health.InspectingTail"}}{{/if}}</p>
-        <div class="capability-actor-picker">
-          <label for="capability-actor-select">{{localize "CHRONICLE.Dashboard.Health.InspectActor"}}:</label>
-          <select id="capability-actor-select" class="config-select capability-actor-select">
-            {{#each capability.actors}}
-            <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}{{#if linked}} {{localize "CHRONICLE.Dashboard.Health.SyncedMark"}}{{/if}}</option>
+          {{#if capability.gaps.length}}
+          <div class="capability-gaps diagnostics-detail">
+            {{#each capability.gaps}}
+            <div class="system-info-row cap-{{status}}">
+              <span class="system-label">{{status}}</span>
+              <span class="system-value">{{#if detail}}{{localize "CHRONICLE.Dashboard.Health.GapWithDetail" label=label detail=detail}}{{else}}{{label}}{{/if}}</span>
+            </div>
             {{/each}}
-          </select>
-        </div>
-        {{#if capability.fieldsError}}<p class="config-hint">{{capability.fieldsError}}</p>{{/if}}
-        <div class="diagnostics-detail">
-          <div class="system-info-row"><span class="system-label">{{localize "CHRONICLE.Dashboard.Health.Synced"}}:</span><span class="system-value">{{localize "CHRONICLE.Dashboard.Health.SyncedOfDeclared" synced=capability.summary.synced total=capability.summary.totalDeclared}}</span></div>
-          <div class="system-info-row"><span class="system-label">{{localize "CHRONICLE.Dashboard.Health.CollectionMapped"}}:</span><span class="system-value">{{capability.summary.collectionMapped}}</span></div>
-          <div class="system-info-row"><span class="system-label">{{localize "CHRONICLE.Dashboard.Health.DeclaredUnmapped"}}:</span><span class="system-value">{{capability.summary.declaredUnmapped}}</span></div>
-          <div class="system-info-row"><span class="system-label">{{localize "CHRONICLE.Dashboard.Health.MappedMissing"}}:</span><span class="system-value">{{capability.summary.mappedMissing}}</span></div>
-          <div class="system-info-row"><span class="system-label">{{localize "CHRONICLE.Dashboard.Health.AvailableUnmapped"}}:</span><span class="system-value">{{capability.summary.availableUnmapped}}</span></div>
-          <div class="system-info-row"><span class="system-label">{{localize "CHRONICLE.Dashboard.Health.Collections"}}:</span><span class="system-value">{{capability.summary.collectionsAvailable}}</span></div>
-        </div>
-        {{#if capability.gaps.length}}
-        <div class="capability-gaps diagnostics-detail">
-          {{#each capability.gaps}}
-          <div class="system-info-row cap-{{status}}">
-            <span class="system-label">{{status}}</span>
-            <span class="system-value">{{#if detail}}{{localize "CHRONICLE.Dashboard.Health.GapWithDetail" label=label detail=detail}}{{else}}{{label}}{{/if}}</span>
           </div>
-          {{/each}}
-        </div>
-        {{/if}}
-        <div class="config-actions">
-          <button type="button" class="dashboard-btn btn-sm" data-action="copy-capability">
-            <i class="fa-solid fa-clipboard-list"></i> {{localize "CHRONICLE.Dashboard.Health.CopyCapability"}}
-          </button>
-          <button type="button" class="dashboard-btn btn-sm" data-action="copy-capability-json">
-            <i class="fa-solid fa-code"></i> {{localize "CHRONICLE.Dashboard.Health.CopyJson"}}
-          </button>
-          <span class="debug-copy-result" data-capability-result></span>
-        </div>
-        {{else}}
-        <p class="config-hint">{{#if capability.error}}{{localize "CHRONICLE.Dashboard.Health.NoRepresentativeError" error=capability.error}}{{else}}{{localize "CHRONICLE.Dashboard.Health.NoRepresentative"}}{{/if}}</p>
-        {{/if}}
-        {{/if}}
+          {{/if}}
+          <div class="config-actions">
+            <button type="button" class="dashboard-btn btn-sm" data-action="copy-capability">
+              <i class="fa-solid fa-clipboard-list"></i> {{localize "CHRONICLE.Dashboard.Health.CopyCapability"}}
+            </button>
+            <button type="button" class="dashboard-btn btn-sm" data-action="copy-capability-json">
+              <i class="fa-solid fa-code"></i> {{localize "CHRONICLE.Dashboard.Health.CopyJson"}}
+            </button>
+            <span class="debug-copy-result" data-capability-result></span>
+          </div>
+          {{else}}
+          <p class="config-hint">{{#if capability.error}}{{localize "CHRONICLE.Dashboard.Health.NoRepresentativeError" error=capability.error}}{{else}}{{localize "CHRONICLE.Dashboard.Health.NoRepresentative"}}{{/if}}</p>
+          {{/if}}
+          {{/if}}
 
-        {{!-- Dice So Nice: someone else's module, so what we rely on is checked, not assumed --}}
-        {{#if dice}}
-        <h3 class="section-heading">{{localize "CHRONICLE.Dice.Heading"}}</h3>
-        <p class="config-hint">{{localize "CHRONICLE.Dice.Intro"}}</p>
-        <div class="diagnostics-detail dice-check dice-check--{{dice.state}}">
-          <div class="system-info-row">
-            <span class="system-label">{{localize "CHRONICLE.Dice.State"}}:</span>
-            <span class="system-value dice-check-state">{{dice.stateLabel}}</span>
+          {{!-- Dice So Nice: someone else's module, so what we rely on is checked, not assumed --}}
+          {{#if dice}}
+          <h3 class="section-heading">{{localize "CHRONICLE.Dice.Heading"}}</h3>
+          <p class="config-hint">{{localize "CHRONICLE.Dice.Intro"}}</p>
+          <div class="diagnostics-detail dice-check dice-check--{{dice.state}}">
+            <div class="system-info-row">
+              <span class="system-label">{{localize "CHRONICLE.Dice.State"}}:</span>
+              <span class="system-value dice-check-state">{{dice.stateLabel}}</span>
+            </div>
+            <ul class="dice-check-rows">
+              {{#each dice.rows}}
+              <li class="dice-check-row dice-check-row--{{level}}">
+                <i class="fa-solid {{#if (eq level 'error')}}fa-circle-xmark{{else if (eq level 'warn')}}fa-triangle-exclamation{{else if (eq level 'ok')}}fa-circle-check{{else}}fa-circle-info{{/if}}" aria-hidden="true"></i>
+                <span>{{text}}{{#if fix}} <span class="dice-check-fix">{{localize "CHRONICLE.Dice.Fix"}}: {{fix}}</span>{{/if}}</span>
+              </li>
+              {{/each}}
+            </ul>
           </div>
-          <ul class="dice-check-rows">
-            {{#each dice.rows}}
-            <li class="dice-check-row dice-check-row--{{level}}">
-              <i class="fa-solid {{#if (eq level 'error')}}fa-circle-xmark{{else if (eq level 'warn')}}fa-triangle-exclamation{{else if (eq level 'ok')}}fa-circle-check{{else}}fa-circle-info{{/if}}" aria-hidden="true"></i>
-              <span>{{text}}{{#if fix}} <span class="dice-check-fix">{{localize "CHRONICLE.Dice.Fix"}}: {{fix}}</span>{{/if}}</span>
-            </li>
+          <div class="config-actions">
+            <button type="button" class="dashboard-btn btn-sm" data-action="check-dice-files" title="{{localize "CHRONICLE.Dice.CheckFilesHint"}}">
+              <i class="fa-solid fa-dice-d20"></i> {{localize "CHRONICLE.Dice.CheckFiles"}}
+            </button>
+          </div>
+          {{/if}}
+
+          {{!-- Error log --}}
+          {{#if hasErrors}}
+          <h3 class="section-heading">{{localize "CHRONICLE.Dashboard.Health.ErrorLog"}}</h3>
+          <div class="error-log">
+            {{#each errorLog}}
+            <div class="log-entry log-error">
+              <span class="log-time">{{timeFormatted}}</span>
+              <span class="log-icon"><i class="fa-solid fa-triangle-exclamation"></i></span>
+              <span class="log-message">{{method}} {{path}}{{#if status}} ({{status}}){{/if}}: {{message}}</span>
+            </div>
             {{/each}}
-          </ul>
-        </div>
-        <div class="config-actions">
-          <button type="button" class="dashboard-btn btn-sm" data-action="check-dice-files" title="{{localize "CHRONICLE.Dice.CheckFilesHint"}}">
-            <i class="fa-solid fa-dice-d20"></i> {{localize "CHRONICLE.Dice.CheckFiles"}}
-          </button>
-        </div>
-        {{/if}}
-
-        {{!-- Error log --}}
-        {{#if hasErrors}}
-        <h3 class="section-heading">{{localize "CHRONICLE.Dashboard.Health.ErrorLog"}}</h3>
-        <div class="error-log">
-          {{#each errorLog}}
-          <div class="log-entry log-error">
-            <span class="log-time">{{timeFormatted}}</span>
-            <span class="log-icon"><i class="fa-solid fa-triangle-exclamation"></i></span>
-            <span class="log-message">{{method}} {{path}}{{#if status}} ({{status}}){{/if}}: {{message}}</span>
           </div>
-          {{/each}}
-        </div>
-        {{/if}}
+          {{/if}}
 
-        {{!-- Diagnostic Bundle (troubleshooting — versions, health, logs, capability) --}}
-        <h3 class="section-heading">{{localize "CHRONICLE.Dashboard.Health.DiagnosticBundle"}}</h3>
-        <p class="config-hint">{{localize "CHRONICLE.Dashboard.Health.DiagnosticBundleHint"}}</p>
-        <div class="config-actions">
-          <button type="button" class="dashboard-btn btn-sm" data-action="copy-diagnostic-bundle">
-            <i class="fa-solid fa-clipboard-check"></i> {{localize "CHRONICLE.Dashboard.Health.CopyDiagnosticBundle"}}
-          </button>
-          <span class="debug-copy-result" data-bundle-result></span>
-        </div>
-
-        {{!-- System Debug Export --}}
-        <h3 class="section-heading">{{localize "CHRONICLE.Dashboard.Health.SystemDebugExport"}}</h3>
-        <p class="config-hint">{{localize "CHRONICLE.Dashboard.Health.SystemDebugExportHint"}}</p>
-        <div class="config-actions">
-          <button type="button" class="dashboard-btn btn-sm" data-action="copy-debug">
-            <i class="fa-solid fa-clipboard"></i> {{localize "CHRONICLE.Dashboard.Health.CopySystemDebug"}}
-          </button>
-          <span class="debug-copy-result" data-debug-result></span>
-        </div>
-
+          {{!-- System Debug Export --}}
+          <h3 class="section-heading">{{localize "CHRONICLE.Dashboard.Health.SystemDebugExport"}}</h3>
+          <p class="config-hint">{{localize "CHRONICLE.Dashboard.Health.SystemDebugExportHint"}}</p>
+          <div class="config-actions">
+            <button type="button" class="dashboard-btn btn-sm" data-action="copy-debug">
+              <i class="fa-solid fa-clipboard"></i> {{localize "CHRONICLE.Dashboard.Health.CopySystemDebug"}}
+            </button>
+            <span class="debug-copy-result" data-debug-result></span>
+          </div>
+          </div>
+        </details>
       </div>
       </div>
 

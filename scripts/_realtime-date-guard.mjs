@@ -68,7 +68,7 @@ export function notifyRealTimePushPaused() {
   if (state.noticeShown) return;
   state.noticeShown = true;
   const msg = 'Chronicle Sync: this calendar tracks real-world time — '
-    + 'Foundry date changes are not pushed to Chronicle. Pulls still work.';
+    + 'Foundry date changes are not sent to Chronicle. Dates still come in from Chronicle.';
   console.warn(msg);
   try { globalThis.ui?.notifications?.warn(msg); } catch { /* headless */ }
 }

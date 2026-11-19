@@ -371,7 +371,7 @@ export function renderCapabilityMarkdown(report) {
     lines.push('');
     lines.push('## Collections');
     for (const c of report.collections) {
-      lines.push(`- \`${c.source}\` — ${c.count} item(s), types: ${c.types.join(', ') || '—'} — ${c.note}`);
+      lines.push(`- \`${c.source}\` — ${c.count} items, types: ${c.types.join(', ') || '—'} — ${c.note}`);
       // Per-type item schemas — the projectable fields for each item type, so a
       // collection mapping can target the right foundry_item_fields paths.
       for (const sample of (c.samples || [])) {

@@ -30,6 +30,27 @@ function item(label, log) {
   return { label, run: async () => { log.push(label); } };
 }
 
+test('what is kept in Chronicle is told so, whether the GM said No or the delete failed', async () => {
+  const kept = [];
+  const entry = (label, run) => ({ label, run, kept: async () => { kept.push(label); } });
+  let timer = manualTimer();
+  let batch = createRemoteDeleteBatch({ ask: async () => false, setTimer: timer.set, clearTimer: timer.clear });
+  batch.add(entry('Mirabel', async () => {}));
+  batch.add({ label: 'An actor', run: async () => {} });
+  await timer.fn();
+  assert.deepEqual(kept, ['Mirabel'], 'No keeps it; an item with nothing to do is fine');
+
+  kept.length = 0;
+  timer = manualTimer();
+  batch = createRemoteDeleteBatch({ ask: async () => true, setTimer: timer.set, clearTimer: timer.clear });
+  batch.add(entry('Gone', async () => {}));
+  batch.add(entry('Stuck', async () => { throw new Error('offline'); }));
+  batch.add({ label: 'Breaks', run: async () => { throw new Error('offline'); }, kept: async () => { throw new Error('no'); } });
+  const result = await timer.fn();
+  assert.deepEqual(kept, ['Stuck'], 'a deleted page is not kept; a failed delete is');
+  assert.deepEqual(result, { asked: true, deleted: 1, kept: 2 });
+});
+
 test('a burst of deletes is asked about once, together', async () => {
   const timer = manualTimer(), asked = [], ran = [];
   const batch = createRemoteDeleteBatch({ ask: async (items) => { asked.push(items.map((i) => i.label)); return false; }, setTimer: timer.set, clearTimer: timer.clear });
@@ -94,6 +115,12 @@ test('the sync files queue their Foundry-side deletes instead of calling the API
   for (const [name, text] of [['actor-sync', actor], ['journal-sync', journal], ['item-sync', item]]) {
     assert.match(text, /queueRemoteDelete\(/, `${name} must ask before deleting in Chronicle`);
   }
-  assert.doesNotMatch(actor, /await this\._api\.delete\(`\/entities/, 'actor-sync must not delete a Chronicle page without asking');
-  assert.doesNotMatch(journal, /await this\._api\.delete\(`\/entities/, 'journal-sync must not delete a Chronicle page without asking');
+  // The one direct delete is a player's own page, which Chronicle moves to its
+  // Trash (restorable); it sits only inside _handlePlayerDelete, behind `own`.
+  const withoutPlayerDelete = (text) => text.replace(/async _handlePlayerDelete[\s\S]*?\n  }\n/, '');
+  assert.doesNotMatch(withoutPlayerDelete(actor), /await this\._api\.delete\(`\/entities/, 'actor-sync must not delete a Chronicle page without asking');
+  assert.doesNotMatch(withoutPlayerDelete(journal), /await this\._api\.delete\(`\/entities/, 'journal-sync must not delete a Chronicle page without asking');
+  for (const [name, text] of [['actor-sync', actor], ['journal-sync', journal]]) {
+    assert.match(text, /if \(own\) \{\s+await this\._api\.delete\(`\/entities/, `${name}: a player's direct delete must sit behind the ownership check`);
+  }
 });

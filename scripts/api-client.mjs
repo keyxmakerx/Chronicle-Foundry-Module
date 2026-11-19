@@ -36,6 +36,23 @@ function _validateCampaignIdOrThrow(campaignId) {
   return campaignId;
 }
 
+/** How long a request may take before it is given up; uploads and pictures get longer. */
+export const REQUEST_TIMEOUT_MS = 30_000;
+export const TRANSFER_TIMEOUT_MS = 120_000;
+
+/**
+ * Fetch options that give a stalled request up after `ms`, so one hung call
+ * (a proxy holding the connection open) cannot stop everything queued behind
+ * it. A caller's own signal is kept.
+ * @param {object} options
+ * @param {number} ms
+ * @returns {object}
+ */
+function withTimeout(options, ms) {
+  if (options?.signal || typeof AbortSignal?.timeout !== 'function') return options;
+  return { ...options, signal: AbortSignal.timeout(ms) };
+}
+
 /**
  * Allowed WebSocket message type prefixes.
  * Messages with types not matching any prefix are silently ignored to prevent
@@ -58,6 +75,7 @@ const ALLOWED_WS_TYPE_PREFIXES = Object.freeze([
   'downtime.',
   'npc.',
   'system_state.',
+  'hero_layers.',
   'roll.',
 ]);
 
@@ -79,7 +97,7 @@ export class ConflictError extends Error {
    * @param {object} data - Parsed response body from the 409 response.
    */
   constructor(data) {
-    super(data?.message || 'Entity was modified by another user');
+    super(data?.message || 'This page was changed by someone else');
     this.name = 'ConflictError';
     this.status = 409;
     this.data = data;
@@ -208,6 +226,8 @@ export class ChronicleAPI {
 
     /** @type {boolean} Whether we're currently processing the retry queue. */
     this._retryProcessing = false;
+    /** When each waiting write last went through on a later try, by `METHOD path`. */
+    this._replayedAt = new Map();
 
     /** Shared pause after a 429, so a burst waits instead of failing call by call. */
     this.rateLimit = new RateLimitGate();
@@ -259,12 +279,12 @@ export class ChronicleAPI {
       await this.rateLimit.wait();
       try {
         try {
-          response = await fetch(url, { ...options, headers });
+          response = await fetch(url, withTimeout({ ...options, headers }, REQUEST_TIMEOUT_MS));
         } catch (err) {
           if (!shouldRetryWithoutVersionHeader(err, headers)) throw err;
           markModuleVersionHeaderRefused();
           const { [MODULE_VERSION_HEADER]: _dropped, ...withoutVersion } = headers;
-          response = await fetch(url, { ...options, headers: withoutVersion });
+          response = await fetch(url, withTimeout({ ...options, headers: withoutVersion }, REQUEST_TIMEOUT_MS));
         }
       } catch (err) {
         // Network error (no response at all).
@@ -444,12 +464,12 @@ export class ChronicleAPI {
     await this.rateLimit.wait();
     try {
       try {
-        response = await fetch(url, { method: 'GET', headers });
+        response = await fetch(url, withTimeout({ method: 'GET', headers }, TRANSFER_TIMEOUT_MS));
       } catch (err) {
         if (!shouldRetryWithoutVersionHeader(err, headers)) throw err;
         markModuleVersionHeaderRefused();
         const { [MODULE_VERSION_HEADER]: _dropped, ...withoutVersion } = headers;
-        response = await fetch(url, { method: 'GET', headers: withoutVersion });
+        response = await fetch(url, withTimeout({ method: 'GET', headers: withoutVersion }, TRANSFER_TIMEOUT_MS));
       }
     } catch (err) {
       this.health.restErrorCount++;
@@ -492,12 +512,12 @@ export class ChronicleAPI {
     let response;
     await this.rateLimit.wait();
     try {
-      response = await fetch(url, { method: 'POST', headers, body: formData });
+      response = await fetch(url, withTimeout({ method: 'POST', headers, body: formData }, TRANSFER_TIMEOUT_MS));
     } catch (err) {
       if (!shouldRetryWithoutVersionHeader(err, headers)) throw err;
       markModuleVersionHeaderRefused();
       const { [MODULE_VERSION_HEADER]: _dropped, ...withoutVersion } = headers;
-      response = await fetch(url, { method: 'POST', headers: withoutVersion, body: formData });
+      response = await fetch(url, withTimeout({ method: 'POST', headers: withoutVersion, body: formData }, TRANSFER_TIMEOUT_MS));
     }
 
     if (!response.ok) {
@@ -673,6 +693,7 @@ export class ChronicleAPI {
           method: item.method,
           body: item.body,
         });
+        this._replayedAt.set(`${item.method} ${item.path}`, Date.now());
         success++;
       } catch (err) {
         if (err instanceof ConflictError) {
@@ -680,6 +701,7 @@ export class ChronicleAPI {
           try {
             if (!item.onConflict) throw err;
             await item.onConflict(item.body ? JSON.parse(item.body) : null);
+            this._replayedAt.set(`${item.method} ${item.path}`, Date.now());
             success++;
           } catch (conflictErr) {
             failed++;
@@ -715,6 +737,27 @@ export class ChronicleAPI {
    */
   getRetryQueueSize() {
     return this._retryQueue.length;
+  }
+
+  /**
+   * The waiting writes, safe to show: method, path and attempt counts only.
+   * The body is left out because it can hold page text.
+   * @returns {{method: string, path: string, retries: number, maxRetries: number}[]}
+   */
+  getRetryQueue() {
+    return this._retryQueue.map(({ method, path, retries, maxRetries }) => ({ method, path, retries, maxRetries }));
+  }
+
+  /**
+   * When a waiting write last went through on a later try, or 0. The error
+   * log keeps the failure that queued it, so this is how a reader tells that
+   * failure was made good.
+   * @param {string} method
+   * @param {string} path
+   * @returns {number} epoch ms
+   */
+  getReplayedAt(method, path) {
+    return this._replayedAt.get(`${method} ${path}`) ?? 0;
   }
 
   // --- Health & error log ---

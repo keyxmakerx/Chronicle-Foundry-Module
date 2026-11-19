@@ -72,7 +72,9 @@ export function makeJournal({ id = 'j1', name = 'Journal', flags = {}, pages = [
       j.updates.push({ data, options });
       for (const [k, v] of Object.entries(data)) {
         const m = k.match(/^flags\.[^.]+\.(.+)$/);
-        if (m) j.flags[m[1]] = v;
+        // `-=key` is Foundry's removal form (flagRemoval without ForcedDeletion).
+        if (m && m[1].startsWith('-=')) delete j.flags[m[1].slice(2)];
+        else if (m) j.flags[m[1]] = v;
         else if (k === 'name') j.name = v;
       }
     },

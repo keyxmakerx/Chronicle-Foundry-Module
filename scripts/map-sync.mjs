@@ -443,6 +443,22 @@ export class MapSync {
   /** Change-feed area (see SyncManager._performInitialSync). */
   get feedArea() { return 'maps'; }
 
+  /** The settings part whose direction and live switch govern this module. */
+  get syncPart() { return 'maps'; }
+
+  /**
+   * Whether a marker edit made here may go to Chronicle. Markers are edited
+   * in Chronicle through the viewer, so they never wait for "Sync now", but
+   * maps set to "From Chronicle" send nothing, and the GM is told why.
+   * @returns {boolean}
+   * @private
+   */
+  _mayEditMarkers() {
+    if (this._syncManager?.pushGate?.('maps') !== 'drop') return true;
+    ui.notifications?.warn?.(game.i18n.localize('CHRONICLE.MapViewer.FromChronicleOnly'));
+    return false;
+  }
+
   /** Map items are in the feed only on a server that records them. */
   get feedType() { return 'marker'; }
 
@@ -581,16 +597,16 @@ export class MapSync {
     if (verbose) {
       if (failures > 0) {
         ui.notifications.warn(
-          `Chronicle: materialized ${materialized} of ${maps.length} map(s); ${failures} failed. See sync dashboard for details.`
+          `Chronicle: ${failures} failed. Maps brought into Foundry: ${materialized} of ${maps.length}. See sync dashboard for details.`
         );
       } else {
-        ui.notifications.info(`Chronicle: synced ${materialized} map(s).`);
+        ui.notifications.info(`Chronicle: maps synced: ${materialized}`);
       }
     } else if (failures > 0) {
       // Silent (initial-sync) path: still surface a single aggregated toast
       // so the operator notices partial materialization.
       ui.notifications.warn(
-        `Chronicle: ${failures} of ${maps.length} maps failed to materialize. See sync dashboard.`
+        `Chronicle: ${failures} of ${maps.length} maps could not be brought into Foundry. See sync dashboard.`
       );
     }
 
@@ -976,7 +992,7 @@ export class MapSync {
       await this._refreshSubResources(mapId);
       this._lastSyncAt = Date.now();
       this._notifyViewers(mapId);
-      ui.notifications.info(`Chronicle: resynced "${noticeText(map.name || mapId)}".`);
+      ui.notifications.info(`Chronicle: synced "${noticeText(map.name || mapId)}" again.`);
       return true;
     } catch (err) {
       const status = err?.status || null;
@@ -988,7 +1004,7 @@ export class MapSync {
         error: err,
       });
       ui.notifications.error(
-        `Chronicle: resync failed for this map${status ? ` (HTTP ${status})` : ''}. See sync dashboard.`
+        `Chronicle: sync again failed for this map${status ? ` (HTTP ${status})` : ''}. See sync dashboard.`
       );
       return false;
     }
@@ -1001,7 +1017,7 @@ export class MapSync {
    * @returns {Promise<object|null>}
    */
   async createMarker(mapId, markerData) {
-    if (!game.user.isGM || !this._api || !mapId) return null;
+    if (!game.user.isGM || !this._api || !mapId || !this._mayEditMarkers()) return null;
     try {
       const result = await this._api.post(`/maps/${mapId}/markers`, markerData);
       if (result?.id) {
@@ -1023,7 +1039,7 @@ export class MapSync {
    * @returns {Promise<object|null>}
    */
   async updateMarker(mapId, markerId, markerData) {
-    if (!game.user.isGM || !this._api || !mapId || !markerId) return null;
+    if (!game.user.isGM || !this._api || !mapId || !markerId || !this._mayEditMarkers()) return null;
     try {
       const result = await this._api.put(`/maps/${mapId}/markers/${markerId}`, markerData);
       await this._refreshSubResources(mapId);
@@ -1041,7 +1057,7 @@ export class MapSync {
    * @param {string} markerId
    */
   async deleteMarker(mapId, markerId) {
-    if (!game.user.isGM || !this._api || !mapId || !markerId) return;
+    if (!game.user.isGM || !this._api || !mapId || !markerId || !this._mayEditMarkers()) return;
     try {
       await this._api.delete(`/maps/${mapId}/markers/${markerId}`);
       await this._refreshSubResources(mapId);

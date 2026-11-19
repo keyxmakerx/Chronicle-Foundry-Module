@@ -48,8 +48,8 @@ flowchart LR
       Chronicle's shop rooms open in Foundry, and players buy with the character they pick. Stashes move items and money between characters, with the GM approving requests from a chat card. Each hero's crafting (spoils to take, harvest or study, and projects to roll) sits in the Satchel.
     </td>
     <td width="50%" valign="top">
-      <b>DM Screen, notebook and NPCs</b><br>
-      The GM's DM Screen in a Foundry window, each player's own journal and jot notes, spotlight, talking glow and open page for NPC tokens, a token's full art beside the cursor when you hover it, and Change form for creatures with more than one form.
+      <b>GM Screen, notebook and NPCs</b><br>
+      The GM Screen in a Foundry window, each player's own journal and jot notes, spotlight, talking glow and open page for NPC tokens, a token's full art beside the cursor when you hover it, and Change form for creatures with more than one form.
     </td>
   </tr>
 </table>
@@ -121,7 +121,7 @@ update choice and sends update traffic to GitHub.
 In order:
 
 1. **Deploy Chronicle first**, with your usual backup. The module keeps
-   working against an older Chronicle, but newer features (the DM Screen,
+   working against an older Chronicle, but newer features (the GM Screen,
    Stashes, map icons) only appear once Chronicle has the matching routes.
 2. **Make the release.** On this repo's GitHub page open **Actions →
    Release → Run workflow**, type the version as `X.Y.Z` (no leading `v`) and

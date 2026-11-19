@@ -22,6 +22,8 @@ import { CraftingSync, registerCraftingSocket } from './crafting-relay.mjs';
 import { registerCraftingButton } from './crafting-button.mjs';
 import { registerSpoilsPrompt } from './spoils-prompt.mjs';
 import { registerStashChat } from './stash-chat.mjs';
+import { PlayerAsks } from './player-asks.mjs';
+import { registerPlayerAsksChat } from './player-asks-chat.mjs';
 import { registerStashButton } from './stash-window.mjs';
 import { bindDebugHub, registerDebugHub } from './debug-hub.mjs';
 import { SyncDashboard } from './sync-dashboard.mjs';
@@ -177,6 +179,7 @@ Hooks.once('ready', async () => {
   syncManager.registerModule(creatureSync);
   syncManager.registerModule(new ItemSync());
   syncManager.registerModule(new StashSync());
+  syncManager.registerModule(new PlayerAsks());
   syncManager.registerModule(new CraftingSync());
   syncManager.registerModule(npcSpotlightRelay);
   syncManager.registerModule(negotiationMirror);
@@ -193,6 +196,7 @@ Hooks.once('ready', async () => {
   registerShopRoomSocket();
   // A shop's journal entry gets an "Open shop" button for anyone who can see it.
   registerShopJournalButton((id, name, opts) => shopWidget.openShop(id, name, opts));
+  registerPlayerAsksChat();
   try {
     registerStashSocket();
     registerStashChat();
@@ -303,7 +307,7 @@ Hooks.once('ready', async () => {
       const mapSync = syncManager._modules?.find((m) => m.constructor?.name === 'MapSync');
       const count = mapSync?._materializedThisStartup || 0;
       if (count > 0) {
-        ui.notifications.info(`Chronicle: synced ${count} map(s) from Chronicle.`);
+        ui.notifications.info(`Chronicle: maps synced from Chronicle: ${count}`);
       }
     }
   } catch (err) {

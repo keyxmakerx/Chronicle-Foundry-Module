@@ -73,6 +73,7 @@ export class CreatureSync {
     this._folderPromise = null;
     this._onUpdateActor = this._handleUpdateActor.bind(this);
     this._onEffect = this._handleEffect.bind(this);
+    this._onCreateActor = this._handleCreateActor.bind(this);
     this._hooked = false;
     this._pictures = null;
     this._formsCache = new Map();
@@ -120,6 +121,7 @@ export class CreatureSync {
     if (!this._hooked) {
       this._hooked = true;
       Hooks.on('updateActor', this._onUpdateActor);
+      Hooks.on('createActor', this._onCreateActor);
       Hooks.on('createActiveEffect', this._onEffect);
       Hooks.on('deleteActiveEffect', this._onEffect);
     }
@@ -141,6 +143,7 @@ export class CreatureSync {
   destroy() {
     if (this._hooked) {
       Hooks.off('updateActor', this._onUpdateActor);
+      Hooks.off('createActor', this._onCreateActor);
       Hooks.off('createActiveEffect', this._onEffect);
       Hooks.off('deleteActiveEffect', this._onEffect);
       this._hooked = false;
@@ -587,6 +590,20 @@ export class CreatureSync {
     return on;
   }
 
+  /**
+   * A copied creature actor (Duplicate, an import) carries the page's link,
+   * but only the first actor found follows the page and both would send
+   * Stamina back. The copy keeps its numbers and its page for the token
+   * tools, and stops following.
+   */
+  async _handleCreateActor(actor, options) {
+    if (!this._active || options?.[APPLY_OPTION]) return;
+    const entityId = actor.getFlag(FLAG_SCOPE, CREATURE_FLAG);
+    if (!entityId) return;
+    if (!game.actors.find((a) => a.id !== actor.id && a.getFlag(FLAG_SCOPE, CREATURE_FLAG) === entityId)) return;
+    await actor.update(flagRemoval(FLAG_SCOPE, CREATURE_FLAG, VERSION_FLAG), syncOptions({ [APPLY_OPTION]: true }));
+  }
+
   _handleUpdateActor(actor, change, options) {
     if (!this._active || options?.[APPLY_OPTION] || !this._pullKeys.length) return;
     const entityId = actor.getFlag(FLAG_SCOPE, CREATURE_FLAG);
@@ -604,7 +621,26 @@ export class CreatureSync {
     this._schedulePull(actor);
   }
 
+  /** The settings part whose live switch governs this module. */
+  get syncPart() { return 'creatures'; }
+
+  /** Waiting changes this module sends on "Sync now". */
+  get heldKinds() { return ['creature.fields']; }
+
+  /** Send one waiting change: what the actor's sent-back fields hold now. */
+  async sendHeld(change) {
+    await this._pull(change.data.actorId);
+  }
+
   _schedulePull(actor) {
+    const gate = this._syncManager?.pushGate?.('creatures') ?? 'send';
+    if (gate === 'drop') return;
+    if (gate === 'hold') {
+      this._syncManager.holdChange({
+        key: `creature:${actor.id}`, part: 'creatures', kind: 'creature.fields', label: actor.name, data: { actorId: actor.id },
+      });
+      return;
+    }
     clearTimeout(this._pullTimers.get(actor.id));
     this._pullTimers.set(actor.id, setTimeout(() => {
       this._pullTimers.delete(actor.id);

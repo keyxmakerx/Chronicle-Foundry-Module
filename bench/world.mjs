@@ -54,7 +54,8 @@ async function loadModule() {
     import('../scripts/item-sync.mjs'),
     import('../scripts/map-sync.mjs'),
     import('../scripts/creature-sync.mjs'),
-  ]).then(([settings, sm, js, as, is, ms, cs]) => ({
+    import('../scripts/player-asks.mjs'),
+  ]).then(([settings, sm, js, as, is, ms, cs, pa]) => ({
     registerSettings: settings.registerSettings,
     SyncManager: sm.SyncManager,
     JournalSync: js.JournalSync,
@@ -62,6 +63,7 @@ async function loadModule() {
     ItemSync: is.ItemSync,
     MapSync: ms.MapSync,
     CreatureSync: cs.CreatureSync,
+    PlayerAsks: pa.PlayerAsks,
   }));
   return modulesLoaded;
 }
@@ -78,6 +80,8 @@ export const benchAdapter = {
   identityFields: ['ancestry', 'kit'].map((key) => ({
     key, type: 'string', foundry_collection: 'items', foundry_item_type: [key], foundry_item_single: true,
   })),
+  // `hp` is the one mapped scalar, so it is what a layer's effect can change.
+  fieldDefs: [{ key: 'hp', type: 'number', foundry_path: 'system.hp' }],
   fromChronicleFields(entity) {
     const out = {};
     if (entity?.name) out.name = entity.name;
@@ -140,7 +144,7 @@ export async function openWorld(world, { modules = ['journals'] } = {}) {
   Object.assign(globalThis, world.globals ??= {
     game: globalThis.game, Hooks: globalThis.Hooks, ui: globalThis.ui, CONST: globalThis.CONST,
     JournalEntry: globalThis.JournalEntry, Actor: globalThis.Actor, Folder: globalThis.Folder,
-    foundry: globalThis.foundry, fromUuid: globalThis.fromUuid, TextEditor: globalThis.TextEditor,
+    foundry: globalThis.foundry, ChatMessage: globalThis.ChatMessage, fromUuid: globalThis.fromUuid, TextEditor: globalThis.TextEditor,
   });
   traffic.moduleKey = world.seed.moduleKey;
   if (!world.settingsRegistered) {
@@ -163,6 +167,7 @@ export async function openWorld(world, { modules = ['journals'] } = {}) {
     sm.registerModule(creatures);
   }
   if (modules.includes('items')) sm.registerModule(new m.ItemSync());
+  if (modules.includes('playerAsks')) sm.registerModule(world.playerAsks = new m.PlayerAsks());
   if (modules.includes('maps')) sm.registerModule(new m.MapSync());
   world.syncManager = sm;
   await sm.start();

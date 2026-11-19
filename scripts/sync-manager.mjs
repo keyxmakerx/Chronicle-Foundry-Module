@@ -19,6 +19,7 @@ import { getSetting, setSetting, isConfigured, getSyncDirections, getExcludedTag
 import { memberKey } from './_member-mapping.mjs';
 import { fetchChronicleVersion } from './_chronicle-version.mjs';
 import { connectionAction } from './_connection-change.mjs';
+import { pushGate, pullGate, parseHeld, holdChange, dropHeld } from './_held-changes.mjs';
 
 /**
  * How long the connection must stay continuously connected after a reconnect
@@ -27,6 +28,9 @@ import { connectionAction } from './_connection-change.mjs';
  * @type {number}
  */
 const RECONNECT_RESYNC_DEBOUNCE_MS = 3000;
+
+/** Waits before a failed catch-up is tried again while still connected. */
+const SYNC_RETRY_DELAYS_MS = [30_000, 60_000, 120_000];
 
 /** How often queued sync-history events are sent to Chronicle. */
 const HISTORY_FLUSH_MS = 15_000;
@@ -112,6 +116,15 @@ export class SyncManager {
 
     /** @type {Array<object>} Registered sync modules. */
     this._modules = [];
+
+    /** @type {Array<object>|null} Foundry changes waiting for "Sync now"; read from the setting on first use. */
+    this._held = null;
+    /** @type {Promise<void>} Saves of the waiting list, one after another. */
+    this._heldSave = Promise.resolve();
+    /** @type {Set<string>} Chronicle changes that arrived while live sync is off. */
+    this._heldIncoming = new Set();
+    /** @type {boolean} A "Sync now" pass is running, so nothing waits. */
+    this._syncingNow = false;
 
     /** @type {boolean} Whether initial sync has completed. */
     this._initialSyncDone = false;
@@ -371,7 +384,7 @@ export class SyncManager {
     try {
       const ok = await this._performInitialSync();
       if (ok !== false) {
-        this.logActivity('connect', 'Reconnected — re-pulled changes made during the disconnect');
+        this.logActivity('connect', 'Reconnected — fetched again the changes made during the disconnect');
       }
     } catch (err) {
       console.warn('Chronicle: Reconnect re-pull failed', err);
@@ -652,6 +665,8 @@ export class SyncManager {
       clearTimeout(this._reconnectResyncTimer);
       this._reconnectResyncTimer = null;
     }
+    if (this._syncRetryTimer) { clearTimeout(this._syncRetryTimer); this._syncRetryTimer = null; }
+    this._syncRetries = 0;
     console.debug('Chronicle: Sync manager stopped');
   }
 
@@ -805,8 +820,43 @@ export class SyncManager {
    *   sync time saved; false when it failed or was cut short.
    * @private
    */
-  async _performInitialSync() {
+  _performInitialSync() {
+    // One pass at a time: the first connect and a reconnect can both ask, and
+    // two passes would apply the same changes twice and race the cursor.
+    this._syncPass ??= this._runInitialSync()
+      .then((ok) => { this._noteSyncPass(ok); return ok; })
+      .finally(() => { this._syncPass = null; });
+    return this._syncPass;
+  }
+
+  /**
+   * A failed catch-up is tried again while the connection stays up (after 30
+   * seconds, then one and two minutes), since nothing else would until the
+   * socket next drops. A pass that works clears the count.
+   * @param {boolean} ok
+   * @private
+   */
+  _noteSyncPass(ok) {
+    if (this._syncRetryTimer) { clearTimeout(this._syncRetryTimer); this._syncRetryTimer = null; }
+    if (ok !== false) { this._syncRetries = 0; return; }
+    const delay = SYNC_RETRY_DELAYS_MS[this._syncRetries ?? 0];
+    if (!delay || !this._started) return;
+    this._syncRetries = (this._syncRetries ?? 0) + 1;
+    this._syncRetryTimer = setTimeout(async () => {
+      this._syncRetryTimer = null;
+      if (!this._started || this.api.state !== 'connected') return;
+      const again = await this._performInitialSync();
+      if (again !== false) this._initialSyncDone = true;
+    }, delay);
+  }
+
+  /** The body of `_performInitialSync`. @private */
+  async _runInitialSync() {
     const lastSync = getSetting('lastSyncTime') || '1970-01-01T00:00:00Z';
+    // While live sync is off, an automatic pass only serves the parts that
+    // never wait. Nothing is read for the others and the cursor stays, so
+    // "Sync now" starts from where the last full pass ended.
+    if (this._modules.some((mod) => this.pullGateFor(mod) === 'hold')) return this._runWaitingPass();
 
     try {
       console.debug(`Chronicle: Initial sync from ${lastSync}`);
@@ -828,7 +878,7 @@ export class SyncManager {
         // Route each mapping to the appropriate module.
         for (const mapping of result.mappings) {
           for (const mod of this._modules) {
-            if (typeof mod.onSyncMapping === 'function') {
+            if (typeof mod.onSyncMapping === 'function' && this.pullGateFor(mod) === 'apply') {
               await mod.onSyncMapping(mapping);
             }
           }
@@ -850,7 +900,9 @@ export class SyncManager {
       const feedAreas = [];
       let feedFailed = false;
       for (const mod of this._modules) {
-        if (typeof mod.onInitialSync === 'function') {
+        // A part set to "From Foundry" takes nothing; its feed area is left
+        // out of the cursor, so it rescans in full once it takes changes again.
+        if (typeof mod.onInitialSync === 'function' && this.pullGateFor(mod) === 'apply') {
           const area = mod.feedArea && mod.feedActive?.() ? mod.feedArea : null;
           try {
             await mod.onInitialSync(area ? { feed: feedForArea(feed, cursor, area, mod.feedType) } : undefined);
@@ -876,7 +928,7 @@ export class SyncManager {
       // the first sync (e.g., journal-sync deletes character duplicates
       // once actor-sync has materialized its actors).
       for (const mod of this._modules) {
-        if (typeof mod.onPostInitialSync === 'function') {
+        if (typeof mod.onPostInitialSync === 'function' && this.pullGateFor(mod) === 'apply') {
           try {
             await mod.onPostInitialSync();
           } catch (err) {
@@ -895,6 +947,8 @@ export class SyncManager {
 
       // The first page's server_time, so changes made mid-walk are re-read.
       await setSetting('lastSyncTime', result.serverTime || new Date().toISOString());
+      this._heldIncoming.clear();
+      this._heldChanged();
 
       // A routine success: History has it, no toast.
       this.logActivity('connect', `Initial sync complete (${result.mappings.length} mappings)`);
@@ -915,8 +969,13 @@ export class SyncManager {
   _routeMessage(msg) {
     const started = Date.now();
     const runs = [];
+    let waiting = false;
     for (const mod of this._modules) {
       if (typeof mod.onMessage === 'function') {
+        // A part that takes nothing from Chronicle, or is waiting for "Sync
+        // now", does not see the message; the next catch-up reads it again.
+        const gate = this.pullGateFor(mod);
+        if (gate !== 'apply') { waiting ||= gate === 'hold'; continue; }
         try {
           runs.push(Promise.resolve(mod.onMessage(msg)));
         } catch (err) {
@@ -924,6 +983,10 @@ export class SyncManager {
           runs.push(Promise.reject(err));
         }
       }
+    }
+    if (waiting) {
+      this._noteHeldIncoming(msg);
+      if (!runs.length) return;
     }
     this._recordApplied(msg, started, runs);
   }
@@ -1094,7 +1157,148 @@ export class SyncManager {
    * @returns {boolean}
    */
   isAutoSync() {
-    return getSetting('autoSync');
+    return getSetting('autoSync') !== false;
+  }
+
+  /**
+   * What to do with a Foundry change in this part: 'send' it, 'hold' it for
+   * "Sync now", or 'drop' it (the part is set to "From Chronicle").
+   * @param {string} part
+   * @returns {'send'|'hold'|'drop'}
+   */
+  pushGate(part) {
+    return pushGate(this.getSyncDirection(part), this._syncingNow || this.isAutoSync(), part);
+  }
+
+  /**
+   * What to do with a Chronicle change in this part: 'apply' it, 'hold' it
+   * for "Sync now", or 'drop' it (the part is set to "From Foundry").
+   * @param {string} part
+   * @returns {'apply'|'hold'|'drop'}
+   */
+  pullGate(part) {
+    return pullGate(this.getSyncDirection(part), this._syncingNow || this.isAutoSync(), part);
+  }
+
+  /** `pullGate` for a module; one that names no part always applies. */
+  pullGateFor(mod) {
+    return mod?.syncPart ? this.pullGate(mod.syncPart) : 'apply';
+  }
+
+  /** The Foundry changes waiting for "Sync now", oldest first. */
+  heldChanges() {
+    this._held ??= parseHeld(getSetting('heldChanges'));
+    return this._held;
+  }
+
+  /** The waiting change for one document, if any. */
+  heldFor(key) {
+    return this.heldChanges().find((r) => r.key === key) ?? null;
+  }
+
+  /**
+   * Keep a Foundry change for "Sync now". One document has one entry.
+   * @param {{key: string, part: string, kind: string, label?: string, data?: object}} change
+   * @param {(before: object, next: object) => object} [merge]
+   */
+  holdChange(change, merge) {
+    this._held = holdChange(this.heldChanges(), change, merge);
+    this._saveHeld();
+  }
+
+  /** Forget a waiting change (its document is gone, or it was sent). */
+  dropHeld(key) {
+    const next = dropHeld(this.heldChanges(), key);
+    if (next === this._held) return;
+    this._held = next;
+    this._saveHeld();
+  }
+
+  /** How many changes are waiting on each side. Chronicle's count is only what arrived while connected. */
+  heldCounts() {
+    return { foundry: this.heldChanges().length, chronicle: this._heldIncoming.size };
+  }
+
+  /** @private */
+  _saveHeld() {
+    const json = JSON.stringify(this._held);
+    this._heldSave = this._heldSave
+      .then(() => setSetting('heldChanges', json))
+      .catch((err) => console.warn('Chronicle: could not save the waiting changes', err));
+    this._heldChanged();
+  }
+
+  /** @private */
+  _heldChanged() {
+    Hooks.callAll?.('chronicleHeldChanged', this.heldCounts());
+  }
+
+  /** @private */
+  _noteHeldIncoming(msg) {
+    const what = describeMessage(msg?.type);
+    if (!what) return;
+    const before = this._heldIncoming.size;
+    this._heldIncoming.add(`${what.kind}:${resourceIdOf(msg) || msg.type}`);
+    if (this._heldIncoming.size !== before) this._heldChanged();
+  }
+
+  /**
+   * An automatic pass while live sync is off: only the parts that never
+   * wait catch up, and nothing about the waiting parts is read or saved.
+   * @returns {Promise<boolean>}
+   * @private
+   */
+  async _runWaitingPass() {
+    await this.fetchAndCacheMembers().catch(() => {});
+    for (const hook of ['onInitialSync', 'onPostInitialSync']) {
+      for (const mod of this._modules) {
+        if (typeof mod[hook] !== 'function' || this.pullGateFor(mod) !== 'apply') continue;
+        try {
+          await mod[hook]();
+        } catch (err) {
+          console.warn(`Chronicle: ${mod.constructor.name}.${hook} failed`, err);
+        }
+      }
+    }
+    return true;
+  }
+
+  /**
+   * "Sync now": send every waiting Foundry change, then bring in Chronicle's.
+   * Foundry's go first, with the version each document last saw, so a page
+   * changed on both sides goes through the GM's conflict setting. A change
+   * that fails stays in the list.
+   * @returns {Promise<{sent: number, failed: number, pulled: boolean}>}
+   */
+  async syncNow() {
+    if (this._syncingNow) return { sent: 0, failed: 0, pulled: false };
+    this._syncingNow = true;
+    let sent = 0;
+    let failed = 0;
+    try {
+      for (const change of [...this.heldChanges()]) {
+        const mod = this._modules.find((m) => m.heldKinds?.includes(change.kind));
+        try {
+          if (mod && this.pushGate(change.part) === 'send') await mod.sendHeld(change);
+          // A change no part answers for, or whose part no longer sends, is dropped.
+          this.dropHeld(change.key);
+          sent += 1;
+        } catch (err) {
+          failed += 1;
+          console.warn(`Chronicle: could not send the waiting change to "${change.label}"`, err);
+          this.logActivity('error', `Sync now: "${change.label}" was not sent (${err?.message || 'unknown error'})`);
+        }
+      }
+      await this._heldSave;
+      // A pass already running was started before the changes above were sent.
+      if (this._syncPass) await this._syncPass.catch(() => {});
+      const pulled = (await this._performInitialSync()) !== false;
+      this.logActivity('connect', `Sync now: ${sent} sent, ${failed} failed`);
+      return { sent, failed, pulled };
+    } finally {
+      this._syncingNow = false;
+      this._heldChanged();
+    }
   }
 
   /**

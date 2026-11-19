@@ -14,6 +14,9 @@ export const MODULE_ID = 'chronicle-sync';
 /** Module flag that marks the one hidden journal entry holding problem reports. */
 export const REPORT_STORE_FLAG = 'problemReportsStore';
 
+/** Journal flag: the GM turned sync off for this journal, so it is never sent to Chronicle by itself. */
+export const KEEP_LOCAL_FLAG = 'keepLocal';
+
 /**
  * Options for every document write sync itself makes, marked so the Foundry
  * hooks ignore it: only sync's own echoes are dropped, and a GM edit made

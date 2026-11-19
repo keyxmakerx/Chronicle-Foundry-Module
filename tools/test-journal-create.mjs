@@ -89,6 +89,8 @@ test('map journals (page flag or Maps folder), sync-made and already-linked jour
   await js._handleCreateJournal(makeJournal(), { chronicleSync: true }, 'gm');
   await js._handleCreateJournal(makeJournal({ flags: { entityId: 'x' } }), {}, 'gm');
   await js._handleCreateJournal(makeJournal(), {}, 'someone-else');
+  // A copy of a journal the GM turned sync off for.
+  await js._handleCreateJournal(makeJournal({ flags: { keepLocal: true } }), {}, 'gm');
   assert.deepEqual(calls, [], 'no request of any kind');
 });
 
@@ -114,4 +116,85 @@ test('the entity.created broadcast that beats our POST response does not make a 
   assert.equal(created, 0);
   release();
   await pending;
+});
+
+test('the Chronicle Sync window sends a journal by the same path, and hears why it failed', async () => {
+  const { js, calls } = harness();
+  const journal = makeJournal({ pages: [textPage('<p>hello</p>')] });
+  assert.deepEqual(await js._sendJournalAsPage(journal), { entityId: 'ent-1' });
+  assert.deepEqual(calls.filter((c) => c[0] !== 'GET').map((c) => c[0]), ['POST', 'PUT', 'MAP']);
+  assert.equal(journal.getFlag('chronicle-sync', 'entityId'), 'ent-1');
+  assert.equal(js._inFlightCreates.size, 0);
+
+  // No page types: nothing is made, and the caller is told so.
+  const none = harness({ types: [] });
+  assert.equal(await none.js._sendJournalAsPage(makeJournal()), null);
+  assert.equal(none.calls.some((c) => c[0] === 'POST'), false);
+
+  // Chronicle refuses: the error reaches the caller and the marker is cleared.
+  const bad = harness();
+  bad.js._api.post = async () => { throw new Error('Chronicle answered 500'); };
+  await assert.rejects(bad.js._sendJournalAsPage(makeJournal()), /answered 500/);
+  assert.equal(bad.js._inFlightCreates.size, 0);
+
+  // A journal already on its way up is not sent a second time.
+  const twice = harness();
+  const going = makeJournal({ id: 'j-going' });
+  twice.js._inFlightCreates.set('j-going', going.name);
+  await assert.rejects(twice.js._sendJournalAsPage(going), /already being sent/);
+  assert.deepEqual(twice.calls, []);
+
+  // A journal that is linked, or another area's, is never made a page.
+  const guard = harness();
+  await assert.rejects(guard.js._sendJournalAsPage(makeJournal({ flags: { entityId: 'x' } })));
+  await assert.rejects(guard.js._sendJournalAsPage(makeJournal({ flags: { oldNote: true } })));
+  assert.deepEqual(guard.calls, []);
+});
+
+test('linking a journal to a page of the same name keeps one text and never makes a second journal', async () => {
+  const entity = { id: 'ent-9', name: 'Brass Lantern', type_name: 'Location', type_slug: 'location', updated_at: 'U5' };
+
+  // Chronicle's text is kept: the page is applied to the journal now linked to it.
+  let { js, calls } = harness();
+  let journal = makeJournal({ name: 'Brass Lantern' });
+  installJournals([journal]);
+  const applied = [];
+  js._applyEntityUpdated = async (e) => { applied.push(e.id); };
+  js._pushJournalUpdate = async () => { calls.push(['PUSH']); };
+  await js._linkJournalToPage(journal, entity, 'chronicle');
+  assert.equal(journal.getFlag('chronicle-sync', 'entityId'), 'ent-9');
+  assert.equal(journal.getFlag('chronicle-sync', 'chronicleUpdatedAt'), '', 'no version held, so the page is not taken for a stale copy');
+  assert.deepEqual(applied, ['ent-9']);
+  assert.deepEqual(calls.map((c) => c[0]), ['MAP']);
+
+  // Foundry's text is kept: it goes up against the version just read.
+  ({ js, calls } = harness());
+  journal = makeJournal({ name: 'Brass Lantern' });
+  installJournals([journal]);
+  js._applyEntityUpdated = async () => { calls.push(['APPLY']); };
+  js._pushJournalUpdate = async (j, id) => { calls.push(['PUSH', id, j.getFlag('chronicle-sync', 'chronicleUpdatedAt')]); };
+  await js._linkJournalToPage(journal, entity, 'foundry');
+  assert.deepEqual(calls, [['MAP', 'ent-9'], ['PUSH', 'ent-9', 'U5']]);
+
+  // The page got a journal meanwhile: nothing is linked.
+  ({ js, calls } = harness());
+  const other = makeJournal({ flags: { entityId: 'ent-9' } });
+  journal = makeJournal({ name: 'Brass Lantern' });
+  installJournals([other, journal]);
+  await assert.rejects(js._linkJournalToPage(journal, entity, 'chronicle'), /already has a journal/);
+  assert.equal(journal.getFlag('chronicle-sync', 'entityId'), undefined);
+  installJournals([]);
+});
+
+test('a journal deleted here and kept in Chronicle gets sync turned off, so the page list does not bring it back', async () => {
+  const { js } = harness();
+  const logged = [];
+  js._syncManager.logActivity = (kind, text) => logged.push([kind, text]);
+  settings.syncExclusions = '{"excludedTypes":[3],"excludedEntities":["a"]}';
+  await js._syncOffAfterDelete('ent-1', 'Old Mill');
+  assert.deepEqual(JSON.parse(settings.syncExclusions), { excludedTypes: [3], excludedEntities: ['a', 'ent-1'] });
+  assert.match(logged[0][1], /"Old Mill" was deleted here and kept in Chronicle/);
+  await js._syncOffAfterDelete('ent-1', 'Old Mill');
+  assert.equal(JSON.parse(settings.syncExclusions).excludedEntities.length, 2, 'not added twice');
+  settings.syncExclusions = '{"excludedTypes":[],"excludedEntities":[]}';
 });

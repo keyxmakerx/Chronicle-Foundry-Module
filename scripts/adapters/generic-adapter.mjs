@@ -61,6 +61,9 @@ export async function createGenericAdapter(api, chronicleSystemId) {
     /** Chronicle system ID. */
     systemId: chronicleSystemId,
 
+    /** Every mapped field def; transformation layers read the scalar ones as effect keys. */
+    fieldDefs: mappedFields,
+
     /** Single-item collection fields Chronicle may change on the sheet (ancestry, culture, career, kit). */
     identityFields: identityFieldDefs(mappedFields),
 

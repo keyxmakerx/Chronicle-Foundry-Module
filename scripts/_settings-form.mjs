@@ -16,7 +16,19 @@ export const SYNC_PARTS = ['journals', 'maps', 'calendar', 'characters', 'shops'
 /** Legacy per-part toggles kept in step with the directions. */
 const PART_TOGGLES = { journals: 'syncJournals', maps: 'syncMaps', calendar: 'syncCalendar', characters: 'syncCharacters' };
 
-const DIRECTIONS = new Set(['both', 'pull', 'push']);
+/**
+ * The directions each part can take. Chronicle owns the calendar, so it
+ * cannot be "From Foundry"; shops only come from Chronicle, so they have no
+ * direction to pick.
+ */
+export const PART_DIRECTIONS = {
+  journals: ['both', 'pull', 'push'],
+  maps: ['both', 'pull', 'push'],
+  characters: ['both', 'pull', 'push'],
+  calendar: ['both', 'pull'],
+  shops: [],
+};
+const allowed = (part, dir) => (PART_DIRECTIONS[part] ?? []).includes(dir);
 const CONFLICT = new Set(['chronicle', 'foundry', 'newest']);
 const ANNOUNCE = ['calendarAnnounceWeather', 'calendarAnnounceWorldstate', 'calendarAnnounceSeasonEra', 'calendarAnnounceMoon'];
 const FLAGS = ['syncEnabled', 'syncCreatures', 'chronicleSheet', 'dmOnlyHidden', 'syncPermissions', 'autoSync', 'skipIncomingSanitization', ...ANNOUNCE];
@@ -52,8 +64,8 @@ export function planSettingsSave(form, current) {
     const on = form.parts?.[part]?.on;
     if (typeof on !== 'boolean') continue;
     const dir = form.parts[part].direction;
-    const kept = DIRECTIONS.has(savedDirections[part]) ? savedDirections[part] : 'both';
-    directions[part] = on ? (DIRECTIONS.has(dir) ? dir : kept) : 'off';
+    const kept = allowed(part, savedDirections[part]) ? savedDirections[part] : 'both';
+    directions[part] = on ? (allowed(part, dir) ? dir : kept) : 'off';
   }
   put('syncDirections', JSON.stringify(directions));
   for (const [part, key] of Object.entries(PART_TOGGLES)) {
@@ -110,7 +122,7 @@ export function settingsView(current) {
     chronicleSheet: current.chronicleSheet !== false,
     parts: SYNC_PARTS.map((part) => {
       const dir = directions[part] || 'both';
-      return { part, on: dir !== 'off', direction: DIRECTIONS.has(dir) ? dir : 'both' };
+      return { part, on: dir !== 'off', direction: allowed(part, dir) ? dir : 'both', directions: PART_DIRECTIONS[part] ?? [] };
     }),
     announce: Object.fromEntries(ANNOUNCE.map((k) => [k, !!current[k]])),
     defaultOwnership: Number.isInteger(current.defaultOwnership) ? current.defaultOwnership : 2,

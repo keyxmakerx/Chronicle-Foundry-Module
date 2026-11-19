@@ -20,7 +20,7 @@ root. There is no `package.json`.
 - [ ] Status indicator shows red when disconnected
 - [ ] Hover the indicator while connected: the tooltip ends "Last change from Chronicle: N minutes ago" (or "No changes from Chronicle since connecting"), and the time moves on between hovers
 - [ ] Settings → Connection: change the API key to a wrong one and Save -> no reload asked; Test connection runs by itself and its steps show the key refused. Put the right key back and Save -> the steps go green and the dot turns green without a reload, with no "Connection lost" toast
-- [ ] On a world that was never connected, paste a connect line and Save -> sync starts without a reload (journals pull in)
+- [ ] On a world that was never connected, paste a connect line and Save -> sync starts without a reload (journals come in)
 - [ ] Change the campaign to another one and Save -> a toast asks to reload Foundry to switch campaigns
 - [ ] Settings → Advanced → When both sides changed: each choice shows one line under it saying which edit is replaced
 - [ ] Edit the same journal in Chronicle and Foundry with "Newest wins" -> no toast; Chronicle Sync → History shows the conflict and which side was kept. With "Chronicle wins" or "Foundry wins" -> a toast names the journal and the side kept
@@ -31,12 +31,12 @@ root. There is no `package.json`.
 
 - [ ] Configure Settings → Chronicle Sync shows Motion (Full, Calm, Off) beside the calendar, calendar look and temperature unit; on a computer set to reduce motion, a new client starts on Calm
 - [ ] Full: the dashboard grows out of the scene-control button that opened it; switching dashboard sections and settings tabs settles the new panel in; Test connection's checks appear one after another
-- [ ] Calm: each of those is a short fade in place, and the DM Screen fades in instead of rolling its die. Off: windows, panels and checks appear at once, the DM Screen opens and closes without its die or fold, and nothing in a Chronicle window animates
+- [ ] Calm: each of those is a short fade in place, and the GM Screen fades in instead of rolling its die. Off: windows, panels and checks appear at once, the GM Screen opens and closes without its die or fold, and nothing in a Chronicle window animates
 - [ ] With reduce motion on and Motion left on Calm, Foundry's own windows and other modules animate as they did before Chronicle
 
 ## Keyboard shortcuts
 
-- [ ] Configure Controls lists a Chronicle Sync group with five shortcuts (Chronicle Sync, DM Screen, Satchel, calendar, token art on hover), all with no key bound
+- [ ] Configure Controls lists a Chronicle Sync group with five shortcuts (Chronicle Sync, GM Screen, Satchel, calendar, token art on hover), all with no key bound
 - [ ] Bind a key to "Open the Chronicle Sync dashboard", press it as the GM: the dashboard opens; as a player the GM-only two are not listed
 - [ ] With the world not connected, a key bound to the notebook does nothing and Foundry's own use of that key still works
 
@@ -48,27 +48,43 @@ root. There is no `package.json`.
 - [ ] A player with Dice So Nice turned off in its own settings, or with Foundry's canvas off, still sees the roll card
 - [ ] Dice So Nice's settings → Special Effects: a new player has two "Chronicle crit" lines (six success crits → sparkles, six fail crits → dark); the trigger's result list names all 12 crits
 
-## Journal Sync (Entities)
+## Journal Sync (Pages)
 
 ### Chronicle -> Foundry
-- [ ] Create entity in Chronicle -> JournalEntry appears in Foundry
-- [ ] Update entity name -> JournalEntry name updates
-- [ ] Update entity entry (rich text) -> JournalEntry pages update
-- [ ] Toggle entity privacy -> JournalEntry ownership changes
-- [ ] Delete entity -> JournalEntry set aside (unlinked, in the "Chronicle: removed" folder), never deleted
+- [ ] Create page in Chronicle -> JournalEntry appears in Foundry
+- [ ] Update page name -> JournalEntry name updates
+- [ ] Update page entry (rich text) -> JournalEntry pages update
+- [ ] Toggle page privacy -> JournalEntry ownership changes
+- [ ] Delete page -> JournalEntry set aside (unlinked, in the "Chronicle: removed" folder), never deleted
 
 ### Foundry -> Chronicle
-- [ ] Create JournalEntry -> Entity appears in Chronicle
-- [ ] Update JournalEntry name -> Entity name updates
-- [ ] Edit JournalEntry page content -> Entity entry updates
-- [ ] Delete JournalEntry -> asked "Delete in Chronicle too?": No keeps the entity, Yes deletes it
+- [ ] Create JournalEntry -> Page appears in Chronicle
+- [ ] Update JournalEntry name -> Page name updates
+- [ ] Edit JournalEntry page content -> Page entry updates
+- [ ] Delete JournalEntry -> asked "Delete in Chronicle too?": No keeps the page, Yes deletes it. After No, Chronicle Sync → Linked → Pages shows the page as "Only in Chronicle, sync off" and does not bring it back by itself; **Bring in** on that row brings it back and turns its sync on again
 - [ ] Delete several linked JournalEntries at once -> asked once, with all of them listed
+- [ ] Clear all the text of a linked JournalEntry -> the Chronicle page's text is empty too
+- [ ] Right-click a linked JournalEntry -> Duplicate -> a second page appears in Chronicle; editing the copy changes only that second page
+- [ ] As a player matched to a Chronicle member who may edit the page there, edit the linked journal's text -> with a GM in the game, the Chronicle page updates
+- [ ] The same edit by a player Chronicle does not let edit the page, or on a page with GM-only text -> nothing changes in Chronicle and the GM gets one notice saying why
+
+### A player's own creates, and the GM card for the rest
+Needs a player client matched to a Chronicle member (Settings, Players), a GM in the game, and a Chronicle with a Trash.
+- [ ] As the player, create a journal -> a page appears in Chronicle under the Notes page type (or the type set in Settings), and no card is posted
+- [ ] As the player, delete that journal -> the page is gone from Chronicle's list and shows in the campaign Trash; Restore brings it back; no card, no GM prompt
+- [ ] As the player, create an actor -> a character page appears; with the claiming add-on on it is under Player Characters and assigned to that player
+- [ ] As the player, delete a character they have claimed in Chronicle -> it goes to the Trash with no card. Delete one they have not claimed -> a whispered card reads "Mira deleted the character X" with Send to Chronicle and Not now; only the GM sees it
+- [ ] As the player, drag an item that is linked to a visible Chronicle item page onto their claimed character -> a "has item" entry appears on the character's page with no card. Onto someone else's character -> a card "Mira added Rope to Sela"; nothing in Chronicle until Send is pressed, then the entry appears and the card reads "Sent by you"
+- [ ] The same drag of an item linked to a GM-only page -> nothing is sent and no card appears
+- [ ] Remove an item from someone else's character as the player -> a card; Send removes the entry in Chronicle. Not now leaves it and the card reads "Left alone by you"
+- [ ] As the player, rewrite a deleted journal's link to a different page (console: `journal.setFlag('chronicle-sync','entityId',...)` before deleting) -> no direct delete; the card's Send shows "In Chronicle this is the page X. Send it anyway?" and waits for a second press
+- [ ] A player posting a chat message with the card's markup gets no working buttons for anyone
 
 ### Multi-Page Sync
-- [ ] Entity with h1/h2 headings creates multiple Foundry journal pages
-- [ ] Entity without headings creates single "Content" page
+- [ ] Page with h1/h2 headings creates multiple Foundry journal pages
+- [ ] Page without headings creates single "Content" page
 - [ ] Multi-page Foundry journal concatenates into single Chronicle entry
-- [ ] Updating entity content adds/removes/updates pages correctly
+- [ ] Updating the Chronicle page's content adds/removes/updates the journal's pages correctly
 - [ ] Page titles match heading text (HTML stripped)
 - [ ] Pre-heading content creates "Overview" page
 
@@ -86,26 +102,26 @@ Needs a player client that can see the journal but does not own its page.
 - [ ] Remove the picture in Chronicle (avatar still ours) -> the user goes back to the default avatar
 
 ### Permission Sync
-- [ ] Private entity (is_private=true) creates journal with default ownership NONE
-- [ ] Public entity (is_private=false) creates journal with default ownership OBSERVER
-- [ ] Custom visibility entity fetches permissions and maps role grants to ownership
+- [ ] Private page (is_private=true) creates journal with default ownership NONE
+- [ ] Public page (is_private=false) creates journal with default ownership OBSERVER
+- [ ] Custom visibility page fetches permissions and maps role grants to ownership
 - [ ] Custom visibility with player view grant → default OBSERVER
 - [ ] Custom visibility with no player grant → default NONE
 - [ ] Changing journal ownership in Foundry pushes is_private to Chronicle
 - [ ] Changing journal ownership pushes visibility/permissions to Chronicle API
-- [ ] **Fail closed:** a permissions API failure on a `custom`-visibility entity
+- [ ] **Fail closed:** a permissions API failure on a `custom`-visibility page
       gives ownership **NONE** (GM-only), even when `is_private=false`, never OBSERVER.
       Stop Chronicle (or block `/permissions`) while it syncs; players must not see it.
 
 ### Visibility Settings (Chronicle Sync → Settings → Players)
 These controls drive journal ownership:
-- [ ] **dmOnlyHidden ON (default):** a DM-only / private entity gives players no access (NONE); the journal is hidden from a player
-- [ ] **dmOnlyHidden OFF:** edit the entity in Chronicle so it re-pulls: players now get it at the default-ownership level. Toggle back ON: they lose it on the next sync
-- [ ] **defaultOwnership = Owner:** a player-visible entity's journal default is OWNER (players can edit). **None:** public entities sync as GM-only
-- [ ] Per-user grant: an entity shared with one Chronicle user (linked in Settings → Players) gives that Foundry user per-user OWNER/OBSERVER; unmapped users are dropped (under-shares, no leak)
+- [ ] **dmOnlyHidden ON (default):** a GM-only / private page gives players no access (NONE); the journal is hidden from a player
+- [ ] **dmOnlyHidden OFF:** edit the page in Chronicle so it is fetched again: players now get it at the default-ownership level. Toggle back ON: they lose it on the next sync
+- [ ] **defaultOwnership = Owner:** a player-visible page's journal default is OWNER (players can edit). **None:** public pages sync as GM-only
+- [ ] Per-user grant: a page shared with one Chronicle user (linked in Settings → Players) gives that Foundry user per-user OWNER/OBSERVER; unmapped users are dropped (under-shares, no leak)
 
 ### Edge Cases
-- [ ] Rapid successive edits don't create duplicate entities
+- [ ] Rapid successive edits don't create duplicate pages
 - [ ] Sync guard prevents infinite loops (edit in A, syncs to B, doesn't re-sync to A)
 - [ ] Monk's Enhanced Journal: content syncs correctly if module active
 
@@ -118,17 +134,17 @@ Foundry; markers are editable by the GM. Needs "Sync Maps" on and a Chronicle
 campaign with at least one map that has an image, markers (some `Everyone`, one
 `DM only`), and ideally a drawing, a token and a fog region.
 
-### Materialize
-- [ ] Dashboard → Linked → Maps → **Resync All Maps** → each Chronicle map is listed under
+### Bring maps in
+- [ ] Dashboard → Linked → Maps → **Sync all maps again** → each Chronicle map is listed under
       "Chronicle Maps" with marker / drawing / token counts and an **Open in Foundry** button
 - [ ] **Open Chronicle Maps Folder** reveals the "Chronicle Maps" folder in the Journal sidebar
-- [ ] The summary row shows Materialized count, Open viewers and Last sync (not "never")
+- [ ] The summary row shows In Foundry count, Open viewers and Last sync (not "never")
 - [ ] Click **Open in Foundry** → the map opens in the Chronicle Map Viewer (image plus overlays, zoom % bottom corner)
-- [ ] A map with no image does not break the Resync (a row appears under recent errors instead, **Dismiss** clears it)
-- [ ] After a Resync, wait 20 minutes, then open a map as a player who has never opened it -> the picture shows (it is a copy in the world's `chronicle-media` folder, not a Chronicle link)
+- [ ] A map with no image does not break Sync all maps again (a row appears under recent errors instead, **Dismiss** clears it)
+- [ ] After syncing all maps again, wait 20 minutes, then open a map as a player who has never opened it -> the picture shows (it is a copy in the world's `chronicle-media` folder, not a Chronicle link)
 - [ ] Share a map's journal with a player, open it as the GM and note its picture address (right-click the image -> copy image address; it ends in `chronicle-media/<id>.<ext>`). Add a shadow to the map in Chronicle. Open that address in a private browser window -> a blank page or one transparent pixel, not the map. Broken: the full map still shows
 - [ ] A map whose journal no player can open: its picture address stays a Chronicle link (`/media/...?sig=...`), not a `chronicle-media` file
-- [ ] Press **Resync All Maps** twice → no duplicate journals or folders
+- [ ] Press **Sync all maps again** twice → no duplicate journals or folders
 
 ### Chronicle -> Foundry (viewer open)
 - [ ] Create a marker in Chronicle's map editor → it appears in the open viewer within a few seconds
@@ -142,11 +158,11 @@ campaign with at least one map that has an image, markers (some `Everyone`, one
 ### Foundry -> Chronicle (GM, markers only)
 - [ ] Toolbar → **Place Chronicle marker**, click the map → dialog with name, category, description and visibility; **Create** → marker appears in Chronicle's editor
 - [ ] Right-click a Chronicle marker → **Configure Chronicle Marker**; change name/category → Save → Chronicle shows the change
-- [ ] In that dialog set Visibility to **DM only** → Save → the marker shows the DM-only style for the GM and Chronicle shows it as DM only
+- [ ] In that dialog set Visibility to **GM only** → Save → the marker shows the GM-only style for the GM and Chronicle shows it as DM only
 - [ ] **Delete Marker** → confirm → marker is removed in Chronicle
-- [ ] Double-click a marker that has a linked entity → the entity's journal opens
+- [ ] Double-click a marker that has a linked page → the page's journal opens
 - [ ] Stop Chronicle, then save a marker edit → an error toast ("Failed to update marker on Chronicle") and the viewer keeps the old value
-- [ ] Viewer toolbar **Resync this map from Chronicle** re-fetches the map; **Open in Chronicle web editor** opens the map URL
+- [ ] Viewer toolbar **Sync this map again from Chronicle** re-fetches the map; **Open in Chronicle web editor** opens the map URL
 
 ### Local pins (never sync to Chronicle)
 - [ ] Pick a pin type in the toolbar, click the map → a local pin is placed; drag moves it; right-click configures; double-click opens its linked journal
@@ -159,14 +175,14 @@ restricted data must never be written there (`scripts/_map-flag-filter.mjs`).
 Setup: in Chronicle, one `Everyone` marker, one `DM only` marker, a marker or
 drawing restricted to specific users, a hidden token, and a fog region; give the
 test player Observer on the map journal.
-- [ ] As GM, all of them show in the viewer (DM-only marker with the DM-only style; fog as a dark overlay)
+- [ ] As GM, all of them show in the viewer (GM-only marker with the GM-only style; fog as a dark overlay)
 - [ ] As the player, open the same map: only the `Everyone` marker and unrestricted drawings and tokens show
 - [ ] As the player, the `DM only` marker, the user-restricted marker/drawing, the hidden token and the fog overlay are all absent
 - [ ] As the player, F12 console: `game.journal.getName("<map name>").pages.contents[0].flags["chronicle-sync"]` — its `chronicleMarkers` list holds no `DM only` or restricted marker, and no fog data is present
 - [ ] Right-click on a marker as the player does nothing (no config dialog); the Place Chronicle marker tool is absent
 - [ ] Change a visible marker to `DM only` in Chronicle while the player has the map open → it vanishes from the player's view and from the page flags after the next sync
 - [ ] Change it back to Everyone → it reappears for the player
-- [ ] A map whose page flags already hold a DM-only marker: **Resync All Maps** strips it
+- [ ] A map whose page flags already hold a GM-only marker: **Sync all maps again** strips it
 
 ### Marker icons and the map's look
 - [ ] A map set to a frame or pin shape in Chronicle shows that frame and pin shape in the viewer
@@ -249,7 +265,7 @@ pushes for 30 seconds with one GM notice (API-CONTRACT.md).
 
 ## Shop Widget
 
-- [ ] Right-click JournalEntry linked to Shop entity -> "Open Chronicle Shop" option appears
+- [ ] Right-click JournalEntry linked to Shop page -> "Open Chronicle Shop" option appears
 - [ ] Dashboard Linked → Shops -> each shop row has an **Open** button that opens the same shop room
 - [ ] Shop room opens with the shop's name; the room matches the Chronicle shop page (same furniture, keeper picture, wares)
 - [ ] Hovering an item in the room shows its name and price; clicking the keeper shows their lines
@@ -269,10 +285,26 @@ pushes for 30 seconds with one GM notice (API-CONTRACT.md).
 - [ ] Player presses **Open shop** with no GM logged in -> the window says "The shop is closed"
 - [ ] GM shows then stops showing a shop a player opened from its journal -> the player's room stays open
 
+## Direction and Sync now
+
+In **Chronicle Sync → Settings → What syncs**.
+
+- [ ] Set Journals to **From Chronicle only** and save. Edit a synced journal in Foundry, rename it and make a new journal: none of it reaches Chronicle. Edit the page in Chronicle: the journal updates.
+- [ ] Set Journals to **From Foundry only** and save. Edit the page in Chronicle: the journal in Foundry does not change, also not after a reload. Edit the journal in Foundry: the page updates.
+- [ ] Repeat both with Characters, using a sheet field and an inventory item.
+- [ ] Set Maps to **From Chronicle only**. Open a map and try to add, move and delete a marker: each is refused with a notice and Chronicle keeps its markers.
+- [ ] With Journals From Foundry only, the dashboard's **Pull All**, **Resync All Journals** and a single page's pull are refused with a notice; with Journals From Chronicle only, **Push All** and a single journal's push are refused.
+- [ ] Calendar offers only **Both ways** and **From Chronicle only**; Shops offers no direction. With Calendar From Chronicle only, setting the date and adding an event in Foundry are refused with a notice.
+- [ ] Switch **Sync changes as they happen** off and save. Edit a journal and a character in Foundry and a different page in Chronicle. Nothing moves; Settings shows how many changes are waiting and a **Sync now** button. The calendar and shops still update as before.
+- [ ] Reload Foundry: the waiting count is still there.
+- [ ] Click **Sync now**: the Foundry edits reach Chronicle, the Chronicle edit reaches Foundry, and the count returns to nothing waiting.
+- [ ] Make another edit, then switch **Sync changes as they happen** back on and save: the waiting edit is sent without pressing Sync now.
+- [ ] With live sync off, delete a synced journal in Foundry and answer the question to remove the page too: the page is removed only when you press Sync now.
+
 ## Initial Sync
 
 - [ ] Fresh connection triggers initial sync (GET /sync/pull)
-- [ ] Existing entities create proper sync mappings
+- [ ] Existing pages create proper sync mappings
 - [ ] Existing Chronicle maps are materialized as journals in the "Chronicle Maps" folder
 - [ ] lastSyncTime updates after successful initial sync
 
@@ -283,21 +315,21 @@ pushes for 30 seconds with one GM notice (API-CONTRACT.md).
 - [ ] Against a Chronicle that answers calendar routes with `503 calendar_rebuilding`: the dashboard Calendar tab says the calendar is being rebuilt and does NOT claim "No calendar configured"
 - [ ] Maps / actors / items / notes still sync while the calendar is down
 - [ ] Disabled maps addon -> Maps API returns 404
-- [ ] Private entities hidden from non-owner API keys
+- [ ] Private pages hidden from non-owner API keys
 - [ ] Rate limiting enforced (300 req/min default); a 429 pauses the module's REST calls until `Retry-After`
 
-## Character Sync (Actor ↔ Entity)
+## Character Sync (Actor ↔ Page)
 
 ### Prerequisites
 - [ ] Game system matches a Chronicle system (built-in or custom with foundry_path annotations)
 - [ ] Characters switched on in Chronicle Sync → Settings → What syncs
-- [ ] Character entity type exists in Chronicle campaign
+- [ ] Character page type exists in Chronicle campaign
 
 ### Chronicle -> Foundry
-- [ ] Create character entity in Chronicle -> Actor (type: character) created in Foundry
-- [ ] Update character entity fields -> Actor system data updates (ability scores, HP)
-- [ ] Update character entity name -> Actor name updates
-- [ ] Delete character entity -> Actor unlinked (flags removed) but NOT deleted
+- [ ] Create character page in Chronicle -> Actor (type: character) created in Foundry
+- [ ] Update character page fields -> Actor system data updates (ability scores, HP)
+- [ ] Update character page name -> Actor name updates
+- [ ] Delete character page -> Actor unlinked (flags removed) but NOT deleted
 
 ### Identity items (Draw Steel: ancestry, culture, career, kit)
 - [ ] In Chronicle, set an actor's linked character to an ancestry that exists in the system compendium (e.g. Dwarf) -> within a few seconds the Foundry sheet shows the Dwarf ancestry item in place of the old one (data from the compendium); the Chronicle value does not change
@@ -310,18 +342,18 @@ pushes for 30 seconds with one GM notice (API-CONTRACT.md).
 - [ ] As a non-GM player nothing is swapped on their client (only the GM's client applies it)
 
 ### Foundry -> Chronicle
-- [ ] Create character Actor in Foundry -> Entity created in Chronicle with mapped fields
-- [ ] Update Actor ability scores -> Chronicle entity fields_data updates
-- [ ] Update Actor HP -> Chronicle entity hp_current/hp_max update
-- [ ] Update Actor name -> Chronicle entity name updates
-- [ ] Delete Actor -> asked "Delete in Chronicle too?": No keeps the entity, Yes deletes it
+- [ ] Create character Actor in Foundry -> Page created in Chronicle with mapped fields
+- [ ] Update Actor ability scores -> Chronicle page fields_data updates
+- [ ] Update Actor HP -> Chronicle page hp_current/hp_max update
+- [ ] Update Actor name -> Chronicle page name updates
+- [ ] Delete Actor -> asked "Delete in Chronicle too?": No keeps the page, Yes deletes it
 
 ### Dashboard - Characters Tab
 - [ ] Characters pane visible in the sync dashboard under Linked
 - [ ] System badge shows matched system name
-- [ ] Synced actors show green check with "Synced" label, a last-sync time and a **Re-sync** button
-- [ ] Unlinked actors show "Not linked" with a Push button, and **Push All** appears in the toolbar
-- [ ] Push button creates Chronicle entity and links actor
+- [ ] Synced actors show green check with "In sync" label, a last-sync time and a **Sync again** button
+- [ ] Unlinked actors show "Not linked" with a Send button, and **Send all** appears in the toolbar
+- [ ] Send button creates Chronicle page and links actor
 - [ ] Empty state shown when no character actors exist
 - [ ] Disabled state shown when syncCharacters is off
 - [ ] No-system state shown when game system doesn't match
@@ -341,8 +373,11 @@ that reads each field's `foundry_path` from the matched Chronicle system's manif
 - [ ] Actor sync disabled when no system adapter available
 - [ ] Sync guard prevents infinite loops (change in A doesn't re-trigger back to A)
 - [ ] Only character-type actors processed (NPCs, vehicles ignored)
-- [ ] Only current user's changes pushed (other users' changes ignored)
-- [ ] Pre-existing actors can be manually pushed via dashboard Push button
+- [ ] As a player on the character you claimed in Chronicle, change HP and an item's quantity -> with a GM in the game, Chronicle shows both; a later change in Chronicle does not undo them
+- [ ] As a player on a character nobody claimed in Chronicle, change HP -> nothing changes in Chronicle and the GM gets one notice saying the character isn't claimed
+- [ ] With two GMs in the game, a player's change is sent once (one History row), not twice
+- [ ] Duplicate a linked character Actor -> the copy is not linked; editing it changes nothing in Chronicle
+- [ ] Pre-existing actors can be manually pushed via dashboard Send button
 
 ## Creature Sync (Draw Steel creature pages → NPC actors)
 
@@ -404,9 +439,9 @@ Needs a GM and a player client on the same scene, and an NPC page synced as a jo
 - [ ] On the NPC's Chronicle page press "Show in Foundry": the page says "Sent to Foundry." and both clients play the same spotlight as the star
 - [ ] "Show in Foundry" for an NPC with no token on the GM's scene, or only a hidden one: only the GM gets a notice
 
-## DM Screen
+## GM Screen
 
-GM only. Needs a Chronicle that serves the DM Screen.
+GM only. Needs a Chronicle that serves its DM Screen (Chronicle's own name for it).
 
 - [ ] The scene controls' Chronicle group has a d20 button for the GM; a player's group has only the Satchel and Calendar buttons
 - [ ] Click it: a d20 rolls out of the button, lands on 20 and the screen unfolds into three leaves (The world, The party, Rules and reveals); a click or Escape skips the opening
@@ -418,11 +453,11 @@ GM only. Needs a Chronicle that serves the DM Screen.
 - [ ] **Cast** lists the scene's tokens that belong to a Chronicle page and no player, hidden ones marked Hidden. Spotlight, Talk as (then Stop talking) and Page do what the token's own buttons do; a player's hero never appears
 - [ ] **Party** shows each shared stash with its money and items, **Move things** opens a hero's Stashes window, and each shop's **Open** opens its shop room. With stashes off in Chronicle, it says so
 
-## Encounters (DM Screen tab)
+## Encounters (GM Screen tab)
 
 GM only. Needs a Chronicle that serves encounters, a key for the campaign owner or a co-DM, creature sync on (so creature pages have actors), and a scene with a grid open. Plan one fight in Chronicle with a creature of count 3, one planned hidden, one planned seen and one planned "arrives later".
 
-- [ ] DM Screen, **Encounters** tab: the panel widens; fights marked Ready are listed first with their page name and creature count; typing in **Search planned encounters** finds others after a short pause
+- [ ] GM Screen, **Encounters** tab: the panel widens; fights marked Ready are listed first with their page name and creature count; typing in **Search planned encounters** finds others after a short pause
 - [ ] A player-role key or a Chronicle without encounters shows a plain message and **Try again**, not an empty list
 - [ ] Open the fight: one row per creature copy ("Hobgoblin Soldier 1", "2", "3"), each with its group and planned start; every row reads **Not placed**; a creature with no actor says "Not in Foundry yet" and its Place is greyed out
 - [ ] **Set up the start**, then click the scene: seen and hidden creatures appear on free squares around the click, hidden ones with the hidden look for the GM; the arrives-later ones stay off. Log in as a player in another browser: no hidden token is visible
@@ -440,7 +475,7 @@ Stages (needs the encounter to have stages in Chronicle, a creature with a secon
 
 - [ ] Under the roster, **Stages** lists each stage with when it comes and what it does; a fight with no stages shows nothing new
 - [ ] A "half Stamina" stage: damage the creature's token past half: the stage turns **Due**, and one notice says so. **Not yet** sets it back until the next round of the started tracker, then it is due again
-- [ ] **Start stage N**: the creature changes form the way the stage says (quiet or reveal); then the scene waits for one click and the arriving rows land there. The stage reads **Started**, and still does after closing and reopening the DM Screen
+- [ ] **Start stage N**: the creature changes form the way the stage says (quiet or reveal); then the scene waits for one click and the arriving rows land there. The stage reads **Started**, and still does after closing and reopening the GM Screen
 - [ ] A "round 3" stage turns due at the start of round 3; a manual stage is never due but its Start works any time
 
 ## Character claims
@@ -451,7 +486,7 @@ Needs the Player Character Claiming addon on in Chronicle, a character linked to
 - [ ] Reassign it to player B -> B is Owner, A is still Owner, and the GM sees one notice saying A still owns it and can be changed in the actor's Ownership settings
 - [ ] Unassign it in Chronicle -> Foundry ownership is unchanged
 - [ ] Assign it to a member with no Foundry user mapped -> no ownership change, one GM notice that the player has no Foundry user, and Chronicle Sync → Settings → Players shows that member as "Owns a character, not linked"; linking them, pressing **Save**, then reconnecting, gives them Owner
-- [ ] Reconnect (or Pull All) with a claim that is already applied -> no notice and no ownership change
+- [ ] Reconnect (or Bring in all) with a claim that is already applied -> no notice and no ownership change
 
 ## Stashes
 
@@ -500,7 +535,7 @@ Needs a drop list on two creature pages in Chronicle (Crafting → Spoils tab �
 - [ ] Start a combat with both creatures, a third token with no Chronicle page and a player's character. Bring both creatures and the third token to 0 (or mark them defeated), then **End Combat** -> one window "The fight is over" lists both creatures with what their drop lists leave and "1 down"; the token with no page is greyed out; the character is not listed
 - [ ] Untick one creature and press **Put in the tray** -> only the ticked one's spoils appear in the players' Satchel → Crafting and on Chronicle's Spoils tab, named "<scene> (Foundry)"; you get a toast and a whispered "Spoils from …" line
 - [ ] End another combat and press **Not now** (or close the window) -> nothing appears in the tray
-- [ ] Place the encounter from the DM Screen, defeat a creature, and end the combat before its stage starts -> "Is the whole fight over?" asks first; **Hold for the next stage** sends nothing. Start the stage, end the next combat of that encounter -> the spoils window lists the held creature too, counted once even if its token was in both combats
+- [ ] Place the encounter from the GM Screen, defeat a creature, and end the combat before its stage starts -> "Is the whole fight over?" asks first; **Hold for the next stage** sends nothing. Start the stage, end the next combat of that encounter -> the spoils window lists the held creature too, counted once even if its token was in both combats
 - [ ] Same again, but press **The whole fight is over** -> the spoils window opens at once
 - [ ] A campaign with no drop lists, or with the crafting addon off, gets no window when a combat ends
 - [ ] With two GMs connected, only one gets the window
@@ -520,9 +555,9 @@ Needs a drop list on two creature pages in Chronicle (Crafting → Spoils tab �
 ## Import Wizard
 
 - [ ] Chronicle Sync → Settings → Connection -> **Setup Wizard** shows a six-step wizard inside the Chronicle Sync window (no second window): Connect, Scan, Types, Tags, Characters, Review; there are no maps or calendar steps. The Connect step fills in its checks (connection, page types, game system) on its own
-- [ ] In a world with no connection, Chronicle Sync opens on "Set up Chronicle in this world" with the five steps listed and the connection settings below. Save a connect line and reload: Chronicle Sync opens on the wizard. **Skip setup** returns to the four sections and the wizard does not reappear on the next open
+- [ ] In a world with no connection, Chronicle Sync opens on "Set up Chronicle in this world" with the five steps listed and the connect-line field below. Paste a connect line and press **Connect and continue**: the wizard opens in the same window. **Skip setup** returns to the four sections and the wizard does not reappear on the next open
 - [ ] Tags and Characters steps are skipped when tags are unavailable or no game system matched
-- [ ] Review lists what will be created; running it creates the entities and marks the wizard completed
+- [ ] Review lists what will be created; running it creates the pages and marks the wizard completed
 
 ## Problem reports (privacy, module #94)
 
@@ -533,38 +568,43 @@ Needs a GM client and a player client, on each of Foundry v12, v13 and v14.
 - [ ] In the player's browser console, `game.journal.find(j => j.getFlag("chronicle-sync", "problemReportsStore"))` returns `undefined`, and `game.journal.contents.some(j => j.name.includes("problem reports"))` is `false`
 - [ ] As the GM, the same first console line returns the entry, and its `flags["chronicle-sync"].reports` lists the report
 - [ ] Reload the GM client: the report is still there and no second entry was made
-- [ ] The entry does not appear in the Import wizard's journal list or the dashboard's Foundry-only journals, and nothing was pushed to Chronicle
+- [ ] The entry does not appear in the Import wizard's journal list or the dashboard's journals that are only in Foundry, and nothing was pushed to Chronicle
 
 ## Error Recovery
 
 - [ ] Invalid API key shows clear error message
 - [ ] Network timeout during sync doesn't corrupt state
-- [ ] Partial sync failure (one entity fails) doesn't block others
+- [ ] A Chronicle that stops answering mid-request: the request gives up after 30 seconds and later changes still sync
+- [ ] If the first sync after connecting fails, it is tried again by itself within 30 seconds, with no reload
+- [ ] Partial sync failure (one page fails) doesn't block others
 - [ ] A Chronicle restart reconnects without a reload
 - [ ] A failed Foundry→Chronicle push (Chronicle down) shows a `ui.notifications.warn` to the GM and an error-log row; journal updates are queued and re-pushed on reconnect
 
 ### Catch-up after a closed world
-- [ ] Close Foundry, edit a page and a character in Chronicle, change a character's inventory there, then reopen the world -> the page, the character and the inventory change appear without Resync All
+- [ ] Close Foundry, edit a page and a character in Chronicle, change a character's inventory there, then reopen the world -> the page, the character and the inventory change appear without Sync all again
 - [ ] Delete a page in Chronicle while Foundry is closed, then reopen -> its journal is set aside in the "Chronicle: removed" folder, not deleted
 - [ ] Against an older Chronicle with no change feed, reopening still catches up (a full rescan; slower)
 - [ ] Remove a "Has Item" relation in Chronicle -> the Foundry item is unlinked from Chronicle but not deleted from the character
 
-### Reconnect re-pull
+### Reconnect catch-up
 Edits made on Chronicle while Foundry was disconnected arrive after reconnect, without a world reload.
-- [ ] Disconnect (stop Chronicle or pull the network) until the status pill goes red/yellow, then rename an entity or change its content in Chronicle
-- [ ] Reconnect: after about 3 s the change appears in Foundry with no reload, and the activity log reads "Reconnected — re-pulled changes made during the disconnect"
-- [ ] Rapid disconnect/reconnect cycles trigger one re-pull once the link settles, not one per reconnect
+- [ ] Disconnect (stop Chronicle or pull the network) until the status pill goes red/yellow, then rename a page or change its content in Chronicle
+- [ ] Reconnect: after about 3 s the change appears in Foundry with no reload, and the activity log reads "Reconnected — fetched again the changes made during the disconnect"
+- [ ] Rapid disconnect/reconnect cycles trigger one catch-up once the link settles, not one per reconnect
 
 ## Sync Dashboard
 
 The Chronicle Sync window is a left rail of four sections: Overview, Linked
-(Entities, Characters, Maps, Shops and Calendar panes), Problems (Health,
+(Pages, Characters, Maps, Shops and Calendar panes), Problems (Health,
 Player reports and History panes) and Settings (at the foot, set apart).
 
 ### Access
 - [ ] Open the Chronicle group in the scene controls: no button in it looks pressed, and only its buttons appear (no blank slot). Press Chronicle Sync → dashboard opens; press it again after closing → opens again. Click Tokens, then back to the Chronicle group → nothing opens on its own
 - [ ] Click the sidebar status indicator (when connected) or the Chronicle Sync button in the scene controls → dashboard opens (GM only); right-click on the indicator opens it even when disconnected; clicking while disconnected tries to reconnect
-- [ ] With URL, key or campaign ID missing, the window shows "Chronicle Sync is not configured" and the Settings form under it, with no rail
+- [ ] With URL, key or campaign ID missing, the window shows "Set up Chronicle in this world", the five steps with Connect current, and one **Connect line** field with the cursor in it; no rail, no tabs, no Save or Test connection button
+- [ ] Paste a connect line (Chronicle: your campaign → Manage → Foundry → Connection) → after a moment "Chronicle answers", "Key accepted", "Campaign found" and the game system line tick by themselves and **Connect and continue** turns on. A wrong key shows a cross with what to do, and the button stays off. Typing "hello" shows "That is not a connect line", and the line is never shown back
+- [ ] **Connect and continue** → the window goes straight on to the Scan step with no reload (or, if the connection cannot start at once, a notice asks for one reload and the setup opens after it)
+- [ ] **Enter details by hand**: fill address, key and campaign → nothing is checked while you type; leaving a field or pressing **Connect and continue** runs the same checks, and it connects only when they pass
 - [ ] It opens to the last-active section and pane; an unknown saved tab falls back to Overview, and a tab saved by an older version opens where its content now lives (Maps → Linked, Maps; Diagnostics → Problems; Status → Problems, Health; Issues → Linked, Characters)
 - [ ] Configure Settings → Chronicle Sync → **Open Chronicle Sync settings** opens the window at Settings (or brings it forward there)
 - [ ] Settings: change a field, let the window re-render (e.g. a player sends a report) → the change is still there; **Undo changes** puts the saved values back; **Save** saves and says so; arrow keys move along every pane strip
@@ -572,22 +612,38 @@ Player reports and History panes) and Settings (at the foot, set apart).
 
 ### Tabs
 Details for Characters, Maps, Shops and Calendar are under their own sections.
-- [ ] **Overview:** connection banner (green/yellow/red) with **Reconnect** when not connected; stat tiles (Entities Synced, Characters Synced n/total, Maps Linked) each jump to their tab; "Needs Attention" lists only real problems, each row jumping to the fixing tab, or says "Everything's in sync"; **Sync Everything Now**, **Problems** and **Refresh** work; below: the DM-only note when any were hidden, last sync time, Recent Activity, **Clear Log**
-- [ ] **Entities:** list grouped by type with status dots, Pull/Push per row, Pull All / Push All, Resync All Journals, visibility toggle, search, bulk select (Make Public / Private / Delete / Change Type), **Create Type**
+- [ ] **Overview:** connection banner (green/yellow/red) with **Reconnect** when not connected; stat tiles (Pages in sync, Characters in sync n/total, Maps Linked) each jump to their tab; "Needs Attention" lists only real problems, each row jumping to the fixing tab, or says "Everything's in sync"; **Sync Everything Now**, **Problems** and **Refresh** work; below: the GM-only note when any were hidden, last sync time, Recent Activity, **Clear Log**
+- [ ] **Pages:** a search box, then the list's commands as plain words (Bring in all (n), Send all (n), Sync all again, New type, and Select at the far end), then one small-caps heading per type with a count line ("3 in sync, 1 only in Chronicle"). Each row: a dot, the name, a lock only when the page is hidden from players, a state word, at most one button, and a ⋯ menu
+- [ ] Type in the search box → rows filter as you type, the cursor stays in the box, types with no match disappear, a folded type shows its matches, and "No pages match that search." shows when nothing does; Escape clears it
+- [ ] Click a type's name → its rows fold away (and stay folded after a reload); its ⋯ menu offers "Turn sync off for this type" and folding. With sync off for a type the count line reads "9 pages, sync off for this type"
+- [ ] A row's ⋯ menu: **Sync this page again**, **Show to players** / **Hide from players**, **Turn sync off for this page**, **Copy details for help**. Arrow keys move through it, Escape closes it and returns to the ⋯ button, a click elsewhere closes it
+- [ ] **Select** → checkboxes appear with "Select all shown", Change type, Show to players, Hide from players and Delete; they stay greyed until a page is ticked; **Done selecting** leaves and forgets the ticks
+- [ ] Self-fixing: edit a page in Chronicle while Foundry is closed to it (stop the world's connection, or edit a page whose live update was missed), then open Chronicle Sync → the row reads "Catching up…" and then "In sync" without a click, and Recent Activity says pages were brought up to date. A page with sync off is left alone
+- [ ] Self-fixing: with Chronicle unreachable, edit a synced journal → its row reads "Waiting to send" with **Send now**; once Chronicle is back it sends by itself. A page that will not sync reads "Couldn't sync" in red, its reason shows on hover, and **Try again** retries it
+- [ ] One side only, Chronicle: make a page in Chronicle while Foundry is closed, then open Chronicle Sync → Linked → Pages → its row reads "Bringing in…" and then "In sync" without a click, and the journal exists. With sync off for the page or its type it reads "Only in Chronicle, sync off" with **Bring in** and stays out
+- [ ] One side only, Foundry: with Chronicle unreachable, make a journal with some text; reconnect and open the list → under "Only in Foundry" its row reads "Sending…", then it moves up among the pages as "In sync", the page in Chronicle has the text, and a notice says how many journals were sent. A journal hidden from players arrives in Chronicle hidden from players
+- [ ] Held back: a journal in "Chronicle: removed" reads "Set aside" and is never sent by itself; a journal's ⋯ menu → **Turn sync off for this journal** → it reads "Sync off", has no Send button, and stays in Foundry; **Turn sync on for this journal** → it is sent
+- [ ] Same name: make a journal named like a Chronicle page that has no journal → neither is copied; both rows read "Same name in Foundry" / "Same name in Chronicle" with **Link**. **Link** asks first and says whose text is kept (what Settings' conflict choice picks); Yes → one row, "In sync", with that text on both sides; No → nothing changes. A journal named like a page that already has a journal reads "Same name in Chronicle" with **Send** and is sent only when pressed
+- [ ] A send that fails reads "Couldn't send" in red with the reason on hover and **Try again**; it is not retried by itself until **Check again** or the window is reopened
+- [ ] Maps and calendar notes are not listed under "Only in Foundry"
+- [ ] Settings → Sync: turn **Sync changes as they happen** off → nothing in the list moves by itself and a line above it says why; set Pages to **From Chronicle** → pages are still brought in, journals are not sent, and the line says so; **From Foundry** → the reverse
+- [ ] **Bring in all** and **Send all** ask first, name what they leave out (sync off, set aside, same name, characters), and their counts leave those out too
+- [ ] **Copy details for help** → the clipboard holds the page's name, ids, versions, state and its recent errors, and none of the page's text and no key; the same on a journal's ⋯ menu
+- [ ] At the foot: "This list was read from Chronicle at HH:MM." with **Check again**; closing and reopening the window also reads it again
 - [ ] **Characters:** a "Needs a match" list comes first when any character can't be matched (the rail shows its count); each row offers "Match to existing…" with **Match**, and **Create new**, and resolving a row links it and removes it
 - [ ] **Calendar**, **Shops**, **Maps:** as in their sections; the Calendar pane explains why when sync is off, no calendar exists, or it is rebuilding or unreachable; Shops empty states say whether the "Shop" type is missing or has no shops
-- [ ] **Problems:** Health / Player reports / History switch; the badge counts new player reports. Health: Game System, Connection, Field Mapping, Sync Capability (pick an actor; **Copy** report and JSON), Error Log, Diagnostic Bundle and System Debug Export copy
+- [ ] **Problems:** Health / Player reports / History switch; the badge counts new player reports. Health: a checklist of plain sentences, problems first (changes waiting to be sent, recent errors, dice, connection, game system, sheet fields), each with at most one action in plain words; "Show them" lists the waiting changes with **Send them now**; **Copy a report for help** copies the diagnostic report; a closed **For troubleshooting** drawer holds Game System, Connection counts, Field Mapping, Sync Capability (pick an actor; **Copy** report and JSON), Dice detail, the Error Log and System Debug Export, and stays open across a redraw once opened
 
 ### Layout Persistence
 - [ ] Switch to Linked → Maps, close the window, reopen -> Linked → Maps still open
-- [ ] Collapse an entity type group, reload Foundry -> group still collapsed
+- [ ] Collapse a page type group, reload Foundry -> group still collapsed
 - [ ] A different browser/user has independent layout preferences (they are client settings)
 
-### Entity Type Creation
-- [ ] "Create Type" button visible in Entities tab toolbar
+### Page Type Creation
+- [ ] "New type" shows among the Pages list's commands
 - [ ] Click -> Dialog with name, plural name, icon and color fields
 - [ ] Submit with name "Quest" -> type created, dashboard refreshes
-- [ ] New type appears in bulk "Change Type" dropdown
+- [ ] New type appears in select mode's "Change type" dropdown
 - [ ] Cancel/close without name -> no API call, no errors
 
 ### Settings (in Chronicle Sync)
@@ -596,7 +652,7 @@ Details for Characters, Maps, Shops and Calendar are under their own sections.
 - [ ] **What syncs:** the new-journal page type lists Chronicle's page types; pick one, **Save**, then make a journal in Foundry -> the Chronicle page has that type
 - [ ] **Connection:** **Setup Wizard** shows the import wizard in the same window; the API key field is always empty, with "Saved in this browser" when a key exists
 - [ ] Overview -> "campaign member(s) not mapped" opens Settings → Players
-- [ ] Delete a synced page in Chronicle -> its journal moves to "Chronicle: removed", and Overview shows "1 page removed in Chronicle was set aside"; the row opens Linked → Entities, where the journal is listed as Set aside with Push and Delete
+- [ ] Delete a synced page in Chronicle -> its journal moves to "Chronicle: removed", and Overview shows "1 page removed in Chronicle was set aside"; the row opens Linked → Pages, where the journal is listed as Set aside with Send and Delete
 - [ ] A dashboard last left on the old Config or Members tab opens on Overview
 
 ### Test Connection (Multi-step, Chronicle Sync → Settings → Connection)

@@ -17,7 +17,7 @@
 import { noticeText } from './_escape-html.mjs';
 import { getSetting, getUserMappings } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
-import { createGenericAdapter } from './adapters/generic-adapter.mjs';
+import { createGenericAdapter, buildChronicleFields } from './adapters/generic-adapter.mjs';
 import { FLAG_SCOPE, syncOptions, APPLY_OPTION } from './constants.mjs';
 import { flagRemoval } from './_flag-removal.mjs';
 import { planClaimOwnership } from './_claim-ownership-plan.mjs';
@@ -30,6 +30,10 @@ import { planActorApply } from './_actor-apply-plan.mjs';
 import { planIdentityItems, identityFieldTypes, identityPicks } from './_identity-item-plan.mjs';
 import { applyIdentityPlan, applyEntryRefresh } from './_identity-item-apply.mjs';
 import { planEntryRefresh } from './_campaign-entry-item.mjs';
+import { sendsChangeHere, memberOf, ownsCharacter } from './_change-author.mjs';
+import { ASK, askModel, sameName } from './_player-asks.mjs';
+import { getPlayerAsks, playerName } from './player-asks.mjs';
+import { planLayerEffects, layeredFieldKeys, storedLayers, LAYER_FLAG } from './_layer-effects.mjs';
 
 /** How long a read of the campaign's pick-list entries is reused. */
 const ENTRY_CACHE_MS = 30_000;
@@ -75,6 +79,12 @@ export class ActorSync {
     // merged so the push knows every field it touched.
     /** @type {Map<string, object>} Merged update diffs awaiting a push. */
     this._pendingChanges = new Map();
+    /** @type {Map<string, string>} Who made the last change of a pending burst, by actor id. */
+    this._pendingAuthors = new Map();
+    /** @type {Map<string, Set<string>>} Players with a change in a pending burst, by actor id. */
+    this._pendingPlayers = new Map();
+    /** @type {Set<string>} Actors the GM was already told hold a player's unsent change. */
+    this._warnedPlayerChange = new Set();
     /** @type {Map<string, object>} Diffs whose push is in flight, by actor id. */
     this._pushingChanges = new Map();
     this._actorPushDebouncer = new JournalPushDebouncer(
@@ -137,6 +147,11 @@ export class ActorSync {
   async onMessage(msg) {
     if (!this._adapter || !getSetting('syncCharacters')) return;
 
+    if (msg.type === 'hero_layers.changed') {
+      await this._onLayersChanged(msg.resourceId);
+      return;
+    }
+
     // Only handle entity events.
     if (!msg.type?.startsWith('entity.')) return;
 
@@ -198,6 +213,52 @@ export class ActorSync {
   /** Change-feed area this module reads at connect (see SyncManager). */
   get feedArea() { return 'actors'; }
 
+  /** The settings part whose direction and live switch govern this module. */
+  get syncPart() { return 'characters'; }
+
+  /** Waiting changes this module sends on "Sync now". */
+  get heldKinds() { return ['actor.create', 'actor.update', 'actor.delete']; }
+
+  /** @returns {'send'|'hold'|'drop'} what to do with a Foundry actor change. @private */
+  _pushGate() { return this._syncManager?.pushGate?.('characters') ?? 'send'; }
+
+  /**
+   * Send one waiting change. An actor that has gone, or whose link has
+   * changed since, has nothing to send.
+   * @param {{key: string, kind: string, label: string, data: object}} change
+   */
+  async sendHeld(change) {
+    if (change.kind === 'actor.delete') {
+      const entityId = change.data.entityId;
+      if (!entityId) return;
+      if (change.data.player) {
+        const gone = { id: change.key.slice('actor:'.length), name: change.label };
+        await this._handlePlayerDelete(gone, entityId, change.data.player);
+        return;
+      }
+      queueRemoteDelete({ label: change.label, run: () => this._api.delete(`/entities/${entityId}`) });
+      return;
+    }
+    const actor = game.actors.get(change.key.slice('actor:'.length));
+    if (!actor) return;
+    const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
+    if (change.kind === 'actor.create') {
+      if (!entityId) await this._pushNewActor(actor, game.user.id, { rethrow: true });
+      return;
+    }
+    if (!entityId || entityId !== change.data.entityId) return;
+    if (typeof change.data.hidden === 'boolean') await this._pushHidden(actor, entityId, change.data.hidden);
+    if (!change.data.change) return;
+    this._pendingChanges.set(actor.id, change.data.change);
+    if (change.data.players?.length) this._pendingPlayers.set(actor.id, new Set(change.data.players));
+    await this._pushActorUpdate(actor, entityId, { rethrow: true });
+    // The push records Chronicle's newest version, so the catch-up would pass
+    // this character by: take what Chronicle changed while the edit waited now.
+    if (this._syncManager?.pullGate?.('characters') !== 'apply') return;
+    const entity = await this._api.get(`/entities/${entityId}`);
+    if (entity) await this._updateActorFromEntity(actor, entity);
+  }
+
   /** Characters use the feed only while character sync is actually running. */
   feedActive() { return !!(getSetting('syncCharacters') && this._adapter && this._characterTypeId); }
 
@@ -238,6 +299,7 @@ export class ActorSync {
     }
 
     await this._reconcileClaimOwnership();
+    await this._syncAllLayers(feed?.mode === 'delta' ? feed.changes : null);
 
     // Surface unresolved character links (broken / missing) so the GM can
     // fix them in the dashboard's Characters section rather than silently desyncing.
@@ -368,6 +430,132 @@ export class ActorSync {
   }
 
   /**
+   * The actor's effects that sync made for Chronicle layers.
+   * @returns {{id: string, flag: object}[]}
+   * @private
+   */
+  _layerEffects(actor) {
+    const out = [];
+    for (const e of actor?.effects?.contents ?? []) {
+      const flag = e.getFlag?.(FLAG_SCOPE, LAYER_FLAG);
+      if (flag) out.push({ id: e.id, flag });
+    }
+    return out;
+  }
+
+  /**
+   * The hero's level for a layer's `"@level"`: the actor's own when the
+   * adapter maps one (Foundry leads it), else Chronicle's.
+   * @private
+   */
+  _heroLevel(actor, fields) {
+    const def = (this._adapter?.fieldDefs ?? []).find((f) => f.key === 'level');
+    const own = def ? Number(buildChronicleFields(actor, [def]).level) : NaN;
+    if (Number.isFinite(own) && own > 0) return own;
+    const chr = Number(fields?.level);
+    return Number.isFinite(chr) ? chr : 0;
+  }
+
+  /**
+   * Make the actor carry one effect per layer. The writes are marked as
+   * sync's own, and only effects sync made are changed or removed.
+   * @private
+   */
+  async _applyLayers(actor, layers, level) {
+    const plan = planLayerEffects({
+      layers, fieldDefs: this._adapter?.fieldDefs ?? [], level, existing: this._layerEffects(actor), scope: FLAG_SCOPE,
+    });
+    if (plan.remove.length) await actor.deleteEmbeddedDocuments('ActiveEffect', plan.remove, syncOptions({ [APPLY_OPTION]: true }));
+    if (plan.update.length) await actor.updateEmbeddedDocuments('ActiveEffect', plan.update, syncOptions({ [APPLY_OPTION]: true }));
+    if (plan.create.length) await actor.createEmbeddedDocuments('ActiveEffect', plan.create, syncOptions({ [APPLY_OPTION]: true }));
+  }
+
+  /**
+   * Read a hero's layers from Chronicle and redraw its effects. A 403
+   * `addon_disabled` means the add-on is off and a 404 that this Chronicle
+   * has none (an owner key sees every page); either way reads stop until
+   * Chronicle next says a layer changed, and the answer is kept out of the
+   * dashboard's error log because it is expected.
+   * @returns {Promise<boolean>} false when the read or a write failed
+   * @private
+   */
+  async _syncLayers(actor, entityId) {
+    if (this._layersOff) return true;
+    let res;
+    try {
+      res = await this._api.get(`/entities/${entityId}/layers`);
+    } catch (err) {
+      if (err?.status === 404 || (err?.status === 403 && err?.code === 'addon_disabled')) {
+        this._api.dropLastErrorLogEntry?.({ path: `/entities/${entityId}/layers`, status: [403, 404] });
+        this._layersOff = true;
+        return true;
+      }
+      console.warn(`Chronicle: could not read the transformations on "${actor.name}"`, err);
+      return false;
+    }
+    try {
+      await this._applyLayers(actor, Array.isArray(res?.layers) ? res.layers : [], this._heroLevel(actor, null));
+      return true;
+    } catch (err) {
+      console.error(`Chronicle: could not update the transformation effects on "${actor.name}"`, err);
+      return false;
+    }
+  }
+
+  /** Chronicle put a layer on a page or took one off. @private */
+  async _onLayersChanged(entityId) {
+    if (!entityId) return;
+    const actor = this._findLinkedActor(entityId);
+    if (!actor || actor.type !== this._actorType) return;
+    this._layersOff = false;
+    await this._syncLayers(actor, entityId);
+  }
+
+  /**
+   * Connect-time read of layers changed while Foundry was closed: with the
+   * change feed, only the heroes it lists under `hero_layers`; without it,
+   * every linked hero. A failure is logged and does not hold the feed
+   * cursor back, because the next change or connect reads that hero again.
+   * @param {object[]|null} changes - the feed's changes, or null for a full read
+   * @private
+   */
+  async _syncAllLayers(changes) {
+    this._layersOff = false;
+    const listed = changes ? new Set(collapseChanges(changes, 'hero_layers').keys()) : null;
+    for (const actor of game.actors?.contents ?? []) {
+      if (this._layersOff) return;
+      const entityId = actor.type === this._actorType && actor.getFlag(FLAG_SCOPE, 'entityId');
+      if (entityId && (!listed || listed.has(entityId))) await this._syncLayers(actor, entityId);
+    }
+  }
+
+  /**
+   * Redraw the layer effects from the layers they were made from, after a
+   * Chronicle copy is applied, so a `"@level"` follows the hero's level
+   * without another read.
+   * @private
+   */
+  async _replanLayers(actor, entity) {
+    const existing = this._layerEffects(actor);
+    if (existing.length === 0) return;
+    await this._applyLayers(actor, storedLayers(existing), this._heroLevel(actor, entity?.fields_data));
+  }
+
+  /**
+   * Fields with a layer effect on them are left out of a push (see
+   * layeredFieldKeys).
+   * @private
+   */
+  _withoutLayered(actor, fields) {
+    if (!fields) return fields;
+    const keys = layeredFieldKeys(this._layerEffects(actor));
+    if (keys.size === 0) return fields;
+    const out = {};
+    for (const [k, v] of Object.entries(fields)) if (!keys.has(k)) out[k] = v;
+    return out;
+  }
+
+  /**
    * Clean up hooks on destroy.
    */
   destroy() {
@@ -436,6 +624,7 @@ export class ActorSync {
 
       const actor = await Actor.create(actorData, applyOptions());
       await this._applyIdentityItems(actor, entity);
+      await this._syncLayers(actor, entity.id);
       await this._applyClaimOwnership(actor, entity.owner_user_id ?? null, null);
 
       // Create sync mapping (idempotent — tolerates a pre-existing
@@ -618,6 +807,7 @@ export class ActorSync {
       }
 
       await this._applyIdentityItems(actor, entity);
+      await this._replanLayers(actor, entity);
 
       // Sync visibility: Chronicle is_private → Foundry actor hidden.
       // A private entity means the NPC is hidden from players.
@@ -690,13 +880,41 @@ export class ActorSync {
    */
   async _handleCreateActor(actor, options, userId) {
     if (options?.[APPLY_OPTION]) return;
-    if (userId !== game.user.id) return;
+
+    // A copy (Duplicate, an import of an export) carries the original's link,
+    // and its items the original's relations. Two actors on one character
+    // would overwrite each other's pushes, so the copy starts unlinked.
+    const linkedTo = actor.getFlag(FLAG_SCOPE, 'entityId');
+    if (linkedTo) {
+      if (!sendsChangeHere(userId)) return;
+      // An actor a player makes never arrives linked: the link is theirs to
+      // write and would aim their later pushes at someone else's character.
+      const byPlayer = userId !== game.user.id;
+      if (!byPlayer && !game.actors.find((a) => a.id !== actor.id && a.getFlag(FLAG_SCOPE, 'entityId') === linkedTo)) return;
+      await this._unlinkCopy(actor);
+    }
+    // A player's new character is theirs, so the active GM's client sends it.
+    if (!sendsChangeHere(userId)) return;
     if (actor.type !== this._actorType) return;
     if (!this._adapter || !this._characterTypeId) return;
 
-    // Skip if already linked (came from Chronicle).
-    if (actor.getFlag(FLAG_SCOPE, 'entityId')) return;
+    const gate = this._pushGate();
+    if (gate === 'drop') return;
+    if (gate === 'hold') {
+      this._syncManager.holdChange({ key: `actor:${actor.id}`, part: 'characters', kind: 'actor.create', label: actor.name });
+      return;
+    }
+    await this._pushNewActor(actor, userId);
+  }
 
+  /**
+   * Make a Chronicle character for an actor created in Foundry, and link them.
+   * @param {Actor} actor
+   * @param {string} userId - who made it, for the History row.
+   * @param {{rethrow?: boolean}} [opts] - rethrow a failure after reporting it.
+   * @private
+   */
+  async _pushNewActor(actor, userId, { rethrow = false } = {}) {
     // Mark this Foundry-originated create as in-flight so the WS-driven
     // _onCharacterCreated can skip the matching `entity.created` broadcast
     // that arrives before our POST returns. The flag is set after the POST
@@ -758,8 +976,27 @@ export class ActorSync {
     } catch (err) {
       console.error('Chronicle: Failed to push new actor to Chronicle', err);
       this._syncManager?.recordUserOutcome?.(userId, err);
+      if (rethrow) throw err;
     } finally {
       this._inFlightCreates.delete(actor.id);
+    }
+  }
+
+  /**
+   * Remove a copied actor's link to the original's character, and its
+   * items' links to the original's inventory.
+   * @param {Actor} actor
+   * @private
+   */
+  async _unlinkCopy(actor) {
+    await actor.update(
+      flagRemoval(FLAG_SCOPE, 'entityId', 'lastSync', 'chronicleUpdatedAt', 'chronicleOwnerUserId', IDENTITY_APPLIED_FLAG),
+      applyOptions(),
+    );
+    const items = (actor.items?.contents ?? [])
+      .filter((i) => i.getFlag(FLAG_SCOPE, 'relationId') || i.getFlag(FLAG_SCOPE, 'unlinkedRelationId'));
+    for (const item of items) {
+      await item.update(flagRemoval(FLAG_SCOPE, 'relationId', 'unlinkedRelationId'), applyOptions());
     }
   }
 
@@ -774,7 +1011,7 @@ export class ActorSync {
    */
   async _handleUpdateActor(actor, change, options, userId) {
     if (options?.[APPLY_OPTION]) return;
-    if (userId !== game.user.id) return;
+    if (!sendsChangeHere(userId)) return;
     if (actor.type !== this._actorType) return;
     if (!this._adapter) return;
 
@@ -786,29 +1023,57 @@ export class ActorSync {
     const hiddenChanged =
       change.prototypeToken?.hidden !== undefined ||
       change.token?.hidden !== undefined;
+    const isHidden = hiddenChanged ? (change.prototypeToken?.hidden ?? change.token?.hidden ?? false) : undefined;
 
-    if (hiddenChanged) {
-      try {
-        const isHidden =
-          change.prototypeToken?.hidden ?? change.token?.hidden ?? false;
-        await this._api.post(`/entities/${entityId}/reveal`, {
-          is_private: isHidden,
-        });
-        console.debug(
-          `Chronicle: ${isHidden ? 'Hid' : 'Revealed'} entity for actor "${actor.name}" (Foundry → Chronicle)`
-        );
-      } catch (err) {
-        console.error('Chronicle: Failed to sync visibility to Chronicle', err);
-        // Continue to field sync even if visibility sync fails.
-      }
+    const gate = this._pushGate();
+    if (gate === 'drop') return;
+    if (gate === 'hold') {
+      if (!hiddenChanged && !change.system && !change.name) return;
+      const byPlayer = userId !== game.user.id;
+      const diff = change.system || change.name !== undefined
+        ? { ...(change.system ? { system: change.system } : {}), ...(change.name !== undefined ? { name: change.name } : {}) }
+        : null;
+      this._syncManager.holdChange({
+        key: `actor:${actor.id}`, part: 'characters', kind: 'actor.update', label: actor.name,
+        data: { entityId, change: diff, players: byPlayer ? [userId] : [], ...(hiddenChanged ? { hidden: isHidden } : {}) },
+      }, (before, next) => (before.kind !== 'actor.update' ? before.data : {
+        ...before.data,
+        ...next.data,
+        change: next.data.change ? mergeChanges(before.data.change ?? undefined, next.data.change) : (before.data.change ?? null),
+        players: [...new Set([...(before.data.players ?? []), ...next.data.players])],
+      }));
+      return;
     }
+
+    if (hiddenChanged) await this._pushHidden(actor, entityId, isHidden);
 
     // Only push field/name changes if system data or name changed. The diff
     // is kept (merged with the burst's earlier ones) so the push can send
     // just the mapped fields that changed.
     if (!change.system && !change.name) return;
     this._pendingChanges.set(actor.id, mergeChanges(this._pendingChanges.get(actor.id), change));
+    this._pendingAuthors.set(actor.id, userId);
+    if (userId !== game.user.id) {
+      this._pendingPlayers.set(actor.id, (this._pendingPlayers.get(actor.id) ?? new Set()).add(userId));
+    }
     this._actorPushDebouncer.schedule(actor.id, actor, entityId);
+  }
+
+  /**
+   * Send the actor's hidden state as the Chronicle page's privacy. A failure
+   * is logged and the field sync goes on.
+   * @param {Actor} actor
+   * @param {string} entityId
+   * @param {boolean} isHidden
+   * @private
+   */
+  async _pushHidden(actor, entityId, isHidden) {
+    try {
+      await this._api.post(`/entities/${entityId}/reveal`, { is_private: isHidden });
+      console.debug(`Chronicle: ${isHidden ? 'Hid' : 'Revealed'} page for actor "${actor.name}" (Foundry → Chronicle)`);
+    } catch (err) {
+      console.error('Chronicle: Failed to sync visibility to Chronicle', err);
+    }
   }
 
   /**
@@ -826,14 +1091,19 @@ export class ActorSync {
    * @param {string} entityId
    * @private
    */
-  async _pushActorUpdate(actor, entityId) {
+  async _pushActorUpdate(actor, entityId, { rethrow = false } = {}) {
     const change = this._pendingChanges.get(actor.id) || {};
     this._pendingChanges.delete(actor.id);
+    const author = this._pendingAuthors.get(actor.id) ?? game.user.id;
+    this._pendingAuthors.delete(actor.id);
+    const players = this._pendingPlayers.get(actor.id);
+    this._pendingPlayers.delete(actor.id);
     // Until the push lands and the version is re-read, a Chronicle copy
     // arriving meanwhile still predates this edit (see _updateActorFromEntity).
     this._pushingChanges.set(actor.id, mergeChanges(this._pushingChanges.get(actor.id), change));
 
     try {
+      if (players?.size && !(await this._playersOwn(actor, entityId, players))) return;
       if (change.name !== undefined) {
         const kept = await this._pushActorName(actor, entityId);
         if (!kept) return;
@@ -841,9 +1111,9 @@ export class ActorSync {
 
       // Only the mapped fields this burst touched. Without an adapter helper
       // fall back to the full set, but only when system data changed.
-      const fields = typeof this._adapter.toChronicleFieldsChanged === 'function'
+      const fields = this._withoutLayered(actor, typeof this._adapter.toChronicleFieldsChanged === 'function'
         ? this._adapter.toChronicleFieldsChanged(actor, change)
-        : (change.system ? this._adapter.toChronicleFields(actor) : null);
+        : (change.system ? this._adapter.toChronicleFields(actor) : null));
 
       if (fields && Object.keys(fields).length > 0) {
         await this._putFieldsMerged(entityId, fields);
@@ -853,14 +1123,36 @@ export class ActorSync {
       await this._setActorFlag(actor, 'lastSync', new Date().toISOString());
 
       console.debug(`Chronicle: Pushed actor "${actor.name}" changes to Chronicle`);
-      // The debounce has no hook userId; the hooks only schedule this for the local user's own edits.
-      this._syncManager?.recordUserOutcome?.(game.user.id);
+      this._syncManager?.recordUserOutcome?.(author);
     } catch (err) {
       console.error('Chronicle: Failed to push actor update to Chronicle', err);
-      this._syncManager?.recordUserOutcome?.(game.user.id, err);
+      this._syncManager?.recordUserOutcome?.(author, err);
+      if (rethrow) throw err;
     } finally {
       this._pushingChanges.delete(actor.id);
     }
+  }
+
+  /**
+   * Whether Chronicle says the character belongs to every player whose
+   * change is waiting. A player can rewrite their actor's link, so the link
+   * alone never sends a player's change under the GM's key. When it does not,
+   * the change stays in Foundry and the GM is told once per actor.
+   * @param {Actor} actor
+   * @param {string} entityId
+   * @param {Set<string>} players - Foundry user ids.
+   * @returns {Promise<boolean>}
+   * @private
+   */
+  async _playersOwn(actor, entityId, players) {
+    const entity = await this._api.get(`/entities/${entityId}`);
+    const mappings = getUserMappings();
+    const owned = [...players].every((id) => ownsCharacter(entity, memberOf(mappings, id)));
+    if (!owned && !this._warnedPlayerChange.has(actor.id)) {
+      this._warnedPlayerChange.add(actor.id);
+      ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.PlayerChangeNotSent', { actor: noticeText(actor.name) }));
+    }
+    return owned;
   }
 
   /**
@@ -905,7 +1197,8 @@ export class ActorSync {
       return true;
     } catch (err) {
       if (!(err instanceof ConflictError)) throw err;
-      const strategy = getSetting('conflictResolution');
+      // A part set to "From Foundry" takes nothing from Chronicle, a conflict included.
+      const strategy = this._syncManager?.pullGate?.('characters') === 'drop' ? 'foundry' : getSetting('conflictResolution');
       if (strategy === 'chronicle') {
         // Re-pull from Chronicle; this burst is dropped, so its paths no
         // longer hold Chronicle's values back.
@@ -967,17 +1260,61 @@ export class ActorSync {
    */
   async _handleDeleteActor(actor, options, userId) {
     if (options?.[APPLY_OPTION]) return;
-    if (userId !== game.user.id) return;
-
     // A push still pending would aim at an actor that is gone.
     this._actorPushDebouncer.cancel(actor.id);
     this._pendingChanges.delete(actor.id);
+    this._pendingAuthors.delete(actor.id);
+    this._pendingPlayers.delete(actor.id);
+    if (!sendsChangeHere(userId)) return;
+
+    // Whatever was waiting for this actor no longer has an actor to send.
+    const key = `actor:${actor.id}`;
+    this._syncManager?.dropHeld?.(key);
+    const gate = this._pushGate();
+    if (gate === 'drop') return;
 
     const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
 
+    if (gate === 'hold') {
+      // A player's delete waits with its author, so "Sync now" checks it the
+      // way a live one is checked instead of asking about a page they named.
+      const player = userId !== game.user.id ? { player: userId } : {};
+      this._syncManager.holdChange({ key, part: 'characters', kind: 'actor.delete', label: actor.name, data: { entityId, ...player } });
+      return;
+    }
+    if (userId !== game.user.id) {
+      await this._handlePlayerDelete(actor, entityId, userId);
+      return;
+    }
     // The GM is asked before the Chronicle page goes too (_remote-deletes.mjs).
     queueRemoteDelete({ label: actor.name, run: () => this._api.delete(`/entities/${entityId}`) });
+  }
+
+  /**
+   * A player deleted an actor. The link is a flag they can rewrite, so the
+   * page it names must be claimed by them in Chronicle and carry the actor's
+   * own name; then Chronicle moves it to its Trash. Anything else becomes a
+   * GM card.
+   * @private
+   */
+  async _handlePlayerDelete(actor, entityId, userId) {
+    try {
+      const page = await this._api.get(`/entities/${entityId}`);
+      const own = ownsCharacter(page, memberOf(getUserMappings(), userId)) && sameName(page?.name, actor.name);
+      if (own) {
+        await this._api.delete(`/entities/${entityId}`);
+        this._syncManager?.recordUserOutcome?.(userId);
+        return;
+      }
+      await getPlayerAsks()?.ask(askModel({
+        kind: ASK.ACTOR_REMOVE, docId: actor.id, who: playerName(userId), name: actor.name,
+        link: { entityId },
+      }));
+    } catch (err) {
+      console.warn(`Chronicle: Could not handle a player's delete of "${actor.name}"`, err);
+      this._syncManager?.recordUserOutcome?.(userId, err);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1312,7 +1649,7 @@ export class ActorSync {
     const actor = game.actors.get(actorId);
     const entityId = actor?.getFlag(FLAG_SCOPE, 'entityId');
     if (!actor || !entityId || !this._adapter) return false;
-    await this._putFieldsMerged(entityId, this._adapter.toChronicleFields(actor));
+    await this._putFieldsMerged(entityId, this._withoutLayered(actor, this._adapter.toChronicleFields(actor)));
     await this._setActorFlag(actor, 'lastSync', new Date().toISOString());
     console.debug(`Chronicle: Re-pushed actor "${actor.name}" → entity ${entityId}`);
     return true;

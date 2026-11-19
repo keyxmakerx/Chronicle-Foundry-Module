@@ -337,7 +337,7 @@ button.chronicle-shop-door {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-weight: 700;
-  color: color-mix(in srgb, var(--cs-text) 35%, transparent);
+  color: var(--cs-text-muted);
   padding: 9px 12px 2px;
   pointer-events: none;
 }
@@ -405,6 +405,18 @@ button.chronicle-shop-door {
 .cs-firstrun-head { display: flex; align-items: flex-start; gap: 12px; padding-bottom: 10px; }
 .cs-firstrun-head > div { flex: 1; min-width: 0; }
 .cs-firstrun-head > button { flex: none; width: auto; }
+
+/* First-run connect screen: one field, live checks, one button. */
+.cs-connect { padding: 4px 14px 14px; }
+.cs-connect-label { display: block; font-weight: 600; margin: 10px 0 4px; }
+.cs-connect-input { width: 100%; height: 34px; }
+.cs-connect-checks { margin-top: 10px; }
+.cs-connect-act { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+.cs-connect-go { height: 32px; min-height: 32px; padding: 0 14px; font-size: 13px; font-weight: 600; border-radius: 4px; border: 1px solid var(--cs-accent-strong); background: var(--cs-accent); color: var(--cs-on-accent); cursor: pointer; white-space: nowrap; }
+.cs-connect-go:disabled { opacity: .55; cursor: not-allowed; }
+.cs-connect-note { font-size: 12px; color: var(--cs-text-muted); }
+.cs-connect-hand { margin-top: 14px; }
+.cs-connect-input:focus-visible, .cs-connect-go:focus-visible, .cs-connect-hand input:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
 .chronicle-dashboard .chronicle-wizard-inner { flex: 1; min-height: 0; }
 .overview-more { margin-top: 12px; }
 
@@ -427,7 +439,7 @@ button.chronicle-shop-door {
 
 .overview-connection .overview-sub {
   font-size: 11px;
-  color: color-mix(in srgb, var(--cs-text) 55%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .overview-connection .dashboard-btn {
@@ -468,7 +480,7 @@ button.chronicle-shop-door {
 
 .overview-stat-label {
   font-size: 11px;
-  color: color-mix(in srgb, var(--cs-text) 60%, transparent);
+  color: var(--cs-text-muted);
 }
 
 /* Needs-attention rows */
@@ -549,7 +561,7 @@ button.chronicle-shop-door {
 .dashboard-tabs .item {
   padding: 8px 16px;
   font-size: 13px;
-  color: color-mix(in srgb, var(--cs-text) 60%, transparent);
+  color: var(--cs-text-muted);
   cursor: pointer;
   border-bottom: 2px solid transparent;
   transition: color 0.15s, border-color 0.15s;
@@ -587,6 +599,7 @@ button.chronicle-shop-door {
 /* Toolbar */
 .dashboard-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 4px 0 8px;
@@ -596,84 +609,143 @@ button.chronicle-shop-door {
 
 .toolbar-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
-/* --- Bulk actions toolbar --- */
+/* ----- Pages list: quiet rows under small-caps type headings ----- */
 
-.bulk-toolbar {
-  display: none;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 10px;
-  margin-bottom: 6px;
-  background: color-mix(in srgb, var(--cs-info) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--cs-info) 20%, transparent);
-  border-radius: 4px;
+.cs-pages { font-size: 13px; }
+
+.chronicle-dashboard input.cs-pages-search {
+  display: block; width: 100%; height: 30px; margin: 0 0 8px; padding: 0 10px;
+  border: 1px solid var(--cs-line); border-radius: 4px;
+  background: color-mix(in srgb, var(--cs-text) 4%, transparent);
+  color: var(--cs-text); font-size: 13px;
 }
+.chronicle-dashboard input.cs-pages-search::placeholder { color: var(--cs-text-muted); }
+.chronicle-dashboard input.cs-pages-search:focus { border-color: var(--cs-accent); outline: none; box-shadow: none; }
+.chronicle-dashboard input.cs-pages-search:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
 
-.bulk-toolbar.visible {
-  display: flex;
-}
+/* The list's commands, as quiet words on one line; "Select" sits at the far end. */
+.cs-pages-words { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin: 0 0 6px; }
+.cs-pages-words .cs-pages-select { margin-left: auto; }
+.cs-quiet.cs-quiet-danger:hover,
+.cs-quiet.cs-quiet-danger:focus-visible { color: var(--cs-bad); }
 
-.bulk-toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+.cs-pages-note { margin: 8px 2px; font-size: 12px; color: var(--cs-text-muted); }
+.cs-pages-read { margin-top: 14px; }
 
-.bulk-count-badge {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--cs-info);
-}
-
-.bulk-toolbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.bulk-type-select {
-  padding: 3px 6px;
-  font-size: 11px;
-  border: 1px solid color-mix(in srgb, var(--cs-text) 15%, transparent);
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.2);
-  color: inherit;
-  max-width: 160px;
-}
-
-.bulk-type-select:focus {
-  border-color: var(--cs-info);
-  outline: none;
-}
-
-.bulk-entity-checkbox {
-  flex-shrink: 0;
-  margin: 0;
-  cursor: pointer;
-}
-
-.entity-row.bulk-selected {
-  background: color-mix(in srgb, var(--cs-info) 6%, transparent);
-}
-
-.dashboard-search {
-  flex: 1;
-  padding: 4px 8px;
-  border: 1px solid color-mix(in srgb, var(--cs-text) 15%, transparent);
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.2);
-  color: inherit;
+/* Select mode: what to do with the ticked pages. */
+.cs-pages-bulk {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
+  margin: 0 0 6px; padding: 6px 8px;
+  border: 1px solid var(--cs-line); border-radius: 4px;
+  background: color-mix(in srgb, var(--cs-text) 4%, transparent);
   font-size: 12px;
 }
-
-.dashboard-search:focus {
-  border-color: var(--cs-info);
-  outline: none;
+.cs-pages-bulk-top { flex: 1 0 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--cs-text-2); }
+.cs-pages-bulk-all { display: inline-flex; align-items: center; gap: 6px; margin: 0; cursor: pointer; }
+.cs-pages-bulk input[type="checkbox"],
+.cs-page-row input.cs-page-select { flex: none; width: 14px; height: 14px; margin: 0; cursor: pointer; }
+.chronicle-dashboard select.bulk-type-select {
+  width: auto; max-width: 160px; height: 24px; padding: 0 6px;
+  border: 1px solid var(--cs-line); border-radius: 4px;
+  background: color-mix(in srgb, var(--cs-text) 4%, transparent);
+  color: var(--cs-text); font-size: 12px;
 }
+.chronicle-dashboard select.bulk-type-select:disabled { color: var(--cs-text-muted); }
+
+.cs-pages-group[hidden],
+.cs-pages-rows[hidden],
+.cs-page-row[hidden],
+.cs-page-row [hidden] { display: none; }
+
+/* A type's heading: small caps over a hairline. Pressing its name folds the rows. */
+.cs-pages-cap {
+  display: flex; align-items: center; gap: 8px;
+  min-height: 28px; margin: 12px 0 2px; padding: 0 2px 2px;
+  border-bottom: 1px solid var(--cs-line);
+}
+.cs-pages-cap > small { flex: 1; min-width: 0; font-size: 11px; color: var(--cs-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chronicle-dashboard .cs-pages-fold {
+  flex: none; display: inline-flex; align-items: center; gap: 8px;
+  width: auto; height: auto; min-height: 0; margin: 0; padding: 2px 0;
+  background: none; border: 0; border-radius: 3px; box-shadow: none;
+  color: var(--cs-text-2); font-size: 11px; font-weight: 700; line-height: 1.4;
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.chronicle-dashboard button.cs-pages-fold { cursor: pointer; }
+.chronicle-dashboard button.cs-pages-fold:hover { color: var(--cs-text); }
+.chronicle-dashboard button.cs-pages-fold:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
+/* A heading's icon takes the heading's colour, never the accent. */
+.cs-pages-fold > i { width: 14px; text-align: center; font-size: 12px; letter-spacing: 0; color: inherit; }
+.cs-pages-group[data-folded="true"] .cs-pages-fold { color: var(--cs-text-muted); }
+
+.cs-page-row {
+  display: flex; align-items: center; gap: 8px;
+  min-height: 34px; padding: 4px 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--cs-line) 45%, transparent);
+}
+.cs-page-row.is-selected { background: color-mix(in srgb, var(--cs-accent) 8%, transparent); }
+.cs-page-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-page-lock { flex: none; font-size: 13px; color: var(--cs-text); }
+.cs-page-state { flex: none; font-size: 12px; color: var(--cs-text-muted); white-space: nowrap; }
+.cs-page-row.is-failed .cs-page-state { color: var(--cs-bad); }
+
+.cs-page-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--cs-ok); }
+.cs-page-row.is-modified .cs-page-dot,
+.cs-page-row.is-catching-up .cs-page-dot,
+.cs-page-row.is-waiting .cs-page-dot { background: var(--cs-warn); }
+.cs-page-row.is-bringing-in .cs-page-dot,
+.cs-page-row.is-sending .cs-page-dot { background: var(--cs-warn); }
+.cs-page-row.is-chronicle-only .cs-page-dot,
+.cs-page-row.is-character .cs-page-dot { background: var(--cs-info); }
+.cs-page-row.is-foundry-only .cs-page-dot,
+.cs-page-row.is-set-aside .cs-page-dot,
+.cs-page-row.is-clash .cs-page-dot { background: var(--cs-attention); }
+.cs-page-row.is-failed .cs-page-dot { background: var(--cs-bad); }
+.cs-page-row.is-off .cs-page-dot,
+.cs-page-row.is-chronicle-only-off .cs-page-dot { background: none; box-shadow: inset 0 0 0 1px var(--cs-text-muted); }
+
+/* A row's one real command. */
+.chronicle-dashboard .cs-page-btn {
+  flex: none; width: auto; height: 26px; min-height: 0; margin: 0; padding: 0 10px;
+  border: 1px solid var(--cs-line); border-radius: 4px; box-shadow: none;
+  background: color-mix(in srgb, var(--cs-text) 6%, transparent);
+  color: var(--cs-text); font-size: 12px; line-height: 1; white-space: nowrap; cursor: pointer;
+}
+.chronicle-dashboard .cs-page-btn:hover { background: color-mix(in srgb, var(--cs-text) 12%, transparent); }
+.chronicle-dashboard .cs-page-btn:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
+
+/* Row-end icon: one colour, framed only on hover or focus. */
+.chronicle-dashboard .cs-row-icon {
+  flex: none; width: 26px; height: 26px; min-height: 0; padding: 0; margin: 0;
+  display: inline-grid; place-items: center;
+  background: none; border: 1px solid transparent; border-radius: 4px; box-shadow: none;
+  color: var(--cs-text-muted); font-size: 12px; line-height: 1; cursor: pointer;
+}
+.chronicle-dashboard .cs-row-icon:hover,
+.chronicle-dashboard .cs-row-icon:focus-visible,
+.chronicle-dashboard .cs-row-icon[aria-expanded="true"] { border-color: var(--cs-line); color: var(--cs-text); }
+.chronicle-dashboard .cs-row-icon.cs-row-icon-danger:hover,
+.chronicle-dashboard .cs-row-icon.cs-row-icon-danger:focus-visible { color: var(--cs-bad); }
+.chronicle-dashboard .cs-row-icon:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
+
+/* The "more" menu of a row or a type. It lies over the list and is gone on any press outside it. */
+.chronicle-dashboard .cs-pages-menu {
+  position: absolute; z-index: 5; min-width: 200px; max-width: 280px; padding: 4px;
+  border: 1px solid var(--cs-line); border-radius: 6px;
+  background: var(--cs-surface); color: var(--cs-text);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+}
+.chronicle-dashboard .cs-pages-menu > button {
+  display: block; width: 100%; height: auto; min-height: 30px; margin: 0; padding: 6px 10px;
+  background: none; border: 0; border-radius: 4px; box-shadow: none;
+  color: inherit; font-size: 13px; line-height: 1.3; text-align: left; white-space: normal; cursor: pointer;
+}
+.chronicle-dashboard .cs-pages-menu > button:hover,
+.chronicle-dashboard .cs-pages-menu > button:focus-visible { background: color-mix(in srgb, var(--cs-text) 9%, transparent); outline: none; }
 
 /* Dashboard buttons */
 .dashboard-btn {
@@ -724,164 +796,12 @@ button.chronicle-shop-door {
   color: var(--cs-attention);
 }
 
-/* Entity type groups */
-.entity-type-group {
-  margin-bottom: 4px;
-}
-
-.entity-type-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  background: rgba(0, 0, 0, 0.15);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.entity-type-header:hover {
-  background: rgba(0, 0, 0, 0.25);
-}
-
-.entity-type-header .collapse-icon {
-  font-size: 10px;
-  width: 12px;
-  text-align: center;
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
-}
-
-.entity-type-header .type-name {
-  flex: 1;
-}
-
-.entity-type-header .type-stats {
-  font-size: 11px;
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
-  font-weight: normal;
-}
-
-.type-sync-toggle {
-  padding: 1px 4px !important;
-  border: none !important;
-  background: none !important;
-  cursor: pointer;
-  color: color-mix(in srgb, var(--cs-text) 50%, transparent);
-  transition: color 0.15s;
-}
-
-.type-sync-toggle:hover {
-  color: color-mix(in srgb, var(--cs-text) 80%, transparent);
-}
-
-.type-sync-toggle i {
-  font-size: 14px;
-}
-
-/* Entity rows */
-.entity-rows {
-  padding: 2px 0 2px 20px;
-}
-
-.entity-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-radius: 3px;
-  font-size: 12px;
-  transition: background 0.1s;
-}
-
-.entity-row:hover {
-  background: color-mix(in srgb, var(--cs-text) 3%, transparent);
-}
-
-/* Row-end icon: monochrome, framed only on hover or focus. */
-.entity-row .cs-row-icon {
-  flex: none; width: 22px; height: 22px; padding: 0; margin: 0;
-  display: inline-grid; place-items: center;
-  background: none; border: 1px solid transparent; border-radius: 4px;
-  color: var(--cs-text-muted); font-size: 11px; line-height: 1; cursor: pointer;
-}
-.entity-row .cs-row-icon:hover,
-.entity-row .cs-row-icon:focus-visible { border-color: var(--cs-line); color: var(--cs-bad); }
-.entity-row .cs-row-icon:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
-
-/* Quiet word: no border, reads as part of the header line. */
-.entity-type-header .cs-quiet-word {
-  flex: none; width: auto; margin: 0 0 0 auto; padding: 0 4px; height: auto; line-height: 1.4;
-  background: none; border: 0; box-shadow: none;
-  color: var(--cs-text-muted); font-size: 11px; text-decoration: underline dotted; cursor: pointer;
-}
-.entity-type-header .cs-quiet-word:hover,
-.entity-type-header .cs-quiet-word:focus-visible { color: var(--cs-bad); }
-
-/* Status dots */
-.entity-status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.entity-row.status-synced .entity-status-dot,
-.entity-row.status-actor .entity-status-dot { background: var(--cs-ok); }
-.entity-row.status-modified .entity-status-dot { background: var(--cs-warn); }
-.entity-row.status-chronicle-only .entity-status-dot { background: var(--cs-info); }
-.entity-row.status-foundry-only .entity-status-dot { background: var(--cs-attention); }
-.entity-row.status-conflict .entity-status-dot { background: var(--cs-bad); }
-
-.entity-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Visibility badge */
-.visibility-badge {
-  background: none;
-  border: none;
-  padding: 2px 4px;
-  cursor: pointer;
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
-  font-size: 11px;
-}
-
-.visibility-badge:hover {
-  color: color-mix(in srgb, var(--cs-text) 70%, transparent);
-}
-
-/* Status label */
-.entity-status-label {
-  font-size: 11px;
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
-  white-space: nowrap;
-}
-
-.entity-row.status-synced .entity-status-label,
-.entity-row.status-actor .entity-status-label { color: var(--cs-ok); }
-.entity-row.status-modified .entity-status-label { color: var(--cs-warn); }
-.entity-row.status-chronicle-only .entity-status-label { color: var(--cs-info); }
-.entity-row.status-foundry-only .entity-status-label { color: var(--cs-attention); }
-
-/* Sync checkbox */
-.entity-sync-checkbox {
-  cursor: pointer;
-}
-
-.entity-sync-toggle {
-  cursor: pointer;
-}
-
 /* Section heading */
 .section-heading {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
   margin: 12px 0 6px;
   padding-bottom: 4px;
   border-bottom: 1px solid color-mix(in srgb, var(--cs-text) 6%, transparent);
@@ -925,7 +845,7 @@ button.chronicle-shop-door {
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: color-mix(in srgb, var(--cs-text) 60%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .map-link-controls select {
@@ -944,7 +864,7 @@ button.chronicle-shop-door {
   padding: 1px 6px;
   border-radius: 8px;
   background: rgba(107, 114, 128, 0.2);
-  color: color-mix(in srgb, var(--cs-text) 60%, transparent);
+  color: var(--cs-text-muted);
   font-size: 11px;
 }
 
@@ -1104,12 +1024,12 @@ button.chronicle-shop-door {
 
 .shop-subtype {
   font-size: 11px;
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .shop-keeper {
   font-size: 11px;
-  color: color-mix(in srgb, var(--cs-text) 35%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .shop-keeper i {
@@ -1125,7 +1045,7 @@ button.chronicle-shop-door {
 }
 
 .shop-private-badge {
-  color: color-mix(in srgb, var(--cs-text) 30%, transparent);
+  color: var(--cs-text-muted);
   font-size: 12px;
 }
 
@@ -1160,7 +1080,7 @@ button.chronicle-shop-door {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
   margin-bottom: 6px;
 }
 
@@ -1171,13 +1091,13 @@ button.chronicle-shop-door {
 
 .calendar-date-box .date-year {
   font-size: 12px;
-  color: color-mix(in srgb, var(--cs-text) 50%, transparent);
+  color: var(--cs-text-muted);
   margin-top: 2px;
 }
 
 .calendar-date-box .date-time {
   font-size: 14px;
-  color: color-mix(in srgb, var(--cs-text) 60%, transparent);
+  color: var(--cs-text-muted);
   margin-top: 4px;
 }
 
@@ -1242,7 +1162,7 @@ button.chronicle-shop-door {
 
 .calendar-worldstate .worldstate-row dt {
   flex: 0 0 90px;
-  color: color-mix(in srgb, var(--cs-text) 60%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .calendar-worldstate .worldstate-row dd {
@@ -1313,7 +1233,7 @@ button.chronicle-shop-door {
 
 .stat-label {
   font-size: 11px;
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-top: 2px;
@@ -1321,7 +1241,7 @@ button.chronicle-shop-door {
 
 .last-sync-info {
   font-size: 12px;
-  color: color-mix(in srgb, var(--cs-text) 50%, transparent);
+  color: var(--cs-text-muted);
   margin-bottom: 12px;
 }
 
@@ -1346,7 +1266,7 @@ button.chronicle-shop-door {
 }
 
 .log-time {
-  color: color-mix(in srgb, var(--cs-text) 30%, transparent);
+  color: var(--cs-text-muted);
   font-size: 11px;
   flex-shrink: 0;
   min-width: 50px;
@@ -1472,12 +1392,6 @@ button.chronicle-shop-door {
   flex-wrap: wrap;
 }
 
-/* Foundry-only group styling */
-.foundry-only-group .entity-type-header {
-  border-top: 1px solid color-mix(in srgb, var(--cs-text) 6%, transparent);
-  margin-top: 8px;
-}
-
 /* ================================================================= */
 /* SHARED FORM BITS (status tab selects and hints)                    */
 /* ================================================================= */
@@ -1499,7 +1413,7 @@ button.chronicle-shop-door {
 
 .config-hint {
   font-size: 11px;
-  color: color-mix(in srgb, var(--cs-text) 35%, transparent);
+  color: var(--cs-text-muted);
   margin-bottom: 8px;
 }
 
@@ -1562,7 +1476,7 @@ button.chronicle-shop-door {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: color-mix(in srgb, var(--cs-text) 30%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .character-details {
@@ -1589,7 +1503,7 @@ button.chronicle-shop-door {
 }
 
 .character-sync-status.unlinked {
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .character-actions {
@@ -1598,6 +1512,35 @@ button.chronicle-shop-door {
   gap: 6px;
   flex-shrink: 0;
 }
+
+/* --- Health pane: a plain checklist and one troubleshooting drawer --- */
+.cs-health { font-size: 13px; color: var(--cs-text); }
+.cs-health-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 4px; border-bottom: 1px solid color-mix(in srgb, var(--cs-line) 45%, transparent); }
+.cs-health-row > i { flex: none; width: 16px; margin-top: 2px; text-align: center; color: var(--cs-ok); }
+.cs-health-row.is-warn > i { color: var(--cs-warn); }
+.cs-health-row.is-bad > i { color: var(--cs-bad); }
+.cs-health-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cs-health-text b { display: block; font-weight: 600; }
+.cs-health-text span { color: var(--cs-text-muted); font-size: 12px; }
+.cs-health-muted { color: var(--cs-text-muted); font-size: 12px; }
+.cs-quiet { flex: none; width: auto; height: auto; min-height: 0; margin: 0; padding: 0 2px; background: none; border: 0; box-shadow: none; color: var(--cs-accent); font-size: 12px; line-height: 1.4; cursor: pointer; white-space: nowrap; }
+.cs-quiet:hover { text-decoration: underline; }
+.cs-quiet:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
+.cs-quiet:disabled { color: var(--cs-text-muted); cursor: default; text-decoration: none; }
+.cs-health-waiting { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 6px 4px 10px 30px; border-bottom: 1px solid color-mix(in srgb, var(--cs-line) 45%, transparent); }
+.cs-health-wait { display: flex; gap: 8px; align-items: baseline; }
+.cs-health-copy { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin: 14px 2px 2px; }
+.cs-health-btn { display: inline-flex; align-items: center; gap: 6px; height: 26px; min-height: 26px; padding: 0 10px; font-size: 12px; border-radius: 4px; border: 1px solid var(--cs-line); background: color-mix(in srgb, var(--cs-text) 6%, transparent); color: var(--cs-text); white-space: nowrap; cursor: pointer; }
+.cs-health-btn:hover { background: color-mix(in srgb, var(--cs-text) 10%, transparent); }
+.cs-health-btn:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
+.cs-health-drawer { margin-top: 8px; }
+.cs-health-cap { display: flex; align-items: baseline; gap: 8px; margin: 0; padding: 0 2px 4px; border-bottom: 1px solid var(--cs-line); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--cs-text-2); cursor: pointer; list-style: none; }
+.cs-health-cap::-webkit-details-marker { display: none; }
+.cs-health-cap small { font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--cs-text-muted); font-size: 11px; }
+.cs-health-cap i { font-size: 10px; width: 10px; transition: transform 120ms ease-out; }
+.cs-health-drawer[open] > .cs-health-cap i { transform: rotate(90deg); }
+.cs-health-cap:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .cs-health-cap i { transition: none; } }
 
 /* --- Issues (character link resolver) tab --- */
 .issue-row .issue-actions {
@@ -1648,7 +1591,7 @@ button.chronicle-shop-door {
 
 .character-last-sync {
   font-size: 11px;
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .system-badge {
@@ -1681,7 +1624,7 @@ button.chronicle-shop-door {
 }
 
 .system-label {
-  color: color-mix(in srgb, var(--cs-text) 50%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .system-value {
@@ -1839,7 +1782,7 @@ html[data-cs-motion="calm"] :is(.cs-grow, .cs-settle, .cs-peek) { animation-name
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: color-mix(in srgb, var(--cs-text) 55%, transparent);
+  color: var(--cs-text-muted);
   border-bottom: 1px solid color-mix(in srgb, var(--cs-text) 8%, transparent);
   padding-bottom: 4px;
 }
@@ -1914,14 +1857,14 @@ html[data-cs-motion="calm"] :is(.cs-grow, .cs-settle, .cs-peek) { animation-name
 }
 
 .chronicle-update-info-form .update-info-empty {
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
   font-style: italic;
 }
 
 .chronicle-update-info-form .update-info-help {
   margin: 0;
   font-size: 12px;
-  color: color-mix(in srgb, var(--cs-text) 60%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .chronicle-update-info-form .update-info-check-btn {
