@@ -382,7 +382,9 @@ test('the list fixes by itself only within bounds', () => {
   // Everything tried is remembered before the work starts, so a redraw cannot start it twice.
   assert.match(fix, /for \(const id of ids\) this\._catchUpTried\.add\(id\);\s*for \(const id of journals\) this\._sendTried\.add\(id\);\s*this\._catchUpRunning = true;/);
   // A list cut short sends nothing unasked: a page of the same name may lie past the cut.
-  assert.match(fix, /const journals = this\._cache\.entitiesTruncated \? \[\] : sendPlan\(/);
+  assert.match(fix, /const journals = !may\.out \|\| this\._cache\.entitiesTruncated \? \[\] : sendPlan\(/);
+  // The direction for pages and "Sync changes as they happen" are respected.
+  assert.match(fix, /const rows = may\.in \? \[\.\.\.this\._pageRows\.values\(\)\] : \[\];/);
   // One way to make a page from a journal, for the list and for a new journal alike.
   assert.match(dash, /await journalSync\._sendJournalAsPage\(journal\);/);
   assert.doesNotMatch(dash, /entity_type_id: 0/);

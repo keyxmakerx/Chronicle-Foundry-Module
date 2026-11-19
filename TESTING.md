@@ -589,6 +589,7 @@ Details for Characters, Maps, Shops and Calendar are under their own sections.
 - [ ] Same name: make a journal named like a Chronicle page that has no journal → neither is copied; both rows read "Same name in Foundry" / "Same name in Chronicle" with **Link**. **Link** asks first and says whose text is kept (what Settings' conflict choice picks); Yes → one row, "In sync", with that text on both sides; No → nothing changes. A journal named like a page that already has a journal reads "Same name in Chronicle" with **Send** and is sent only when pressed
 - [ ] A send that fails reads "Couldn't send" in red with the reason on hover and **Try again**; it is not retried by itself until **Check again** or the window is reopened
 - [ ] Maps and calendar notes are not listed under "Only in Foundry"
+- [ ] Settings → Sync: turn **Sync changes as they happen** off → nothing in the list moves by itself and a line above it says why; set Pages to **From Chronicle** → pages are still brought in, journals are not sent, and the line says so; **From Foundry** → the reverse
 - [ ] **Bring in all** and **Send all** ask first, name what they leave out (sync off, set aside, same name, characters), and their counts leave those out too
 - [ ] **Copy details for help** → the clipboard holds the page's name, ids, versions, state and its recent errors, and none of the page's text and no key; the same on a journal's ⋯ menu
 - [ ] At the foot: "This list was read from Chronicle at HH:MM." with **Check again**; closing and reopening the window also reads it again

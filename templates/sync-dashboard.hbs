@@ -210,8 +210,8 @@
         <button type="button" class="cs-quiet cs-pages-select" data-action="pages-select" aria-pressed="{{#if pages.selecting}}true{{else}}false{{/if}}">{{#if pages.selecting}}{{localize "CHRONICLE.Dashboard.Pages.SelectDone"}}{{else}}{{localize "CHRONICLE.Dashboard.Pages.Select"}}{{/if}}</button>
       </div>
 
-      {{#if pages.syncOff}}
-      <p class="cs-pages-note">{{localize "CHRONICLE.Dashboard.Pages.SyncIsOff"}}
+      {{#if pages.syncNote}}
+      <p class="cs-pages-note">{{pages.syncNote}}
         <button type="button" class="cs-quiet" data-action="open-settings" data-settings-tab="sync">{{localize "CHRONICLE.Dashboard.Pages.OpenSettings"}}</button></p>
       {{/if}}
 

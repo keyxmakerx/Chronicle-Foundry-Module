@@ -809,8 +809,37 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       readText: this._cache.entitiesAt
         ? game.i18n.format('CHRONICLE.Dashboard.Pages.ReadAt', { time: this._healthClock(this._cache.entitiesAt) })
         : game.i18n.localize('CHRONICLE.Dashboard.Pages.ReadNow'),
-      syncOff: !getSetting('syncJournals'),
+      syncNote: this._pagesNote(),
     };
+  }
+
+  /**
+   * Which way the list may move pages without being asked. Nothing moves
+   * while "Sync changes as they happen" is off, and a one-way direction
+   * for pages stops the other way.
+   * @returns {{in: boolean, out: boolean}}
+   * @private
+   */
+  _pagesMayMove() {
+    const live = !!getSetting('syncJournals') && getSetting('autoSync') !== false;
+    const manager = this._syncManager;
+    return {
+      in: live && (manager?.canPull?.('journals') ?? true),
+      out: live && (manager?.canPush?.('journals') ?? true),
+    };
+  }
+
+  /** The line above the list that says what does not sync by itself, if anything. @private */
+  _pagesNote() {
+    const may = this._pagesMayMove();
+    if (may.in && may.out) return '';
+    let key = 'SyncIsOff';
+    if (getSetting('syncJournals')) {
+      if (getSetting('autoSync') === false) key = 'LiveIsOff';
+      else if (may.in) key = 'OnlyFromChronicle';
+      else if (may.out) key = 'OnlyFromFoundry';
+    }
+    return game.i18n.localize(`CHRONICLE.Dashboard.Pages.${key}`);
   }
 
   /** "3 selected", for select mode's bar. @private */
@@ -1942,8 +1971,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    * tried once per window, so a fix that keeps failing is shown on its row,
    * never repeated in a loop; a pass takes a bounded number and the draw
    * that ends it starts the next. Nothing runs while Chronicle is away,
-   * page sync is off, or the first-run setup has not finished choosing
-   * what to import.
+   * page sync or "Sync changes as they happen" is off, or the first-run
+   * setup has not finished choosing what to import; a one-way direction
+   * for pages stops the other way.
    * @private
    */
   _fixPagesByItself() {
@@ -1959,12 +1989,13 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     if (this._catchUpRunning) return;
     if (!this._cache.entities || !getSetting('syncJournals') || !this._journalSync()) return;
     if (getSetting('firstRunPending')) return;
-    const rows = [...this._pageRows.values()];
+    const may = this._pagesMayMove();
+    const rows = may.in ? [...this._pageRows.values()] : [];
     const stale = catchUpPlan({ rows, tried: this._catchUpTried });
     const fresh = bringInPlan({ rows, tried: this._catchUpTried, limit: CATCH_UP_LIMIT - stale.length });
     // A list cut short cannot rule out a page of the same name further on,
     // so nothing is sent from it unasked.
-    const journals = this._cache.entitiesTruncated ? [] : sendPlan({
+    const journals = !may.out || this._cache.entitiesTruncated ? [] : sendPlan({
       journals: [...this._journalRows.values()],
       tried: this._sendTried,
       limit: CATCH_UP_LIMIT - stale.length - fresh.length,

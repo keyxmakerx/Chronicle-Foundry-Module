@@ -155,6 +155,43 @@ test('nothing is brought in or sent before the first-run setup is done, and a li
   assert.deepEqual(cut.journalSync.sent, []);
 });
 
+test('a one-way direction stops the other way, and "Sync changes as they happen" off stops both', async () => {
+  const world = () => makeDash({ rows: [lone('p'), changed('a')], journals: [{ id: 'j1', state: 'foundry-only' }] });
+  const pull = world();
+  pull.dash._syncManager.canPull = () => true;
+  pull.dash._syncManager.canPush = () => false;
+  pull.dash._fixPagesByItself();
+  await settle();
+  assert.deepEqual(pull.api.gets, ['/entities/a', '/entities/p']);
+  assert.deepEqual(pull.journalSync.sent, []);
+
+  const push = world();
+  push.dash._syncManager.canPull = () => false;
+  push.dash._syncManager.canPush = () => true;
+  push.dash._fixPagesByItself();
+  await settle();
+  assert.deepEqual(push.api.gets, []);
+  assert.deepEqual(push.journalSync.sent, ['j1']);
+
+  settings.autoSync = false;
+  const held = world();
+  held.dash._fixPagesByItself();
+  await settle();
+  delete settings.autoSync;
+  assert.deepEqual(held.api.gets, []);
+  assert.deepEqual(held.journalSync.sent, []);
+  // The line above the list says which it is.
+  assert.equal(held.dash._pagesNote(), '');
+  settings.autoSync = false;
+  assert.equal(held.dash._pagesNote(), 'CHRONICLE.Dashboard.Pages.LiveIsOff');
+  delete settings.autoSync;
+  assert.equal(pull.dash._pagesNote(), 'CHRONICLE.Dashboard.Pages.OnlyFromChronicle');
+  assert.equal(push.dash._pagesNote(), 'CHRONICLE.Dashboard.Pages.OnlyFromFoundry');
+  settings.syncJournals = false;
+  assert.equal(held.dash._pagesNote(), 'CHRONICLE.Dashboard.Pages.SyncIsOff');
+  settings.syncJournals = true;
+});
+
 test('a send that fails is kept for its row, and one that half worked is its page\'s to show', async () => {
   const { dash, journalSync, docs } = makeDash({ journals: ['bad-send', 'no-types', 'half-sent', 'fine'].map((id) => ({ id, state: 'foundry-only' })) });
   dash._fixPagesByItself();
