@@ -717,6 +717,15 @@ export class ChronicleAPI {
     return this._retryQueue.length;
   }
 
+  /**
+   * The waiting writes, safe to show: method, path and attempt counts only.
+   * The body is left out because it can hold page text.
+   * @returns {{method: string, path: string, retries: number, maxRetries: number}[]}
+   */
+  getRetryQueue() {
+    return this._retryQueue.map(({ method, path, retries, maxRetries }) => ({ method, path, retries, maxRetries }));
+  }
+
   // --- Health & error log ---
 
   /**

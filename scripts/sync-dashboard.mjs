@@ -30,6 +30,7 @@ import {
 import { buildDiagnosticBundle } from './sync-diagnostic-bundle.mjs';
 import { checkDiceFiles, diceSoNiceReport } from './dice-so-nice.mjs';
 import { buildOverviewModel } from './_overview-model.mjs';
+import { buildHealthChecks, describeWaiting } from './_health-checks.mjs';
 import { log, getLogBuffer } from './logger.mjs';
 import { walkEntityPages } from './_entity-page-walk.mjs';
 import { mapThumbSrc } from './_map-look.mjs';
@@ -117,6 +118,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'debug-report-row': SyncDashboard.#onDebugReportRowAction,
       'debug-report-send': SyncDashboard.#onDebugReportSendAction,
       'debug-report-cancel': SyncDashboard.#onDebugReportCancelAction,
+      'health-row': SyncDashboard.#onHealthRowAction,
+      'health-send-waiting': SyncDashboard.#onHealthSendWaitingAction,
     },
   };
 
@@ -158,6 +161,13 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
      * resets when the dashboard window is closed.
      */
     this._capabilityActorId = null;
+
+    /** Health pane: whether the troubleshooting drawer is open. Kept here so a re-render does not close it. */
+    this._healthDrawerOpen = false;
+    /** Health pane: whether the list of waiting changes is shown. */
+    this._healthWaitingOpen = false;
+    /** Health pane: true while "Send them now" is running. */
+    this._healthSending = false;
 
     // The saved tab may be a name an older version used; it opens where that
     // content lives now. Defaults to the Overview, a calm summary.
@@ -327,6 +337,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       loadErrors.push({ tab: 'problems', message: err.message || 'Failed to build sync capability' });
     }
 
+    const dice = this._buildDiceData();
+
     // Build characters tab data.
     const characterData = this._buildCharacterData();
 
@@ -415,7 +427,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       capability: capabilityData,
 
       // Diagnostics, Health pane: Dice So Nice as this client sees it.
-      dice: this._buildDiceData(),
+      dice,
+
+      // Diagnostics, Health pane: the plain checklist and its drawer.
+      health: this._buildHealthData(statusData, capabilityData, dice),
 
       // Diagnostics, Player reports pane.
       debug: debugData,
@@ -1329,6 +1344,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // Map tab handlers are wired via the `open-map-journal` action above;
     // no additional select listeners are needed.
+
+    // Health drawer: `toggle` does not bubble and is not a click, so it is
+    // read here and kept on the instance for the next render.
+    const healthDrawer = el.querySelector('[data-health-drawer]');
+    healthDrawer?.addEventListener('toggle', () => { this._healthDrawerOpen = healthDrawer.open; });
   }
 
   /**
@@ -1552,6 +1572,89 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   static #onReconnectAction() {
     this.api?.connect();
     setTimeout(() => this.render({ force: true }), 1000);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Health pane checklist
+  // ---------------------------------------------------------------------------
+
+  /** Clock time as the GM reads it, or '' for a missing or invalid time. @private */
+  _healthClock(ms) {
+    if (!ms) return '';
+    const d = new Date(ms);
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  /**
+   * The checklist rows, the waiting changes and the drawer state, from values
+   * the pane already computes. Reads only what is in memory.
+   * @private
+   */
+  _buildHealthData(statusData, capabilityData, dice) {
+    const t = (k, d) => (d ? game.i18n.format(k, d) : game.i18n.localize(k));
+    const health = this.api?.health ?? {};
+    const errorLog = statusData.errorLog ?? [];
+    const newest = errorLog[0];
+    const waitingItems = this.api?.getRetryQueue?.() ?? [];
+    const waiting = waitingItems.map((item) => describeWaiting(item, t));
+    const rows = buildHealthChecks({
+      connectionState: statusData.connectionState,
+      since: this._healthClock(health.connectedSince),
+      reconnects: health.reconnectAttempts ?? null,
+      lastAnswer: this._healthClock(health.lastRestSuccess),
+      waiting: waitingItems.length,
+      errorCount: errorLog.length,
+      newestError: newest ? { time: this._healthClock(newest.time), message: newest.message } : null,
+      dice,
+      systemMatched: statusData.systemMatched,
+      matchedSystem: statusData.matchedSystem,
+      foundrySystem: statusData.foundrySystem,
+      syncCharacters: statusData.syncCharacters,
+      capability: capabilityData,
+      t,
+    }).map((row) => (row.id === 'waiting' && this._healthWaitingOpen
+      ? { ...row, expanded: true, waiting, sending: this._healthSending }
+      : row));
+    return { rows, drawerOpen: this._healthDrawerOpen };
+  }
+
+  /** A checklist row's quiet word. The kind says what it does; most reuse an existing action. */
+  static async #onHealthRowAction(event, target) {
+    switch (target?.dataset?.kind) {
+      case 'reconnect':
+        return SyncDashboard.#onReconnectAction.call(this);
+      case 'open-settings':
+        return SyncDashboard.#onOpenSettingsAction.call(this, event, { dataset: { settingsTab: 'sync' } });
+      case 'check-dice':
+        return SyncDashboard.#onCheckDiceFilesAction.call(this);
+      case 'toggle-waiting':
+        this._healthWaitingOpen = !this._healthWaitingOpen;
+        return this.render({ force: true });
+      case 'open-drawer':
+        this._healthDrawerOpen = true;
+        await this.render({ force: true });
+        return this.element?.querySelector('[data-health-drawer]')?.scrollIntoView?.({ block: 'nearest' });
+      default:
+        return undefined;
+    }
+  }
+
+  /**
+   * Send the waiting changes again now. The queue retries each once per
+   * pass, drops the ones that fail for good (the error log says which), and
+   * keeps the rest for the next pass.
+   */
+  static async #onHealthSendWaitingAction() {
+    if (this._healthSending) return;
+    this._healthSending = true;
+    this.render({ force: true });
+    try {
+      await this.api?.processRetryQueue();
+    } catch (err) {
+      log.warn('Dashboard: sending the waiting changes failed', err);
+    }
+    this._healthSending = false;
+    this.render({ force: true });
   }
 
   // ---------------------------------------------------------------------------
