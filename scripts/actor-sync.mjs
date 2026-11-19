@@ -30,6 +30,7 @@ import { planActorApply } from './_actor-apply-plan.mjs';
 import { planIdentityItems, identityFieldTypes, identityPicks } from './_identity-item-plan.mjs';
 import { applyIdentityPlan, applyEntryRefresh } from './_identity-item-apply.mjs';
 import { planEntryRefresh } from './_campaign-entry-item.mjs';
+import { sendsChangeHere, memberOf, ownsCharacter } from './_change-author.mjs';
 
 /** How long a read of the campaign's pick-list entries is reused. */
 const ENTRY_CACHE_MS = 30_000;
@@ -75,6 +76,12 @@ export class ActorSync {
     // merged so the push knows every field it touched.
     /** @type {Map<string, object>} Merged update diffs awaiting a push. */
     this._pendingChanges = new Map();
+    /** @type {Map<string, string>} Who made the last change of a pending burst, by actor id. */
+    this._pendingAuthors = new Map();
+    /** @type {Map<string, Set<string>>} Players with a change in a pending burst, by actor id. */
+    this._pendingPlayers = new Map();
+    /** @type {Set<string>} Actors the GM was already told hold a player's unsent change. */
+    this._warnedPlayerChange = new Set();
     /** @type {Map<string, object>} Diffs whose push is in flight, by actor id. */
     this._pushingChanges = new Map();
     this._actorPushDebouncer = new JournalPushDebouncer(
@@ -690,12 +697,19 @@ export class ActorSync {
    */
   async _handleCreateActor(actor, options, userId) {
     if (options?.[APPLY_OPTION]) return;
+
+    // A copy (Duplicate, an import of an export) carries the original's link,
+    // and its items the original's relations. Two actors on one character
+    // would overwrite each other's pushes, so the copy starts unlinked.
+    const linkedTo = actor.getFlag(FLAG_SCOPE, 'entityId');
+    if (linkedTo) {
+      if (!sendsChangeHere(userId)) return;
+      if (!game.actors.find((a) => a.id !== actor.id && a.getFlag(FLAG_SCOPE, 'entityId') === linkedTo)) return;
+      await this._unlinkCopy(actor);
+    }
     if (userId !== game.user.id) return;
     if (actor.type !== this._actorType) return;
     if (!this._adapter || !this._characterTypeId) return;
-
-    // Skip if already linked (came from Chronicle).
-    if (actor.getFlag(FLAG_SCOPE, 'entityId')) return;
 
     // Mark this Foundry-originated create as in-flight so the WS-driven
     // _onCharacterCreated can skip the matching `entity.created` broadcast
@@ -764,6 +778,24 @@ export class ActorSync {
   }
 
   /**
+   * Remove a copied actor's link to the original's character, and its
+   * items' links to the original's inventory.
+   * @param {Actor} actor
+   * @private
+   */
+  async _unlinkCopy(actor) {
+    await actor.update(
+      flagRemoval(FLAG_SCOPE, 'entityId', 'lastSync', 'chronicleUpdatedAt', 'chronicleOwnerUserId', IDENTITY_APPLIED_FLAG),
+      applyOptions(),
+    );
+    const items = (actor.items?.contents ?? [])
+      .filter((i) => i.getFlag(FLAG_SCOPE, 'relationId') || i.getFlag(FLAG_SCOPE, 'unlinkedRelationId'));
+    for (const item of items) {
+      await item.update(flagRemoval(FLAG_SCOPE, 'relationId', 'unlinkedRelationId'), applyOptions());
+    }
+  }
+
+  /**
    * Handle Foundry updateActor hook.
    * Pushes field changes to the linked Chronicle entity.
    * @param {Actor} actor
@@ -774,7 +806,7 @@ export class ActorSync {
    */
   async _handleUpdateActor(actor, change, options, userId) {
     if (options?.[APPLY_OPTION]) return;
-    if (userId !== game.user.id) return;
+    if (!sendsChangeHere(userId)) return;
     if (actor.type !== this._actorType) return;
     if (!this._adapter) return;
 
@@ -808,6 +840,10 @@ export class ActorSync {
     // just the mapped fields that changed.
     if (!change.system && !change.name) return;
     this._pendingChanges.set(actor.id, mergeChanges(this._pendingChanges.get(actor.id), change));
+    this._pendingAuthors.set(actor.id, userId);
+    if (userId !== game.user.id) {
+      this._pendingPlayers.set(actor.id, (this._pendingPlayers.get(actor.id) ?? new Set()).add(userId));
+    }
     this._actorPushDebouncer.schedule(actor.id, actor, entityId);
   }
 
@@ -829,11 +865,16 @@ export class ActorSync {
   async _pushActorUpdate(actor, entityId) {
     const change = this._pendingChanges.get(actor.id) || {};
     this._pendingChanges.delete(actor.id);
+    const author = this._pendingAuthors.get(actor.id) ?? game.user.id;
+    this._pendingAuthors.delete(actor.id);
+    const players = this._pendingPlayers.get(actor.id);
+    this._pendingPlayers.delete(actor.id);
     // Until the push lands and the version is re-read, a Chronicle copy
     // arriving meanwhile still predates this edit (see _updateActorFromEntity).
     this._pushingChanges.set(actor.id, mergeChanges(this._pushingChanges.get(actor.id), change));
 
     try {
+      if (players?.size && !(await this._playersOwn(actor, entityId, players))) return;
       if (change.name !== undefined) {
         const kept = await this._pushActorName(actor, entityId);
         if (!kept) return;
@@ -853,14 +894,35 @@ export class ActorSync {
       await this._setActorFlag(actor, 'lastSync', new Date().toISOString());
 
       console.debug(`Chronicle: Pushed actor "${actor.name}" changes to Chronicle`);
-      // The debounce has no hook userId; the hooks only schedule this for the local user's own edits.
-      this._syncManager?.recordUserOutcome?.(game.user.id);
+      this._syncManager?.recordUserOutcome?.(author);
     } catch (err) {
       console.error('Chronicle: Failed to push actor update to Chronicle', err);
-      this._syncManager?.recordUserOutcome?.(game.user.id, err);
+      this._syncManager?.recordUserOutcome?.(author, err);
     } finally {
       this._pushingChanges.delete(actor.id);
     }
+  }
+
+  /**
+   * Whether Chronicle says the character belongs to every player whose
+   * change is waiting. A player can rewrite their actor's link, so the link
+   * alone never sends a player's change under the GM's key. When it does not,
+   * the change stays in Foundry and the GM is told once per actor.
+   * @param {Actor} actor
+   * @param {string} entityId
+   * @param {Set<string>} players - Foundry user ids.
+   * @returns {Promise<boolean>}
+   * @private
+   */
+  async _playersOwn(actor, entityId, players) {
+    const entity = await this._api.get(`/entities/${entityId}`);
+    const mappings = getUserMappings();
+    const owned = [...players].every((id) => ownsCharacter(entity, memberOf(mappings, id)));
+    if (!owned && !this._warnedPlayerChange.has(actor.id)) {
+      this._warnedPlayerChange.add(actor.id);
+      ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.PlayerChangeNotSent', { actor: noticeText(actor.name) }));
+    }
+    return owned;
   }
 
   /**
@@ -967,11 +1029,14 @@ export class ActorSync {
    */
   async _handleDeleteActor(actor, options, userId) {
     if (options?.[APPLY_OPTION]) return;
-    if (userId !== game.user.id) return;
-
     // A push still pending would aim at an actor that is gone.
     this._actorPushDebouncer.cancel(actor.id);
     this._pendingChanges.delete(actor.id);
+    this._pendingAuthors.delete(actor.id);
+    this._pendingPlayers.delete(actor.id);
+    // Only the GM's own delete asks about Chronicle's page: the link on a
+    // player's actor is theirs to rewrite, and the prompt would name it.
+    if (userId !== game.user.id) return;
 
     const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;

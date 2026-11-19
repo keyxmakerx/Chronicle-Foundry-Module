@@ -17,12 +17,13 @@
  */
 
 import { flagRemoval } from './_flag-removal.mjs';
-import { getSetting } from './settings.mjs';
+import { getSetting, getUserMappings } from './settings.mjs';
 import { FLAG_SCOPE, APPLY_OPTION } from './constants.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { collapseChanges } from './_change-feed.mjs';
 import { HAS_ITEM, planInventory, itemDataFor } from './_inventory-plan.mjs';
 import { itemsToRemove } from './_stash-reconcile.mjs';
+import { sendsChangeHere, memberOf, ownsCharacter } from './_change-author.mjs';
 
 /** The actor linked to a Chronicle character, or null. */
 function linkedActor(entityId) {
@@ -276,7 +277,7 @@ export class ItemSync {
    */
   async _handleCreateItem(item, options, userId) {
     if (options?.[APPLY_OPTION]) return;
-    if (userId !== game.user.id) return;
+    if (!sendsChangeHere(userId)) return;
     if (!item.parent || !(item.parent instanceof Actor)) return;
 
     // Items this module creates carry APPLY_OPTION, so a new item that already
@@ -286,6 +287,10 @@ export class ItemSync {
     if (item.getFlag(FLAG_SCOPE, 'relationId') || item.getFlag(FLAG_SCOPE, 'unlinkedRelationId')) {
       await item.update(flagRemoval(FLAG_SCOPE, 'relationId', 'unlinkedRelationId'), { [APPLY_OPTION]: true });
     }
+
+    // A player's new item stays in Foundry: the page it would point at is
+    // named by a flag on the item, which is theirs to write.
+    if (userId !== game.user.id) return;
 
     const actor = item.parent;
     const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
@@ -344,7 +349,7 @@ export class ItemSync {
    */
   async _handleDeleteItem(item, options, userId) {
     if (options?.[APPLY_OPTION]) return;
-    if (userId !== game.user.id) return;
+    if (!sendsChangeHere(userId)) return;
 
     const relationId = item.getFlag(FLAG_SCOPE, 'relationId');
     if (!relationId) return;
@@ -352,6 +357,8 @@ export class ItemSync {
     const actor = item.parent;
     const entityId = actor?.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
+
+    if (userId !== game.user.id && !(await this._playerHolds(entityId, relationId, userId).catch(() => false))) return;
 
     // The GM is asked before the Chronicle relation goes too (_remote-deletes.mjs).
     // Chronicle serves a flat relation route: DELETE /relations/:relationId.
@@ -382,7 +389,7 @@ export class ItemSync {
    */
   async _handleUpdateItem(item, change, options, userId) {
     if (options?.[APPLY_OPTION]) return;
-    if (userId !== game.user.id) return;
+    if (!sendsChangeHere(userId)) return;
     // Only the two values sent below matter; a rest or a use that changes
     // charges on many items must not send one write per item.
     if (!change.system || !('quantity' in change.system || 'equipped' in change.system)) return;
@@ -395,6 +402,7 @@ export class ItemSync {
     if (!entityId) return;
 
     try {
+      if (userId !== game.user.id && !(await this._playerHolds(entityId, relationId, userId))) return;
       const meta = {
         quantity: item.system?.quantity ?? 1,
         equipped: item.system?.equipped ?? false,
@@ -416,6 +424,24 @@ export class ItemSync {
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
+
+  /**
+   * Whether Chronicle says the character belongs to the player and holds
+   * this relation. Both ids come from flags a player can rewrite, so neither
+   * is trusted for a player's change sent under the GM's key.
+   * @param {string} entityId
+   * @param {string} relationId
+   * @param {string} userId - Foundry user id.
+   * @returns {Promise<boolean>}
+   * @private
+   */
+  async _playerHolds(entityId, relationId, userId) {
+    const entity = await this._api.get(`/entities/${entityId}`);
+    if (!ownsCharacter(entity, memberOf(getUserMappings(), userId))) return false;
+    const relations = await this._api.get(`/entities/${entityId}/relations`);
+    const list = Array.isArray(relations) ? relations : (relations?.data || []);
+    return list.some((r) => String(r?.id) === String(relationId));
+  }
 
   /**
    * Load item field definitions from the Chronicle API.

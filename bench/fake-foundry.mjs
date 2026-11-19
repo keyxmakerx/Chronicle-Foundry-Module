@@ -206,7 +206,7 @@ class BenchDocument {
     this._refresh();
     this._world.log.writes.push({ op: 'update', type: this.documentName, id: this.id, change, options });
     change._id = this.id;
-    this._world.Hooks.callAll(`update${this.documentName}`, this, change, options, this._world.game.user.id);
+    this._world.Hooks.callAll(`update${this.documentName}`, this, change, options, this._world.authorId());
     return this;
   }
 
@@ -217,7 +217,7 @@ class BenchDocument {
     if (!coll.get(this.id)) return undefined;
     coll.delete(this.id);
     this._world.log.writes.push({ op: 'delete', type: this.documentName, id: this.id, options });
-    this._world.Hooks.callAll(`delete${this.documentName}`, this, options, this._world.game.user.id);
+    this._world.Hooks.callAll(`delete${this.documentName}`, this, options, this._world.authorId());
     return this;
   }
 }
@@ -239,7 +239,7 @@ class BenchPage extends BenchDocument {
     this._refresh();
     this._world.log.writes.push({ op: 'update', type: 'JournalEntryPage', id: this.id, parent: this.parent.id, change, options });
     change._id = this.id;
-    this._world.Hooks.callAll('updateJournalEntryPage', this, change, options, this._world.game.user.id);
+    this._world.Hooks.callAll('updateJournalEntryPage', this, change, options, this._world.authorId());
     return this;
   }
 
@@ -274,7 +274,7 @@ class BenchJournal extends BenchDocument {
       this.pages.set(page.id, page);
       made.push(page);
       this._world.log.writes.push({ op: 'create', type: 'JournalEntryPage', id: page.id, parent: this.id, options });
-      this._world.Hooks.callAll('createJournalEntryPage', page, options, this._world.game.user.id);
+      this._world.Hooks.callAll('createJournalEntryPage', page, options, this._world.authorId());
     }
     return made;
   }
@@ -300,7 +300,7 @@ class BenchJournal extends BenchDocument {
       this.pages.delete(id);
       out.push(page);
       this._world.log.writes.push({ op: 'delete', type: 'JournalEntryPage', id, parent: this.id, options });
-      this._world.Hooks.callAll('deleteJournalEntryPage', page, options, this._world.game.user.id);
+      this._world.Hooks.callAll('deleteJournalEntryPage', page, options, this._world.authorId());
     }
     return out;
   }
@@ -323,7 +323,7 @@ class BenchItem extends BenchDocument {
     this._refresh();
     this._world.log.writes.push({ op: 'update', type: 'Item', id: this.id, parent: this.parent.id, change, options });
     change._id = this.id;
-    this._world.Hooks.callAll('updateItem', this, change, options, this._world.game.user.id);
+    this._world.Hooks.callAll('updateItem', this, change, options, this._world.authorId());
     return this;
   }
 
@@ -358,7 +358,7 @@ class BenchActor extends BenchDocument {
       this.items.set(item.id, item);
       made.push(item);
       this._world.log.writes.push({ op: 'create', type: 'Item', id: item.id, parent: this.id, options });
-      this._world.Hooks.callAll('createItem', item, options, this._world.game.user.id);
+      this._world.Hooks.callAll('createItem', item, options, this._world.authorId());
     }
     return made;
   }
@@ -384,7 +384,7 @@ class BenchActor extends BenchDocument {
       this.items.delete(id);
       out.push(item);
       this._world.log.writes.push({ op: 'delete', type: 'Item', id, parent: this.id, options });
-      this._world.Hooks.callAll('deleteItem', item, options, this._world.game.user.id);
+      this._world.Hooks.callAll('deleteItem', item, options, this._world.authorId());
     }
     return out;
   }
@@ -466,6 +466,15 @@ export function installFoundry({ settings = {}, systemId = 'dnd5e' } = {}) {
     },
   };
   world.game = game;
+  // Hooks name the user who made a change; `asPlayer` makes that a player,
+  // as when a change made in a player's browser reaches the GM's client.
+  let author = null;
+  world.authorId = () => author ?? game.user.id;
+  world.asPlayer = async (fn, id = 'benchPlayer00001') => {
+    if (!users.get(id)) users.set(id, { id, name: 'Bench Player', isGM: false, role: 1, flags: {} });
+    author = id;
+    try { return await fn(); } finally { author = null; }
+  };
   world.settingsValues = values;
 
   // The world's user-data files, in memory: path → { size, type }.

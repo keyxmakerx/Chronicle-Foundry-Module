@@ -36,6 +36,23 @@ function _validateCampaignIdOrThrow(campaignId) {
   return campaignId;
 }
 
+/** How long a request may take before it is given up; uploads and pictures get longer. */
+export const REQUEST_TIMEOUT_MS = 30_000;
+export const TRANSFER_TIMEOUT_MS = 120_000;
+
+/**
+ * Fetch options that give a stalled request up after `ms`, so one hung call
+ * (a proxy holding the connection open) cannot stop everything queued behind
+ * it. A caller's own signal is kept.
+ * @param {object} options
+ * @param {number} ms
+ * @returns {object}
+ */
+function withTimeout(options, ms) {
+  if (options?.signal || typeof AbortSignal?.timeout !== 'function') return options;
+  return { ...options, signal: AbortSignal.timeout(ms) };
+}
+
 /**
  * Allowed WebSocket message type prefixes.
  * Messages with types not matching any prefix are silently ignored to prevent
@@ -259,12 +276,12 @@ export class ChronicleAPI {
       await this.rateLimit.wait();
       try {
         try {
-          response = await fetch(url, { ...options, headers });
+          response = await fetch(url, withTimeout({ ...options, headers }, REQUEST_TIMEOUT_MS));
         } catch (err) {
           if (!shouldRetryWithoutVersionHeader(err, headers)) throw err;
           markModuleVersionHeaderRefused();
           const { [MODULE_VERSION_HEADER]: _dropped, ...withoutVersion } = headers;
-          response = await fetch(url, { ...options, headers: withoutVersion });
+          response = await fetch(url, withTimeout({ ...options, headers: withoutVersion }, REQUEST_TIMEOUT_MS));
         }
       } catch (err) {
         // Network error (no response at all).
@@ -444,12 +461,12 @@ export class ChronicleAPI {
     await this.rateLimit.wait();
     try {
       try {
-        response = await fetch(url, { method: 'GET', headers });
+        response = await fetch(url, withTimeout({ method: 'GET', headers }, TRANSFER_TIMEOUT_MS));
       } catch (err) {
         if (!shouldRetryWithoutVersionHeader(err, headers)) throw err;
         markModuleVersionHeaderRefused();
         const { [MODULE_VERSION_HEADER]: _dropped, ...withoutVersion } = headers;
-        response = await fetch(url, { method: 'GET', headers: withoutVersion });
+        response = await fetch(url, withTimeout({ method: 'GET', headers: withoutVersion }, TRANSFER_TIMEOUT_MS));
       }
     } catch (err) {
       this.health.restErrorCount++;
@@ -492,12 +509,12 @@ export class ChronicleAPI {
     let response;
     await this.rateLimit.wait();
     try {
-      response = await fetch(url, { method: 'POST', headers, body: formData });
+      response = await fetch(url, withTimeout({ method: 'POST', headers, body: formData }, TRANSFER_TIMEOUT_MS));
     } catch (err) {
       if (!shouldRetryWithoutVersionHeader(err, headers)) throw err;
       markModuleVersionHeaderRefused();
       const { [MODULE_VERSION_HEADER]: _dropped, ...withoutVersion } = headers;
-      response = await fetch(url, { method: 'POST', headers: withoutVersion, body: formData });
+      response = await fetch(url, withTimeout({ method: 'POST', headers: withoutVersion, body: formData }, TRANSFER_TIMEOUT_MS));
     }
 
     if (!response.ok) {

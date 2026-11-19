@@ -106,6 +106,36 @@ test('a Foundry HP edit reaches Chronicle once and is not re-applied on reopen',
   assert.equal(actor.system.hp, 12);
 }, { settings: ON }));
 
+test('a player\'s HP edit on the character they claimed reaches Chronicle and survives the next Chronicle change; on a character they have not claimed it is not sent', () => scenario('fvtt-player-edit', async ({ seed, world }) => {
+  await seed.enableClaiming();
+  await openWorld(world, MODULES);
+  const members = await seed.chronicle.get('/members');
+  const member = (Array.isArray(members) ? members : members.data).find((m) => m.display_name === seed.displayName);
+  const memberId = String(member.user_id ?? member.id);
+  await world.game.settings.set('chronicle-sync', 'userMappings', JSON.stringify({ [memberId]: 'benchPlayer00001' }));
+
+  const mine = await chronicleCharacter(seed, 'Sela', 20);
+  const other = await chronicleCharacter(seed, 'Not Sela', 20);
+  await waitFor(() => actorFor(world, mine.id) && actorFor(world, other.id), 10000, 'actors created');
+  await seed.assignOwner(mine.id, memberId);
+  await settle();
+
+  const actor = actorFor(world, mine.id);
+  await world.asPlayer(() => actor.update({ 'system.hp': 7 }));
+  await settle();
+  assert.equal((await seed.chronicle.get(`/entities/${mine.id}`)).fields_data?.hp, 7, 'the player\'s edit is in Chronicle');
+  await seed.chronicle.put(`/entities/${mine.id}/fields`, { fields_data: { ancestry: 'Elf' } });
+  await settle();
+  assert.equal(actor.system.hp, 7, 'the edit survives the next Chronicle change');
+
+  const reqs = await recordRequests(async () => {
+    await world.asPlayer(() => actorFor(world, other.id).update({ 'system.hp': 3 }));
+    await settle();
+  });
+  assert.deepEqual(writes(reqs).map((r) => `${r.method} ${r.url}`), [], 'nothing is written for a character the player has not claimed');
+  assert.equal((await seed.chronicle.get(`/entities/${other.id}`)).fields_data?.hp, 20);
+}, { settings: ON }));
+
 test('a Chronicle ancestry pick swaps the actor\'s ancestry item from a compendium, and a custom kit becomes a plain item, with nothing pushed back', () => scenario('chr-identity-items', async ({ seed, world }) => {
   const modules = { modules: ['journals', 'actors', 'items'] };
   // An installed system compendium holding Dwarf; "Homebrew Kit" is nowhere.

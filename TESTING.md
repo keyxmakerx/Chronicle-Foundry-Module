@@ -63,6 +63,10 @@ root. There is no `package.json`.
 - [ ] Edit JournalEntry page content -> Entity entry updates
 - [ ] Delete JournalEntry -> asked "Delete in Chronicle too?": No keeps the entity, Yes deletes it
 - [ ] Delete several linked JournalEntries at once -> asked once, with all of them listed
+- [ ] Clear all the text of a linked JournalEntry -> the Chronicle page's text is empty too
+- [ ] Right-click a linked JournalEntry -> Duplicate -> a second page appears in Chronicle; editing the copy changes only that second page
+- [ ] As a player matched to a Chronicle member who may edit the page there, edit the linked journal's text -> with a GM in the game, the Chronicle page updates
+- [ ] The same edit by a player Chronicle does not let edit the page, or on a page with GM-only text -> nothing changes in Chronicle and the GM gets one notice saying why
 
 ### Multi-Page Sync
 - [ ] Entity with h1/h2 headings creates multiple Foundry journal pages
@@ -341,7 +345,10 @@ that reads each field's `foundry_path` from the matched Chronicle system's manif
 - [ ] Actor sync disabled when no system adapter available
 - [ ] Sync guard prevents infinite loops (change in A doesn't re-trigger back to A)
 - [ ] Only character-type actors processed (NPCs, vehicles ignored)
-- [ ] Only current user's changes pushed (other users' changes ignored)
+- [ ] As a player on the character you claimed in Chronicle, change HP and an item's quantity -> with a GM in the game, Chronicle shows both; a later change in Chronicle does not undo them
+- [ ] As a player on a character nobody claimed in Chronicle, change HP -> nothing changes in Chronicle and the GM gets one notice saying the character isn't claimed
+- [ ] With two GMs in the game, a player's change is sent once (one History row), not twice
+- [ ] Duplicate a linked character Actor -> the copy is not linked; editing it changes nothing in Chronicle
 - [ ] Pre-existing actors can be manually pushed via dashboard Push button
 
 ## Creature Sync (Draw Steel creature pages → NPC actors)
@@ -539,6 +546,8 @@ Needs a GM client and a player client, on each of Foundry v12, v13 and v14.
 
 - [ ] Invalid API key shows clear error message
 - [ ] Network timeout during sync doesn't corrupt state
+- [ ] A Chronicle that stops answering mid-request: the request gives up after 30 seconds and later changes still sync
+- [ ] If the first sync after connecting fails, it is tried again by itself within 30 seconds, with no reload
 - [ ] Partial sync failure (one entity fails) doesn't block others
 - [ ] A Chronicle restart reconnects without a reload
 - [ ] A failed Foundry→Chronicle push (Chronicle down) shows a `ui.notifications.warn` to the GM and an error-log row; journal updates are queued and re-pushed on reconnect

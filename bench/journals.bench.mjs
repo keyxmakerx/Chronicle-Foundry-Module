@@ -36,6 +36,37 @@ test('a page made in Chronicle while Foundry is open becomes one journal, with n
   assert.deepEqual(writes(reqs).filter((r) => r.url.startsWith('/entities')).map((r) => `${r.method} ${r.url}`), [], 'module wrote nothing back to Chronicle');
 }));
 
+test('a duplicated journal becomes its own page, and each journal then edits only its own', () => scenario('fvtt-duplicate', async ({ seed, world }) => {
+  await openWorld(world);
+  const j = await JournalEntry.create({ name: 'Twin', pages: [{ name: 'Twin', type: 'text', text: { content: '<p>first</p>' } }] });
+  await settle();
+  const firstId = j.getFlag(FLAG, 'entityId');
+  const data = j.toObject();
+  delete data._id;
+  for (const p of data.pages) delete p._id;
+  const copy = await JournalEntry.create({ ...data, name: 'Twin (Copy)' });
+  await settle();
+  const copyId = copy.getFlag(FLAG, 'entityId');
+  assert.ok(copyId && copyId !== firstId, 'the copy has a page of its own');
+  await copy.pages.contents[0].update({ 'text.content': '<p>second</p>' });
+  await settle();
+  assert.match((await seed.chronicle.get(`/entities/${firstId}`)).entry_html || '', /first/);
+  assert.match((await seed.chronicle.get(`/entities/${copyId}`)).entry_html || '', /second/);
+}));
+
+test('clearing a page\'s text in Foundry clears it in Chronicle, and it stays cleared', () => scenario('fvtt-clear-text', async ({ seed, world }) => {
+  const e = await chroniclePage(seed, 'Wiped', '<p>To be removed.</p>');
+  await openWorld(world);
+  await JournalSync_resync(world);
+  const j = byEntity(world, e.id);
+  await j.pages.contents.find((p) => p.type === 'text').update({ 'text.content': '' });
+  await settle();
+  assert.equal((await seed.chronicle.get(`/entities/${e.id}`)).entry_html || '', '', 'Chronicle\'s text is gone');
+  await closeWorld(world);
+  await openWorld(world);
+  assert.equal(pageText(byEntity(world, e.id)), '', 'the old text did not come back');
+}));
+
 test('renaming a journal in Foundry renames the page once, with no echo loop', () => scenario('fvtt-rename', async ({ seed, world }) => {
   await openWorld(world);
   const j = await JournalEntry.create({ name: 'Old Name', pages: [{ name: 'Old Name', type: 'text', text: { content: '<p>x</p>' } }] });

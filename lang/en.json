@@ -52,7 +52,9 @@
     },
     "Secrets": {
       "Placeholder": "GM-only text, kept in Chronicle",
-      "NotSent": "Chronicle: your edit of \"{name}\" wasn't sent, because its GM-only text changed in Chronicle. Pull it from the sync dashboard, then edit again."
+      "NotSent": "Chronicle: your edit of \"{name}\" wasn't sent, because its GM-only text changed in Chronicle. Pull it from the sync dashboard, then edit again.",
+      "PlayerEditNotSent": "Chronicle: a player's edit of \"{name}\" wasn't sent, because the page has GM-only text. It stays in Foundry until Chronicle next changes the page. To keep it, make the same edit yourself.",
+      "PlayerEditNotAllowed": "Chronicle: a player's edit of \"{name}\" wasn't sent, because Chronicle doesn't let that player edit the page. Match the player to their Chronicle member and give them editing there, or make the edit yourself."
     },
     "ShopRoom": {
       "OpenShop": "Open Chronicle Shop",
@@ -242,6 +244,7 @@
       "Folder": "Chronicle: Creatures"
     },
     "ActorSync": {
+      "PlayerChangeNotSent": "Chronicle: a player's change to \"{actor}\" wasn't sent, because the character isn't claimed in Chronicle by the member that player is matched to. Have them claim it there, or make the change yourself.",
       "PreviousOwnerKept": "Chronicle: {player} is no longer the owner of {actor} in Chronicle, but still owns the actor in Foundry. Change this in the actor's Ownership settings if you want.",
       "ClaimantUnmapped": "Chronicle: a player owns {actor} in Chronicle but has no Foundry user mapped, so Foundry ownership was not changed. Link them in Chronicle Sync, under Settings, Players.",
       "IdentityItemFailed": "Chronicle: Could not update {actor}'s ancestry, culture, career or kit item ({fields}). The sheet was left as it was; see the console for details."
