@@ -17,12 +17,15 @@
  */
 
 import { flagRemoval } from './_flag-removal.mjs';
-import { getSetting } from './settings.mjs';
+import { getSetting, getUserMappings } from './settings.mjs';
 import { FLAG_SCOPE, APPLY_OPTION } from './constants.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { collapseChanges } from './_change-feed.mjs';
-import { HAS_ITEM, planInventory, itemDataFor } from './_inventory-plan.mjs';
+import { HAS_ITEM, planInventory, itemDataFor, hasItemBody } from './_inventory-plan.mjs';
 import { itemsToRemove } from './_stash-reconcile.mjs';
+import { sendsChangeHere, memberOf, ownsCharacter } from './_change-author.mjs';
+import { ASK, askModel, playersCanView } from './_player-asks.mjs';
+import { getPlayerAsks, playerName } from './player-asks.mjs';
 
 /** The actor linked to a Chronicle character, or null. */
 function linkedActor(entityId) {
@@ -276,7 +279,7 @@ export class ItemSync {
    */
   async _handleCreateItem(item, options, userId) {
     if (options?.[APPLY_OPTION]) return;
-    if (userId !== game.user.id) return;
+    if (!sendsChangeHere(userId)) return;
     if (!item.parent || !(item.parent instanceof Actor)) return;
 
     // Items this module creates carry APPLY_OPTION, so a new item that already
@@ -307,21 +310,15 @@ export class ItemSync {
     }
 
     try {
-      // Create a "Has Item" relation in Chronicle. Body is snake_case — Chronicle
-      // binds target_entity_id/relation_type/reverse_relation_type (the response
-      // is camelCase, but the write binding is snake_case). Metadata is a raw
-      // object (json.RawMessage), not a JSON-encoded string, so it round-trips as
-      // structured JSON rather than a double-encoded string.
-      const relation = await this._api.post(`/entities/${entityId}/relations`, {
-        target_entity_id: targetEntityId,
-        relation_type: HAS_ITEM,
-        reverse_relation_type: 'In Inventory Of',
-        metadata: {
-          quantity: item.system?.quantity ?? 1,
-          equipped: item.system?.equipped ?? false,
-          foundry_item_name: item.name,
-        },
-      });
+      // A player's new item goes straight up on a character Chronicle says
+      // is theirs; on anyone else's it becomes a card for the GM.
+      if (userId !== game.user.id && !(await this._playerAdd(item, actor, entityId, targetEntityId, userId))) return;
+      const relation = await this._api.post(`/entities/${entityId}/relations`, hasItemBody({
+        targetEntityId,
+        quantity: item.system?.quantity,
+        equipped: item.system?.equipped,
+        name: item.name,
+      }));
 
       if (relation) {
         await item.update({ [`flags.${FLAG_SCOPE}.relationId`]: relation.id }, { [APPLY_OPTION]: true });
@@ -344,7 +341,7 @@ export class ItemSync {
    */
   async _handleDeleteItem(item, options, userId) {
     if (options?.[APPLY_OPTION]) return;
-    if (userId !== game.user.id) return;
+    if (!sendsChangeHere(userId)) return;
 
     const relationId = item.getFlag(FLAG_SCOPE, 'relationId');
     if (!relationId) return;
@@ -352,6 +349,19 @@ export class ItemSync {
     const actor = item.parent;
     const entityId = actor?.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
+
+    if (userId !== game.user.id) {
+      const held = await this._playerRelation(entityId, relationId, userId).catch(() => null);
+      if (!held?.holds) return;
+      if (!held.own) {
+        // Not their character: the GM decides.
+        await getPlayerAsks()?.ask(askModel({
+          kind: ASK.ITEM_REMOVE, docId: item.id, who: playerName(userId), name: item.name, where: actor.name,
+          link: { entityId, relationId },
+        }));
+        return;
+      }
+    }
 
     // The GM is asked before the Chronicle relation goes too (_remote-deletes.mjs).
     // Chronicle serves a flat relation route: DELETE /relations/:relationId.
@@ -382,7 +392,7 @@ export class ItemSync {
    */
   async _handleUpdateItem(item, change, options, userId) {
     if (options?.[APPLY_OPTION]) return;
-    if (userId !== game.user.id) return;
+    if (!sendsChangeHere(userId)) return;
     // Only the two values sent below matter; a rest or a use that changes
     // charges on many items must not send one write per item.
     if (!change.system || !('quantity' in change.system || 'equipped' in change.system)) return;
@@ -395,6 +405,7 @@ export class ItemSync {
     if (!entityId) return;
 
     try {
+      if (userId !== game.user.id && !(await this._playerHolds(entityId, relationId, userId))) return;
       const meta = {
         quantity: item.system?.quantity ?? 1,
         equipped: item.system?.equipped ?? false,
@@ -416,6 +427,59 @@ export class ItemSync {
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
+
+  /**
+   * Whether the character is the player's and whether the relation is in its
+   * list. Both ids come from flags a player can rewrite, so neither is
+   * trusted for a player's change sent under the GM's key.
+   * @param {string} entityId
+   * @param {string} relationId
+   * @param {string} userId - Foundry user id.
+   * @returns {Promise<{own: boolean, holds: boolean}>}
+   * @private
+   */
+  async _playerRelation(entityId, relationId, userId) {
+    const entity = await this._api.get(`/entities/${entityId}`);
+    const own = ownsCharacter(entity, memberOf(getUserMappings(), userId));
+    const relations = await this._api.get(`/entities/${entityId}/relations`);
+    const list = Array.isArray(relations) ? relations : (relations?.data || []);
+    return { own, holds: list.some((r) => String(r?.id) === String(relationId)) };
+  }
+
+  /** A player's change is sent only for a character and relation that are theirs. */
+  async _playerHolds(entityId, relationId, userId) {
+    const { own, holds } = await this._playerRelation(entityId, relationId, userId);
+    return own && holds;
+  }
+
+  /**
+   * A player's new item: may it be sent now?
+   * The page it points at must be one players can already view, whoever
+   * asks. A character that is theirs is sent now; any other character's
+   * becomes a GM card.
+   * @returns {Promise<boolean>} true when the caller sends it now.
+   * @private
+   */
+  async _playerAdd(item, actor, entityId, targetEntityId, userId) {
+    const [page, perms, character] = await Promise.all([
+      this._api.get(`/entities/${targetEntityId}`),
+      this._api.get(`/entities/${targetEntityId}/permissions`).catch(() => null),
+      this._api.get(`/entities/${entityId}`),
+    ]);
+    if (!playersCanView(page, perms)) {
+      console.debug(`Chronicle: Item "${item.name}" points at a page players cannot view — not sent.`);
+      return false;
+    }
+    if (ownsCharacter(character, memberOf(getUserMappings(), userId))) return true;
+    await getPlayerAsks()?.ask(askModel({
+      kind: ASK.ITEM_ADD, docId: item.id, who: playerName(userId), name: item.name, where: actor.name,
+      link: {
+        entityId, targetEntityId, actorId: actor.id, itemId: item.id,
+        quantity: item.system?.quantity ?? 1, equipped: item.system?.equipped ?? false,
+      },
+    }));
+    return false;
+  }
 
   /**
    * Load item field definitions from the Chronicle API.

@@ -314,6 +314,19 @@ export function toChronicleSecrets(html) {
 }
 
 /**
+ * Whether Foundry HTML holds any GM-only text: a secret block, a placeholder
+ * for one, or a paragraph marked as part of one.
+ * @param {string} html
+ * @returns {boolean}
+ */
+export function hasSecretBlock(html) {
+  const input = String(html || '');
+  if (input.includes(PART_ATTR) || input.includes(PLACEHOLDER_ID_PREFIX)) return true;
+  if (!/<section\b/i.test(input)) return false;
+  return secretBlocks(parse(input)).length > 0;
+}
+
+/**
  * [start, end) offsets of each outermost secret block, so a heading inside
  * one never becomes a page break (its text would name a page players see).
  * @param {string} html

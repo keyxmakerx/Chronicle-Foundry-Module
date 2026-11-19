@@ -52,7 +52,9 @@
     },
     "Secrets": {
       "Placeholder": "GM-only text, kept in Chronicle",
-      "NotSent": "Chronicle: your edit of \"{name}\" wasn't sent, because its GM-only text changed in Chronicle. Bring it in from the sync dashboard, then edit again."
+      "NotSent": "Chronicle: your edit of \"{name}\" wasn't sent, because its GM-only text changed in Chronicle. Bring it in from the sync dashboard, then edit again.",
+      "PlayerEditNotSent": "Chronicle: a player's edit of \"{name}\" wasn't sent, because the page has GM-only text. It stays in Foundry until Chronicle next changes the page. To keep it, make the same edit yourself.",
+      "PlayerEditNotAllowed": "Chronicle: a player's edit of \"{name}\" wasn't sent, because Chronicle doesn't let that player edit the page. Match the player to their Chronicle member and give them editing there, or make the edit yourself."
     },
     "ShopRoom": {
       "OpenShop": "Open Chronicle Shop",
@@ -242,6 +244,7 @@
       "Folder": "Chronicle: Creatures"
     },
     "ActorSync": {
+      "PlayerChangeNotSent": "Chronicle: a player's change to \"{actor}\" wasn't sent, because the character isn't claimed in Chronicle by the member that player is matched to. Have them claim it there, or make the change yourself.",
       "PreviousOwnerKept": "Chronicle: {player} is no longer the owner of {actor} in Chronicle, but still owns the actor in Foundry. Change this in the actor's Ownership settings if you want.",
       "ClaimantUnmapped": "Chronicle: a player owns {actor} in Chronicle but has no Foundry user mapped, so Foundry ownership was not changed. Link them in Chronicle Sync, under Settings, Players.",
       "IdentityItemFailed": "Chronicle: Could not update {actor}'s ancestry, culture, career or kit item ({fields}). The sheet was left as it was; see the console for details."
@@ -1211,6 +1214,27 @@
       "FolderName": "Chronicle: removed",
       "Entity": "\"{name}\" was deleted in Chronicle. Its journal is kept, unlinked, in the \"Chronicle: removed\" folder.",
       "Duplicates": "{count} journal entries repeated characters that now sync as actors. They were moved, unlinked, to the \"Chronicle: removed\" folder."
+    },
+    "PlayerAsk": {
+      "ItemAdd": "{who} added {name} to {where}",
+      "ItemRemove": "{who} removed {name} from {where}",
+      "JournalRemove": "{who} deleted the journal {name}",
+      "ActorRemove": "{who} deleted the character {name}",
+      "RealPage": "In Chronicle this is the page {page}. Send it anyway?",
+      "RealCharacter": "In Chronicle this is the character {character}.",
+      "Send": "Send to Chronicle",
+      "NotNow": "Not now",
+      "SentBy": "Sent by {name}",
+      "DeclinedBy": "Left alone by {name}",
+      "You": "you",
+      "TheGM": "the GM",
+      "Failed": "Couldn't be sent. It may already be gone in Chronicle.",
+      "Refused": {
+        "Hidden": "Not sent: that page is hidden from players.",
+        "Gone": "Not sent: Chronicle no longer has it.",
+        "Other": "Not sent: it isn't linked to Chronicle."
+      },
+      "NotReady": "Chronicle sync isn't ready on this client."
     },
     "RemoteDelete": {
       "Title": "Delete in Chronicle too?",

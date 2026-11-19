@@ -206,7 +206,7 @@ class BenchDocument {
     this._refresh();
     this._world.log.writes.push({ op: 'update', type: this.documentName, id: this.id, change, options });
     change._id = this.id;
-    this._world.Hooks.callAll(`update${this.documentName}`, this, change, options, this._world.game.user.id);
+    this._world.Hooks.callAll(`update${this.documentName}`, this, change, options, this._world.authorId());
     return this;
   }
 
@@ -217,7 +217,7 @@ class BenchDocument {
     if (!coll.get(this.id)) return undefined;
     coll.delete(this.id);
     this._world.log.writes.push({ op: 'delete', type: this.documentName, id: this.id, options });
-    this._world.Hooks.callAll(`delete${this.documentName}`, this, options, this._world.game.user.id);
+    this._world.Hooks.callAll(`delete${this.documentName}`, this, options, this._world.authorId());
     return this;
   }
 }
@@ -239,7 +239,7 @@ class BenchPage extends BenchDocument {
     this._refresh();
     this._world.log.writes.push({ op: 'update', type: 'JournalEntryPage', id: this.id, parent: this.parent.id, change, options });
     change._id = this.id;
-    this._world.Hooks.callAll('updateJournalEntryPage', this, change, options, this._world.game.user.id);
+    this._world.Hooks.callAll('updateJournalEntryPage', this, change, options, this._world.authorId());
     return this;
   }
 
@@ -274,7 +274,7 @@ class BenchJournal extends BenchDocument {
       this.pages.set(page.id, page);
       made.push(page);
       this._world.log.writes.push({ op: 'create', type: 'JournalEntryPage', id: page.id, parent: this.id, options });
-      this._world.Hooks.callAll('createJournalEntryPage', page, options, this._world.game.user.id);
+      this._world.Hooks.callAll('createJournalEntryPage', page, options, this._world.authorId());
     }
     return made;
   }
@@ -300,7 +300,7 @@ class BenchJournal extends BenchDocument {
       this.pages.delete(id);
       out.push(page);
       this._world.log.writes.push({ op: 'delete', type: 'JournalEntryPage', id, parent: this.id, options });
-      this._world.Hooks.callAll('deleteJournalEntryPage', page, options, this._world.game.user.id);
+      this._world.Hooks.callAll('deleteJournalEntryPage', page, options, this._world.authorId());
     }
     return out;
   }
@@ -323,7 +323,7 @@ class BenchItem extends BenchDocument {
     this._refresh();
     this._world.log.writes.push({ op: 'update', type: 'Item', id: this.id, parent: this.parent.id, change, options });
     change._id = this.id;
-    this._world.Hooks.callAll('updateItem', this, change, options, this._world.game.user.id);
+    this._world.Hooks.callAll('updateItem', this, change, options, this._world.authorId());
     return this;
   }
 
@@ -358,7 +358,7 @@ class BenchActor extends BenchDocument {
       this.items.set(item.id, item);
       made.push(item);
       this._world.log.writes.push({ op: 'create', type: 'Item', id: item.id, parent: this.id, options });
-      this._world.Hooks.callAll('createItem', item, options, this._world.game.user.id);
+      this._world.Hooks.callAll('createItem', item, options, this._world.authorId());
     }
     return made;
   }
@@ -384,7 +384,7 @@ class BenchActor extends BenchDocument {
       this.items.delete(id);
       out.push(item);
       this._world.log.writes.push({ op: 'delete', type: 'Item', id, parent: this.id, options });
-      this._world.Hooks.callAll('deleteItem', item, options, this._world.game.user.id);
+      this._world.Hooks.callAll('deleteItem', item, options, this._world.authorId());
     }
     return out;
   }
@@ -466,6 +466,15 @@ export function installFoundry({ settings = {}, systemId = 'dnd5e' } = {}) {
     },
   };
   world.game = game;
+  // Hooks name the user who made a change; `asPlayer` makes that a player,
+  // as when a change made in a player's browser reaches the GM's client.
+  let author = null;
+  world.authorId = () => author ?? game.user.id;
+  world.asPlayer = async (fn, id = 'benchPlayer00001') => {
+    if (!users.get(id)) users.set(id, { id, name: 'Bench Player', isGM: false, role: 1, flags: {} });
+    author = id;
+    try { return await fn(); } finally { author = null; }
+  };
   world.settingsValues = values;
 
   // The world's user-data files, in memory: path → { size, type }.
@@ -505,7 +514,7 @@ export function installFoundry({ settings = {}, systemId = 'dnd5e' } = {}) {
           const doc = new Impl(world, d);
           world.collectionFor(type).set(doc.id, doc);
           log.writes.push({ op: 'create', type, id: doc.id, options });
-          Hooks.callAll(`create${type}`, doc, options, gmUser.id);
+          Hooks.callAll(`create${type}`, doc, options, world.authorId());
           out.push(doc);
         }
         return Array.isArray(data) ? out : out[0];
@@ -513,6 +522,27 @@ export function installFoundry({ settings = {}, systemId = 'dnd5e' } = {}) {
       static async createDocuments(list, options) { return this.create(list, options); }
     };
   }
+
+  // Chat messages are written by the user running the code (the GM's client
+  // here), whispered or not; a card is found again by its flag.
+  const messages = new Collection();
+  game.messages = messages;
+  const ChatMessage = {
+    getWhisperRecipients: () => users.contents.filter((u) => u.isGM),
+    async create(data) {
+      const msg = {
+        id: randomID(), author: game.user, content: data.content, whisper: data.whisper, flags: clone(data.flags) || {},
+        getFlag(scope, key) { return this.flags[scope]?.[key]; },
+        async update(change) {
+          if (change.content !== undefined) this.content = change.content;
+          if (change.flags) for (const [scope, v] of Object.entries(change.flags)) this.flags[scope] = { ...this.flags[scope], ...clone(v) };
+        },
+      };
+      messages.set(msg.id, msg);
+      log.writes.push({ op: 'create', type: 'ChatMessage', id: msg.id });
+      return msg;
+    },
+  };
 
   const ui = {
     notifications: {
@@ -528,6 +558,7 @@ export function installFoundry({ settings = {}, systemId = 'dnd5e' } = {}) {
     Hooks,
     ui,
     CONST,
+    ChatMessage,
     JournalEntry: makeDocClass('JournalEntry', BenchJournal),
     Actor: makeDocClass('Actor', BenchActor),
     Folder: makeDocClass('Folder', BenchFolder),

@@ -63,6 +63,22 @@ root. There is no `package.json`.
 - [ ] Edit JournalEntry page content -> Page entry updates
 - [ ] Delete JournalEntry -> asked "Delete in Chronicle too?": No keeps the page, Yes deletes it. After No, Chronicle Sync → Linked → Pages shows the page as "Only in Chronicle, sync off" and does not bring it back by itself; **Bring in** on that row brings it back and turns its sync on again
 - [ ] Delete several linked JournalEntries at once -> asked once, with all of them listed
+- [ ] Clear all the text of a linked JournalEntry -> the Chronicle page's text is empty too
+- [ ] Right-click a linked JournalEntry -> Duplicate -> a second page appears in Chronicle; editing the copy changes only that second page
+- [ ] As a player matched to a Chronicle member who may edit the page there, edit the linked journal's text -> with a GM in the game, the Chronicle page updates
+- [ ] The same edit by a player Chronicle does not let edit the page, or on a page with GM-only text -> nothing changes in Chronicle and the GM gets one notice saying why
+
+### A player's own creates, and the GM card for the rest
+Needs a player client matched to a Chronicle member (Settings, Players), a GM in the game, and a Chronicle with a Trash.
+- [ ] As the player, create a journal -> a page appears in Chronicle under the Notes page type (or the type set in Settings), and no card is posted
+- [ ] As the player, delete that journal -> the page is gone from Chronicle's list and shows in the campaign Trash; Restore brings it back; no card, no GM prompt
+- [ ] As the player, create an actor -> a character page appears; with the claiming add-on on it is under Player Characters and assigned to that player
+- [ ] As the player, delete a character they have claimed in Chronicle -> it goes to the Trash with no card. Delete one they have not claimed -> a whispered card reads "Mira deleted the character X" with Send to Chronicle and Not now; only the GM sees it
+- [ ] As the player, drag an item that is linked to a visible Chronicle item page onto their claimed character -> a "has item" entry appears on the character's page with no card. Onto someone else's character -> a card "Mira added Rope to Sela"; nothing in Chronicle until Send is pressed, then the entry appears and the card reads "Sent by you"
+- [ ] The same drag of an item linked to a GM-only page -> nothing is sent and no card appears
+- [ ] Remove an item from someone else's character as the player -> a card; Send removes the entry in Chronicle. Not now leaves it and the card reads "Left alone by you"
+- [ ] As the player, rewrite a deleted journal's link to a different page (console: `journal.setFlag('chronicle-sync','entityId',...)` before deleting) -> no direct delete; the card's Send shows "In Chronicle this is the page X. Send it anyway?" and waits for a second press
+- [ ] A player posting a chat message with the card's markup gets no working buttons for anyone
 
 ### Multi-Page Sync
 - [ ] Page with h1/h2 headings creates multiple Foundry journal pages
@@ -341,7 +357,10 @@ that reads each field's `foundry_path` from the matched Chronicle system's manif
 - [ ] Actor sync disabled when no system adapter available
 - [ ] Sync guard prevents infinite loops (change in A doesn't re-trigger back to A)
 - [ ] Only character-type actors processed (NPCs, vehicles ignored)
-- [ ] Only current user's changes pushed (other users' changes ignored)
+- [ ] As a player on the character you claimed in Chronicle, change HP and an item's quantity -> with a GM in the game, Chronicle shows both; a later change in Chronicle does not undo them
+- [ ] As a player on a character nobody claimed in Chronicle, change HP -> nothing changes in Chronicle and the GM gets one notice saying the character isn't claimed
+- [ ] With two GMs in the game, a player's change is sent once (one History row), not twice
+- [ ] Duplicate a linked character Actor -> the copy is not linked; editing it changes nothing in Chronicle
 - [ ] Pre-existing actors can be manually pushed via dashboard Send button
 
 ## Creature Sync (Draw Steel creature pages → NPC actors)
@@ -539,6 +558,8 @@ Needs a GM client and a player client, on each of Foundry v12, v13 and v14.
 
 - [ ] Invalid API key shows clear error message
 - [ ] Network timeout during sync doesn't corrupt state
+- [ ] A Chronicle that stops answering mid-request: the request gives up after 30 seconds and later changes still sync
+- [ ] If the first sync after connecting fails, it is tried again by itself within 30 seconds, with no reload
 - [ ] Partial sync failure (one page fails) doesn't block others
 - [ ] A Chronicle restart reconnects without a reload
 - [ ] A failed Foundry→Chronicle push (Chronicle down) shows a `ui.notifications.warn` to the GM and an error-log row; journal updates are queued and re-pushed on reconnect

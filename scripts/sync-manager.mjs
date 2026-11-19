@@ -28,6 +28,9 @@ import { connectionAction } from './_connection-change.mjs';
  */
 const RECONNECT_RESYNC_DEBOUNCE_MS = 3000;
 
+/** Waits before a failed catch-up is tried again while still connected. */
+const SYNC_RETRY_DELAYS_MS = [30_000, 60_000, 120_000];
+
 /** How often queued sync-history events are sent to Chronicle. */
 const HISTORY_FLUSH_MS = 15_000;
 
@@ -652,6 +655,8 @@ export class SyncManager {
       clearTimeout(this._reconnectResyncTimer);
       this._reconnectResyncTimer = null;
     }
+    if (this._syncRetryTimer) { clearTimeout(this._syncRetryTimer); this._syncRetryTimer = null; }
+    this._syncRetries = 0;
     console.debug('Chronicle: Sync manager stopped');
   }
 
@@ -805,7 +810,38 @@ export class SyncManager {
    *   sync time saved; false when it failed or was cut short.
    * @private
    */
-  async _performInitialSync() {
+  _performInitialSync() {
+    // One pass at a time: the first connect and a reconnect can both ask, and
+    // two passes would apply the same changes twice and race the cursor.
+    this._syncPass ??= this._runInitialSync()
+      .then((ok) => { this._noteSyncPass(ok); return ok; })
+      .finally(() => { this._syncPass = null; });
+    return this._syncPass;
+  }
+
+  /**
+   * A failed catch-up is tried again while the connection stays up (after 30
+   * seconds, then one and two minutes), since nothing else would until the
+   * socket next drops. A pass that works clears the count.
+   * @param {boolean} ok
+   * @private
+   */
+  _noteSyncPass(ok) {
+    if (this._syncRetryTimer) { clearTimeout(this._syncRetryTimer); this._syncRetryTimer = null; }
+    if (ok !== false) { this._syncRetries = 0; return; }
+    const delay = SYNC_RETRY_DELAYS_MS[this._syncRetries ?? 0];
+    if (!delay || !this._started) return;
+    this._syncRetries = (this._syncRetries ?? 0) + 1;
+    this._syncRetryTimer = setTimeout(async () => {
+      this._syncRetryTimer = null;
+      if (!this._started || this.api.state !== 'connected') return;
+      const again = await this._performInitialSync();
+      if (again !== false) this._initialSyncDone = true;
+    }, delay);
+  }
+
+  /** The body of `_performInitialSync`. @private */
+  async _runInitialSync() {
     const lastSync = getSetting('lastSyncTime') || '1970-01-01T00:00:00Z';
 
     try {

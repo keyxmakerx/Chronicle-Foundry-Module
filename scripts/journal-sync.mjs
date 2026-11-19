@@ -11,7 +11,7 @@
 
 import { flagRemoval } from './_flag-removal.mjs';
 import { noticeText, escapeHtml } from './_escape-html.mjs';
-import { getSetting, setSetting, getSyncExclusions } from './settings.mjs';
+import { getSetting, setSetting, getSyncExclusions, getUserMappings } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
 import { FLAG_SCOPE, KEEP_LOCAL_FLAG, syncOptions } from './constants.mjs';
 import { TYPE_SLUG_FLAG } from './_shop-journal.mjs';
@@ -19,7 +19,7 @@ import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
 import {
   toFoundrySecrets, toChronicleSecrets, secretBlockRanges, PART_ATTR,
   hideSecrets, restoreSecrets, secretKeyer, hasClearSecrets, DEFAULT_PLACEHOLDER_TEXT,
-  applyReveals, carryReveals, revealableSecrets,
+  applyReveals, carryReveals, revealableSecrets, hasSecretBlock,
 } from './_gm-secrets.mjs';
 import { watchGMSecrets } from './gm-secret-view.mjs';
 import { newJournalSheetFlags } from './chronicle-sheet.mjs';
@@ -34,12 +34,15 @@ import { isMapJournal } from './_journal-ownership.mjs';
 import { pickJournalCreateType, buildEntityCreateBody } from './_journal-create.mjs';
 import { JournalPushDebouncer } from './_journal-push-debounce.mjs';
 import { mergeJournalChange, changedJournalFields } from './_journal-push-fields.mjs';
-import { setAside } from './_set-aside.mjs';
+import { setAside, LINK_FLAGS } from './_set-aside.mjs';
 import { isOldNotesJournal } from './_notes-folder.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { collapseChanges } from './_change-feed.mjs';
 import { sharedPictureIds, toFoundryPictures, toChroniclePictures } from './_inline-pictures.mjs';
 import { PictureStore, watchGMPictures } from './picture-store.mjs';
+import { sendsChangeHere, memberOf, mayEditPage } from './_change-author.mjs';
+import { ASK, askModel, sameName } from './_player-asks.mjs';
+import { getPlayerAsks, playerName } from './player-asks.mjs';
 
 
 /** The facts flag write for a journal update; nothing when facts are unknown. */
@@ -196,6 +199,14 @@ export class JournalSync {
     // never left behind a timer that doesn't get to fire.
     /** Name/ownership changes seen since a journal's last push, by journal id. */
     this._pendingJournalChanges = new Map();
+    /** Who made the last change of a pending burst, by journal id. */
+    this._pendingJournalAuthors = new Map();
+    /** When the last change of a pending burst was made (ms), for "Newest wins". */
+    this._pendingJournalEditAt = new Map();
+    /** Players with a change in a pending burst, by journal id. */
+    this._pendingPlayerEdits = new Map();
+    /** Journals the GM was already told hold a player's unsent text. */
+    this._warnedPlayerText = new Set();
     this._journalPushDebouncer = new JournalPushDebouncer(
       (journal, entityId) => { this._pushJournalUpdate(journal, entityId); }
     );
@@ -1212,10 +1223,21 @@ export class JournalSync {
    */
   async _handleCreateJournal(journal, options, userId) {
     if (options?.chronicleSync) return;
-    if (userId !== game.user.id) return;
 
-    // Skip if this journal was created by Chronicle sync.
-    if (journal.getFlag(FLAG_SCOPE, 'entityId')) return;
+    // A copy (Duplicate, an import of an export) carries the original's link.
+    // Two journals on one page would overwrite each other's pushes while only
+    // one received Chronicle's changes, so the copy starts unlinked.
+    const linkedTo = journal.getFlag(FLAG_SCOPE, 'entityId');
+    if (linkedTo) {
+      if (!sendsChangeHere(userId)) return;
+      // A journal a player makes never arrives linked: the link is theirs to
+      // write and would aim their later pushes at someone else's page.
+      const byPlayer = userId !== game.user.id;
+      if (!byPlayer && !game.journal.find((j) => j.id !== journal.id && j.getFlag(FLAG_SCOPE, 'entityId') === linkedTo)) return;
+      await journal.update(flagRemoval(FLAG_SCOPE, ...LINK_FLAGS, 'pushedPermissions'), syncOptions());
+    }
+    // A player's new journal is theirs, so the active GM's client sends it.
+    if (!sendsChangeHere(userId)) return;
 
     // Skip journals owned by another sync domain: a journal already mirrored
     // to a calendar event and maps also persist as JournalEntries, and
@@ -1402,7 +1424,7 @@ export class JournalSync {
    */
   async _handleUpdateJournal(journal, change, options, userId) {
     if (options?.chronicleSync) return;
-    if (userId !== game.user.id) return;
+    if (!sendsChangeHere(userId)) return;
 
     const entityId = journal.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
@@ -1417,9 +1439,20 @@ export class JournalSync {
     // the last edit. `journal` reflects the live document state by the
     // time the timer fires, so re-reading it at push time (not now)
     // captures whatever the GM last typed.
+    // A player's change is sent by this GM's client under the GM's key, so
+    // it carries text and name only: never sharing, which is the GM's.
+    const byPlayer = userId !== game.user.id;
+    const sent = byPlayer && change && Object.hasOwn(change, 'ownership')
+      ? Object.fromEntries(Object.entries(change).filter(([key]) => key !== 'ownership'))
+      : change;
     this._pendingJournalChanges.set(
-      journal.id, mergeJournalChange(this._pendingJournalChanges.get(journal.id), change)
+      journal.id, mergeJournalChange(this._pendingJournalChanges.get(journal.id), sent)
     );
+    if (byPlayer) {
+      this._pendingPlayerEdits.set(journal.id, (this._pendingPlayerEdits.get(journal.id) ?? new Set()).add(userId));
+    }
+    this._pendingJournalAuthors.set(journal.id, userId);
+    this._pendingJournalEditAt.set(journal.id, Date.now());
     this._journalPushDebouncer.schedule(journal.id, journal, entityId);
   }
 
@@ -1475,10 +1508,21 @@ export class JournalSync {
   async _pushJournalUpdate(journal, entityId) {
     const changed = this._pendingJournalChanges.get(journal.id);
     this._pendingJournalChanges.delete(journal.id);
+    const author = this._pendingJournalAuthors.get(journal.id) ?? game.user.id;
+    this._pendingJournalAuthors.delete(journal.id);
+    const editedAt = this._pendingJournalEditAt.get(journal.id) ?? Date.now();
+    this._pendingJournalEditAt.delete(journal.id);
+    const players = this._pendingPlayerEdits.get(journal.id);
+    this._pendingPlayerEdits.delete(journal.id);
+    let sendText = true;
     try {
+      if (players?.size) {
+        if (!(await this._playersMayEdit(journal, entityId, players))) return;
+        sendText = await this._playerMaySendText(journal, entityId);
+      }
       // Concatenate all text pages into a single entry for Chronicle.
-      const entryHtml = await this._entryForPush(journal, entityId);
-      const playerNotesHtml = await this._playerNotesForPush(journal, entityId);
+      const entryHtml = sendText ? await this._entryForPush(journal, entityId) : undefined;
+      const playerNotesHtml = sendText ? await this._playerNotesForPush(journal, entityId) : undefined;
       const isPrivate =
         (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER;
 
@@ -1486,7 +1530,10 @@ export class JournalSync {
       // content can't be put back (undefined) is left out, never sent
       // without it.
       const body = changedJournalFields({ name: journal.name, isPrivate }, changed);
-      if (entryHtml !== undefined) body.entry = entryHtml;
+      // Chronicle keeps its text on an empty string and clears it on null.
+      // Null only when the journal has text pages and they are all empty (the
+      // GM cleared them), never for a journal that simply has no text pages.
+      if (entryHtml !== undefined) body.entry = entryHtml === '' && this._hasTextPages(journal) ? null : entryHtml;
 
       // Include player notes if present.
       if (playerNotesHtml !== null && playerNotesHtml !== undefined) {
@@ -1504,7 +1551,7 @@ export class JournalSync {
         result = await this._api.put(`/entities/${entityId}`, body);
       } catch (err) {
         if (err instanceof ConflictError) {
-          await this._handleConflict(journal, entityId, body);
+          await this._handleConflict(journal, entityId, body, editedAt);
           return;
         }
         throw err;
@@ -1522,17 +1569,18 @@ export class JournalSync {
       await this._hidePushedSecrets(journal, result);
 
       console.debug(`Chronicle: Pushed journal update "${journal.name}" to Chronicle`);
-      // The debounce has no hook userId; the hooks only schedule this for the local user's own edits.
-      this._syncManager?.recordUserOutcome?.(game.user.id);
+      this._syncManager?.recordUserOutcome?.(author);
     } catch (err) {
       // Surface the failure and queue the update for retry on reconnect.
       console.error('Chronicle: Failed to push journal update', err);
-      this._syncManager?.recordUserOutcome?.(game.user.id, err);
+      this._syncManager?.recordUserOutcome?.(author, err);
       const retry = changedJournalFields({
         name: journal.name,
         isPrivate: (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER,
       }, changed);
-      const entry = await this._entryForPush(journal, entityId, { fetch: false }).catch(() => undefined);
+      const entry = sendText
+        ? await this._entryForPush(journal, entityId, { fetch: false }).catch(() => undefined)
+        : undefined;
       if (entry !== undefined) retry.entry = entry;
       // Keep the conflict check, so a replay never overwrites a Chronicle
       // edit made while this push waited; a 409 then goes through the same
@@ -1544,7 +1592,7 @@ export class JournalSync {
         onConflict: async (body) => {
           const current = game.journal.get(journalId);
           if (current?.getFlag(FLAG_SCOPE, 'entityId') !== entityId) return;
-          await this._handleConflict(current, entityId, body);
+          await this._handleConflict(current, entityId, body, editedAt);
         },
       });
       ui.notifications?.warn?.(`Chronicle: Failed to send update for "${noticeText(journal.name)}" — queued for retry. See the sync dashboard.`);
@@ -1587,17 +1635,25 @@ export class JournalSync {
    */
   async _handleDeleteJournal(journal, options, userId) {
     if (options?.chronicleSync) return;
-    if (userId !== game.user.id) return;
 
     // Drop any push still pending for this journal before deleting.
     // Otherwise it fires after the delete, and the queueForRetry in its
     // catch block can resurrect the deleted entity's data on Chronicle.
     this._journalPushDebouncer.cancel(journal.id);
     this._pendingJournalChanges.delete(journal.id);
+    this._pendingJournalAuthors.delete(journal.id);
+    this._pendingJournalEditAt.delete(journal.id);
+    this._pendingPlayerEdits.delete(journal.id);
+
+    if (!sendsChangeHere(userId)) return;
 
     const entityId = journal.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
 
+    if (userId !== game.user.id) {
+      await this._handlePlayerDelete(journal, entityId, userId);
+      return;
+    }
     queueRemoteDelete({
       label: journal.name,
       run: () => this._api.delete(`/entities/${entityId}`),
@@ -1622,6 +1678,34 @@ export class JournalSync {
       excludedEntities: [...excludedEntities, entityId],
     }));
     this._syncManager?.logActivity?.('unlink', `"${name}" was deleted here and kept in Chronicle; sync is now off for that page`);
+  }
+
+  /**
+   * A player deleted a journal. The link is a flag they can rewrite, so the
+   * page it names must be one they may edit and carry the journal's own name;
+   * then Chronicle moves it to its Trash. Anything else becomes a GM card.
+   * @private
+   */
+  async _handlePlayerDelete(journal, entityId, userId) {
+    try {
+      const [page, perms] = await Promise.all([
+        this._api.get(`/entities/${entityId}`),
+        this._api.get(`/entities/${entityId}/permissions`),
+      ]);
+      const own = mayEditPage(perms, memberOf(getUserMappings(), userId)) && sameName(page?.name, journal.name);
+      if (own) {
+        await this._api.delete(`/entities/${entityId}`);
+        this._syncManager?.recordUserOutcome?.(userId);
+        return;
+      }
+      await getPlayerAsks()?.ask(askModel({
+        kind: ASK.JOURNAL_REMOVE, docId: journal.id, who: playerName(userId), name: journal.name,
+        link: { entityId },
+      }));
+    } catch (err) {
+      console.warn(`Chronicle: Could not handle a player's delete of "${journal.name}"`, err);
+      this._syncManager?.recordUserOutcome?.(userId, err);
+    }
   }
 
   /**
@@ -2033,6 +2117,64 @@ export class JournalSync {
   }
 
   /**
+   * Whether Chronicle lets every player whose edit is waiting edit this
+   * page. A player can rewrite their journal's link, so the link alone never
+   * sends a player's edit under the GM's key. When it does not, the edit
+   * stays in Foundry and the GM is told once per journal.
+   * @param {JournalEntry} journal
+   * @param {string} entityId
+   * @param {Set<string>} players - Foundry user ids.
+   * @returns {Promise<boolean>}
+   * @private
+   */
+  async _playersMayEdit(journal, entityId, players) {
+    const perms = await this._api.get(`/entities/${entityId}/permissions`);
+    const mappings = getUserMappings();
+    const allowed = [...players].every((id) => mayEditPage(perms, memberOf(mappings, id)));
+    if (!allowed && !this._warnedPlayerText.has(journal.id)) {
+      this._warnedPlayerText.add(journal.id);
+      ui.notifications?.warn?.(game.i18n.format('CHRONICLE.Secrets.PlayerEditNotAllowed', { name: noticeText(journal.name) }));
+    }
+    return allowed;
+  }
+
+  /**
+   * Whether a player's edit of this journal may send its text. A page with
+   * GM-only text, here or in Chronicle, never does: this client would put
+   * that text back around markup the player wrote, and a player could use
+   * that to remove it or have it shown. The edit stays in Foundry and the GM
+   * is told once. An unreadable page counts as having GM-only text.
+   * @param {JournalEntry} journal
+   * @param {string} entityId
+   * @returns {Promise<boolean>}
+   * @private
+   */
+  async _playerMaySendText(journal, entityId) {
+    const local = `${this._joinTextPages(journal)}${this._playerNotesPageHtml(journal) ?? ''}`;
+    let safe = !hasSecretBlock(local);
+    if (safe) {
+      try {
+        const entity = await this._api.get(`/entities/${entityId}`);
+        safe = ![entity?.entry_html, entity?.player_notes_html]
+          .some((html) => html && hasSecretBlock(toFoundryPictures(toFoundrySecrets(html), () => undefined)));
+      } catch (err) {
+        console.warn('Chronicle: could not check a page for GM-only text before sending a player\'s edit', err);
+        safe = false;
+      }
+    }
+    if (!safe && !this._warnedPlayerText.has(journal.id)) {
+      this._warnedPlayerText.add(journal.id);
+      ui.notifications?.warn?.(game.i18n.format('CHRONICLE.Secrets.PlayerEditNotSent', { name: noticeText(journal.name) }));
+    }
+    return safe;
+  }
+
+  /** Whether the journal has a text page of its own (not Player Notes). @private */
+  _hasTextPages(journal) {
+    return journal.pages.some((p) => p.type === 'text' && !p.getFlag(FLAG_SCOPE, 'isPlayerNotes'));
+  }
+
+  /**
    * The Player Notes page's HTML as Foundry holds it, or null when the
    * journal has none.
    * @param {JournalEntry} journal
@@ -2281,9 +2423,10 @@ export class JournalSync {
    * @param {JournalEntry} journal
    * @param {string} entityId
    * @param {object} body - The PUT body that was rejected.
+   * @param {number} [editedAt] - When the rejected Foundry edit was made (ms).
    * @private
    */
-  async _handleConflict(journal, entityId, body) {
+  async _handleConflict(journal, entityId, body, editedAt) {
     const strategy = getSetting('conflictResolution');
     console.warn(`Chronicle: Conflict on entity ${entityId}, strategy="${strategy}"`);
 
@@ -2312,9 +2455,12 @@ export class JournalSync {
       default: {
         // Compare timestamps, keep newest. This is the rule doing what the
         // GM picked, so it is written to History rather than a toast.
+        // The Foundry side's time is when the rejected edit was made. The
+        // last sync time would always be older than Chronicle's change (that
+        // is what a conflict means), so Chronicle would always win.
         const remote = await this._api.get(`/entities/${entityId}`);
-        const localUpdatedAt = journal.getFlag(FLAG_SCOPE, 'lastSync') || '1970-01-01';
-        if (remote && new Date(localUpdatedAt) > new Date(remote.updated_at)) {
+        const localEditAt = Number.isFinite(editedAt) ? editedAt : 0;
+        if (remote && localEditAt > Date.parse(remote.updated_at || '')) {
           // Local is newer — force push.
           delete body.expected_updated_at;
           const result = await this._api.put(`/entities/${entityId}`, body);
