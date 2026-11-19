@@ -71,6 +71,17 @@ test('the connect line and the key never reach a notice, the page or the console
   assert.doesNotMatch(src, /settings\.set\([^)]*apiKey/);
 });
 
+test('typed by hand, the key is sent nowhere until the GM leaves a field or presses the button', async () => {
+  const src = await read('scripts/first-connect.mjs');
+  assert.doesNotMatch(src, /innerHTML/);
+  // While typing, a complete by-hand set only enables the button; no check is scheduled.
+  const onEdit = src.slice(src.indexOf('const onEdit = () => {'), src.indexOf("for (const name of FIELDS) field[name]?.addEventListener('input', onEdit);"));
+  assert.match(onEdit, /if \(values\.ok && values\.from === 'hand'\) \{\s*button\.disabled = false;\s*idle\(\);\s*return;\s*\}\s*button\.disabled = true;\s*timer = setTimeout\(checkQuietly, DEBOUNCE_MS\);/);
+  assert.match(src, /for \(const name of \['apiUrl', 'apiKey', 'campaignId'\]\) \{\s*field\[name\]\?\.addEventListener\('change',/);
+  // The button checks first when no check has passed yet, and connects only on a pass.
+  assert.match(src, /if \(!ready\) await checkQuietly\(\);\s*const values = ready;\s*if \(!values\) return;/);
+});
+
 test('connecting sets the setup to open, picks the connection up, and falls back to a reload notice', async () => {
   const src = await read('scripts/first-connect.mjs');
   assert.match(src, /setSetting\('firstRunPending', true\)/);

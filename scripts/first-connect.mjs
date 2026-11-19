@@ -4,6 +4,10 @@
  * The decisions are in _first-connect.mjs. The line and the key are only ever
  * read from the fields and passed on; they are never written into the page,
  * a notice or the console.
+ *
+ * A pasted line is checked as it arrives, since it names its own server. Typed
+ * by hand, the key is sent nowhere until the GM leaves a field or presses the
+ * button: a half-typed address is some other server.
  */
 
 import { MODULE_ID } from './constants.mjs';
@@ -27,7 +31,7 @@ export function wireFirstConnect(root, { onConnected }) {
   const field = Object.fromEntries(FIELDS.map((name) => [name, screen.querySelector(`[data-field="${name}"]`)]));
   const list = screen.querySelector('[data-connect-checks]');
   const button = screen.querySelector('[data-connect-go]');
-  const idleHint = list.innerHTML;
+  const idleHint = [...list.childNodes].map((node) => node.cloneNode(true));
   const goLabel = button.textContent;
 
   let run = 0;
@@ -36,7 +40,7 @@ export function wireFirstConnect(root, { onConnected }) {
   let busy = false;
 
   const read = () => Object.fromEntries(FIELDS.map((name) => [name, field[name]?.value ?? '']));
-  const idle = () => { list.innerHTML = idleHint; };
+  const idle = () => { list.replaceChildren(...idleHint.map((node) => node.cloneNode(true))); };
   const show = (steps) => {
     const ul = document.createElement('ul');
     ul.className = 'cs-steps';
@@ -72,22 +76,38 @@ export function wireFirstConnect(root, { onConnected }) {
     if (checksPass(steps)) {
       ready = values;
       button.disabled = false;
+    } else if (values.from === 'hand') {
+      // The button is the by-hand way to check again after a fix.
+      button.disabled = false;
     }
   }
+  const checkQuietly = () => check().catch((err) => console.warn('Chronicle Sync | First connect check failed', err?.message));
 
   const onEdit = () => {
     // Stop the old result from enabling the button, and keep it off until the new one is in.
     run += 1;
     ready = null;
-    button.disabled = true;
     clearTimeout(timer);
-    timer = setTimeout(() => { check().catch((err) => console.warn('Chronicle Sync | First connect check failed', err?.message)); }, DEBOUNCE_MS);
+    const values = connectValues(read());
+    if (values.ok && values.from === 'hand') {
+      button.disabled = false;
+      idle();
+      return;
+    }
+    button.disabled = true;
+    timer = setTimeout(checkQuietly, DEBOUNCE_MS);
   };
   for (const name of FIELDS) field[name]?.addEventListener('input', onEdit);
+  // Leaving a by-hand field with all three filled is the GM saying it is finished.
+  for (const name of ['apiUrl', 'apiKey', 'campaignId']) {
+    field[name]?.addEventListener('change', () => { if (!ready && connectValues(read()).ok) checkQuietly(); });
+  }
 
   async function connect() {
+    if (busy) return;
+    if (!ready) await checkQuietly();
     const values = ready;
-    if (!values || busy) return;
+    if (!values) return;
     busy = true;
     button.disabled = true;
     button.textContent = text('CHRONICLE.Dashboard.FirstConnect.Connecting');

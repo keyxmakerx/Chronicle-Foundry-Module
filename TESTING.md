@@ -68,7 +68,7 @@ root. There is no `package.json`.
 - [ ] Page with h1/h2 headings creates multiple Foundry journal pages
 - [ ] Page without headings creates single "Content" page
 - [ ] Multi-page Foundry journal concatenates into single Chronicle entry
-- [ ] Updating page content adds/removes/updates pages correctly
+- [ ] Updating the Chronicle page's content adds/removes/updates the journal's pages correctly
 - [ ] Page titles match heading text (HTML stripped)
 - [ ] Pre-heading content creates "Overview" page
 
@@ -116,7 +116,7 @@ folder, drawn by the Chronicle Map Viewer sheet with markers, drawings, tokens,
 layers and fog as overlays. Drawings, tokens, layers and fog are read-only in
 Foundry; markers are editable by the GM. Needs "Sync Maps" on and a Chronicle
 campaign with at least one map that has an image, markers (some `Everyone`, one
-`GM only`), and ideally a drawing, a token and a fog region.
+`DM only`), and ideally a drawing, a token and a fog region.
 
 ### Bring maps in
 - [ ] Dashboard → Linked → Maps → **Sync all maps again** → each Chronicle map is listed under
@@ -142,7 +142,7 @@ campaign with at least one map that has an image, markers (some `Everyone`, one
 ### Foundry -> Chronicle (GM, markers only)
 - [ ] Toolbar → **Place Chronicle marker**, click the map → dialog with name, category, description and visibility; **Create** → marker appears in Chronicle's editor
 - [ ] Right-click a Chronicle marker → **Configure Chronicle Marker**; change name/category → Save → Chronicle shows the change
-- [ ] In that dialog set Visibility to **GM only** → Save → the marker shows the GM-only style for the GM and Chronicle shows it as GM only
+- [ ] In that dialog set Visibility to **GM only** → Save → the marker shows the GM-only style for the GM and Chronicle shows it as DM only
 - [ ] **Delete Marker** → confirm → marker is removed in Chronicle
 - [ ] Double-click a marker that has a linked page → the page's journal opens
 - [ ] Stop Chronicle, then save a marker edit → an error toast ("Failed to update marker on Chronicle") and the viewer keeps the old value
@@ -156,15 +156,15 @@ campaign with at least one map that has an image, markers (some `Everyone`, one
 ### Player Visibility (security)
 Players read only what the GM client wrote into the journal page flags, so
 restricted data must never be written there (`scripts/_map-flag-filter.mjs`).
-Setup: in Chronicle, one `Everyone` marker, one `GM only` marker, a marker or
+Setup: in Chronicle, one `Everyone` marker, one `DM only` marker, a marker or
 drawing restricted to specific users, a hidden token, and a fog region; give the
 test player Observer on the map journal.
 - [ ] As GM, all of them show in the viewer (GM-only marker with the GM-only style; fog as a dark overlay)
 - [ ] As the player, open the same map: only the `Everyone` marker and unrestricted drawings and tokens show
-- [ ] As the player, the `GM only` marker, the user-restricted marker/drawing, the hidden token and the fog overlay are all absent
-- [ ] As the player, F12 console: `game.journal.getName("<map name>").pages.contents[0].flags["chronicle-sync"]` — its `chronicleMarkers` list holds no `GM only` or restricted marker, and no fog data is present
+- [ ] As the player, the `DM only` marker, the user-restricted marker/drawing, the hidden token and the fog overlay are all absent
+- [ ] As the player, F12 console: `game.journal.getName("<map name>").pages.contents[0].flags["chronicle-sync"]` — its `chronicleMarkers` list holds no `DM only` or restricted marker, and no fog data is present
 - [ ] Right-click on a marker as the player does nothing (no config dialog); the Place Chronicle marker tool is absent
-- [ ] Change a visible marker to `GM only` in Chronicle while the player has the map open → it vanishes from the player's view and from the page flags after the next sync
+- [ ] Change a visible marker to `DM only` in Chronicle while the player has the map open → it vanishes from the player's view and from the page flags after the next sync
 - [ ] Change it back to Everyone → it reappears for the player
 - [ ] A map whose page flags already hold a GM-only marker: **Sync all maps again** strips it
 
@@ -406,7 +406,7 @@ Needs a GM and a player client on the same scene, and an NPC page synced as a jo
 
 ## GM Screen
 
-GM only. Needs a Chronicle that serves the GM Screen.
+GM only. Needs a Chronicle that serves its DM Screen (Chronicle's own name for it).
 
 - [ ] The scene controls' Chronicle group has a d20 button for the GM; a player's group has only the Satchel and Calendar buttons
 - [ ] Click it: a d20 rolls out of the button, lands on 20 and the screen unfolds into three leaves (The world, The party, Rules and reveals); a click or Escape skips the opening
@@ -414,13 +414,13 @@ GM only. Needs a Chronicle that serves the GM Screen.
 - [ ] The party leaf lists each hero on one line; a row expands for detail, with a green dot after "Played by" when that player is on Chronicle now
 - [ ] The top strip says how many players are here (hover lists who); with requests waiting, **Waiting on you** lists them and its link opens the Stashes page
 - [ ] Rules tab: **Find a condition** filters the list. Reveal tab: **Reveal** on a hidden character makes it visible to players in Chronicle
-- [ ] Against a Chronicle without the GM Screen, the window says to update Chronicle; with a wrong key it says the key was not accepted; **Try again** reloads
+- [ ] Against a Chronicle without the DM Screen, the window says to update Chronicle; with a wrong key it says the key was not accepted; **Try again** reloads
 - [ ] **Cast** lists the scene's tokens that belong to a Chronicle page and no player, hidden ones marked Hidden. Spotlight, Talk as (then Stop talking) and Page do what the token's own buttons do; a player's hero never appears
 - [ ] **Party** shows each shared stash with its money and items, **Move things** opens a hero's Stashes window, and each shop's **Open** opens its shop room. With stashes off in Chronicle, it says so
 
 ## Encounters (GM Screen tab)
 
-GM only. Needs a Chronicle that serves encounters, a key for the campaign owner or a co-GM, creature sync on (so creature pages have actors), and a scene with a grid open. Plan one fight in Chronicle with a creature of count 3, one planned hidden, one planned seen and one planned "arrives later".
+GM only. Needs a Chronicle that serves encounters, a key for the campaign owner or a co-DM, creature sync on (so creature pages have actors), and a scene with a grid open. Plan one fight in Chronicle with a creature of count 3, one planned hidden, one planned seen and one planned "arrives later".
 
 - [ ] GM Screen, **Encounters** tab: the panel widens; fights marked Ready are listed first with their page name and creature count; typing in **Search planned encounters** finds others after a short pause
 - [ ] A player-role key or a Chronicle without encounters shows a plain message and **Try again**, not an empty list
@@ -520,7 +520,7 @@ Needs a drop list on two creature pages in Chronicle (Crafting → Spoils tab �
 ## Import Wizard
 
 - [ ] Chronicle Sync → Settings → Connection -> **Setup Wizard** shows a six-step wizard inside the Chronicle Sync window (no second window): Connect, Scan, Types, Tags, Characters, Review; there are no maps or calendar steps. The Connect step fills in its checks (connection, page types, game system) on its own
-- [ ] In a world with no connection, Chronicle Sync opens on "Set up Chronicle in this world" with the five steps listed and the connection settings below. Save a connect line and reload: Chronicle Sync opens on the wizard. **Skip setup** returns to the four sections and the wizard does not reappear on the next open
+- [ ] In a world with no connection, Chronicle Sync opens on "Set up Chronicle in this world" with the five steps listed and the connect-line field below. Paste a connect line and press **Connect and continue**: the wizard opens in the same window. **Skip setup** returns to the four sections and the wizard does not reappear on the next open
 - [ ] Tags and Characters steps are skipped when tags are unavailable or no game system matched
 - [ ] Review lists what will be created; running it creates the pages and marks the wizard completed
 
@@ -564,7 +564,10 @@ Player reports and History panes) and Settings (at the foot, set apart).
 ### Access
 - [ ] Open the Chronicle group in the scene controls: no button in it looks pressed, and only its buttons appear (no blank slot). Press Chronicle Sync → dashboard opens; press it again after closing → opens again. Click Tokens, then back to the Chronicle group → nothing opens on its own
 - [ ] Click the sidebar status indicator (when connected) or the Chronicle Sync button in the scene controls → dashboard opens (GM only); right-click on the indicator opens it even when disconnected; clicking while disconnected tries to reconnect
-- [ ] With URL, key or campaign ID missing, the window shows "Chronicle Sync is not configured" and the Settings form under it, with no rail
+- [ ] With URL, key or campaign ID missing, the window shows "Set up Chronicle in this world", the five steps with Connect current, and one **Connect line** field with the cursor in it; no rail, no tabs, no Save or Test connection button
+- [ ] Paste a connect line (Chronicle: your campaign → Manage → Foundry → Connection) → after a moment "Chronicle answers", "Key accepted", "Campaign found" and the game system line tick by themselves and **Connect and continue** turns on. A wrong key shows a cross with what to do, and the button stays off. Typing "hello" shows "That is not a connect line", and the line is never shown back
+- [ ] **Connect and continue** → the window goes straight on to the Scan step with no reload (or, if the connection cannot start at once, a notice asks for one reload and the setup opens after it)
+- [ ] **Enter details by hand**: fill address, key and campaign → nothing is checked while you type; leaving a field or pressing **Connect and continue** runs the same checks, and it connects only when they pass
 - [ ] It opens to the last-active section and pane; an unknown saved tab falls back to Overview, and a tab saved by an older version opens where its content now lives (Maps → Linked, Maps; Diagnostics → Problems; Status → Problems, Health; Issues → Linked, Characters)
 - [ ] Configure Settings → Chronicle Sync → **Open Chronicle Sync settings** opens the window at Settings (or brings it forward there)
 - [ ] Settings: change a field, let the window re-render (e.g. a player sends a report) → the change is still there; **Undo changes** puts the saved values back; **Save** saves and says so; arrow keys move along every pane strip
@@ -573,10 +576,18 @@ Player reports and History panes) and Settings (at the foot, set apart).
 ### Tabs
 Details for Characters, Maps, Shops and Calendar are under their own sections.
 - [ ] **Overview:** connection banner (green/yellow/red) with **Reconnect** when not connected; stat tiles (Pages in sync, Characters in sync n/total, Maps Linked) each jump to their tab; "Needs Attention" lists only real problems, each row jumping to the fixing tab, or says "Everything's in sync"; **Sync Everything Now**, **Problems** and **Refresh** work; below: the GM-only note when any were hidden, last sync time, Recent Activity, **Clear Log**
-- [ ] **Pages:** list grouped by type with status dots, Bring in/Send per row, Bring in all / Send all, Sync all again, visibility toggle, search, bulk select (Make Public / Private / Delete / Change Type), **Create Type**
+- [ ] **Pages:** a search box, then the list's commands as plain words (Bring in all (n), Send all (n), Sync all again, New type, and Select at the far end), then one small-caps heading per type with a count line ("3 in sync, 1 only in Chronicle"). Each row: a dot, the name, a lock only when the page is hidden from players, a state word, at most one button, and a ⋯ menu
+- [ ] Type in the search box → rows filter as you type, the cursor stays in the box, types with no match disappear, a folded type shows its matches, and "No pages match that search." shows when nothing does; Escape clears it
+- [ ] Click a type's name → its rows fold away (and stay folded after a reload); its ⋯ menu offers "Turn sync off for this type" and folding. With sync off for a type the count line reads "9 pages, sync off for this type"
+- [ ] A row's ⋯ menu: **Sync this page again**, **Show to players** / **Hide from players**, **Turn sync off for this page**, **Copy details for help**. Arrow keys move through it, Escape closes it and returns to the ⋯ button, a click elsewhere closes it
+- [ ] **Select** → checkboxes appear with "Select all shown", Change type, Show to players, Hide from players and Delete; they stay greyed until a page is ticked; **Done selecting** leaves and forgets the ticks
+- [ ] Self-fixing: edit a page in Chronicle while Foundry is closed to it (stop the world's connection, or edit a page whose live update was missed), then open Chronicle Sync → the row reads "Catching up…" and then "In sync" without a click, and Recent Activity says pages were brought up to date. A page with sync off is left alone
+- [ ] Self-fixing: with Chronicle unreachable, edit a synced journal → its row reads "Waiting to send" with **Send now**; once Chronicle is back it sends by itself. A page that will not sync reads "Couldn't sync" in red, its reason shows on hover, and **Try again** retries it
+- [ ] **Copy details for help** → the clipboard holds the page's name, ids, versions, state and its recent errors, and none of the page's text and no key
+- [ ] At the foot: "This list was read from Chronicle at HH:MM." with **Check again**; closing and reopening the window also reads it again
 - [ ] **Characters:** a "Needs a match" list comes first when any character can't be matched (the rail shows its count); each row offers "Match to existing…" with **Match**, and **Create new**, and resolving a row links it and removes it
 - [ ] **Calendar**, **Shops**, **Maps:** as in their sections; the Calendar pane explains why when sync is off, no calendar exists, or it is rebuilding or unreachable; Shops empty states say whether the "Shop" type is missing or has no shops
-- [ ] **Problems:** Health / Player reports / History switch; the badge counts new player reports. Health: Game System, Connection, Field Mapping, Sync Capability (pick an actor; **Copy** report and JSON), Error Log, Diagnostic Bundle and System Debug Export copy
+- [ ] **Problems:** Health / Player reports / History switch; the badge counts new player reports. Health: a checklist of plain sentences, problems first (changes waiting to be sent, recent errors, dice, connection, game system, sheet fields), each with at most one action in plain words; "Show them" lists the waiting changes with **Send them now**; **Copy a report for help** copies the diagnostic report; a closed **For troubleshooting** drawer holds Game System, Connection counts, Field Mapping, Sync Capability (pick an actor; **Copy** report and JSON), Dice detail, the Error Log and System Debug Export, and stays open across a redraw once opened
 
 ### Layout Persistence
 - [ ] Switch to Linked → Maps, close the window, reopen -> Linked → Maps still open
@@ -584,10 +595,10 @@ Details for Characters, Maps, Shops and Calendar are under their own sections.
 - [ ] A different browser/user has independent layout preferences (they are client settings)
 
 ### Page Type Creation
-- [ ] "Create Type" button visible in Pages tab toolbar
+- [ ] "New type" shows among the Pages list's commands
 - [ ] Click -> Dialog with name, plural name, icon and color fields
 - [ ] Submit with name "Quest" -> type created, dashboard refreshes
-- [ ] New type appears in bulk "Change Type" dropdown
+- [ ] New type appears in select mode's "Change type" dropdown
 - [ ] Cancel/close without name -> no API call, no errors
 
 ### Settings (in Chronicle Sync)
