@@ -15,7 +15,7 @@
 import { readPath, sameValue } from './_actor-apply-plan.mjs';
 
 /** Formats this module converts; a field with any other format is skipped. */
-export const CREATURE_FORMATS = new Set(['set', 'integer', 'size']);
+export const CREATURE_FORMATS = new Set(['set', 'integer', 'size', 'fraction', 'ac_flat', 'type_subtype']);
 
 const SIZE_LETTERS = new Set(['T', 'S', 'M', 'L']);
 
@@ -63,6 +63,22 @@ function sizeOf(value) {
   return size;
 }
 
+/** A challenge rating ("1/4", "2", "1/2 (100 XP)") as a number: 0.25, 2, 0.5. */
+function fractionOf(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const m = /^\s*(\d+)(?:\s*\/\s*(\d+))?/.exec(String(value ?? ''));
+  if (!m) return null;
+  if (!m[2]) return Number(m[1]);
+  const d = Number(m[2]);
+  return d ? Number(m[1]) / d : null;
+}
+
+/** "Humanoid (goblinoid)" as its type and subtype; no parentheses, no subtype. */
+function typeParts(value) {
+  const m = /^\s*([^()]+?)\s*(?:\(([^()]*)\))?\s*$/.exec(String(value ?? ''));
+  return m ? { type: m[1], subtype: (m[2] ?? '').trim() } : null;
+}
+
 /**
  * One field's Foundry value, or `{skip}` with the reason it was left out.
  * @param {object} field - A creature field definition from Chronicle.
@@ -97,6 +113,23 @@ export function toFoundryValue(field, raw, choicesFor) {
   if (format === 'size') {
     const s = sizeOf(raw);
     return s ? { value: s } : { skip: 'not a size' };
+  }
+  if (format === 'fraction') {
+    const n = fractionOf(raw);
+    return n === null ? { skip: 'not a number' } : { value: n };
+  }
+  if (format === 'ac_flat') {
+    // A printed armour class is the number to show; Foundry derives one
+    // unless it is told the class is flat.
+    const n = integerOf(raw);
+    return n === null ? { skip: 'not a number' } : { value: { calc: 'flat', flat: n } };
+  }
+  if (format === 'type_subtype') {
+    const parts = typeParts(raw);
+    if (!parts) return { skip: 'not a type' };
+    const key = choices ? resolveChoice(parts.type, choices) : parts.type;
+    if (!key) return { skip: `no ${field.foundry_choices} entry for "${parts.type}"`, unknown: [parts.type] };
+    return { value: { value: key, subtype: parts.subtype } };
   }
   if (choices) {
     const key = resolveChoice(raw, choices);

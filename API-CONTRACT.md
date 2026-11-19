@@ -1755,6 +1755,7 @@ allowlist (`api-client.mjs`) is ignored.
 | `npc.spotlight` | none; `resourceId` is the NPC's entity id | "Show in Foundry" pressed on a Chronicle NPC page |
 | `system_state.updated` | `{ systemId, key }`; `resourceId` is the page's entity id; DM-equivalent sockets only | A system widget saved a page's per-system state (Draw Steel negotiation tracker: `systemId` `drawsteel`, `key` `negotiation`) |
 | `hero_layers.changed` | no payload; `resourceId` is the page's entity id; DM-equivalent sockets only; recorded in the change feed as `hero_layers` | The Director put a transformation layer on that page or took one off |
+| `creature_add.requested` | no payload; `resourceId` is the creature page's entity id; DM-equivalent sockets only; recorded in the change feed as `creature_add` (op `created`) | "Add to Foundry" pressed on a creature page |
 | `quest.updated` | `{ version }`; `resourceId` is the quest page's id. Sent only to DM sockets when the change is DM-only | A quest sheet was saved; open quest windows refetch |
 | `notice_boards.updated` | `{ home }` (`page` or `category`); `resourceId` is the page id or the type id | A home's boards changed; open board windows refetch |
 | `roll.made` | A roll (see "Shared rolls" below); `resourceId` is the roll id. Public, gm and blind rolls in full; a self roll only to its owner's key | A roll was made at Chronicle's table or crafting, or recorded from Foundry |
@@ -1886,6 +1887,23 @@ or a 404 (an older Chronicle) stops the reads until the next message.
 `tools/test-layer-effects.mjs`, bench `chr-layer-effect`, `chr-layer-offline`.
 
 Re-verify by: 2026-12-15 (Chronicle `internal/plugins/transformations`, `internal/plugins/syncapi/layers_api.go`; keyxmakerx/Chronicle#2025)
+
+### What the module does with `creature_add.requested`
+
+Creature pages reach Foundry when they are used: a fight places one, or the
+DM presses "Add to Foundry" on the page (Chronicle's
+`POST /campaigns/:id/foundry-vtt/creature-add/:eid`, a web route; the button
+shows only on a creature page of a campaign Foundry has connected to).
+`scripts/creature-sync.mjs` makes that page's actor when it has none (a page
+playing Foundry's own monster makes none). The same request is a change-feed
+row of type `creature_add`, so a world that was closed makes the actor from
+the delta on connect; a full rescan cannot see them. The highest `seq` acted
+on per page is kept in the world setting `creatureAddsHandled`, so a replay
+or the live copy of a handled request never brings back an actor the GM
+deleted. Live edits and the connect walk update only actors that exist.
+`tools/test-creature-add.mjs`, bench `chr-creature-add-offline`.
+
+Re-verify by: 2026-12-19 (Chronicle `internal/plugins/foundry_vtt/creature_add.go`, `internal/app/creature_add_adapters.go`, `internal/plugins/syncapi/sync_change_bus.go`)
 
 ### What the module does with `note.*`
 

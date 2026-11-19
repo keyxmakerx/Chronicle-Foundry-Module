@@ -2,7 +2,11 @@
  * Chronicle Sync - Creature sync (Chronicle creature pages to Foundry NPC actors)
  *
  * A creature page becomes an NPC actor in the "Chronicle: Creatures" folder
- * and follows every change to its stat block. Chronicle owns the stat block;
+ * when it is used, and then follows every change to its stat block. Used
+ * means a fight places it (`ensureActor`) or the DM pressed "Add to
+ * Foundry" on the page (`creature_add` in the change feed, _creature-add.mjs);
+ * a page nobody uses makes no actor, so a monster book does not fill the
+ * world and an actor the GM deletes stays deleted until it is used again. Chronicle owns the stat block;
  * Foundry owns only the fields the system's preset lists in
  * `foundry_pull_fields` (current Stamina and conditions for Draw Steel), and
  * sends those back only for a page whose director turned it on (the page's
@@ -19,7 +23,8 @@
  */
 
 import { flagRemoval } from './_flag-removal.mjs';
-import { getSetting } from './settings.mjs';
+import { getSetting, setSetting } from './settings.mjs';
+import { ADD_TYPE, addRequests, isNewAdd, recordAdd } from './_creature-add.mjs';
 import { FLAG_SCOPE, syncOptions, APPLY_OPTION } from './constants.mjs';
 import { LINK_FLAG } from './npc-presence.mjs';
 import { walkEntityPages, unwrapEntityList } from './_entity-page-walk.mjs';
@@ -85,6 +90,14 @@ export class CreatureSync {
     // Every GM client runs sync; only the active one may create actors.
     return !!(this._defs && getSetting('syncCreatures') && isAnsweringGM(game.user, game.users?.activeGM));
   }
+
+  /** The change-feed area: "Add to Foundry" requests made while the world was closed. */
+  get feedArea() { return 'creatures'; }
+
+  /** A delta needs a cursor saved while Chronicle recorded these requests. */
+  get feedType() { return ADD_TYPE; }
+
+  feedActive() { return this._active; }
 
   /** True when this client makes creature actors, so a fight can ask for one. */
   get canMakeActors() {
@@ -199,8 +212,14 @@ export class CreatureSync {
     return this._findActor(entityId);
   }
 
-  /** Brings every creature page in on connect; actors already current are left alone. */
-  async onInitialSync() {
+  /**
+   * On connect, brings each creature actor up to date and makes the actors
+   * asked for with "Add to Foundry" while the world was closed (feed delta
+   * only: a full rescan cannot see them). A page with no actor otherwise
+   * stays without one until it is used.
+   * @param {{feed?: {mode: 'delta'|'full', changes?: object[]}}} [opts]
+   */
+  async onInitialSync(opts) {
     if (!this._active) return;
     // A missed system_state message must not leave an old answer in place.
     this._sendBack.clear();
@@ -212,7 +231,7 @@ export class CreatureSync {
     if (walked.truncated) log.warn(`Creature sync stopped at ${walked.entities.length} creatures; there are more.`);
     let errors = 0;
     for (const entity of walked.entities) {
-      if (!(await this._upsert(entity))) errors++;
+      if (!(await this._upsert(entity, { create: false }))) errors++;
     }
     // Pages removed while Foundry was closed; a cut-short walk proves nothing.
     if (!walked.truncated) {
@@ -221,7 +240,31 @@ export class CreatureSync {
         if (!seen.has(actor.getFlag(FLAG_SCOPE, CREATURE_FLAG))) await this._unlink(actor.getFlag(FLAG_SCOPE, CREATURE_FLAG));
       }
     }
+    if (opts?.feed?.mode === 'delta') {
+      for (const [entityId, seq] of addRequests(opts.feed.changes)) {
+        if (!(await this._addRequested(entityId, seq))) errors++;
+      }
+    }
     if (errors) throw new Error(`creature catch-up: ${errors} creature(s) failed`);
+  }
+
+  /**
+   * "Add to Foundry" on a page: make its actor once per request. A page
+   * playing Foundry's own monster makes none, as a fight would.
+   * @param {string} entityId
+   * @param {number} [seq] - the request's change-feed seq.
+   * @returns {Promise<boolean>} false when making it failed.
+   */
+  async _addRequested(entityId, seq) {
+    const handled = getSetting('creatureAddsHandled') ?? {};
+    if (!isNewAdd(handled, entityId, seq)) return true;
+    await this._refreshMatch(entityId);
+    if (!playsFoundry(this._matches.get(entityId)) && !this._findActor(entityId)) {
+      if (!(await this._upsert({ id: entityId }))) return false;
+    }
+    const next = recordAdd(handled, entityId, seq);
+    if (next[entityId] !== handled[entityId]) await setSetting('creatureAddsHandled', next);
+    return true;
   }
 
   async onMessage(msg) {
@@ -237,6 +280,10 @@ export class CreatureSync {
       if (actor && msg.payload.key === formKey(actor.getFlag(FLAG_SCOPE, FORM_FLAG))) await this._upsert({ id: msg.resourceId });
       return;
     }
+    if (msg?.type === 'creature_add.requested') {
+      if (msg.resourceId) await this._addRequested(msg.resourceId, msg.seq);
+      return;
+    }
     if (!msg?.type?.startsWith('entity.')) return;
     const entity = msg.payload;
     if (!entity?.id) return;
@@ -246,8 +293,10 @@ export class CreatureSync {
     }
     if (entity.entity_type_id && entity.entity_type_id !== this._typeId) return;
     if (!entity.entity_type_id && entity.type_slug !== this._defs.preset_slug) return;
+    // Only a page already in Foundry follows the edit; a new page waits until it is used.
+    if (!this._findActor(entity.id)) return;
     await this._refreshMatch(entity.id);
-    await this._upsert(entity);
+    await this._upsert(entity, { create: false });
   }
 
   _findActor(entityId) {
@@ -277,22 +326,26 @@ export class CreatureSync {
 
   /**
    * Create or update the actor for one creature page.
+   * @param {object} entity
+   * @param {{create?: boolean}} [opts] - create false only updates an actor
+   *   that exists; a page without one is left alone.
    * @returns {Promise<boolean>} false when it failed.
    */
-  _upsert(entity) {
+  _upsert(entity, { create = true } = {}) {
     // Overlapping events for one page (created then updated) run in turn, so
     // the second sees the first's actor instead of making another.
     const prev = this._inFlight.get(entity.id) ?? Promise.resolve();
-    const run = prev.then(() => this._upsertNow(entity));
+    const run = prev.then(() => this._upsertNow(entity, create));
     this._inFlight.set(entity.id, run);
     run.finally(() => { if (this._inFlight.get(entity.id) === run) this._inFlight.delete(entity.id); });
     return run;
   }
 
-  async _upsertNow(entity) {
+  async _upsertNow(entity, create = true) {
     // Foundry's own monster is this creature; an actor made earlier, before
     // the DM chose, is left as it is.
     if (playsFoundry(this._matches.get(entity.id))) return true;
+    if (!create && !this._findActor(entity.id)) return true;
     try {
       if (!entity.fields_data) entity = await this._api.get(`/entities/${entity.id}`);
       const before = this._known.get(entity.id);
