@@ -9,8 +9,9 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
-  CATCH_UP_LIMIT, catchUpPlan, groupStats, matchesSearch, pageDetails, pageMenu, pageStatus,
-  pageTrouble, rowAction, rowHasMenu, rowState, sendAgainPlan, stateLabelKey, typeMenu,
+  CATCH_UP_LIMIT, bringInPlan, catchUpPlan, groupStats, journalAction, journalDetails, journalLabelKey,
+  journalMenu, journalState, linkKeeps, matchesSearch, nameClashes, nameKey, pageDetails, pageMenu,
+  pageStatus, pageTrouble, rowAction, rowHasMenu, rowState, sendAgainPlan, sendPlan, stateLabelKey, typeMenu,
 } from '../scripts/_page-rows.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -76,14 +77,114 @@ test('a row shows one state, and trouble outranks standing', () => {
   assert.equal(rowState('modified', { trouble: { kind: 'waiting' } }), 'waiting');
   assert.equal(rowState('synced', { trouble: { kind: 'failed' } }), 'failed');
   assert.equal(rowState('synced', { excluded: true, trouble: { kind: 'failed' } }), 'off');
-  // A page with no journal still offers Bring in, even with sync off for its type.
-  assert.equal(rowState('chronicle-only', { excluded: true }), 'chronicle-only');
   assert.equal(rowState('actor', { excluded: true, catchingUp: true }), 'actor');
   assert.equal(rowState('modified', { catchingUp: true }), 'catching-up');
 });
 
+test('a page with no journal says why it is not brought in by itself', () => {
+  assert.equal(rowState('chronicle-only'), 'chronicle-only');
+  assert.equal(rowState('chronicle-only', { catchingUp: true }), 'bringing-in');
+  assert.equal(rowState('chronicle-only', { excluded: true }), 'chronicle-only-off');
+  assert.equal(rowState('chronicle-only', { clash: true }), 'clash');
+  assert.equal(rowState('chronicle-only', { character: true }), 'character');
+  assert.equal(rowState('chronicle-only', { trouble: { kind: 'failed' } }), 'failed');
+  // Sync off outranks a clash: the page is not coming in either way.
+  assert.equal(rowState('chronicle-only', { excluded: true, clash: true }), 'chronicle-only-off');
+  // Only the plain state is brought in, each page once, within the limit.
+  const rows = ['chronicle-only', 'chronicle-only-off', 'clash', 'character', 'failed', 'bringing-in', 'chronicle-only']
+    .map((state, i) => ({ id: String(i), state }));
+  assert.deepEqual(bringInPlan({ rows, tried: new Set() }), ['0', '6']);
+  assert.deepEqual(bringInPlan({ rows, tried: new Set(['0']) }), ['6']);
+  assert.deepEqual(bringInPlan({ rows, tried: new Set(), limit: 1 }), ['0']);
+  assert.deepEqual(bringInPlan({ rows, tried: new Set(), limit: 0 }), []);
+});
+
+test('a page and a journal of one name are held, and only a clean pair can be linked', () => {
+  assert.equal(nameKey('  The  Brass\tLantern '), 'the brass lantern');
+  const page = (id, name, extra = {}) => ({ id, name, status: 'chronicle-only', ...extra });
+  // One unlinked page, one unlinked journal: a pair.
+  let got = nameClashes({ rows: [page('p1', 'Brass Lantern'), page('p2', 'Other')], journals: [{ id: 'j1', name: 'brass  lantern' }, { id: 'j2', name: 'Loose notes' }] });
+  assert.deepEqual([...got.pages], [['p1', 'j1']]);
+  assert.deepEqual([...got.journals], [['j1', { entityId: 'p1' }]]);
+  // The page already has a journal: the second journal is held, with no pair.
+  got = nameClashes({ rows: [{ id: 'p1', name: 'Low Harbor', status: 'synced' }], journals: [{ id: 'j1', name: 'Low Harbor' }] });
+  assert.deepEqual([...got.journals], [['j1', { entityId: null }]]);
+  assert.equal(got.pages.size, 0);
+  // A journal linked since the list was read counts too.
+  got = nameClashes({ rows: [], journals: [{ id: 'j1', name: 'Low Harbor' }], linkedNames: ['low harbor'] });
+  assert.deepEqual([...got.journals], [['j1', { entityId: null }]]);
+  // Two journals of the name, or a page with sync off: held, never paired.
+  got = nameClashes({ rows: [page('p1', 'Tavern')], journals: [{ id: 'j1', name: 'Tavern' }, { id: 'j2', name: 'Tavern' }] });
+  assert.deepEqual([...got.pages], [['p1', null]]);
+  assert.deepEqual([...got.journals.values()], [{ entityId: null }, { entityId: null }]);
+  got = nameClashes({ rows: [page('p1', 'Tavern', { excluded: true })], journals: [{ id: 'j1', name: 'Tavern' }] });
+  assert.deepEqual([...got.journals], [['j1', { entityId: null }]]);
+  // Two journals of one name with nothing of that name in Chronicle are not a clash.
+  got = nameClashes({ rows: [page('p1', 'Other')], journals: [{ id: 'j1', name: 'Notes' }, { id: 'j2', name: 'Notes' }] });
+  assert.equal(got.journals.size, 0);
+  assert.deepEqual(rowAction('clash', { paired: true }), { action: 'pages-link', labelKey: 'Link' });
+  assert.deepEqual(rowAction('clash'), { action: 'pull-entity', labelKey: 'BringIn' });
+});
+
+test('a journal with no page is sent by itself only in its plain state', () => {
+  assert.equal(journalState(), 'foundry-only');
+  assert.equal(journalState({ setAside: true, clash: {}, failure: {} }), 'set-aside');
+  assert.equal(journalState({ keepLocal: true, clash: {} }), 'off');
+  assert.equal(journalState({ clash: { entityId: null }, failure: {} }), 'clash');
+  assert.equal(journalState({ failure: { message: 'x' } }), 'failed');
+  assert.equal(journalState({ sending: true, setAside: true }), 'sending');
+  const journals = ['foundry-only', 'set-aside', 'off', 'clash', 'failed', 'sending', 'foundry-only'].map((state, i) => ({ id: `j${i}`, state }));
+  assert.deepEqual(sendPlan({ journals, tried: new Set() }), ['j0', 'j6']);
+  assert.deepEqual(sendPlan({ journals, tried: new Set(['j0']) }), ['j6']);
+  assert.deepEqual(sendPlan({ journals, tried: new Set(), limit: 1 }), ['j0']);
+  // The one button, and the menu.
+  assert.deepEqual(journalAction('foundry-only'), { action: 'push-journal', labelKey: 'Send' });
+  assert.deepEqual(journalAction('set-aside'), { action: 'push-journal', labelKey: 'Send' });
+  assert.deepEqual(journalAction('failed'), { action: 'push-journal', labelKey: 'TryAgain' });
+  assert.deepEqual(journalAction('clash', { paired: true }), { action: 'pages-link', labelKey: 'Link' });
+  assert.deepEqual(journalAction('clash'), { action: 'push-journal', labelKey: 'Send' });
+  assert.equal(journalAction('off'), null);
+  assert.equal(journalAction('sending'), null);
+  const actions = (row) => journalMenu(row).map((item) => item.action);
+  assert.deepEqual(actions({ state: 'foundry-only' }), ['pages-journal-sync', 'pages-copy-journal']);
+  assert.deepEqual(actions({ state: 'clash', paired: true }), ['push-journal', 'pages-journal-sync', 'pages-copy-journal']);
+  assert.deepEqual(actions({ state: 'clash' }), ['pages-journal-sync', 'pages-copy-journal']);
+  assert.deepEqual(actions({ state: 'set-aside' }), ['pages-copy-journal']);
+  assert.deepEqual(journalMenu({ state: 'off', keepLocal: true })[0], { action: 'pages-journal-sync', labelKey: 'MenuJournalOn', data: { enable: 'true' } });
+  for (const state of ['foundry-only', 'set-aside', 'off', 'clash', 'failed', 'sending']) assert.ok(lang[journalLabelKey(state)], `no word for ${state}`);
+  for (const item of [...journalMenu({ state: 'clash', paired: true }), ...journalMenu({ state: 'off', keepLocal: true }), journalAction('failed'), journalAction('clash', { paired: true }), journalAction('foundry-only')]) {
+    assert.ok(lang[item.labelKey], `no label ${item.labelKey}`);
+  }
+});
+
+test('linking keeps the text the conflict setting picks', () => {
+  const page = '2026-11-19T19:00:00Z';
+  assert.equal(linkKeeps({ strategy: 'chronicle', journalChangedAt: Date.parse(page) + 9e6, pageUpdatedAt: page }), 'chronicle');
+  assert.equal(linkKeeps({ strategy: 'foundry', pageUpdatedAt: page }), 'foundry');
+  assert.equal(linkKeeps({ strategy: 'newest', journalChangedAt: Date.parse(page) + 1, pageUpdatedAt: page }), 'foundry');
+  assert.equal(linkKeeps({ strategy: 'newest', journalChangedAt: Date.parse(page) - 1, pageUpdatedAt: page }), 'chronicle');
+  // When it cannot be told which is newer, Chronicle's is kept.
+  assert.equal(linkKeeps({ strategy: 'newest', pageUpdatedAt: page }), 'chronicle');
+  assert.equal(linkKeeps({ strategy: 'newest', journalChangedAt: 5, pageUpdatedAt: '' }), 'chronicle');
+  assert.equal(linkKeeps({ strategy: undefined }), 'chronicle');
+});
+
+test('a journal\'s copied details say where it stands and never carry its text', () => {
+  const text = journalDetails({
+    journal: { id: 'j1', name: 'Loose notes', state: 'clash', pageCount: 2, text: '<p>secret</p>' },
+    clash: { entityId: 'p9' },
+    failure: { message: 'Chronicle answered 500', at: 1 },
+    versions: { Foundry: '14.1', Connection: 'connected', Empty: '' },
+  });
+  assert.match(text, /Journal: Loose notes/);
+  assert.match(text, /Same name as a Chronicle page: yes, page p9, not linked/);
+  assert.match(text, /Trouble: Chronicle answered 500/);
+  assert.match(text, /Foundry: 14\.1/);
+  assert.doesNotMatch(text, /secret|Empty/);
+});
+
 test('every state has a word, and every word and menu label exists', () => {
-  const states = ['synced', 'modified', 'chronicle-only', 'actor', 'off', 'catching-up', 'waiting', 'failed'];
+  const states = ['synced', 'modified', 'chronicle-only', 'chronicle-only-off', 'bringing-in', 'clash', 'character', 'actor', 'off', 'catching-up', 'waiting', 'failed'];
   for (const state of states) assert.ok(lang[stateLabelKey(state)], `no word for ${state}`);
   for (const state of states) {
     const action = rowAction(state);
@@ -96,20 +197,20 @@ test('every state has a word, and every word and menu label exists', () => {
     ...typeMenu({ typeExcluded: true, collapsed: true }),
   ];
   for (const item of menus) assert.ok(lang[item.labelKey], `no label ${item.labelKey}`);
-  for (const part of [...groupStats([{ state: 'synced' }, { state: 'chronicle-only' }, { state: 'modified' }, { state: 'failed' }, { state: 'off' }]),
+  for (const part of [...groupStats([{ state: 'synced' }, { state: 'chronicle-only' }, { state: 'bringing-in' }, { state: 'modified' }, { state: 'failed' }, { state: 'off' }]),
     ...groupStats([{}], { typeExcluded: true }), ...groupStats([{}, {}], { typeExcluded: true })]) {
     assert.ok(lang[part.key], `no words for ${part.key}`);
   }
 });
 
-test('a row has at most one button, and only rows with a journal have a menu', () => {
+test('a row has at most one button, and a row being worked on has no menu', () => {
   assert.deepEqual(rowAction('chronicle-only'), { action: 'pull-entity', labelKey: 'BringIn' });
+  assert.deepEqual(rowAction('chronicle-only-off'), { action: 'pull-entity', labelKey: 'BringIn' });
   assert.deepEqual(rowAction('failed'), { action: 'pages-retry', labelKey: 'TryAgain' });
   assert.deepEqual(rowAction('waiting'), { action: 'pages-send-waiting', labelKey: 'SendNow' });
-  for (const state of ['synced', 'modified', 'off', 'actor', 'catching-up']) assert.equal(rowAction(state), null);
-  assert.equal(rowHasMenu('synced'), true);
-  assert.equal(rowHasMenu('failed'), true);
-  for (const state of ['chronicle-only', 'actor', 'catching-up']) assert.equal(rowHasMenu(state), false);
+  for (const state of ['synced', 'modified', 'off', 'actor', 'character', 'catching-up', 'bringing-in']) assert.equal(rowAction(state), null);
+  for (const state of ['synced', 'failed', 'chronicle-only', 'chronicle-only-off', 'clash']) assert.equal(rowHasMenu(state), true);
+  for (const state of ['actor', 'character', 'catching-up', 'bringing-in']) assert.equal(rowHasMenu(state), false);
 });
 
 test('the page menu follows the page', () => {
@@ -121,19 +222,23 @@ test('the page menu follows the page', () => {
   assert.deepEqual(off.map((item) => item.action), ['toggle-visibility', 'pages-toggle-sync', 'pages-copy-details']);
   assert.deepEqual(off[0], { action: 'toggle-visibility', labelKey: 'MenuShow', data: { isPrivate: 'true' } });
   assert.deepEqual(off[1], { action: 'pages-toggle-sync', labelKey: 'MenuSyncOn', data: { enable: 'true' } });
+  // A page with no journal has nothing to sync again or hide here: the switch is how it is kept out.
+  assert.deepEqual(actions({ state: 'chronicle-only', isPrivate: false, pageExcluded: false, typeExcluded: false, journalId: null }),
+    ['pages-toggle-sync', 'pages-copy-details']);
   // A page whose whole type is off has no switch of its own.
   assert.deepEqual(actions({ state: 'off', isPrivate: false, pageExcluded: false, typeExcluded: true }),
     ['toggle-visibility', 'pages-copy-details']);
 });
 
 test('the small print beside a type leaves out what is empty', () => {
-  const rows = [{ state: 'synced' }, { state: 'actor' }, { state: 'chronicle-only' }, { state: 'catching-up' }, { state: 'waiting' }, { state: 'failed' }, { state: 'off' }];
+  const rows = [{ state: 'synced' }, { state: 'actor' }, { state: 'chronicle-only' }, { state: 'clash' }, { state: 'bringing-in' }, { state: 'catching-up' },
+    { state: 'waiting' }, { state: 'failed' }, { state: 'off' }, { state: 'chronicle-only-off' }];
   assert.deepEqual(groupStats(rows), [
-    { key: 'StatInSync', count: 2 }, { key: 'StatOnlyChronicle', count: 1 }, { key: 'StatChanged', count: 1 },
-    { key: 'StatTrouble', count: 2 }, { key: 'StatOff', count: 1 },
+    { key: 'StatInSync', count: 2 }, { key: 'StatOnlyChronicle', count: 2 }, { key: 'StatBringingIn', count: 1 }, { key: 'StatChanged', count: 1 },
+    { key: 'StatTrouble', count: 2 }, { key: 'StatOff', count: 2 },
   ]);
   assert.deepEqual(groupStats([{ state: 'synced' }]), [{ key: 'StatInSync', count: 1 }]);
-  assert.deepEqual(groupStats(rows, { typeExcluded: true }), [{ key: 'StatTypeOff', count: 7 }]);
+  assert.deepEqual(groupStats(rows, { typeExcluded: true }), [{ key: 'StatTypeOff', count: 10 }]);
   assert.deepEqual(groupStats([{ state: 'off' }], { typeExcluded: true }), [{ key: 'StatTypeOffOne', count: 1 }]);
 });
 
@@ -249,7 +354,8 @@ test('every list action in the markup and the menus is one the window handles', 
   const inMenus = [
     ...pageMenu({ state: 'synced', isPrivate: false, pageExcluded: false, typeExcluded: false }),
     ...typeMenu({ typeExcluded: false, collapsed: false }),
-    rowAction('chronicle-only'), rowAction('failed'), rowAction('waiting'),
+    rowAction('chronicle-only'), rowAction('failed'), rowAction('waiting'), rowAction('clash', { paired: true }),
+    ...journalMenu({ state: 'clash', paired: true }), journalAction('foundry-only'),
   ].map((item) => item.action);
   for (const action of new Set([...inPane, ...inMenus])) {
     assert.match(dash, new RegExp(`\\n\\s+'?${action}'?: SyncDashboard\\.#on`), `no handler for ${action}`);
@@ -266,12 +372,21 @@ test('the menu is built without innerHTML and closes on Escape', () => {
 test('the list fixes by itself only within bounds', () => {
   // Chronicle's copy is applied by the path a live change takes.
   assert.match(dash, /await journalSync\._onEntityUpdated\(entity\);/);
-  // Nothing is tried while Chronicle is away, and one pass is made per loaded list.
-  const fix = dash.slice(dash.indexOf('  _fixPagesByItself() {'), dash.indexOf('  async _retryPage('));
+  // Nothing is tried while Chronicle is away, page sync is off or the first-run setup is still open.
+  const fix = dash.slice(dash.indexOf('  _fixPagesByItself() {'), dash.indexOf('  async _sendJournal('));
   assert.match(fix, /if \(this\.api\?\.state !== 'connected'\) return;/);
-  assert.match(fix, /this\._catchUpList === this\._cache\.entities\) return;/);
+  assert.match(fix, /if \(this\._catchUpRunning\) return;/);
   assert.match(fix, /getSetting\('syncJournals'\)/);
+  assert.match(fix, /if \(getSetting\('firstRunPending'\)\) return;/);
   assert.doesNotMatch(fix, /setInterval|setTimeout/);
+  // Everything tried is remembered before the work starts, so a redraw cannot start it twice.
+  assert.match(fix, /for \(const id of ids\) this\._catchUpTried\.add\(id\);\s*for \(const id of journals\) this\._sendTried\.add\(id\);\s*this\._catchUpRunning = true;/);
+  // A list cut short sends nothing unasked: a page of the same name may lie past the cut.
+  assert.match(fix, /const journals = this\._cache\.entitiesTruncated \? \[\] : sendPlan\(/);
+  // One way to make a page from a journal, for the list and for a new journal alike.
+  assert.match(dash, /await journalSync\._sendJournalAsPage\(journal\);/);
+  assert.doesNotMatch(dash, /entity_type_id: 0/);
+  assert.equal((read('scripts/journal-sync.mjs').match(/this\._api\.post\('\/entities'/g) ?? []).length, 1);
   // A change of the GM's own that was not sent goes back through the push path.
   assert.match(dash, /trouble\?\.direction === 'out' && journal && journalSync\) \{[\s\S]*?await journalSync\._pushJournalUpdate\(journal, entityId\);/);
 });

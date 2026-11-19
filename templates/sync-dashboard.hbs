@@ -290,15 +290,23 @@
           </div>
           <div class="cs-pages-rows" data-page-rows>
             {{#each foundryOnlyJournals}}
-            <div class="cs-page-row is-foundry-only" data-page-row data-page-name="{{name}}" {{#if hidden}}hidden{{/if}}>
+            <div class="cs-page-row is-{{state}}" data-page-row data-journal-row="{{id}}" data-page-name="{{name}}" {{#if hidden}}hidden{{/if}}>
               <span class="cs-page-dot" aria-hidden="true"></span>
               <span class="cs-page-name">{{name}}</span>
-              <span class="cs-page-state">{{#if setAside}}{{localize "CHRONICLE.Dashboard.Entities.SetAside"}}{{else}}{{localize "CHRONICLE.Dashboard.Entities.FoundryOnlyStatus"}}{{/if}}</span>
-              <button type="button" class="cs-page-btn" data-action="push-journal" data-journal-id="{{id}}">{{localize "CHRONICLE.Dashboard.Entities.Push"}}</button>
+              <span class="cs-page-state" {{#if stateTitle}}title="{{stateTitle}}"{{/if}}>{{stateLabel}}</span>
+              {{#if action}}
+              <button type="button" class="cs-page-btn" data-action="{{action.action}}" data-journal-id="{{id}}">{{action.label}}</button>
+              {{/if}}
+              {{#unless sending}}
               <button type="button" class="cs-row-icon cs-row-icon-danger" data-action="delete-journal" data-journal-id="{{id}}"
                       title="{{localize 'CHRONICLE.Dashboard.Entities.Delete'}}" aria-label="{{localize 'CHRONICLE.Dashboard.Entities.Delete'}}">
                 <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
               </button>
+              <button type="button" class="cs-row-icon" data-action="pages-journal-menu" data-journal-id="{{id}}"
+                      aria-haspopup="menu" aria-expanded="false" title="{{menuLabel}}" aria-label="{{menuLabel}}">
+                <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+              </button>
+              {{/unless}}
             </div>
             {{/each}}
           </div>

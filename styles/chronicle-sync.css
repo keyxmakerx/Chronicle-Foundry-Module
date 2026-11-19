@@ -695,10 +695,16 @@ button.chronicle-shop-door {
 .cs-page-row.is-modified .cs-page-dot,
 .cs-page-row.is-catching-up .cs-page-dot,
 .cs-page-row.is-waiting .cs-page-dot { background: var(--cs-warn); }
-.cs-page-row.is-chronicle-only .cs-page-dot { background: var(--cs-info); }
-.cs-page-row.is-foundry-only .cs-page-dot { background: var(--cs-attention); }
+.cs-page-row.is-bringing-in .cs-page-dot,
+.cs-page-row.is-sending .cs-page-dot { background: var(--cs-warn); }
+.cs-page-row.is-chronicle-only .cs-page-dot,
+.cs-page-row.is-character .cs-page-dot { background: var(--cs-info); }
+.cs-page-row.is-foundry-only .cs-page-dot,
+.cs-page-row.is-set-aside .cs-page-dot,
+.cs-page-row.is-clash .cs-page-dot { background: var(--cs-attention); }
 .cs-page-row.is-failed .cs-page-dot { background: var(--cs-bad); }
-.cs-page-row.is-off .cs-page-dot { background: none; box-shadow: inset 0 0 0 1px var(--cs-text-muted); }
+.cs-page-row.is-off .cs-page-dot,
+.cs-page-row.is-chronicle-only-off .cs-page-dot { background: none; box-shadow: inset 0 0 0 1px var(--cs-text-muted); }
 
 /* A row's one real command. */
 .chronicle-dashboard .cs-page-btn {

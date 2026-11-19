@@ -48,7 +48,7 @@ test('the shop menu listens on both directory hook names and records the slug', 
   assert.match(widget, /Hooks\.on\('getJournalEntryContextOptions', addOpenShop\)/);
   assert.doesNotMatch(widget, /=== 'Shop'/);
   const sync = readFileSync(new URL('../scripts/journal-sync.mjs', import.meta.url), 'utf8');
-  assert.equal((sync.match(/entity\.type_slug/g) || []).length, 2, 'create and update both record the slug');
+  assert.equal((sync.match(/entity\.type_slug/g) || []).length, 3, 'create, update and link all record the slug');
 });
 
 // Just enough DOM for the door: elements found by class, a pages area that

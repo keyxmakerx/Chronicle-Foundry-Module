@@ -13,7 +13,7 @@ import { flagRemoval } from './_flag-removal.mjs';
 import { noticeText, escapeHtml } from './_escape-html.mjs';
 import { getSetting, setSetting, getSyncExclusions } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
-import { FLAG_SCOPE, syncOptions } from './constants.mjs';
+import { FLAG_SCOPE, KEEP_LOCAL_FLAG, syncOptions } from './constants.mjs';
 import { TYPE_SLUG_FLAG } from './_shop-journal.mjs';
 import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
 import {
@@ -1236,16 +1236,58 @@ export class JournalSync {
       return;
     }
 
+    // A copy of a journal the GM turned sync off for carries that choice.
+    if (journal.getFlag(FLAG_SCOPE, KEEP_LOCAL_FLAG) === true) return;
+
+    try {
+      const sent = await this._sendJournalAsPage(journal);
+      if (!sent) {
+        console.warn(`Chronicle: "${journal.name}" not sent; the campaign has no page types`);
+        this._syncManager?.logActivity?.('error', `"${journal.name}" not sent: the campaign has no page types`);
+        return;
+      }
+      console.debug(`Chronicle: Pushed new journal "${journal.name}" to Chronicle`);
+      this._syncManager?.recordUserOutcome?.(userId);
+    } catch (err) {
+      // Surface push failures to the GM instead of failing silently; the
+      // REST error itself is already in the dashboard's error log.
+      console.error('Chronicle: Failed to push journal to Chronicle', err);
+      this._syncManager?.recordUserOutcome?.(userId, err);
+      ui.notifications?.warn?.(`Chronicle: Failed to send journal "${noticeText(journal.name)}". Check the sync dashboard for details.`);
+    }
+  }
+
+  /**
+   * True when another part of the module owns this journal (a calendar
+   * note, a map, the old notes folder), so it is never a page of its own.
+   * @param {JournalEntry} journal
+   * @returns {boolean}
+   */
+  _ownedElsewhere(journal) {
+    return isCalendarNoteJournal(journal) || isOldNotesJournal(journal, FLAG_SCOPE) || isMapJournal(journal, FLAG_SCOPE);
+  }
+
+  /**
+   * Make a Chronicle page for a journal that has none, and link the two.
+   * The one way a journal becomes a page, for a journal just made and for
+   * one the Chronicle Sync window sends. Throws when Chronicle refuses, so
+   * each caller tells the GM in its own way.
+   * @param {JournalEntry} journal
+   * @returns {Promise<{entityId: string}|null>} null when the campaign has no page types
+   * @private
+   */
+  async _sendJournalAsPage(journal) {
+    if (journal.getFlag(FLAG_SCOPE, 'entityId') || this._ownedElsewhere(journal)) {
+      throw new Error(`"${journal.name}" is already linked or is not a page`);
+    }
+    // Two senders for one journal would make two pages.
+    if (this._inFlightCreates.has(journal.id)) throw new Error(`"${journal.name}" is already being sent`);
     // Marked before the first await so the entity.created broadcast, which
     // can beat our POST response, finds it and does not make a second journal.
     this._inFlightCreates.set(journal.id, journal.name);
     try {
       const entityTypeId = await this._resolveCreateTypeId();
-      if (!entityTypeId) {
-        console.warn(`Chronicle: "${journal.name}" not sent; the campaign has no page types`);
-        this._syncManager?.logActivity?.('error', `"${journal.name}" not sent: the campaign has no page types`);
-        return;
-      }
+      if (!entityTypeId) return null;
 
       const isPrivate =
         (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER;
@@ -1257,48 +1299,84 @@ export class JournalSync {
         entityTypeId,
         isPrivate,
       }));
+      if (!entity?.id) throw new Error('Chronicle did not return the new page');
 
-      if (entity) {
-        // Linked before the text goes up, so a failed text push leaves a
-        // linked journal whose next edit retries it, not an orphan page.
-        await journal.update({
-          [`flags.${FLAG_SCOPE}.entityId`]: entity.id,
-          [`flags.${FLAG_SCOPE}.lastSync`]: new Date().toISOString(),
-          [`flags.${FLAG_SCOPE}.chronicleUpdatedAt`]: entity.updated_at || '',
-        }, syncOptions());
+      // Linked before the text goes up, so a failed text push leaves a
+      // linked journal whose next edit retries it, not an orphan page.
+      await journal.update({
+        [`flags.${FLAG_SCOPE}.entityId`]: entity.id,
+        [`flags.${FLAG_SCOPE}.lastSync`]: new Date().toISOString(),
+        [`flags.${FLAG_SCOPE}.chronicleUpdatedAt`]: entity.updated_at || '',
+      }, syncOptions());
 
-        const entryHtml = await this._entryForPush(journal, entity.id);
-        if (entryHtml) {
-          const updated = await this._api.put(`/entities/${entity.id}`, { entry: entryHtml });
-          await this._recordPush(journal, updated);
-          await this._hidePushedSecrets(journal, updated);
-        }
+      const entryHtml = await this._entryForPush(journal, entity.id);
+      if (entryHtml) {
+        const updated = await this._api.put(`/entities/${entity.id}`, { entry: entryHtml });
+        await this._recordPush(journal, updated);
+        await this._hidePushedSecrets(journal, updated);
+      }
 
-        // Create sync mapping (idempotent — tolerates server-side
-        // mapping created concurrently or pre-existing for this entity).
+      // Create sync mapping (idempotent — tolerates server-side
+      // mapping created concurrently or pre-existing for this entity).
+      await this._syncManager?.ensureMapping({
+        chronicle_type: 'entity',
+        chronicle_id: entity.id,
+        external_system: 'foundry',
+        external_id: journal.id,
+        sync_direction: 'both',
+      });
+
+      // Push initial permissions from Foundry ownership.
+      await this._pushPermissions(entity.id, journal.ownership, isPrivate, journal.name, journal);
+      return { entityId: entity.id };
+    } finally {
+      this._inFlightCreates.delete(journal.id);
+    }
+  }
+
+  /**
+   * Link a journal that has no page to a Chronicle page that has no journal,
+   * keeping one side's text. Runs in the page's queue slot and checks again
+   * there, so a live change for the page cannot make a second journal
+   * meanwhile. Keeping Foundry's text sends only the text: the page's name
+   * and who may see it stay as Chronicle has them.
+   * @param {JournalEntry} journal
+   * @param {object} entity - the page, from GET /entities/:id
+   * @param {'chronicle'|'foundry'} keep
+   * @returns {Promise<void>}
+   * @private
+   */
+  async _linkJournalToPage(journal, entity, keep) {
+    await this._queue.run(entity.id, async () => {
+      if (this._findJournal(entity.id)) throw new Error(`"${entity.name}" already has a journal`);
+      if (journal.getFlag(FLAG_SCOPE, 'entityId') || this._ownedElsewhere(journal)) {
+        throw new Error(`"${journal.name}" is already linked or is not a page`);
+      }
+      // Foundry's text goes up against the version just read, so a Chronicle
+      // edit made meanwhile is a conflict, not silently overwritten.
+      await journal.update({
+        [`flags.${FLAG_SCOPE}.entityId`]: entity.id,
+        [`flags.${FLAG_SCOPE}.entityType`]: entity.type_name || '',
+        [`flags.${FLAG_SCOPE}.${TYPE_SLUG_FLAG}`]: entity.type_slug || '',
+        [`flags.${FLAG_SCOPE}.lastSync`]: new Date().toISOString(),
+        [`flags.${FLAG_SCOPE}.chronicleUpdatedAt`]: keep === 'foundry' ? (entity.updated_at || '') : '',
+      }, syncOptions());
+      try {
         await this._syncManager?.ensureMapping({
           chronicle_type: 'entity',
           chronicle_id: entity.id,
           external_system: 'foundry',
           external_id: journal.id,
           sync_direction: 'both',
+          sync_metadata: { foundry_type: 'JournalEntry' },
         });
-
-        // Push initial permissions from Foundry ownership.
-        await this._pushPermissions(entity.id, journal.ownership, isPrivate, journal.name, journal);
-
-        console.debug(`Chronicle: Pushed new journal "${journal.name}" to Chronicle`);
-        this._syncManager?.recordUserOutcome?.(userId);
+      } catch (err) {
+        console.warn('Chronicle: Failed to create sync mapping', err);
       }
-    } catch (err) {
-      // Surface push failures to the GM instead of failing silently; the
-      // REST error itself is already in the dashboard's error log.
-      console.error('Chronicle: Failed to push journal to Chronicle', err);
-      this._syncManager?.recordUserOutcome?.(userId, err);
-      ui.notifications?.warn?.(`Chronicle: Failed to send journal "${noticeText(journal.name)}". Check the sync dashboard for details.`);
-    } finally {
-      this._inFlightCreates.delete(journal.id);
-    }
+      if (keep !== 'foundry') await this._applyEntityUpdated(entity);
+    });
+    // Outside the slot: a conflict on this push takes the slot itself.
+    if (keep === 'foundry') await this._pushJournalUpdate(journal, entity.id);
   }
 
   /**
@@ -1520,7 +1598,30 @@ export class JournalSync {
     const entityId = journal.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
 
-    queueRemoteDelete({ label: journal.name, run: () => this._api.delete(`/entities/${entityId}`) });
+    queueRemoteDelete({
+      label: journal.name,
+      run: () => this._api.delete(`/entities/${entityId}`),
+      kept: () => this._syncOffAfterDelete(entityId, journal.name),
+    });
+  }
+
+  /**
+   * The GM deleted a journal here and kept its page in Chronicle. Sync is
+   * turned off for that page, so the Chronicle Sync window, which brings in
+   * pages that have no journal, does not undo the delete.
+   * @param {string} entityId
+   * @param {string} name
+   * @private
+   */
+  async _syncOffAfterDelete(entityId, name) {
+    const exclusions = getSyncExclusions();
+    const excludedEntities = exclusions.excludedEntities || [];
+    if (excludedEntities.includes(entityId)) return;
+    await setSetting('syncExclusions', JSON.stringify({
+      excludedTypes: exclusions.excludedTypes || [],
+      excludedEntities: [...excludedEntities, entityId],
+    }));
+    this._syncManager?.logActivity?.('unlink', `"${name}" was deleted here and kept in Chronicle; sync is now off for that page`);
   }
 
   /**

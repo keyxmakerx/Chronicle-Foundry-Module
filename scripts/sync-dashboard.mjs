@@ -17,7 +17,7 @@ import { ImportWizard } from './import-wizard.mjs';
 import { wireFirstConnect } from './first-connect.mjs';
 import { getSetting, setSetting, getUserMappings } from './settings.mjs';
 import { SyncHistoryTab } from './sync-history-tab.mjs';
-import { FLAG_SCOPE, REPORT_STORE_FLAG } from './constants.mjs';
+import { FLAG_SCOPE, KEEP_LOCAL_FLAG, REPORT_STORE_FLAG, syncOptions } from './constants.mjs';
 import { confirmDialog, promptDialog } from './_dialogs.mjs';
 import { REMOVED_FOLDER_FLAG } from './_set-aside.mjs';
 import { buildMemberRows, memberKey } from './_member-mapping.mjs';
@@ -33,9 +33,12 @@ import { checkDiceFiles, diceSoNiceReport } from './dice-so-nice.mjs';
 import { buildOverviewModel } from './_overview-model.mjs';
 import { buildHealthChecks, describeWaiting } from './_health-checks.mjs';
 import {
-  catchUpPlan, groupStats, matchesSearch, pageDetails, pageMenu, pageStatus, pageTrouble,
-  rowAction, rowHasMenu, rowState, sendAgainPlan, stateLabelKey, typeMenu,
+  CATCH_UP_LIMIT, bringInPlan, catchUpPlan, groupStats, journalAction, journalDetails, journalLabelKey,
+  journalMenu, journalState, linkKeeps, matchesSearch, nameClashes, pageDetails, pageMenu, pageStatus,
+  pageTrouble, rowAction, rowHasMenu, rowState, sendAgainPlan, sendPlan, stateLabelKey, typeMenu,
 } from './_page-rows.mjs';
+import { isMapJournal } from './_journal-ownership.mjs';
+import { isOldNotesJournal } from './_notes-folder.mjs';
 import {
   applyPagesSearch, markCatchingUp, openPagesMenu, togglePagesFold, wirePagesList,
 } from './pages-list.mjs';
@@ -52,6 +55,11 @@ import { resolveDashboardTab, SECTION_PANES } from './_dashboard-tabs.mjs';
 import { MAX_TEXT, relativeAge, splitReports, unreadCount } from './_debug-reports.mjs';
 import { reportToMarkdown } from './_debug-markdown.mjs';
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+
+/** Page rows "Bring in all" covers: a held page (sync off, same name, a character) is left out. */
+const BRING_IN_ALL = ['chronicle-only', 'failed'];
+/** Journal rows "Send all" covers: one set aside, with sync off or of a clashing name is left out. */
+const SEND_ALL = ['foundry-only', 'failed'];
 
 /**
  * SyncDashboard is the main sync management UI.
@@ -136,6 +144,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'pages-toggle-sync': SyncDashboard.#onPagesToggleSyncAction,
       'pages-toggle-type': SyncDashboard.#onPagesToggleTypeAction,
       'pages-copy-details': SyncDashboard.#onPagesCopyDetailsAction,
+      'pages-journal-menu': SyncDashboard.#onPagesJournalMenuAction,
+      'pages-journal-sync': SyncDashboard.#onPagesJournalSyncAction,
+      'pages-copy-journal': SyncDashboard.#onPagesCopyJournalAction,
+      'pages-link': SyncDashboard.#onPagesLinkAction,
       'health-row': SyncDashboard.#onHealthRowAction,
       'health-send-waiting': SyncDashboard.#onHealthSendWaitingAction,
     },
@@ -218,9 +230,17 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this._catchingUp = new Set();
     /** @type {Set<string>} Pages the list has already tried to bring up to date by itself. */
     this._catchUpTried = new Set();
-    /** The loaded page list the last automatic catch-up looked at; one pass per load. */
-    this._catchUpList = null;
     this._catchUpRunning = false;
+    /** @type {Map<string, object>} "Only in Foundry" rows as last drawn, by journal id. */
+    this._journalRows = new Map();
+    /** @type {Set<string>} Journals being sent right now. */
+    this._sendingJournals = new Set();
+    /** @type {Set<string>} Journals the list has already tried to send by itself. */
+    this._sendTried = new Set();
+    /** @type {Map<string, {message: string, at: number}>} Sends from the list that failed, by journal id. */
+    this._journalFailures = new Map();
+    /** Same-name clashes as last worked out, for the rows and the Link button. */
+    this._clashes = { pages: new Map(), journals: new Map() };
     /** @type {Map<string, {message: string, at: number}>} Fixes made from the list that failed, by page id. */
     this._pageFailures = new Map();
     /** @type {Set<string>} Waiting changes the list has already sent again by itself. */
@@ -243,7 +263,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     super._onFirstRender?.(context, options);
     // Each time the window opens, the list may try its fixes afresh.
     this._catchUpTried.clear();
-    this._catchUpList = null;
+    this._sendTried.clear();
     this._sendAgainTried.clear();
     Hooks.on(REPORTS_CHANGED_HOOK, this._onReportsChanged);
     if (context.configured && getSetting('firstRunPending')) this.startFirstRun();
@@ -335,6 +355,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     try {
       entityGroups = await this._buildEntityGroups(exclusions);
       foundryOnlyJournals = this._getFoundryOnlyJournals();
+      this._journalRows = new Map(foundryOnlyJournals.map((j) => [j.id, j]));
     } catch (err) {
       console.error('Chronicle Dashboard: Failed to load entities', err);
       loadErrors.push({ tab: 'entities', message: err.message || 'Failed to load entities' });
@@ -528,6 +549,21 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const t = (key, data) => (data
       ? game.i18n.format(`CHRONICLE.Dashboard.Pages.${key}`, data)
       : game.i18n.localize(`CHRONICLE.Dashboard.Pages.${key}`));
+    const journalSync = this._journalSync();
+    const isExcluded = (entity) => exclusions.excludedEntities.includes(entity.id)
+      || exclusions.excludedTypes.includes(entity.entity_type_id);
+    // A page and a journal of one name, neither linked, are held for the GM
+    // instead of being copied across as two more.
+    this._clashes = nameClashes({
+      rows: chronicleEntities.map((entity) => ({
+        id: entity.id,
+        name: entity.name,
+        status: journalsByEntityId.has(entity.id) || actorEntityIds.has(entity.id) ? 'linked' : 'chronicle-only',
+        excluded: isExcluded(entity),
+      })),
+      journals: this._unlinkedJournals().filter((j) => !j.setAside && !j.keepLocal),
+      linkedNames: [...journalsByEntityId.values()].map((j) => j.name),
+    });
     const waiting = this.api.getRetryQueue?.() ?? [];
     const errors = this.api.getErrorLog?.() ?? [];
     const searching = !!this._searchFilter.trim();
@@ -551,23 +587,32 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
           lastSync,
           updatedAt: entity.updated_at,
         });
+        // A page with no journal has no sync history to read: only a try
+        // made from this list can have failed for it.
+        const local = this._pageFailures.get(entity.id) ?? null;
         const trouble = journal ? pageTrouble({
           entityId: entity.id,
           lastSync,
           sentAt: this.api.getReplayedAt?.('PUT', `/entities/${entity.id}`) ?? 0,
           waiting,
           errors,
-          local: this._pageFailures.get(entity.id) ?? null,
-        }) : null;
+          local,
+        }) : (local && { kind: 'failed', direction: 'in', message: local.message, at: local.at });
+        const clashWith = this._clashes.pages.get(entity.id);
         const state = rowState(status, {
           excluded: pageExcluded || isTypeExcluded,
           trouble,
           catchingUp: this._catchingUp.has(entity.id),
+          clash: this._clashes.pages.has(entity.id),
+          character: status === 'chronicle-only' && !!journalSync?._isHandledByActorSync?.(entity),
         });
-        const action = rowAction(state);
+        const action = rowAction(state, { paired: !!clashWith });
         let stateTitle = '';
         if (state === 'waiting') stateTitle = t('WaitingHint');
         if (state === 'failed') stateTitle = t(trouble.direction === 'out' ? 'FailedOut' : 'FailedIn', { reason: trouble.message });
+        if (state === 'clash') stateTitle = t(clashWith ? 'ClashPairHint' : 'ClashHint');
+        if (state === 'character') stateTitle = t('CharacterHint');
+        if (state === 'chronicle-only-off') stateTitle = t('OnlyChronicleOffHint');
 
         return {
           id: entity.id,
@@ -579,6 +624,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
           stateTitle,
           trouble,
           action: action ? { action: action.action, label: t(action.labelKey) } : null,
+          clashJournalId: clashWith ?? null,
           hasMenu: rowHasMenu(state),
           menuLabel: t('MoreFor', { name: entity.name }),
           isPrivate: entity.is_private ?? false,
@@ -659,24 +705,79 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this.render();
   }
 
-  _getFoundryOnlyJournals() {
-    const result = [];
+  /** Whether another part of the module owns this journal, so it is not a page. @private */
+  _notAPage(journal) {
+    const sync = this._journalSync();
+    if (sync?._ownedElsewhere) return sync._ownedElsewhere(journal);
+    return isMapJournal(journal, FLAG_SCOPE) || isOldNotesJournal(journal, FLAG_SCOPE);
+  }
 
+  /**
+   * Journals that could be pages and have none: not linked, and not a map,
+   * a calendar note or the report store, which sync their own way.
+   * @returns {Array<{id: string, name: string, setAside: boolean, keepLocal: boolean, sending: boolean, pageCount: number}>}
+   * @private
+   */
+  _unlinkedJournals() {
+    const result = [];
+    const beingSent = this._journalSync()?._inFlightCreates;
     for (const j of game.journal.contents) {
       if (j.getFlag(FLAG_SCOPE, 'entityId')) continue;
       if (j.getFlag(FLAG_SCOPE, REPORT_STORE_FLAG)) continue;
-
+      if (this._notAPage(j)) continue;
       result.push({
         id: j.id,
         name: j.name,
-        status: 'foundry-only',
-        pageCount: j.pages?.size ?? 0,
         setAside: this._isSetAside(j),
-        hidden: !matchesSearch(j.name, this._searchFilter),
+        keepLocal: j.getFlag(FLAG_SCOPE, KEEP_LOCAL_FLAG) === true,
+        // A journal just made is on its way up already.
+        sending: this._sendingJournals.has(j.id) || !!beingSent?.has(j.id),
+        pageCount: j.pages?.size ?? 0,
       });
     }
-
     return result;
+  }
+
+  /**
+   * The "Only in Foundry" rows: each journal's state, its one button and
+   * whether it has a menu. Reads the clashes the page rows worked out.
+   * @returns {Array<object>}
+   * @private
+   */
+  _getFoundryOnlyJournals() {
+    const t = (key, data) => (data
+      ? game.i18n.format(`CHRONICLE.Dashboard.Pages.${key}`, data)
+      : game.i18n.localize(`CHRONICLE.Dashboard.Pages.${key}`));
+    return this._unlinkedJournals().map((j) => {
+      const clash = !j.setAside && !j.keepLocal ? (this._clashes.journals.get(j.id) ?? null) : null;
+      const failure = this._journalFailures.get(j.id) ?? null;
+      const state = journalState({
+        setAside: j.setAside,
+        keepLocal: j.keepLocal,
+        clash,
+        sending: j.sending,
+        failure,
+      });
+      const action = journalAction(state, { paired: !!clash?.entityId });
+      let stateTitle = '';
+      if (state === 'failed') stateTitle = t('FailedOut', { reason: failure.message });
+      if (state === 'clash') stateTitle = t(clash.entityId ? 'ClashPairHint' : 'ClashHint');
+      if (state === 'off') stateTitle = t('JournalOffHint');
+      return {
+        ...j,
+        status: 'foundry-only',
+        state,
+        stateLabel: t(journalLabelKey(state)),
+        stateTitle,
+        clash,
+        failure,
+        action: action ? { action: action.action, label: t(action.labelKey) } : null,
+        clashEntityId: clash?.entityId ?? null,
+        sending: state === 'sending',
+        menuLabel: t('MoreFor', { name: j.name }),
+        hidden: !matchesSearch(j.name, this._searchFilter),
+      };
+    });
   }
 
   /**
@@ -697,8 +798,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       selecting: this._selecting,
       selectedLabel: this._selectedLabel(this._selectedEntities.size),
       nothingSelected: this._selectedEntities.size === 0,
-      bringInCount: rows.filter((r) => r.state === 'chronicle-only').length,
-      sendCount: foundryOnly.length,
+      bringInCount: rows.filter((r) => BRING_IN_ALL.includes(r.state) && !r.journalId).length,
+      sendCount: foundryOnly.filter((j) => SEND_ALL.includes(j.state)).length,
       foundryOnlyHidden: searching && foundryMatches === 0,
       noMatch: searching && !anyMatch,
       empty: groups.length === 0 && foundryOnly.length === 0,
@@ -1501,6 +1602,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this._cache = { entityTypes: null, entities: null, maps: null, calendar: null };
     this._catchUpTried.clear();
     this._pageFailures.clear();
+    this._sendTried.clear();
+    this._journalFailures.clear();
     this._settings.pageTypesTried = false;
     this.render({ force: true });
   }
@@ -1729,6 +1832,47 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this._copyPageDetails(target.dataset.entityId);
   }
 
+  /** An "Only in Foundry" row's "more" button. */
+  static #onPagesJournalMenuAction(_event, target) {
+    const row = this._journalRows.get(target.dataset.journalId);
+    if (!row) return;
+    openPagesMenu(this.element, target, journalMenu({ ...row, paired: !!row.clashEntityId }).map((item) => ({
+      action: item.action,
+      label: game.i18n.localize(`CHRONICLE.Dashboard.Pages.${item.labelKey}`),
+      data: { journalId: row.id, ...item.data },
+    })));
+  }
+
+  /** Turn sync off or on for one journal that has no page. Off, the list never sends it. */
+  static async #onPagesJournalSyncAction(_event, target) {
+    const journal = game.journal.get(target.dataset.journalId);
+    if (!journal) return;
+    try {
+      await journal.update(
+        { [`flags.${FLAG_SCOPE}.${KEEP_LOCAL_FLAG}`]: target.dataset.enable !== 'true' },
+        syncOptions(),
+      );
+      // Turning it on again is a fresh start: the list may try it once more.
+      this._sendTried.delete(journal.id);
+      this._journalFailures.delete(journal.id);
+    } catch (err) {
+      log.warn(`Dashboard: could not change sync for journal ${journal.id}`, err);
+    }
+    this.render({ force: true });
+  }
+
+  static #onPagesCopyJournalAction(_event, target) {
+    this._copyJournalDetails(target.dataset.journalId);
+  }
+
+  /** "Link" on either row of a same-name pair. */
+  static #onPagesLinkAction(_event, target) {
+    const { entityId, journalId } = target.dataset;
+    const pageId = entityId || this._journalRows.get(journalId)?.clashEntityId;
+    const otherId = journalId || this._pageRows.get(entityId)?.clashJournalId;
+    if (pageId && otherId) this._linkPair(pageId, otherId);
+  }
+
   /** The module that syncs pages with journals, if it is running. @private */
   _journalSync() {
     return this._syncManager?._modules?.find((m) => m.constructor?.name === 'JournalSync') ?? null;
@@ -1750,6 +1894,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       const entity = await this.api.get(`/entities/${entityId}`);
       if (!entity?.id) throw new Error(game.i18n.localize('CHRONICLE.Dashboard.Pages.NoAnswer'));
       await journalSync._onEntityUpdated(entity);
+      // Page sync leaves some pages without a journal on purpose (sync off,
+      // a character). Nothing failed, and the row says which it is.
       this._pageFailures.delete(entityId);
       return true;
     } catch (err) {
@@ -1761,30 +1907,43 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /**
    * Bring these pages up to date one after another, showing each as
-   * "Catching up" meanwhile, then draw once.
+   * "Catching up" (or "Bringing in", when it has no journal yet) meanwhile,
+   * then draw once.
    * @param {string[]} ids
+   * @param {{draw?: boolean}} [opts] - false when more work follows before the draw
    * @private
    */
-  async _runCatchUp(ids) {
+  async _runCatchUp(ids, { draw = true } = {}) {
     const todo = ids.filter((id) => id && !this._catchingUp.has(id));
     if (!todo.length) return;
     for (const id of todo) this._catchingUp.add(id);
-    markCatchingUp(this.element, todo, game.i18n.localize('CHRONICLE.Dashboard.Pages.CatchingUp'));
-    let done = 0;
+    const fresh = todo.filter((id) => !this._pageRows.get(id)?.journalId);
+    const stale = todo.filter((id) => !fresh.includes(id));
+    markCatchingUp(this.element, stale, game.i18n.localize('CHRONICLE.Dashboard.Pages.CatchingUp'));
+    markCatchingUp(this.element, fresh, game.i18n.localize('CHRONICLE.Dashboard.Pages.BringingIn'));
+    let updated = 0;
+    let broughtIn = 0;
     for (const id of todo) {
-      if (await this._catchUpPage(id)) done++;
+      const ok = await this._catchUpPage(id);
+      if (ok && fresh.includes(id)) broughtIn++;
+      else if (ok) updated++;
       this._catchingUp.delete(id);
     }
-    if (done) this._logActivity('pull', `Brought ${done} page${done === 1 ? '' : 's'} up to date with Chronicle`);
-    if (this.rendered) this.render({ force: true });
+    if (updated) this._logActivity('pull', `Brought ${updated} page${updated === 1 ? '' : 's'} up to date with Chronicle`);
+    if (broughtIn) this._logActivity('pull', `Brought in ${broughtIn} page${broughtIn === 1 ? '' : 's'} that had no journal`);
+    if (draw && this.rendered) this.render({ force: true });
   }
 
   /**
    * What the list fixes without being asked, after each draw: pages that
-   * Chronicle changed are brought up to date, and changes still waiting to
-   * be sent are sent again. Both are bounded so a fix that keeps failing is
-   * shown on its row, never repeated in a loop: a page is tried once per
-   * loaded list, a waiting change once per window.
+   * Chronicle changed are brought up to date, pages with no journal are
+   * brought in, journals with no page are sent, and changes still waiting
+   * to be sent are sent again. Each page, journal and waiting change is
+   * tried once per window, so a fix that keeps failing is shown on its row,
+   * never repeated in a loop; a pass takes a bounded number and the draw
+   * that ends it starts the next. Nothing runs while Chronicle is away,
+   * page sync is off, or the first-run setup has not finished choosing
+   * what to import.
    * @private
    */
   _fixPagesByItself() {
@@ -1797,14 +1956,144 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       this._sendWaiting();
     }
 
-    if (this._catchUpRunning || this._catchUpList === this._cache.entities) return;
+    if (this._catchUpRunning) return;
     if (!this._cache.entities || !getSetting('syncJournals') || !this._journalSync()) return;
-    this._catchUpList = this._cache.entities;
-    const ids = catchUpPlan({ rows: [...this._pageRows.values()], tried: this._catchUpTried });
-    if (!ids.length) return;
+    if (getSetting('firstRunPending')) return;
+    const rows = [...this._pageRows.values()];
+    const stale = catchUpPlan({ rows, tried: this._catchUpTried });
+    const fresh = bringInPlan({ rows, tried: this._catchUpTried, limit: CATCH_UP_LIMIT - stale.length });
+    // A list cut short cannot rule out a page of the same name further on,
+    // so nothing is sent from it unasked.
+    const journals = this._cache.entitiesTruncated ? [] : sendPlan({
+      journals: [...this._journalRows.values()],
+      tried: this._sendTried,
+      limit: CATCH_UP_LIMIT - stale.length - fresh.length,
+    });
+    const ids = [...stale, ...fresh];
+    if (!ids.length && !journals.length) return;
     for (const id of ids) this._catchUpTried.add(id);
+    for (const id of journals) this._sendTried.add(id);
     this._catchUpRunning = true;
-    this._runCatchUp(ids).finally(() => { this._catchUpRunning = false; });
+    (async () => {
+      try {
+        if (ids.length) await this._runCatchUp(ids, { draw: false });
+        if (journals.length) await this._sendJournals(journals, { draw: false });
+      } catch (err) {
+        log.warn('Dashboard: the page list could not finish its own fixes', err);
+      }
+      // Cleared before the draw, whose own pass takes the next batch.
+      this._catchUpRunning = false;
+      if (this.rendered) this.render({ force: true });
+    })();
+  }
+
+  /**
+   * Send one journal that has no page, by the path a new journal takes, so
+   * its text, its secrets and who may see it are handled the same way. A
+   * failure is kept for the row to show.
+   * @param {string} journalId
+   * @returns {Promise<boolean>} whether a page was made
+   * @private
+   */
+  async _sendJournal(journalId) {
+    const journal = game.journal.get(journalId);
+    if (!journal || journal.getFlag(FLAG_SCOPE, 'entityId')) return false;
+    try {
+      const journalSync = this._journalSync();
+      if (!journalSync) throw new Error(game.i18n.localize('CHRONICLE.Dashboard.Pages.NotRunning'));
+      const sent = await journalSync._sendJournalAsPage(journal);
+      if (!sent) throw new Error(game.i18n.localize('CHRONICLE.Dashboard.Pages.NoPageTypes'));
+      this._journalFailures.delete(journalId);
+      return true;
+    } catch (err) {
+      log.warn(`Dashboard: could not send journal ${journalId}`, err);
+      // A page was made but its text or permissions did not follow: the
+      // journal is linked now, and its page row carries the trouble.
+      if (!journal.getFlag(FLAG_SCOPE, 'entityId')) {
+        this._journalFailures.set(journalId, { message: err?.message || String(err), at: Date.now() });
+      }
+      return false;
+    }
+  }
+
+  /**
+   * Send these journals one after another, showing each as "Sending"
+   * meanwhile. The list is read again afterwards, since Chronicle has new
+   * pages.
+   * @param {string[]} ids
+   * @param {{byHand?: boolean, draw?: boolean}} [opts] - byHand: the GM asked, so
+   *   say how it went; draw false when the caller draws
+   * @returns {Promise<number>} how many were sent
+   * @private
+   */
+  async _sendJournals(ids, { byHand = false, draw = true } = {}) {
+    const todo = ids.filter((id) => id && !this._sendingJournals.has(id));
+    if (!todo.length) return 0;
+    for (const id of todo) this._sendingJournals.add(id);
+    markCatchingUp(this.element, todo, game.i18n.localize('CHRONICLE.Dashboard.Pages.Sending'), 'journal');
+    let done = 0;
+    let linked = 0;
+    for (const id of todo) {
+      if (await this._sendJournal(id)) done++;
+      if (game.journal.get(id)?.getFlag(FLAG_SCOPE, 'entityId')) linked++;
+      this._sendingJournals.delete(id);
+    }
+    if (done) this._logActivity('push', `Sent ${done} journal${done === 1 ? '' : 's'} that had no page to Chronicle${byHand ? '' : ' by itself'}`);
+    // Sending is the one thing the list does unasked that leaves Foundry, so it says so.
+    if (done && !byHand) ui.notifications.info(game.i18n.format('CHRONICLE.Dashboard.Pages.SentByItself', { count: done }));
+    const failures = todo.length - done;
+    if (byHand && failures) ui.notifications.warn(game.i18n.format('CHRONICLE.Dashboard.Pages.SendFailed', { count: failures }));
+    if (linked) this._cache.entities = null;
+    if (draw && this.rendered) this.render({ force: true });
+    return done;
+  }
+
+  /**
+   * Link a page that has no journal and a journal that has no page, of the
+   * same name, after asking. One side's text replaces the other's, so the
+   * question says whose is kept: what the conflict setting picks.
+   * @param {string} entityId
+   * @param {string} journalId
+   * @private
+   */
+  async _linkPair(entityId, journalId) {
+    const journal = game.journal.get(journalId);
+    const journalSync = this._journalSync();
+    if (!journal) return;
+    if (!journalSync) {
+      ui.notifications.warn(game.i18n.localize('CHRONICLE.Dashboard.Pages.NotRunning'));
+      return;
+    }
+    try {
+      const entity = await this.api.get(`/entities/${entityId}`);
+      if (!entity?.id) throw new Error(game.i18n.localize('CHRONICLE.Dashboard.Pages.NoAnswer'));
+      const changedAt = Math.max(
+        journal._stats?.modifiedTime ?? 0,
+        ...[...(journal.pages ?? [])].map((page) => page._stats?.modifiedTime ?? 0),
+      );
+      const keep = linkKeeps({
+        strategy: getSetting('conflictResolution'),
+        journalChangedAt: changedAt,
+        pageUpdatedAt: entity.updated_at,
+      });
+      const ok = await confirmDialog({
+        title: game.i18n.localize('CHRONICLE.Dashboard.Pages.LinkTitle'),
+        content: `<p>${game.i18n.format(
+          keep === 'foundry' ? 'CHRONICLE.Dashboard.Pages.LinkKeepFoundry' : 'CHRONICLE.Dashboard.Pages.LinkKeepChronicle',
+          { name: noticeText(journal.name) },
+        )}</p>`,
+        defaultYes: false,
+      });
+      if (!ok) return;
+      await journalSync._linkJournalToPage(journal, entity, keep);
+      this._pageFailures.delete(entityId);
+      this._journalFailures.delete(journalId);
+      this._logActivity('update', `Linked "${journal.name}" to the Chronicle page of the same name; kept the ${keep === 'foundry' ? 'Foundry' : 'Chronicle'} text`);
+    } catch (err) {
+      log.warn(`Dashboard: could not link journal ${journalId} to page ${entityId}`, err);
+      ui.notifications.error(game.i18n.format('CHRONICLE.Dashboard.Pages.LinkFailed', { reason: noticeText(err?.message ?? '') }));
+    }
+    if (this.rendered) this.render({ force: true });
   }
 
   /**
@@ -1879,6 +2168,33 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       ui.notifications.info(game.i18n.format('CHRONICLE.Dashboard.Pages.DetailsCopied', { name: noticeText(row.name) }));
     } catch (err) {
       log.warn('Dashboard: copying page details failed', err);
+      ui.notifications.warn(game.i18n.localize('CHRONICLE.Dashboard.Pages.DetailsNotCopied'));
+    }
+  }
+
+  /**
+   * "Copy details for help" for a journal that has no page. Never its text.
+   * @param {string} journalId
+   * @private
+   */
+  async _copyJournalDetails(journalId) {
+    const row = this._journalRows.get(journalId);
+    if (!row) return;
+    const text = journalDetails({
+      journal: row,
+      clash: row.clash,
+      failure: row.failure,
+      versions: {
+        'Chronicle Sync': game.modules.get('chronicle-sync')?.version ?? '',
+        Foundry: game.version ?? '',
+        Connection: this.api?.state ?? '',
+      },
+    });
+    try {
+      await navigator.clipboard.writeText(text);
+      ui.notifications.info(game.i18n.format('CHRONICLE.Dashboard.Pages.DetailsCopied', { name: noticeText(row.name) }));
+    } catch (err) {
+      log.warn('Dashboard: copying journal details failed', err);
       ui.notifications.warn(game.i18n.localize('CHRONICLE.Dashboard.Pages.DetailsNotCopied'));
     }
   }
@@ -2414,7 +2730,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       }
       if (journalSync) {
         await journalSync._createJournalFromEntity(entity);
+        this._pageFailures.delete(entityId);
         this._logActivity('pull', `Brought in "${entity.name}" from Chronicle`);
+        // Bringing a page in by hand says the GM wants it here, so its own
+        // sync switch goes back on. A type that is off stays off.
+        if (this._getExclusions().excludedEntities.includes(entityId)) await this._onToggleEntity(entityId, true);
       }
 
       if (quiet) return;
@@ -2427,48 +2747,12 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Push a Foundry journal to Chronicle as a new entity.
+   * "Send" on a journal that has no page.
    * @param {string} journalId
-   * @param {{quiet?: boolean}} [opts] - quiet: Push all redraws once at the end.
    * @private
    */
-  async _onPushJournal(journalId, { quiet = false } = {}) {
-    const journal = game.journal.get(journalId);
-    if (!journal) return;
-
-    try {
-      const textPage = journal.pages.find(p => p.type === 'text');
-      const entity = await this.api.post('/entities', {
-        name: journal.name,
-        entity_type_id: 0,
-        is_private: (journal.ownership?.default ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER,
-        entry: textPage?.text?.content || '',
-      });
-
-      if (entity) {
-        await journal.setFlag(FLAG_SCOPE, 'entityId', entity.id);
-        await journal.setFlag(FLAG_SCOPE, 'lastSync', new Date().toISOString());
-
-        // Idempotent — tolerates pre-existing mapping (e.g., dashboard
-        // re-push or race with a concurrent server-side create).
-        await this._syncManager?.ensureMapping({
-          chronicle_type: 'entity',
-          chronicle_id: entity.id,
-          external_system: 'foundry',
-          external_id: journal.id,
-          sync_direction: 'both',
-        });
-
-        this._logActivity('push', `Sent "${journal.name}" to Chronicle`);
-      }
-
-      if (quiet) return;
-      this._cache.entities = null;
-      this.render({ force: true });
-    } catch (err) {
-      console.error('Chronicle Dashboard: Push failed', err);
-      ui.notifications.error(`Failed to send journal: ${noticeText(err.message)}`);
-    }
+  async _onPushJournal(journalId) {
+    await this._sendJournals([journalId], { byHand: true });
   }
 
   /**
@@ -2510,7 +2794,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     try {
       confirmed = await confirmDialog({
         title: 'Bring in all from Chronicle',
-        content: '<p>Bring in every Chronicle page that does not have a Foundry journal yet?</p>',
+        content: `<p>${game.i18n.localize('CHRONICLE.Dashboard.Pages.BringInAllAsk')}</p>`,
       });
     } catch {
       return; // User closed dialog.
@@ -2521,7 +2805,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     let count = 0;
     for (const group of data.entityGroups) {
       for (const entity of group.entities) {
-        if (entity.status === 'chronicle-only') {
+        if (!entity.journalId && BRING_IN_ALL.includes(entity.state)) {
           await this._onPullEntity(entity.id, { quiet: true });
           count++;
         }
@@ -2541,21 +2825,15 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     try {
       confirmed = await confirmDialog({
         title: 'Send all to Chronicle',
-        content: '<p>Send every Foundry journal that is not linked to Chronicle yet?</p>',
+        content: `<p>${game.i18n.localize('CHRONICLE.Dashboard.Pages.SendAllAsk')}</p>`,
       });
     } catch {
       return; // User closed dialog.
     }
     if (!confirmed) return;
 
-    const journals = this._getFoundryOnlyJournals();
-    let count = 0;
-    for (const j of journals) {
-      await this._onPushJournal(j.id, { quiet: true });
-      count++;
-    }
-    this._cache.entities = null;
-    this.render({ force: true });
+    const journals = this._getFoundryOnlyJournals().filter((j) => SEND_ALL.includes(j.state));
+    const count = await this._sendJournals(journals.map((j) => j.id), { byHand: true });
     ui.notifications.info(`Chronicle: journals sent: ${count}`);
   }
 

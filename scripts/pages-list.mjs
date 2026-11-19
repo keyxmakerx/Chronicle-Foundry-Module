@@ -138,15 +138,19 @@ export function togglePagesFold(root, typeId) {
   return folded;
 }
 
-/** Show a row as being brought up to date, before the work starts. */
-export function markCatchingUp(root, ids, label) {
+/**
+ * Show rows as being worked on, before the work starts. `kind` says whether
+ * the ids are Chronicle pages or journals that have no page.
+ */
+export function markCatchingUp(root, ids, label, kind = 'page') {
+  const attr = kind === 'journal' ? 'data-journal-row' : 'data-page-id';
   for (const id of ids) {
-    const row = root?.querySelector(`[data-page-row][data-page-id="${CSS.escape(String(id))}"]`);
+    const row = root?.querySelector(`[data-page-row][${attr}="${CSS.escape(String(id))}"]`);
     if (!row) continue;
     row.className = row.className.replace(/\bis-[a-z-]+/g, '').trim() + ' is-catching-up';
     const word = row.querySelector('.cs-page-state');
     if (word) { word.textContent = label; word.removeAttribute('title'); }
-    for (const control of row.querySelectorAll('.cs-page-btn, [data-action="pages-menu"]')) control.hidden = true;
+    for (const control of row.querySelectorAll('.cs-page-btn, .cs-row-icon, [data-action="pages-menu"], [data-action="pages-journal-menu"]')) control.hidden = true;
   }
 }
 

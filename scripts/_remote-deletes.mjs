@@ -17,7 +17,7 @@ export const REMOTE_DELETE_WAIT_MS = 400;
  * Collects deletes and asks once per burst.
  * @param {{ask: (items: object[]) => Promise<boolean>, onDone?: (result: object) => void,
  *   delayMs?: number, setTimer?: Function, clearTimer?: Function}} deps
- * @returns {{add: (item: {label: string, run: () => Promise<any>}) => void, flush: () => Promise<object>}}
+ * @returns {{add: (item: {label: string, run: () => Promise<any>, kept?: () => Promise<any>}) => void, flush: () => Promise<object>}}
  */
 export function createRemoteDeleteBatch({ ask, onDone = () => {}, delayMs = REMOTE_DELETE_WAIT_MS, setTimer = setTimeout, clearTimer = clearTimeout }) {
   let items = [];
@@ -35,15 +35,26 @@ export function createRemoteDeleteBatch({ ask, onDone = () => {}, delayMs = REMO
       console.warn('Chronicle: Could not ask about deleting in Chronicle; keeping everything', err);
     }
     let deleted = 0;
+    const removed = new Set();
     if (yes) {
       for (const item of batch) {
         try {
           await item.run();
+          removed.add(item);
           deleted++;
         } catch (err) {
           // It may already be gone on Chronicle's side, which is fine.
           console.warn(`Chronicle: Failed to delete "${item.label}" in Chronicle`, err);
         }
+      }
+    }
+    // A page kept in Chronicle may need something done here; never let that stop the rest.
+    for (const item of batch) {
+      if (removed.has(item)) continue;
+      try {
+        await item.kept?.();
+      } catch (err) {
+        console.warn(`Chronicle: Could not finish keeping "${item.label}" in Chronicle`, err);
       }
     }
     const result = { asked: true, deleted, kept: batch.length - deleted };
@@ -83,8 +94,9 @@ let shared = null;
 
 /**
  * Queues one Foundry-side delete for the GM's answer: `run` deletes the
- * Chronicle copy and is called only on Yes.
- * @param {{label: string, run: () => Promise<any>}} item
+ * Chronicle copy and is called only on Yes; `kept` is called when the copy
+ * stays, whether the GM said No or the delete failed.
+ * @param {{label: string, run: () => Promise<any>, kept?: () => Promise<any>}} item
  */
 export function queueRemoteDelete(item) {
   if (!shared) shared = createRemoteDeleteBatch({ ask: askGM, onDone: notify });

@@ -61,7 +61,7 @@ root. There is no `package.json`.
 - [ ] Create JournalEntry -> Page appears in Chronicle
 - [ ] Update JournalEntry name -> Page name updates
 - [ ] Edit JournalEntry page content -> Page entry updates
-- [ ] Delete JournalEntry -> asked "Delete in Chronicle too?": No keeps the page, Yes deletes it
+- [ ] Delete JournalEntry -> asked "Delete in Chronicle too?": No keeps the page, Yes deletes it. After No, Chronicle Sync → Linked → Pages shows the page as "Only in Chronicle, sync off" and does not bring it back by itself; **Bring in** on that row brings it back and turns its sync on again
 - [ ] Delete several linked JournalEntries at once -> asked once, with all of them listed
 
 ### Multi-Page Sync
@@ -583,7 +583,14 @@ Details for Characters, Maps, Shops and Calendar are under their own sections.
 - [ ] **Select** → checkboxes appear with "Select all shown", Change type, Show to players, Hide from players and Delete; they stay greyed until a page is ticked; **Done selecting** leaves and forgets the ticks
 - [ ] Self-fixing: edit a page in Chronicle while Foundry is closed to it (stop the world's connection, or edit a page whose live update was missed), then open Chronicle Sync → the row reads "Catching up…" and then "In sync" without a click, and Recent Activity says pages were brought up to date. A page with sync off is left alone
 - [ ] Self-fixing: with Chronicle unreachable, edit a synced journal → its row reads "Waiting to send" with **Send now**; once Chronicle is back it sends by itself. A page that will not sync reads "Couldn't sync" in red, its reason shows on hover, and **Try again** retries it
-- [ ] **Copy details for help** → the clipboard holds the page's name, ids, versions, state and its recent errors, and none of the page's text and no key
+- [ ] One side only, Chronicle: make a page in Chronicle while Foundry is closed, then open Chronicle Sync → Linked → Pages → its row reads "Bringing in…" and then "In sync" without a click, and the journal exists. With sync off for the page or its type it reads "Only in Chronicle, sync off" with **Bring in** and stays out
+- [ ] One side only, Foundry: with Chronicle unreachable, make a journal with some text; reconnect and open the list → under "Only in Foundry" its row reads "Sending…", then it moves up among the pages as "In sync", the page in Chronicle has the text, and a notice says how many journals were sent. A journal hidden from players arrives in Chronicle hidden from players
+- [ ] Held back: a journal in "Chronicle: removed" reads "Set aside" and is never sent by itself; a journal's ⋯ menu → **Turn sync off for this journal** → it reads "Sync off", has no Send button, and stays in Foundry; **Turn sync on for this journal** → it is sent
+- [ ] Same name: make a journal named like a Chronicle page that has no journal → neither is copied; both rows read "Same name in Foundry" / "Same name in Chronicle" with **Link**. **Link** asks first and says whose text is kept (what Settings' conflict choice picks); Yes → one row, "In sync", with that text on both sides; No → nothing changes. A journal named like a page that already has a journal reads "Same name in Chronicle" with **Send** and is sent only when pressed
+- [ ] A send that fails reads "Couldn't send" in red with the reason on hover and **Try again**; it is not retried by itself until **Check again** or the window is reopened
+- [ ] Maps and calendar notes are not listed under "Only in Foundry"
+- [ ] **Bring in all** and **Send all** ask first, name what they leave out (sync off, set aside, same name, characters), and their counts leave those out too
+- [ ] **Copy details for help** → the clipboard holds the page's name, ids, versions, state and its recent errors, and none of the page's text and no key; the same on a journal's ⋯ menu
 - [ ] At the foot: "This list was read from Chronicle at HH:MM." with **Check again**; closing and reopening the window also reads it again
 - [ ] **Characters:** a "Needs a match" list comes first when any character can't be matched (the rail shows its count); each row offers "Match to existing…" with **Match**, and **Create new**, and resolving a row links it and removes it
 - [ ] **Calendar**, **Shops**, **Maps:** as in their sections; the Calendar pane explains why when sync is off, no calendar exists, or it is rebuilding or unreachable; Shops empty states say whether the "Shop" type is missing or has no shops
