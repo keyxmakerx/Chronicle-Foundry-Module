@@ -5,7 +5,7 @@
       <button type="button" data-cs-tab="move" class="{{#if isMove}}active{{/if}}">{{localize "CHRONICLE.Stashes.TabMove"}}</button>
       <button type="button" data-cs-tab="history" class="{{#unless isMove}}active{{/unless}}">{{localize "CHRONICLE.Stashes.TabHistory"}}</button>
     </nav>
-    <button type="button" class="cs-refresh" data-cs-refresh title="{{localize 'CHRONICLE.Stashes.Refresh'}}"><i class="fa-solid fa-rotate"></i></button>
+    <button type="button" class="cs-refresh" data-cs-refresh title="{{localize 'CHRONICLE.Stashes.Refresh'}}" aria-label="{{localize 'CHRONICLE.Stashes.Refresh'}}"><i class="fa-solid fa-rotate"></i></button>
   </header>
 
   {{#if error}}<p class="cs-error" role="alert">{{error}}</p>{{/if}}

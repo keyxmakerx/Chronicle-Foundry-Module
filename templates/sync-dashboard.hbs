@@ -215,7 +215,7 @@
                   title="{{localize "CHRONICLE.Dashboard.Entities.CreateType"}}">
             <i class="fa-solid fa-plus"></i> {{localize "CHRONICLE.Dashboard.Entities.CreateType"}}
           </button>
-          <button type="button" data-action="refresh" class="dashboard-btn btn-sm" title="{{localize 'CHRONICLE.Dashboard.Entities.RefreshData'}}">
+          <button type="button" data-action="refresh" class="dashboard-btn btn-sm" title="{{localize 'CHRONICLE.Dashboard.Entities.RefreshData'}}" aria-label="{{localize 'CHRONICLE.Dashboard.Entities.RefreshData'}}">
             <i class="fa-solid fa-arrows-rotate"></i>
           </button>
         </div>
@@ -238,15 +238,15 @@
             {{/each}}
           </select>
           <button type="button" class="dashboard-btn btn-xs" data-action="bulk-set-public"
-                  title="{{localize "CHRONICLE.Dashboard.Bulk.MakePublic"}}">
+                  title="{{localize "CHRONICLE.Dashboard.Bulk.MakePublic"}}" aria-label="{{localize "CHRONICLE.Dashboard.Bulk.MakePublic"}}">
             <i class="fa-solid fa-lock-open"></i>
           </button>
           <button type="button" class="dashboard-btn btn-xs" data-action="bulk-set-private"
-                  title="{{localize "CHRONICLE.Dashboard.Bulk.MakePrivate"}}">
+                  title="{{localize "CHRONICLE.Dashboard.Bulk.MakePrivate"}}" aria-label="{{localize "CHRONICLE.Dashboard.Bulk.MakePrivate"}}">
             <i class="fa-solid fa-lock"></i>
           </button>
           <button type="button" class="dashboard-btn btn-xs btn-danger" data-action="bulk-delete"
-                  title="{{localize "CHRONICLE.Dashboard.Bulk.Delete"}}">
+                  title="{{localize "CHRONICLE.Dashboard.Bulk.Delete"}}" aria-label="{{localize "CHRONICLE.Dashboard.Bulk.Delete"}}">
             <i class="fa-solid fa-trash"></i>
           </button>
         </div>
@@ -264,7 +264,7 @@
               {{localize 'CHRONICLE.Dashboard.Entities.SyncedCount' count=syncedCount}}{{#if chronicleOnlyCount}}{{localize 'CHRONICLE.Dashboard.Entities.ChronicleOnlyCount' count=chronicleOnlyCount}}{{/if}}
             </span>
             <button type="button" class="type-sync-toggle dashboard-btn btn-xs" data-type-id="{{typeId}}"
-                    title="{{#if isTypeExcluded}}{{localize 'CHRONICLE.Dashboard.Entities.EnableSync'}}{{else}}{{localize 'CHRONICLE.Dashboard.Entities.DisableSync'}}{{/if}}">
+                    title="{{#if isTypeExcluded}}{{localize 'CHRONICLE.Dashboard.Entities.EnableSync'}}{{else}}{{localize 'CHRONICLE.Dashboard.Entities.DisableSync'}}{{/if}}" aria-label="{{#if isTypeExcluded}}{{localize 'CHRONICLE.Dashboard.Entities.EnableSync'}}{{else}}{{localize 'CHRONICLE.Dashboard.Entities.DisableSync'}}{{/if}}">
               {{#if isTypeExcluded}}
               <i class="fa-solid fa-toggle-off"></i>
               {{else}}
@@ -286,7 +286,7 @@
               {{#if journalId}}
               <button type="button" class="visibility-badge" data-action="toggle-visibility"
                       data-entity-id="{{id}}" data-is-private="{{isPrivate}}"
-                      title="{{#if isPrivate}}{{localize 'CHRONICLE.Dashboard.Entities.PrivateClickPublic'}}{{else}}{{localize 'CHRONICLE.Dashboard.Entities.PublicClickPrivate'}}{{/if}}">
+                      title="{{#if isPrivate}}{{localize 'CHRONICLE.Dashboard.Entities.PrivateClickPublic'}}{{else}}{{localize 'CHRONICLE.Dashboard.Entities.PublicClickPrivate'}}{{/if}}" aria-label="{{#if isPrivate}}{{localize 'CHRONICLE.Dashboard.Entities.PrivateClickPublic'}}{{else}}{{localize 'CHRONICLE.Dashboard.Entities.PublicClickPrivate'}}{{/if}}">
                 {{#if isPrivate}}<i class="fa-solid fa-lock"></i>{{else}}<i class="fa-solid fa-lock-open"></i>{{/if}}
               </button>
               {{/if}}
@@ -428,7 +428,7 @@
     {{!-- ================================================================= --}}
     <div class="cs-pane" role="tabpanel" data-subpane="linked:maps">
       <div class="dashboard-toolbar">
-        <button type="button" data-action="refresh" class="dashboard-btn btn-sm" title="{{localize 'CHRONICLE.Dashboard.Common.Refresh'}}">
+        <button type="button" data-action="refresh" class="dashboard-btn btn-sm" title="{{localize 'CHRONICLE.Dashboard.Common.Refresh'}}" aria-label="{{localize 'CHRONICLE.Dashboard.Common.Refresh'}}">
           <i class="fa-solid fa-arrows-rotate"></i>
         </button>
         <button type="button" data-action="resync-all-maps" class="dashboard-btn btn-sm"
@@ -462,7 +462,7 @@
         <div class="map-status-errors">
           <div class="map-status-errors-header">
             <span><i class="fa-solid fa-triangle-exclamation"></i>
-              {{mapSyncStatus.errorCount}} {{localize "CHRONICLE.Dashboard.Maps.RecentErrors"}}</span>
+              {{localize "CHRONICLE.Dashboard.Maps.RecentErrors"}}: {{mapSyncStatus.errorCount}}</span>
             <button type="button" data-action="dismiss-map-errors" class="dashboard-btn btn-xs"
                     title="{{localize 'CHRONICLE.Dashboard.Maps.DismissErrorsHint'}}">
               {{localize "CHRONICLE.Dashboard.Maps.DismissErrors"}}
@@ -583,7 +583,7 @@
         {{#if pcClaimingHint}}
         <div class="dashboard-hint">
           <i class="fa-solid fa-circle-info"></i>
-          {{{localize "CHRONICLE.Dashboard.Characters.ClaimingHint"}}}
+          <span>{{{localize "CHRONICLE.Dashboard.Characters.ClaimingHint"}}}</span>
         </div>
         {{/if}}
         <div class="dashboard-toolbar">
@@ -596,7 +596,7 @@
               <i class="fa-solid fa-upload"></i> {{localize "CHRONICLE.Dashboard.Entities.PushAll"}}
             </button>
             {{/if}}
-            <button type="button" data-action="refresh" class="dashboard-btn btn-sm" title="{{localize 'CHRONICLE.Dashboard.Common.Refresh'}}">
+            <button type="button" data-action="refresh" class="dashboard-btn btn-sm" title="{{localize 'CHRONICLE.Dashboard.Common.Refresh'}}" aria-label="{{localize 'CHRONICLE.Dashboard.Common.Refresh'}}">
               <i class="fa-solid fa-arrows-rotate"></i>
             </button>
           </div>
@@ -697,9 +697,7 @@
           </div>
         </div>
 
-        {{!-- FM-SYNC-SUBRESOURCES-P1: Chronicle world state. Weather, season,
-              era and moon phases folded from the WebSocket stream this
-              session. Read-only. --}}
+        {{!-- Weather, season, era and moon phases as Chronicle has sent them this session. Read-only. --}}
         <div class="calendar-worldstate">
           <div class="worldstate-title">
             <i class="fa-solid fa-cloud-sun"></i>

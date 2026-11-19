@@ -337,7 +337,7 @@ button.chronicle-shop-door {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-weight: 700;
-  color: color-mix(in srgb, var(--cs-text) 35%, transparent);
+  color: var(--cs-text-muted);
   padding: 9px 12px 2px;
   pointer-events: none;
 }
@@ -427,7 +427,7 @@ button.chronicle-shop-door {
 
 .overview-connection .overview-sub {
   font-size: 11px;
-  color: color-mix(in srgb, var(--cs-text) 55%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .overview-connection .dashboard-btn {
@@ -468,7 +468,7 @@ button.chronicle-shop-door {
 
 .overview-stat-label {
   font-size: 11px;
-  color: color-mix(in srgb, var(--cs-text) 60%, transparent);
+  color: var(--cs-text-muted);
 }
 
 /* Needs-attention rows */
@@ -549,7 +549,7 @@ button.chronicle-shop-door {
 .dashboard-tabs .item {
   padding: 8px 16px;
   font-size: 13px;
-  color: color-mix(in srgb, var(--cs-text) 60%, transparent);
+  color: var(--cs-text-muted);
   cursor: pointer;
   border-bottom: 2px solid transparent;
   transition: color 0.15s, border-color 0.15s;
@@ -587,6 +587,7 @@ button.chronicle-shop-door {
 /* Toolbar */
 .dashboard-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 4px 0 8px;
@@ -596,6 +597,7 @@ button.chronicle-shop-door {
 
 .toolbar-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
@@ -660,8 +662,10 @@ button.chronicle-shop-door {
   background: color-mix(in srgb, var(--cs-info) 6%, transparent);
 }
 
+/* Wide enough to type in: beside the buttons when they leave room, else on its own row. */
 .dashboard-search {
-  flex: 1;
+  flex: 1 1 180px;
+  min-width: 180px;
   padding: 4px 8px;
   border: 1px solid color-mix(in srgb, var(--cs-text) 15%, transparent);
   border-radius: 4px;
@@ -749,7 +753,7 @@ button.chronicle-shop-door {
   font-size: 10px;
   width: 12px;
   text-align: center;
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .entity-type-header .type-name {
@@ -758,7 +762,7 @@ button.chronicle-shop-door {
 
 .entity-type-header .type-stats {
   font-size: 11px;
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
   font-weight: normal;
 }
 
@@ -767,7 +771,7 @@ button.chronicle-shop-door {
   border: none !important;
   background: none !important;
   cursor: pointer;
-  color: color-mix(in srgb, var(--cs-text) 50%, transparent);
+  color: var(--cs-text-muted);
   transition: color 0.15s;
 }
 
@@ -846,7 +850,7 @@ button.chronicle-shop-door {
   border: none;
   padding: 2px 4px;
   cursor: pointer;
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
   font-size: 11px;
 }
 
@@ -857,7 +861,7 @@ button.chronicle-shop-door {
 /* Status label */
 .entity-status-label {
   font-size: 11px;
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
   white-space: nowrap;
 }
 
@@ -881,7 +885,7 @@ button.chronicle-shop-door {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
   margin: 12px 0 6px;
   padding-bottom: 4px;
   border-bottom: 1px solid color-mix(in srgb, var(--cs-text) 6%, transparent);
@@ -925,7 +929,7 @@ button.chronicle-shop-door {
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: color-mix(in srgb, var(--cs-text) 60%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .map-link-controls select {
@@ -944,7 +948,7 @@ button.chronicle-shop-door {
   padding: 1px 6px;
   border-radius: 8px;
   background: rgba(107, 114, 128, 0.2);
-  color: color-mix(in srgb, var(--cs-text) 60%, transparent);
+  color: var(--cs-text-muted);
   font-size: 11px;
 }
 
@@ -1104,12 +1108,12 @@ button.chronicle-shop-door {
 
 .shop-subtype {
   font-size: 11px;
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .shop-keeper {
   font-size: 11px;
-  color: color-mix(in srgb, var(--cs-text) 35%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .shop-keeper i {
@@ -1125,7 +1129,7 @@ button.chronicle-shop-door {
 }
 
 .shop-private-badge {
-  color: color-mix(in srgb, var(--cs-text) 30%, transparent);
+  color: var(--cs-text-muted);
   font-size: 12px;
 }
 
@@ -1160,7 +1164,7 @@ button.chronicle-shop-door {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
   margin-bottom: 6px;
 }
 
@@ -1171,13 +1175,13 @@ button.chronicle-shop-door {
 
 .calendar-date-box .date-year {
   font-size: 12px;
-  color: color-mix(in srgb, var(--cs-text) 50%, transparent);
+  color: var(--cs-text-muted);
   margin-top: 2px;
 }
 
 .calendar-date-box .date-time {
   font-size: 14px;
-  color: color-mix(in srgb, var(--cs-text) 60%, transparent);
+  color: var(--cs-text-muted);
   margin-top: 4px;
 }
 
@@ -1242,7 +1246,7 @@ button.chronicle-shop-door {
 
 .calendar-worldstate .worldstate-row dt {
   flex: 0 0 90px;
-  color: color-mix(in srgb, var(--cs-text) 60%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .calendar-worldstate .worldstate-row dd {
@@ -1313,7 +1317,7 @@ button.chronicle-shop-door {
 
 .stat-label {
   font-size: 11px;
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-top: 2px;
@@ -1321,7 +1325,7 @@ button.chronicle-shop-door {
 
 .last-sync-info {
   font-size: 12px;
-  color: color-mix(in srgb, var(--cs-text) 50%, transparent);
+  color: var(--cs-text-muted);
   margin-bottom: 12px;
 }
 
@@ -1346,7 +1350,7 @@ button.chronicle-shop-door {
 }
 
 .log-time {
-  color: color-mix(in srgb, var(--cs-text) 30%, transparent);
+  color: var(--cs-text-muted);
   font-size: 11px;
   flex-shrink: 0;
   min-width: 50px;
@@ -1499,7 +1503,7 @@ button.chronicle-shop-door {
 
 .config-hint {
   font-size: 11px;
-  color: color-mix(in srgb, var(--cs-text) 35%, transparent);
+  color: var(--cs-text-muted);
   margin-bottom: 8px;
 }
 
@@ -1562,7 +1566,7 @@ button.chronicle-shop-door {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: color-mix(in srgb, var(--cs-text) 30%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .character-details {
@@ -1589,7 +1593,7 @@ button.chronicle-shop-door {
 }
 
 .character-sync-status.unlinked {
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .character-actions {
@@ -1648,7 +1652,7 @@ button.chronicle-shop-door {
 
 .character-last-sync {
   font-size: 11px;
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .system-badge {
@@ -1681,7 +1685,7 @@ button.chronicle-shop-door {
 }
 
 .system-label {
-  color: color-mix(in srgb, var(--cs-text) 50%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .system-value {
@@ -1839,7 +1843,7 @@ html[data-cs-motion="calm"] :is(.cs-grow, .cs-settle, .cs-peek) { animation-name
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: color-mix(in srgb, var(--cs-text) 55%, transparent);
+  color: var(--cs-text-muted);
   border-bottom: 1px solid color-mix(in srgb, var(--cs-text) 8%, transparent);
   padding-bottom: 4px;
 }
@@ -1914,14 +1918,14 @@ html[data-cs-motion="calm"] :is(.cs-grow, .cs-settle, .cs-peek) { animation-name
 }
 
 .chronicle-update-info-form .update-info-empty {
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
   font-style: italic;
 }
 
 .chronicle-update-info-form .update-info-help {
   margin: 0;
   font-size: 12px;
-  color: color-mix(in srgb, var(--cs-text) 60%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .chronicle-update-info-form .update-info-check-btn {

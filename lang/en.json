@@ -357,7 +357,7 @@
         "Calendar": "Calendar",
         "Maps": "Maps",
         "Shops": "Shops",
-        "IssuesBadge": "{count} character(s) need a match",
+        "IssuesBadge": "Characters needing a match: {count}",
         "Linked": "Linked",
         "Problems": "Problems",
         "Settings": "Settings"
@@ -434,7 +434,7 @@
         "OpenViewers": "Open viewers",
         "LastSync": "Last sync",
         "NeverSynced": "never",
-        "RecentErrors": "recent error(s)",
+        "RecentErrors": "Recent errors",
         "DismissErrors": "Dismiss",
         "DismissErrorsHint": "Clear the recent map-sync error log"
       },
@@ -497,7 +497,7 @@
         "CharacterSyncEnabled": "Enabled",
         "CharacterSyncDisabled": "Disabled",
         "CharacterSyncNoSystem": "Requires matching game system",
-        "DmOnlyHiddenNote": "{count} DM-only entit(y/ies) synced this session and were hidden from players (per the \"DM-only hidden\" setting). The GM sees them; players intentionally don't — this is not a sync failure.",
+        "DmOnlyHiddenNote": "GM-only pages synced this session and kept from players: {count}. You see them and players don't. That is the \"Hide GM-only pages from players\" setting at work, not a sync problem.",
         "RecentActivity": "Recent Activity",
         "NoActivity": "No recent activity.",
         "ClearLog": "Clear Log",
@@ -1094,10 +1094,10 @@
     },
     "RemoteDelete": {
       "Title": "Delete in Chronicle too?",
-      "Body": "<p>You deleted {count} item(s) in Foundry that are linked to Chronicle:</p>{list}<p>Delete them in Chronicle too? Chronicle deletes them for good.</p><p>Choose No to keep them in Chronicle. A kept journal comes back into Foundry at the next full sync; a kept actor does not.</p>",
+      "Body": "<p>Deleted in Foundry and linked to Chronicle ({count}):</p>{list}<p>Delete them in Chronicle too? Chronicle deletes them for good.</p><p>Choose No to keep them in Chronicle. A kept journal comes back into Foundry at the next full sync; a kept actor does not.</p>",
       "More": "and {count} more",
-      "Deleted": "Deleted {count} item(s) in Chronicle.",
-      "Kept": "Kept {count} item(s) in Chronicle."
+      "Deleted": "Deleted in Chronicle: {count}.",
+      "Kept": "Kept in Chronicle: {count}."
     },
     "CalendarDatePush": {
       "Rejected": "Chronicle won't accept this date: its calendar has different months or leap days. Date sync is paused.",
@@ -1106,7 +1106,7 @@
     },
     "Debug": {
       "TabLabel": "Debug",
-      "NewBadge": "{count} new report(s)",
+      "NewBadge": "New reports: {count}",
       "ReportedNotice": "{name} reported a problem",
       "Report": {
         "Link": "Report a problem",

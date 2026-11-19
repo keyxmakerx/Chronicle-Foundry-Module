@@ -60,7 +60,7 @@
   border: 2px solid color-mix(in srgb, var(--cs-text) 20%, transparent);
   font-size: 12px;
   font-weight: 600;
-  color: color-mix(in srgb, var(--cs-text) 60%, transparent);
+  color: var(--cs-text-muted);
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 
@@ -78,7 +78,7 @@
 
 .step-label {
   font-size: 10px;
-  color: color-mix(in srgb, var(--cs-text) 50%, transparent);
+  color: var(--cs-text-muted);
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -121,7 +121,7 @@
 .wizard-step-desc {
   margin: 0 0 16px;
   font-size: 13px;
-  color: color-mix(in srgb, var(--cs-text) 50%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .wizard-subheading {
@@ -150,7 +150,7 @@
 }
 
 .detect-label {
-  color: color-mix(in srgb, var(--cs-text) 60%, transparent);
+  color: var(--cs-text-muted);
   font-weight: 500;
 }
 
@@ -183,7 +183,7 @@
 }
 
 .detect-muted {
-  color: color-mix(in srgb, var(--cs-text) 35%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .wizard-addon-badge {
@@ -202,7 +202,7 @@
 
 .wizard-addon-badge.addon-off {
   background: color-mix(in srgb, var(--cs-text) 4%, transparent);
-  color: color-mix(in srgb, var(--cs-text) 30%, transparent);
+  color: var(--cs-text-muted);
   border: 1px solid color-mix(in srgb, var(--cs-text) 8%, transparent);
 }
 
@@ -233,7 +233,7 @@
 
 .wizard-stat-label {
   font-size: 11px;
-  color: color-mix(in srgb, var(--cs-text) 50%, transparent);
+  color: var(--cs-text-muted);
   margin-top: 2px;
 }
 
@@ -257,7 +257,7 @@
 }
 
 .wizard-folder-row i {
-  color: color-mix(in srgb, var(--cs-text) 30%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .folder-name {
@@ -266,7 +266,7 @@
 }
 
 .folder-count {
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
   font-size: 12px;
 }
 
@@ -283,7 +283,7 @@
   padding: 6px 8px;
   font-size: 11px;
   font-weight: 600;
-  color: color-mix(in srgb, var(--cs-text) 50%, transparent);
+  color: var(--cs-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   border-bottom: 1px solid color-mix(in srgb, var(--cs-text) 8%, transparent);
@@ -304,7 +304,7 @@
 
 .wizard-mapping-table td i {
   margin-right: 4px;
-  color: color-mix(in srgb, var(--cs-text) 30%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .text-center {
@@ -395,7 +395,7 @@
 
 .tag-source {
   font-size: 11px;
-  color: color-mix(in srgb, var(--cs-text) 30%, transparent);
+  color: var(--cs-text-muted);
   margin-left: auto;
 }
 
@@ -437,7 +437,7 @@
 }
 
 .wizard-radio-label i {
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
 }
 
 /* --- Progress bar (Step 8) --- */
@@ -464,7 +464,7 @@
 
 .wizard-progress-text {
   font-size: 13px;
-  color: color-mix(in srgb, var(--cs-text) 60%, transparent);
+  color: var(--cs-text-muted);
   margin-bottom: 12px;
 }
 
@@ -536,7 +536,7 @@
   margin: 0;
   text-align: center;
   font-size: 13px;
-  color: color-mix(in srgb, var(--cs-text) 50%, transparent);
+  color: var(--cs-text-muted);
 }
 
 /* --- Footer navigation --- */
@@ -552,7 +552,7 @@
 
 .wizard-step-counter {
   font-size: 12px;
-  color: color-mix(in srgb, var(--cs-text) 40%, transparent);
+  color: var(--cs-text-muted);
 }
 
 .btn-import {
