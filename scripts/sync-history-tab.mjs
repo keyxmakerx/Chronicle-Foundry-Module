@@ -80,7 +80,7 @@ export class SyncHistoryTab {
       this.nextBefore = Number(res?.nextBefore) || 0;
     } catch (err) {
       this.error = err?.status === 403
-        ? 'Only the campaign owner’s key, or the key of a member with DM access, can read the sync history.'
+        ? 'Only the campaign owner’s key, or the key of a member with GM access, can read the sync history.'
         : err?.status === 404
           ? 'This Chronicle has no sync history yet. Update Chronicle to see it here.'
           : 'Couldn’t load the sync history. Try again in a moment.';

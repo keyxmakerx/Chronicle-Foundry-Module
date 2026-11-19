@@ -581,16 +581,16 @@ export class MapSync {
     if (verbose) {
       if (failures > 0) {
         ui.notifications.warn(
-          `Chronicle: materialized ${materialized} of ${maps.length} map(s); ${failures} failed. See sync dashboard for details.`
+          `Chronicle: ${failures} failed. Maps brought into Foundry: ${materialized} of ${maps.length}. See sync dashboard for details.`
         );
       } else {
-        ui.notifications.info(`Chronicle: synced ${materialized} map(s).`);
+        ui.notifications.info(`Chronicle: maps synced: ${materialized}`);
       }
     } else if (failures > 0) {
       // Silent (initial-sync) path: still surface a single aggregated toast
       // so the operator notices partial materialization.
       ui.notifications.warn(
-        `Chronicle: ${failures} of ${maps.length} maps failed to materialize. See sync dashboard.`
+        `Chronicle: ${failures} of ${maps.length} maps could not be brought into Foundry. See sync dashboard.`
       );
     }
 
@@ -976,7 +976,7 @@ export class MapSync {
       await this._refreshSubResources(mapId);
       this._lastSyncAt = Date.now();
       this._notifyViewers(mapId);
-      ui.notifications.info(`Chronicle: resynced "${noticeText(map.name || mapId)}".`);
+      ui.notifications.info(`Chronicle: synced "${noticeText(map.name || mapId)}" again.`);
       return true;
     } catch (err) {
       const status = err?.status || null;
@@ -988,7 +988,7 @@ export class MapSync {
         error: err,
       });
       ui.notifications.error(
-        `Chronicle: resync failed for this map${status ? ` (HTTP ${status})` : ''}. See sync dashboard.`
+        `Chronicle: sync again failed for this map${status ? ` (HTTP ${status})` : ''}. See sync dashboard.`
       );
       return false;
     }

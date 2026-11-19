@@ -303,7 +303,7 @@ Hooks.once('ready', async () => {
       const mapSync = syncManager._modules?.find((m) => m.constructor?.name === 'MapSync');
       const count = mapSync?._materializedThisStartup || 0;
       if (count > 0) {
-        ui.notifications.info(`Chronicle: synced ${count} map(s) from Chronicle.`);
+        ui.notifications.info(`Chronicle: maps synced from Chronicle: ${count}`);
       }
     }
   } catch (err) {

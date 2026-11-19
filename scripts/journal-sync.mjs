@@ -490,7 +490,7 @@ export class JournalSync {
       return { updated: 0, created: 0, skipped: 0, errors: 0 };
     }
 
-    if (verbose) ui.notifications.info('Chronicle: fetching entities for resync…');
+    if (verbose) ui.notifications.info('Chronicle: fetching pages to sync again…');
 
     // A resync started from the dashboard runs before any connect has read
     // the folder layout; without it every new journal would land loose.
@@ -523,7 +523,7 @@ export class JournalSync {
       const status = err?.status || null;
       console.warn(`Chronicle JournalSync.resyncAll: GET /entities failed (${status || 'network'})`, err);
       ui.notifications.error(
-        `Chronicle: could not fetch entities from Chronicle${status ? ` (HTTP ${status})` : ''}. Check the connection in Chronicle settings.`
+        `Chronicle: could not fetch pages from Chronicle${status ? ` (HTTP ${status})` : ''}. Check the connection in Chronicle settings.`
       );
       return { updated: 0, created: 0, skipped: 0, errors: 1 };
     }
@@ -536,7 +536,7 @@ export class JournalSync {
     if (truncated) {
       console.warn(`Chronicle: resyncAll stopped at ${allEntities.length} entities; the campaign has more.`);
       ui.notifications.warn(
-        `Chronicle: resync covered the first ${allEntities.length} entities only — the campaign has more. Run it again or narrow your sync exclusions.`
+        `Chronicle: sync again covered only the first ${allEntities.length} pages — the campaign has more. Run it again or narrow your sync exclusions.`
       );
     }
 
@@ -619,11 +619,11 @@ export class JournalSync {
     if (verbose) {
       if (errors > 0) {
         ui.notifications.warn(
-          `Chronicle: resynced ${updated + created} of ${allEntities.length - skipped} entity(ies); ${errors} failed. See the sync dashboard for details.`
+          `Chronicle: ${errors} failed. Pages synced again: ${updated + created} of ${allEntities.length - skipped}. See the sync dashboard for details.`
         );
       } else {
         ui.notifications.info(
-          `Chronicle: resynced ${updated + created} entity(ies) (${updated} updated, ${created} created).`
+          `Chronicle: pages synced again: ${updated + created} (${updated} updated, ${created} created).`
         );
       }
     }
@@ -1295,7 +1295,7 @@ export class JournalSync {
       // REST error itself is already in the dashboard's error log.
       console.error('Chronicle: Failed to push journal to Chronicle', err);
       this._syncManager?.recordUserOutcome?.(userId, err);
-      ui.notifications?.warn?.(`Chronicle: Failed to push journal "${noticeText(journal.name)}". Check the sync dashboard for details.`);
+      ui.notifications?.warn?.(`Chronicle: Failed to send journal "${noticeText(journal.name)}". Check the sync dashboard for details.`);
     } finally {
       this._inFlightCreates.delete(journal.id);
     }
@@ -1469,7 +1469,7 @@ export class JournalSync {
           await this._handleConflict(current, entityId, body);
         },
       });
-      ui.notifications?.warn?.(`Chronicle: Failed to push update for "${noticeText(journal.name)}" — queued for retry. See the sync dashboard.`);
+      ui.notifications?.warn?.(`Chronicle: Failed to send update for "${noticeText(journal.name)}" — queued for retry. See the sync dashboard.`);
     }
   }
 
@@ -1809,7 +1809,7 @@ export class JournalSync {
       const who = label ? ` on "${label}"` : '';
       this._syncManager?.logActivity?.(
         'warning',
-        `Permission push${who}: ${unmapped.length} player grant(s) not sent — no Chronicle mapping for ${named}. Link them in Chronicle Sync, under Settings, Players.`
+        `Permission push${who}: ${unmapped.length} player grants not sent — no Chronicle mapping for ${named}. Link them in Chronicle Sync, under Settings, Players.`
       );
       ui.notifications?.warn?.(
         `Chronicle: ${unmapped.length} player permission grant(s)${label ? ` on "${noticeText(label)}"` : ''} were not sent — unmapped Foundry user(s): ${noticeText(named)}. Link them in Chronicle Sync, under Settings, Players.`
@@ -1842,7 +1842,7 @@ export class JournalSync {
         `Failed to push permissions${label ? ` for "${label}"` : ''} — ${err?.message || 'unknown error'}`
       );
       ui.notifications?.warn?.(
-        `Chronicle: Failed to push permissions${label ? ` for "${noticeText(label)}"` : ''}. See the sync dashboard for details.`
+        `Chronicle: Failed to send permissions${label ? ` for "${noticeText(label)}"` : ''}. See the sync dashboard for details.`
       );
     }
   }

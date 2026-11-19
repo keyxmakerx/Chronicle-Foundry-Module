@@ -52,7 +52,7 @@
     },
     "Secrets": {
       "Placeholder": "GM-only text, kept in Chronicle",
-      "NotSent": "Chronicle: your edit of \"{name}\" wasn't sent, because its GM-only text changed in Chronicle. Pull it from the sync dashboard, then edit again."
+      "NotSent": "Chronicle: your edit of \"{name}\" wasn't sent, because its GM-only text changed in Chronicle. Bring it in from the sync dashboard, then edit again."
     },
     "ShopRoom": {
       "OpenShop": "Open Chronicle Shop",
@@ -145,11 +145,11 @@
       },
       "SyncJournals": {
         "Name": "Sync Journals",
-        "Hint": "Sync Chronicle entities with Foundry journal entries"
+        "Hint": "Sync Chronicle pages with Foundry journal entries"
       },
       "SyncMaps": {
         "Name": "Sync Maps",
-        "Hint": "Materialize Chronicle maps as Foundry journal entries with an interactive map viewer"
+        "Hint": "Bring Chronicle maps into Foundry as journal entries with an interactive map viewer"
       },
       "SyncCalendar": {
         "Name": "Sync Calendar",
@@ -194,7 +194,7 @@
       },
       "SyncCharacters": {
         "Name": "Sync Characters",
-        "Hint": "Sync Foundry actors with Chronicle character entities (requires matching game system)"
+        "Hint": "Sync Foundry actors with Chronicle character pages (requires matching game system)"
       },
       "SyncCreatures": {
         "Name": "Sync Creatures",
@@ -236,7 +236,7 @@
       "InitialSyncFailed": "Chronicle: The first sync failed ({message}). The dashboard's History tab lists what happened.",
       "MatchFailed": "Chronicle: Match failed: {message}",
       "CreateFailed": "Chronicle: Create failed: {message}",
-      "ResyncFailed": "Chronicle: Re-sync failed: {message}"
+      "ResyncFailed": "Chronicle: Sync again failed: {message}"
     },
     "Creatures": {
       "Folder": "Chronicle: Creatures"
@@ -271,8 +271,8 @@
         "AllClear": "Everything's in sync — nothing needs your attention.",
         "QuickActions": "Quick Actions",
         "SyncEverything": "Sync Everything Now",
-        "StatEntities": "Entities Synced",
-        "StatCharacters": "Characters Synced",
+        "StatEntities": "Pages in sync",
+        "StatCharacters": "Characters in sync",
         "StatMaps": "Maps Linked",
         "Disconnected": "Disconnected",
         "Never": "Never",
@@ -317,8 +317,8 @@
         "InspectingMid": "(type",
         "InspectingTail": ").",
         "InspectActor": "Inspect actor",
-        "SyncedMark": "✓ synced",
-        "Synced": "Synced",
+        "SyncedMark": "✓ in sync",
+        "Synced": "In sync",
         "SyncedOfDeclared": "{synced} / {total} declared",
         "CollectionMapped": "Collection-mapped (items)",
         "DeclaredUnmapped": "Declared, unmapped",
@@ -352,7 +352,7 @@
       },
       "Rail": {
         "Overview": "Overview",
-        "Entities": "Entities",
+        "Entities": "Pages",
         "Characters": "Characters",
         "Calendar": "Calendar",
         "Maps": "Maps",
@@ -369,19 +369,19 @@
         "Connection": "Connection"
       },
       "Entities": {
-        "PullAllHint": "Pull all Chronicle-only entities",
-        "PushAllHint": "Push all Foundry-only journals",
+        "PullAllHint": "Bring in every page that is only in Chronicle",
+        "PushAllHint": "Send every journal that is only in Foundry",
         "RefreshData": "Refresh data",
-        "SyncedCount": "{count} synced",
-        "ChronicleOnlyCount": ", {count} Chronicle-only",
-        "FoundryOnlyStatus": "Foundry-only",
-        "NoMatch": "No entities match \"{search}\".",
-        "PullAll": "Pull All",
-        "PushAll": "Push All",
+        "SyncedCount": "{count} in sync",
+        "ChronicleOnlyCount": ", {count} only in Chronicle",
+        "FoundryOnlyStatus": "Only in Foundry",
+        "NoMatch": "No pages match \"{search}\".",
+        "PullAll": "Bring in all",
+        "PushAll": "Send all",
         "Refresh": "Refresh",
-        "SearchPlaceholder": "Search entities...",
-        "Synced": "Synced",
-        "Modified": "Modified",
+        "SearchPlaceholder": "Search pages...",
+        "Synced": "In sync",
+        "Modified": "Changed in Chronicle",
         "ChronicleOnly": "Chronicle",
         "SyncedAsActor": "Synced as an actor",
         "SetAside": "Set aside",
@@ -393,21 +393,21 @@
         "DeleteFailed": "Chronicle: some journals could not be deleted. Check the console.",
         "PullCharacter": "Chronicle: \"{name}\" is a character, so it syncs as an actor, not a journal. Link it in Chronicle Sync › Characters.",
         "FoundryOnly": "Foundry",
-        "Pull": "Pull",
-        "Push": "Push",
+        "Pull": "Bring in",
+        "Push": "Send",
         "SyncEnabled": "Sync enabled",
         "SyncDisabled": "Sync disabled",
         "EnableSync": "Enable sync for this type",
         "DisableSync": "Disable sync for this type",
-        "FoundryOnlyJournals": "Foundry-Only Journals",
-        "Unlinked": "unlinked",
+        "FoundryOnlyJournals": "Only in Foundry",
+        "Unlinked": "not linked",
         "PrivateClickPublic": "Private — click to make public",
         "PublicClickPrivate": "Public — click to make private",
-        "EmptyState": "No entities found. Create entities in Chronicle or journals in Foundry to get started.",
+        "EmptyState": "No pages found. Create pages in Chronicle or journals in Foundry to get started.",
         "CreateType": "Create Type",
-        "CreateTypeTitle": "Create Entity Type",
-        "ResyncAllJournals": "Resync All Journals",
-        "ResyncAllJournalsHint": "Re-fetch every entity from Chronicle and update existing journals, including their permissions"
+        "CreateTypeTitle": "Create page type",
+        "ResyncAllJournals": "Sync all again",
+        "ResyncAllJournalsHint": "Fetch every page from Chronicle again and update existing journals, including their permissions"
       },
       "Bulk": {
         "Selected": "selected",
@@ -415,22 +415,22 @@
         "MakePublic": "Make Public",
         "MakePrivate": "Make Private",
         "Delete": "Delete",
-        "ConfirmChangeType": "Change entity type for {count} selected entities?",
-        "ConfirmDelete": "Permanently delete {count} selected entities from Chronicle? This cannot be undone."
+        "ConfirmChangeType": "Change page type for {count} selected pages?",
+        "ConfirmDelete": "Permanently delete {count} selected pages from Chronicle? This cannot be undone."
       },
       "Maps": {
         "CountsTitle": "{markers} markers / {drawings} drawings / {tokens} tokens",
         "ChronicleMaps": "Chronicle Maps",
         "OpenInFoundry": "Open in Foundry",
-        "OpenInFoundryHint": "Open the materialized journal entry for this map",
+        "OpenInFoundryHint": "Open the journal entry for this map",
         "OpenInChronicle": "Open in Chronicle",
-        "NotMaterialized": "Not yet materialized",
+        "NotMaterialized": "Not in Foundry yet",
         "NoMaps": "No maps found in this Chronicle campaign.",
-        "ResyncAll": "Resync All Maps",
-        "ResyncAllHint": "Re-fetch every map from Chronicle and re-materialize the journal entries",
+        "ResyncAll": "Sync all maps again",
+        "ResyncAllHint": "Fetch every map from Chronicle again and rebuild the journal entries",
         "OpenFolder": "Open Chronicle Maps Folder",
         "OpenFolderHint": "Reveal the Chronicle Maps folder in Foundry's journal sidebar",
-        "Materialized": "Materialized",
+        "Materialized": "In Foundry",
         "OpenViewers": "Open viewers",
         "LastSync": "Last sync",
         "NeverSynced": "never",
@@ -439,13 +439,13 @@
         "DismissErrorsHint": "Clear the recent map-sync error log"
       },
       "Shops": {
-        "PrivateDmOnly": "Private (DM only)",
+        "PrivateDmOnly": "Private (GM only)",
         "Open": "Open",
-        "Synced": "Synced",
+        "Synced": "In sync",
         "NoShops": "No shops found in this campaign.",
-        "NoShopsHint": "Create shop entities in Chronicle to see them here.",
-        "NoShopType": "No shop entity type found.",
-        "NoShopTypeHint": "Add a \"Shop\" entity type to your campaign in Chronicle."
+        "NoShopsHint": "Create shop pages in Chronicle to see them here.",
+        "NoShopType": "No shop page type found.",
+        "NoShopTypeHint": "Add a \"Shop\" page type to your campaign in Chronicle."
       },
       "Calendar": {
         "DayMonth": "Day {day}, Month {month}",
@@ -468,22 +468,22 @@
         "MatchSelectTitle": "Match to an existing Chronicle character",
         "MatchOption": "— Match to existing… —",
         "Match": "Match",
-        "MatchHint": "Link to the selected character and push this actor's data",
+        "MatchHint": "Link to the selected character and send this actor's data",
         "CreateNew": "Create new",
         "CreateNewHint": "Create a new Chronicle character of the correct type and link it",
         "ClaimingHint": "Enable <strong>Player Character Claiming</strong> in Chronicle to sync player claims.",
-        "PushAllHint": "Push all unlinked actors to Chronicle",
-        "Resync": "Re-sync",
-        "ResyncHint": "Re-push this actor's current data to Chronicle",
+        "PushAllHint": "Send every actor that is not linked to Chronicle",
+        "Resync": "Sync again",
+        "ResyncHint": "Send this actor's current data to Chronicle again",
         "NoMatchingSystem": "No Chronicle system matches your Foundry game system",
         "PackageHint": "Is the game system package installed in Chronicle? (Admin → Packages)",
         "EnabledHint": "Is it enabled for this campaign? (Campaign Settings → Game System)",
         "ConsoleHint": "Check the browser console for detailed diagnostics.",
-        "Synced": "Synced",
+        "Synced": "In sync",
         "NotLinked": "Not linked",
-        "Push": "Push",
+        "Push": "Send",
         "NoActors": "No character actors found.",
-        "NoActorsHint": "Create character actors in Foundry or character entities in Chronicle.",
+        "NoActorsHint": "Create character actors in Foundry or character pages in Chronicle.",
         "Disabled": "Character sync is disabled.",
         "DisabledHint": "Turn on Characters in Settings, under What syncs, to sync actors with Chronicle.",
         "NeedMatch": "Needs a match"
@@ -532,9 +532,9 @@
       "LocalPinShared": "Personal annotation, visible to all players in this world",
       "LocalPinGmOnly": "Personal annotation, GM only",
       "MarkerAudienceEveryone": "Chronicle marker, visible to everyone",
-      "MarkerAudienceDm": "Chronicle marker, DM only",
+      "MarkerAudienceDm": "Chronicle marker, GM only",
       "PlaceChronicleMarker": "Place Chronicle marker",
-      "ResyncThisMap": "Resync this map from Chronicle",
+      "ResyncThisMap": "Sync this map again from Chronicle",
       "OpenInChronicle": "Open in Chronicle",
       "LiveFromChronicle": "Live from Chronicle",
       "MapTools": "Map tools",
@@ -560,7 +560,7 @@
       "MarkerDeleteFailed": "Failed to delete marker on Chronicle.",
       "MarkerVisibility": {
         "everyone": "Everyone",
-        "dm_only": "DM only"
+        "dm_only": "GM only"
       },
       "ZoomIn": "Zoom In",
       "ZoomOut": "Zoom Out",
@@ -578,7 +578,7 @@
     "Wizard": {
       "Title": "Chronicle Import Wizard",
       "OpenWizard": "Setup Wizard",
-      "Hint": "Guided import of your Foundry world into Chronicle — maps folders to entity types, suggests tags, and bulk-imports content.",
+      "Hint": "Guided import of your Foundry world into Chronicle — maps folders to page types, suggests tags, and bulk-imports content.",
       "Back": "Back",
       "Next": "Next",
       "StartImport": "Start Import",
@@ -595,7 +595,7 @@
       "ConnectDesc": "Verifying connection to Chronicle and detecting your campaign configuration.",
       "Connection": "Connection",
       "Connected": "Connected",
-      "EntityTypes": "Entity Types",
+      "EntityTypes": "Page types",
       "TypesFound": "types configured",
       "GameSystem": "Game System",
       "NoSystemMatch": "No matching game system found — character sync will be skipped.",
@@ -605,7 +605,7 @@
       "Available": "Available",
       "NotAvailable": "Not available",
       "Detecting": "Detecting campaign configuration...",
-      "ScanDesc": "Scanning your Foundry world for journals, actors, scenes, and items that aren't yet synced with Chronicle.",
+      "ScanDesc": "Scanning your Foundry world for journals, actors, scenes, and items that aren't in Chronicle yet.",
       "Journals": "Journals",
       "Actors": "Actors",
       "Scenes": "Scenes",
@@ -613,22 +613,22 @@
       "ByFolder": "By Folder",
       "Documents": "documents",
       "Scanning": "Scanning Foundry world...",
-      "TypesDesc": "Map each Foundry folder to a Chronicle entity type. Documents in that folder will be created as that type in Chronicle.",
+      "TypesDesc": "Map each Foundry folder to a Chronicle page type. Documents in that folder will be created as that type in Chronicle.",
       "Folder": "Folder",
       "Count": "Count",
       "ChronicleType": "Chronicle Type",
       "Skip": "Skip",
       "CreateNewType": "Create new type…",
       "NewTypeName": "Type name",
-      "NoFolders": "No unsynced documents found in your world.",
+      "NoFolders": "No documents waiting to be synced were found in your world.",
       "TagsDesc": "Auto-generated tags from your folder names and actor types. Toggle, rename, or remove as needed.",
       "NoTags": "No tags to suggest.",
-      "CharactersDesc": "Select which actors to import as Chronicle character entities. Mark PCs and NPCs.",
+      "CharactersDesc": "Select which actors to import as Chronicle character pages. Mark PCs and NPCs.",
       "Actor": "Actor",
       "Type": "Type",
       "PC": "PC",
       "Include": "Include",
-      "NoActors": "No unsynced actors found.",
+      "NoActors": "No actors waiting to be synced were found.",
       "ReviewSummary": "The following operations will be performed:",
       "Errors": "errors",
       "NoPlan": "No import plan generated — go back and configure at least one step.",
@@ -704,7 +704,7 @@
         "Hint": "GM only."
       },
       "OpenDMScreen": {
-        "Name": "Open the DM Screen",
+        "Name": "Open the GM Screen",
         "Hint": "GM only. Works once the world is connected to Chronicle."
       },
       "OpenSatchel": {
@@ -722,7 +722,7 @@
     },
     "SceneControl": {
       "Dashboard": "Open Chronicle Sync",
-      "DMScreen": "Open the DM Screen",
+      "DMScreen": "Open the GM Screen",
       "Satchel": "Open my Satchel",
       "Calendar": "Open the Chronicle calendar"
     },
@@ -736,7 +736,7 @@
       },
       "BackToBoard": "Back to the board",
       "StashGMTitle": "Your stash lives on a character",
-      "StashGM": "The party's shared stashes are in the DM Screen's Party tab.",
+      "StashGM": "The party's shared stashes are in the GM Screen's Party tab.",
       "StashOffTitle": "Stashes are off",
       "StashOff": "This campaign doesn't use stashes in Chronicle.",
       "StashNoCharacterTitle": "No character yet",
@@ -863,7 +863,7 @@
       "Conflict": "Someone else changed this quest just now. It has been reloaded; make your change again.",
       "OpenQuest": "Open quest",
       "Error": {
-        "NotAllowed": "Chronicle refused. Quest boards need the campaign owner's or a co-DM's sync key.",
+        "NotAllowed": "Chronicle refused. Quest boards need the campaign owner's or a co-GM's sync key.",
         "NeedsUpdate": "Chronicle didn't find this. It may be hidden, or Chronicle may need updating to show quest boards in Foundry.",
         "NoGM": "Quest boards need the GM to be connected.",
         "NoAnswer": "The GM's client didn't answer. Try again in a moment.",
@@ -871,7 +871,7 @@
       }
     },
     "DMScreen": {
-      "Title": "DM Screen",
+      "Title": "GM Screen",
       "WorldEmptyTitle": "No world state yet",
       "WorldEmpty": "Add a calendar or turn on the Armory to see the world's date and game state here.",
       "Skip": "Click anywhere to skip",
@@ -906,10 +906,10 @@
       },
       "Error": {
         "NotSetUp": "Connect this world to Chronicle first (Chronicle Sync settings).",
-        "NeedsUpdate": "This Chronicle doesn't have the DM Screen yet. Update Chronicle to use it here.",
+        "NeedsUpdate": "This Chronicle doesn't have the GM Screen yet. Update Chronicle to use it here.",
         "BadKey": "Chronicle didn't accept this world's sync key. Check it in the Chronicle Sync settings.",
-        "NotAllowed": "Chronicle refused the DM Screen for this sync key. Check that the Sync API is on for the campaign and the key can read.",
-        "Failed": "The DM Screen couldn't load from Chronicle. Try again in a moment.",
+        "NotAllowed": "Chronicle refused the GM Screen for this sync key. Check that the Sync API is on for the campaign and the key can read.",
+        "Failed": "The GM Screen couldn't load from Chronicle. Try again in a moment.",
         "Action": "Chronicle didn't accept that change. Try again in a moment."
       }
     },
@@ -918,7 +918,7 @@
         "Heading": "Stages",
         "Title": "Stage {n}",
         "Due": "Due",
-        "DueNotice": "Stage {n} of {name} is due. Start it from the DM Screen's Encounters tab.",
+        "DueNotice": "Stage {n} of {name} is due. Start it from the GM Screen's Encounters tab.",
         "WhenManual": "When you start it",
         "WhenStamina": "When {name} is at or below {p}% Stamina",
         "WhenRound": "At the start of round {n}",
@@ -994,7 +994,7 @@
       "Error": {
         "NeedsUpdate": "This Chronicle doesn't have planned encounters yet. Update Chronicle to use them here.",
         "BadKey": "Chronicle didn't accept this world's sync key. Check it in the Chronicle Sync settings.",
-        "NotAllowed": "Encounters are for the campaign owner or a co-DM. Check that this world's sync key belongs to one of them.",
+        "NotAllowed": "Encounters are for the campaign owner or a co-GM. Check that this world's sync key belongs to one of them.",
         "Failed": "Encounters couldn't load from Chronicle. Try again in a moment.",
         "Action": "That didn't work. Nothing was changed.",
         "Place": "Couldn't place the creatures. Try again."

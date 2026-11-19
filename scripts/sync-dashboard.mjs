@@ -571,7 +571,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!ok) return;
     try {
       await JournalEntry.deleteDocuments(journals.map((j) => j.id));
-      this._logActivity('update', `Deleted ${journals.length} Foundry-only journal${one ? '' : 's'}`);
+      this._logActivity('update', `Deleted ${journals.length} journal${one ? '' : 's'} that ${one ? 'was' : 'were'} only in Foundry`);
     } catch (err) {
       console.error('Chronicle: deleting journals failed', err);
       ui.notifications.error(game.i18n.localize('CHRONICLE.Dashboard.Entities.DeleteFailed'));
@@ -1128,7 +1128,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       gaps.push({ status: 'available-unmapped', label: `…and ${availCount - AVAIL_CAP} more available paths`, detail: '' });
     }
     for (const c of report.collections) {
-      gaps.push({ status: c.status, label: c.source, detail: `${c.count} item(s) [${c.types.join(', ')}] — ${c.note}` });
+      gaps.push({ status: c.status, label: c.source, detail: `${c.count} items [${c.types.join(', ')}] — ${c.note}` });
     }
     return gaps;
   }
@@ -1983,12 +1983,12 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     try {
       await this.api.createEntityType(result);
-      ui.notifications.info(`Entity type "${noticeText(result.name)}" created.`);
+      ui.notifications.info(`Page type "${noticeText(result.name)}" created.`);
       this._cache.entityTypes = null;
       this._cache.entities = null;
       this.render({ force: true });
     } catch (err) {
-      ui.notifications.error(`Failed to create entity type: ${noticeText(err.message)}`);
+      ui.notifications.error(`Failed to create page type: ${noticeText(err.message)}`);
     }
   }
 
@@ -2052,7 +2052,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       }
       if (journalSync) {
         await journalSync._createJournalFromEntity(entity);
-        this._logActivity('pull', `Pulled "${entity.name}" from Chronicle`);
+        this._logActivity('pull', `Brought in "${entity.name}" from Chronicle`);
       }
 
       if (quiet) return;
@@ -2060,7 +2060,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       this.render({ force: true });
     } catch (err) {
       console.error('Chronicle Dashboard: Pull failed', err);
-      ui.notifications.error(`Failed to pull entity: ${noticeText(err.message)}`);
+      ui.notifications.error(`Failed to bring in page: ${noticeText(err.message)}`);
     }
   }
 
@@ -2097,7 +2097,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
           sync_direction: 'both',
         });
 
-        this._logActivity('push', `Pushed "${journal.name}" to Chronicle`);
+        this._logActivity('push', `Sent "${journal.name}" to Chronicle`);
       }
 
       if (quiet) return;
@@ -2105,7 +2105,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       this.render({ force: true });
     } catch (err) {
       console.error('Chronicle Dashboard: Push failed', err);
-      ui.notifications.error(`Failed to push journal: ${noticeText(err.message)}`);
+      ui.notifications.error(`Failed to send journal: ${noticeText(err.message)}`);
     }
   }
 
@@ -2147,8 +2147,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     let confirmed;
     try {
       confirmed = await confirmDialog({
-        title: 'Pull All from Chronicle',
-        content: '<p>Pull all Chronicle entities that don\'t have a Foundry journal yet?</p>',
+        title: 'Bring in all from Chronicle',
+        content: '<p>Bring in every Chronicle page that does not have a Foundry journal yet?</p>',
       });
     } catch {
       return; // User closed dialog.
@@ -2167,7 +2167,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     }
     this._cache.entities = null;
     this.render({ force: true });
-    ui.notifications.info(`Chronicle: Pulled ${count} entities.`);
+    ui.notifications.info(`Chronicle: pages brought in: ${count}`);
   }
 
   /**
@@ -2178,8 +2178,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     let confirmed;
     try {
       confirmed = await confirmDialog({
-        title: 'Push All to Chronicle',
-        content: '<p>Push all Foundry journals that aren\'t linked to Chronicle yet?</p>',
+        title: 'Send all to Chronicle',
+        content: '<p>Send every Foundry journal that is not linked to Chronicle yet?</p>',
       });
     } catch {
       return; // User closed dialog.
@@ -2194,7 +2194,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     }
     this._cache.entities = null;
     this.render({ force: true });
-    ui.notifications.info(`Chronicle: Pushed ${count} journals.`);
+    ui.notifications.info(`Chronicle: journals sent: ${count}`);
   }
 
   /**
@@ -2250,11 +2250,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     try {
       // Trigger the create flow by calling the hook handler directly.
       await actorSync._handleCreateActor(actor, {}, game.user.id);
-      this._logActivity('push', `Pushed actor "${actor.name}" to Chronicle`);
+      this._logActivity('push', `Sent actor "${actor.name}" to Chronicle`);
       this.render({ force: true });
     } catch (err) {
       console.error('Chronicle Dashboard: Push actor failed', err);
-      ui.notifications.error(`Failed to push actor: ${noticeText(err.message)}`);
+      ui.notifications.error(`Failed to send actor: ${noticeText(err.message)}`);
     }
   }
 
@@ -2300,7 +2300,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!actorSync) { ui.notifications.warn('Chronicle: Character sync not active.'); return; }
     try {
       const ok = await actorSync.repushActor(actorId);
-      ui.notifications[ok ? 'info' : 'warn'](ok ? 'Chronicle: Re-synced to Chronicle.' : 'Chronicle: Re-sync failed.');
+      ui.notifications[ok ? 'info' : 'warn'](ok ? 'Chronicle: Synced again to Chronicle.' : 'Chronicle: Sync again failed.');
     } catch (err) {
       console.error('Chronicle Dashboard: re-sync failed', err);
       ui.notifications.error(game.i18n.format('CHRONICLE.Notifications.ResyncFailed', { message: noticeText(err?.message ?? '') }));
@@ -2321,15 +2321,15 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const unlinked = characters.filter((c) => !c.synced);
 
     if (unlinked.length === 0) {
-      ui.notifications.info('Chronicle: All characters are already synced.');
+      ui.notifications.info('Chronicle: All characters are already in sync.');
       return;
     }
 
     let confirmed;
     try {
       confirmed = await confirmDialog({
-        title: 'Push All Actors to Chronicle',
-        content: `<p>Push ${unlinked.length} unlinked actor(s) to Chronicle?</p>`,
+        title: 'Send all actors to Chronicle',
+        content: `<p>Send the actors that are not linked to Chronicle yet? Actors to send: ${unlinked.length}</p>`,
       });
     } catch {
       return; // User closed dialog.
@@ -2349,8 +2349,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       }
     }
 
-    this._logActivity('push', `Pushed ${count} actors to Chronicle`);
-    ui.notifications.info(`Chronicle: Pushed ${count} actor(s) to Chronicle.`);
+    this._logActivity('push', `Sent ${count} actors to Chronicle`);
+    ui.notifications.info(`Chronicle: actors sent to Chronicle: ${count}`);
     this.render({ force: true });
   }
 
@@ -2370,15 +2370,15 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     try {
       confirmed = await confirmDialog({
         title: 'Sync Everything Now',
-        content: '<p>Re-sync <strong>all</strong> journals, linked characters, and maps with Chronicle?</p>'
-          + '<p class="hint">Foundry is the source of truth for characters — their current data is pushed up.</p>',
+        content: '<p>Sync <strong>all</strong> journals, linked characters, and maps with Chronicle again?</p>'
+          + '<p class="hint">Foundry is the source of truth for characters — their current data is sent to Chronicle.</p>',
       });
     } catch {
       return; // User dismissed the dialog.
     }
     if (!confirmed) return;
 
-    ui.notifications.info('Chronicle: Re-syncing everything…');
+    ui.notifications.info('Chronicle: Syncing everything again…');
     const mods = this._syncManager?._modules || [];
     const find = (name) => mods.find((m) => m.constructor?.name === name);
     const done = [];
@@ -2400,7 +2400,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         try { if (await actorSync.repushActor(c.id)) pushed++; }
         catch (err) { console.error(`Chronicle: re-push failed for "${c.name}"`, err); }
       }
-      if (pushed) done.push(`${pushed} character(s)`);
+      if (pushed) done.push(`characters: ${pushed}`);
     }
 
     // 3. Maps.
@@ -2412,9 +2412,9 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     this._cache.maps = null;
     this._cache.entities = null;
-    this._logActivity('push', `Re-synced everything (${done.join(', ') || 'nothing'})`);
+    this._logActivity('push', `Synced everything again (${done.join(', ') || 'nothing'})`);
     this.render({ force: true });
-    ui.notifications.info(`Chronicle: Re-sync complete — ${done.join(', ') || 'nothing to sync'}.`);
+    ui.notifications.info(`Chronicle: Sync again complete — ${done.join(', ') || 'nothing to sync'}.`);
   }
 
   // ---------------------------------------------------------------------------
@@ -2660,7 +2660,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       });
       this._selectedEntities.clear();
       this._cache.entities = null;
-      this._logActivity('update', `Bulk changed type for ${count} entities`);
+      this._logActivity('update', `Changed the page type of ${count} pages`);
       this.render({ force: true });
     } catch (err) {
       console.error('Chronicle Dashboard: Bulk change type failed', err);
@@ -2703,7 +2703,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this._selectedEntities.clear();
     this._cache.entities = null;
     const label = makePrivate ? 'private' : 'public';
-    this._logActivity('update', `Set ${succeeded} entities to ${label}`);
+    this._logActivity('update', `Set ${succeeded} pages to ${label}`);
     this.render({ force: true });
   }
 
@@ -2738,7 +2738,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     this._selectedEntities.clear();
     this._cache.entities = null;
-    this._logActivity('update', `Deleted ${succeeded} entities from Chronicle`);
+    this._logActivity('update', `Deleted ${succeeded} pages from Chronicle`);
     this.render({ force: true });
   }
 

@@ -523,7 +523,7 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
       for (const doc of mapping.docs) {
         plan.push({
           type: 'push-journal',
-          label: `Push "${doc.name}" as ${mapping.folderName}`,
+          label: `Send "${doc.name}" as ${mapping.folderName}`,
           data: { journalId: doc.id, entityTypeId: mapping.chronicleTypeId },
           status: 'pending',
         });
@@ -534,7 +534,7 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
     for (const char of this._characterPlan.filter((c) => c.include)) {
       plan.push({
         type: 'push-actor',
-        label: `Push character "${char.name}"`,
+        label: `Send character "${char.name}"`,
         data: { actorId: char.actorId, isPC: char.isPC },
         status: 'pending',
       });
@@ -833,7 +833,7 @@ export class ImportWizard extends HandlebarsApplicationMixin(ApplicationV2) {
         this._typeMappings[mappingIndex].isNew = true;
       }
     } catch (err) {
-      ui.notifications.error(`Failed to create entity type: ${noticeText(err.message)}`);
+      ui.notifications.error(`Failed to create page type: ${noticeText(err.message)}`);
     }
 
     this._newTypeForm = null;

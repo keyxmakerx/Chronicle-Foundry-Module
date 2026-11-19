@@ -795,7 +795,7 @@ export class ActorSync {
           is_private: isHidden,
         });
         console.debug(
-          `Chronicle: ${isHidden ? 'Hid' : 'Revealed'} entity for actor "${actor.name}" (Foundry → Chronicle)`
+          `Chronicle: ${isHidden ? 'Hid' : 'Revealed'} page for actor "${actor.name}" (Foundry → Chronicle)`
         );
       } catch (err) {
         console.error('Chronicle: Failed to sync visibility to Chronicle', err);

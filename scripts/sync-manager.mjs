@@ -371,7 +371,7 @@ export class SyncManager {
     try {
       const ok = await this._performInitialSync();
       if (ok !== false) {
-        this.logActivity('connect', 'Reconnected — re-pulled changes made during the disconnect');
+        this.logActivity('connect', 'Reconnected — fetched again the changes made during the disconnect');
       }
     } catch (err) {
       console.warn('Chronicle: Reconnect re-pull failed', err);

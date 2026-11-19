@@ -122,7 +122,7 @@ export function idsInResponse(body) {
 const ACTIVITY_ROWS = {
   connect: { direction: 'link', kind: 'connection', action: 'connected', ok: true },
   disconnect: { direction: 'link', kind: 'connection', action: 'disconnected', ok: true },
-  pull: { direction: 'to_foundry', kind: 'sync', action: 'pulled', ok: true },
+  pull: { direction: 'to_foundry', kind: 'sync', action: 'brought in', ok: true },
   update: { direction: 'link', kind: 'sync', action: 'sync note', ok: true },
   link: { direction: 'link', kind: 'link', action: 'linked', ok: true },
   unlink: { direction: 'link', kind: 'link', action: 'unlinked', ok: true },

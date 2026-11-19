@@ -79,7 +79,7 @@ export class ConflictError extends Error {
    * @param {object} data - Parsed response body from the 409 response.
    */
   constructor(data) {
-    super(data?.message || 'Entity was modified by another user');
+    super(data?.message || 'This page was changed by someone else');
     this.name = 'ConflictError';
     this.status = 409;
     this.data = data;
