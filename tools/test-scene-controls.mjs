@@ -107,3 +107,17 @@ test('the placeholder button is hidden by the module stylesheet', async () => {
   const css = await readFile(new URL('../styles/chronicle-sync.css', import.meta.url), 'utf8');
   assert.ok(css.includes(`[data-tool="${IDLE_TOOL}"]`));
 });
+
+test('an unlinked player of a connected world gets Link to Chronicle; a GM never does', () => {
+  const withLink = { ...run, link() {} };
+  const allTitles = { ...titles, link: 'Link to Chronicle' };
+  const player = {};
+  addChronicleControls(player, { isGM: false, notebook: true, link: true, run: withLink, titles: allTitles });
+  assert.deepEqual(names(player), ['satchel', 'calendar', 'link']);
+  const gm = {};
+  addChronicleControls(gm, { isGM: true, notebook: true, link: true, run: withLink, titles: allTitles });
+  assert.ok(!names(gm).includes('link'));
+  const offline = [];
+  addChronicleControls(offline, { isGM: false, notebook: false, link: true, run: withLink, titles: allTitles });
+  assert.equal(names(offline), null);
+});

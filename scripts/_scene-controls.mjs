@@ -14,10 +14,11 @@
  * @param {object} opts
  * @param {boolean} opts.isGM
  * @param {boolean} opts.notebook - the world is connected to Chronicle
- * @param {{dashboard: Function, dmScreen: Function, satchel: Function, calendar?: Function}} opts.run
- * @param {{dashboard: string, dmScreen: string, satchel: string, calendar?: string}} opts.titles - localized
+ * @param {boolean} [opts.link] - a player not yet linked to a Chronicle member
+ * @param {{dashboard: Function, dmScreen: Function, satchel: Function, calendar?: Function, link?: Function}} opts.run
+ * @param {{dashboard: string, dmScreen: string, satchel: string, calendar?: string, link?: string}} opts.titles - localized
  */
-export function addChronicleControls(controls, { isGM, notebook, run, titles }) {
+export function addChronicleControls(controls, { isGM, notebook, link = false, run, titles }) {
   const tools = [];
   if (isGM) {
     tools.push({
@@ -50,6 +51,15 @@ export function addChronicleControls(controls, { isGM, notebook, run, titles }) 
         icon: 'fa-solid fa-calendar-days',
         button: true,
         run: run.calendar,
+      });
+    }
+    if (link && !isGM && run.link) {
+      tools.push({
+        name: 'link',
+        title: titles.link,
+        icon: 'fa-solid fa-link',
+        button: true,
+        run: run.link,
       });
     }
   }

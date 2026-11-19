@@ -69,6 +69,37 @@ html[data-cs-motion="off"] :is(.cs-grow, .cs-settle, .cs-peek) {
   text-decoration: none;
 }
 
+/* Link to Chronicle: the last try's problem, above the code box */
+.chronicle-link-problem {
+  color: var(--cs-bad);
+}
+
+/* "Finish your hero": the class Chronicle picked, until it is on the sheet */
+.chronicle-finish-hero {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--cs-line);
+  border-left: 3px solid var(--cs-accent);
+  border-radius: 4px;
+  background: var(--cs-accent-soft);
+  color: var(--cs-text);
+  font-size: 12px;
+}
+
+.chronicle-finish-hero > span {
+  flex: 1;
+}
+
+.chronicle-finish-hero > button {
+  flex: 0 0 auto;
+  width: auto;
+  line-height: 1.6;
+  padding: 0 10px;
+}
+
 /* Sync status indicator in the sidebar */
 .chronicle-sync-status {
   display: flex;

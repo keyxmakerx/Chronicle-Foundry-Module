@@ -515,6 +515,15 @@ export function registerSettings() {
     default: '{}',
   });
 
+  // This player said "Not now" to the Link to Chronicle window that opens
+  // on joining; the scene-control button still opens it (player-link.mjs).
+  game.settings.register(MODULE_ID, 'linkPromptDismissed', {
+    scope: 'client',
+    config: false,
+    type: Boolean,
+    default: false,
+  });
+
   // Where this player dragged the jot tab and panel (scripts/_jot-placement.mjs).
   game.settings.register(MODULE_ID, 'jotPlacement', {
     scope: 'client',

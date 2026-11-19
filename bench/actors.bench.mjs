@@ -259,6 +259,34 @@ test('a Chronicle ancestry pick swaps the actor\'s ancestry item from a compendi
   await closeWorld(world);
 }, { settings: ON }));
 
+test('a class picked in Chronicle is noted on the actor for its player and never embedded, and the note goes once a class is on the sheet', () => scenario('chr-class-pick', async ({ seed, world }) => {
+  await openWorld(world, { modules: ['journals', 'actors', 'items'] });
+  const e = await chronicleCharacter(seed, 'Tyne', 10);
+  await waitFor(() => actorFor(world, e.id), 10000, 'actor created');
+  await settle();
+  const actor = actorFor(world, e.id);
+
+  const reqs = await recordRequests(async () => {
+    await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: { class: 'Fury', level: 2 } });
+    await waitFor(() => actor.getFlag(FLAG, 'classPick'), 10000, 'class pick noted');
+    await settle();
+  });
+  assert.deepEqual(actor.getFlag(FLAG, 'classPick'), { name: 'Fury', level: 2 });
+  assert.equal(actor.items.filter((i) => i.type === 'class').length, 0, 'sync never embeds the class');
+  assert.deepEqual(
+    writes(reqs).filter((r) => !/^\/(sync|entities\/[^/]+\/fields)/.test(r.url)).map((r) => `${r.method} ${r.url}`),
+    [], 'nothing pushed back for the note',
+  );
+
+  // The player finishes the hero; the next Chronicle change clears the note.
+  await actor.createEmbeddedDocuments('Item', [{ name: 'Fury', type: 'class' }], { chronicleSyncApply: true });
+  await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: { hp: 6 } });
+  await waitFor(() => actor.system.hp === 6, 10000, 'hp applied');
+  await settle();
+  assert.ok(!actor.getFlag(FLAG, 'classPick'), 'nothing left to finish');
+  await closeWorld(world);
+}, { settings: ON }));
+
 test('a kit the GM swaps in Foundry survives a later Chronicle edit to another field', () => scenario('chr-identity-gm-swap', async ({ seed, world }) => {
   const modules = { modules: ['journals', 'actors', 'items'] };
   await openWorld(world, modules);

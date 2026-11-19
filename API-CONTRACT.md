@@ -793,6 +793,24 @@ Foundry page shows it as "Players in Foundry".
 
 Re-verify by: 2026-12-01 (Chronicle `internal/plugins/syncapi`, the players handler)
 
+#### POST /sync/link-code
+Redeems the code a player typed in Foundry's Link to Chronicle window. The
+player got it in Chronicle on the hero they claimed (only they see it); their
+client sends it, sealed to a key the active GM's client made for the session,
+over the module socket, and the GM's client redeems it here.
+
+**Used by:** `player-link.mjs` → `answer`, GM client only, with the GM's own key
+
+**Body:** `{ "code": "K7Q2MX" }` (dashes, spaces and case are ignored)
+
+**Response:** `{ "userId", "displayName" }`: the member the code was made for. The module then links the Foundry user who sent the code (the socket's sender, never a field in the message) to that member in `userMappings`, dropping the member's earlier link and any other member's link to that user, and claims apply at once.
+
+**Errors:** 404 for a wrong, used, expired or other campaign's code, or a member who has left; 429 after 10 wrong codes for the campaign in 10 minutes (all redeems wait); 403 when the key is not the owner's or a DM-access key.
+
+**When:** once per code; a code works once and for 10 minutes.
+
+Re-verify by: 2026-12-19 (Chronicle `internal/plugins/syncapi`, `link_codes.go` and `link_code_handler.go`)
+
 #### POST /sync/monsters
 The GM's client reports the monsters the world can place: its actors of the
 system's creature type and the entries of its Actor compendiums. Chronicle's

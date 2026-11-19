@@ -35,6 +35,7 @@ import { ASK, askModel, sameName } from './_player-asks.mjs';
 import { getPlayerAsks, playerName } from './player-asks.mjs';
 import { planLayerEffects, layeredFieldKeys, storedLayers, LAYER_FLAG } from './_layer-effects.mjs';
 import { bringsInActor } from './_actor-catch-up.mjs';
+import { CLASS_PICK_FLAG, classPick, pickToFinish, pickChanged } from './_finish-hero.mjs';
 
 /** How long a read of the campaign's pick-list entries is reused. */
 const ENTRY_CACHE_MS = 30_000;
@@ -732,6 +733,7 @@ export class ActorSync {
 
       const actor = await Actor.create(actorData, applyOptions());
       await this._applyIdentityItems(actor, entity);
+      await this._recordClassPick(actor, entity);
       await this._syncLayers(actor, entity.id);
       await this._applyClaimOwnership(actor, entity.owner_user_id ?? null, null);
 
@@ -765,6 +767,26 @@ export class ActorSync {
     );
     if (!actor) return;
     await this._updateActorFromEntity(actor, entity);
+  }
+
+  /**
+   * Note Chronicle's class pick on an actor whose sheet has no class item, so
+   * its player is offered "Finish your hero" (finish-hero.mjs). Sync never
+   * embeds the class itself: the system's level-up steps build it.
+   * @param {Actor} actor
+   * @param {object} entity
+   * @private
+   */
+  async _recordClassPick(actor, entity) {
+    if (!game.user?.isGM) return;
+    try {
+      const items = actor.items?.contents ?? Array.from(actor.items ?? []);
+      const next = pickToFinish(items, classPick(this._adapter?.fieldDefs, entity?.fields_data));
+      const current = actor.getFlag?.(FLAG_SCOPE, CLASS_PICK_FLAG) ?? null;
+      if (pickChanged(current, next)) await this._setActorFlag(actor, CLASS_PICK_FLAG, next);
+    } catch (err) {
+      console.warn(`Chronicle: could not note the class pick on "${actor.name}"`, err);
+    }
   }
 
   /**
@@ -919,6 +941,7 @@ export class ActorSync {
       }
 
       await this._applyIdentityItems(actor, entity);
+      await this._recordClassPick(actor, entity);
       await this._replanLayers(actor, entity);
 
       // Sync visibility: Chronicle is_private → Foundry actor hidden.
@@ -1102,7 +1125,7 @@ export class ActorSync {
    */
   async _unlinkCopy(actor) {
     await actor.update(
-      flagRemoval(FLAG_SCOPE, 'entityId', 'lastSync', 'chronicleUpdatedAt', 'chronicleOwnerUserId', IDENTITY_APPLIED_FLAG),
+      flagRemoval(FLAG_SCOPE, 'entityId', 'lastSync', 'chronicleUpdatedAt', 'chronicleOwnerUserId', IDENTITY_APPLIED_FLAG, CLASS_PICK_FLAG),
       applyOptions(),
     );
     const items = (actor.items?.contents ?? [])
