@@ -106,6 +106,23 @@ test('a player\'s journal whose link names a page with another name is not delet
   assert.equal(asked.length, 1);
 });
 
+test('with live sync off, a player\'s waiting journal delete gets the same check on Sync now', async () => {
+  const asked = asks();
+  const j = makeJournal({ id: 'pj', name: 'Notes', flags: { entityId: 'e1' } });
+  const { js, calls } = journalSync({ page: { name: 'The Vault Plans' } });
+  const held = [];
+  js._syncManager.pushGate = () => 'hold';
+  js._syncManager.dropHeld = () => {};
+  js._syncManager.holdChange = (c) => held.push(c);
+  await js._handleDeleteJournal(j, {}, 'player');
+  assert.equal(held.length, 1);
+  assert.equal(held[0].data.player, 'player');
+  await js.sendHeld(held[0]);
+  assert.deepEqual(calls, []);
+  assert.equal(asked.length, 1);
+  assert.equal(asked[0].kind, 'journal-remove');
+});
+
 // --- actors -----------------------------------------------------------------
 
 function actorSync({ owner = 'm1', name = 'Sela' } = {}) {
@@ -172,4 +189,18 @@ test('a player\'s character whose link names a page with another name is not del
   await sync._handleDeleteActor(actorDoc({ entityId: 'ent-1' }), {}, 'player');
   assert.deepEqual(calls, []);
   assert.equal(asked.length, 1);
+});
+
+test('with live sync off, a player\'s waiting character delete gets the same check on Sync now', async () => {
+  const asked = asks();
+  const { sync, calls } = actorSync({ owner: 'm2' });
+  const held = [];
+  Object.assign(sync._syncManager, { pushGate: () => 'hold', dropHeld: () => {}, holdChange: (c) => held.push(c) });
+  await sync._handleDeleteActor(actorDoc({ entityId: 'ent-1' }), {}, 'player');
+  assert.equal(held.length, 1);
+  assert.equal(held[0].data.player, 'player');
+  await sync.sendHeld(held[0]);
+  assert.deepEqual(calls, []);
+  assert.equal(asked.length, 1);
+  assert.equal(asked[0].kind, 'actor-remove');
 });
