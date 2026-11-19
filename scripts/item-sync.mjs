@@ -21,9 +21,11 @@ import { getSetting, getUserMappings } from './settings.mjs';
 import { FLAG_SCOPE, APPLY_OPTION } from './constants.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { collapseChanges } from './_change-feed.mjs';
-import { HAS_ITEM, planInventory, itemDataFor } from './_inventory-plan.mjs';
+import { HAS_ITEM, planInventory, itemDataFor, hasItemBody } from './_inventory-plan.mjs';
 import { itemsToRemove } from './_stash-reconcile.mjs';
 import { sendsChangeHere, memberOf, ownsCharacter } from './_change-author.mjs';
+import { ASK, askModel, playersCanView } from './_player-asks.mjs';
+import { getPlayerAsks, playerName } from './player-asks.mjs';
 
 /** The actor linked to a Chronicle character, or null. */
 function linkedActor(entityId) {
@@ -288,10 +290,6 @@ export class ItemSync {
       await item.update(flagRemoval(FLAG_SCOPE, 'relationId', 'unlinkedRelationId'), { [APPLY_OPTION]: true });
     }
 
-    // A player's new item stays in Foundry: the page it would point at is
-    // named by a flag on the item, which is theirs to write.
-    if (userId !== game.user.id) return;
-
     const actor = item.parent;
     const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return; // Actor not synced.
@@ -312,21 +310,15 @@ export class ItemSync {
     }
 
     try {
-      // Create a "Has Item" relation in Chronicle. Body is snake_case — Chronicle
-      // binds target_entity_id/relation_type/reverse_relation_type (the response
-      // is camelCase, but the write binding is snake_case). Metadata is a raw
-      // object (json.RawMessage), not a JSON-encoded string, so it round-trips as
-      // structured JSON rather than a double-encoded string.
-      const relation = await this._api.post(`/entities/${entityId}/relations`, {
-        target_entity_id: targetEntityId,
-        relation_type: HAS_ITEM,
-        reverse_relation_type: 'In Inventory Of',
-        metadata: {
-          quantity: item.system?.quantity ?? 1,
-          equipped: item.system?.equipped ?? false,
-          foundry_item_name: item.name,
-        },
-      });
+      // A player's new item goes straight up on a character Chronicle says
+      // is theirs; on anyone else's it becomes a card for the GM.
+      if (userId !== game.user.id && !(await this._playerAdd(item, actor, entityId, targetEntityId, userId))) return;
+      const relation = await this._api.post(`/entities/${entityId}/relations`, hasItemBody({
+        targetEntityId,
+        quantity: item.system?.quantity,
+        equipped: item.system?.equipped,
+        name: item.name,
+      }));
 
       if (relation) {
         await item.update({ [`flags.${FLAG_SCOPE}.relationId`]: relation.id }, { [APPLY_OPTION]: true });
@@ -358,7 +350,18 @@ export class ItemSync {
     const entityId = actor?.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
 
-    if (userId !== game.user.id && !(await this._playerHolds(entityId, relationId, userId).catch(() => false))) return;
+    if (userId !== game.user.id) {
+      const held = await this._playerRelation(entityId, relationId, userId).catch(() => null);
+      if (!held?.holds) return;
+      if (!held.own) {
+        // Not their character: the GM decides.
+        await getPlayerAsks()?.ask(askModel({
+          kind: ASK.ITEM_REMOVE, docId: item.id, who: playerName(userId), name: item.name, where: actor.name,
+          link: { entityId, relationId },
+        }));
+        return;
+      }
+    }
 
     // The GM is asked before the Chronicle relation goes too (_remote-deletes.mjs).
     // Chronicle serves a flat relation route: DELETE /relations/:relationId.
@@ -426,21 +429,56 @@ export class ItemSync {
   // ---------------------------------------------------------------------------
 
   /**
-   * Whether Chronicle says the character belongs to the player and holds
-   * this relation. Both ids come from flags a player can rewrite, so neither
-   * is trusted for a player's change sent under the GM's key.
+   * Whether the character is the player's and whether the relation is in its
+   * list. Both ids come from flags a player can rewrite, so neither is
+   * trusted for a player's change sent under the GM's key.
    * @param {string} entityId
    * @param {string} relationId
    * @param {string} userId - Foundry user id.
-   * @returns {Promise<boolean>}
+   * @returns {Promise<{own: boolean, holds: boolean}>}
    * @private
    */
-  async _playerHolds(entityId, relationId, userId) {
+  async _playerRelation(entityId, relationId, userId) {
     const entity = await this._api.get(`/entities/${entityId}`);
-    if (!ownsCharacter(entity, memberOf(getUserMappings(), userId))) return false;
+    const own = ownsCharacter(entity, memberOf(getUserMappings(), userId));
     const relations = await this._api.get(`/entities/${entityId}/relations`);
     const list = Array.isArray(relations) ? relations : (relations?.data || []);
-    return list.some((r) => String(r?.id) === String(relationId));
+    return { own, holds: list.some((r) => String(r?.id) === String(relationId)) };
+  }
+
+  /** A player's change is sent only for a character and relation that are theirs. */
+  async _playerHolds(entityId, relationId, userId) {
+    const { own, holds } = await this._playerRelation(entityId, relationId, userId);
+    return own && holds;
+  }
+
+  /**
+   * A player's new item: may it be sent now?
+   * The page it points at must be one players can already view, whoever
+   * asks. A character that is theirs is sent now; any other character's
+   * becomes a GM card.
+   * @returns {Promise<boolean>} true when the caller sends it now.
+   * @private
+   */
+  async _playerAdd(item, actor, entityId, targetEntityId, userId) {
+    const [page, perms, character] = await Promise.all([
+      this._api.get(`/entities/${targetEntityId}`),
+      this._api.get(`/entities/${targetEntityId}/permissions`).catch(() => null),
+      this._api.get(`/entities/${entityId}`),
+    ]);
+    if (!playersCanView(page, perms)) {
+      console.debug(`Chronicle: Item "${item.name}" points at a page players cannot view — not sent.`);
+      return false;
+    }
+    if (ownsCharacter(character, memberOf(getUserMappings(), userId))) return true;
+    await getPlayerAsks()?.ask(askModel({
+      kind: ASK.ITEM_ADD, docId: item.id, who: playerName(userId), name: item.name, where: actor.name,
+      link: {
+        entityId, targetEntityId, actorId: actor.id, itemId: item.id,
+        quantity: item.system?.quantity ?? 1, equipped: item.system?.equipped ?? false,
+      },
+    }));
+    return false;
   }
 
   /**

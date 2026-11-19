@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * A player's quantity or equipped change is sent only when Chronicle says
- * the character is theirs and holds that relation; their new items are not
- * sent.
+ * the character is theirs and holds that relation. Their new items on their
+ * own character are sent; on another character's they become a GM card.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,6 +10,7 @@ import { settings } from './_journal-test-env.mjs';
 
 globalThis.Actor = globalThis.Actor ?? class {};
 const { ItemSync } = await import('../scripts/item-sync.mjs');
+const { PlayerAsks } = await import('../scripts/player-asks.mjs');
 
 function make({ owner = 'm1', relations = [{ id: 'r1' }] } = {}) {
   settings.userMappings = JSON.stringify({ m1: 'player' });
@@ -30,7 +31,7 @@ function makeItem(flags = { relationId: 'r1' }) {
   actor.name = 'Hero';
   actor.getFlag = (_s, k) => (k === 'entityId' ? 'hero' : undefined);
   return {
-    name: 'Rope', parent: actor, system: { quantity: 2, equipped: false },
+    id: 'i1', name: 'Rope', parent: actor, system: { quantity: 2, equipped: false },
     getFlag: (_s, k) => flags[k],
     update: async () => {},
   };
@@ -63,12 +64,55 @@ test('the GM\'s own change needs no check', async () => {
   assert.equal(calls.length, 1);
 });
 
-test('a player\'s new item is not sent, the GM\'s is', async () => {
-  const flags = { entityId: 'rope-page' };
+const NEW_FLAGS = { entityId: 'rope-page' };
+
+test('a player\'s new item on their own character is sent, the GM\'s too', async () => {
   const a = make();
-  await a.is._handleCreateItem(makeItem(flags), {}, 'player');
-  assert.deepEqual(a.calls, []);
+  await a.is._handleCreateItem(makeItem(NEW_FLAGS), {}, 'player');
+  assert.deepEqual(a.calls, [['POST', '/entities/hero/relations']]);
   const b = make();
-  await b.is._handleCreateItem(makeItem(flags), {}, 'gm');
+  await b.is._handleCreateItem(makeItem(NEW_FLAGS), {}, 'gm');
   assert.deepEqual(b.calls, [['POST', '/entities/hero/relations']]);
+});
+
+test('a player\'s new item on another character asks the GM and sends nothing', async () => {
+  const asked = [];
+  new PlayerAsks().ask = async (m) => { asked.push(m); };
+  const { is, calls } = make({ owner: 'm2' });
+  await is._handleCreateItem(makeItem(NEW_FLAGS), {}, 'player');
+  assert.deepEqual(calls, []);
+  assert.equal(asked.length, 1);
+  assert.equal(asked[0].kind, 'item-add');
+  assert.equal(asked[0].link.targetEntityId, 'rope-page');
+});
+
+test('a player\'s new item that points at a hidden page is not sent and asks nothing', async () => {
+  const asked = [];
+  new PlayerAsks().ask = async (m) => { asked.push(m); };
+  for (const owner of ['m1', 'm2']) {
+    const { is, calls } = make({ owner });
+    const get = is._api.get;
+    is._api.get = async (path) => (path === '/entities/rope-page' ? { id: 'rope-page', is_private: true } : get(path));
+    await is._handleCreateItem(makeItem(NEW_FLAGS), {}, 'player');
+    assert.deepEqual(calls, []);
+  }
+  assert.deepEqual(asked, []);
+});
+
+test('removing an item from another character asks the GM instead of dropping it', async () => {
+  const asked = [];
+  new PlayerAsks().ask = async (m) => { asked.push(m); };
+  const { is } = make({ owner: 'm2' });
+  await is._handleDeleteItem(makeItem(), {}, 'player');
+  assert.equal(asked.length, 1);
+  assert.equal(asked[0].kind, 'item-remove');
+  assert.equal(asked[0].link.relationId, 'r1');
+});
+
+test('removing an item whose relation is not on that character asks nothing', async () => {
+  const asked = [];
+  new PlayerAsks().ask = async (m) => { asked.push(m); };
+  const { is } = make({ owner: 'm2', relations: [{ id: 'other' }] });
+  await is._handleDeleteItem(makeItem(), {}, 'player');
+  assert.deepEqual(asked, []);
 });

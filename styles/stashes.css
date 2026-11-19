@@ -253,3 +253,37 @@
   display: flex;
   gap: 6px;
 }
+
+/* GM card for a player's change to something that is not theirs */
+
+.chronicle-ask-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chronicle-ask-real {
+  color: var(--cs-bad);
+}
+
+.chronicle-ask-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.chronicle-ask-actions button {
+  flex: 1;
+}
+
+.chronicle-ask-answer {
+  font-weight: bold;
+}
+
+.chronicle-ask-sent {
+  color: var(--cs-ok);
+}
+
+.chronicle-ask-failed,
+.chronicle-ask-refused {
+  color: var(--cs-bad);
+}

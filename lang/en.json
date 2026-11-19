@@ -1095,6 +1095,27 @@
       "Entity": "\"{name}\" was deleted in Chronicle. Its journal is kept, unlinked, in the \"Chronicle: removed\" folder.",
       "Duplicates": "{count} journal entries repeated characters that now sync as actors. They were moved, unlinked, to the \"Chronicle: removed\" folder."
     },
+    "PlayerAsk": {
+      "ItemAdd": "{who} added {name} to {where}",
+      "ItemRemove": "{who} removed {name} from {where}",
+      "JournalRemove": "{who} deleted the journal {name}",
+      "ActorRemove": "{who} deleted the character {name}",
+      "RealPage": "In Chronicle this is the page {page}. Send it anyway?",
+      "RealCharacter": "In Chronicle this is the character {character}.",
+      "Send": "Send to Chronicle",
+      "NotNow": "Not now",
+      "SentBy": "\u2713 Sent by {name}",
+      "DeclinedBy": "\u2713 Left alone by {name}",
+      "You": "you",
+      "TheGM": "the GM",
+      "Failed": "Couldn't be sent. It may already be gone in Chronicle.",
+      "Refused": {
+        "Hidden": "Not sent: that page is hidden from players.",
+        "Gone": "Not sent: Chronicle no longer has it.",
+        "Other": "Not sent: it isn't linked to Chronicle."
+      },
+      "NotReady": "Chronicle sync isn't ready on this client."
+    },
     "RemoteDelete": {
       "Title": "Delete in Chronicle too?",
       "Body": "<p>You deleted {count} item(s) in Foundry that are linked to Chronicle:</p>{list}<p>Delete them in Chronicle too? Chronicle deletes them for good.</p><p>Choose No to keep them in Chronicle. A kept journal comes back into Foundry at the next full sync; a kept actor does not.</p>",

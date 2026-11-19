@@ -41,6 +41,8 @@ import { collapseChanges } from './_change-feed.mjs';
 import { sharedPictureIds, toFoundryPictures, toChroniclePictures } from './_inline-pictures.mjs';
 import { PictureStore, watchGMPictures } from './picture-store.mjs';
 import { sendsChangeHere, memberOf, mayEditPage } from './_change-author.mjs';
+import { ASK, askModel, sameName } from './_player-asks.mjs';
+import { getPlayerAsks, playerName } from './player-asks.mjs';
 
 
 /** The facts flag write for a journal update; nothing when facts are unknown. */
@@ -1228,10 +1230,14 @@ export class JournalSync {
     const linkedTo = journal.getFlag(FLAG_SCOPE, 'entityId');
     if (linkedTo) {
       if (!sendsChangeHere(userId)) return;
-      if (!game.journal.find((j) => j.id !== journal.id && j.getFlag(FLAG_SCOPE, 'entityId') === linkedTo)) return;
+      // A journal a player makes never arrives linked: the link is theirs to
+      // write and would aim their later pushes at someone else's page.
+      const byPlayer = userId !== game.user.id;
+      if (!byPlayer && !game.journal.find((j) => j.id !== journal.id && j.getFlag(FLAG_SCOPE, 'entityId') === linkedTo)) return;
       await journal.update(flagRemoval(FLAG_SCOPE, ...LINK_FLAGS, 'pushedPermissions'), syncOptions());
     }
-    if (userId !== game.user.id) return;
+    // A player's new journal is theirs, so the active GM's client sends it.
+    if (!sendsChangeHere(userId)) return;
 
     // Skip journals owned by another sync domain: a journal already mirrored
     // to a calendar event and maps also persist as JournalEntries, and
@@ -1561,14 +1567,44 @@ export class JournalSync {
     this._pendingJournalEditAt.delete(journal.id);
     this._pendingPlayerEdits.delete(journal.id);
 
-    // Only the GM's own delete asks about Chronicle's page: the link on a
-    // player's journal is theirs to rewrite, and the prompt would name it.
-    if (userId !== game.user.id) return;
+    if (!sendsChangeHere(userId)) return;
 
     const entityId = journal.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
 
+    if (userId !== game.user.id) {
+      await this._handlePlayerDelete(journal, entityId, userId);
+      return;
+    }
     queueRemoteDelete({ label: journal.name, run: () => this._api.delete(`/entities/${entityId}`) });
+  }
+
+  /**
+   * A player deleted a journal. The link is a flag they can rewrite, so the
+   * page it names must be one they may edit and carry the journal's own name;
+   * then Chronicle moves it to its Trash. Anything else becomes a GM card.
+   * @private
+   */
+  async _handlePlayerDelete(journal, entityId, userId) {
+    try {
+      const [page, perms] = await Promise.all([
+        this._api.get(`/entities/${entityId}`),
+        this._api.get(`/entities/${entityId}/permissions`),
+      ]);
+      const own = mayEditPage(perms, memberOf(getUserMappings(), userId)) && sameName(page?.name, journal.name);
+      if (own) {
+        await this._api.delete(`/entities/${entityId}`);
+        this._syncManager?.recordUserOutcome?.(userId);
+        return;
+      }
+      await getPlayerAsks()?.ask(askModel({
+        kind: ASK.JOURNAL_REMOVE, docId: journal.id, who: playerName(userId), name: journal.name,
+        link: { entityId },
+      }));
+    } catch (err) {
+      console.warn(`Chronicle: Could not handle a player's delete of "${journal.name}"`, err);
+      this._syncManager?.recordUserOutcome?.(userId, err);
+    }
   }
 
   /**

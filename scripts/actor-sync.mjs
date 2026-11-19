@@ -31,6 +31,8 @@ import { planIdentityItems, identityFieldTypes, identityPicks } from './_identit
 import { applyIdentityPlan, applyEntryRefresh } from './_identity-item-apply.mjs';
 import { planEntryRefresh } from './_campaign-entry-item.mjs';
 import { sendsChangeHere, memberOf, ownsCharacter } from './_change-author.mjs';
+import { ASK, askModel, sameName } from './_player-asks.mjs';
+import { getPlayerAsks, playerName } from './player-asks.mjs';
 
 /** How long a read of the campaign's pick-list entries is reused. */
 const ENTRY_CACHE_MS = 30_000;
@@ -704,10 +706,14 @@ export class ActorSync {
     const linkedTo = actor.getFlag(FLAG_SCOPE, 'entityId');
     if (linkedTo) {
       if (!sendsChangeHere(userId)) return;
-      if (!game.actors.find((a) => a.id !== actor.id && a.getFlag(FLAG_SCOPE, 'entityId') === linkedTo)) return;
+      // An actor a player makes never arrives linked: the link is theirs to
+      // write and would aim their later pushes at someone else's character.
+      const byPlayer = userId !== game.user.id;
+      if (!byPlayer && !game.actors.find((a) => a.id !== actor.id && a.getFlag(FLAG_SCOPE, 'entityId') === linkedTo)) return;
       await this._unlinkCopy(actor);
     }
-    if (userId !== game.user.id) return;
+    // A player's new character is theirs, so the active GM's client sends it.
+    if (!sendsChangeHere(userId)) return;
     if (actor.type !== this._actorType) return;
     if (!this._adapter || !this._characterTypeId) return;
 
@@ -1034,15 +1040,43 @@ export class ActorSync {
     this._pendingChanges.delete(actor.id);
     this._pendingAuthors.delete(actor.id);
     this._pendingPlayers.delete(actor.id);
-    // Only the GM's own delete asks about Chronicle's page: the link on a
-    // player's actor is theirs to rewrite, and the prompt would name it.
-    if (userId !== game.user.id) return;
+    if (!sendsChangeHere(userId)) return;
 
     const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
 
+    if (userId !== game.user.id) {
+      await this._handlePlayerDelete(actor, entityId, userId);
+      return;
+    }
     // The GM is asked before the Chronicle page goes too (_remote-deletes.mjs).
     queueRemoteDelete({ label: actor.name, run: () => this._api.delete(`/entities/${entityId}`) });
+  }
+
+  /**
+   * A player deleted an actor. The link is a flag they can rewrite, so the
+   * page it names must be claimed by them in Chronicle and carry the actor's
+   * own name; then Chronicle moves it to its Trash. Anything else becomes a
+   * GM card.
+   * @private
+   */
+  async _handlePlayerDelete(actor, entityId, userId) {
+    try {
+      const page = await this._api.get(`/entities/${entityId}`);
+      const own = ownsCharacter(page, memberOf(getUserMappings(), userId)) && sameName(page?.name, actor.name);
+      if (own) {
+        await this._api.delete(`/entities/${entityId}`);
+        this._syncManager?.recordUserOutcome?.(userId);
+        return;
+      }
+      await getPlayerAsks()?.ask(askModel({
+        kind: ASK.ACTOR_REMOVE, docId: actor.id, who: playerName(userId), name: actor.name,
+        link: { entityId },
+      }));
+    } catch (err) {
+      console.warn(`Chronicle: Could not handle a player's delete of "${actor.name}"`, err);
+      this._syncManager?.recordUserOutcome?.(userId, err);
+    }
   }
 
   // ---------------------------------------------------------------------------

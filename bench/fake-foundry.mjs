@@ -514,7 +514,7 @@ export function installFoundry({ settings = {}, systemId = 'dnd5e' } = {}) {
           const doc = new Impl(world, d);
           world.collectionFor(type).set(doc.id, doc);
           log.writes.push({ op: 'create', type, id: doc.id, options });
-          Hooks.callAll(`create${type}`, doc, options, gmUser.id);
+          Hooks.callAll(`create${type}`, doc, options, world.authorId());
           out.push(doc);
         }
         return Array.isArray(data) ? out : out[0];
@@ -522,6 +522,27 @@ export function installFoundry({ settings = {}, systemId = 'dnd5e' } = {}) {
       static async createDocuments(list, options) { return this.create(list, options); }
     };
   }
+
+  // Chat messages are written by the user running the code (the GM's client
+  // here), whispered or not; a card is found again by its flag.
+  const messages = new Collection();
+  game.messages = messages;
+  const ChatMessage = {
+    getWhisperRecipients: () => users.contents.filter((u) => u.isGM),
+    async create(data) {
+      const msg = {
+        id: randomID(), author: game.user, content: data.content, whisper: data.whisper, flags: clone(data.flags) || {},
+        getFlag(scope, key) { return this.flags[scope]?.[key]; },
+        async update(change) {
+          if (change.content !== undefined) this.content = change.content;
+          if (change.flags) for (const [scope, v] of Object.entries(change.flags)) this.flags[scope] = { ...this.flags[scope], ...clone(v) };
+        },
+      };
+      messages.set(msg.id, msg);
+      log.writes.push({ op: 'create', type: 'ChatMessage', id: msg.id });
+      return msg;
+    },
+  };
 
   const ui = {
     notifications: {
@@ -537,6 +558,7 @@ export function installFoundry({ settings = {}, systemId = 'dnd5e' } = {}) {
     Hooks,
     ui,
     CONST,
+    ChatMessage,
     JournalEntry: makeDocClass('JournalEntry', BenchJournal),
     Actor: makeDocClass('Actor', BenchActor),
     Folder: makeDocClass('Folder', BenchFolder),

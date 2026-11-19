@@ -68,6 +68,18 @@ root. There is no `package.json`.
 - [ ] As a player matched to a Chronicle member who may edit the page there, edit the linked journal's text -> with a GM in the game, the Chronicle page updates
 - [ ] The same edit by a player Chronicle does not let edit the page, or on a page with GM-only text -> nothing changes in Chronicle and the GM gets one notice saying why
 
+### A player's own creates, and the GM card for the rest
+Needs a player client matched to a Chronicle member (Settings, Players), a GM in the game, and a Chronicle with a Trash.
+- [ ] As the player, create a journal -> a page appears in Chronicle under the Notes page type (or the type set in Settings), and no card is posted
+- [ ] As the player, delete that journal -> the page is gone from Chronicle's list and shows in the campaign Trash; Restore brings it back; no card, no GM prompt
+- [ ] As the player, create an actor -> a character page appears; with the claiming add-on on it is under Player Characters and assigned to that player
+- [ ] As the player, delete a character they have claimed in Chronicle -> it goes to the Trash with no card. Delete one they have not claimed -> a whispered card reads "Mira deleted the character X" with Send to Chronicle and Not now; only the GM sees it
+- [ ] As the player, drag an item that is linked to a visible Chronicle item page onto their claimed character -> a "has item" entry appears on the character's page with no card. Onto someone else's character -> a card "Mira added Rope to Sela"; nothing in Chronicle until Send is pressed, then the entry appears and the card reads "Sent by you"
+- [ ] The same drag of an item linked to a GM-only page -> nothing is sent and no card appears
+- [ ] Remove an item from someone else's character as the player -> a card; Send removes the entry in Chronicle. Not now leaves it and the card reads "Left alone by you"
+- [ ] As the player, rewrite a deleted journal's link to a different page (console: `journal.setFlag('chronicle-sync','entityId',...)` before deleting) -> no direct delete; the card's Send shows "In Chronicle this is the page X. Send it anyway?" and waits for a second press
+- [ ] A player posting a chat message with the card's markup gets no working buttons for anyone
+
 ### Multi-Page Sync
 - [ ] Entity with h1/h2 headings creates multiple Foundry journal pages
 - [ ] Entity without headings creates single "Content" page
