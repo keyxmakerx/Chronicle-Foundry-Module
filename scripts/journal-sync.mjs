@@ -312,6 +312,40 @@ export class JournalSync {
   /** Change-feed area this module reads at connect (see SyncManager). */
   get feedArea() { return 'journals'; }
 
+  /** The settings part whose direction and live switch govern this module. */
+  get syncPart() { return 'journals'; }
+
+  /** Waiting changes this module sends on "Sync now". */
+  get heldKinds() { return ['journal.create', 'journal.update', 'journal.delete']; }
+
+  /** @returns {'send'|'hold'|'drop'} what to do with a Foundry journal change. @private */
+  _pushGate() { return this._syncManager?.pushGate?.('journals') ?? 'send'; }
+
+  /**
+   * Send one waiting change. A journal that has gone, or whose link has
+   * changed since, has nothing to send.
+   * @param {{key: string, kind: string, label: string, data: object}} change
+   */
+  async sendHeld(change) {
+    const journal = game.journal.get(change.key.slice('journal:'.length));
+    if (change.kind === 'journal.delete') {
+      const entityId = change.data.entityId;
+      if (entityId) queueRemoteDelete({ label: change.label, run: () => this._api.delete(`/entities/${entityId}`) });
+      return;
+    }
+    if (!journal) return;
+    const entityId = journal.getFlag(FLAG_SCOPE, 'entityId');
+    if (change.kind === 'journal.create') {
+      if (!entityId) await this._pushNewJournal(journal, game.user.id, { rethrow: true });
+      return;
+    }
+    if (!entityId || entityId !== change.data.entityId) return;
+    this._pendingJournalChanges.set(journal.id, { name: !!change.data.name, ownership: !!change.data.ownership });
+    this._pendingJournalEditAt.set(journal.id, Number(change.data.editedAt) || 0);
+    if (change.data.players?.length) this._pendingPlayerEdits.set(journal.id, new Set(change.data.players));
+    await this._pushJournalUpdate(journal, entityId);
+  }
+
   /** Journals use the feed only while journal sync is on. */
   feedActive() { return !!getSetting('syncJournals'); }
 
@@ -1252,6 +1286,23 @@ export class JournalSync {
       return;
     }
 
+    const gate = this._pushGate();
+    if (gate === 'drop') return;
+    if (gate === 'hold') {
+      this._syncManager.holdChange({ key: `journal:${journal.id}`, part: 'journals', kind: 'journal.create', label: journal.name });
+      return;
+    }
+    await this._pushNewJournal(journal, userId);
+  }
+
+  /**
+   * Make a Chronicle page for a journal created in Foundry, and link them.
+   * @param {JournalEntry} journal
+   * @param {string} userId - who made it, for the History row.
+   * @param {{rethrow?: boolean}} [opts] - rethrow a failure after reporting it.
+   * @private
+   */
+  async _pushNewJournal(journal, userId, { rethrow = false } = {}) {
     // Marked before the first await so the entity.created broadcast, which
     // can beat our POST response, finds it and does not make a second journal.
     this._inFlightCreates.set(journal.id, journal.name);
@@ -1312,6 +1363,7 @@ export class JournalSync {
       console.error('Chronicle: Failed to push journal to Chronicle', err);
       this._syncManager?.recordUserOutcome?.(userId, err);
       ui.notifications?.warn?.(`Chronicle: Failed to push journal "${noticeText(journal.name)}". Check the sync dashboard for details.`);
+      if (rethrow) throw err;
     } finally {
       this._inFlightCreates.delete(journal.id);
     }
@@ -1355,12 +1407,27 @@ export class JournalSync {
     // the last edit. `journal` reflects the live document state by the
     // time the timer fires, so re-reading it at push time (not now)
     // captures whatever the GM last typed.
+    const gate = this._pushGate();
+    if (gate === 'drop') return;
+
     // A player's change is sent by this GM's client under the GM's key, so
     // it carries text and name only: never sharing, which is the GM's.
     const byPlayer = userId !== game.user.id;
     const sent = byPlayer && change && Object.hasOwn(change, 'ownership')
       ? Object.fromEntries(Object.entries(change).filter(([key]) => key !== 'ownership'))
       : change;
+    if (gate === 'hold') {
+      this._syncManager.holdChange({
+        key: `journal:${journal.id}`, part: 'journals', kind: 'journal.update', label: journal.name,
+        data: { entityId, ...mergeJournalChange(undefined, sent), editedAt: Date.now(), players: byPlayer ? [userId] : [] },
+      }, (before, next) => ({
+        ...next.data,
+        name: !!before.data.name || next.data.name,
+        ownership: !!before.data.ownership || next.data.ownership,
+        players: [...new Set([...(before.data.players ?? []), ...next.data.players])],
+      }));
+      return;
+    }
     this._pendingJournalChanges.set(
       journal.id, mergeJournalChange(this._pendingJournalChanges.get(journal.id), sent)
     );
@@ -1565,9 +1632,19 @@ export class JournalSync {
     // player's journal is theirs to rewrite, and the prompt would name it.
     if (userId !== game.user.id) return;
 
+    // Whatever was waiting for this journal no longer has a journal to send.
+    const key = `journal:${journal.id}`;
+    this._syncManager?.dropHeld?.(key);
+    const gate = this._pushGate();
+    if (gate === 'drop') return;
+
     const entityId = journal.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
 
+    if (gate === 'hold') {
+      this._syncManager.holdChange({ key, part: 'journals', kind: 'journal.delete', label: journal.name, data: { entityId } });
+      return;
+    }
     queueRemoteDelete({ label: journal.name, run: () => this._api.delete(`/entities/${entityId}`) });
   }
 
@@ -2290,7 +2367,8 @@ export class JournalSync {
    * @private
    */
   async _handleConflict(journal, entityId, body, editedAt) {
-    const strategy = getSetting('conflictResolution');
+    // A part set to "From Foundry" takes nothing from Chronicle, a conflict included.
+    const strategy = this._syncManager?.pullGate?.('journals') === 'drop' ? 'foundry' : getSetting('conflictResolution');
     console.warn(`Chronicle: Conflict on entity ${entityId}, strategy="${strategy}"`);
 
     switch (strategy) {

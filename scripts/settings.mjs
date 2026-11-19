@@ -403,6 +403,15 @@ export function registerSettings() {
     default: '{"journals":"both","maps":"both","calendar":"both","characters":"both","shops":"both"}',
   });
 
+  // Foundry changes waiting for "Sync now" while live sync is off
+  // (scripts/_held-changes.mjs). Saved so a reload does not lose them.
+  game.settings.register(MODULE_ID, 'heldChanges', {
+    scope: 'world',
+    config: false,
+    type: String,
+    default: '[]',
+  });
+
   // Permission mapping: sync Chronicle visibility to Foundry ownership levels.
   game.settings.register(MODULE_ID, 'syncPermissions', {
     scope: 'world',

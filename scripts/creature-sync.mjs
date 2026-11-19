@@ -621,7 +621,26 @@ export class CreatureSync {
     this._schedulePull(actor);
   }
 
+  /** The settings part whose live switch governs this module. */
+  get syncPart() { return 'creatures'; }
+
+  /** Waiting changes this module sends on "Sync now". */
+  get heldKinds() { return ['creature.fields']; }
+
+  /** Send one waiting change: what the actor's sent-back fields hold now. */
+  async sendHeld(change) {
+    await this._pull(change.data.actorId);
+  }
+
   _schedulePull(actor) {
+    const gate = this._syncManager?.pushGate?.('creatures') ?? 'send';
+    if (gate === 'drop') return;
+    if (gate === 'hold') {
+      this._syncManager.holdChange({
+        key: `creature:${actor.id}`, part: 'creatures', kind: 'creature.fields', label: actor.name, data: { actorId: actor.id },
+      });
+      return;
+    }
     clearTimeout(this._pullTimers.get(actor.id));
     this._pullTimers.set(actor.id, setTimeout(() => {
       this._pullTimers.delete(actor.id);

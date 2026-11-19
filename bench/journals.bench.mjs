@@ -67,6 +67,78 @@ test('clearing a page\'s text in Foundry clears it in Chronicle, and it stays cl
   assert.equal(pageText(byEntity(world, e.id)), '', 'the old text did not come back');
 }));
 
+const DIRECTIONS = (journals) => JSON.stringify({ journals, maps: 'both', calendar: 'both', characters: 'both', shops: 'both' });
+
+test('journals set to From Chronicle: a Chronicle edit arrives, and a Foundry edit, new journal and rename stay in Foundry', () => scenario('dir-from-chronicle', async ({ seed, world }) => {
+  const e = await chroniclePage(seed, 'One Way In', '<p>from chronicle</p>');
+  await openWorld(world);
+  await JournalSync_resync(world);
+  const j = byEntity(world, e.id);
+  const reqs = await recordRequests(async () => {
+    await j.pages.contents.find((p) => p.type === 'text').update({ 'text.content': '<p>typed in foundry</p>' });
+    await j.update({ name: 'Renamed Here' });
+    await JournalEntry.create({ name: 'Local Only', pages: [{ name: 'Local Only', type: 'text', text: { content: '<p>x</p>' } }] });
+    await settle();
+  });
+  assert.deepEqual(writes(reqs).map((r) => `${r.method} ${r.url}`), [], 'nothing was sent');
+  assert.equal((await seed.chronicle.allEntities()).length, 1, 'the new journal made no page');
+  await seed.chronicle.put(`/entities/${e.id}`, { entry: '<p>chronicle again</p>' });
+  await waitFor(() => /chronicle again/.test(pageText(j)), 15000, 'Chronicle edit to arrive');
+}, { settings: { syncDirections: DIRECTIONS('pull') } }));
+
+test('journals set to From Foundry: a Foundry edit arrives in Chronicle, and a Chronicle edit or new page stays in Chronicle, on reopen too', () => scenario('dir-from-foundry', async ({ seed, world }) => {
+  await openWorld(world);
+  const j = await JournalEntry.create({ name: 'One Way Out', pages: [{ name: 'One Way Out', type: 'text', text: { content: '<p>first</p>' } }] });
+  await settle();
+  const id = j.getFlag(FLAG, 'entityId');
+  assert.ok(id, 'the new journal made its page');
+  await seed.chronicle.put(`/entities/${id}`, { entry: '<p>edited in chronicle</p>' });
+  await chroniclePage(seed, 'Made In Chronicle');
+  await settle();
+  assert.match(pageText(j), /first/, 'the Chronicle edit was not brought in');
+  assert.equal(linked(world).length, 1, 'the Chronicle page made no journal');
+  await closeWorld(world);
+  await openWorld(world);
+  assert.match(pageText(j), /first/, 'nor on reopen');
+  assert.equal(linked(world).length, 1);
+  await j.pages.contents.find((p) => p.type === 'text').update({ 'text.content': '<p>second</p>' });
+  await settle();
+  assert.match((await seed.chronicle.get(`/entities/${id}`)).entry_html || '', /second/, 'the Foundry edit won over the Chronicle one');
+}, { settings: { syncDirections: DIRECTIONS('push') } }));
+
+test('with live sync off, changes on both sides wait, survive a reopen, and Sync now sends and fetches them', () => scenario('hold-sync-now', async ({ seed, world }) => {
+  const mine = await chroniclePage(seed, 'Edited Here', '<p>old</p>');
+  const theirs = await chroniclePage(seed, 'Edited There', '<p>old</p>');
+  let sm = await openWorld(world);
+  assert.equal(linked(world).length, 0, 'nothing comes in by itself');
+  await JournalSync_resync(world);
+  assert.equal(linked(world).length, 2, 'the GM fetched both pages');
+
+  const reqs = await recordRequests(async () => {
+    await byEntity(world, mine.id).pages.contents.find((p) => p.type === 'text').update({ 'text.content': '<p>new here</p>' });
+    await JournalEntry.create({ name: 'Made Here', pages: [{ name: 'Made Here', type: 'text', text: { content: '<p>made here</p>' } }] });
+    await seed.chronicle.put(`/entities/${theirs.id}`, { entry: '<p>new there</p>' });
+    await settle();
+  });
+  assert.deepEqual(writes(reqs).map((r) => `${r.method} ${r.url}`), [], 'nothing was sent while waiting');
+  assert.match(pageText(byEntity(world, theirs.id)), /old/, 'Chronicle\'s edit waits');
+  assert.equal(sm.heldCounts().foundry, 2);
+  assert.equal(sm.heldCounts().chronicle, 1);
+
+  await closeWorld(world);
+  sm = await openWorld(world);
+  assert.equal(sm.heldCounts().foundry, 2, 'the waiting changes survive a reopen');
+  assert.match(pageText(byEntity(world, theirs.id)), /old/);
+
+  const result = await sm.syncNow();
+  await settle();
+  assert.deepEqual(result, { sent: 2, failed: 0, pulled: true });
+  assert.match((await seed.chronicle.get(`/entities/${mine.id}`)).entry_html || '', /new here/);
+  assert.match(pageText(byEntity(world, theirs.id)), /new there/);
+  assert.equal((await seed.chronicle.allEntities()).length, 3, 'the journal made here is a page now');
+  assert.deepEqual(sm.heldCounts(), { foundry: 0, chronicle: 0 });
+}, { settings: { autoSync: false } }));
+
 test('renaming a journal in Foundry renames the page once, with no echo loop', () => scenario('fvtt-rename', async ({ seed, world }) => {
   await openWorld(world);
   const j = await JournalEntry.create({ name: 'Old Name', pages: [{ name: 'Old Name', type: 'text', text: { content: '<p>x</p>' } }] });

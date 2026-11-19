@@ -124,6 +124,34 @@ export class ItemSync {
   /** Change-feed area (see SyncManager._performInitialSync). */
   get feedArea() { return 'items'; }
 
+  /** The settings part whose direction and live switch govern this module. */
+  get syncPart() { return 'characters'; }
+
+  /** Waiting changes this module sends on "Sync now". */
+  get heldKinds() { return ['item.create', 'item.update', 'item.delete']; }
+
+  /** @returns {'send'|'hold'|'drop'} what to do with a Foundry item change. @private */
+  _pushGate() { return this._syncManager?.pushGate?.('characters') ?? 'send'; }
+
+  /**
+   * Send one waiting change. An item that has gone has nothing to send.
+   * @param {{key: string, kind: string, label: string, data: object}} change
+   */
+  async sendHeld(change) {
+    const { actorId, itemId, relationId, userId } = change.data;
+    if (change.kind === 'item.delete') {
+      if (relationId) this._queueRelationDelete(relationId, change.label, userId ?? game.user.id);
+      return;
+    }
+    const item = game.actors.get(actorId)?.items?.get(itemId);
+    if (!item) return;
+    if (change.kind === 'item.create') {
+      if (!item.getFlag(FLAG_SCOPE, 'relationId')) await this._pushNewItem(item, game.user.id, { rethrow: true });
+      return;
+    }
+    await this._pushItemMeta(item, userId ?? game.user.id, { rethrow: true });
+  }
+
   /**
    * Inventory changes are recorded as `relation`; until a cursor was taken
    * while the server recorded them, every character is reconciled.
@@ -292,6 +320,27 @@ export class ItemSync {
     // named by a flag on the item, which is theirs to write.
     if (userId !== game.user.id) return;
 
+    const gate = this._pushGate();
+    if (gate === 'drop') return;
+    if (gate === 'hold') {
+      if (!item.parent.getFlag(FLAG_SCOPE, 'entityId') || !item.getFlag(FLAG_SCOPE, 'entityId')) return;
+      this._syncManager.holdChange({
+        key: `item:${item.parent.id}:${item.id}`, part: 'characters', kind: 'item.create',
+        label: `${item.name} (${item.parent.name})`, data: { actorId: item.parent.id, itemId: item.id },
+      });
+      return;
+    }
+    await this._pushNewItem(item, userId);
+  }
+
+  /**
+   * Add a "Has Item" relation in Chronicle for an item on a linked actor.
+   * @param {Item} item
+   * @param {string} userId - who added it, for the History row.
+   * @param {{rethrow?: boolean}} [opts] - rethrow a failure after reporting it.
+   * @private
+   */
+  async _pushNewItem(item, userId, { rethrow = false } = {}) {
     const actor = item.parent;
     const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return; // Actor not synced.
@@ -336,6 +385,7 @@ export class ItemSync {
     } catch (err) {
       console.warn(`Chronicle: Failed to push new item "${item.name}" to Chronicle`, err);
       this._syncManager?.recordUserOutcome?.(userId, err);
+      if (rethrow) throw err;
     }
   }
 
@@ -351,6 +401,12 @@ export class ItemSync {
     if (options?.[APPLY_OPTION]) return;
     if (!sendsChangeHere(userId)) return;
 
+    // Whatever was waiting for this item no longer has an item to send.
+    const key = `item:${item.parent?.id}:${item.id}`;
+    this._syncManager?.dropHeld?.(key);
+    const gate = this._pushGate();
+    if (gate === 'drop') return;
+
     const relationId = item.getFlag(FLAG_SCOPE, 'relationId');
     if (!relationId) return;
 
@@ -360,11 +416,25 @@ export class ItemSync {
 
     if (userId !== game.user.id && !(await this._playerHolds(entityId, relationId, userId).catch(() => false))) return;
 
-    // The GM is asked before the Chronicle relation goes too (_remote-deletes.mjs).
-    // Chronicle serves a flat relation route: DELETE /relations/:relationId.
-    const name = item.name;
+    const label = `${item.name} (${actor.name})`;
+    if (gate === 'hold') {
+      this._syncManager.holdChange({ key, part: 'characters', kind: 'item.delete', label, data: { relationId, userId } });
+      return;
+    }
+    this._queueRelationDelete(relationId, label, userId);
+  }
+
+  /**
+   * Ask the GM whether the Chronicle relation goes too (_remote-deletes.mjs),
+   * and remove it on a yes. Chronicle serves a flat relation route.
+   * @param {string} relationId
+   * @param {string} name - shown in the prompt.
+   * @param {string} userId - who removed the item, for the History row.
+   * @private
+   */
+  _queueRelationDelete(relationId, name, userId) {
     queueRemoteDelete({
-      label: `${name} (${actor.name})`,
+      label: name,
       run: async () => {
         try {
           await this._api.delete(`/relations/${relationId}`);
@@ -394,6 +464,27 @@ export class ItemSync {
     // charges on many items must not send one write per item.
     if (!change.system || !('quantity' in change.system || 'equipped' in change.system)) return;
 
+    const gate = this._pushGate();
+    if (gate === 'drop') return;
+    if (gate === 'hold') {
+      if (!item.getFlag(FLAG_SCOPE, 'relationId') || !item.parent?.getFlag(FLAG_SCOPE, 'entityId')) return;
+      this._syncManager.holdChange({
+        key: `item:${item.parent.id}:${item.id}`, part: 'characters', kind: 'item.update',
+        label: `${item.name} (${item.parent.name})`, data: { actorId: item.parent.id, itemId: item.id, userId },
+      }, (before, next) => (before.kind === 'item.create' ? before.data : next.data));
+      return;
+    }
+    await this._pushItemMeta(item, userId);
+  }
+
+  /**
+   * Send an item's quantity and equipped state to its Chronicle relation.
+   * @param {Item} item
+   * @param {string} userId - who changed it.
+   * @param {{rethrow?: boolean}} [opts] - rethrow a failure after reporting it.
+   * @private
+   */
+  async _pushItemMeta(item, userId, { rethrow = false } = {}) {
     const relationId = item.getFlag(FLAG_SCOPE, 'relationId');
     if (!relationId) return;
 
@@ -418,6 +509,7 @@ export class ItemSync {
     } catch (err) {
       console.warn(`Chronicle: Failed to update item metadata for "${item.name}"`, err);
       this._syncManager?.recordUserOutcome?.(userId, err);
+      if (rethrow) throw err;
     }
   }
 

@@ -106,6 +106,36 @@ test('a Foundry HP edit reaches Chronicle once and is not re-applied on reopen',
   assert.equal(actor.system.hp, 12);
 }, { settings: ON }));
 
+test('with live sync off, a sheet edit and a Chronicle edit to one character both wait for Sync now', () => scenario('hold-character', async ({ seed, world }) => {
+  const sm = await openWorld(world, MODULES);
+  const e = await chronicleCharacter(seed, 'Odalys', 20);
+  await waitFor(() => actorFor(world, e.id), 10000, 'actor created');
+  await settle();
+  const actor = actorFor(world, e.id);
+  await world.game.settings.set('chronicle-sync', 'autoSync', false);
+
+  const reqs = await recordRequests(async () => {
+    await actor.update({ 'system.hp': 9 });
+    await seed.chronicle.put(`/entities/${e.id}`, { name: 'Odalys the Bold' });
+    await settle();
+  });
+  assert.deepEqual(writes(reqs).map((r) => `${r.method} ${r.url}`), [], 'nothing was sent while waiting');
+  assert.equal((await seed.chronicle.get(`/entities/${e.id}`)).fields_data?.hp, 20);
+  assert.equal(actor.name, 'Odalys', 'Chronicle\'s edit waits');
+  assert.equal(sm.heldCounts().foundry, 1);
+
+  const result = await sm.syncNow();
+  await settle();
+  assert.equal(result.sent, 1);
+  assert.equal(result.failed, 0);
+  const page = await seed.chronicle.get(`/entities/${e.id}`);
+  assert.equal(page.fields_data?.hp, 9, 'the sheet edit arrived');
+  assert.equal(page.name, 'Odalys the Bold', 'and did not undo Chronicle\'s edit');
+  assert.equal(actor.name, 'Odalys the Bold', 'Chronicle\'s edit arrived');
+  assert.equal(actor.system.hp, 9);
+  assert.equal(sm.heldCounts().foundry, 0);
+}, { settings: ON }));
+
 test('a player\'s HP edit on the character they claimed reaches Chronicle and survives the next Chronicle change; on a character they have not claimed it is not sent', () => scenario('fvtt-player-edit', async ({ seed, world }) => {
   await seed.enableClaiming();
   await openWorld(world, MODULES);

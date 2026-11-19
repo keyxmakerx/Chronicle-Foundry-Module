@@ -443,6 +443,22 @@ export class MapSync {
   /** Change-feed area (see SyncManager._performInitialSync). */
   get feedArea() { return 'maps'; }
 
+  /** The settings part whose direction and live switch govern this module. */
+  get syncPart() { return 'maps'; }
+
+  /**
+   * Whether a marker edit made here may go to Chronicle. Markers are edited
+   * in Chronicle through the viewer, so they never wait for "Sync now", but
+   * maps set to "From Chronicle" send nothing, and the GM is told why.
+   * @returns {boolean}
+   * @private
+   */
+  _mayEditMarkers() {
+    if (this._syncManager?.pushGate?.('maps') !== 'drop') return true;
+    ui.notifications?.warn?.(game.i18n.localize('CHRONICLE.MapViewer.FromChronicleOnly'));
+    return false;
+  }
+
   /** Map items are in the feed only on a server that records them. */
   get feedType() { return 'marker'; }
 
@@ -1001,7 +1017,7 @@ export class MapSync {
    * @returns {Promise<object|null>}
    */
   async createMarker(mapId, markerData) {
-    if (!game.user.isGM || !this._api || !mapId) return null;
+    if (!game.user.isGM || !this._api || !mapId || !this._mayEditMarkers()) return null;
     try {
       const result = await this._api.post(`/maps/${mapId}/markers`, markerData);
       if (result?.id) {
@@ -1023,7 +1039,7 @@ export class MapSync {
    * @returns {Promise<object|null>}
    */
   async updateMarker(mapId, markerId, markerData) {
-    if (!game.user.isGM || !this._api || !mapId || !markerId) return null;
+    if (!game.user.isGM || !this._api || !mapId || !markerId || !this._mayEditMarkers()) return null;
     try {
       const result = await this._api.put(`/maps/${mapId}/markers/${markerId}`, markerData);
       await this._refreshSubResources(mapId);
@@ -1041,7 +1057,7 @@ export class MapSync {
    * @param {string} markerId
    */
   async deleteMarker(mapId, markerId) {
-    if (!game.user.isGM || !this._api || !mapId || !markerId) return;
+    if (!game.user.isGM || !this._api || !mapId || !markerId || !this._mayEditMarkers()) return;
     try {
       await this._api.delete(`/maps/${mapId}/markers/${markerId}`);
       await this._refreshSubResources(mapId);

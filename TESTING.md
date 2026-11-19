@@ -273,6 +273,22 @@ pushes for 30 seconds with one GM notice (API-CONTRACT.md).
 - [ ] Player presses **Open shop** with no GM logged in -> the window says "The shop is closed"
 - [ ] GM shows then stops showing a shop a player opened from its journal -> the player's room stays open
 
+## Direction and Sync now
+
+In **Chronicle Sync → Settings → What syncs**.
+
+- [ ] Set Journals to **From Chronicle only** and save. Edit a synced journal in Foundry, rename it and make a new journal: none of it reaches Chronicle. Edit the page in Chronicle: the journal updates.
+- [ ] Set Journals to **From Foundry only** and save. Edit the page in Chronicle: the journal in Foundry does not change, also not after a reload. Edit the journal in Foundry: the page updates.
+- [ ] Repeat both with Characters, using a sheet field and an inventory item.
+- [ ] Set Maps to **From Chronicle only**. Open a map and try to add, move and delete a marker: each is refused with a notice and Chronicle keeps its markers.
+- [ ] With Journals From Foundry only, the dashboard's **Pull All**, **Resync All Journals** and a single page's pull are refused with a notice; with Journals From Chronicle only, **Push All** and a single journal's push are refused.
+- [ ] Calendar offers only **Both ways** and **From Chronicle only**; Shops offers no direction. With Calendar From Chronicle only, setting the date and adding an event in Foundry are refused with a notice.
+- [ ] Switch **Sync changes as they happen** off and save. Edit a journal and a character in Foundry and a different page in Chronicle. Nothing moves; Settings shows how many changes are waiting and a **Sync now** button. The calendar and shops still update as before.
+- [ ] Reload Foundry: the waiting count is still there.
+- [ ] Click **Sync now**: the Foundry edits reach Chronicle, the Chronicle edit reaches Foundry, and the count returns to nothing waiting.
+- [ ] Make another edit, then switch **Sync changes as they happen** back on and save: the waiting edit is sent without pressing Sync now.
+- [ ] With live sync off, delete a synced journal in Foundry and answer the question to remove the page too: the page is removed only when you press Sync now.
+
 ## Initial Sync
 
 - [ ] Fresh connection triggers initial sync (GET /sync/pull)

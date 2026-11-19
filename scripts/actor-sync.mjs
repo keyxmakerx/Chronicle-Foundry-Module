@@ -205,6 +205,46 @@ export class ActorSync {
   /** Change-feed area this module reads at connect (see SyncManager). */
   get feedArea() { return 'actors'; }
 
+  /** The settings part whose direction and live switch govern this module. */
+  get syncPart() { return 'characters'; }
+
+  /** Waiting changes this module sends on "Sync now". */
+  get heldKinds() { return ['actor.create', 'actor.update', 'actor.delete']; }
+
+  /** @returns {'send'|'hold'|'drop'} what to do with a Foundry actor change. @private */
+  _pushGate() { return this._syncManager?.pushGate?.('characters') ?? 'send'; }
+
+  /**
+   * Send one waiting change. An actor that has gone, or whose link has
+   * changed since, has nothing to send.
+   * @param {{key: string, kind: string, label: string, data: object}} change
+   */
+  async sendHeld(change) {
+    if (change.kind === 'actor.delete') {
+      const entityId = change.data.entityId;
+      if (entityId) queueRemoteDelete({ label: change.label, run: () => this._api.delete(`/entities/${entityId}`) });
+      return;
+    }
+    const actor = game.actors.get(change.key.slice('actor:'.length));
+    if (!actor) return;
+    const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
+    if (change.kind === 'actor.create') {
+      if (!entityId) await this._pushNewActor(actor, game.user.id, { rethrow: true });
+      return;
+    }
+    if (!entityId || entityId !== change.data.entityId) return;
+    if (typeof change.data.hidden === 'boolean') await this._pushHidden(actor, entityId, change.data.hidden);
+    if (!change.data.change) return;
+    this._pendingChanges.set(actor.id, change.data.change);
+    if (change.data.players?.length) this._pendingPlayers.set(actor.id, new Set(change.data.players));
+    await this._pushActorUpdate(actor, entityId, { rethrow: true });
+    // The push records Chronicle's newest version, so the catch-up would pass
+    // this character by: take what Chronicle changed while the edit waited now.
+    if (this._syncManager?.pullGate?.('characters') !== 'apply') return;
+    const entity = await this._api.get(`/entities/${entityId}`);
+    if (entity) await this._updateActorFromEntity(actor, entity);
+  }
+
   /** Characters use the feed only while character sync is actually running. */
   feedActive() { return !!(getSetting('syncCharacters') && this._adapter && this._characterTypeId); }
 
@@ -711,6 +751,23 @@ export class ActorSync {
     if (actor.type !== this._actorType) return;
     if (!this._adapter || !this._characterTypeId) return;
 
+    const gate = this._pushGate();
+    if (gate === 'drop') return;
+    if (gate === 'hold') {
+      this._syncManager.holdChange({ key: `actor:${actor.id}`, part: 'characters', kind: 'actor.create', label: actor.name });
+      return;
+    }
+    await this._pushNewActor(actor, userId);
+  }
+
+  /**
+   * Make a Chronicle character for an actor created in Foundry, and link them.
+   * @param {Actor} actor
+   * @param {string} userId - who made it, for the History row.
+   * @param {{rethrow?: boolean}} [opts] - rethrow a failure after reporting it.
+   * @private
+   */
+  async _pushNewActor(actor, userId, { rethrow = false } = {}) {
     // Mark this Foundry-originated create as in-flight so the WS-driven
     // _onCharacterCreated can skip the matching `entity.created` broadcast
     // that arrives before our POST returns. The flag is set after the POST
@@ -772,6 +829,7 @@ export class ActorSync {
     } catch (err) {
       console.error('Chronicle: Failed to push new actor to Chronicle', err);
       this._syncManager?.recordUserOutcome?.(userId, err);
+      if (rethrow) throw err;
     } finally {
       this._inFlightCreates.delete(actor.id);
     }
@@ -818,22 +876,29 @@ export class ActorSync {
     const hiddenChanged =
       change.prototypeToken?.hidden !== undefined ||
       change.token?.hidden !== undefined;
+    const isHidden = hiddenChanged ? (change.prototypeToken?.hidden ?? change.token?.hidden ?? false) : undefined;
 
-    if (hiddenChanged) {
-      try {
-        const isHidden =
-          change.prototypeToken?.hidden ?? change.token?.hidden ?? false;
-        await this._api.post(`/entities/${entityId}/reveal`, {
-          is_private: isHidden,
-        });
-        console.debug(
-          `Chronicle: ${isHidden ? 'Hid' : 'Revealed'} entity for actor "${actor.name}" (Foundry → Chronicle)`
-        );
-      } catch (err) {
-        console.error('Chronicle: Failed to sync visibility to Chronicle', err);
-        // Continue to field sync even if visibility sync fails.
-      }
+    const gate = this._pushGate();
+    if (gate === 'drop') return;
+    if (gate === 'hold') {
+      if (!hiddenChanged && !change.system && !change.name) return;
+      const byPlayer = userId !== game.user.id;
+      const diff = change.system || change.name !== undefined
+        ? { ...(change.system ? { system: change.system } : {}), ...(change.name !== undefined ? { name: change.name } : {}) }
+        : null;
+      this._syncManager.holdChange({
+        key: `actor:${actor.id}`, part: 'characters', kind: 'actor.update', label: actor.name,
+        data: { entityId, change: diff, players: byPlayer ? [userId] : [], ...(hiddenChanged ? { hidden: isHidden } : {}) },
+      }, (before, next) => (before.kind !== 'actor.update' ? before.data : {
+        ...before.data,
+        ...next.data,
+        change: next.data.change ? mergeChanges(before.data.change ?? undefined, next.data.change) : (before.data.change ?? null),
+        players: [...new Set([...(before.data.players ?? []), ...next.data.players])],
+      }));
+      return;
     }
+
+    if (hiddenChanged) await this._pushHidden(actor, entityId, isHidden);
 
     // Only push field/name changes if system data or name changed. The diff
     // is kept (merged with the burst's earlier ones) so the push can send
@@ -845,6 +910,23 @@ export class ActorSync {
       this._pendingPlayers.set(actor.id, (this._pendingPlayers.get(actor.id) ?? new Set()).add(userId));
     }
     this._actorPushDebouncer.schedule(actor.id, actor, entityId);
+  }
+
+  /**
+   * Send the actor's hidden state as the Chronicle page's privacy. A failure
+   * is logged and the field sync goes on.
+   * @param {Actor} actor
+   * @param {string} entityId
+   * @param {boolean} isHidden
+   * @private
+   */
+  async _pushHidden(actor, entityId, isHidden) {
+    try {
+      await this._api.post(`/entities/${entityId}/reveal`, { is_private: isHidden });
+      console.debug(`Chronicle: ${isHidden ? 'Hid' : 'Revealed'} entity for actor "${actor.name}" (Foundry → Chronicle)`);
+    } catch (err) {
+      console.error('Chronicle: Failed to sync visibility to Chronicle', err);
+    }
   }
 
   /**
@@ -862,7 +944,7 @@ export class ActorSync {
    * @param {string} entityId
    * @private
    */
-  async _pushActorUpdate(actor, entityId) {
+  async _pushActorUpdate(actor, entityId, { rethrow = false } = {}) {
     const change = this._pendingChanges.get(actor.id) || {};
     this._pendingChanges.delete(actor.id);
     const author = this._pendingAuthors.get(actor.id) ?? game.user.id;
@@ -898,6 +980,7 @@ export class ActorSync {
     } catch (err) {
       console.error('Chronicle: Failed to push actor update to Chronicle', err);
       this._syncManager?.recordUserOutcome?.(author, err);
+      if (rethrow) throw err;
     } finally {
       this._pushingChanges.delete(actor.id);
     }
@@ -967,7 +1050,8 @@ export class ActorSync {
       return true;
     } catch (err) {
       if (!(err instanceof ConflictError)) throw err;
-      const strategy = getSetting('conflictResolution');
+      // A part set to "From Foundry" takes nothing from Chronicle, a conflict included.
+      const strategy = this._syncManager?.pullGate?.('characters') === 'drop' ? 'foundry' : getSetting('conflictResolution');
       if (strategy === 'chronicle') {
         // Re-pull from Chronicle; this burst is dropped, so its paths no
         // longer hold Chronicle's values back.
@@ -1038,9 +1122,19 @@ export class ActorSync {
     // player's actor is theirs to rewrite, and the prompt would name it.
     if (userId !== game.user.id) return;
 
+    // Whatever was waiting for this actor no longer has an actor to send.
+    const key = `actor:${actor.id}`;
+    this._syncManager?.dropHeld?.(key);
+    const gate = this._pushGate();
+    if (gate === 'drop') return;
+
     const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
 
+    if (gate === 'hold') {
+      this._syncManager.holdChange({ key, part: 'characters', kind: 'actor.delete', label: actor.name, data: { entityId } });
+      return;
+    }
     // The GM is asked before the Chronicle page goes too (_remote-deletes.mjs).
     queueRemoteDelete({ label: actor.name, run: () => this._api.delete(`/entities/${entityId}`) });
   }
