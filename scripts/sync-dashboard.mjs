@@ -11,7 +11,7 @@
 
 import { noticeText } from './_escape-html.mjs';
 import {
-  newSettingsState, settingsContext, wireSettingsForm, testConnection, refreshMembers,
+  newSettingsState, settingsContext, wireSettingsForm, testConnection, refreshMembers, syncNow,
 } from './chronicle-settings.mjs';
 import { ImportWizard } from './import-wizard.mjs';
 import { wireFirstConnect } from './first-connect.mjs';
@@ -110,6 +110,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       'open-settings': SyncDashboard.#onOpenSettingsAction,
       testConnection: SyncDashboard.#onTestConnectionAction,
       refreshMembers: SyncDashboard.#onRefreshMembersAction,
+      'sync-now': SyncDashboard.#onSyncNowAction,
       startImport: SyncDashboard.#onStartImportAction,
       ...Object.fromEntries(ImportWizard.ACTION_NAMES.map((name) => [name, SyncDashboard.#onWizardAction])),
       'open-shop': SyncDashboard.#onOpenShopAction,
@@ -1115,6 +1116,19 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     return { characters, hasUnlinkedCharacters, pcClaimingHint };
   }
 
+  /**
+   * Whether a part's direction rules out a button that sends to Chronicle
+   * ('push') or fetches from it ('pull'). Tells the GM when it does.
+   * @private
+   */
+  _directionRefuses(part, way) {
+    const gate = way === 'push' ? this._syncManager?.pushGate?.(part) : this._syncManager?.pullGate?.(part);
+    if (gate !== 'drop') return false;
+    const key = way === 'push' ? 'CHRONICLE.SettingsWindow.DirectionNoPush' : 'CHRONICLE.SettingsWindow.DirectionNoPull';
+    ui.notifications.warn(game.i18n.localize(key));
+    return true;
+  }
+
   /** @returns {object|null} the live ActorSync module, if active. @private */
   _actorSync() {
     return this._syncManager?._modules?.find((m) => m.constructor?.name === 'ActorSync') || null;
@@ -1687,6 +1701,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** Trigger a verbose full map resync. */
   static async #onResyncAllMapsAction() {
+    if (this._directionRefuses('maps', 'pull')) return;
     const mapSync = this._syncManager?._modules?.find(
       (m) => m.constructor?.name === 'MapSync'
     );
@@ -1837,6 +1852,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   static #onPagesSyncOneAction(_event, target) {
+    if (this._directionRefuses('journals', 'pull')) return;
     this._runCatchUp([target.dataset.entityId]);
   }
 
@@ -2103,7 +2119,10 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
         journal._stats?.modifiedTime ?? 0,
         ...[...(journal.pages ?? [])].map((page) => page._stats?.modifiedTime ?? 0),
       );
-      const keep = linkKeeps({
+      // A part set to one direction keeps the side it syncs from, as a conflict does.
+      const oneWay = this._syncManager?.pullGate?.('journals') === 'drop' ? 'foundry'
+        : (this._syncManager?.pushGate?.('journals') === 'drop' ? 'chronicle' : null);
+      const keep = oneWay ?? linkKeeps({
         strategy: getSetting('conflictResolution'),
         journalChangedAt: changedAt,
         pageUpdatedAt: entity.updated_at,
@@ -2141,6 +2160,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     const journal = row?.journalId ? game.journal.get(row.journalId) : null;
     const journalSync = this._journalSync();
     if (row?.trouble?.direction === 'out' && journal && journalSync) {
+      if (this._directionRefuses('journals', 'push')) return;
       this._catchingUp.add(entityId);
       markCatchingUp(this.element, [entityId], game.i18n.localize('CHRONICLE.Dashboard.Pages.Sending'));
       try {
@@ -2152,6 +2172,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       if (this.rendered) this.render({ force: true });
       return;
     }
+    if (this._directionRefuses('journals', 'pull')) return;
     await this._runCatchUp([entityId]);
   }
 
@@ -2461,6 +2482,12 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     this.render({ force: true });
   }
 
+  /** Settings: send what is waiting and fetch Chronicle's changes. */
+  static async #onSyncNowAction(_event, target) {
+    await syncNow(target);
+    this.render({ force: true });
+  }
+
   /** Settings > Connection: the Setup Wizard, shown as the first-run screen. */
   static #onStartImportAction() {
     return this.startFirstRun();
@@ -2748,6 +2775,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    * @private
    */
   async _onPullEntity(entityId, { quiet = false } = {}) {
+    if (this._directionRefuses('journals', 'pull')) return;
     try {
       const entity = await this.api.get(`/entities/${entityId}`);
       if (!entity) return;
@@ -2784,6 +2812,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    * @private
    */
   async _onPushJournal(journalId) {
+    if (this._directionRefuses('journals', 'push')) return;
     await this._sendJournals([journalId], { byHand: true });
   }
 
@@ -2794,6 +2823,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    * @private
    */
   async _onResyncAllJournals() {
+    if (this._directionRefuses('journals', 'pull')) return;
     let confirmed;
     try {
       confirmed = await confirmDialog({
@@ -2822,6 +2852,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    * @private
    */
   async _onPullAll() {
+    if (this._directionRefuses('journals', 'pull')) return;
     let confirmed;
     try {
       confirmed = await confirmDialog({
@@ -2853,6 +2884,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    * @private
    */
   async _onPushAll() {
+    if (this._directionRefuses('journals', 'push')) return;
     let confirmed;
     try {
       confirmed = await confirmDialog({
@@ -2908,6 +2940,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
    * @private
    */
   async _onPushActor(actorId) {
+    if (this._directionRefuses('characters', 'push')) return;
     const actor = game.actors.get(actorId);
     if (!actor) return;
 
@@ -2950,6 +2983,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** Create a new Chronicle character (the system's type) for an orphaned actor. */
   async _onResolveCreate(target) {
+    if (this._directionRefuses('characters', 'push')) return;
     const actorId = target?.dataset?.actorId;
     if (!actorId) return;
     const actorSync = this._actorSync();
@@ -2966,6 +3000,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** Re-push a linked actor's current data to Chronicle (the stranded-data fix). */
   async _onResolveRepush(target) {
+    if (this._directionRefuses('characters', 'push')) return;
     const actorId = target?.dataset?.actorId;
     if (!actorId) return;
     const actorSync = this._actorSync();
@@ -2981,6 +3016,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   async _onPushAllActors() {
+    if (this._directionRefuses('characters', 'push')) return;
     const actorSync = this._syncManager?._modules?.find(
       (m) => m.constructor?.name === 'ActorSync'
     );
@@ -3051,20 +3087,22 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!confirmed) return;
 
     ui.notifications.info('Chronicle: Syncing everything again…');
-    const mods = this._syncManager?._modules || [];
+    const sm = this._syncManager;
+    // A part set to one direction is left out of the half that runs against it.
+    const mods = sm?._modules || [];
     const find = (name) => mods.find((m) => m.constructor?.name === name);
     const done = [];
 
     // 1. Journals (verbose=false to avoid a flood of per-entry toasts mid-sweep).
     const journalSync = find('JournalSync');
-    if (journalSync?.resyncAll) {
+    if (journalSync?.resyncAll && sm?.pullGate?.('journals') !== 'drop') {
       try { await journalSync.resyncAll({ verbose: false }); done.push('journals'); }
       catch (err) { console.error('Chronicle: journal resync failed', err); }
     }
 
     // 2. Characters — re-push every LINKED actor so stale fields refresh.
     const actorSync = find('ActorSync');
-    if (actorSync?.repushActor) {
+    if (actorSync?.repushActor && sm?.pushGate?.('characters') !== 'drop') {
       const chars = actorSync.getSyncedActors?.() ?? [];
       let pushed = 0;
       for (const c of chars) {
@@ -3077,7 +3115,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // 3. Maps.
     const mapSync = find('MapSync');
-    if (mapSync?.resyncAll) {
+    if (mapSync?.resyncAll && sm?.pullGate?.('maps') !== 'drop') {
       try { await mapSync.resyncAll({ verbose: false }); done.push('maps'); }
       catch (err) { console.error('Chronicle: map resync failed', err); }
     }

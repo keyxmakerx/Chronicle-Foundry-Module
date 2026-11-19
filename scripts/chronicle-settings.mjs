@@ -69,8 +69,9 @@ export async function settingsContext(state) {
       icon: PART_ICONS[p.part],
       name: t(`Parts.${p.part}.Name`),
       hint: t(`Parts.${p.part}.Hint`),
-      directions: ['both', 'pull', 'push'].map((value) => ({ value, label: dirLabels[value], checked: value === p.direction })),
+      directions: p.directions.map((value) => ({ value, label: dirLabels[value], checked: value === p.direction })),
     })),
+    waiting: waitingLine(syncManager),
     announce: Object.entries(view.announce).map(([key, on]) => ({
       key, on, label: t(`Announce.${key}`),
       hint: key === 'calendarAnnounceMoon' ? `${t('AnnounceHint')} ${t('MoonHint')}` : t('AnnounceHint'),
@@ -81,6 +82,38 @@ export async function settingsContext(state) {
     })),
     conflictHint: t(`ConflictHint.${view.conflictResolution}`),
   };
+}
+
+/**
+ * The line beside "Sync now": how many changes are waiting while live sync
+ * is off. Chronicle's side counts only what arrived while connected, so the
+ * line never says nothing is waiting there.
+ * @param {object} syncManager
+ * @returns {string}
+ */
+export function waitingLine(syncManager) {
+  const counts = syncManager?.heldCounts?.() ?? { foundry: 0, chronicle: 0 };
+  const count = counts.foundry + counts.chronicle;
+  if (!count) return t('WaitingNone');
+  return game.i18n.format(`CHRONICLE.SettingsWindow.${count === 1 ? 'WaitingOne' : 'WaitingMany'}`, { count });
+}
+
+/**
+ * The Sync now button: send what is waiting here and fetch Chronicle's
+ * changes, then say how it went.
+ * @param {HTMLButtonElement} button
+ */
+export async function syncNow(button) {
+  const syncManager = game.modules.get(MODULE_ID)?.api?.syncManager;
+  if (!syncManager?.syncNow) return;
+  button.disabled = true;
+  try {
+    const { failed, pulled } = await syncManager.syncNow();
+    if (failed || !pulled) ui.notifications.warn(t('SyncNowPartly'));
+    else ui.notifications.info(t('SyncNowDone'));
+  } finally {
+    button.disabled = false;
+  }
 }
 
 /**
@@ -189,6 +222,11 @@ export async function saveSettingsForm(form) {
       reconnect = (await applyConnectLine(plan.connectLine)) || reconnect;
     }
     ui.notifications.info(t('Saved'));
+    // Switching live sync back on sends what waited and catches up.
+    if (plan.writes.some(([key, value]) => key === 'autoSync' && value === true)) {
+      game.modules.get(MODULE_ID)?.api?.syncManager?.syncNow?.()
+        .catch((err) => console.warn('Chronicle Sync | Catching up after switching live sync on failed:', err?.message));
+    }
     if (reconnect) {
       const syncManager = game.modules.get(MODULE_ID)?.api?.syncManager;
       const outcome = syncManager?.applyConnection ? await syncManager.applyConnection() : 'reload';

@@ -166,6 +166,9 @@ export class CalendarSync {
     /** @type {import('./api-client.mjs').ChronicleAPI|null} */
     this._api = null;
 
+    /** Back-reference to SyncManager (bound by registerModule). */
+    this._syncManager = null;
+
     /** @type {object|null} Cached Chronicle calendar (GET /calendar). */
     this._chronicleCalendar = null;
 
@@ -384,6 +387,7 @@ export class CalendarSync {
   async setDate(date) {
     const clean = clampDate(this._chronicleCalendar, date);
     if (!clean) return false;
+    if (this._fromChronicleOnly(true)) return false;
     const ok = await this.pushDate(clean);
     if (ok) {
       this._onChronicleDateAdvanced(clean);
@@ -400,6 +404,7 @@ export class CalendarSync {
    */
   async addEvent(ev) {
     if (!this._api || !game.user?.isGM || !ev?.name?.trim()) return false;
+    if (this._fromChronicleOnly(true)) return false;
     const day = clampDate(this._chronicleCalendar, ev);
     if (!day) return false;
     const timed = Number.isFinite(ev.hour);
@@ -703,6 +708,20 @@ export class CalendarSync {
   // --- Foundry → Chronicle ---
 
   /**
+   * Whether the calendar is set to "From Chronicle", so no date or event is
+   * sent from here. The calendar never waits for "Sync now": it is a view of
+   * Chronicle's, and a date set here is set there at once.
+   * @param {boolean} [tell] - tell the GM why (for something they pressed).
+   * @returns {boolean}
+   * @private
+   */
+  _fromChronicleOnly(tell = false) {
+    if (this._syncManager?.pushGate?.('calendar') !== 'drop') return false;
+    if (tell) ui.notifications?.warn?.(game.i18n.localize('CHRONICLE.CalendarDatePush.FromChronicleOnly'));
+    return true;
+  }
+
+  /**
    * Push a date to Chronicle (PUT /calendar/date), behind the date-push
    * guards: GM only, the rebuild blackout, a refused-push pause, and the
    * real-time-calendar signal. Refusals pause the push with one notice
@@ -714,6 +733,7 @@ export class CalendarSync {
     if (!date) return false;
     if (!getSetting('syncCalendar')) return false;
     if (!game.user.isGM) return false;
+    if (this._fromChronicleOnly()) return false;
 
     // Check before the pre-push probe so a known blackout costs zero requests.
     if (calendarBlackoutActive() || datePushPaused()) return false;

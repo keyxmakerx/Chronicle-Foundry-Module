@@ -79,12 +79,14 @@
         <span class="cs-part-icon"><i class="fa-solid {{icon}}" aria-hidden="true"></i></span>
         <label class="cs-part-name" for="cs-part-{{part}}">{{name}}<small>{{hint}}</small></label>
         <span class="cs-switch"><input id="cs-part-{{part}}" name="part.{{part}}.on" type="checkbox" {{#if on}}checked{{/if}}><i aria-hidden="true"></i></span>
+        {{#if directions.length}}
         <fieldset class="cs-dir">
           <legend>{{../labels.direction}}</legend>
           {{#each directions}}
           <label class="cs-dir-opt"><input type="radio" name="part.{{../part}}.direction" value="{{value}}" {{#if checked}}checked{{/if}}><span>{{label}}</span></label>
           {{/each}}
         </fieldset>
+        {{/if}}
       </div>
       {{/each}}
       {{!-- Creatures come from Chronicle only, so there is no direction to pick. --}}
@@ -198,6 +200,14 @@
           <p class="cs-hint">{{localize "CHRONICLE.SettingsWindow.AutoSyncHint"}}</p>
         </div>
       </div>
+      {{#unless view.autoSync}}
+      <div class="cs-field cs-inline">
+        <span class="cs-hint" aria-live="polite">{{waiting}}</span>
+        <div class="cs-ctl cs-row">
+          <button type="button" data-action="sync-now"><i class="fa-solid fa-rotate" aria-hidden="true"></i>{{localize "CHRONICLE.SettingsWindow.SyncNow"}}</button>
+        </div>
+      </div>
+      {{/unless}}
       <div class="cs-field">
         <label for="cs-excluded-tags">{{localize "CHRONICLE.SettingsWindow.ExcludeTags"}}</label>
         <div class="cs-ctl">

@@ -678,6 +678,7 @@
       "MarkerCreate": "Create",
       "MarkerDelete": "Delete Marker",
       "MarkerDeleteConfirm": "Delete this Chronicle marker? This change syncs to Chronicle and other clients.",
+      "FromChronicleOnly": "Chronicle: maps are set to come from Chronicle only, so markers can't be changed from Foundry. Change the direction in Chronicle Sync settings.",
       "MarkerCreateFailed": "Failed to create marker on Chronicle.",
       "MarkerUpdateFailed": "Failed to update marker on Chronicle.",
       "MarkerDeleteFailed": "Failed to delete marker on Chronicle.",
@@ -1244,6 +1245,7 @@
       "Kept": "Kept in Chronicle: {count}."
     },
     "CalendarDatePush": {
+      "FromChronicleOnly": "Chronicle: the calendar is set to come from Chronicle only, so dates and events can't be changed from Foundry. Change the direction in Chronicle Sync settings.",
       "Rejected": "Chronicle won't accept this date: its calendar has different months or leap days. Date sync is paused.",
       "Forbidden": "Only the campaign owner's key can change Chronicle's date. Date sync is paused.",
       "Disabled": "This campaign's calendar is switched off in Chronicle. Date sync is paused."
@@ -1554,7 +1556,15 @@
         "newest": "Whichever side was saved last is kept; the other edit is replaced."
       },
       "AutoSync": "Sync changes as they happen",
-      "AutoSyncHint": "Off means changes wait until you press Sync now in the dashboard.",
+      "AutoSyncHint": "Off means journals, maps, characters and creatures wait on both sides until you press Sync now. The calendar and shops always show Chronicle as it is.",
+      "SyncNow": "Sync now",
+      "DirectionNoPush": "Chronicle: this part is set to come from Chronicle only, so nothing is sent from Foundry. Change the direction in Chronicle Sync settings.",
+      "DirectionNoPull": "Chronicle: this part is set to come from Foundry only, so nothing is fetched from Chronicle. Change the direction in Chronicle Sync settings.",
+      "WaitingNone": "Nothing is waiting here. Sync now also fetches what changed in Chronicle.",
+      "WaitingOne": "{count} change is waiting.",
+      "WaitingMany": "{count} changes are waiting.",
+      "SyncNowDone": "Chronicle: synced. Nothing is waiting.",
+      "SyncNowPartly": "Chronicle: some changes could not be synced and are still waiting. The History tab says which.",
       "ExcludeTags": "Leave out pages tagged",
       "ExcludeTagsHint": "Separate tags with commas.",
       "ExcludeNames": "Leave out names containing",
