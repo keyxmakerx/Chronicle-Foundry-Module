@@ -73,6 +73,52 @@ test('characters changed while Foundry was closed update on open from the feed, 
   assert.deepEqual(writes(again).map((r) => `${r.method} ${r.url}`), [], 'second open wrote nothing in Chronicle');
 }, { settings: ON }));
 
+test('a character made in Chronicle while Foundry was closed gets its actor on open, and a second open makes no other', () => scenario('chr-character-made-offline', async ({ seed, world }) => {
+  await openWorld(world, MODULES);
+  await closeWorld(world);
+  const e = await chronicleCharacter(seed, 'Late Arrival', 11);
+
+  await openWorld(world, MODULES);
+  const actor = actorFor(world, e.id);
+  assert.ok(actor, 'actor made on open');
+  assert.equal(actor.system.hp, 11, 'with the character\'s fields');
+  assert.equal(world.game.journal.filter((j) => j.name === 'Late Arrival').length, 0, 'not a journal');
+  await closeWorld(world);
+
+  const before = world.log.writes.length;
+  const again = await recordRequests(async () => { await openWorld(world, MODULES); });
+  assert.equal(world.game.actors.filter((a) => a.name === 'Late Arrival').length, 1, 'still one actor');
+  assert.deepEqual(world.log.writes.slice(before).filter((w) => w.type === 'Actor' && w.op === 'create').map((w) => w.change?.name), [], 'second open made no actor');
+  assert.deepEqual(writes(again).map((r) => `${r.method} ${r.url}`), [], 'second open wrote nothing in Chronicle');
+}, { settings: ON }));
+
+test('a character made while Foundry was closed is brought in on a full rescan too', () => scenario('chr-character-made-offline-full', async ({ seed, world }) => {
+  await openWorld(world, MODULES);
+  await closeWorld(world);
+  const e = await chronicleCharacter(seed, 'Rescan Arrival', 6);
+  // No saved cursor: the connect lists every character instead of reading the feed.
+  await world.game.settings.set('chronicle-sync', 'changeFeedCursor', null);
+  await openWorld(world, MODULES);
+  assert.ok(actorFor(world, e.id), 'actor made on open');
+  assert.equal(world.game.actors.filter((a) => a.name === 'Rescan Arrival').length, 1);
+}, { settings: ON }));
+
+test('an actor the GM deletes here, keeping its character in Chronicle, is not made again on open', () => scenario('fvtt-character-delete-kept', async ({ seed, world }) => {
+  await openWorld(world, MODULES);
+  const e = await chronicleCharacter(seed, 'Benched', 5);
+  await waitFor(() => actorFor(world, e.id), 10000, 'actor created');
+  await settle();
+  world.answerConfirm = false;
+  await actorFor(world, e.id).delete();
+  await settle();
+  assert.ok(await seed.chronicle.get(`/entities/${e.id}`), 'character kept in Chronicle');
+  await closeWorld(world);
+  await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: { hp: 2 } });
+
+  await openWorld(world, MODULES);
+  assert.equal(world.game.actors.filter((a) => a.name === 'Benched').length, 0, 'not made again');
+}, { settings: ON }));
+
 test('a character deleted in Chronicle while Foundry was closed unlinks its actor and keeps it', () => scenario('chr-character-delete', async ({ seed, world }) => {
   await openWorld(world, MODULES);
   const e = await chronicleCharacter(seed, 'Gone Hero', 4);
@@ -213,6 +259,34 @@ test('a Chronicle ancestry pick swaps the actor\'s ancestry item from a compendi
   await closeWorld(world);
 }, { settings: ON }));
 
+test('a class picked in Chronicle is noted on the actor for its player and never embedded, and the note goes once a class is on the sheet', () => scenario('chr-class-pick', async ({ seed, world }) => {
+  await openWorld(world, { modules: ['journals', 'actors', 'items'] });
+  const e = await chronicleCharacter(seed, 'Tyne', 10);
+  await waitFor(() => actorFor(world, e.id), 10000, 'actor created');
+  await settle();
+  const actor = actorFor(world, e.id);
+
+  const reqs = await recordRequests(async () => {
+    await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: { class: 'Fury', level: 2 } });
+    await waitFor(() => actor.getFlag(FLAG, 'classPick'), 10000, 'class pick noted');
+    await settle();
+  });
+  assert.deepEqual(actor.getFlag(FLAG, 'classPick'), { name: 'Fury', level: 2 });
+  assert.equal(actor.items.filter((i) => i.type === 'class').length, 0, 'sync never embeds the class');
+  assert.deepEqual(
+    writes(reqs).filter((r) => !/^\/(sync|entities\/[^/]+\/fields)/.test(r.url)).map((r) => `${r.method} ${r.url}`),
+    [], 'nothing pushed back for the note',
+  );
+
+  // The player finishes the hero; the next Chronicle change clears the note.
+  await actor.createEmbeddedDocuments('Item', [{ name: 'Fury', type: 'class' }], { chronicleSyncApply: true });
+  await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: { hp: 6 } });
+  await waitFor(() => actor.system.hp === 6, 10000, 'hp applied');
+  await settle();
+  assert.ok(!actor.getFlag(FLAG, 'classPick'), 'nothing left to finish');
+  await closeWorld(world);
+}, { settings: ON }));
+
 test('a kit the GM swaps in Foundry survives a later Chronicle edit to another field', () => scenario('chr-identity-gm-swap', async ({ seed, world }) => {
   const modules = { modules: ['journals', 'actors', 'items'] };
   await openWorld(world, modules);
@@ -273,6 +347,30 @@ test('a character claimed in Chronicle gives the mapped Foundry player Owner on 
   await seed.assignOwner(e.id, null);
   await settle();
   assert.equal(actor.ownership.benchPlayer00001, 3, 'unclaim leaves Foundry ownership alone');
+}, { settings: ON }));
+
+test('a Foundry player added after connect, named like the claimant, is linked and owns the claimed actor without the GM', () => scenario('fvtt-player-added-later', async ({ seed, world }) => {
+  await seed.enableClaiming();
+  // The GM's Foundry name differs, so the campaign's one member starts unlinked.
+  world.game.user.name = 'Bench Game Master';
+  await openWorld(world, MODULES);
+  const members = await seed.chronicle.get('/members');
+  const member = (Array.isArray(members) ? members : members.data).find((x) => x.display_name === seed.displayName);
+  const memberId = String(member.user_id ?? member.id);
+  const e = await chronicleCharacter(seed, 'Claimed Later', 7);
+  await waitFor(() => actorFor(world, e.id), 10000, 'actor created');
+  await seed.assignOwner(e.id, memberId);
+  await settle();
+  const actor = actorFor(world, e.id);
+
+  // Same name with other spacing and case, as people type it in Foundry.
+  const loose = seed.displayName.replace(/\s+/g, '_').toUpperCase();
+  const player = { id: 'benchLatePlayer01', name: loose, isGM: false, role: 1, flags: {} };
+  world.game.users.set(player.id, player);
+  world.Hooks.callAll('createUser', player, {}, world.game.user.id);
+  await waitFor(() => actor.ownership[player.id] === 3, 10000, 'the new player owns the claimed actor');
+  const saved = JSON.parse(world.game.settings.get('chronicle-sync', 'userMappings'));
+  assert.equal(saved[memberId], player.id, 'the link is saved');
 }, { settings: ON }));
 
 test('a Chronicle edit to one field updates the actor once, marked as applied, with nothing pushed back; a repeat writes nothing', () => scenario('chr-field-apply', async ({ seed, world }) => {

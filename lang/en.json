@@ -243,8 +243,35 @@
     "Creatures": {
       "Folder": "Chronicle: Creatures"
     },
+    "PlayerLink": {
+      "Title": "Link to Chronicle",
+      "Intro": "Type the code from your Chronicle account. In Chronicle, open the hero you claimed and press <strong>Link to Foundry</strong>; the code is good for 10 minutes. You do this once.",
+      "Label": "Code",
+      "Link": "Link",
+      "NotNow": "Not now",
+      "BadCode": "A code is six letters and numbers, like K7Q-2MX.",
+      "WrongCode": "That code is wrong or has expired. Get a new one in Chronicle and try again.",
+      "TooMany": "Too many wrong codes. Wait a few minutes and try again.",
+      "NoGM": "Linking needs your GM in the world with Chronicle connected. Try again when they are.",
+      "Failed": "Could not link right now. Try again in a moment.",
+      "Linked": "Linked. You are {name} in Chronicle, and the hero you claimed there is yours here.",
+      "GMLinked": "{user} linked themselves to {name} in Chronicle with a code.",
+      "Tool": "Link to Chronicle"
+    },
+    "FinishHero": {
+      "Title": "Finish {actor}",
+      "Body": "Chronicle picked <strong>{cls}</strong> as {actor}'s class. Foundry builds a class through its own level-up steps. Run them now with {cls} chosen?",
+      "BodyLevel": "Chronicle has this hero at level {level}. If the sheet ends up at a lower level, level it up there.",
+      "Finish": "Finish in Foundry",
+      "Later": "Later",
+      "SheetLine": "Chronicle picked {cls}, level {level}. The class is not on this sheet yet.",
+      "NoClass": "No {cls} class was found in this world or its compendiums. Add one, then drag it onto the sheet.",
+      "DragIt": "Drag the {cls} class from the Items or Compendium tab onto the sheet.",
+      "Failed": "Could not add {cls} to {actor}. Drag the class onto the sheet instead."
+    },
     "ActorSync": {
       "PlayerChangeNotSent": "Chronicle: a player's change to \"{actor}\" wasn't sent, because the character isn't claimed in Chronicle by the member that player is matched to. Have them claim it there, or make the change yourself.",
+      "PlayerPicksHeld": "Chronicle: not saved to Chronicle for {actor}: {reasons}. Their change stays in Foundry. Ask the player to choose from the list, or change it in Chronicle yourself.",
       "PreviousOwnerKept": "Chronicle: {player} is no longer the owner of {actor} in Chronicle, but still owns the actor in Foundry. Change this in the actor's Ownership settings if you want.",
       "ClaimantUnmapped": "Chronicle: a player owns {actor} in Chronicle but has no Foundry user mapped, so Foundry ownership was not changed. Link them in Chronicle Sync, under Settings, Players.",
       "IdentityItemFailed": "Chronicle: Could not update {actor}'s ancestry, culture, career or kit item ({fields}). The sheet was left as it was; see the console for details."

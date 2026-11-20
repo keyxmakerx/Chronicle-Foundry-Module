@@ -31,6 +31,8 @@ import { MapViewerSheet } from './map-viewer.mjs';
 import { openDMScreen } from './dm-screen.mjs';
 import { initEncounterHooks } from './encounters.mjs';
 import { registerCharacterClaimIndicator } from './character-claim-indicator.mjs';
+import { registerFinishHero } from './finish-hero.mjs';
+import { registerPlayerLink, openLinkWindow, linkToolWanted } from './player-link.mjs';
 import { registerNpcPresence, npcSpotlightRelay } from './npc-presence.mjs';
 import { negotiationMirror } from './negotiation-mirror.mjs';
 import { rollRelay } from './roll-relay.mjs';
@@ -191,6 +193,17 @@ Hooks.once('ready', async () => {
   dashboard.bind(syncManager);
   _addStatusIndicator();
   registerCharacterClaimIndicator();
+  try {
+    registerFinishHero();
+  } catch (err) {
+    console.warn('Chronicle Sync | Finish-your-hero card unavailable', err);
+  }
+  try {
+    // A player sync can't match links themselves with a Chronicle code.
+    registerPlayerLink(() => syncManager?.api ?? null);
+  } catch (err) {
+    console.warn('Chronicle Sync | Link to Chronicle unavailable', err);
+  }
   // Players open a shop room when the GM shows one (they have no API key);
   // the active GM answers their buying requests.
   registerShopRoomSocket();
@@ -414,17 +427,20 @@ Hooks.on('getSceneControlButtons', (controls) => {
   addChronicleControls(controls, {
     isGM: game.user.isGM,
     notebook: notebookAvailable(),
+    link: linkToolWanted(),
     run: {
       dashboard: openDashboard,
       dmScreen: () => { openDMScreen(() => syncManager?.api ?? null); },
       satchel: () => { openSatchel(); },
       calendar: () => { openCalendarWindow(); },
+      link: () => { openLinkWindow(); },
     },
     titles: {
       dashboard: game.i18n.localize('CHRONICLE.SceneControl.Dashboard'),
       dmScreen: game.i18n.localize('CHRONICLE.SceneControl.DMScreen'),
       satchel: game.i18n.localize('CHRONICLE.SceneControl.Satchel'),
       calendar: game.i18n.localize('CHRONICLE.SceneControl.Calendar'),
+      link: game.i18n.localize('CHRONICLE.PlayerLink.Tool'),
     },
   });
 });

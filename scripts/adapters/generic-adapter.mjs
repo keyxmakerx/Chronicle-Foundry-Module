@@ -284,6 +284,11 @@ export function extractCollectionField(actor, field) {
  * defs. Scalar fields read their foundry_path; collection fields extract from the
  * named actor collection. PURE (no Foundry globals) → unit-testable.
  *
+ * A single-item field whose item the actor lacks is left out, not sent as "":
+ * a hero built in Chronicle arrives without its Foundry-led class item, and an
+ * empty value would erase the class, subclass and level the player picked
+ * there. Sync never clears a Chronicle value for something that is merely absent.
+ *
  * @param {object} actor
  * @param {Array<object>} mappedFields
  * @returns {object}
@@ -292,7 +297,9 @@ export function buildChronicleFields(actor, mappedFields) {
   const result = {};
   for (const field of mappedFields) {
     if (field.foundry_collection) {
-      result[field.key] = extractCollectionField(actor, field);
+      const value = extractCollectionField(actor, field);
+      if (field.foundry_item_single && (value === '' || value == null)) continue;
+      result[field.key] = value;
     } else {
       let value = normalizeFoundryValue(getNestedValue(actor, field.foundry_path));
       // A Set/array/object scalar (e.g. system.skills.value, actor.statuses)

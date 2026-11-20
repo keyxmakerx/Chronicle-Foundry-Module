@@ -169,3 +169,39 @@ test('sending back is off unless the director turned it on', async (t) => {
   ];
   for (const [name, state, want] of cases) await t.test(name, () => assert.equal(sendBackOn(state), want));
 });
+
+// The D&D monster preset's conversions (Chronicle-DnD-5.5e manifest).
+const DND = {
+  'DND5E.creatureTypes': { humanoid: { label: 'Humanoid' }, fiend: { label: 'Fiend' } },
+  'DND5E.actorSizes': { sm: { label: 'Small' }, med: { label: 'Medium' } },
+};
+const dndChoices = (path) => DND[path] ?? null;
+
+test('D&D monster formats: challenge rating, flat armour class, type and subtype', async (t) => {
+  const cr = { key: 'challenge_rating', foundry_path: 'system.details.cr', foundry_format: 'fraction' };
+  const ac = { key: 'armor_class', foundry_path: 'system.attributes.ac', foundry_format: 'ac_flat' };
+  const type = { key: 'type', foundry_path: 'system.details.type', foundry_format: 'type_subtype', foundry_choices: 'DND5E.creatureTypes' };
+  const size = { key: 'size', foundry_path: 'system.traits.size', foundry_choices: 'DND5E.actorSizes' };
+  const cases = [
+    ['a quarter', cr, '1/4', { value: 0.25 }],
+    ['a half with experience', cr, '1/2 (100 XP)', { value: 0.5 }],
+    ['a whole rating', cr, '13', { value: 13 }],
+    ['zero', cr, '0', { value: 0 }],
+    ['a number as stored', cr, 3, { value: 3 }],
+    ['not a rating', cr, 'varies', { skip: 'not a number' }],
+    ['a divide by zero', cr, '1/0', { skip: 'not a number' }],
+    ['armour with a note', ac, '15 (natural armor)', { value: { calc: 'flat', flat: 15 } }],
+    ['armour with no number', ac, 'see text', { skip: 'not a number' }],
+    ['type with subtype', type, 'Humanoid (goblinoid)', { value: { value: 'humanoid', subtype: 'goblinoid' } }],
+    ['type alone', type, 'fiend', { value: { value: 'fiend', subtype: '' } }],
+    ['a type the system lacks', type, 'Swarm of Tiny beasts', { skip: 'no DND5E.creatureTypes entry for "Swarm of Tiny beasts"', unknown: ['Swarm of Tiny beasts'] }],
+    ['size by label', size, 'Medium', { value: 'med' }],
+  ];
+  for (const [name, field, raw, want] of cases) await t.test(name, () => assert.deepEqual(toFoundryValue(field, raw, dndChoices), want));
+});
+
+test('a flat armour class already on the actor is not written again', () => {
+  const actor = { system: { attributes: { ac: { calc: 'flat', flat: 15, value: 15 } } } };
+  assert.deepEqual(planCreatureApply({ update: { 'system.attributes.ac': { calc: 'flat', flat: 15 } }, actor }), {});
+  assert.deepEqual(Object.keys(planCreatureApply({ update: { 'system.attributes.ac': { calc: 'flat', flat: 16 } }, actor })), ['system.attributes.ac']);
+});

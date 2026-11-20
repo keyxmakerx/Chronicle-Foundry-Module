@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 /**
  * Creature sync, both sides real (the system's creature fields are the
- * bench stand-in in world.mjs). Chronicle owns the stat block; Foundry owns
- * only the pull fields, and sends them back only for a page that allows it,
- * which no bench page can (no system is enabled), so here they never go.
+ * bench stand-in in world.mjs). A page reaches Foundry when it is used: a
+ * fight places it or the DM presses "Add to Foundry". Chronicle owns the stat
+ * block; Foundry owns only the pull fields, and sends them back only for a
+ * page that allows it, which no bench page can (no system is enabled), so
+ * here they never go.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,6 +15,13 @@ import { FLAG, writes, scenario } from './scenario.mjs';
 const ON = { syncCreatures: true };
 const MODULES = { modules: ['creatures'] };
 const actorFor = (world, id) => world.game.actors.find((a) => a.getFlag(FLAG, 'creatureEntityId') === id);
+const creatureSyncOf = (world) => world.syncManager._modules.find((m) => m.constructor.name === 'CreatureSync');
+
+/** A page in Foundry: "Add to Foundry", then wait for its actor. */
+async function added(seed, world, e) {
+  await seed.addToFoundry(e.id);
+  await waitFor(() => actorFor(world, e.id), 10000, `actor for ${e.name}`);
+}
 
 /** The sheet keys these scenarios write. */
 const CREATURE_FIELDS = [
@@ -32,9 +41,12 @@ async function chronicleCreature(seed, name, fields) {
   return e;
 }
 
-test('a creature made in Chronicle becomes one NPC actor in the creatures folder and follows its edits', () => scenario('chr-creature-live', async ({ seed, world }) => {
+test('a new creature page makes no actor until "Add to Foundry"; then one NPC actor in the creatures folder follows its edits', () => scenario('chr-creature-live', async ({ seed, world }) => {
   await openWorld(world, MODULES);
   const e = await chronicleCreature(seed, 'Skrix Webrider', { challenge_rating: '4', hp: 90 });
+  await settle();
+  assert.ok(!actorFor(world, e.id), 'an unused page makes no actor');
+  await seed.addToFoundry(e.id);
   await waitFor(() => actorFor(world, e.id)?.system?.cr === '4', 10000, 'actor created');
   await settle();
   const actors = world.game.actors.filter((a) => a.name === 'Skrix Webrider');
@@ -53,7 +65,7 @@ test('a creature made in Chronicle becomes one NPC actor in the creatures folder
 test('a Foundry Stamina change stays in Foundry while the page does not allow sending back', () => scenario('fvtt-creature-edit', async ({ seed, world }) => {
   await openWorld(world, MODULES);
   const e = await chronicleCreature(seed, 'Goblin Sniper', { challenge_rating: '1', hp: 15 });
-  await waitFor(() => actorFor(world, e.id), 10000, 'actor created');
+  await added(seed, world, e);
   await settle();
   const actor = actorFor(world, e.id);
   const reqs = await recordRequests(async () => {
@@ -68,7 +80,8 @@ test('creatures changed or removed while Foundry was closed catch up on open; ac
   await openWorld(world, MODULES);
   const a = await chronicleCreature(seed, 'Ogre', { challenge_rating: '2' });
   const b = await chronicleCreature(seed, 'Gone Wolf', { challenge_rating: '1' });
-  await waitFor(() => actorFor(world, a.id) && actorFor(world, b.id), 10000, 'actors created');
+  await added(seed, world, a);
+  await added(seed, world, b);
   await settle();
   await closeWorld(world);
 
@@ -95,6 +108,7 @@ const abilities = (actor) => actor.items.filter((i) => i.type === 'ability');
 test('under Draw Steel a creature\'s abilities become ability items; the GM\'s own ability stays and a reopen writes nothing', () => scenario('chr-creature-abilities', async ({ seed, world }) => {
   await openWorld(world, MODULES);
   const e = await chronicleCreature(seed, 'Cave Drake', { challenge_rating: '3', abilities_json: JSON.stringify([BITE, GAZE]) });
+  await seed.addToFoundry(e.id);
   await waitFor(() => actorFor(world, e.id) && abilities(actorFor(world, e.id)).length === 2, 10000, 'abilities made');
   await settle();
   const actor = actorFor(world, e.id);
@@ -132,7 +146,32 @@ test('under Draw Steel a creature\'s abilities become ability items; the GM\'s o
 test('under another system no ability items are made', () => scenario('chr-creature-abilities-other-system', async ({ seed, world }) => {
   await openWorld(world, MODULES);
   const e = await chronicleCreature(seed, 'Plain Drake', { challenge_rating: '3', abilities_json: JSON.stringify([BITE]) });
+  await seed.addToFoundry(e.id);
   await waitFor(() => actorFor(world, e.id)?.system?.cr === '3', 10000, 'actor created');
   await settle();
   assert.equal(abilities(actorFor(world, e.id)).length, 0);
+}, { settings: ON }));
+
+test('"Add to Foundry" pressed while the world was closed makes the actor on open; an actor the GM then deletes stays deleted until used again', () => scenario('chr-creature-add-offline', async ({ seed, world }) => {
+  await openWorld(world, MODULES);
+  await settle();
+  await closeWorld(world);
+
+  const e = await chronicleCreature(seed, 'Night Hag', { challenge_rating: '7' });
+  const quiet = await chronicleCreature(seed, 'Unused Imp', { challenge_rating: '1' });
+  await seed.addToFoundry(e.id);
+  await openWorld(world, MODULES);
+  await waitFor(() => actorFor(world, e.id)?.system?.cr === '7', 10000, 'actor made on open');
+  assert.ok(!actorFor(world, quiet.id), 'a page made while closed and not used makes no actor');
+
+  await actorFor(world, e.id).delete();
+  await settle();
+  await closeWorld(world);
+  await openWorld(world, MODULES);
+  await settle();
+  assert.ok(!actorFor(world, e.id), 'a deleted actor does not come back on open');
+
+  // A fight places it: the actor is made again.
+  const placed = await creatureSyncOf(world).ensureActor(e.id);
+  assert.equal(placed?.getFlag(FLAG, 'creatureEntityId'), e.id, 'a fight makes it again');
 }, { settings: ON }));

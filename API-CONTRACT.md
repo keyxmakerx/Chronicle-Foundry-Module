@@ -320,6 +320,18 @@ Updates only `fields_data`. Chronicle with keyxmakerx/Chronicle#927 merges the s
 { "fields_data": { "hp_current": 45, "str": 18, "level": 5 } }
 ```
 
+**A player's change.** The module sends a player's edit under the GM's key. It adds `actingUserId`, the Chronicle member id the player is matched to (`userMappings`), only after checking the character is that member's:
+```json
+{ "fields_data": { "stamina": 30, "class": "Wizard" }, "actingUserId": "<member id>" }
+```
+Chronicle then judges the write as that member with the web door's hero-choice check (pick lists, hero-choice rules, typed text on a limited step, required steps; an ask-first pick is held, not stored). It stores the keys that pass and answers the rest:
+```json
+{ "status": "ok", "held": [ { "key": "class", "reason": "\"Wizard\" is not on the class list" } ] }
+```
+`held` is absent when nothing was held. A held key is not an error: the module leaves the player's change in Foundry, tells the GM the `reason` once, and never writes anything back for it. A member who does not own the page, or is not in the campaign, is a 403; a Scribe, Director or Co-DM author, or no `actingUserId`, is judged as the key's own user and holds nothing. A Chronicle from before this field ignores it and stores everything, so a player's picks there are not checked.
+
+Re-verify by: 2027-01-15 (Chronicle `internal/plugins/syncapi/acting_player.go` `judgeActingPlayer`, `internal/plugins/entities/owner_picks_check.go` `PlayerPicksHeld`)
+
 #### GET /entities/:entityId/permissions
 Returns entity permission/visibility settings.
 
@@ -536,7 +548,7 @@ are immutable via this route. Flat route, no `/metadata` suffix.
 #### GET /members
 Lists campaign members with their display names and roles.
 
-**Used by:** `sync-manager.mjs` → auto-match Chronicle users to Foundry users by display name
+**Used by:** `sync-manager.mjs` → auto-match Chronicle users to Foundry users (`_member-match.mjs`: display name, and `character_entity_id` with the Foundry owner of that character's actor)
 
 **Response:** a bare array. The sync API sends no email address. `character_entity_id` and `character_name` appear only for a member with a character.
 ```json
@@ -792,6 +804,24 @@ Foundry page shows it as "Players in Foundry".
 **When:** on connect, shortly after a Foundry user logs in or out or is edited, or the mappings change, and otherwise at most every 5 min while connected, only when the snapshot changed.
 
 Re-verify by: 2026-12-01 (Chronicle `internal/plugins/syncapi`, the players handler)
+
+#### POST /sync/link-code
+Redeems the code a player typed in Foundry's Link to Chronicle window. The
+player got it in Chronicle on the hero they claimed (only they see it); their
+client sends it, sealed to a key the active GM's client made for the session,
+over the module socket, and the GM's client redeems it here.
+
+**Used by:** `player-link.mjs` → `answer`, GM client only, with the GM's own key
+
+**Body:** `{ "code": "K7Q2MX" }` (dashes, spaces and case are ignored)
+
+**Response:** `{ "userId", "displayName" }`: the member the code was made for. The module then links the Foundry user who sent the code (the socket's sender, never a field in the message) to that member in `userMappings`, dropping the member's earlier link and any other member's link to that user, and claims apply at once.
+
+**Errors:** 404 for a wrong, used, expired or other campaign's code, or a member who has left; 429 after 10 wrong codes for the campaign in 10 minutes (all redeems wait); 403 when the key is not the owner's or a DM-access key.
+
+**When:** once per code; a code works once and for 10 minutes.
+
+Re-verify by: 2026-12-19 (Chronicle `internal/plugins/syncapi`, `link_codes.go` and `link_code_handler.go`)
 
 #### POST /sync/monsters
 The GM's client reports the monsters the world can place: its actors of the
@@ -1755,6 +1785,7 @@ allowlist (`api-client.mjs`) is ignored.
 | `npc.spotlight` | none; `resourceId` is the NPC's entity id | "Show in Foundry" pressed on a Chronicle NPC page |
 | `system_state.updated` | `{ systemId, key }`; `resourceId` is the page's entity id; DM-equivalent sockets only | A system widget saved a page's per-system state (Draw Steel negotiation tracker: `systemId` `drawsteel`, `key` `negotiation`) |
 | `hero_layers.changed` | no payload; `resourceId` is the page's entity id; DM-equivalent sockets only; recorded in the change feed as `hero_layers` | The Director put a transformation layer on that page or took one off |
+| `creature_add.requested` | no payload; `resourceId` is the creature page's entity id; DM-equivalent sockets only; recorded in the change feed as `creature_add` (op `created`) | "Add to Foundry" pressed on a creature page |
 | `quest.updated` | `{ version }`; `resourceId` is the quest page's id. Sent only to DM sockets when the change is DM-only | A quest sheet was saved; open quest windows refetch |
 | `notice_boards.updated` | `{ home }` (`page` or `category`); `resourceId` is the page id or the type id | A home's boards changed; open board windows refetch |
 | `roll.made` | A roll (see "Shared rolls" below); `resourceId` is the roll id. Public, gm and blind rolls in full; a self roll only to its owner's key | A roll was made at Chronicle's table or crafting, or recorded from Foundry |
@@ -1886,6 +1917,23 @@ or a 404 (an older Chronicle) stops the reads until the next message.
 `tools/test-layer-effects.mjs`, bench `chr-layer-effect`, `chr-layer-offline`.
 
 Re-verify by: 2026-12-15 (Chronicle `internal/plugins/transformations`, `internal/plugins/syncapi/layers_api.go`; keyxmakerx/Chronicle#2025)
+
+### What the module does with `creature_add.requested`
+
+Creature pages reach Foundry when they are used: a fight places one, or the
+DM presses "Add to Foundry" on the page (Chronicle's
+`POST /campaigns/:id/foundry-vtt/creature-add/:eid`, a web route; the button
+shows only on a creature page of a campaign Foundry has connected to).
+`scripts/creature-sync.mjs` makes that page's actor when it has none (a page
+playing Foundry's own monster makes none). The same request is a change-feed
+row of type `creature_add`, so a world that was closed makes the actor from
+the delta on connect; a full rescan cannot see them. The highest `seq` acted
+on per page is kept in the world setting `creatureAddsHandled`, so a replay
+or the live copy of a handled request never brings back an actor the GM
+deleted. Live edits and the connect walk update only actors that exist.
+`tools/test-creature-add.mjs`, bench `chr-creature-add-offline`.
+
+Re-verify by: 2026-12-19 (Chronicle `internal/plugins/foundry_vtt/creature_add.go`, `internal/app/creature_add_adapters.go`, `internal/plugins/syncapi/sync_change_bus.go`)
 
 ### What the module does with `note.*`
 

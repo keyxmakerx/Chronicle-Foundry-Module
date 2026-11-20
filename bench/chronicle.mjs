@@ -220,7 +220,16 @@ export async function seedCampaign(label = 'bench') {
     });
     if (r.status >= 300) throw new Error(`layer take off failed: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
   };
-  return { campaignId, moduleKey, displayName, createMap, enableClaiming, assignOwner, createFolder, fileInFolder, declareFields, enableTransformations, putOnLayer, takeOffLayer, chronicle: apiClient(campaignId, otherKey), module: apiClient(campaignId, moduleKey) };
+  // A creature page's "Add to Foundry" button (a web route, DM team).
+  const addToFoundry = async (entityId) => {
+    const r = await fetch(`${CHRONICLE_URL}/campaigns/${campaignId}/foundry-vtt/creature-add/${entityId}`, {
+      method: 'POST', redirect: 'manual',
+      headers: { cookie: web.cookie(), 'content-type': 'application/x-www-form-urlencoded', 'x-csrf-token': web.csrf() },
+      body: `csrf_token=${encodeURIComponent(web.csrf())}`,
+    });
+    if (r.status >= 300) throw new Error(`add to Foundry failed: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
+  };
+  return { campaignId, moduleKey, displayName, addToFoundry, createMap, enableClaiming, assignOwner, createFolder, fileInFolder, declareFields, enableTransformations, putOnLayer, takeOffLayer, chronicle: apiClient(campaignId, otherKey), module: apiClient(campaignId, moduleKey) };
 }
 
 /** A REST client scoped to one campaign, for scenario setup and assertions. */

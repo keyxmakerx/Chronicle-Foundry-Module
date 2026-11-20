@@ -34,8 +34,17 @@ test('a pick Chronicle has not changed since the last apply leaves the GM\'s own
   // The GM swapped the kit in Foundry; Chronicle still has the old one.
   const plan = planIdentityItems({ items, fieldDefs: DEFS, fieldsData, applied: { kit: 'shining armor ', ancestry: 'Human' } });
   assert.deepEqual(plan, [{ fieldKey: 'ancestry', itemType: 'ancestry', wantName: 'Dwarf', removeIds: ['a1'] }]);
-  // With nothing recorded (first apply), Chronicle's pick is applied as before.
-  assert.equal(planIdentityItems({ items, fieldDefs: DEFS, fieldsData }).length, 2);
+  // With nothing recorded (first apply), the actor's own items stay too.
+  assert.deepEqual(planIdentityItems({ items, fieldDefs: DEFS, fieldsData }), []);
+});
+
+test('a first apply fills an empty slot but never replaces an item the actor already has', () => {
+  const items = [{ id: 'r1', name: 'Hill Dwarf', type: 'ancestry' }];
+  const plan = planIdentityItems({ items, fieldDefs: DEFS, fieldsData: { ancestry: 'Dwarf', kit: 'Panther' } });
+  assert.deepEqual(plan, [{ fieldKey: 'kit', itemType: 'kit', wantName: 'Panther', removeIds: [] }]);
+  // Once applied (even with no pick for that field then), a new pick is Chronicle's change and swaps.
+  const later = planIdentityItems({ items, fieldDefs: DEFS, fieldsData: { ancestry: 'Dwarf' }, applied: {} });
+  assert.deepEqual(later, [{ fieldKey: 'ancestry', itemType: 'ancestry', wantName: 'Dwarf', removeIds: ['r1'] }]);
 });
 
 test('the recorded picks are the trimmed, non-empty eligible ones', () => {
@@ -52,7 +61,7 @@ test('a differing pick plans a swap that removes the old item of that type only'
     { id: 'c1', name: 'Censor', type: 'class' },
     { id: 'k1', name: 'Shining Armor', type: 'kit' },
   ];
-  const plan = planIdentityItems({ items, fieldDefs: DEFS, fieldsData: { ancestry: 'Dwarf', kit: 'Shining Armor' } });
+  const plan = planIdentityItems({ items, fieldDefs: DEFS, fieldsData: { ancestry: 'Dwarf', kit: 'Shining Armor' }, applied: { ancestry: 'Human' } });
   assert.deepEqual(plan, [{ fieldKey: 'ancestry', itemType: 'ancestry', wantName: 'Dwarf', removeIds: ['a1'] }]);
 });
 
@@ -74,7 +83,7 @@ test('an actor with no item of the type plans an add; with two items only the fi
   assert.deepEqual(none, [{ fieldKey: 'career', itemType: 'career', wantName: 'Soldier', removeIds: [] }]);
   const two = planIdentityItems({
     items: [{ id: 'x', name: 'Old', type: 'culture' }, { id: 'y', name: 'Older', type: 'culture' }],
-    fieldDefs: DEFS, fieldsData: { culture: 'Urban' },
+    fieldDefs: DEFS, fieldsData: { culture: 'Urban' }, applied: { culture: 'Old' },
   });
   assert.deepEqual(two[0].removeIds, ['x']);
 });

@@ -76,6 +76,7 @@ const ALLOWED_WS_TYPE_PREFIXES = Object.freeze([
   'npc.',
   'system_state.',
   'hero_layers.',
+  'creature_add.',
   'roll.',
 ]);
 
