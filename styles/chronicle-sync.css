@@ -74,6 +74,13 @@ html[data-cs-motion="off"] :is(.cs-grow, .cs-settle, .cs-peek) {
   color: var(--cs-bad);
 }
 
+/* The code is read off another screen, so it is set like one: spaced capitals */
+.chronicle-link-code {
+  font-family: monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
 /* "Finish your hero": the class Chronicle picked, until it is on the sheet */
 .chronicle-finish-hero {
   display: flex;
@@ -82,7 +89,7 @@ html[data-cs-motion="off"] :is(.cs-grow, .cs-settle, .cs-peek) {
   margin: 0 0 6px;
   padding: 6px 10px;
   border: 1px solid var(--cs-line);
-  border-left: 3px solid var(--cs-accent);
+  border-left: 2px solid var(--cs-accent);
   border-radius: 4px;
   background: var(--cs-accent-soft);
   color: var(--cs-text);

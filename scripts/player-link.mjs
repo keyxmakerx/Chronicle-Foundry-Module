@@ -95,12 +95,12 @@ export async function openLinkWindow({ fromJoin = false, problem = '' } = {}) {
     + (problem ? `<p class="chronicle-link-problem" role="alert">${escapeHtml(problem)}</p>` : '')
     + `<div class="form-group"><label for="chronicle-link-code">${escapeHtml(t('Label'))}</label>`
     + `<input id="chronicle-link-code" name="code" type="text" autocomplete="off" spellcheck="false"`
-    + ` maxlength="9" placeholder="K7Q-2MX" style="font-family: monospace; text-transform: uppercase; letter-spacing: 0.1em;"></div>`;
+    + ` maxlength="9" placeholder="K7Q-2MX" class="chronicle-link-code"></div>`;
   const res = await choiceDialog({
     title: t('Title'),
     content,
     buttons: [
-      { action: 'link', label: t('Link'), icon: 'fa-solid fa-link', default: true },
+      { action: 'link', label: t('Link'), default: true },
       { action: 'later', label: t('NotNow') },
     ],
     read: (root) => root?.querySelector?.('input[name="code"]')?.value ?? '',
