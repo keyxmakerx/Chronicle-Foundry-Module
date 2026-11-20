@@ -66,8 +66,8 @@ async function offer(actor) {
     title: t('Title', { actor: actor.name }),
     content,
     buttons: [
-      { action: 'finish', label: t('Finish'), icon: 'fa-solid fa-hammer', default: true },
-      { action: 'later', label: t('Later'), icon: 'fa-solid fa-clock' },
+      { action: 'finish', label: t('Finish'), default: true },
+      { action: 'later', label: t('Later') },
     ],
   });
   if (res?.action === 'finish') await finishHero(actor);
