@@ -25,4 +25,39 @@
     <div class="cs-mp-hud top"><span>CHART // {{mapTitleUpper}}</span><span>LINK OK</span></div>
     <div class="cs-mp-hud"><span>&nbsp;</span><span class="cs-mp-hudzoom">ZOOM {{zoomPercent}}%</span></div>
   </div>
+  <div data-o="blueprint">
+    {{#each frameCorners}}
+    <svg class="{{this}}" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="15" cy="15" r="7"></circle><path d="M15 2v26M2 15h26"></path></svg>
+    {{/each}}
+    <div class="cs-mp-bp-dim"><span>PLAN VIEW</span></div>
+    <div class="cs-mp-bp-block"><span>Sheet 1</span><b>{{mapTitle}}</b><span>Not to scale</span></div>
+  </div>
+  <div data-o="stone">
+    <div class="cs-mp-key t"></div><div class="cs-mp-key r"></div><div class="cs-mp-key b"></div><div class="cs-mp-key l"></div>
+    <i class="tl"></i><i class="tr"></i><i class="br"></i><i class="bl"></i>
+    <div class="cs-mp-stone-plate">{{mapTitle}}</div>
+  </div>
+  <div data-o="verdant">
+    {{#each frameCorners}}
+    <svg class="{{this}}" viewBox="0 0 46 46" fill="currentColor" stroke="none"><path d="M5 5C16 4 30 6 42 12M5 5C4 16 6 30 12 42" fill="none" stroke="#7da35a" stroke-width="1.4"></path><path d="M0 0C3-4 8-4 10 0 8 4 3 4 0 0z" transform="translate(4 4) rotate(45) scale(1.5)"></path><path d="M0 0C3-4 8-4 10 0 8 4 3 4 0 0z" transform="translate(14 5) rotate(-42)"></path><path d="M0 0C3-4 8-4 10 0 8 4 3 4 0 0z" transform="translate(23 6.5) rotate(52)"></path><path d="M0 0C3-4 8-4 10 0 8 4 3 4 0 0z" transform="translate(33 9) rotate(-30)"></path><path d="M0 0C3-4 8-4 10 0 8 4 3 4 0 0z" transform="translate(5 14) rotate(132)"></path><path d="M0 0C3-4 8-4 10 0 8 4 3 4 0 0z" transform="translate(6.5 23) rotate(38)"></path><path d="M0 0C3-4 8-4 10 0 8 4 3 4 0 0z" transform="translate(9 33) rotate(120)"></path></svg>
+    {{/each}}
+    <div class="cs-mp-vine t"></div>
+    <div class="cs-mp-vine b"></div>
+    <div class="cs-mp-leaf-tag">{{mapTitle}}</div>
+  </div>
+  <div data-o="illuminated">
+    <i class="tl"></i><i class="tr"></i><i class="br"></i><i class="bl"></i>
+    <div class="cs-mp-ill-head">
+      <div class="cs-mp-ill-cap">{{mapInitial}}</div>
+      <div class="cs-mp-ill-rubric">{{mapRest}}</div>
+      <div class="cs-mp-ill-rule"></div>
+    </div>
+  </div>
+  <div data-o="corkboard">
+    <i class="tl"></i><i class="tr"></i><i class="br"></i><i class="bl"></i>
+    <div class="cs-mp-tape">{{mapTitle}}</div>
+  </div>
+  <div data-o="terminal">
+    <div class="cs-mp-crt"><span>&gt; {{mapTitleUpper}}<b class="cs-mp-crt-cur"></b></span><span class="cs-mp-crt-led">READY</span></div>
+  </div>
 </div>

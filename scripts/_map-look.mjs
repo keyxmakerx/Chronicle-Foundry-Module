@@ -10,10 +10,14 @@
  */
 
 /** Chronicle's frames, in its gallery order; the first is the default. */
-export const FRAMES = Object.freeze(['atlas', 'arcane', 'old', 'modern', 'futuristic', 'gilded']);
+export const FRAMES = Object.freeze([
+  'atlas', 'arcane', 'old', 'modern', 'futuristic', 'gilded',
+  'blueprint', 'stone', 'verdant', 'illuminated', 'corkboard', 'terminal',
+]);
 export const DEFAULT_FRAME = 'atlas';
 
-const PIN_STYLES = ['drop', 'seal', 'flag', 'dot'];
+/** Chronicle's pin shapes, in its settings order; the first is the default. */
+export const PIN_STYLES = Object.freeze(['drop', 'seal', 'flag', 'dot', 'shield', 'tack', 'diamond', 'plaque']);
 const PIN_SIZES = ['s', 'm', 'l'];
 const PIN_LABELS = ['always', 'hover', 'never'];
 
@@ -159,12 +163,17 @@ export function mapThumbSrc(src, isAllowedHost) {
 
 const PIN_SCALE = { s: 0.75, m: 1, l: 1.35 };
 // cx, cy: where the icon sits in the 30x38 box; fs: icon size; ax, ay: the
-// map point (the tip of a drop, the foot of a flag, the middle of a dot).
+// map point (the tip of a drop, the foot of a flag, the middle of a dot or
+// a diamond).
 const PIN_SHAPE = {
   drop: { cx: 15, cy: 15, fs: 12, ax: 15, ay: 37 },
   seal: { cx: 15, cy: 22, fs: 12, ax: 15, ay: 37 },
   flag: { cx: 17, cy: 11, fs: 8, ax: 8, ay: 37 },
   dot: { cx: 15, cy: 19, fs: 11, ax: 15, ay: 19 },
+  shield: { cx: 15, cy: 15, fs: 11, ax: 15, ay: 37 },
+  tack: { cx: 15, cy: 11, fs: 10, ax: 15, ay: 37 },
+  diamond: { cx: 15, cy: 19, fs: 10, ax: 15, ay: 19 },
+  plaque: { cx: 15, cy: 15, fs: 12, ax: 15, ay: 37 },
 };
 
 /**
@@ -196,11 +205,25 @@ export function pinShapeSvg(style, color, dashed) {
   if (style === 'seal') return `${open}<path d="M15 34v4" stroke="${c}" stroke-width="2"/><circle cx="15" cy="22" r="12" fill="${c}" stroke="#fff" stroke-width="2"${dash}/><circle cx="15" cy="22" r="8" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.2"/></svg>`;
   if (style === 'flag') return `${open}<path d="M8 37V4" stroke="#3b2f1e" stroke-width="2.4"/><path d="M9 5h17l-4 6 4 6H9z" fill="${c}" stroke="#fff" stroke-width="1.5"${dash}/></svg>`;
   if (style === 'dot') return `${open}<circle cx="15" cy="19" r="10" fill="${c}" stroke="#fff" stroke-width="2.5"${dash}/></svg>`;
+  if (style === 'shield') return `${open}<path d="M3 4h24v13c0 9.5-6.5 15.5-12 20-5.5-4.5-12-10.5-12-20z" fill="${c}" stroke="#fff" stroke-width="2" stroke-linejoin="round"${dash}/><path d="M6.5 7.5h17v9.5c0 7-4.5 11.5-8.5 15-4-3.5-8.5-8-8.5-15z" fill="none" stroke="rgba(255,255,255,.5)" stroke-width="1.1"/></svg>`;
+  if (style === 'tack') return `${open}<path d="M15 20v17" stroke="#4b5563" stroke-width="2.2" stroke-linecap="round"/><circle cx="15" cy="11" r="10" fill="${c}" stroke="#fff" stroke-width="2"${dash}/><path d="M8.5 8a7.5 7.5 0 016-4.2" fill="none" stroke="rgba(255,255,255,.6)" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+  if (style === 'diamond') return `${open}<path d="M15 6l13 13-13 13L2 19z" fill="${c}" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"${dash}/></svg>`;
+  if (style === 'plaque') return `${open}<path d="M7 3h16a4 4 0 014 4v16a4 4 0 01-4 4h-3.5L15 37l-4.5-10H7a4 4 0 01-4-4V7a4 4 0 014-4z" fill="${c}" stroke="#fff" stroke-width="2" stroke-linejoin="round"${dash}/></svg>`;
   return `${open}<path d="M15 37s-12-12.5-12-22a12 12 0 0124 0c0 9.5-12 22-12 22z" fill="${c}" stroke="#fff" stroke-width="2"${dash}/></svg>`;
 }
 
-/** The frame's title-plate initial (the wax seal on Old). */
+/** A map name as whole characters, so a letter outside the basic plane is never cut in half. */
+function _titleChars(title) {
+  return Array.from(String(title || '').trim());
+}
+
+/** The frame's title-plate initial (the wax seal on Old, the painted letter on Illuminated). */
 export function frameInitial(title) {
-  const ch = String(title || '').trim().charAt(0);
+  const ch = _titleChars(title)[0];
   return ch ? ch.toUpperCase() : 'M';
+}
+
+/** The map's name after its first letter, which Illuminated paints large beside it. */
+export function frameRest(title) {
+  return _titleChars(title).slice(1).join('');
 }
