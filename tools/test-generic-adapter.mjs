@@ -146,6 +146,21 @@ test('buildChronicleFields mixes scalar + collection fields into one fields_data
   assert.deepEqual(JSON.parse(out.abilities_json), [{ name: 'Ashfall Strike' }, { name: 'Mountain Stance' }]);
 });
 
+test('buildChronicleFields leaves out a single-item field the actor has no item for, so it never clears a Chronicle pick', () => {
+  const single = (key, type, extra = {}) => ({ key, type: 'string', foundry_collection: 'items', foundry_item_type: [type], foundry_item_single: true, ...extra });
+  const mapped = [
+    single('ancestry', 'ancestry'),
+    single('kit', 'kit'),
+    single('complication', 'complication'),
+    { ...single('level', 'complication'), type: 'number', foundry_item_fields: { level: 'system.level' } },
+    { key: 'stamina_current', foundry_path: 'system.stamina.value', type: 'number' },
+  ];
+  const out = buildChronicleFields(makeActor(), mapped);
+  assert.equal(out.ancestry, 'Hakaan');
+  assert.equal(out.stamina_current, 21);
+  for (const key of ['kit', 'complication', 'level']) assert.ok(!(key in out), `${key} must be left out, not sent empty`);
+});
+
 test('buildChronicleFields sets null for a missing scalar path', () => {
   const out = buildChronicleFields(makeActor(), [{ key: 'speed', foundry_path: 'system.movement.speed', type: 'number' }]);
   assert.equal(out.speed, null);

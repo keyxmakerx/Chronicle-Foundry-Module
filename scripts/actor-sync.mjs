@@ -15,7 +15,7 @@
  */
 
 import { noticeText } from './_escape-html.mjs';
-import { getSetting, getUserMappings } from './settings.mjs';
+import { getSetting, setSetting, getUserMappings, getSyncExclusions } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
 import { createGenericAdapter, buildChronicleFields } from './adapters/generic-adapter.mjs';
 import { FLAG_SCOPE, syncOptions, APPLY_OPTION } from './constants.mjs';
@@ -34,6 +34,8 @@ import { sendsChangeHere, memberOf, ownsCharacter } from './_change-author.mjs';
 import { ASK, askModel, sameName } from './_player-asks.mjs';
 import { getPlayerAsks, playerName } from './player-asks.mjs';
 import { planLayerEffects, layeredFieldKeys, storedLayers, LAYER_FLAG } from './_layer-effects.mjs';
+import { bringsInActor } from './_actor-catch-up.mjs';
+import { CLASS_PICK_FLAG, classPick, pickToFinish, pickChanged } from './_finish-hero.mjs';
 
 /** How long a read of the campaign's pick-list entries is reused. */
 const ENTRY_CACHE_MS = 30_000;
@@ -63,6 +65,14 @@ export class ActorSync {
      * @type {Map<string, string>}
      */
     this._inFlightCreates = new Map();
+
+    /**
+     * Chronicle work queued per character, so a create, an update and a
+     * connect-time catch-up for one page run in turn: the second sees the
+     * first's actor instead of making another or being dropped.
+     * @type {Map<string, Promise<unknown>>}
+     */
+    this._entityTurns = new Map();
 
     /** @type {object|null} Loaded system adapter module. */
     this._adapter = null;
@@ -163,15 +173,39 @@ export class ActorSync {
 
     switch (msg.type) {
       case 'entity.created':
-        await this._onCharacterCreated(entity);
+        await this._inTurn(entity.id, () => this._onCharacterCreated(entity));
         break;
       case 'entity.updated':
-        await this._onCharacterUpdated(entity);
+        await this._inTurn(entity.id, () => this._onCharacterUpdated(entity));
         break;
       case 'entity.deleted':
-        await this._onCharacterDeleted(entity);
+        await this._inTurn(entity.id, () => this._onCharacterDeleted(entity));
         break;
     }
+  }
+
+  /**
+   * Run `fn` after the work already queued for this character.
+   * @template T
+   * @param {string} entityId
+   * @param {() => Promise<T>} fn
+   * @returns {Promise<T>}
+   * @private
+   */
+  _inTurn(entityId, fn) {
+    if (!entityId) return fn();
+    const prev = this._entityTurns.get(entityId) ?? Promise.resolve();
+    const run = prev.catch(() => {}).then(fn);
+    this._entityTurns.set(entityId, run);
+    run.catch(() => {}).finally(() => {
+      if (this._entityTurns.get(entityId) === run) this._entityTurns.delete(entityId);
+    });
+    return run;
+  }
+
+  /** Pages the GM turned sync off for (kept in Chronicle when deleted here). @private */
+  _excludedIds() {
+    return getSyncExclusions()?.excludedEntities || [];
   }
 
   /**
@@ -199,11 +233,13 @@ export class ActorSync {
     }
 
     if (actor) return; // Either path found it → nothing to do.
+    // An actor the GM deleted here, keeping the page, is not made again.
+    if (this._excludedIds().includes(mapping.chronicle_id)) return;
 
     try {
       const entity = await this._api.get(`/entities/${mapping.chronicle_id}`);
       if (entity && this._isCharacterEntity(entity)) {
-        await this._onCharacterCreated(entity);
+        await this._inTurn(entity.id, () => this._onCharacterCreated(entity));
       }
     } catch (err) {
       console.warn('Chronicle: Failed to sync actor mapping', err);
@@ -263,22 +299,25 @@ export class ActorSync {
   feedActive() { return !!(getSetting('syncCharacters') && this._adapter && this._characterTypeId); }
 
   /**
-   * Connect-time catch-up for linked actors. With the change feed only the
-   * characters Chronicle says changed are refetched; without it every
-   * character is listed. Either way an actor already at the entity's version
-   * is left alone, and no actor is created here (live creates and the import
-   * wizard do that). Throws when anything failed, so the feed cursor is not
-   * advanced past it.
+   * Connect-time catch-up. With the change feed only the characters Chronicle
+   * says changed are refetched; without it every character is listed. Either
+   * way an actor already at the entity's version is left alone, and a
+   * character made in Chronicle since the last sync, while this world was
+   * closed, gets its actor now (see _actor-catch-up.mjs). Throws when
+   * anything failed, so the feed cursor is not advanced past it.
    *
-   * @param {{feed?: {mode: 'delta', changes: object[]}|{mode: 'full'}}} [opts]
+   * @param {{feed?: {mode: 'delta', changes: object[], createdAfter?: string|null}|{mode: 'full'}}} [opts]
    */
   async onInitialSync({ feed } = {}) {
     if (!this._adapter || !getSetting('syncCharacters')) return;
     if (!this._characterTypeId) return;
 
+    // lastSyncTime is still the previous pass's here: SyncManager writes the
+    // new one after every module's onInitialSync.
+    const createdAfter = getSetting('lastSyncTime') || null;
     let errors = 0;
     if (feed?.mode === 'delta') {
-      errors = await this._catchUpFromFeed(feed.changes);
+      errors = await this._catchUpFromFeed(feed.changes, feed.createdAfter ?? createdAfter);
     } else {
       // Pull the parent character type and (when resolved) the PC sub-type so
       // existing actor–entity links are refreshed regardless of which Chronicle
@@ -291,10 +330,16 @@ export class ActorSync {
         allEntities.push(...(await this._walkTypeEntities(typeId)));
       }
 
+      const excluded = this._excludedIds();
       for (const entity of allEntities) {
         const existingActor = this._findLinkedActor(entity.id);
-        if (!existingActor || this._atVersion(existingActor, entity)) continue;
-        if (!(await this._updateActorFromEntity(existingActor, entity))) errors++;
+        if (!existingActor) {
+          if (bringsInActor({ entity, createdAfter, excludedIds: excluded })
+              && !(await this._bringInActor(entity.id, createdAfter, excluded))) errors++;
+          continue;
+        }
+        if (this._atVersion(existingActor, entity)) continue;
+        if (!(await this._inTurn(entity.id, () => this._updateActorFromEntity(existingActor, entity)))) errors++;
       }
     }
 
@@ -312,17 +357,55 @@ export class ActorSync {
   }
 
   /**
-   * Apply the characters the change feed lists to their linked actors.
+   * Make the actor for a character made while this world was closed. The
+   * full page is read first: a list row carries no fields, and a feed entry
+   * only an id. "Made since" is the page's own created_at, not the feed's
+   * `created` entry, which a replay repeats.
+   * @param {string} entityId
+   * @param {string|null} createdAfter
+   * @param {string[]} excluded
+   * @returns {Promise<boolean>} false when it failed
+   * @private
+   */
+  async _bringInActor(entityId, createdAfter, excluded) {
+    let entity;
+    try {
+      entity = await this._api.get(`/entities/${entityId}`);
+    } catch (err) {
+      // Removed again before this connect: nothing to bring in.
+      if ((err?.status ?? err?.statusCode) === 404) {
+        this._api.dropLastErrorLogEntry?.({ path: `/entities/${entityId}`, status: 404 });
+        return true;
+      }
+      console.warn(`Chronicle: could not read new character ${entityId}`, err);
+      return false;
+    }
+    if (!entity || !this._isCharacterEntity(entity)) return true;
+    if (!bringsInActor({ entity, createdAfter, excludedIds: excluded })) return true;
+    const made = await this._inTurn(entityId, () => this._onCharacterCreated(entity));
+    if (made) this._syncManager?.logActivity?.('create', `"${entity.name}" was made in Chronicle while Foundry was closed; its actor was created`);
+    return made !== false;
+  }
+
+  /**
+   * Apply the characters the change feed lists to their linked actors, and
+   * make the actor for one created since the last sync (`createdAfter`).
    * A removed character unlinks its actor (the actor is kept).
    * @param {object[]} changes
+   * @param {string|null} createdAfter
    * @returns {Promise<number>} how many failed
    * @private
    */
-  async _catchUpFromFeed(changes) {
+  async _catchUpFromFeed(changes, createdAfter = null) {
     let errors = 0;
+    const excluded = this._excludedIds();
+    const created = new Set();
     for (const [entityId, op] of collapseChanges(changes, 'entity')) {
       const actor = this._findLinkedActor(entityId);
-      if (!actor) continue;
+      if (!actor) {
+        if (op === 'created' && createdAfter && !excluded.includes(entityId)) created.add(entityId);
+        continue;
+      }
       if (op === 'deleted') {
         await this._onCharacterDeleted({ id: entityId });
         continue;
@@ -342,7 +425,17 @@ export class ActorSync {
         continue;
       }
       if (!entity || !this._isCharacterEntity(entity) || this._atVersion(actor, entity)) continue;
-      if (!(await this._updateActorFromEntity(actor, entity))) errors++;
+      if (!(await this._inTurn(entityId, () => this._updateActorFromEntity(actor, entity)))) errors++;
+    }
+    if (created.size) {
+      // The feed names pages of every kind; one list of the characters picks
+      // out the new ones, instead of reading every new page here.
+      const characters = await this._listCharacterEntities();
+      if (this._characterListFailed) errors++;
+      for (const row of characters) {
+        if (!created.has(row.id) || !bringsInActor({ entity: row, createdAfter, excludedIds: excluded })) continue;
+        if (!(await this._bringInActor(row.id, createdAfter, excluded))) errors++;
+      }
     }
     return errors;
   }
@@ -382,13 +475,27 @@ export class ActorSync {
           player: noticeText(game.users?.get?.(staleId)?.name ?? staleId),
         }));
       }
-      if (plan.unmapped && !this._unmappedNoticed.has(ownerId)) {
-        this._unmappedNoticed.add(ownerId);
-        ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.ClaimantUnmapped', { actor: noticeText(actor.name) }));
+      if (plan.unmapped) {
+        // They may have joined since connect: read the members again and
+        // match. Not awaited, since that re-applies claims, this one included.
+        this._syncManager?.refreshMembersForClaim?.()?.catch?.((err) => console.warn('Chronicle: could not read members again', err));
+        if (!this._unmappedNoticed.has(ownerId)) {
+          this._unmappedNoticed.add(ownerId);
+          ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.ClaimantUnmapped', { actor: noticeText(actor.name) }));
+        }
       }
     } catch (err) {
       console.error(`Chronicle: could not apply the owner of "${actor.name}"`, err);
     }
+  }
+
+  /**
+   * Apply cached claims again after a member was linked to a Foundry user
+   * (SyncManager calls this), so the player owns their actor at once.
+   */
+  async reconcileOwnership() {
+    if (!this._adapter || !getSetting('syncCharacters')) return;
+    await this._reconcileClaimOwnership();
   }
 
   /**
@@ -575,6 +682,8 @@ export class ActorSync {
    * Creates a new Foundry Actor if one isn't already linked.
    * Uses the adapter's actorType to create the correct type (e.g., "hero").
    * @param {object} entity
+   * @returns {Promise<boolean|null>} true when an actor was made, null when
+   *   none was needed, false when making it failed.
    * @private
    */
   async _onCharacterCreated(entity) {
@@ -582,7 +691,7 @@ export class ActorSync {
     const existing = game.actors.find(
       (a) => a.getFlag(FLAG_SCOPE, 'entityId') === entity.id
     );
-    if (existing) return;
+    if (existing) return null;
 
     // Race guard: a Foundry-originated POST for this name is in flight.
     // The originating handler will set the entityId flag once its POST
@@ -595,7 +704,7 @@ export class ActorSync {
           `Chronicle: Skipping WS-driven actor create for "${entity.name}" — ` +
           `Foundry-originated POST is in flight; the originating handler will link it.`
         );
-        return;
+        return null;
       }
     }
 
@@ -624,6 +733,7 @@ export class ActorSync {
 
       const actor = await Actor.create(actorData, applyOptions());
       await this._applyIdentityItems(actor, entity);
+      await this._recordClassPick(actor, entity);
       await this._syncLayers(actor, entity.id);
       await this._applyClaimOwnership(actor, entity.owner_user_id ?? null, null);
 
@@ -639,8 +749,10 @@ export class ActorSync {
       });
 
       console.debug(`Chronicle: Created actor "${entity.name}" from character entity`);
+      return true;
     } catch (err) {
       console.error('Chronicle: Failed to create actor from entity', err);
+      return false;
     }
   }
 
@@ -655,6 +767,26 @@ export class ActorSync {
     );
     if (!actor) return;
     await this._updateActorFromEntity(actor, entity);
+  }
+
+  /**
+   * Note Chronicle's class pick on an actor whose sheet has no class item, so
+   * its player is offered "Finish your hero" (finish-hero.mjs). Sync never
+   * embeds the class itself: the system's level-up steps build it.
+   * @param {Actor} actor
+   * @param {object} entity
+   * @private
+   */
+  async _recordClassPick(actor, entity) {
+    if (!game.user?.isGM) return;
+    try {
+      const items = actor.items?.contents ?? Array.from(actor.items ?? []);
+      const next = pickToFinish(items, classPick(this._adapter?.fieldDefs, entity?.fields_data));
+      const current = actor.getFlag?.(FLAG_SCOPE, CLASS_PICK_FLAG) ?? null;
+      if (pickChanged(current, next)) await this._setActorFlag(actor, CLASS_PICK_FLAG, next);
+    } catch (err) {
+      console.warn(`Chronicle: could not note the class pick on "${actor.name}"`, err);
+    }
   }
 
   /**
@@ -686,7 +818,9 @@ export class ActorSync {
         // A failed swap keeps the older pick, so the next apply tries again.
         const next = { ...(applied ?? {}) };
         for (const [key, name] of Object.entries(picks)) if (!failedKeys.includes(key)) next[key] = name;
-        if (JSON.stringify(next) !== JSON.stringify(applied ?? {})) {
+        // An empty record still counts: it ends the first apply, after which a
+        // new pick is Chronicle's change and replaces the actor's item.
+        if (applied == null || JSON.stringify(next) !== JSON.stringify(applied)) {
           await this._setActorFlag(actor, IDENTITY_APPLIED_FLAG, next);
         }
       };
@@ -807,6 +941,7 @@ export class ActorSync {
       }
 
       await this._applyIdentityItems(actor, entity);
+      await this._recordClassPick(actor, entity);
       await this._replanLayers(actor, entity);
 
       // Sync visibility: Chronicle is_private → Foundry actor hidden.
@@ -990,7 +1125,7 @@ export class ActorSync {
    */
   async _unlinkCopy(actor) {
     await actor.update(
-      flagRemoval(FLAG_SCOPE, 'entityId', 'lastSync', 'chronicleUpdatedAt', 'chronicleOwnerUserId', IDENTITY_APPLIED_FLAG),
+      flagRemoval(FLAG_SCOPE, 'entityId', 'lastSync', 'chronicleUpdatedAt', 'chronicleOwnerUserId', IDENTITY_APPLIED_FLAG, CLASS_PICK_FLAG),
       applyOptions(),
     );
     const items = (actor.items?.contents ?? [])
@@ -1288,7 +1423,29 @@ export class ActorSync {
       return;
     }
     // The GM is asked before the Chronicle page goes too (_remote-deletes.mjs).
-    queueRemoteDelete({ label: actor.name, run: () => this._api.delete(`/entities/${entityId}`) });
+    queueRemoteDelete({
+      label: actor.name,
+      run: () => this._api.delete(`/entities/${entityId}`),
+      kept: () => this._syncOffAfterDelete(entityId),
+    });
+  }
+
+  /**
+   * The GM deleted an actor here and kept its character in Chronicle. Sync
+   * is turned off for that page (the shared exclusion list the GM can undo in
+   * Chronicle Sync), so no connect pass makes its actor again.
+   * @param {string} entityId
+   * @private
+   */
+  async _syncOffAfterDelete(entityId) {
+    const exclusions = getSyncExclusions();
+    const excludedEntities = exclusions.excludedEntities || [];
+    if (excludedEntities.includes(entityId)) return;
+    await setSetting('syncExclusions', JSON.stringify({
+      ...exclusions,
+      excludedTypes: exclusions.excludedTypes || [],
+      excludedEntities: [...excludedEntities, entityId],
+    }));
   }
 
   /**

@@ -381,6 +381,15 @@ export function registerSettings() {
     onChange: () => Hooks.callAll('chronicleUserMappingsChanged'),
   });
 
+  // Internal: per creature page, the highest "Add to Foundry" request seq
+  // already acted on, so a replayed request never brings back a deleted actor.
+  game.settings.register(MODULE_ID, 'creatureAddsHandled', {
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
+  });
+
   // Internal: per-type and per-entity sync exclusions (not shown in settings UI).
   // Stored as JSON: { excludedTypes: [typeId, ...], excludedEntities: ["entityId", ...] }
   game.settings.register(MODULE_ID, 'syncExclusions', {
@@ -504,6 +513,15 @@ export function registerSettings() {
     config: false,
     type: String,
     default: '{}',
+  });
+
+  // This player said "Not now" to the Link to Chronicle window that opens
+  // on joining; the scene-control button still opens it (player-link.mjs).
+  game.settings.register(MODULE_ID, 'linkPromptDismissed', {
+    scope: 'client',
+    config: false,
+    type: Boolean,
+    default: false,
   });
 
   // Where this player dragged the jot tab and panel (scripts/_jot-placement.mjs).
