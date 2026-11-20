@@ -917,16 +917,21 @@ Re-verify by: 2026-12-01 (Chronicle `internal/plugins/syncapi/map_api_handler.go
 
 Each map row carries `display_settings` (nullable object): the map's own
 look. The module reads `frame.style`/`frame.tint` and `pins.style`
-(`drop|seal|flag|dot`), `pins.size` (`s|m|l`), `pins.labels`
-(`always|hover|never`); absent means "follow the campaign" / the default.
+(`drop|seal|flag|dot|shield|tack|diamond|plaque`), `pins.size` (`s|m|l`),
+`pins.labels` (`always|hover|never`); absent means "follow the campaign" /
+the default. An older Chronicle sends only the first four pin shapes and the
+first six frames below. A value the module does not know draws as the
+default (`drop`, or the campaign frame) rather than failing.
 Resolved by `scripts/_map-look.mjs` `resolveMapLook` into the page meta
 (`chronicleMapMeta.look`) so players never need campaign settings.
+
+Re-verify by: 2026-12-19 (Chronicle `internal/plugins/maps/display_settings.go` `FrameStyles`, `PinStyles`; keyxmakerx/Chronicle#2430)
 
 #### GET /maps/look
 The campaign map look: `{campaign_frame, frames[], kinds[{id,label,color}],
 icons[{id,label,category}], default_icon}`. `campaign_frame` is one of
-`atlas|arcane|old|modern|futuristic|gilded` and is what a map without its
-own frame wears. Fetched once per full sync; a 404 (older Chronicle) keeps
+`atlas|arcane|old|modern|futuristic|gilded|blueprint|stone|verdant|illuminated|corkboard|terminal`
+and is what a map without its own frame wears. Fetched once per full sync; a 404 (older Chronicle) keeps
 the Atlas default. Marker `icon` is a Font Awesome class from `icons`; the
 viewer draws any well-formed `fa-` class and falls back to `default_icon`.
 The marker dialog's icon picker offers `icons` grouped by `category` and

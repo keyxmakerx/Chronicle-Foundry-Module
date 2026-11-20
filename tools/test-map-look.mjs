@@ -7,12 +7,15 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 const {
   resolveMapLook, sanitizeLook, markerIconClass, parseMapLook,
-  pinMetrics, pinShapeSvg, frameInitial, DEFAULT_FRAME, DEFAULT_MARKER_ICON,
-  groupIconCatalog, mapThumbSrc,
+  pinMetrics, pinShapeSvg, frameInitial, frameRest, DEFAULT_FRAME, DEFAULT_MARKER_ICON,
+  groupIconCatalog, mapThumbSrc, FRAMES, PIN_STYLES,
 } = await import('../scripts/_map-look.mjs');
+
+const read = (rel) => readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
 const { startMotionRest } = await import('../scripts/_map-motion-rest.mjs');
 
 test('resolveMapLook: defaults follow Chronicle (campaign frame, drop, medium, hover, tint on)', () => {
@@ -28,6 +31,44 @@ test('resolveMapLook: a map\'s own choices win; JSON string accepted', () => {
   const want = { frame: 'old', tint: false, pinStyle: 'seal', pinSize: 'l', pinLabels: 'always' };
   assert.deepEqual(resolveMapLook(ds, 'arcane'), want);
   assert.deepEqual(resolveMapLook(JSON.stringify(ds), 'arcane'), want);
+});
+
+test('resolveMapLook: every frame and pin shape Chronicle offers is accepted', () => {
+  assert.deepEqual([...FRAMES], [
+    'atlas', 'arcane', 'old', 'modern', 'futuristic', 'gilded',
+    'blueprint', 'stone', 'verdant', 'illuminated', 'corkboard', 'terminal',
+  ]);
+  assert.deepEqual([...PIN_STYLES], ['drop', 'seal', 'flag', 'dot', 'shield', 'tack', 'diamond', 'plaque']);
+  for (const frame of FRAMES) {
+    assert.equal(resolveMapLook({ frame: { style: frame } }).frame, frame);
+    assert.equal(resolveMapLook(null, frame).frame, frame, 'as the campaign frame');
+    assert.equal(parseMapLook({ campaign_frame: frame }).campaignFrame, frame);
+    assert.equal(sanitizeLook({ frame }).frame, frame);
+  }
+  for (const style of PIN_STYLES) {
+    assert.equal(resolveMapLook({ pins: { style } }).pinStyle, style);
+    assert.equal(sanitizeLook({ pinStyle: style }).pinStyle, style);
+  }
+});
+
+test('every frame has its stylesheet rule and every ornament block can show', () => {
+  const css = read('styles/map-frames.css');
+  const ornaments = read('templates/map-frame-ornaments.hbs');
+  for (const frame of FRAMES) {
+    assert.ok(css.includes(`.cs-mp-frame[data-frame="${frame}"]`), `no frame rule for ${frame}`);
+  }
+  const blocks = [...ornaments.matchAll(/data-o="([a-z]+)"/g)].map((m) => m[1]);
+  assert.ok(blocks.length > 0);
+  for (const block of blocks) {
+    assert.ok(FRAMES.includes(block), `ornament block for an unknown frame: ${block}`);
+    assert.ok(
+      css.includes(`.cs-mp-frame[data-frame="${block}"] .cs-mp-orn [data-o="${block}"]`),
+      `ornament block ${block} is never shown`,
+    );
+  }
+  for (const frame of ['blueprint', 'stone', 'verdant', 'illuminated', 'corkboard', 'terminal']) {
+    assert.ok(blocks.includes(frame), `no ornament block for ${frame}`);
+  }
 });
 
 test('resolveMapLook: unknown or hostile values fall back', () => {
@@ -98,6 +139,22 @@ test('pinMetrics: Chronicle\'s anchors per shape, scaled by size', () => {
   assert.equal(pinMetrics('flag', 'm').ax, 8, 'a flag sits on its pole');
   assert.equal(pinMetrics('drop', 'l').w, 30 * 1.35);
   assert.deepEqual(pinMetrics('nope', 'nope'), pinMetrics('drop', 'm'));
+  assert.equal(pinMetrics('diamond', 'm').ay, 19, 'a diamond sits on its middle');
+  assert.equal(pinMetrics('tack', 'm').icoY, 11, 'a tack carries its icon in its head');
+  for (const style of ['shield', 'tack', 'plaque']) {
+    assert.equal(pinMetrics(style, 'm').ay, 37, `${style} sits on its point`);
+  }
+});
+
+test('pinShapeSvg: every pin shape has its own drawing', () => {
+  const drawings = PIN_STYLES.map((style) => pinShapeSvg(style, '#ff0000', false));
+  assert.equal(new Set(drawings).size, PIN_STYLES.length);
+  for (const [i, svg] of drawings.entries()) {
+    assert.match(svg, /^<svg viewBox="0 0 30 38" aria-hidden="true">.*<\/svg>$/, PIN_STYLES[i]);
+    assert.match(svg, /fill="#ff0000"/, PIN_STYLES[i]);
+    assert.match(pinShapeSvg(PIN_STYLES[i], '#ff0000', true), /stroke-dasharray/, `${PIN_STYLES[i]} hidden`);
+    assert.doesNotMatch(pinShapeSvg(PIN_STYLES[i], 'red" onload="x', false), /onload/, PIN_STYLES[i]);
+  }
 });
 
 test('pinShapeSvg: one shape per style, dashed when hidden, bad colour replaced', () => {
@@ -111,6 +168,15 @@ test('pinShapeSvg: one shape per style, dashed when hidden, bad colour replaced'
 test('frameInitial: first letter, upper-cased, with a fallback', () => {
   assert.equal(frameInitial('vellmoor Isle'), 'V');
   assert.equal(frameInitial(''), 'M');
+});
+
+test('frameRest: the name after its first letter, whole characters only', () => {
+  assert.equal(frameRest('Vellmoor Isle'), 'ellmoor Isle');
+  assert.equal(frameRest('  Vellmoor'), 'ellmoor', 'leading space is not the first letter');
+  assert.equal(frameRest('V'), '');
+  assert.equal(frameRest(''), '');
+  assert.equal(frameRest(null), '');
+  assert.equal(frameInitial('𝔙ale') + frameRest('𝔙ale'), '𝔙ale', 'a letter outside the basic plane stays whole');
 });
 
 /** Minimal document/element stand-ins for the rest timer. */

@@ -28,7 +28,7 @@ import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
 import { confirmDialog } from './_dialogs.mjs';
 import { userCanSeeMarker } from './_map-flag-filter.mjs';
 import {
-  sanitizeLook, markerIconClass, pinMetrics, pinShapeSvg, frameInitial, groupIconCatalog,
+  sanitizeLook, markerIconClass, pinMetrics, pinShapeSvg, frameInitial, frameRest, groupIconCatalog,
 } from './_map-look.mjs';
 import { startMotionRest } from './_map-motion-rest.mjs';
 
@@ -309,6 +309,7 @@ export class MapViewerSheet extends HandlebarsApplicationMixin(_JournalEntryPage
       mapTitle: meta?.name || this.document.name || '',
       mapTitleUpper: String(meta?.name || this.document.name || '').toUpperCase(),
       mapInitial: frameInitial(meta?.name || this.document.name),
+      mapRest: frameRest(meta?.name || this.document.name),
       frameCorners: ['tl', 'tr', 'br', 'bl'],
     };
   }
