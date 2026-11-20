@@ -176,6 +176,9 @@ function loadLooks() {
   return win.SkyLooks;
 }
 
+// Weather that stays in the sky and never touches the ground.
+const DRY_SKIES = ['clear', 'partly-cloudy', 'cloudy', 'overcast', 'sunbeams', 'red-sky', 'night-clouds', 'butterfly-days', 'dry-lightning'];
+
 test('every weather Chronicle\'s sky draws marks the stone in range, and none is left when it clears', () => {
   const L = loadLooks();
   const ids = Object.keys(L.PHYS);
@@ -187,7 +190,7 @@ test('every weather Chronicle\'s sky draws marks the stone in range, and none is
       if (typeof v === 'number') assert.ok(v >= 0 && v <= 1, `${id}.${k} = ${v}`);
       else if (v && v.k != null) assert.ok(v.k >= 0 && v.k <= 1 && v.c.every((c) => c >= 0 && c <= 255), `${id}.${k}`);
     }
-    if (!['clear', 'partly-cloudy', 'cloudy', 'overcast'].includes(id)) assert.ok(marked(S), `${id} leaves no mark on the stone`);
+    if (!DRY_SKIES.includes(id)) assert.ok(marked(S), `${id} leaves no mark on the stone`);
   }
   assert.equal(marked(SC.stoneWeather(L.resolve(L.spec({ preset_id: 'clear' })))), false, 'clear stone is dry');
   // A campaign's own weather draws like the built-in its icon and precipitation are closest to.
@@ -211,6 +214,17 @@ test('each kind of weather leaves its own mark', () => {
   assert.ok(of('wildfire-smoke').soot > 0.5);
   assert.equal(of('autumn-leaves').litter.kind, 'leaf');
   assert.equal(of('sakura-bloom').litter.kind, 'petal');
+  assert.equal(of('featherfall').litter.kind, 'leaf', 'a feather lies like a leaf');
+  assert.equal(of('thistledown').litter.kind, 'petal', 'down lies like a petal');
+  assert.ok(of('hard-frost').rime > 0.7 && of('bitter-cold').rime > 0.5 && of('freezing-rain').rime > 0.8, 'frost rimes the stone');
+  assert.ok(of('firestorm').soot > 0.7 && of('smog').soot > 0.4);
+  assert.equal(of('firestorm').dew, 0, 'fire leaves the stone dry');
+  assert.equal(of('dry-lightning').wet, 0, 'a storm with no rain leaves it dry');
+  assert.ok(of('sea-spray').wet > 0.3 && !of('sea-spray').dust, 'spray wets the stone and is not grit');
+  assert.ok(of('pollen-haze').dust.c[0] > of('pollen-haze').dust.c[2], 'pollen dusts it yellow');
+  for (const id of ['firefly-dusk', 'fey-lights', 'wisp-lights', 'dreamfog', 'sky-rift', 'star-rain', 'glimmersnow', 'witchfire', 'brimstone']) {
+    assert.ok(of(id).glow && of(id).glow.c.length === 3, id + ' glows out of the cracks');
+  }
   const acid = of('acid-rain').drip;
   assert.ok(acid[1] > acid[0] && acid[1] > acid[2], 'acid rain runs green');
   const blood = of('blood-rain').drip;
