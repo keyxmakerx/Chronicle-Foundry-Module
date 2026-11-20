@@ -232,11 +232,21 @@ const GLOWS = {
   sigils: (R) => R.sigils[0]?.c, motes: (R) => R.parts[0]?.c, sparks: (R) => R.parts[0]?.c2,
   embers: (R) => R.parts[0]?.c, meteors: (R) => R.fire[0]?.c, miasma: (R) => R.air[0]?.c,
   spores: (R) => R.parts[0]?.c,
+  fireflies: (R) => R.parts[0]?.c, 'fey-lights': () => '#bff5e6', wisps: (R) => R.parts[0]?.c,
+  dreamfog: (R) => R.air[1]?.c, rift: (R) => R.parts[0]?.c, 'star-rain': (R) => R.parts[0]?.c,
+  'snow-glow': (R) => R.parts[0]?.c, witchfire: (R) => R.parts[0]?.c, brimstone: (R) => R.parts[0]?.c,
 };
 
 /** Particles that settle on the stone's tops as dust, and ones that come to rest on it whole. */
 const DUSTS = { grain: 1, ash: 1, debris: 0.8 };
-const LITTER = { leaf: 1, petal: 1 };
+/** Each resting particle and the shape it lies in: down lies like a petal, a feather like a leaf. */
+const LITTER = { leaf: 'leaf', petal: 'petal', fluff: 'petal', feather: 'leaf' };
+/** Frost along every edge, by the effect that brings it. */
+const RIMES = { ice: 0.9, 'snow-heavy': 0.4, frost: 0.8, 'diamond-dust': 0.6, 'freezing-rain': 0.9 };
+/** Smoke and fire that darken the stone. */
+const SOOTS = { smoke: 0.6, ashfall: 0.35, embers: 0.25, firestorm: 0.8, cinders: 0.5, brimstone: 0.45, smog: 0.5 };
+/** Effects whose grains are not grit: spray wets the stone, and a storm with no rain leaves it dry. */
+const SPRAY = { 'sea-spray': 0.45 };
 
 /**
  * How a weather marks the stone figure, read from the sky's own recipe for it
@@ -260,16 +270,18 @@ export function stoneWeather(R) {
   const fx = Array.isArray(R.effects) ? R.effects : [];
   const parts = Array.isArray(R.parts) ? R.parts : [];
   const has = (id) => fx.includes(id);
-  S.wet = clamp01(0.8 * (R.rain || 0) + 0.3 * (R.hail || 0) + 0.2 * (R.storm || 0));
+  const sum = (table) => clamp01(fx.reduce((n, id) => n + (table[id] || 0), 0));
+  S.wet = has('dry-lightning') ? 0 : clamp01(0.8 * (R.rain || 0) + 0.3 * (R.hail || 0) + 0.2 * (R.storm || 0) + sum(SPRAY));
   if (S.wet > 0) S.drip = hexRgb(R.rainTint?.[0]) || [200, 214, 238];
   S.snow = clamp01(R.snow);
   S.hail = clamp01(R.hail);
-  S.rime = clamp01((has('ice') ? 0.9 : 0) + (has('snow-heavy') ? 0.4 : 0));
+  S.rime = sum(RIMES);
   for (const p of parts) {
-    if (DUSTS[p.p] && !S.dust) S.dust = { c: hexRgb(p.c) || [150, 140, 120], k: clamp01((p.a ?? 1) * DUSTS[p.p] * (p.mode === 'blow' && p.n < 60 ? 0.45 : 1)) };
-    if (LITTER[p.p] && !S.litter) S.litter = { kind: p.p, c: hexRgb(p.c) || [190, 110, 50], c2: hexRgb(p.c2) || hexRgb(p.c) || [220, 160, 60], k: clamp01(p.a ?? 1) };
+    if (SPRAY[p.fx]) continue;
+    if ((DUSTS[p.p] || p.fx === 'pollen') && !S.dust) S.dust = { c: hexRgb(p.c) || [150, 140, 120], k: clamp01((p.a ?? 1) * (DUSTS[p.p] || 0.6) * (p.mode === 'blow' && p.n < 60 ? 0.45 : 1)) };
+    if (LITTER[p.p] && !S.litter) S.litter = { kind: LITTER[p.p], c: hexRgb(p.c) || [190, 110, 50], c2: hexRgb(p.c2) || hexRgb(p.c) || [220, 160, 60], k: clamp01(p.a ?? 1) };
   }
-  S.soot = clamp01((has('smoke') ? 0.6 : 0) + (has('ashfall') ? 0.35 : 0) + (has('embers') ? 0.25 : 0));
+  S.soot = sum(SOOTS);
   for (const id of fx) {
     const pick = GLOWS[id];
     const c = pick && hexRgb(pick({ aurora: [], air: [], parts: [], sigils: [], fire: [], ...R }));
