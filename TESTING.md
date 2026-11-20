@@ -80,6 +80,11 @@ Needs a player client matched to a Chronicle member (Settings, Players), a GM in
 - [ ] As the player, rewrite a deleted journal's link to a different page (console: `journal.setFlag('chronicle-sync','entityId',...)` before deleting) -> no direct delete; the card's Send shows "In Chronicle this is the page X. Send it anyway?" and waits for a second press
 - [ ] A player posting a chat message with the card's markup gets no working buttons for anyone
 
+### A player's hero picks (security)
+Needs a Draw Steel world, a player client matched to a Chronicle member who claimed a hero, and a GM in the game.
+- [ ] Draw Steel world, Chronicle with a hero-choice rule marking a class "Not here" for the player: as that player, drag that class onto their claimed hero, then change stamina -> Chronicle takes the stamina and keeps the old class; the GM gets one notice naming why; the player's class item stays in Foundry; changing stamina again repeats no notice
+- [ ] Same player, an allowed class and stamina -> both reach Chronicle, no notice
+
 ### Multi-Page Sync
 - [ ] Page with h1/h2 headings creates multiple Foundry journal pages
 - [ ] Page without headings creates single "Content" page

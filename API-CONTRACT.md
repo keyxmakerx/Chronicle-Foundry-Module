@@ -320,6 +320,18 @@ Updates only `fields_data`. Chronicle with keyxmakerx/Chronicle#927 merges the s
 { "fields_data": { "hp_current": 45, "str": 18, "level": 5 } }
 ```
 
+**A player's change.** The module sends a player's edit under the GM's key. It adds `actingUserId`, the Chronicle member id the player is matched to (`userMappings`), only after checking the character is that member's:
+```json
+{ "fields_data": { "stamina": 30, "class": "Wizard" }, "actingUserId": "<member id>" }
+```
+Chronicle then judges the write as that member with the web door's hero-choice check (pick lists, hero-choice rules, typed text on a limited step, required steps; an ask-first pick is held, not stored). It stores the keys that pass and answers the rest:
+```json
+{ "status": "ok", "held": [ { "key": "class", "reason": "\"Wizard\" is not on the class list" } ] }
+```
+`held` is absent when nothing was held. A held key is not an error: the module leaves the player's change in Foundry, tells the GM the `reason` once, and never writes anything back for it. A member who does not own the page, or is not in the campaign, is a 403; a Scribe, Director or Co-DM author, or no `actingUserId`, is judged as the key's own user and holds nothing. A Chronicle from before this field ignores it and stores everything, so a player's picks there are not checked.
+
+Re-verify by: 2027-01-15 (Chronicle `internal/plugins/syncapi/acting_player.go` `judgeActingPlayer`, `internal/plugins/entities/owner_picks_check.go` `PlayerPicksHeld`)
+
 #### GET /entities/:entityId/permissions
 Returns entity permission/visibility settings.
 

@@ -32,6 +32,7 @@ import { applyIdentityPlan, applyEntryRefresh } from './_identity-item-apply.mjs
 import { planEntryRefresh } from './_campaign-entry-item.mjs';
 import { sendsChangeHere, memberOf, ownsCharacter } from './_change-author.mjs';
 import { ASK, askModel, sameName } from './_player-asks.mjs';
+import { actingMemberOf, heldKeysOf, describeHeld, HeldNotices } from './_player-picks-held.mjs';
 import { getPlayerAsks, playerName } from './player-asks.mjs';
 import { planLayerEffects, layeredFieldKeys, storedLayers, LAYER_FLAG } from './_layer-effects.mjs';
 import { bringsInActor } from './_actor-catch-up.mjs';
@@ -95,6 +96,8 @@ export class ActorSync {
     this._pendingPlayers = new Map();
     /** @type {Set<string>} Actors the GM was already told hold a player's unsent change. */
     this._warnedPlayerChange = new Set();
+    /** Picks Chronicle held from a player's change, told to the GM once per distinct refusal. */
+    this._heldNotices = new HeldNotices();
     /** @type {Map<string, object>} Diffs whose push is in flight, by actor id. */
     this._pushingChanges = new Map();
     this._actorPushDebouncer = new JournalPushDebouncer(
@@ -1251,7 +1254,12 @@ export class ActorSync {
         : (change.system ? this._adapter.toChronicleFields(actor) : null));
 
       if (fields && Object.keys(fields).length > 0) {
-        await this._putFieldsMerged(entityId, fields);
+        // A player's change is judged by Chronicle as that player: the keys
+        // it will not take come back as `held` and stay as the player made
+        // them in Foundry.
+        const acting = actingMemberOf(players, (id) => memberOf(getUserMappings(), id));
+        const answer = await this._putFieldsMerged(entityId, fields, acting);
+        this._tellHeld(actor, heldKeysOf(answer));
         await this._refreshChronicleVersion(actor, entityId);
       }
 
@@ -1298,14 +1306,36 @@ export class ActorSync {
    * partial set wiping the rest on an older server.
    * @param {string} entityId
    * @param {object} fields
+   * @param {string|null} [actingUserId] - Chronicle member a player's change is for.
+   * @returns {Promise<any>} Chronicle's answer, which names any `held` keys.
    * @private
    */
-  async _putFieldsMerged(entityId, fields) {
+  async _putFieldsMerged(entityId, fields, actingUserId = null) {
     const current = (await this._api.get(`/entities/${entityId}`))?.fields_data;
     const merged = current && typeof current === 'object' && !Array.isArray(current)
       ? { ...current, ...fields }
       : fields;
-    await this._api.put(`/entities/${entityId}/fields`, { fields_data: merged });
+    return this._api.put(`/entities/${entityId}/fields`, {
+      fields_data: merged,
+      ...(actingUserId ? { actingUserId } : {}),
+    });
+  }
+
+  /**
+   * Tell the GM which of a player's picks Chronicle did not take, and why.
+   * The change stays in Foundry (sync never undoes a player's item), so
+   * nothing is written back and nothing can loop. Told once per distinct
+   * answer per actor.
+   * @param {Actor} actor
+   * @param {Array<{key: string, reason: string}>} held
+   * @private
+   */
+  _tellHeld(actor, held) {
+    if (!this._heldNotices.shouldTell(actor.id, held)) return;
+    ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.PlayerPicksHeld', {
+      actor: noticeText(actor.name),
+      reasons: noticeText(describeHeld(held)),
+    }));
   }
 
   /**
