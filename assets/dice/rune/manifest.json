@@ -588,6 +588,666 @@
           "edge": "#07080c"
         }
       ]
+    },
+    {
+      "id": "damascus",
+      "name": "Damascus steel",
+      "material": "metal",
+      "colours": [
+        {
+          "id": "watered",
+          "name": "Watered steel and gold",
+          "foreground": "#efc257",
+          "background": "#6f737b",
+          "outline": "#000000",
+          "edge": "#2c2e33"
+        },
+        {
+          "id": "blued",
+          "name": "Blued steel and silver",
+          "foreground": "#e6ebf3",
+          "background": "#223778",
+          "outline": "#000000",
+          "edge": "#0c102c"
+        },
+        {
+          "id": "mokume",
+          "name": "Copper and silver mokume",
+          "foreground": "#f0f1f3",
+          "background": "#a86c48",
+          "outline": "#000000",
+          "edge": "#502712"
+        },
+        {
+          "id": "black",
+          "name": "Black damascus and copper",
+          "foreground": "#e88f58",
+          "background": "#24262c",
+          "outline": "#000000",
+          "edge": "#060708"
+        },
+        {
+          "id": "star",
+          "name": "Star iron and gold",
+          "foreground": "#f2c860",
+          "background": "#8c9199",
+          "outline": "#000000",
+          "edge": "#40444a"
+        },
+        {
+          "id": "rose",
+          "name": "Rose bronze and ivory",
+          "foreground": "#fbf1dc",
+          "background": "#b07869",
+          "outline": "#000000",
+          "edge": "#522a26"
+        }
+      ]
+    },
+    {
+      "id": "cloisonne",
+      "name": "Cloisonné",
+      "material": "pristine",
+      "colours": [
+        {
+          "id": "imperial",
+          "name": "Imperial blue",
+          "foreground": "#f0c860",
+          "background": "#2040a6",
+          "outline": "#000000",
+          "edge": "#0a174c"
+        },
+        {
+          "id": "jade",
+          "name": "Jade garden",
+          "foreground": "#f0c860",
+          "background": "#107b59",
+          "outline": "#000000",
+          "edge": "#043425"
+        },
+        {
+          "id": "vermilion",
+          "name": "Vermilion",
+          "foreground": "#f6d470",
+          "background": "#b42c1f",
+          "outline": "#000000",
+          "edge": "#520e08"
+        },
+        {
+          "id": "plum",
+          "name": "Plum blossom",
+          "foreground": "#f0c860",
+          "background": "#501e7a",
+          "outline": "#000000",
+          "edge": "#1e0930"
+        },
+        {
+          "id": "snow",
+          "name": "Snow and sapphire",
+          "foreground": "#f0c860",
+          "background": "#e8e1cc",
+          "outline": "#000000",
+          "edge": "#9b937e"
+        },
+        {
+          "id": "onyx",
+          "name": "Onyx and silver",
+          "foreground": "#e6eaf0",
+          "background": "#1e2026",
+          "outline": "#000000",
+          "edge": "#060708"
+        }
+      ]
+    },
+    {
+      "id": "kintsugi",
+      "name": "Kintsugi",
+      "material": "pristine",
+      "colours": [
+        {
+          "id": "porcelain",
+          "name": "White porcelain and gold",
+          "foreground": "#1f2f7a",
+          "background": "#efece2",
+          "outline": "#ffffff",
+          "edge": "#a29e93"
+        },
+        {
+          "id": "celadon",
+          "name": "Celadon and gold",
+          "foreground": "#e9bb4a",
+          "background": "#9fc5b0",
+          "outline": "#000000",
+          "edge": "#537766"
+        },
+        {
+          "id": "raku",
+          "name": "Black raku and gold",
+          "foreground": "#f0c558",
+          "background": "#24262c",
+          "outline": "#000000",
+          "edge": "#060708"
+        },
+        {
+          "id": "cobalt",
+          "name": "Cobalt and gold",
+          "foreground": "#f0c558",
+          "background": "#2240a2",
+          "outline": "#000000",
+          "edge": "#081445"
+        },
+        {
+          "id": "oxblood",
+          "name": "Oxblood and silver",
+          "foreground": "#e8ecf2",
+          "background": "#7f1717",
+          "outline": "#000000",
+          "edge": "#2e0507"
+        },
+        {
+          "id": "robin",
+          "name": "Robin egg and copper",
+          "foreground": "#c56a34",
+          "background": "#86c5c0",
+          "outline": "#000000",
+          "edge": "#387470"
+        }
+      ]
+    },
+    {
+      "id": "leather",
+      "name": "Tooled leather",
+      "material": "velvet",
+      "colours": [
+        {
+          "id": "saddle",
+          "name": "Saddle tan and gold",
+          "foreground": "#eec35a",
+          "background": "#9d622e",
+          "outline": "#000000",
+          "edge": "#502c0f"
+        },
+        {
+          "id": "oxblood",
+          "name": "Oxblood and gold",
+          "foreground": "#eec35a",
+          "background": "#6a1c20",
+          "outline": "#000000",
+          "edge": "#2c0809"
+        },
+        {
+          "id": "black",
+          "name": "Black and silver",
+          "foreground": "#e3e8f0",
+          "background": "#212125",
+          "outline": "#000000",
+          "edge": "#080809"
+        },
+        {
+          "id": "forest",
+          "name": "Forest green and brass",
+          "foreground": "#e0bd5c",
+          "background": "#244c30",
+          "outline": "#000000",
+          "edge": "#0c2013"
+        },
+        {
+          "id": "navy",
+          "name": "Navy and copper",
+          "foreground": "#e28a55",
+          "background": "#1d2d5a",
+          "outline": "#000000",
+          "edge": "#091024"
+        },
+        {
+          "id": "natural",
+          "name": "Natural hide and silver",
+          "foreground": "#5a3a1c",
+          "background": "#cdaa80",
+          "outline": "#ffffff",
+          "edge": "#7c5d39"
+        }
+      ]
+    },
+    {
+      "id": "runestone",
+      "name": "Runestone",
+      "material": "stone",
+      "colours": [
+        {
+          "id": "granite",
+          "name": "Grey granite and red ochre",
+          "foreground": "#c23a1e",
+          "background": "#8b8d91",
+          "outline": "#ffffff",
+          "edge": "#444548"
+        },
+        {
+          "id": "basalt",
+          "name": "Black basalt and woad",
+          "foreground": "#4a9af0",
+          "background": "#33363a",
+          "outline": "#000000",
+          "edge": "#0f1011"
+        },
+        {
+          "id": "sandstone",
+          "name": "Sandstone and soot",
+          "foreground": "#2a2018",
+          "background": "#c0a275",
+          "outline": "#ffffff",
+          "edge": "#6f5738"
+        },
+        {
+          "id": "slate",
+          "name": "Blue slate and chalk",
+          "foreground": "#f2f0e8",
+          "background": "#4d5b70",
+          "outline": "#000000",
+          "edge": "#1d2530"
+        },
+        {
+          "id": "moss",
+          "name": "Mossy greenstone and gold",
+          "foreground": "#e8c050",
+          "background": "#587356",
+          "outline": "#000000",
+          "edge": "#213021"
+        },
+        {
+          "id": "redstone",
+          "name": "Red sandstone and bone white",
+          "foreground": "#f6efe0",
+          "background": "#974733",
+          "outline": "#000000",
+          "edge": "#44180f"
+        }
+      ]
+    },
+    {
+      "id": "arcana",
+      "name": "Arcana",
+      "material": "velvet",
+      "colours": [
+        {
+          "id": "midnight",
+          "name": "Midnight and gold",
+          "foreground": "#edc358",
+          "background": "#13204f",
+          "outline": "#000000",
+          "edge": "#05091b"
+        },
+        {
+          "id": "ivory",
+          "name": "Ivory and gold",
+          "foreground": "#1c1a22",
+          "background": "#e8e0ca",
+          "outline": "#ffffff",
+          "edge": "#9b927a"
+        },
+        {
+          "id": "crimson",
+          "name": "Crimson and gold",
+          "foreground": "#edc358",
+          "background": "#5f1119",
+          "outline": "#000000",
+          "edge": "#210407"
+        },
+        {
+          "id": "void",
+          "name": "Black and silver",
+          "foreground": "#dfe5ee",
+          "background": "#19191f",
+          "outline": "#000000",
+          "edge": "#040405"
+        },
+        {
+          "id": "emerald",
+          "name": "Emerald and rose gold",
+          "foreground": "#eda886",
+          "background": "#0d3e2e",
+          "outline": "#000000",
+          "edge": "#03140e"
+        },
+        {
+          "id": "prism",
+          "name": "Black and rainbow foil",
+          "foreground": "#c9b8ff",
+          "background": "#14111b",
+          "outline": "#000000",
+          "edge": "#030204"
+        }
+      ]
+    },
+    {
+      "id": "relic",
+      "name": "Relic coin",
+      "material": "metal",
+      "colours": [
+        {
+          "id": "bronze",
+          "name": "Bronze and verdigris",
+          "foreground": "#e6b877",
+          "background": "#9c6d38",
+          "outline": "#000000",
+          "edge": "#44280f"
+        },
+        {
+          "id": "silver",
+          "name": "Tarnished silver",
+          "foreground": "#e6eaf0",
+          "background": "#9fa5b1",
+          "outline": "#000000",
+          "edge": "#40454e"
+        },
+        {
+          "id": "gold",
+          "name": "Hoard gold",
+          "foreground": "#f6d470",
+          "background": "#cb9d38",
+          "outline": "#000000",
+          "edge": "#684509"
+        },
+        {
+          "id": "iron",
+          "name": "Iron and rust",
+          "foreground": "#c9ced6",
+          "background": "#585b61",
+          "outline": "#000000",
+          "edge": "#1a1b1e"
+        },
+        {
+          "id": "copper",
+          "name": "Copper and sea green",
+          "foreground": "#f0a070",
+          "background": "#ab5c38",
+          "outline": "#000000",
+          "edge": "#461b0c"
+        },
+        {
+          "id": "orichalc",
+          "name": "Sunken orichalcum",
+          "foreground": "#f4c6c2",
+          "background": "#bd8684",
+          "outline": "#000000",
+          "edge": "#522a30"
+        }
+      ]
+    },
+    {
+      "id": "agate",
+      "name": "Banded agate",
+      "material": "stone",
+      "colours": [
+        {
+          "id": "lace",
+          "name": "Blue lace and silver",
+          "foreground": "#e9edf4",
+          "background": "#94b2dc",
+          "outline": "#000000",
+          "edge": "#3b5a8c"
+        },
+        {
+          "id": "fire",
+          "name": "Fire agate and gold",
+          "foreground": "#efc257",
+          "background": "#b85028",
+          "outline": "#000000",
+          "edge": "#520f06"
+        },
+        {
+          "id": "moss",
+          "name": "Moss agate and gold",
+          "foreground": "#efc257",
+          "background": "#447859",
+          "outline": "#000000",
+          "edge": "#0e2c1c"
+        },
+        {
+          "id": "botswana",
+          "name": "Botswana pink and silver",
+          "foreground": "#f2f2f6",
+          "background": "#9c858d",
+          "outline": "#000000",
+          "edge": "#38333c"
+        },
+        {
+          "id": "grape",
+          "name": "Grape agate and gold",
+          "foreground": "#efc257",
+          "background": "#6c499e",
+          "outline": "#000000",
+          "edge": "#200c3c"
+        },
+        {
+          "id": "onyx",
+          "name": "Sardonyx and gold",
+          "foreground": "#efc257",
+          "background": "#48474a",
+          "outline": "#000000",
+          "edge": "#080809"
+        }
+      ]
+    },
+    {
+      "id": "neon",
+      "name": "Neon",
+      "material": "plastic",
+      "colours": [
+        {
+          "id": "arcade",
+          "name": "Pink and cyan",
+          "foreground": "#ff5ac4",
+          "background": "#281028",
+          "outline": "#000000",
+          "edge": "#050408"
+        },
+        {
+          "id": "ice",
+          "name": "Ice blue and white",
+          "foreground": "#5ab8ff",
+          "background": "#0f1c34",
+          "outline": "#000000",
+          "edge": "#040508"
+        },
+        {
+          "id": "toxic",
+          "name": "Acid green and violet",
+          "foreground": "#8aff4a",
+          "background": "#142810",
+          "outline": "#000000",
+          "edge": "#040504"
+        },
+        {
+          "id": "sunset",
+          "name": "Orange and magenta",
+          "foreground": "#ff9a3a",
+          "background": "#34180c",
+          "outline": "#000000",
+          "edge": "#080404"
+        },
+        {
+          "id": "ultraviolet",
+          "name": "Violet and gold",
+          "foreground": "#b07aff",
+          "background": "#1d1038",
+          "outline": "#000000",
+          "edge": "#040408"
+        },
+        {
+          "id": "ghost",
+          "name": "White and red",
+          "foreground": "#f4f6ff",
+          "background": "#242429",
+          "outline": "#000000",
+          "edge": "#040405"
+        }
+      ]
+    },
+    {
+      "id": "amber",
+      "name": "Amber",
+      "material": "resin",
+      "colours": [
+        {
+          "id": "honey",
+          "name": "Honey amber",
+          "foreground": "#fff6dc",
+          "background": "#ecb85f",
+          "outline": "#000000",
+          "edge": "#975c0c"
+        },
+        {
+          "id": "cognac",
+          "name": "Cognac amber",
+          "foreground": "#ffe9c4",
+          "background": "#bc6933",
+          "outline": "#000000",
+          "edge": "#5c2106"
+        },
+        {
+          "id": "cherry",
+          "name": "Cherry amber",
+          "foreground": "#ffd98a",
+          "background": "#a73431",
+          "outline": "#000000",
+          "edge": "#44090a"
+        },
+        {
+          "id": "green",
+          "name": "Green amber",
+          "foreground": "#fbffe0",
+          "background": "#a7b955",
+          "outline": "#000000",
+          "edge": "#45540c"
+        },
+        {
+          "id": "blue",
+          "name": "Blue amber",
+          "foreground": "#f0f8ff",
+          "background": "#6593dc",
+          "outline": "#000000",
+          "edge": "#103074"
+        },
+        {
+          "id": "butter",
+          "name": "Butterscotch amber",
+          "foreground": "#4a2408",
+          "background": "#f1d791",
+          "outline": "#ffffff",
+          "edge": "#a27e2c"
+        }
+      ]
+    },
+    {
+      "id": "botanical",
+      "name": "Pressed flowers",
+      "material": "glass",
+      "colours": [
+        {
+          "id": "meadow",
+          "name": "Wild meadow",
+          "foreground": "#1e2a22",
+          "background": "#f4faf6",
+          "outline": "#ffffff",
+          "edge": "#9baba2"
+        },
+        {
+          "id": "rose",
+          "name": "Rose garden",
+          "foreground": "#fff6f0",
+          "background": "#fff0f3",
+          "outline": "#000000",
+          "edge": "#b78a94"
+        },
+        {
+          "id": "lavender",
+          "name": "Lavender field",
+          "foreground": "#2a1c4a",
+          "background": "#f4f0fc",
+          "outline": "#ffffff",
+          "edge": "#9e93b2"
+        },
+        {
+          "id": "fern",
+          "name": "Fern hollow",
+          "foreground": "#12301c",
+          "background": "#ecf8ec",
+          "outline": "#ffffff",
+          "edge": "#8aa58d"
+        },
+        {
+          "id": "autumn",
+          "name": "Autumn walk",
+          "foreground": "#3a1a08",
+          "background": "#fff4e2",
+          "outline": "#ffffff",
+          "edge": "#b4946c"
+        },
+        {
+          "id": "night",
+          "name": "Night garden",
+          "foreground": "#f2f4ff",
+          "background": "#3a4068",
+          "outline": "#000000",
+          "edge": "#090a15"
+        }
+      ]
+    },
+    {
+      "id": "clockwork",
+      "name": "Clockwork",
+      "material": "metal",
+      "colours": [
+        {
+          "id": "brass",
+          "name": "Brass and blued steel",
+          "foreground": "#1c2c7a",
+          "background": "#be953c",
+          "outline": "#ffffff",
+          "edge": "#5c3f0f"
+        },
+        {
+          "id": "steel",
+          "name": "Steel and brass",
+          "foreground": "#101218",
+          "background": "#9fa5af",
+          "outline": "#ffffff",
+          "edge": "#3e424b"
+        },
+        {
+          "id": "copper",
+          "name": "Copper and verdigris",
+          "foreground": "#0f5a4c",
+          "background": "#ae643e",
+          "outline": "#ffffff",
+          "edge": "#461e0e"
+        },
+        {
+          "id": "gunmetal",
+          "name": "Gunmetal and gold",
+          "foreground": "#f0c558",
+          "background": "#373b44",
+          "outline": "#000000",
+          "edge": "#0d0e10"
+        },
+        {
+          "id": "rose",
+          "name": "Rose gold and ivory",
+          "foreground": "#fff6e8",
+          "background": "#c38b7c",
+          "outline": "#000000",
+          "edge": "#5c302a"
+        },
+        {
+          "id": "bronze",
+          "name": "Dark bronze and jade",
+          "foreground": "#5fe0b0",
+          "background": "#644720",
+          "outline": "#000000",
+          "edge": "#1e1208"
+        }
+      ]
     }
   ]
 }

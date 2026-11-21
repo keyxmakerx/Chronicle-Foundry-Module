@@ -27,6 +27,8 @@ export const GROUP = 'Chronicle Rune';
 export const RUNE_SET_IDS = Object.freeze([
   'jewelled', 'confetti', 'acrylic', 'cage', 'heartlight', 'gothic',
   'obsidian', 'moonstone', 'oak', 'nebula', 'bone', 'scale',
+  'damascus', 'cloisonne', 'kintsugi', 'leather', 'runestone', 'arcana',
+  'relic', 'agate', 'neon', 'amber', 'botanical', 'clockwork',
 ]);
 
 /** Die types Chronicle rolls; Dice So Nice knows each one. */
@@ -237,12 +239,24 @@ export const CRITS = Object.freeze([
   { id: 'starfall', name: 'Starfall', kind: 'succ' },
   { id: 'bloom', name: 'Wildbloom', kind: 'succ' },
   { id: 'hoard', name: "Dragon's hoard", kind: 'succ' },
+  { id: 'koi', name: 'Dragon gate', kind: 'succ' },
+  { id: 'prism', name: 'Prismatic', kind: 'succ' },
+  { id: 'festival', name: 'Festival', kind: 'succ' },
+  { id: 'encore', name: "Bard's encore", kind: 'succ' },
+  { id: 'fortune', name: "Fortune's hand", kind: 'succ' },
+  { id: 'flutter', name: 'Flutter', kind: 'succ' },
   { id: 'grasp', name: 'Eldritch grasp', kind: 'fail' },
   { id: 'frost', name: 'Frostbite', kind: 'fail' },
   { id: 'shatter', name: 'Shatter', kind: 'fail' },
   { id: 'hex', name: 'Hex', kind: 'fail' },
   { id: 'crows', name: 'Murder of crows', kind: 'fail' },
   { id: 'abyss', name: 'The abyss', kind: 'fail' },
+  { id: 'mimic', name: 'Mimic', kind: 'fail' },
+  { id: 'engulf', name: 'Engulfed', kind: 'fail' },
+  { id: 'omen', name: 'Ill omen', kind: 'fail' },
+  { id: 'shackle', name: 'Shackled', kind: 'fail' },
+  { id: 'melt', name: 'Meltdown', kind: 'fail' },
+  { id: 'dust', name: 'Dust', kind: 'fail' },
 ]);
 
 /** Chronicle's default picks, used when a crit die names none or an unknown one. */

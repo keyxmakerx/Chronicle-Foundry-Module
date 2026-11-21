@@ -46,7 +46,7 @@ root. There is no `package.json`.
 - [ ] With Dice So Nice 6.x on: the same pane shows "Working", the version, and "calls for adding dice are all there"; "Check dice files" adds "All N dice files are where they should be" (or "No rune dice sets are shipped" while the list is empty)
 - [ ] With rune sets shipped: Dice So Nice's settings (the dice icon in chat) list a "Chronicle Rune" group under dice and themes, on a player's client too
 - [ ] A player with Dice So Nice turned off in its own settings, or with Foundry's canvas off, still sees the roll card
-- [ ] Dice So Nice's settings → Special Effects: a new player has two "Chronicle crit" lines (six success crits → sparkles, six fail crits → dark); the trigger's result list names all 12 crits
+- [ ] Dice So Nice's settings → Special Effects: a new player has two "Chronicle crit" lines (twelve success crits → sparkles, twelve fail crits → dark); the trigger's result list names all 24 crits
 
 ## Journal Sync (Pages)
 
