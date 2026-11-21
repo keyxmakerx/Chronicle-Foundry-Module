@@ -11,6 +11,13 @@ import { isPublicJwk } from './_stash-crypto.mjs';
 /** Socket message type for showing and hiding a shop room to players. */
 export const SHOP_ROOM_MESSAGE = 'shop-room';
 
+/** Chronicle's shop room files under vendor/chronicle/, in load order. The parts packs add to the counter's tables, so they follow it and precede the widget. */
+export const SHOP_ROOM_FILES = [
+  'shop_room_icons.js', 'shop_room_paper.js', 'shop_room_counter.js',
+  'shop_room_parts_strange.js', 'shop_room_parts_trades.js', 'shop_room_parts_places.js',
+  'shop_room_keeper.js', 'shop_room.js',
+];
+
 // Limits on a shown shop, well above anything Chronicle saves (its room
 // layout is capped at 64 KiB), so a bad message cannot stall a client.
 const MAX_GOODS = 500;

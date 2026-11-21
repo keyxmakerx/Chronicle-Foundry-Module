@@ -28,7 +28,7 @@ import { loadVendored } from './vendor-chronicle.mjs';
 import { makeAskLimiter } from './_quest-relay.mjs';
 import {
   describeSale, sanitizeShopBuyReply, sanitizeShopBuyRequest,
-  sanitizeShopRoomMessage, shopEndpoints, MAX_ROOM_REPLY_CHARS, SHOP_ROOM_MESSAGE,
+  sanitizeShopRoomMessage, shopEndpoints, MAX_ROOM_REPLY_CHARS, SHOP_ROOM_FILES, SHOP_ROOM_MESSAGE,
 } from './_shop-room-data.mjs';
 
 /** Each buying request spends the GM's key and rate budget; a looping client is cut off. */
@@ -100,7 +100,7 @@ async function requestFromGM(shopId, action, body) {
 function loadShopRoomWidget() {
   if (widgetLoad) return widgetLoad;
   widgetLoad = (async () => {
-    shim = await loadVendored(['shop_room_icons.js', 'shop_room_paper.js', 'shop_room_counter.js', 'shop_room_keeper.js', 'shop_room.js']);
+    shim = await loadVendored(SHOP_ROOM_FILES);
     const def = shim.widgets.get('shop_room');
     if (!def) throw new Error('shop room widget did not register');
     return def;
