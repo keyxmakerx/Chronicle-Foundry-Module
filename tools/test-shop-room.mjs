@@ -22,7 +22,7 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const VENDOR = join(REPO_ROOT, 'vendor', 'chronicle');
 const {
   createChronicleShim, describeSale, MAX_ROOM_REPLY_CHARS, sanitizeShopBuyReply, sanitizeShopBuyRequest,
-  sanitizeShopRoomMessage, shopEndpoints, SHOP_ROOM_MESSAGE,
+  sanitizeShopRoomMessage, shopEndpoints, SHOP_ROOM_FILES, SHOP_ROOM_MESSAGE,
 } = await import('../scripts/_shop-room-data.mjs');
 
 const API_URL = 'https://chronicle.example.com';
@@ -240,10 +240,70 @@ test('vendored drawing engine runs and draws a room', () => {
   for (const u of used) assert.ok(defined.has(u), `${u} has no symbol`);
 });
 
+const PACKS = ['shop_room_parts_strange.js', 'shop_room_parts_trades.js', 'shop_room_parts_places.js'];
+
+test('the parts packs load straight after the counter, in order, and are all vendored', () => {
+  const at = SHOP_ROOM_FILES.indexOf('shop_room_counter.js');
+  assert.ok(at >= 0);
+  assert.deepEqual(SHOP_ROOM_FILES.slice(at + 1, at + 1 + PACKS.length), PACKS);
+  for (const f of SHOP_ROOM_FILES) assert.ok(existsSync(join(VENDOR, f)), `${f} is not in vendor/chronicle/`);
+});
+
+// Runs the counter room's files in a sandbox with a stand-in page, and draws a room
+// saved with the given starter. Returns the room's SVG and the counter's own tables.
+function drawCounterRoom(files, starterName, saved) {
+  const el = () => ({
+    style: {}, classList: { add() {}, remove() {}, toggle() {} }, innerHTML: '', isConnected: true, hidden: false,
+    setAttribute() {}, getAttribute() { return null; }, appendChild(c) { return c; }, insertBefore(c) { return c; },
+    querySelector: () => el(), querySelectorAll: () => [], addEventListener() {}, removeEventListener() {}, remove() {},
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 1200, height: 700, right: 1200, bottom: 700 }),
+    get firstChild() { return el(); }, set textContent(v) {},
+  });
+  let svg = '';
+  const doc = {
+    documentElement: { getAttribute: () => null }, head: el(), getElementById: () => null, createElement: el,
+    // The room sets the scene's markup on the one <svg> it makes; no layer has a box to bake here.
+    createElementNS: () => { const e = el(); Object.defineProperty(e, 'innerHTML', { set(v) { svg = v; }, get() { return svg; } }); return e; },
+    addEventListener() {}, removeEventListener() {},
+  };
+  const sandbox = { document: doc, setTimeout: () => 0, clearTimeout() {}, requestAnimationFrame: () => 0, cancelAnimationFrame() {} };
+  sandbox.window = sandbox;
+  vm.createContext(sandbox);
+  for (const f of files) vm.runInContext(readFileSync(join(VENDOR, f), 'utf8'), sandbox, { filename: f });
+  const C = sandbox.ShopRoomCounter;
+  const starter = saved || C.starters.find((s) => s.name === starterName);
+  if (!starter) return { C, starter: null, svg: '' };
+  C.render(el(), { its: [], basket: {}, icons: {}, name: 'Shop', roomType: 'general', counter: starter }, { canAdd: () => true });
+  return { C, starter, svg };
+}
+
+test('a room saved with a pack part (The Taproom) draws with that part in the shop room window', () => {
+  const win = drawCounterRoom(SHOP_ROOM_FILES.filter((f) => /^shop_room_(icons|counter|parts_.*)\.js$/.test(f)), 'The Taproom');
+  assert.ok(win.starter, 'the packs add The Taproom');
+  // The saved parts survive normalising instead of falling back to the plain counter's.
+  assert.equal(JSON.stringify(win.C.normalise(win.starter).skeleton), JSON.stringify({ shape: 'taproom', opening: 'hearth', display: 'casks', counter: 'bar' }));
+  assert.ok(win.svg.length > 1000, 'the room draws');
+  // The same room without the packs falls back part by part, so it draws differently.
+  const bare = drawCounterRoom(['shop_room_icons.js', 'shop_room_counter.js'], 'The Taproom');
+  assert.equal(bare.starter, null, 'the plain counter has no Taproom');
+  const plain = drawCounterRoom(['shop_room_icons.js', 'shop_room_counter.js'], '', win.starter).svg;
+  assert.ok(plain.length > 1000, 'the same saved room still draws without the packs');
+  assert.notEqual(win.svg, plain);
+});
+
+test('every starter room the packs add keeps its own parts', () => {
+  const { C } = drawCounterRoom(SHOP_ROOM_FILES.filter((f) => /^shop_room_(icons|counter|parts_.*)\.js$/.test(f)), 'The Taproom');
+  const bare = drawCounterRoom(['shop_room_icons.js', 'shop_room_counter.js'], 'none').C;
+  const own = new Set(bare.starters.map((s) => s.name));
+  const added = C.starters.filter((s) => !own.has(s.name));
+  assert.equal(added.length, 27);
+  for (const s of added) assert.equal(JSON.stringify(C.normalise(s).skeleton), JSON.stringify(s.skeleton), `${s.name} fell back to the counter's parts`);
+});
+
 const chronicleDir = process.env.CHRONICLE_DIR;
 const chronicleWidgets = chronicleDir && join(resolve(chronicleDir), 'static', 'js', 'widgets');
 test('vendored files match Chronicle (needs CHRONICLE_DIR)', { skip: !(chronicleWidgets && existsSync(chronicleWidgets)) && 'CHRONICLE_DIR not set' }, () => {
-  for (const f of ['shop_room.js', 'shop_room_icons.js', 'shop_room_paper.js', 'shop_room_counter.js', 'shop_room_keeper.js']) {
+  for (const f of SHOP_ROOM_FILES) {
     assert.equal(readFileSync(join(VENDOR, f), 'utf8'), readFileSync(join(chronicleWidgets, f), 'utf8'),
       `vendor/chronicle/${f} differs from Chronicle's; copy it again from static/js/widgets/`);
   }
