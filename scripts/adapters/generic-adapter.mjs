@@ -217,6 +217,21 @@ export function normalizeFoundryValue(value, depth) {
 }
 
 /**
+ * Whether an item still carries the name Foundry gives a new, empty item of
+ * its type ("Complication", "New Complication"). That is no choice yet, so a
+ * single-item field treats it as absent rather than sending the type's name
+ * to Chronicle as though it were the hero's pick.
+ *
+ * @param {object} item
+ * @returns {boolean}
+ */
+export function isPlaceholderName(item) {
+  const name = String(item?.name ?? '').trim().toLowerCase();
+  const type = String(item?.type ?? '').replace(/[_-]+/g, ' ').trim().toLowerCase();
+  return !!type && (name === type || name === `new ${type}`);
+}
+
+/**
  * Extract a collection-mapped field (e.g. abilities/inventory from actor.items[]).
  * Reads field.foundry_collection off the actor, optionally filters by
  * foundry_item_type, projects each entry per foundry_item_fields (or a default
@@ -260,7 +275,7 @@ export function extractCollectionField(actor, field) {
         const firstPath = Object.values(proj)[0];
         return normalizeFoundryValue(getNestedValue(first, firstPath)) ?? '';
       }
-      return first.name ?? '';
+      return isPlaceholderName(first) ? '' : (first.name ?? '');
     }
 
     const items = contents.map((it) => {
