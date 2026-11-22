@@ -198,6 +198,7 @@
   align-items: center;
   padding: 30px 12px 0;
   overflow: hidden;
+  container: cs-steel-cloth / inline-size;
   clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 91%, 0 100%);
   background:
     repeating-linear-gradient(90deg, transparent 0 34px, color-mix(in srgb, var(--cs-steel-black) 10%, transparent) 34px 36px, color-mix(in srgb, var(--cs-steel-white) 4%, transparent) 36px 70px),
@@ -287,25 +288,28 @@
 .chronicle-hero-sheet[data-cs-look="steel"] button.cs-steel-lvl:active:not(:disabled) { translate: 0 2px; }
 .chronicle-hero-sheet[data-cs-look="steel"] button.cs-steel-lvl:disabled { cursor: default; }
 .chronicle-hero-sheet[data-cs-look="steel"] button.cs-steel-lvl:focus-visible { outline: 2px solid var(--cs-steel-white); outline-offset: 5px; }
-/* Level ready: a red arrow badge on the medal's lower edge. */
+/* Level ready: a stencilled amber arrow, a glow ring and a gentle rock on
+   the banner. A viewer who cannot level the hero sees the plain medal. */
 .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-lvlup i {
   position: absolute;
-  right: -8px;
-  bottom: -4px;
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: var(--cs-steel-red);
-  box-shadow: 0 0 0 2px var(--cs-steel-gold);
-  color: var(--cs-steel-white);
-  font-size: 13px;
+  right: -22px;
+  top: -6px;
+  width: 18px;
+  height: 20px;
+  background: var(--cs-steel-gold);
+  clip-path: polygon(50% 0, 100% 50%, 70% 50%, 70% 100%, 30% 100%, 30% 50%, 0 50%);
+  font-size: 0;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-lvlup:disabled i { display: none; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-lvlup:not(:disabled) {
+  transform-origin: 50% -14px;
+  box-shadow: 0 0 0 3px var(--cs-steel-cloth-mid), 0 0 0 4px var(--cs-steel-gold), 0 0 0 7px color-mix(in srgb, var(--cs-steel-gold) 25%, transparent), 0 0 20px color-mix(in srgb, var(--cs-steel-gold) 60%, transparent);
+  animation: cs-steel-rock 2.2s infinite;
 }
 .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-cls {
   margin: 12px 0 0;
-  font: 700 26px/1.15 var(--cs-steel-display);
-  letter-spacing: 0.12em;
+  font: 700 clamp(15px, 11cqi, 26px)/1.15 var(--cs-steel-display);
+  letter-spacing: 0.08em;
   text-align: center;
   text-transform: uppercase;
   color: var(--cs-steel-white);
@@ -472,6 +476,7 @@
   margin-right: 46px;
   padding-top: 18px;
   color: var(--cs-hero-body);
+  container: cs-steel-stats / inline-size;
 }
 .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-k {
   display: inline-block;
@@ -531,8 +536,7 @@
 }
 .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-shine {
   position: absolute;
-  inset: 3px;
-  clip-path: polygon(0 0, 96% 0, 100% 50%, 96% 100%, 0 100%);
+  inset: 0;
   background: linear-gradient(100deg, transparent 40%, color-mix(in srgb, var(--cs-steel-white) 67%, transparent) 50%, transparent 60%);
   transform: translateX(-100%);
   opacity: 0;
@@ -614,7 +618,7 @@
 
 /* The characteristics: steel-rimmed shields that roll when pressed. The cut
    is drawn on the layers, so the focus ring is not clipped away. */
-.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-shields { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; container: cs-steel-shields / inline-size; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-shields { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
 .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sh {
   position: relative;
   display: flex;
@@ -779,7 +783,7 @@
 .chronicle-hero-sheet[data-cs-look="steel"] .item-list-container .item-controls a:hover { color: var(--cs-steel-gold); }
 .chronicle-hero-sheet[data-cs-look="steel"] .item-list-container .item-controls a:focus-visible { outline: 2px solid var(--cs-hero-accent); outline-offset: 1px; }
 .chronicle-hero-sheet[data-cs-look="steel"] .item-list-container .document-description.expanded { padding: 8px 12px 12px; font-size: 14.5px; }
-.chronicle-hero-sheet[data-cs-look="steel"] .draw-steel.actor.chronicle-hero-sheet[data-cs-look="steel"] .item-list-container :is(.item-cost, .item-distance, .item-target) { width: 84px; }
+.draw-steel.actor.chronicle-hero-sheet[data-cs-look="steel"] .item-list-container :is(.item-cost, .item-distance, .item-target) { width: 84px; }
 .chronicle-hero-sheet[data-cs-look="steel"] section.tab :is(fieldset legend, h3, h4) {
   font: 600 11.5px var(--cs-steel-display);
   letter-spacing: 0.18em;
@@ -800,7 +804,6 @@
   .chronicle-hero-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content { grid-template-columns: 240px minmax(0, 1fr); }
   .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-banner { width: 176px; margin-left: 24px; }
   .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-cloth { padding-top: 24px; }
-  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-cls { font-size: 22px; }
   .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-col { font-size: 11px; letter-spacing: 0.14em; }
   .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-id { margin-right: 28px; padding-top: 30px; }
   .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-stats { margin-right: 28px; }
@@ -851,13 +854,13 @@
   .chronicle-hero-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content > section.tab { grid-column: 1; grid-row: 5; margin: 0 28px; }
   .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@container cs-steel-vit (max-width: 560px) {
+@container cs-steel-stats (max-width: 520px) {
   .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-wind { display: none; }
 }
-@container cs-steel-vit (max-width: 430px) {
+@container cs-steel-stats (max-width: 400px) {
   .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-temp > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 }
-@container cs-steel-shields (max-width: 470px) {
+@container cs-steel-stats (max-width: 470px) {
   .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-shields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @container cs-steel-id (max-width: 520px) {
@@ -979,7 +982,7 @@
 .chronicle-hero-sheet[data-cs-look="steel"].cs-move-editin .cs-name-edit input { animation: cs-steel-fade 300ms ease-out both; }
 
 @keyframes cs-steel-fade { from { opacity: 0; } }
-@keyframes cs-steel-sway { 0%, 100% { transform: skewX(-0.5deg); } 50% { transform: skewX(0.6deg); } }
+@keyframes cs-steel-sway { 25% { transform: skewX(0.6deg); } 75% { transform: skewX(-0.5deg); } }
 @keyframes cs-steel-unfurl { from { transform: scaleY(0.02); } }
 @keyframes cs-steel-drop { from { opacity: 0; transform: translateY(-28px); } }
 @keyframes cs-steel-slide { from { opacity: 0; transform: translateX(-24px); } }
@@ -1004,6 +1007,7 @@
   40% { transform: rotateY(540deg) scale(1.25); }
   100% { transform: rotateY(720deg) scale(1); }
 }
+@keyframes cs-steel-rock { 0%, 56%, 100% { rotate: 0deg; } 62% { rotate: -11deg; } 70% { rotate: 9deg; } 78% { rotate: -5deg; } 86% { rotate: 2deg; } }
 @keyframes cs-steel-hoist { 30% { transform: translateY(-26px); } }
 @keyframes cs-steel-card-in { from { opacity: 0; transform: translateY(-40px); } }
 @keyframes cs-steel-menu-in { from { opacity: 0; transform: translateY(-4px); } }
@@ -1017,4 +1021,4 @@ html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="steel"] :is(.cs-
 html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="steel"].cs-move-hit .window-content { animation: none; }
 html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-shine { transform: none; }
 html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="steel"].cs-move-heal .cs-steel-shine { animation-name: cs-steel-glow; }
-html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="steel"] :is(button, a, [data-tab], .item-row, .cs-menu-item):active { translate: none; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="steel"] :is(button, a, [data-tab], .item-row, .cs-menu-item):active { translate: none !important; }

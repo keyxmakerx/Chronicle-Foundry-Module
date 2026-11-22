@@ -57,3 +57,60 @@ test('the look adds no figures of its own and keeps the shared move timings', ()
   assert.deepEqual(lookContext({}, {}), {});
   assert.deepEqual(MOVE_MS, {});
 });
+
+const bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
+
+/** Each `@container name (cond) { … }` in the stylesheet, with the selectors inside. */
+function containerQueries() {
+  const out = [];
+  for (const m of bare.matchAll(/@container ([\w-]+) \([^)]*\) \{/g)) {
+    let depth = 1;
+    let i = m.index + m[0].length;
+    const start = i;
+    while (depth && i < bare.length) { if (bare[i] === '{') depth += 1; else if (bare[i] === '}') depth -= 1; i += 1; }
+    const body = bare.slice(start, i - 1);
+    out.push({ name: m[1], selectors: [...body.matchAll(/([^{}]+)\{/g)].map((x) => x[1].trim()) });
+  }
+  return out;
+}
+
+/** The last compound of each selector in a rule's list, e.g. `.cs-steel-id`. */
+const lastCompounds = (list) => list.split(',').map((s) => s.trim().split(/[\s>+~]+/).at(-1).replace(/::?[\w-]+(\([^)]*\))?/g, ''));
+
+test('no selector names the window twice, which could never match', () => {
+  for (const m of bare.matchAll(/([^{}]+)\{/g)) {
+    for (const sel of m[1].split(',')) assert.ok((sel.match(/chronicle-hero-sheet\[/g) ?? []).length <= 1, sel.trim());
+  }
+  // The check catches the slip it exists for.
+  assert.equal(('.a .draw-steel.actor.chronicle-hero-sheet[x] .b'.match(/chronicle-hero-sheet\[/g) ?? []).length, 1);
+});
+
+test('every container query asks a container that exists, and restyles only what is inside it', () => {
+  const declared = new Map();
+  for (const m of bare.matchAll(/([^{}]+)\{[^{}]*\bcontainer: ([\w-]+) \//g)) declared.set(m[2], lastCompounds(m[1]));
+  const queries = containerQueries();
+  assert.ok(queries.length >= 5);
+  const shared = read('styles/hero-looks.css');
+  for (const q of queries) {
+    assert.ok(declared.has(q.name) || shared.includes(`container: ${q.name} /`), `${q.name} is never declared`);
+    const owners = declared.get(q.name) ?? [];
+    for (const sel of q.selectors) {
+      for (const c of lastCompounds(sel)) assert.ok(!owners.includes(c), `@container ${q.name} restyles its own container ${c}`);
+    }
+  }
+});
+
+test('the heal shine lives inside the clipped blade, so it never paints outside it', () => {
+  assert.match(stats, /<span class="cs-steel-fillwrap">[^]*?cs-steel-shine[^]*?<\/span>/);
+});
+
+test('the sway begins and ends at rest, so a redraw never shows a jump', () => {
+  const kf = bare.match(/@keyframes cs-steel-sway \{([^]*?)\n\}|@keyframes cs-steel-sway \{(.*)\}$/m);
+  const body = bare.match(/@keyframes cs-steel-sway \{(.*)\}\s*$/m)?.[1] ?? '';
+  assert.ok(kf);
+  assert.doesNotMatch(body, /\b0%|\b100%/);
+});
+
+test('nothing sinks when pressed under Calm, whatever the control\'s own press rule', () => {
+  assert.match(bare, /html\[data-cs-motion="calm"\][^{]*:active \{ translate: none !important; \}/);
+});
