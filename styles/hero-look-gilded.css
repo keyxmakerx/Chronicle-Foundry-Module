@@ -126,7 +126,7 @@
     repeating-linear-gradient(-45deg, var(--cs-gilded-hatch) 0 1px, transparent 1px 9px),
     var(--cs-gilded-card),
     var(--cs-gilded-bg);
-  --cs-gc-ah: clamp(300px, calc(100cqh - 305px), 440px);
+  --cs-gc-ah: clamp(190px, calc(100cqh - 360px), 440px);
   --cs-gc-aw: calc(var(--cs-gc-ah) * 0.727);
 }
 /* The header and the boxes are placed straight on the window's grid. */
@@ -434,16 +434,15 @@
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-s2 { stop-color: var(--cs-gilded-gold-pale); }
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-s3 { stop-color: var(--cs-gilded-gold-deep); }
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-dial-art path { fill: none; }
-.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-rays { stroke: url("#cs-gc-gold"); stroke-width: 1; opacity: 0.5; transform-origin: 150px 150px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-rays { stroke-width: 1; opacity: 0.5; transform-origin: 150px 150px; }
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-track { stroke: color-mix(in srgb, var(--cs-gilded-white) 10%, transparent); stroke-width: 12; }
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-fill {
-  stroke: url("#cs-gc-gold");
   stroke-width: 12;
   stroke-linecap: round;
   transition: stroke-dasharray 800ms cubic-bezier(0.3, 0.9, 0.3, 1);
 }
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-fill[stroke-dasharray^="0 "] { stroke-linecap: butt; }
-.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-base { stroke: url("#cs-gc-gold"); stroke-width: 1.5; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-base { stroke-width: 1.5; }
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-dv {
   position: absolute;
   left: 0;
@@ -468,6 +467,11 @@
   text-transform: uppercase;
   text-align: center;
   color: var(--cs-gilded-gold-warm);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] :is(.cs-gc-of, .cs-gc-state) {
+  padding: 1px 7px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--cs-gilded-navy-lo) 88%, transparent);
 }
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-state {
   margin-top: 2px;
@@ -573,7 +577,7 @@
   flex-direction: column;
   gap: 9px;
   min-width: 0;
-  padding: 20px 0 64px;
+  padding: 20px 0 78px;
   container: cs-gc-right / inline-size;
 }
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-chars { display: flex; flex-direction: column; gap: 9px; }
@@ -649,8 +653,12 @@
   flex-direction: column;
   align-items: center;
   min-width: 0;
-  padding: 10px 0 34px;
+  padding: 10px 0 20px;
   container: cs-gc-mid / inline-size;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-mid:has(.cs-gc-prog-edit) {
+  --cs-gc-ah: clamp(190px, calc(100cqh - 470px), 440px);
+  --cs-gc-aw: calc(var(--cs-gc-ah) * 0.727);
 }
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-arch {
   position: relative;
@@ -678,7 +686,10 @@
   border-radius: 0;
 }
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-archin .cs-portrait-btn:active { transform: none; }
-.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-archin .cs-portrait-btn:focus-visible { outline-offset: -4px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-archin .cs-portrait-btn:active .cs-portrait { transform: scale(0.995); filter: brightness(0.85); }
+/* The keyboard ring is drawn round the whole arch, outside its gold, so the rounded top does not clip it. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-archin .cs-portrait-btn:focus-visible { outline: none; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-arch:has(.cs-portrait-btn:focus-visible) { outline: 3px solid var(--cs-gilded-gold-hi); outline-offset: 16px; }
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-archin .cs-portrait {
   width: 100%;
   height: 100%;
@@ -738,10 +749,19 @@
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--cs-gilded-coin);
-  box-shadow: 0 0 0 4px var(--cs-gilded-navy), 0 0 0 5px var(--cs-gilded-gold), 0 6px 14px color-mix(in srgb, var(--cs-gilded-shade) 65%, transparent);
+  background: none;
   text-shadow: none;
   color: var(--cs-gilded-gold-ink);
+}
+/* The gold coin is its own layer, so the glow can sit behind it inside the medal. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-medal::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 50%;
+  background: var(--cs-gilded-coin);
+  box-shadow: 0 0 0 4px var(--cs-gilded-navy), 0 0 0 5px var(--cs-gilded-gold), 0 6px 14px color-mix(in srgb, var(--cs-gilded-shade) 65%, transparent);
 }
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-medal span { font: 600 7.5px/1 var(--cs-gilded-display); letter-spacing: 0.18em; text-transform: uppercase; }
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-medal b { font: 600 26px/1 var(--cs-gilded-display); }
@@ -750,12 +770,13 @@
 .chronicle-hero-sheet[data-cs-look="gilded"] button.cs-gc-medal:hover:not(:disabled) { transform: scale(1.06); filter: brightness(1.08); }
 .chronicle-hero-sheet[data-cs-look="gilded"] button.cs-gc-medal:active:not(:disabled) { transform: scale(0.97); }
 .chronicle-hero-sheet[data-cs-look="gilded"] button.cs-gc-medal:disabled { cursor: default; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-lvlup:disabled::after { display: none; }
 /* A level is ready: a gold glow breathes round the medal. */
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-lvlup::after {
   content: "";
   position: absolute;
   inset: -12px;
-  z-index: -1;
+  z-index: -2;
   border-radius: 50%;
   background: radial-gradient(circle, color-mix(in srgb, var(--cs-gilded-gold-warm) 70%, transparent), transparent 70%);
   animation: cs-gilded-breathe 2.4s ease-in-out infinite;
@@ -788,6 +809,7 @@
   flex-wrap: wrap;
   justify-content: center;
   align-items: baseline;
+  gap: 0 1.6em;
   margin: 6px 0 0;
   padding: 0;
   list-style: none;
@@ -796,7 +818,6 @@
   text-transform: uppercase;
   color: var(--cs-gilded-soft);
 }
-.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-origin:not(:last-child)::after { content: "·"; margin: 0 0.7em; color: var(--cs-gilded-gold); }
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-origin a { color: inherit; text-decoration: none; }
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-origin a:hover { color: var(--cs-gilded-gold-hi); text-decoration: underline; text-decoration-color: var(--cs-gilded-line-hi); text-underline-offset: 4px; }
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-kind { margin-right: 0.5em; font-size: 8.5px; color: var(--cs-gilded-dim); }
@@ -890,7 +911,7 @@
 @container cs-hero (max-width: 940px) {
   .chronicle-hero-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content {
     --cs-gc-pad: 44px;
-    --cs-gc-ah: clamp(280px, min(calc(100cqh - 305px), 385px), 440px);
+    --cs-gc-ah: clamp(190px, min(calc(100cqh - 360px), 385px), 440px);
     grid-template-columns: minmax(0, 1fr) minmax(0, 284px) minmax(0, 1fr);
     column-gap: 20px;
   }
@@ -923,6 +944,21 @@
   .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-foot { grid-row: 5; }
   .chronicle-hero-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content > nav.tabs { gap: 4px 14px; }
   .chronicle-hero-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content > nav.tabs > [data-tab] + [data-tab]::before { left: -9px; }
+}
+
+/* A short window: the boxes tighten so the whole card stays above the foot of the frame. */
+@container cs-gilded (max-height: 700px) {
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-left { gap: 8px; padding-top: 10px; }
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-dial { width: 78%; align-self: center; }
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-right { gap: 4px; padding-top: 12px; }
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-chars { gap: 4px; }
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-coin { width: 42px; height: 42px; }
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-coin b { font-size: 18px; }
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-nm { font-size: 12.5px; }
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-rk { font-size: 13px; line-height: 1.2; }
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-skill-list { margin-top: 4px; font-size: 13.5px; line-height: 1.35; }
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-it { font-size: 14px; line-height: 1.3; }
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-fact b { font-size: 20px; }
 }
 
 /* ---- Folded: the card in the hand, a small card with the picture under an arch ---- */
@@ -1106,4 +1142,5 @@ html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-
 html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="gilded"] :is(.cs-gc-foil, .cs-gc-medal, .cs-gc-coin) { animation: none; }
 html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-lvlup::after { animation: none; opacity: 0.7; }
 html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="gilded"] :is(.cs-gc-row, .cs-gc-medal, .cs-card-chr):hover { transform: none; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-archin .cs-portrait-btn:hover .cs-portrait { transform: none; }
 html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-btn:hover::before { animation: none; }

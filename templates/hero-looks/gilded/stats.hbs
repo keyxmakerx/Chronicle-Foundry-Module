@@ -10,14 +10,14 @@ active-effect locks work. Edit: Draw Steel's own stat editors. --}}
     <div class="cs-gc-dial" data-band="{{chronicle.stamina.band}}">
       <svg class="cs-gc-dial-art" viewBox="0 0 300 170" aria-hidden="true" focusable="false">
         <defs>
-          <linearGradient id="cs-gc-gold" x1="0" y1="0" x2="1" y2="1">
+          <linearGradient id="cs-gc-gold-{{document.id}}" x1="0" y1="0" x2="1" y2="1">
             <stop class="cs-gc-s0" offset="0"/><stop class="cs-gc-s1" offset="0.35"/><stop class="cs-gc-s2" offset="0.6"/><stop class="cs-gc-s3" offset="1"/>
           </linearGradient>
         </defs>
-        <g class="cs-gc-rays"><path d="M150 150L290.0 150.0"/><path d="M150 150L288.3 128.1"/><path d="M150 150L283.1 106.7"/><path d="M150 150L274.7 86.4"/><path d="M150 150L263.3 67.7"/><path d="M150 150L249.0 51.0"/><path d="M150 150L232.3 36.7"/><path d="M150 150L213.6 25.3"/><path d="M150 150L193.3 16.9"/><path d="M150 150L171.9 11.7"/><path d="M150 150L150.0 10.0"/><path d="M150 150L128.1 11.7"/><path d="M150 150L106.7 16.9"/><path d="M150 150L86.4 25.3"/><path d="M150 150L67.7 36.7"/><path d="M150 150L51.0 51.0"/><path d="M150 150L36.7 67.7"/><path d="M150 150L25.3 86.4"/><path d="M150 150L16.9 106.7"/><path d="M150 150L11.7 128.1"/><path d="M150 150L10.0 150.0"/></g>
+        <g class="cs-gc-rays" stroke="url(#cs-gc-gold-{{document.id}})"><path d="M150 150L290.0 150.0"/><path d="M150 150L288.3 128.1"/><path d="M150 150L283.1 106.7"/><path d="M150 150L274.7 86.4"/><path d="M150 150L263.3 67.7"/><path d="M150 150L249.0 51.0"/><path d="M150 150L232.3 36.7"/><path d="M150 150L213.6 25.3"/><path d="M150 150L193.3 16.9"/><path d="M150 150L171.9 11.7"/><path d="M150 150L150.0 10.0"/><path d="M150 150L128.1 11.7"/><path d="M150 150L106.7 16.9"/><path d="M150 150L86.4 25.3"/><path d="M150 150L67.7 36.7"/><path d="M150 150L51.0 51.0"/><path d="M150 150L36.7 67.7"/><path d="M150 150L25.3 86.4"/><path d="M150 150L16.9 106.7"/><path d="M150 150L11.7 128.1"/><path d="M150 150L10.0 150.0"/></g>
         <path class="cs-gc-track" d="M30 150A120 120 0 0 1 270 150"/>
-        <path class="cs-gc-fill" d="M30 150A120 120 0 0 1 270 150" pathLength="100" stroke-dasharray="{{chronicle.stamina.fill}} 100"/>
-        <path class="cs-gc-base" d="M10 150h280"/>
+        <path class="cs-gc-fill" stroke="url(#cs-gc-gold-{{document.id}})" d="M30 150A120 120 0 0 1 270 150" pathLength="100" stroke-dasharray="{{chronicle.stamina.fill}} 100"/>
+        <path class="cs-gc-base" stroke="url(#cs-gc-gold-{{document.id}})" d="M10 150h280"/>
       </svg>
       <div class="cs-gc-dv">
         <label class="cs-field cs-gc-stam">
