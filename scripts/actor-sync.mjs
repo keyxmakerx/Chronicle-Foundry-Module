@@ -36,6 +36,8 @@ import { actingMemberOf, heldKeysOf, describeHeld, HeldNotices } from './_player
 import { getPlayerAsks, playerName } from './player-asks.mjs';
 import { planLayerEffects, layeredFieldKeys, storedLayers, LAYER_FLAG } from './_layer-effects.mjs';
 import { bringsInActor } from './_actor-catch-up.mjs';
+import { PictureStore } from './picture-store.mjs';
+import { heroChoice, heroPictureIds, heroPicturePlan, HERO_PICTURES_FLAG } from './_hero-pictures.mjs';
 import { folderKindFor, needsPlacing, FOLDER_PLACED_FLAG, ACTOR_FOLDER_FLAG, HEROES } from './_actor-folder.mjs';
 import { CLASS_PICK_FLAG, classPick, pickToFinish, pickChanged } from './_finish-hero.mjs';
 
@@ -55,6 +57,9 @@ export class ActorSync {
 
     /** @type {import('./sync-manager.mjs').SyncManager|null} */
     this._syncManager = null;
+
+    /** @type {PictureStore|null} made on first use */
+    this._pictures = null;
 
     /** Chronicle claimants already reported as having no Foundry user, so the GM hears once a session. */
     this._unmappedNoticed = new Set();
@@ -736,6 +741,10 @@ export class ActorSync {
         }
       }
 
+      for (const [path, value] of Object.entries(await this._picturePlan(entity, null))) {
+        _setNestedValue(actorData, path, value);
+      }
+
       const actor = await Actor.create(actorData, applyOptions());
       await this._applyIdentityItems(actor, entity);
       await this._recordClassPick(actor, entity);
@@ -759,6 +768,32 @@ export class ActorSync {
     } catch (err) {
       console.error('Chronicle: Failed to create actor from entity', err);
       return false;
+    }
+  }
+
+  /**
+   * The portrait and token changes for a hero page, copying its pictures into
+   * the world first. Never throws: a picture that can't be copied leaves the
+   * actor as it is and is retried on the next pull.
+   * @param {object} entity
+   * @param {Actor|null} actor null for an actor not yet made
+   * @returns {Promise<object>} dot-path changes, possibly empty
+   * @private
+   */
+  async _picturePlan(entity, actor) {
+    try {
+      const choice = heroChoice(entity);
+      const ids = heroPictureIds(choice);
+      if (ids.length === 0) return {};
+      const applied = actor?.getFlag(FLAG_SCOPE, HERO_PICTURES_FLAG) || null;
+      if (applied && applied.img === choice.img && applied.token === choice.token) return {};
+      const current = actor ? { img: actor.img, token: actor.prototypeToken?.texture?.src } : null;
+      this._pictures ??= new PictureStore({ api: this._api });
+      const local = await this._pictures.ensure(ids);
+      return heroPicturePlan({ choice, local, applied, current });
+    } catch (err) {
+      console.warn(`Chronicle: could not bring in the pictures for "${entity?.name ?? entity?.id}"`, err);
+      return {};
     }
   }
 
@@ -942,6 +977,7 @@ export class ActorSync {
           if (changeTouchesPath(local, path)) delete changes[path];
         }
       }
+      Object.assign(changes, await this._picturePlan(entity, actor));
       if (Object.keys(changes).length > 0) {
         await actor.update(changes, syncOptions({ [APPLY_OPTION]: true }));
       }
