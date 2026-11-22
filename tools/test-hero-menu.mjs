@@ -352,24 +352,66 @@ test('the look picker lists the look, Draw Steel Plus when it is on, and Draw St
   const { Sheet, sheet, root, anchor } = sheetFor({ plus: true });
   Sheet.DEFAULT_OPTIONS.actions.csLookPicker.call(sheet, {}, anchor);
   assert.deepEqual(labels(root), [
-    'CHRONICLE.HeroSheet.Looks.chronicle', 'CHRONICLE.HeroSheet.Picker.Plus', 'CHRONICLE.HeroSheet.Picker.DrawSteel',
+    'CHRONICLE.HeroSheet.Looks.chronicle', 'CHRONICLE.HeroSheet.Looks.hall', 'CHRONICLE.HeroSheet.Picker.Plus', 'CHRONICLE.HeroSheet.Picker.DrawSteel',
   ]);
   assert.match(menuOf(root).querySelector('.cs-menu-head').textContent, /Picker\.Heading \{"name":"Ash"\}/);
   assert.equal(items(menuOf(root))[0].getAttribute('aria-checked'), 'true');
+  assert.equal(items(menuOf(root))[1].getAttribute('aria-checked'), 'false');
   // The other sheets are plain rows after a line, not choices of a look.
-  assert.equal(items(menuOf(root))[2].getAttribute('role'), 'menuitem');
+  assert.equal(items(menuOf(root))[3].getAttribute('role'), 'menuitem');
   assert.equal(menuOf(root).querySelectorAll('hr').length, 1);
 }));
 
-test('picking another sheet stores it as the hero\'s sheet; picking the current look writes nothing', () => withGlobals(async () => {
+test('picking a look stores it on the hero, picking another sheet stores that; the current look writes nothing', () => withGlobals(async () => {
   const { Sheet, sheet, root, anchor, calls } = sheetFor();
-  Sheet.DEFAULT_OPTIONS.actions.csLookPicker.call(sheet, {}, anchor);
-  fire(items(menuOf(root))[0], 'click');
-  fire(menuOf(root), 'animationend');
+  const pick = async (i) => {
+    Sheet.DEFAULT_OPTIONS.actions.csLookPicker.call(sheet, {}, anchor);
+    fire(items(menuOf(root))[i], 'click');
+    fire(menuOf(root), 'animationend');
+    await new Promise((r) => setImmediate(r));
+  };
+  await pick(0);
+  await pick(1);
+  await pick(2);
+  assert.deepEqual(calls, [
+    ['update', { 'flags.chronicle-sync.heroLook': 'hall' }, { chronicleSync: true }],
+    ['update', { 'flags.core.sheetClass': DRAW_STEEL_SHEET }, { chronicleSync: true }],
+  ]);
+}));
+
+test('picking a look gives the window that look\'s size; back to Chronicle, the sheet\'s own', () => withGlobals(async () => {
+  let look;
+  const { Sheet, sheet, root, anchor } = sheetFor({ update: async (data) => { look = data['flags.chronicle-sync.heroLook'] ?? look; } });
+  const flag = sheet.document.getFlag;
+  sheet.document.getFlag = (scope, key) => (key === 'heroLook' ? look : flag(scope, key));
+  sheet.options.position = { width: 820, height: 780 };
+  const sizes = [];
+  sheet.setPosition = (p) => sizes.push(p);
+  const pick = async (i) => {
+    Sheet.DEFAULT_OPTIONS.actions.csLookPicker.call(sheet, {}, anchor);
+    fire(items(menuOf(root))[i], 'click');
+    fire(menuOf(root), 'animationend');
+    await new Promise((r) => setImmediate(r));
+  };
+  await pick(1);
+  assert.deepEqual(sizes, [{ width: 1100, height: 760 }]);
+  await pick(0);
+  assert.deepEqual(sizes, [{ width: 1100, height: 760 }, { width: 820, height: 780 }]);
+}));
+
+test('picking a look while folded leaves the card where it is', () => withGlobals(async () => {
+  let look;
+  const { Sheet, sheet, root, anchor } = sheetFor({ folded: true, update: async (data) => { look = data['flags.chronicle-sync.heroLook'] ?? look; } });
+  const flag = sheet.document.getFlag;
+  sheet.document.getFlag = (scope, key) => (key === 'heroLook' ? look : flag(scope, key));
+  const sizes = [];
+  sheet.setPosition = (p) => sizes.push(p);
+  assert.equal(sheet.folded, true);
   Sheet.DEFAULT_OPTIONS.actions.csLookPicker.call(sheet, {}, anchor);
   fire(items(menuOf(root))[1], 'click');
   await new Promise((r) => setImmediate(r));
-  assert.deepEqual(calls, [['update', { 'flags.core.sheetClass': DRAW_STEEL_SHEET }, { chronicleSync: true }]]);
+  assert.equal(look, 'hall');
+  assert.deepEqual(sizes, []);
 }));
 
 test('a picker write that fails tells the player and leaves the sheet as it was', () => withGlobals(async () => {

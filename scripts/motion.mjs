@@ -9,7 +9,11 @@ import { effectiveMotion, growOrigin, motionLevel } from './_motion.mjs';
 
 let lastPress = null;
 
-/** Windows that play their own opening move, so the shared grow stays off them. */
+/**
+ * Windows that play their own opening move, so the shared grow stays off
+ * them: by class, or a window that marks itself with cs-own-opening (a hero
+ * sheet look with its own opening).
+ */
 const OWN_OPENING = ['chronicle-dm-screen'];
 
 /**
@@ -41,7 +45,7 @@ export function registerMotion() {
     if (!classes.some((c) => typeof c === 'string' && c.startsWith('chronicle-'))) return;
     if (classes.some((c) => OWN_OPENING.includes(c))) return;
     const el = element instanceof HTMLElement ? element : app.element;
-    if (!el) return;
+    if (!el || el.classList.contains('cs-own-opening')) return;
     const origin = growOrigin(lastPress, el.getBoundingClientRect(), Date.now());
     if (origin) el.style.setProperty('--cs-origin', origin);
     el.classList.add('cs-grow');

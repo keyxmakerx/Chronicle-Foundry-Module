@@ -4,13 +4,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  DEFAULT_LOOK, DRAW_STEEL_PLUS_SHEET, DRAW_STEEL_SHEET, FOLD_KEEP, HERO_LOOKS, LOOK_FLAG, MIN_DRAW_STEEL,
+  DEFAULT_LOOK, DRAW_STEEL_PLUS_SHEET, DRAW_STEEL_SHEET, FOLD_KEEP, HERO_LOOKS, LOOK_FLAG, MIN_DRAW_STEEL, allLookTemplates,
   chronicleParts, chroniclePageUrl, chronicleTabs, conditionList, drawSteelSupported, fitRenderParts, menuFocus,
   pickerRows, portraitRows, recoveryDots, resolveLook, staminaView, withFold,
+  countDiamonds, lookTemplate, plaqueMetal, ringSegments, sheetChanges, skillNames,
 } from '../scripts/_hero-looks.mjs';
 import {
-  FOLD_SETTING, HERO_SHEET_CLASS, LOOK_DEFAULT_SETTING, LOOK_LOCK_SETTING, makeChronicleHeroSheet, registerHeroLooks,
+  FOLD_SETTING, HERO_SHEET_CLASS, LOOK_DEFAULT_SETTING, LOOK_LOCK_SETTING, forceDarkTheme, makeChronicleHeroSheet, registerHeroLooks,
 } from '../scripts/hero-looks.mjs';
+import { registerMotion } from '../scripts/motion.mjs';
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 
@@ -340,30 +342,43 @@ test('the GM\'s world default stands in for a hero with no look, and a lock over
 test('the look picker: the looks, then Draw Steel Plus when it is on, then Draw Steel\'s own sheet, always', () => {
   const ids = (rows) => rows.map((r) => r.id);
   const plain = pickerRows({ current: 'chronicle' });
-  assert.deepEqual(ids(plain), ['chronicle', DRAW_STEEL_SHEET]);
+  assert.deepEqual(ids(plain), ['chronicle', 'hall', DRAW_STEEL_SHEET]);
   assert.deepEqual(plain[0], {
     kind: 'look', id: 'chronicle', label: 'CHRONICLE.HeroSheet.Looks.chronicle', note: null,
     tag: 'CHRONICLE.HeroSheet.Picker.Now', checked: true, disabled: false,
   });
-  assert.equal(plain[1].kind, 'sheet');
-  assert.equal(plain[1].checked, false);
+  assert.deepEqual(plain[1], {
+    kind: 'look', id: 'hall', label: 'CHRONICLE.HeroSheet.Looks.hall', note: null,
+    tag: null, checked: false, disabled: false,
+  });
+  assert.equal(plain[2].kind, 'sheet');
+  assert.equal(plain[2].checked, false);
+  assert.equal(pickerRows({ current: 'hall' }).find((r) => r.checked).id, 'hall');
   const plus = pickerRows({ current: 'chronicle', plusActive: true, registered: () => true });
-  assert.deepEqual(ids(plus), ['chronicle', DRAW_STEEL_PLUS_SHEET, DRAW_STEEL_SHEET]);
-  assert.equal(plus[1].tag, 'CHRONICLE.HeroSheet.Picker.Found');
+  assert.deepEqual(ids(plus), ['chronicle', 'hall', DRAW_STEEL_PLUS_SHEET, DRAW_STEEL_SHEET]);
+  assert.equal(plus[2].tag, 'CHRONICLE.HeroSheet.Picker.Found');
   // Installed but its sheet not registered (an older Draw Steel Plus): not offered.
-  assert.deepEqual(ids(pickerRows({ current: 'chronicle', plusActive: true, registered: (id) => id !== DRAW_STEEL_PLUS_SHEET })), ['chronicle', DRAW_STEEL_SHEET]);
-  assert.deepEqual(ids(pickerRows({ current: 'chronicle', plusActive: false })), ['chronicle', DRAW_STEEL_SHEET]);
+  assert.deepEqual(ids(pickerRows({ current: 'chronicle', plusActive: true, registered: (id) => id !== DRAW_STEEL_PLUS_SHEET })), ['chronicle', 'hall', DRAW_STEEL_SHEET]);
+  assert.deepEqual(ids(pickerRows({ current: 'chronicle', plusActive: false })), ['chronicle', 'hall', DRAW_STEEL_SHEET]);
 });
 
-test('a locked look: players see why and keep the way back to Draw Steel; the GM is not locked out', () => {
+test('a locked look: nobody picks another look, each is told why, and the way back to Draw Steel stays open', () => {
   const player = pickerRows({ current: 'chronicle', locked: true, isGM: false, plusActive: true });
   assert.equal(player[0].note, 'CHRONICLE.HeroSheet.Picker.Locked');
-  // The current look stays open, so its row can still be read and focused.
+  // The current look stays open, so its row can still be read and focused; the other look can't be picked.
   assert.equal(player[0].disabled, false);
+  assert.equal(player[1].disabled, true);
+  assert.equal(player[1].note, 'CHRONICLE.HeroSheet.Picker.Locked');
   assert.ok(player.filter((r) => r.kind === 'sheet').every((r) => !r.disabled));
-  const gm = pickerRows({ current: 'chronicle', locked: true, isGM: true });
-  assert.equal(gm[0].note, null);
-  assert.ok(gm.every((r) => !r.disabled));
+  // The lock means every hero uses the world's default, which resolveLook
+  // draws whatever the hero's flag says, so a GM's pick would change nothing.
+  const gm = pickerRows({ current: 'chronicle', locked: true, isGM: true, plusActive: true });
+  assert.equal(gm[0].note, 'CHRONICLE.HeroSheet.Picker.LockedGM');
+  assert.equal(gm[0].disabled, false);
+  assert.equal(gm[1].disabled, true);
+  assert.ok(gm.filter((r) => r.kind === 'sheet').every((r) => !r.disabled));
+  const open = pickerRows({ current: 'chronicle', locked: false, isGM: true });
+  assert.ok(open.every((r) => !r.disabled && (r.kind === 'sheet' || r.note === null)));
 });
 
 test('the portrait menu offers what each viewer may do', () => {
@@ -563,7 +578,7 @@ test('the card gets the portrait and characteristics Draw Steel prepares only fo
   assert.equal(card.chronicle.stamina.band, 'healthy');
 });
 
-test('the look and lock settings are the GM\'s, hidden until there is a second look; fold states are each player\'s', () => {
+test('the look and lock settings are the GM\'s, shown now there is a second look; fold states are each player\'s', () => {
   const saved = { game: globalThis.game, ds: globalThis.ds, foundry: globalThis.foundry };
   const registered = {};
   try {
@@ -578,7 +593,8 @@ test('the look and lock settings are the GM\'s, hidden until there is a second l
     assert.equal(registered[LOOK_DEFAULT_SETTING].default, DEFAULT_LOOK);
     assert.equal(registered[LOOK_LOCK_SETTING].default, false);
     for (const key of [LOOK_DEFAULT_SETTING, LOOK_LOCK_SETTING]) {
-      assert.equal(registered[key].config, HERO_LOOKS.length > 1, key);
+      assert.equal(HERO_LOOKS.length > 1, true);
+      assert.equal(registered[key].config, true, key);
     }
     assert.deepEqual(Object.keys(registered[LOOK_DEFAULT_SETTING].choices), HERO_LOOKS.map((l) => l.id));
     const fold = registered[FOLD_SETTING];
@@ -651,7 +667,9 @@ test('opened as the card, the full sheet\'s templates are loaded too, so Open ha
     await withSettings({ heroSheetFolds: {} }, async () => {
       await new Sheet(fakeHero())._preFirstRender({}, {});
     });
-    assert.deepEqual(loaded, [], 'open: Foundry loads them itself');
+    // Open, Foundry loads the sheet's own; every look's are loaded so a change of look draws at once.
+    assert.deepEqual([...loaded].sort(), allLookTemplates().sort());
+    assert.ok(loaded.includes('modules/chronicle-sync/templates/hero-looks/hall/stats.hbs'));
   } finally {
     globalThis.foundry = saved;
   }
@@ -719,4 +737,317 @@ test('a failure drawing the full sheet is not swallowed', async () => {
     sheet.failRender = () => true;
     await assert.rejects(sheet.render({ force: true }), /Failed to render/);
   });
+});
+
+/* ---- The portrait hall ---------------------------------------------- */
+
+test('plaques: gold at +2 or more, bronze at +1, iron at 0 or below', () => {
+  for (const [v, metal] of [[5, 'gold'], [2, 'gold'], [1, 'bronze'], [0, 'iron'], [-1, 'iron'], [undefined, 'iron'], ['2', 'iron']]) {
+    assert.equal(plaqueMetal(v), metal, String(v));
+  }
+});
+
+test('the recovery ring: one arc per recovery, round the whole circle, lit while unspent', () => {
+  const segs = ringSegments(5, 8);
+  assert.equal(segs.length, 8);
+  assert.deepEqual(segs.map((s) => s.on), [true, true, true, true, true, false, false, false]);
+  // Each arc plus its gap is an eighth of the circle; the arcs follow one another.
+  const [len, rest] = segs[0].dash.split(' ').map(Number);
+  assert.equal(Math.round((len + rest) * 100) / 100, 100);
+  assert.equal(Math.round((segs[0].offset - segs[1].offset) * 100) / 100, 12.5);
+  assert.equal(ringSegments(1, 1)[0].dash, '100 0');
+  // Past the cap, or with no recoveries, the number stands alone.
+  assert.equal(ringSegments(5, 20), null);
+  assert.equal(ringSegments(0, 0), null);
+});
+
+test('a count with no maximum lights one diamond per point, up to ten', () => {
+  assert.deepEqual(countDiamonds(3), [true, true, true]);
+  assert.equal(countDiamonds(25).length, 10);
+  assert.deepEqual(countDiamonds(0), []);
+  assert.deepEqual(countDiamonds(-2), []);
+  assert.deepEqual(countDiamonds(undefined), []);
+});
+
+test('skills by name, sorted, unknown keys left out', () => {
+  const list = { alchemy: { label: 'Alchemy' }, climb: { label: 'Climb' }, sneak: { label: 'Sneak' } };
+  assert.deepEqual(skillNames(new Set(['sneak', 'alchemy', 'retired', 'climb']), list, 'en'), ['Alchemy', 'Climb', 'Sneak']);
+  assert.deepEqual(skillNames(undefined, list), []);
+  assert.deepEqual(skillNames(['climb'], undefined), []);
+});
+
+test('what moved between two draws: a hit, a heal, a level, Edit mode', () => {
+  assert.deepEqual(sheetChanges(null, { stamina: 3 }), []);
+  assert.deepEqual(sheetChanges({ stamina: 30, level: 2, isPlay: true }, { stamina: 22, level: 2, isPlay: true }), ['hit']);
+  assert.deepEqual(sheetChanges({ stamina: 22 }, { stamina: 30 }), ['heal']);
+  assert.deepEqual(sheetChanges({ stamina: 22, level: 2 }, { stamina: 22, level: 3 }), ['level']);
+  assert.deepEqual(sheetChanges({ isPlay: true }, { isPlay: false }), ['editin']);
+  assert.deepEqual(sheetChanges({ isPlay: false }, { isPlay: true }), []);
+  assert.deepEqual(sheetChanges({ stamina: null }, { stamina: 4 }), []);
+});
+
+test('the portrait hall draws its own header and boxes and borrows the Chronicle card', async () => {
+  const Sheet = makeChronicleHeroSheet(fakeBase());
+  await withSettings({ heroSheetFolds: {}, heroLookDefault: 'chronicle', heroLookLocked: false }, async () => {
+    const hall = new Sheet(fakeHero({ flag: 'hall' }));
+    assert.equal(hall.look, 'hall');
+    const parts = hall._configureRenderParts({});
+    assert.equal(parts.header.template, lookTemplate('hall', 'header'));
+    assert.equal(parts.stats.template, lookTemplate('hall', 'stats'));
+    // Draw Steel's own parts and partials are untouched.
+    assert.equal(parts.features.template, 'f.hbs');
+    assert.deepEqual(parts.stats.templates, ['systems/draw-steel/partials/characteristics.hbs']);
+    assert.equal(parts.card, undefined);
+    const plain = new Sheet(fakeHero())._configureRenderParts({});
+    assert.equal(plain.header.template, lookTemplate('chronicle', 'header'));
+  });
+  await withSettings({ heroSheetFolds: { 'Actor~hero1': { folded: true } }, heroLookDefault: 'chronicle', heroLookLocked: false }, async () => {
+    const parts = new Sheet(fakeHero({ flag: 'hall' }))._configureRenderParts({});
+    assert.deepEqual(Object.keys(parts), ['card']);
+    assert.equal(parts.card.template, 'modules/chronicle-sync/templates/hero-looks/chronicle/card.hbs');
+  });
+});
+
+test('a hero opening in the portrait hall opens at the hall\'s size; the card and the Chronicle look keep theirs', async () => {
+  const Sheet = makeChronicleHeroSheet(fakeBase());
+  await withSettings({ heroSheetFolds: {}, heroLookDefault: 'hall', heroLookLocked: false }, async () => {
+    const options = { isFirstRender: true };
+    new Sheet(fakeHero())._configureRenderOptions(options);
+    assert.deepEqual(options.position, { width: 1100, height: 760 });
+    const again = { isFirstRender: false };
+    new Sheet(fakeHero())._configureRenderOptions(again);
+    assert.equal(again.position, undefined);
+    const chronicle = { isFirstRender: true };
+    new Sheet(fakeHero({ flag: 'chronicle' }))._configureRenderOptions(chronicle);
+    assert.equal(chronicle.position, undefined);
+  });
+  await withSettings({ heroSheetFolds: { 'Actor~hero1': { folded: true } }, heroLookDefault: 'hall', heroLookLocked: false }, async () => {
+    const options = { isFirstRender: true };
+    new Sheet(fakeHero())._configureRenderOptions(options);
+    assert.equal(options.position.width, 296);
+  });
+});
+
+test('the portrait hall plays its opening, then a hit, a heal and a level; the Chronicle look and the card play none', async () => {
+  const Sheet = makeChronicleHeroSheet(fakeBase());
+  await withSettings({ heroSheetFolds: {}, heroLookDefault: 'chronicle', heroLookLocked: false }, async () => {
+    const hero = fakeHero({ flag: 'hall', value: 40 });
+    const sheet = new Sheet(hero);
+    const { element } = fakeWindow();
+    sheet.element = element;
+    await sheet._onRender({}, { isFirstRender: true });
+    assert.ok(element.classList.contains('cs-move-open'));
+    assert.ok(element.classList.contains('cs-own-opening'));
+    hero.system.stamina.value = 31;
+    await sheet._onRender({}, { isFirstRender: false });
+    assert.ok(element.classList.contains('cs-move-hit'));
+    hero.system.stamina.value = 36;
+    hero.system.level = 4;
+    await sheet._onRender({}, { isFirstRender: false });
+    assert.ok(element.classList.contains('cs-move-heal'));
+    assert.ok(element.classList.contains('cs-move-level'));
+
+    const plainHero = fakeHero({ value: 40 });
+    const plain = new Sheet(plainHero);
+    const other = fakeWindow().element;
+    plain.element = other;
+    await plain._onRender({}, { isFirstRender: true });
+    plainHero.system.stamina.value = 10;
+    await plain._onRender({}, { isFirstRender: false });
+    for (const move of ['open', 'hit']) assert.equal(other.classList.contains(`cs-move-${move}`), false, move);
+    assert.equal(other.classList.contains('cs-own-opening'), false);
+  });
+  await withSettings({ heroSheetFolds: { 'Actor~hero1': { folded: true } }, heroLookDefault: 'chronicle', heroLookLocked: false }, async () => {
+    const sheet = new Sheet(fakeHero({ flag: 'hall' }));
+    const { element } = fakeWindow();
+    sheet.element = element;
+    await sheet._onRender({}, { isFirstRender: true });
+    assert.equal(element.classList.contains('cs-move-open'), false);
+    assert.equal(element.classList.contains('cs-own-opening'), false);
+  });
+});
+
+test('a Limited viewer of the portrait hall sees no hit or heal, since Draw Steel shows them no Stamina', async () => {
+  const Sheet = makeChronicleHeroSheet(fakeBase());
+  await withSettings({ heroSheetFolds: {}, heroLookDefault: 'chronicle', heroLookLocked: false }, async () => {
+    const hero = fakeHero({ flag: 'hall', value: 40, limited: true });
+    const sheet = new Sheet(hero);
+    const { element } = fakeWindow();
+    sheet.element = element;
+    await sheet._onRender({}, { isFirstRender: true });
+    assert.ok(element.classList.contains('cs-move-open'));
+    hero.system.stamina.value = 20;
+    await sheet._onRender({}, { isFirstRender: false });
+    assert.equal(element.classList.contains('cs-move-hit'), false);
+    hero.system.stamina.value = 50;
+    hero.system.level = 4;
+    await sheet._onRender({}, { isFirstRender: false });
+    assert.equal(element.classList.contains('cs-move-heal'), false);
+    // The level is in the header a Limited viewer gets.
+    assert.ok(element.classList.contains('cs-move-level'));
+  });
+});
+
+test('the card comes in when the sheet folds, in either look, and not on its redraws', async () => {
+  const Sheet = makeChronicleHeroSheet(fakeBase());
+  for (const flag of ['chronicle', 'hall']) {
+    await withSettings({ heroSheetFolds: {}, heroLookDefault: 'chronicle', heroLookLocked: false }, async () => {
+      const sheet = new Sheet(fakeHero({ flag }));
+      const { element } = fakeWindow();
+      sheet.element = element;
+      await Sheet.DEFAULT_OPTIONS.actions.csFold.call(sheet);
+      assert.ok(element.classList.contains('cs-move-fold'), flag);
+    });
+  }
+  const base = read('styles/hero-looks.css');
+  const hall = read('styles/hero-look-hall.css');
+  for (const css of [base, hall]) {
+    for (const m of css.matchAll(/([^{}]*\.cs-card\s*)\{([^}]*)\}/g)) {
+      if (/animation:/.test(m[2])) assert.match(m[1], /\.cs-move-fold/, m[1].trim());
+    }
+  }
+  // Draw Steel redraws an open description on every change, so it doesn't animate in.
+  for (const m of hall.matchAll(/([^{}]*\.document-description\.expanded[^{]*)\{([^}]*)\}/g)) assert.doesNotMatch(m[2], /animation/, m[1].trim());
+});
+
+test('the settings window\'s rules for the classes this sheet shares are reset on the sheet', () => {
+  const heroClasses = new Set();
+  for (const look of HERO_LOOKS) {
+    for (const part of look.parts) {
+      for (const m of read(lookTemplate(look.id, part).replace('modules/chronicle-sync/', '')).matchAll(/class="([^"]*)"/g)) {
+        for (const c of m[1].split(/\s+/)) if (c.startsWith('cs-')) heroClasses.add(c);
+      }
+    }
+  }
+  const styles = JSON.parse(read('module.json')).styles.filter((f) => !f.includes('hero-look'));
+  const leaks = new Map();
+  for (const file of styles) {
+    const css = read(file).replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      for (const sel of m[1].split(',').map((x) => x.trim())) {
+        const compounds = sel.split(/[\s>+~]+/).filter(Boolean);
+        // Scoped to another window when any part names something this sheet doesn't use.
+        if (!compounds.length || !compounds.every((c) => /^\.cs-[a-z0-9-]+(:[a-z-]+(\([^)]*\))?)*$/.test(c) && heroClasses.has(c.slice(1).split(':')[0]))) continue;
+        const cls = compounds.at(-1).slice(1).split(':')[0];
+        const props = leaks.get(cls) ?? new Set();
+        for (const d of m[2].split(';')) { const k = d.split(':')[0].trim(); if (k) props.add(k); }
+        leaks.set(cls, props);
+      }
+    }
+  }
+  // A new shared class is a decision: reset it below and add it here.
+  assert.deepEqual([...leaks.keys()].sort(), ['cs-field', 'cs-group', 'cs-lab', 'cs-state']);
+  const base = read('styles/hero-looks.css');
+  const LAYOUT = /^(padding|margin|border|display|grid-template-columns|font-size|font-weight|letter-spacing|text-transform|color|text-align)/;
+  for (const [cls, props] of leaks) {
+    const rule = base.match(new RegExp(`\\.chronicle-hero-sheet \\.${cls} \\{([^}]*)\\}`))?.[1] ?? '';
+    const declared = new Set(rule.split(';').map((d) => d.split(':')[0].trim()));
+    for (const prop of props) {
+      if (!LAYOUT.test(prop)) continue;
+      const short = prop.split('-')[0];
+      assert.ok(declared.has(prop) || (['padding', 'margin', 'border'].includes(short) && declared.has(short) && prop !== 'border-radius'), `${cls}: ${prop} not reset`);
+    }
+  }
+});
+
+test('the portrait hall is drawn in Foundry\'s dark theme; another look gives the window its own theme back', () => {
+  const el = { dataset: {}, classList: fakeClassList() };
+  el.classList.add('themed', 'theme-light');
+  forceDarkTheme(el, true);
+  assert.ok(el.classList.contains('theme-dark') && el.classList.contains('themed'));
+  assert.equal(el.classList.contains('theme-light'), false);
+  forceDarkTheme(el, true);
+  assert.equal(el.dataset.csTheme, 'themed theme-light');
+  forceDarkTheme(el, false);
+  assert.ok(el.classList.contains('theme-light') && el.classList.contains('themed'));
+  assert.equal(el.classList.contains('theme-dark'), false);
+  assert.equal(el.dataset.csTheme, undefined);
+  // A window that followed the page's theme goes back to following it.
+  const bare = { dataset: {}, classList: fakeClassList() };
+  forceDarkTheme(bare, true);
+  forceDarkTheme(bare, false);
+  for (const c of ['themed', 'theme-dark', 'theme-light']) assert.equal(bare.classList.contains(c), false, c);
+  forceDarkTheme(bare, false);
+  assert.equal(bare.dataset.csTheme, undefined);
+});
+
+test('the boxes get the hall\'s plaques, ring, diamonds and skill names', async () => {
+  const Sheet = makeChronicleHeroSheet(fakeBase());
+  const hero = fakeHero();
+  hero.system.characteristics = { might: { value: 2 }, agility: { value: 1 }, reason: { value: -1 } };
+  hero.system.hero = { primary: { value: 3 }, surges: 1, epic: { value: 0 } };
+  hero.system.skills = { value: new Set(['sneak', 'alchemy']) };
+  const saved = globalThis.ds;
+  globalThis.ds = { CONFIG: { skills: { list: { alchemy: { label: 'Alchemy' }, sneak: { label: 'Sneak' } } } } };
+  try {
+    const { chronicle } = await new Sheet(hero)._preparePartContext('stats', {}, {});
+    assert.deepEqual(chronicle.metals, { might: 'gold', agility: 'bronze', reason: 'iron' });
+    assert.equal(chronicle.ring.length, 8);
+    assert.equal(chronicle.primaryDiamonds.length, 3);
+    assert.equal(chronicle.surgeDiamonds.length, 1);
+    assert.deepEqual(chronicle.epicDiamonds, []);
+    assert.deepEqual(chronicle.skills, ['Alchemy', 'Sneak']);
+  } finally {
+    globalThis.ds = saved;
+  }
+});
+
+test('the hall\'s opening replaces Chronicle\'s window grow', () => {
+  const saved = { document: globalThis.document, Hooks: globalThis.Hooks, game: globalThis.game, HTMLElement: globalThis.HTMLElement };
+  let onRender = null;
+  try {
+    globalThis.HTMLElement = class {};
+    globalThis.document = { addEventListener: () => {}, documentElement: { dataset: {} } };
+    globalThis.Hooks = { on: (name, fn) => { if (name === 'renderApplicationV2') onRender = fn; } };
+    globalThis.game = { settings: { get: () => 'full' } };
+    registerMotion();
+    const win = (own) => {
+      const el = { classList: fakeClassList(), style: { setProperty: () => {} }, addEventListener: () => {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 10, height: 10 }) };
+      if (own) el.classList.add('cs-own-opening');
+      return el;
+    };
+    const app = { options: { classes: ['chronicle-hero-sheet'] } };
+    const hall = win(true);
+    onRender({ ...app, element: hall }, hall, {}, { isFirstRender: true });
+    assert.equal(hall.classList.contains('cs-grow'), false);
+    const chronicle = win(false);
+    onRender({ ...app, element: chronicle }, chronicle, {}, { isFirstRender: true });
+    assert.equal(chronicle.classList.contains('cs-grow'), true);
+  } finally {
+    Object.assign(globalThis, saved);
+  }
+});
+
+test('the hall stylesheet gives every one of the sheet\'s tokens a value, so it is one set of values', () => {
+  const base = read('styles/hero-looks.css');
+  const hall = read('styles/hero-look-hall.css');
+  const block = (css, sel) => {
+    const at = css.indexOf(`${sel} {`);
+    assert.ok(at >= 0, sel);
+    return css.slice(at, css.indexOf('}', at));
+  };
+  const names = (css) => new Set([...css.matchAll(/(--cs-hero-[a-z-]+)\s*:/g)].map((m) => m[1]));
+  const defaults = names(block(base, '.chronicle-hero-sheet'));
+  const values = names(block(hall, '.chronicle-hero-sheet[data-cs-look="hall"]'));
+  const read_ = new Set([...base.matchAll(/var\((--cs-hero-[a-z-]+)/g)].map((m) => m[1]));
+  for (const t of read_) assert.ok(defaults.has(t), `${t} has no Chronicle value`);
+  // The ease is shared; every colour, face and corner the sheet reads has a hall value.
+  for (const t of read_) if (t !== '--cs-hero-ease') assert.ok(values.has(t), `${t} has no hall value`);
+  // Corners are lengths, as the sheet's min() radii need.
+  assert.match(block(hall, '.chronicle-hero-sheet[data-cs-look="hall"]'), /--cs-hero-radius: 0px;/);
+  // The base reads no page token directly outside its defaults.
+  assert.equal(base.replace(block(base, '.chronicle-hero-sheet'), '').match(/var\(--cs-page-/g), null);
+});
+
+test('the hall\'s moves: each has its Calm, and every font it uses ships with its licence', () => {
+  const hall = read('styles/hero-look-hall.css');
+  for (const move of ['open', 'hit', 'heal', 'level', 'editin']) assert.match(hall, new RegExp(`\\.cs-move-${move}\\b`), move);
+  assert.match(hall, /html\[data-cs-motion="calm"\] \.chronicle-hero-sheet\[data-cs-look="hall"\]/);
+  // Pseudo-elements inside :is() would void the whole selector.
+  assert.doesNotMatch(hall, /:is\([^)]*::/);
+  for (const m of hall.matchAll(/url\("\.\.\/fonts\/([^"]+)"\)/g)) {
+    assert.doesNotThrow(() => read(`fonts/${m[1]}`), m[1]);
+  }
+  for (const f of ['Cinzel-OFL.txt', 'EBGaramond-OFL.txt']) assert.match(read(`fonts/${f}`), /SIL Open Font License/);
+  assert.ok(JSON.parse(read('module.json')).styles.indexOf('styles/hero-look-hall.css') > JSON.parse(read('module.json')).styles.indexOf('styles/hero-looks.css'));
 });

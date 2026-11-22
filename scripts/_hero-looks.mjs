@@ -5,12 +5,38 @@
  * own prepared data; this file only turns it into widths and labels.
  */
 
-/** The looks a hero can be drawn in, first one the default. */
+/**
+ * The looks a hero can be drawn in, first one the default. `parts` are the
+ * parts a look draws with its own templates; the rest are the first look's.
+ */
 export const HERO_LOOKS = Object.freeze([
-  Object.freeze({ id: 'chronicle', label: 'CHRONICLE.HeroSheet.Looks.chronicle' }),
+  Object.freeze({ id: 'chronicle', label: 'CHRONICLE.HeroSheet.Looks.chronicle', parts: Object.freeze(['header', 'stats', 'card']) }),
+  Object.freeze({ id: 'hall', label: 'CHRONICLE.HeroSheet.Looks.hall', parts: Object.freeze(['header', 'stats']) }),
 ]);
 
 export const DEFAULT_LOOK = HERO_LOOKS[0].id;
+
+/** Where the looks' templates live. */
+export const LOOK_TEMPLATE_DIR = 'modules/chronicle-sync/templates/hero-looks';
+
+/**
+ * The template a look draws one of its parts with: its own, or the first
+ * look's when it has none. Null for a part no look draws.
+ * @param {string} look
+ * @param {string} part
+ * @returns {string|null}
+ */
+export function lookTemplate(look, part) {
+  const own = HERO_LOOKS.find((l) => l.id === look && l.parts.includes(part));
+  const base = HERO_LOOKS[0].parts.includes(part) ? HERO_LOOKS[0] : null;
+  const from = own ?? base;
+  return from ? `${LOOK_TEMPLATE_DIR}/${from.id}/${part}.hbs` : null;
+}
+
+/** Every look template, for loading them before the first draw. */
+export function allLookTemplates() {
+  return [...new Set(HERO_LOOKS.flatMap((l) => l.parts.map((part) => lookTemplate(l.id, part))))];
+}
 
 /** The actor flag holding a hero's look, under the module's scope. */
 export const LOOK_FLAG = 'heroLook';
@@ -63,21 +89,23 @@ export const DRAW_STEEL_PLUS_MODULE = 'draw-steel-plus';
 /**
  * The look picker's rows: each Chronicle look, then Draw Steel Plus while
  * that module is on and its sheet registered, then Draw Steel's own sheet,
- * always, so nobody is stuck on a look they dislike. A lock greys out the
- * Chronicle looks for players; the other sheets stay open to them.
+ * always, so nobody is stuck on a look they dislike. A lock means every
+ * hero uses the world's default look, so it greys out the other Chronicle
+ * looks for everyone, the GM included (the GM is told where the lock is);
+ * the other sheets stay open.
  * @param {{current: string, locked?: boolean, isGM?: boolean, plusActive?: boolean, registered?: (id: string) => boolean}} state
  * @returns {{kind: 'look'|'sheet', id: string, label: string, note: string|null, tag: string|null, checked: boolean, disabled: boolean}[]}
  */
 export function pickerRows({ current, locked = false, isGM = false, plusActive = false, registered = () => true }) {
-  const lockedOut = locked && !isGM;
+  const lockNote = isGM ? 'CHRONICLE.HeroSheet.Picker.LockedGM' : 'CHRONICLE.HeroSheet.Picker.Locked';
   const rows = HERO_LOOKS.map((l) => ({
     kind: 'look',
     id: l.id,
     label: l.label,
-    note: lockedOut ? 'CHRONICLE.HeroSheet.Picker.Locked' : null,
+    note: locked ? lockNote : null,
     tag: l.id === current ? 'CHRONICLE.HeroSheet.Picker.Now' : null,
     checked: l.id === current,
-    disabled: lockedOut && l.id !== current,
+    disabled: locked && l.id !== current,
   }));
   if (plusActive && registered(DRAW_STEEL_PLUS_SHEET)) {
     rows.push({
@@ -309,4 +337,86 @@ export function conditionList(statusIds, statusEffects, hidden = []) {
     out.push({ id, name: s.name || id, img: s.img || null });
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * The metal a characteristic's plaque is cast in on the portrait hall look:
+ * gold at +2 or more, bronze at +1, iron at 0 or below.
+ * @param {unknown} value
+ * @returns {'gold'|'bronze'|'iron'}
+ */
+export function plaqueMetal(value) {
+  const v = num(value) ?? 0;
+  if (v >= 2) return 'gold';
+  return v >= 1 ? 'bronze' : 'iron';
+}
+
+const round2 = (n) => Math.round(n * 100) / 100;
+
+/**
+ * The recovery arcs inside the portrait hall's Stamina ring: one per
+ * recovery, lit while unspent, on a circle measured as 100 (pathLength).
+ * A hero with more than `cap` recoveries gets the number alone.
+ * @param {number} value
+ * @param {number} max
+ * @param {number} [cap]
+ * @returns {{dash: string, offset: number, on: boolean}[]|null}
+ */
+export function ringSegments(value, max, cap = 12) {
+  const dots = recoveryDots(value, max, cap);
+  if (!dots) return null;
+  const n = dots.length;
+  const gap = n > 1 ? Math.min(3, 30 / n) : 0;
+  const len = round2(100 / n - gap);
+  return dots.map((on, i) => ({ dash: `${len} ${round2(100 - len)}`, offset: round2(-(i * (100 / n) + gap / 2)), on }));
+}
+
+/**
+ * Lit diamonds for a count with no maximum (a heroic resource, surges): one
+ * per point up to `cap`, so a big number doesn't run off the row; the field
+ * beside it holds the true number.
+ * @param {unknown} value
+ * @param {number} [cap]
+ * @returns {true[]}
+ */
+export function countDiamonds(value, cap = 10) {
+  const v = Math.max(0, Math.floor(num(value) ?? 0));
+  return Array.from({ length: Math.min(v, cap) }, () => true);
+}
+
+/**
+ * The hero's skills by name, sorted, as Draw Steel names them in its list.
+ * @param {Iterable<string>} keys  system.skills.value
+ * @param {Record<string, {label?: string}>} catalogue  ds.CONFIG.skills.list
+ * @param {string} [lang]
+ * @returns {string[]}
+ */
+export function skillNames(keys, catalogue, lang) {
+  const names = [];
+  for (const key of keys ?? []) {
+    const label = catalogue?.[key]?.label;
+    if (label) names.push(label);
+  }
+  return names.sort((a, b) => a.localeCompare(b, lang));
+}
+
+/**
+ * What changed between two draws of the sheet, for the look's moves: a hit
+ * or a heal when Stamina moved, a level gained, Edit mode entered.
+ * @param {{stamina?: number|null, level?: number|null, isPlay?: boolean}|null} before
+ * @param {{stamina?: number|null, level?: number|null, isPlay?: boolean}} after
+ * @returns {('hit'|'heal'|'level'|'editin')[]}
+ */
+export function sheetChanges(before, after) {
+  if (!before || !after) return [];
+  const out = [];
+  const b = num(before.stamina);
+  const a = num(after.stamina);
+  if (b !== null && a !== null && a < b) out.push('hit');
+  if (b !== null && a !== null && a > b) out.push('heal');
+  const lb = num(before.level);
+  const la = num(after.level);
+  if (lb !== null && la !== null && la > lb) out.push('level');
+  if (before.isPlay === true && after.isPlay === false) out.push('editin');
+  return out;
 }
