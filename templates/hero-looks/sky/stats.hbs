@@ -21,7 +21,7 @@ active-effect locks work. Edit: Draw Steel's own stat editors. --}}
         {{formInput systemFields.stamina.fields.value value=system.stamina.value dataset=datasets.notSource}}
       </label>
       {{#if editable}}
-      <button type="button" class="cs-sky-k" data-action="spendStaminaHeroToken" data-tooltip="DRAW_STEEL.Setting.HeroTokens.RegainStamina.tooltip">{{localize "CHRONICLE.HeroSheet.OfStamina" max=system.stamina.max}}</button>
+      <button type="button" class="cs-sky-k" data-action="spendStaminaHeroToken" data-tooltip="DRAW_STEEL.Setting.HeroTokens.RegainStamina.tooltip" aria-label="{{localize "CHRONICLE.HeroSheet.HeroToken"}}: {{localize "CHRONICLE.HeroSheet.OfStamina" max=system.stamina.max}}">{{localize "CHRONICLE.HeroSheet.OfStamina" max=system.stamina.max}}</button>
       {{else}}
       <span class="cs-sky-k">{{localize "CHRONICLE.HeroSheet.OfStamina" max=system.stamina.max}}</span>
       {{/if}}

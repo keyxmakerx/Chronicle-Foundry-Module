@@ -174,7 +174,8 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 100cqw;
+  /* Past the content box, so it fills the strip the scrollbar gutter reserves. */
+  width: calc(100cqw + 24px);
   height: 100cqh;
   overflow: hidden;
 }
@@ -693,7 +694,7 @@
 }
 .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-pl b { font: 300 max(16px, calc(var(--u) * 22))/1.15 var(--cs-sky-display); font-variant-numeric: tabular-nums; transition: text-shadow 0.3s ease; }
 .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-pl span {
-  max-width: 100%;
+  flex: none;
   font: 400 9.5px/1.4 var(--cs-sky-display);
   letter-spacing: 0.2em;
   text-transform: uppercase;
@@ -854,7 +855,7 @@
 .chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .item-row:hover .item-name .label { color: var(--cs-sky-ink); text-shadow: 0 0 12px color-mix(in srgb, var(--cs-sky-peri) 55%, transparent); }
 .chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .item-controls a:focus-visible { outline: 1px solid var(--cs-sky-gold); outline-offset: 2px; border-radius: 50%; }
 .chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .document-description.expanded { font: italic 400 15.5px/1.45 var(--cs-sky-serif); }
-.chronicle-hero-sheet[data-cs-look="sky"] .draw-steel.actor.chronicle-hero-sheet .item-list-container :is(.item-cost, .item-distance, .item-target) { width: 84px; }
+.draw-steel.actor.chronicle-hero-sheet[data-cs-look="sky"] .item-list-container :is(.item-cost, .item-distance, .item-target) { width: 84px; }
 .chronicle-hero-sheet[data-cs-look="sky"] section.tab :is(fieldset legend, h3, h4) {
   font: 400 10px var(--cs-sky-display);
   letter-spacing: 0.3em;
@@ -1118,7 +1119,7 @@
   15% { opacity: 1; }
   100% { opacity: 0; transform: rotate(152deg) translateX(620px); }
 }
-@keyframes cs-sky-nova { 0% { opacity: 0.13; transform: scale(1); } 30% { opacity: 0.42; transform: scale(1.7); } 100% { opacity: 0.13; transform: scale(1); } }
+@keyframes cs-sky-nova { 0% { opacity: 0.13; transform: scale(1); } 30% { opacity: 0.7; transform: scale(1.9); } 100% { opacity: 0.13; transform: scale(1); } }
 @keyframes cs-sky-card-in { from { opacity: 0; transform: translateY(50px); } }
 @keyframes cs-sky-menu-in { from { opacity: 0; transform: translateY(-3px); } }
 @keyframes cs-sky-menu-out { to { opacity: 0; } }
@@ -1130,7 +1131,15 @@
    appears without drawing, nothing travels, and no star shoots or falls. The
    eclipse, the red horizon and the aurora are a brief fade of the same light. */
 html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"] :is(.cs-sky-stars i, .cs-sky-orbit, .cs-sky-core, .cs-sky-ready, .cs-sky-lvlup .fa-solid) { animation: none; }
-html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"]:is(.cs-move-open, .cs-move-level, .cs-move-editin, .cs-move-fold) :is(.cs-sky-moon, .cs-sky-ring, .cs-sky-id, .cs-sky-nums, .cs-sky-skills, .cs-sky-link, .cs-sky-star, .cs-sky-pl, .cs-card, .cs-edit > *, .cs-name-edit input, .window-content > :is(nav.tabs, section.tab)) {
+/* Only what a move already animates at Full is renamed to the fade, and only in that move. */
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"].cs-move-open :is(.cs-sky-moon, .cs-sky-ring, .cs-sky-id, .cs-sky-nums, .cs-sky-skills, .cs-sky-link, .cs-sky-star, .cs-sky-pl, .window-content > :is(nav.tabs, section.tab)) {
+  animation-name: cs-sky-fade;
+  animation-duration: 0.35s;
+  animation-delay: 0s;
+}
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"].cs-move-level .cs-sky-link,
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"].cs-move-editin :is(.cs-edit > *, .cs-name-edit input),
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"].cs-move-fold .cs-card {
   animation-name: cs-sky-fade;
   animation-duration: 0.35s;
   animation-delay: 0s;
@@ -1144,4 +1153,5 @@ html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"] :is(.cs-me
 html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"] .cs-menu.cs-menu-out { animation-name: cs-sky-fade; animation-direction: reverse; }
 html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"] :is(.cs-sky-disc .cs-portrait-btn, .cs-card-art):hover .cs-portrait,
 html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"] .cs-card-art:hover img { transform: none; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .item-row::before { transform: none; }
 @keyframes cs-sky-aurora-fade { 0%, 100% { opacity: 0; } 50% { opacity: 0.8; } }

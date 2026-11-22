@@ -5,7 +5,7 @@
  */
 
 /** How long this look's moves run (ms), where they differ from the shared timings. */
-export const MOVE_MS = Object.freeze({ open: 2400, hit: 1300, heal: 2300, level: 2800 });
+export const MOVE_MS = Object.freeze({ open: 2400, hit: 1300, heal: 2300, level: 2800, fold: 1000 });
 
 /** The constellation's drawing space; the SVG and the roll buttons both scale from it. */
 export const CONSTELLATION_BOX = Object.freeze({ width: 590, height: 240 });

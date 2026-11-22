@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Pins the night sky look's figures (scripts/_hero-look-sky.mjs): the constellation's stars and lines. */
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import {
   CONSTELLATION_BOX, MAX_TIER, MOVE_MS, STAR_LINKS, STAR_PLACES, constellation, lookContext, starPath, starTier,
@@ -73,4 +74,50 @@ test('the context is the constellation, read from Draw Steel\'s characteristics'
 
 test('the look\'s move timings stay under the 4 second ceiling', () => {
   for (const [move, ms] of Object.entries(MOVE_MS)) assert.ok(ms > 0 && ms <= 4000, move);
+});
+
+const css = readFileSync(new URL('../styles/hero-look-sky.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+
+/** Seconds in a time token or a calc() of them, with --i at its largest (4). */
+function seconds(expr) {
+  const e = expr.replace(/var\(--i\)/g, '4').replace(/calc\(/g, '(').replace(/(-?[\d.]+)s/g, '$1');
+  return Function(`return (${e})`)();
+}
+
+/** The moves' longest animation, delay included, from the stylesheet's own rules. */
+function longestByMove() {
+  const out = {};
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const move = m[1].match(/\.cs-move-(\w+)/)?.[1];
+    if (!move || m[1].includes('data-cs-motion')) continue;
+    const decl = m[2].match(/animation:\s*([^;]+);/)?.[1];
+    if (decl) {
+      const times = decl.match(/calc\((?:[^()]|\([^()]*\))*\)|(?<![\w.-])-?[\d.]+s/g) ?? [];
+      const [dur, delay = '0s'] = times;
+      out[move] = Math.max(out[move] ?? 0, (seconds(dur) + seconds(delay)) * 1000);
+    }
+  }
+  return out;
+}
+
+test('every move\'s timing covers the longest animation it runs', () => {
+  const longest = longestByMove();
+  assert.ok(Object.keys(longest).length >= 5, Object.keys(longest).join());
+  const SHARED = { open: 1500, hit: 950, heal: 1050, level: 2200, editin: 900, fold: 600 };
+  for (const [move, ms] of Object.entries(longest)) {
+    assert.ok((MOVE_MS[move] ?? SHARED[move]) >= ms, `${move}: ${MOVE_MS[move] ?? SHARED[move]} < ${ms}`);
+  }
+});
+
+test('no selector names the sheet twice, so none can look for a sheet inside the window', () => {
+  for (const m of css.matchAll(/([^{}]+)\{/g)) {
+    for (const sel of m[1].split(',')) assert.ok((sel.match(/\.chronicle-hero-sheet/g) ?? []).length <= 1, sel.trim());
+  }
+});
+
+test('Calm renames only what a move already animates at Full', () => {
+  for (const m of css.matchAll(/html\[data-cs-motion="calm"\][^{}]*\{([^{}]*)\}/g)) {
+    if (!/animation-name|animation-duration/.test(m[1])) continue;
+    assert.match(m[0], /\.cs-move-(open|level|editin|fold|hit|heal)|\.cs-menu/, m[0].slice(0, 120));
+  }
 });
