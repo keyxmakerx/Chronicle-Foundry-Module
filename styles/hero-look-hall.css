@@ -178,10 +178,10 @@
   background: radial-gradient(80% 90% at 40% 45%, #0000 30%, #b3121fcc 100%);
 }
 .chronicle-hero-sheet[data-cs-look="hall"] .cs-hall-sweep {
-  top: -10%;
+  top: 0;
   left: 0;
   width: 240px;
-  height: calc(100cqh * 1.2);
+  height: 100cqh;
   background: linear-gradient(100deg, #0000, #fff3c455 45%, #fff8dd99 50%, #fff3c455 55%, #0000);
   transform: translateX(-300px) skewX(-14deg);
 }
@@ -269,7 +269,7 @@
 }
 .chronicle-hero-sheet[data-cs-look="hall"] .cs-hall-lvlup i { -webkit-text-fill-color: var(--cs-hall-gold); filter: drop-shadow(0 0 4px #f4d58d); }
 /* Sized to the picture's width; a name too long for it breaks between
-   words, and only splits a word that can't fit on its own. */
+   words, and only splits a word too long for the line on its own. */
 .chronicle-hero-sheet[data-cs-look="hall"] .cs-hall-id .cs-name {
   margin: 6px 0 4px;
   font: 600 clamp(28px, 12.5cqi, 66px)/1.02 var(--cs-hall-display);
@@ -277,7 +277,6 @@
   color: var(--cs-hall-ink);
   text-shadow: 0 2px 24px #000, 0 0 2px #000;
   overflow-wrap: break-word;
-  hyphens: auto;
 }
 .chronicle-hero-sheet[data-cs-look="hall"] .cs-name-edit input {
   height: 48px;
@@ -396,7 +395,8 @@
     linear-gradient(#f4d58d55, #f4d58d55) 0 100% / 100% 1px no-repeat;
 }
 .chronicle-hero-sheet[data-cs-look="hall"] .cs-field input[type="number"]:focus {
-  outline: none;
+  outline: 1px solid #f4d58daa;
+  outline-offset: 3px;
   background:
     linear-gradient(#f4d58d, #f4d58d) 50% 100% / 100% 1.5px no-repeat,
     linear-gradient(#f4d58d55, #f4d58d55) 0 100% / 100% 1px no-repeat;
@@ -677,7 +677,7 @@
     radial-gradient(90% 60% at 50% 0, #252b30, #0d1114 70%);
 }
 .chronicle-hero-sheet[data-cs-look="hall"] .cs-hall-pl > * { position: relative; z-index: 1; }
-.chronicle-hero-sheet[data-cs-look="hall"] .cs-hall-pl b { font: 600 clamp(26px, 3.4cqi, 38px)/1 var(--cs-hall-display); color: var(--cs-hall-ink); text-shadow: 0 0 14px #ffffff44; }
+.chronicle-hero-sheet[data-cs-look="hall"] .cs-hall-pl b { font: 600 clamp(24px, 6.5cqi, 38px)/1 var(--cs-hall-display); color: var(--cs-hall-ink); text-shadow: 0 0 14px #ffffff44; }
 .chronicle-hero-sheet[data-cs-look="hall"] .cs-hall-pl span {
   max-width: calc(100% - 10px);
   margin-top: 4px;
@@ -763,7 +763,7 @@
 .draw-steel.actor.chronicle-hero-sheet[data-cs-look="hall"] .item-list-container :is(.item-cost, .item-distance, .item-target) { width: 84px; }
 .chronicle-hero-sheet[data-cs-look="hall"] .item-list-container .item-row .item-name .keywords { font-style: italic; font-size: 13px; }
 .chronicle-hero-sheet[data-cs-look="hall"] .item-list-container .item-row .item-name img { border-color: #f4d58d33; }
-.chronicle-hero-sheet[data-cs-look="hall"] .item-list-container .document-description.expanded { font-size: 15px; animation: cs-hall-rise 320ms var(--cs-hall-slow) both; }
+.chronicle-hero-sheet[data-cs-look="hall"] .item-list-container .document-description.expanded { font-size: 15px; }
 .chronicle-hero-sheet[data-cs-look="hall"] section.tab :is(fieldset legend, h3, h4) {
   font: 600 9.5px var(--cs-hall-display);
   letter-spacing: 0.22em;
@@ -777,7 +777,7 @@
 .chronicle-hero-sheet[data-cs-look="hall"] .cs-edit legend { font-family: var(--cs-hall-display); letter-spacing: 0.22em; color: var(--cs-hall-gold); }
 
 /* ---- Narrower windows -------------------------------------------------- */
-@container (max-width: 940px) {
+@container cs-hero (max-width: 940px) {
   .chronicle-hero-sheet[data-cs-look="hall"]:not(.cs-folded) .window-content { grid-template-columns: minmax(240px, 39%) minmax(0, 1fr) 58px; }
 }
 @container cs-hall (max-width: 860px) {
@@ -790,7 +790,7 @@
 }
 /* Too narrow for the picture beside the boxes: the picture becomes a
    banner over them, and the rail a row of tabs under it. */
-@container (max-width: 760px) {
+@container cs-hero (max-width: 760px) {
   .chronicle-hero-sheet[data-cs-look="hall"]:not(.cs-folded) .window-content {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto auto auto;
@@ -873,7 +873,7 @@
 .chronicle-hero-sheet[data-cs-look="hall"] .cs-card-chr:hover:not(:disabled) { border-color: var(--cs-hall-gold); box-shadow: 0 0 10px #f4d58d44; }
 .chronicle-hero-sheet[data-cs-look="hall"] .cs-card-actions .cs-btn { margin: 0; padding: 7px 4px; font-size: 9.5px; letter-spacing: 0.1em; }
 .chronicle-hero-sheet[data-cs-look="hall"] .cs-card-actions .cs-btn-main { background-color: #f4d58d1f; border-color: var(--cs-hall-gold); color: var(--cs-hall-gold); filter: none; }
-.chronicle-hero-sheet[data-cs-look="hall"] .cs-card { animation: cs-hall-card-in 500ms cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+.chronicle-hero-sheet[data-cs-look="hall"].cs-move-fold .cs-card { animation: cs-hall-card-in 500ms cubic-bezier(0.2, 0.9, 0.3, 1) both; }
 
 /* ---- Menus: black, a thin gold edge, square ---------------------------- */
 .chronicle-hero-sheet[data-cs-look="hall"] .cs-menu {
@@ -962,7 +962,7 @@
 @keyframes cs-hall-card-in { from { opacity: 0; transform: translateY(24px) scale(0.94); } }
 
 /* Calm: every move becomes a fade; glows stay, travelling light and turns stop. */
-html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="hall"] :is(.cs-hall-id, .cs-hall-stats > *, .cs-edit > *, .cs-menu, .cs-menu-item, .cs-card, .document-description.expanded) { animation-name: cs-hall-fade; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="hall"] :is(.cs-hall-id, .cs-hall-stats > *, .cs-edit > *, .cs-menu, .cs-menu-item, .cs-card) { animation-name: cs-hall-fade; }
 html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="hall"] .cs-menu.cs-menu-out { animation-name: cs-hall-fade; animation-direction: reverse; }
 html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="hall"] :is(.cs-hall-art .cs-portrait, .cs-hall-stam input, .cs-hall-sweep, .cs-hall-pl, .cs-hall-lvlup) { animation: none; }
 html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="hall"] .cs-hall-pl::after { animation: none; }

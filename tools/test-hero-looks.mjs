@@ -867,6 +867,89 @@ test('the portrait hall plays its opening, then a hit, a heal and a level; the C
   });
 });
 
+test('a Limited viewer of the portrait hall sees no hit or heal, since Draw Steel shows them no Stamina', async () => {
+  const Sheet = makeChronicleHeroSheet(fakeBase());
+  await withSettings({ heroSheetFolds: {}, heroLookDefault: 'chronicle', heroLookLocked: false }, async () => {
+    const hero = fakeHero({ flag: 'hall', value: 40, limited: true });
+    const sheet = new Sheet(hero);
+    const { element } = fakeWindow();
+    sheet.element = element;
+    await sheet._onRender({}, { isFirstRender: true });
+    assert.ok(element.classList.contains('cs-move-open'));
+    hero.system.stamina.value = 20;
+    await sheet._onRender({}, { isFirstRender: false });
+    assert.equal(element.classList.contains('cs-move-hit'), false);
+    hero.system.stamina.value = 50;
+    hero.system.level = 4;
+    await sheet._onRender({}, { isFirstRender: false });
+    assert.equal(element.classList.contains('cs-move-heal'), false);
+    // The level is in the header a Limited viewer gets.
+    assert.ok(element.classList.contains('cs-move-level'));
+  });
+});
+
+test('the card comes in when the sheet folds, in either look, and not on its redraws', async () => {
+  const Sheet = makeChronicleHeroSheet(fakeBase());
+  for (const flag of ['chronicle', 'hall']) {
+    await withSettings({ heroSheetFolds: {}, heroLookDefault: 'chronicle', heroLookLocked: false }, async () => {
+      const sheet = new Sheet(fakeHero({ flag }));
+      const { element } = fakeWindow();
+      sheet.element = element;
+      await Sheet.DEFAULT_OPTIONS.actions.csFold.call(sheet);
+      assert.ok(element.classList.contains('cs-move-fold'), flag);
+    });
+  }
+  const base = read('styles/hero-looks.css');
+  const hall = read('styles/hero-look-hall.css');
+  for (const css of [base, hall]) {
+    for (const m of css.matchAll(/([^{}]*\.cs-card\s*)\{([^}]*)\}/g)) {
+      if (/animation:/.test(m[2])) assert.match(m[1], /\.cs-move-fold/, m[1].trim());
+    }
+  }
+  // Draw Steel redraws an open description on every change, so it doesn't animate in.
+  for (const m of hall.matchAll(/([^{}]*\.document-description\.expanded[^{]*)\{([^}]*)\}/g)) assert.doesNotMatch(m[2], /animation/, m[1].trim());
+});
+
+test('the settings window\'s rules for the classes this sheet shares are reset on the sheet', () => {
+  const heroClasses = new Set();
+  for (const look of HERO_LOOKS) {
+    for (const part of look.parts) {
+      for (const m of read(lookTemplate(look.id, part).replace('modules/chronicle-sync/', '')).matchAll(/class="([^"]*)"/g)) {
+        for (const c of m[1].split(/\s+/)) if (c.startsWith('cs-')) heroClasses.add(c);
+      }
+    }
+  }
+  const styles = JSON.parse(read('module.json')).styles.filter((f) => !f.includes('hero-look'));
+  const leaks = new Map();
+  for (const file of styles) {
+    const css = read(file).replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      for (const sel of m[1].split(',').map((x) => x.trim())) {
+        const compounds = sel.split(/[\s>+~]+/).filter(Boolean);
+        // Scoped to another window when any part names something this sheet doesn't use.
+        if (!compounds.length || !compounds.every((c) => /^\.cs-[a-z0-9-]+(:[a-z-]+(\([^)]*\))?)*$/.test(c) && heroClasses.has(c.slice(1).split(':')[0]))) continue;
+        const cls = compounds.at(-1).slice(1).split(':')[0];
+        const props = leaks.get(cls) ?? new Set();
+        for (const d of m[2].split(';')) { const k = d.split(':')[0].trim(); if (k) props.add(k); }
+        leaks.set(cls, props);
+      }
+    }
+  }
+  // A new shared class is a decision: reset it below and add it here.
+  assert.deepEqual([...leaks.keys()].sort(), ['cs-field', 'cs-group', 'cs-lab', 'cs-state']);
+  const base = read('styles/hero-looks.css');
+  const LAYOUT = /^(padding|margin|border|display|grid-template-columns|font-size|font-weight|letter-spacing|text-transform|color|text-align)/;
+  for (const [cls, props] of leaks) {
+    const rule = base.match(new RegExp(`\\.chronicle-hero-sheet \\.${cls} \\{([^}]*)\\}`))?.[1] ?? '';
+    const declared = new Set(rule.split(';').map((d) => d.split(':')[0].trim()));
+    for (const prop of props) {
+      if (!LAYOUT.test(prop)) continue;
+      const short = prop.split('-')[0];
+      assert.ok(declared.has(prop) || (['padding', 'margin', 'border'].includes(short) && declared.has(short) && prop !== 'border-radius'), `${cls}: ${prop} not reset`);
+    }
+  }
+});
+
 test('the portrait hall is drawn in Foundry\'s dark theme; another look gives the window its own theme back', () => {
   const el = { dataset: {}, classList: fakeClassList() };
   el.classList.add('themed', 'theme-light');

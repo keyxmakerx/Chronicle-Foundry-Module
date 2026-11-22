@@ -350,6 +350,7 @@ In **Chronicle Sync → Settings → What syncs**.
 Needs Draw Steel 1.1.0 or later; on an older Draw Steel the sheet is not offered. Pick it on a hero: open the hero, title bar menu (three dots) -> Sheet -> Sheet: "Chronicle hero sheet" -> Save. Draw Steel's sheet stays the world's default.
 - [ ] The hero opens with the portrait, name, "Level N · class · subclass", origin chips (a missing one dashed, "Still to choose"), Level, XP and Victories; below, the characteristic and combat boxes, Stamina with its bar, recoveries, the heroic resource and surges, then potency, damage, conditions and skills; then the tabs, Abilities open
 - [ ] Light and dark interface themes both read cleanly
+- [ ] Insight, Surges and the epic resource each show their number in their box, and no stray line runs over the Stamina, Temporary or Recoveries numbers
 - [ ] Click a characteristic box -> Draw Steel's roll dialog for it
 - [ ] Type a new Stamina, temporary Stamina, recoveries, heroic resource or surges value -> it saves; the bar turns amber at or under the winded figure and red at 0 or less
 - [ ] Hero token, recovery heart and surge bolt buttons do what they do on Draw Steel's sheet
@@ -362,7 +363,7 @@ Needs Draw Steel 1.1.0 or later; on an older Draw Steel the sheet is not offered
 - [ ] A player who owns the hero sees the same; an Observer cannot roll or change values; a Limited viewer sees only the header (picture, name, class, origins, level, XP and victories), the tab row and the Biography tab, as on Draw Steel's sheet
 - [ ] Title bar: beside the padlock, a Fold button (two arrows) and a Sheet look button (palette)
 - [ ] Fold -> the window shrinks to a small card: picture, name, "Level N · class", the Stamina bar and number, recovery marks, the five characteristics, then Abilities, Respite and Open. Drag it beside the map
-- [ ] With the card out, damage the hero's token on the map -> the card's Stamina changes within a moment; the bar turns amber at the winded figure
+- [ ] With the card out, damage the hero's token on the map -> the card's Stamina changes within a moment, without the card moving; the bar turns amber at the winded figure
 - [ ] Click a characteristic on the card -> Draw Steel's roll dialog for it; Respite -> Draw Steel's respite
 - [ ] Abilities on the card -> the full sheet, on the Abilities tab; Open -> the full sheet at the size and place it had before folding
 - [ ] Close the card and open the hero again -> it opens as the card, where it was left. A second player on another computer still gets the full sheet until they fold it themselves
@@ -379,12 +380,12 @@ Needs Draw Steel 1.1.0 or later; on an older Draw Steel the sheet is not offered
 #### The portrait hall look
 Open a hero in the Chronicle hero sheet, then palette button in the title bar -> "The portrait hall".
 - [ ] The window grows to about 1100 by 760 and turns black and gold: the hero's picture fills the left, with "Level N · class · subclass", the name, the origins, XP, Victories and Take Respite over its foot, a thin gold frame round the window; on the right the Stamina ring, recoveries, heroic resource and surges as rows of diamonds, the combat line, five six-sided plaques and the skills; the tabs run down a gold rail on the far right, Abilities open
-- [ ] On first opening, the picture fades up, the name and boxes rise in turn and the plaques flip in, all within about a second and a half; set Motion (module settings) to Calm -> only fades; Off -> no movement at all. The same with the computer's "reduce motion" setting on
+- [ ] On first opening, the picture fades up and the name and boxes rise in turn, all within about a second and a half; set Motion (module settings) to Calm -> only fades; Off -> no movement at all. The same with the computer's "reduce motion" setting on
 - [ ] Pictures: try a bright picture, a wide landscape picture and a hero with no picture of its own. The name stays readable over the bright one, the wide one fills the left without stretching, and with no picture a gold shield outline stands in
-- [ ] A long name (about 20 letters) stays on one line at full size and wraps between words, never mid-word, when narrower
+- [ ] A long name (about 20 letters) wraps between words, never mid-word, and stays readable over the picture
 - [ ] Foundry's light theme: the hall stays dark and readable; switch the hero back to "Chronicle" -> the light look returns
 - [ ] Plaques: a characteristic of 2 or more is gold, 1 bronze, 0 or less iron; hover lifts a plaque; click it -> Draw Steel's roll dialog
-- [ ] Damage the hero (its token on the map, or type a lower Stamina) -> the picture jolts, its edges flash red and the Stamina number thumps; at or under the winded figure the ring turns amber and says "Winded", at 0 or less red and "Dying". Heal it -> the ring glows for a moment and turns back to green
+- [ ] With no temporary Stamina, damage the hero (its token on the map, or type a lower Stamina) -> the picture jolts, its edges flash red and the Stamina number thumps; at or under the winded figure the ring turns amber and says "Winded", at 0 or less red and "Dying". Heal it -> the ring glows for a moment and turns back to green
 - [ ] With Level up showing, the level glints; level the hero up -> a gold light sweeps across the window
 - [ ] Type in Stamina, temporary Stamina, recoveries, heroic resource and surges -> each saves; the hero token, recovery heart and surge bolt buttons work as on Draw Steel's sheet
 - [ ] Drag the window narrower: about 820 wide everything still fits beside the picture; under about 760 the picture becomes a banner across the top, the boxes go under it and the tabs become a row
@@ -392,7 +393,7 @@ Open a hero in the Chronicle hero sheet, then palette button in the title bar ->
 - [ ] Edit mode (padlock): the name field, origins with remove and add, XP and Victories fields, and Draw Steel's editors on the right, rising in one after another
 - [ ] Fold -> the card in black and gold, with all five characteristic names readable; Open -> the hall again, at its size
 - [ ] Press Tab through the sheet -> a clear gold ring shows on each plaque, button and field
-- [ ] A Limited viewer sees the hall's picture, name, class, origins, level, XP and victories, the tab rail and Biography, and nothing else
+- [ ] A Limited viewer sees the hall's picture, name, class, origins, level, XP and victories, the tab rail and Biography, and nothing else; when the GM damages or heals the hero, the picture doesn't jolt or flash for them
 - [ ] Module settings now show "Default hero sheet look" and "Lock hero sheet looks" (GM only). Set the default to "The portrait hall" -> a hero that never picked a look opens in the hall. Turn the lock on -> every hero shows the default look; the Sheet look menu greys out the other looks with a note ("Your GM has set the look for every hero" for a player, "Locked to the world's default look in the module settings" for the GM), and "Draw Steel's own sheet" still works for both
 - [ ] Picking the hall changes nothing in Chronicle: the hero's history in Chronicle shows no new entry
 

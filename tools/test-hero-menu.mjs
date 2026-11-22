@@ -379,6 +379,41 @@ test('picking a look stores it on the hero, picking another sheet stores that; t
   ]);
 }));
 
+test('picking a look gives the window that look\'s size; back to Chronicle, the sheet\'s own', () => withGlobals(async () => {
+  let look;
+  const { Sheet, sheet, root, anchor } = sheetFor({ update: async (data) => { look = data['flags.chronicle-sync.heroLook'] ?? look; } });
+  const flag = sheet.document.getFlag;
+  sheet.document.getFlag = (scope, key) => (key === 'heroLook' ? look : flag(scope, key));
+  sheet.options.position = { width: 820, height: 780 };
+  const sizes = [];
+  sheet.setPosition = (p) => sizes.push(p);
+  const pick = async (i) => {
+    Sheet.DEFAULT_OPTIONS.actions.csLookPicker.call(sheet, {}, anchor);
+    fire(items(menuOf(root))[i], 'click');
+    fire(menuOf(root), 'animationend');
+    await new Promise((r) => setImmediate(r));
+  };
+  await pick(1);
+  assert.deepEqual(sizes, [{ width: 1100, height: 760 }]);
+  await pick(0);
+  assert.deepEqual(sizes, [{ width: 1100, height: 760 }, { width: 820, height: 780 }]);
+}));
+
+test('picking a look while folded leaves the card where it is', () => withGlobals(async () => {
+  let look;
+  const { Sheet, sheet, root, anchor } = sheetFor({ folded: true, update: async (data) => { look = data['flags.chronicle-sync.heroLook'] ?? look; } });
+  const flag = sheet.document.getFlag;
+  sheet.document.getFlag = (scope, key) => (key === 'heroLook' ? look : flag(scope, key));
+  const sizes = [];
+  sheet.setPosition = (p) => sizes.push(p);
+  assert.equal(sheet.folded, true);
+  Sheet.DEFAULT_OPTIONS.actions.csLookPicker.call(sheet, {}, anchor);
+  fire(items(menuOf(root))[1], 'click');
+  await new Promise((r) => setImmediate(r));
+  assert.equal(look, 'hall');
+  assert.deepEqual(sizes, []);
+}));
+
 test('a picker write that fails tells the player and leaves the sheet as it was', () => withGlobals(async () => {
   const warned = [];
   const { Sheet, sheet, root, anchor } = sheetFor({ update: async () => { throw new Error('no permission'); } });

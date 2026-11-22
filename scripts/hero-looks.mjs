@@ -73,7 +73,7 @@ export function forceDarkTheme(el, dark) {
 }
 
 /** How long each of a look's moves runs, so its class comes off after (ms). */
-const MOVE_MS = { open: 1500, hit: 950, heal: 1050, level: 2200, editin: 900 };
+const MOVE_MS = { open: 1500, hit: 950, heal: 1050, level: 2200, editin: 900, fold: 600 };
 
 /** The title bar's Fold button: fold in, or open out. */
 const FOLD_ICON = 'fa-solid fa-down-left-and-up-right-to-center';
@@ -249,7 +249,7 @@ export function makeChronicleHeroSheet(Base) {
       }
       for (const el of this.element?.querySelectorAll?.('.window-content > [data-application-part]') ?? []) el.remove();
       this.#drawn = null;
-      const full = this.#fullPosition ?? { width: this.options.position?.width, height: this.options.position?.height };
+      const full = this.#fullPosition ?? this.#lookSize();
       this.#fullPosition = null;
       await super.render({ force: true });
       this.setPosition({ ...full });
@@ -262,7 +262,12 @@ export function makeChronicleHeroSheet(Base) {
       if (!options.isFirstRender) return;
       // Open straight into the card, so the full sheet never flashes first.
       if (this.folded) options.position = { ...(options.position ?? {}), ...this.#cardPosition() };
-      else if (LOOK_SIZE[this.look]) options.position = { ...(options.position ?? {}), ...LOOK_SIZE[this.look] };
+      else if (LOOK_SIZE[this.look]) options.position = { ...(options.position ?? {}), ...this.#lookSize() };
+    }
+
+    /** The full sheet's size in a look: its own, or the sheet's default. */
+    #lookSize(look = this.look) {
+      return LOOK_SIZE[look] ?? { width: this.options.position?.width, height: this.options.position?.height };
     }
 
     /** @override */
@@ -377,7 +382,9 @@ export function makeChronicleHeroSheet(Base) {
       const before = this.#seen;
       this.#seen = now;
       if (this.folded || !OWN_OPENING_LOOKS.has(this.look)) return;
-      const moves = options?.isFirstRender ? ['open'] : sheetChanges(before, now);
+      let moves = options?.isFirstRender ? ['open'] : sheetChanges(before, now);
+      // Draw Steel shows a Limited viewer no Stamina, so no hit or heal either.
+      if (this.document?.limited) moves = moves.filter((m) => m !== 'hit' && m !== 'heal');
       for (const move of moves) this.#play(move);
     }
 
@@ -461,9 +468,11 @@ export function makeChronicleHeroSheet(Base) {
       await this.render();
       // The card failed and the full sheet opened instead, already in place.
       if (this.folded !== folded) return;
-      const full = this.#fullPosition ?? { width: this.options.position?.width, height: this.options.position?.height };
+      const full = this.#fullPosition ?? this.#lookSize();
       this.setPosition(folded ? this.#cardPosition() : { ...full });
       if (!folded) this.#fullPosition = null;
+      // The card comes in once here, not on each redraw of it.
+      else this.#play('fold');
       (this.window?.header ?? this.element)?.querySelector?.('[data-action="csFold"]')?.focus?.();
     }
 
@@ -509,7 +518,13 @@ export function makeChronicleHeroSheet(Base) {
       if (!row || row.disabled || !this.document?.isOwner) return;
       try {
         if (row.kind === 'look') {
-          if (row.id !== this.look) await this.document.update({ [`flags.${FLAG_SCOPE}.${LOOK_FLAG}`]: row.id }, syncOptions());
+          if (row.id === this.look) return;
+          const from = this.look;
+          await this.document.update({ [`flags.${FLAG_SCOPE}.${LOOK_FLAG}`]: row.id }, syncOptions());
+          if (this.look === from) return;
+          // The new look's size for whoever picked it; a card keeps its size and Open uses it.
+          if (this.folded) this.#fullPosition = null;
+          else this.setPosition({ ...this.#lookSize() });
         } else {
           // Foundry closes this sheet and opens the chosen one.
           await this.document.update({ 'flags.core.sheetClass': row.id }, syncOptions());
