@@ -19,6 +19,33 @@
       "Setting": "Show synced journals as Chronicle pages",
       "SettingHint": "Synced journals open in Chronicle's page look. Turn it off to give them Foundry's journal sheet back. A journal you set to another sheet keeps it."
     },
+    "HeroSheet": {
+      "Name": "Chronicle hero sheet",
+      "Looks": {
+        "chronicle": "Chronicle"
+      },
+      "Remove": "Remove",
+      "StillToChoose": "Still to choose",
+      "ShowPortrait": "Show the portrait",
+      "ChangePortrait": "Change the portrait",
+      "LevelN": "Level {level}",
+      "HeroToken": "Hero token",
+      "Thresholds": "Winded {winded} · Dying 0 · Dead {dead}",
+      "Winded": "Winded",
+      "Dying": "Dying",
+      "Dead": "Dead",
+      "SpendRecovery": "Spend a recovery",
+      "RecoveryHeals": "Each recovery heals {n}",
+      "HeroicResource": "Heroic resource",
+      "EpicResource": "Epic resource",
+      "Potency": "Potency",
+      "Weak": "Weak",
+      "Average": "Average",
+      "Strong": "Strong",
+      "Damage": "Damage",
+      "Conditions": "Conditions",
+      "Choose": "Choose"
+    },
     "Table": {
       "Name": "At this table",
       "Find": "Find a page",

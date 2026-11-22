@@ -43,6 +43,7 @@ import { surfaceManifestRecoveryIfNeeded } from './update-info.mjs';
 import { registerShopRoomSocket, registerShopJournalButton } from './shop-room-window.mjs';
 import { watchMentionLinks } from './mention-links.mjs';
 import { applyChronicleSheetSetting, registerChronicleSheet } from './chronicle-sheet.mjs';
+import { registerHeroLooks } from './hero-looks.mjs';
 import { registerTableView } from './table-view.mjs';
 import { notebookAvailable, openCalendarWindow, registerPlayerNotebook } from './player-notebook.mjs';
 import { openSatchel } from './satchel.mjs';
@@ -134,6 +135,13 @@ Hooks.once('init', () => {
     registerChronicleSheet();
   } catch (err) {
     console.warn('Chronicle Sync | Chronicle page sheet unavailable', err);
+  }
+
+  // Draw Steel heroes get the Chronicle hero sheet as a choice; never the default.
+  try {
+    registerHeroLooks();
+  } catch (err) {
+    console.warn('Chronicle Sync | Chronicle hero sheet unavailable', err);
   }
 
   // Register Handlebars helpers used by dashboard/shop templates.

@@ -22,8 +22,8 @@ const read = (p) => readFileSync(resolve(ROOT, p), 'utf8');
 /** The dark-only status palette the tokens replaced. */
 const DARK_ONLY = ['#4ade80', '#f87171', '#60a5fa', '#fbbf24', '#fb923c', '#ff7b72', '#94a3b8', '#cbd5e1', '#e2e8f0'];
 
-/** Stylesheets whose every rule is a tool window. */
-const TOOL_SHEETS = ['styles/import-wizard.css', 'styles/stashes.css', 'styles/crafting.css', 'styles/dm-screen.css'];
+/** Stylesheets drawn entirely on the tokens: the tool windows and the Chronicle hero sheet. */
+const TOOL_SHEETS = ['styles/import-wizard.css', 'styles/stashes.css', 'styles/crafting.css', 'styles/dm-screen.css', 'styles/hero-looks.css'];
 
 /** chronicle-sync.css with its own-palette sections cut out. */
 function chronicleSyncToolRules() {

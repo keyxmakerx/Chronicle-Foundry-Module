@@ -1,0 +1,547 @@
+/* The Chronicle hero sheet (scripts/hero-looks.mjs): Draw Steel's hero sheet
+   drawn like Chronicle's hero sheet, in Chronicle's Material look. Colours
+   are the --cs-page-* tokens, so it follows Foundry's light and dark themes.
+   The Chronicle look is the base; another look overrides it under
+   [data-cs-look="…"].
+
+   Not in a cascade layer, like chronicle-sheet.css: Draw Steel's styles sit
+   in the system layer, and unlayered rules win over every layer, so these
+   apply without specificity fights. Everything is scoped to
+   .chronicle-hero-sheet, so Draw Steel's own sheet is untouched. */
+
+.chronicle-hero-sheet {
+  --cs-hero-face: "Chronicle Inter", "Signika", system-ui, sans-serif;
+  --cs-hero-radius: 12px;
+  --cs-hero-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  container-type: inline-size;
+  /* The module ships Inter at 400 and 600; bold draws as 600, not smeared. */
+  font-synthesis-weight: none;
+}
+
+/* One page that scrolls, with the tabs pinned under the title bar once the
+   boxes scroll away, instead of a scroll area per tab. */
+.chronicle-hero-sheet .window-content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden auto;
+  padding: 16px 20px 24px;
+  scrollbar-gutter: stable;
+  background: var(--cs-page-bg);
+  color: var(--cs-page-body);
+  font-family: var(--cs-hero-face);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.chronicle-hero-sheet .window-content > * { flex: none; }
+.chronicle-hero-sheet .window-content section.tab {
+  height: auto;
+  overflow: visible;
+  margin: 0;
+  padding: 14px 0 0;
+  scrollbar-gutter: auto;
+}
+.chronicle-hero-sheet :is(button, input, select, a):focus-visible {
+  outline: 2px solid var(--cs-page-accent);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+/* Header: portrait, name, class line and origins, then level, XP, victories. */
+.chronicle-hero-sheet .cs-hero-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: center;
+}
+.chronicle-hero-sheet .cs-portrait {
+  width: 96px;
+  height: 96px;
+  border: 1px solid var(--cs-page-line);
+  border-radius: var(--cs-hero-radius);
+  object-fit: var(--avatar-object-fit, cover);
+  object-position: var(--avatar-object-position, 50% 0);
+  background: var(--cs-page-tert);
+  box-shadow: var(--cs-page-shadow);
+  cursor: pointer;
+}
+.chronicle-hero-sheet .cs-name {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-family: var(--cs-hero-face);
+  font-size: clamp(24px, 4cqi, 34px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--cs-page-text);
+  overflow-wrap: anywhere;
+}
+.chronicle-hero-sheet .cs-name-edit input {
+  height: 40px;
+  font-size: 22px;
+  font-weight: 700;
+}
+.chronicle-hero-sheet .cs-line {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 4px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cs-page-text);
+}
+.chronicle-hero-sheet .cs-line > * + *::before {
+  content: "·";
+  margin: 0 8px;
+  color: var(--cs-page-muted);
+  font-weight: 400;
+}
+.chronicle-hero-sheet .cs-line a { color: inherit; text-decoration: none; }
+.chronicle-hero-sheet .cs-line a:hover { color: var(--cs-page-accent-strong); text-decoration: underline; text-underline-offset: 3px; }
+/* The subclass reads quieter than the class, as on Chronicle's sheet. */
+.chronicle-hero-sheet .cs-line-item + .cs-line-item { font-weight: 400; color: var(--cs-page-body); }
+.chronicle-hero-sheet .cs-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.chronicle-hero-sheet .cs-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--cs-page-line);
+  border-radius: 4px;
+  background: var(--cs-page-panel);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cs-page-text);
+  transition: border-color 120ms var(--cs-hero-ease), box-shadow 120ms var(--cs-hero-ease);
+}
+.chronicle-hero-sheet .cs-chip:hover { border-color: color-mix(in srgb, var(--cs-page-accent) 60%, transparent); box-shadow: var(--cs-page-shadow); }
+.chronicle-hero-sheet .cs-chip-kind {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cs-page-muted);
+}
+.chronicle-hero-sheet .cs-chip a { color: inherit; text-decoration: none; }
+.chronicle-hero-sheet .cs-chip a.cs-chip-del { color: var(--cs-page-muted); }
+.chronicle-hero-sheet .cs-chip a.cs-chip-del:hover { color: var(--cs-bad); }
+/* A place for something still to choose: Chronicle's dashed edge. */
+.chronicle-hero-sheet .cs-chip-todo {
+  border-style: dashed;
+  background: none;
+  font-weight: 500;
+  color: var(--cs-page-accent-strong);
+}
+.chronicle-hero-sheet .cs-chip-todo:hover { box-shadow: none; }
+
+.chronicle-hero-sheet .cs-prog {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+.chronicle-hero-sheet .cs-prog dl {
+  display: flex;
+  gap: 20px;
+  margin: 0;
+}
+.chronicle-hero-sheet .cs-prog dl > div { min-width: 44px; text-align: center; }
+.chronicle-hero-sheet .cs-prog dt {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cs-page-muted);
+}
+.chronicle-hero-sheet .cs-prog dd {
+  margin: 2px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--cs-page-text);
+  font-variant-numeric: tabular-nums;
+}
+.chronicle-hero-sheet .cs-prog dd small { font-size: 13px; font-weight: 500; color: var(--cs-page-muted); }
+.chronicle-hero-sheet .cs-prog-edit { display: grid; gap: 4px; }
+.chronicle-hero-sheet .cs-prog-edit input { width: 72px; }
+
+/* Buttons: a quiet outlined one, and the small pill on a box's heading. */
+.chronicle-hero-sheet :is(.cs-btn, .cs-mini, .cs-level-up) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: auto;
+  height: auto;
+  margin: 0;
+  border: 1px solid var(--cs-page-line);
+  background: var(--cs-page-panel);
+  color: var(--cs-page-text);
+  font-family: inherit;
+  line-height: 1.2;
+  box-shadow: none;
+  text-shadow: none;
+  cursor: pointer;
+  transition: border-color 120ms var(--cs-hero-ease), background-color 120ms var(--cs-hero-ease), color 120ms var(--cs-hero-ease);
+}
+.chronicle-hero-sheet .cs-btn { min-height: 32px; padding: 4px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; }
+.chronicle-hero-sheet .cs-mini {
+  min-height: 24px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border-color: transparent;
+  background: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cs-page-accent-strong);
+}
+.chronicle-hero-sheet .cs-level-up {
+  padding: 0 8px;
+  border-color: var(--cs-page-accent-strong);
+  border-radius: 8px;
+  background: var(--cs-page-accent-strong);
+  color: var(--cs-on-accent);
+  font-size: 18px;
+  font-weight: 700;
+}
+.chronicle-hero-sheet .cs-btn:hover { border-color: color-mix(in srgb, var(--cs-page-accent) 60%, transparent); background: var(--cs-page-tert); }
+.chronicle-hero-sheet .cs-mini:hover { background: var(--cs-page-accent-soft); }
+.chronicle-hero-sheet :is(.cs-btn, .cs-mini, .cs-level-up):disabled { opacity: 0.5; cursor: default; }
+
+/* Boxes: one fact panel, filled and lifted, used for every number. */
+.chronicle-hero-sheet .cs-row { margin-top: 12px; }
+.chronicle-hero-sheet .cs-row-numbers {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 4fr);
+  gap: 8px;
+  margin-top: 18px;
+}
+.chronicle-hero-sheet .cs-group { display: grid; gap: 8px; }
+.chronicle-hero-sheet .cs-chars { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.chronicle-hero-sheet .cs-combat { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.chronicle-hero-sheet .cs-box {
+  min-width: 0;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--cs-page-line);
+  border-radius: var(--cs-hero-radius);
+  background: var(--cs-page-panel);
+  box-shadow: var(--cs-page-shadow);
+  color: var(--cs-page-text);
+  text-align: left;
+}
+.chronicle-hero-sheet .cs-num {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 2px;
+  padding: 10px 4px 12px;
+  text-align: center;
+}
+.chronicle-hero-sheet button.cs-box {
+  width: auto;
+  height: auto;
+  font-family: inherit;
+  line-height: inherit;
+  text-shadow: none;
+  cursor: pointer;
+  transition: box-shadow 120ms var(--cs-hero-ease), border-color 120ms var(--cs-hero-ease);
+}
+.chronicle-hero-sheet button.cs-box:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--cs-page-accent) 55%, transparent);
+  box-shadow: var(--cs-page-shadow-raised);
+}
+.chronicle-hero-sheet button.cs-box:active:not(:disabled) { box-shadow: var(--cs-page-shadow-pressed); }
+.chronicle-hero-sheet button.cs-box:disabled { cursor: default; }
+.chronicle-hero-sheet .cs-lab {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--cs-page-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.chronicle-hero-sheet .cs-big {
+  display: block;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--cs-page-text);
+  font-variant-numeric: tabular-nums;
+}
+.chronicle-hero-sheet .cs-combat .cs-big { font-size: 22px; }
+.chronicle-hero-sheet .cs-combat .cs-lab { font-size: 10.5px; letter-spacing: 0.02em; }
+.chronicle-hero-sheet .cs-sub { margin: 4px 0 0; font-size: 12.5px; color: var(--cs-page-muted); }
+.chronicle-hero-sheet .cs-box-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+}
+.chronicle-hero-sheet .cs-hidden-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Number fields read as the number itself until pointed at or typed in. */
+.chronicle-hero-sheet .cs-field { display: inline-flex; align-items: baseline; gap: 6px; margin: 0; }
+.chronicle-hero-sheet .cs-field input[type="number"] {
+  height: 34px;
+  width: 3.4ch;
+  min-width: 0;
+  padding: 0 2px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--cs-page-text);
+  font-family: inherit;
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  box-shadow: none;
+  field-sizing: content;
+  appearance: textfield;
+  -moz-appearance: textfield;
+  transition: border-color 120ms var(--cs-hero-ease), background-color 120ms var(--cs-hero-ease);
+}
+.chronicle-hero-sheet .cs-field input[type="number"]::-webkit-inner-spin-button,
+.chronicle-hero-sheet .cs-field input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.chronicle-hero-sheet .cs-field input[type="number"]:hover { border-color: var(--cs-page-line); background: var(--cs-page-tert); }
+.chronicle-hero-sheet .cs-field input[type="number"]:focus { border-color: var(--cs-page-accent); background: var(--cs-page-panel); }
+.chronicle-hero-sheet .cs-field input[type="number"]:disabled { color: var(--cs-page-muted); }
+.chronicle-hero-sheet .cs-field-big input[type="number"] { height: 42px; width: 4ch; font-size: 32px; }
+/* Where the browser can size a field to its number, it does, so "74 / 96" reads as one figure. */
+@supports (field-sizing: content) {
+  .chronicle-hero-sheet .cs-field input[type="number"] { width: auto; min-width: 1.6ch; }
+}
+.chronicle-hero-sheet .cs-res .cs-field { display: grid; justify-items: start; gap: 0; }
+.chronicle-hero-sheet .cs-res-n { display: flex; align-items: center; gap: 4px; }
+/* A class's own resource names can be long ("Epic Resource"); they wrap rather than cut. */
+.chronicle-hero-sheet .cs-res .cs-lab { white-space: normal; overflow-wrap: anywhere; }
+
+/* Stamina, recoveries, heroic resource, surges. */
+/* One row: Stamina and recoveries wide, then a column per resource (the epic one from level 10). */
+.chronicle-hero-sheet .cs-row-vitals {
+  display: grid;
+  grid-template-columns: minmax(0, 2.3fr) minmax(0, 1.4fr);
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.chronicle-hero-sheet .cs-stam-n { display: flex; align-items: baseline; gap: 6px; margin-top: 2px; }
+.chronicle-hero-sheet .cs-of { font-size: 16px; font-weight: 500; color: var(--cs-page-muted); font-variant-numeric: tabular-nums; }
+.chronicle-hero-sheet .cs-temp { margin-left: auto; align-items: center; }
+.chronicle-hero-sheet .cs-temp > span {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--cs-page-muted);
+}
+.chronicle-hero-sheet .cs-temp input[type="number"] {
+  height: 28px;
+  width: 4ch;
+  min-width: 3ch;
+  border-color: var(--cs-page-line);
+  font-size: 16px;
+  text-align: center;
+}
+.chronicle-hero-sheet .cs-bar {
+  position: relative;
+  height: 8px;
+  margin: 8px 0 6px;
+  border-radius: 999px;
+  background: var(--cs-page-tert);
+}
+.chronicle-hero-sheet .cs-bar i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: var(--cs-ok);
+  transition: width 200ms var(--cs-hero-ease), background-color 200ms var(--cs-hero-ease);
+}
+.chronicle-hero-sheet .cs-bar u {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--cs-page-text);
+}
+.chronicle-hero-sheet .cs-stamina[data-band="winded"] .cs-bar i { background: var(--cs-warn); }
+.chronicle-hero-sheet .cs-stamina:is([data-band="dying"], [data-band="dead"]) .cs-bar i { background: var(--cs-bad); }
+.chronicle-hero-sheet .cs-state { margin-left: 6px; font-weight: 600; color: var(--cs-warn); }
+.chronicle-hero-sheet .cs-stamina:is([data-band="dying"], [data-band="dead"]) .cs-state { color: var(--cs-bad); }
+.chronicle-hero-sheet .cs-dots { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 0; }
+.chronicle-hero-sheet .cs-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--cs-page-body); }
+.chronicle-hero-sheet .cs-dots i.off { background: none; box-shadow: inset 0 0 0 1.5px var(--cs-page-muted); }
+
+/* Potency, damage, conditions, skills. */
+.chronicle-hero-sheet .cs-row-facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.3fr) minmax(0, 0.9fr) minmax(0, 1.5fr);
+  gap: 8px;
+}
+.chronicle-hero-sheet .cs-pot { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 2px 0 0; }
+.chronicle-hero-sheet .cs-pot > div { display: flex; flex-direction: column-reverse; }
+.chronicle-hero-sheet .cs-pot dd { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.2; color: var(--cs-page-text); font-variant-numeric: tabular-nums; }
+.chronicle-hero-sheet .cs-pot dt { font-size: 11.5px; color: var(--cs-page-muted); }
+.chronicle-hero-sheet .cs-kv { display: grid; gap: 4px; margin: 4px 0 0; font-size: 13.5px; }
+.chronicle-hero-sheet .cs-kv dt { display: inline; margin-right: 6px; color: var(--cs-page-muted); }
+.chronicle-hero-sheet .cs-kv dd { display: inline; margin: 0; font-weight: 600; color: var(--cs-page-text); }
+.chronicle-hero-sheet .cs-val { display: block; margin-top: 4px; font-size: 16px; font-weight: 600; color: var(--cs-page-text); }
+.chronicle-hero-sheet .cs-plain { margin: 4px 0 0; font-size: 13.5px; color: var(--cs-page-text); }
+.chronicle-hero-sheet .cs-tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; }
+.chronicle-hero-sheet .cs-tags li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--cs-page-tert);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cs-page-text);
+}
+.chronicle-hero-sheet .cs-tags img { width: 14px; height: 14px; border: 0; }
+
+/* Edit mode: Draw Steel's own editors, set on the page's panels. */
+.chronicle-hero-sheet .cs-edit { display: grid; gap: 10px; margin-top: 16px; }
+.chronicle-hero-sheet .cs-edit fieldset {
+  margin: 0;
+  padding: 8px 12px 10px;
+  border: 1px solid var(--cs-page-line);
+  border-radius: var(--cs-hero-radius);
+  background: var(--cs-page-panel);
+}
+.chronicle-hero-sheet .cs-edit legend {
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--cs-page-muted);
+}
+
+/* Tabs: the open one underlined in the accent, pinned once you scroll. */
+.chronicle-hero-sheet .window-content > nav.tabs {
+  position: sticky;
+  top: -16px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 0 24px;
+  margin: 18px 0 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--cs-page-line);
+  background: var(--cs-page-bg);
+}
+.chronicle-hero-sheet .window-content > nav.tabs > [data-tab] {
+  flex: none;
+  margin: 0 0 -1px;
+  padding: 12px 0 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  box-shadow: none;
+  text-shadow: none;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--cs-page-muted);
+  transition: color 120ms var(--cs-hero-ease), border-color 120ms var(--cs-hero-ease);
+}
+.chronicle-hero-sheet .window-content > nav.tabs > [data-tab]:hover { color: var(--cs-page-text); }
+.chronicle-hero-sheet .window-content > nav.tabs > [data-tab].active {
+  color: var(--cs-page-accent-strong);
+  border-bottom-color: var(--cs-page-accent-strong);
+}
+
+/* Draw Steel's lists (abilities, features, equipment, projects): a heading
+   per group with its own columns, one quiet row per entry. */
+.chronicle-hero-sheet .item-list-container { margin: 0 0 18px; }
+.chronicle-hero-sheet .item-list-container .item-header {
+  position: static;
+  align-items: end;
+  padding: 0 8px 6px;
+  border-bottom: 1px solid var(--cs-page-line);
+  border-radius: 0;
+  background: none;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--cs-page-muted);
+}
+.chronicle-hero-sheet .item-list-container .item-header .item-name {
+  padding: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--cs-page-text);
+}
+.chronicle-hero-sheet .item-list-container .item-list .item {
+  border-bottom: 1px solid var(--cs-page-line);
+  background: none;
+}
+.chronicle-hero-sheet .item-list-container .item-list .item:nth-child(even) { background: none; }
+.chronicle-hero-sheet .item-list-container .item-row {
+  min-height: 44px;
+  padding: 2px 8px;
+  border-left: 2px solid transparent;
+  border-radius: 8px;
+  color: var(--cs-page-text);
+  transition: background-color 120ms var(--cs-hero-ease);
+}
+.chronicle-hero-sheet .item-list-container .item-row:hover { background: var(--cs-page-tert); }
+.chronicle-hero-sheet .item-list-container .item:has(> .document-description.expanded) > .item-row {
+  border-left-color: var(--cs-page-accent);
+  border-radius: 8px 8px 0 0;
+  background: var(--cs-page-accent-soft);
+}
+.chronicle-hero-sheet .item-list-container .item-row .item-name img {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+}
+.chronicle-hero-sheet .item-list-container .item-row .item-name .name .label { font-size: 14px; font-weight: 600; }
+.chronicle-hero-sheet .item-list-container .item-row .item-name .keywords { font-size: 12px; color: var(--cs-page-muted); }
+/* Muted grey is just under 4.5:1 on the hover shade, so it darkens with the row. */
+.chronicle-hero-sheet .item-list-container .item-row:hover .item-name .keywords { color: var(--cs-page-body); }
+.chronicle-hero-sheet .item-list-container .item-row .item-name.rollable:hover .label { color: var(--cs-page-accent-strong); text-shadow: none; }
+.chronicle-hero-sheet .item-list-container :is(.item-controls) { width: 56px; }
+.chronicle-hero-sheet .item-list-container .item-controls a { color: var(--cs-page-muted); }
+.chronicle-hero-sheet .item-list-container .item-controls a:hover { color: var(--cs-page-accent-strong); text-shadow: none; }
+.chronicle-hero-sheet .item-list-container .document-description.expanded { padding: 8px 12px 12px; }
+
+/* Narrower windows: the boxes wrap instead of shrinking past reading. */
+@container (max-width: 700px) {
+  .chronicle-hero-sheet .cs-row-numbers { grid-template-columns: minmax(0, 1fr); }
+  .chronicle-hero-sheet .cs-row-vitals { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: row; }
+  .chronicle-hero-sheet .cs-row-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 560px) {
+  .chronicle-hero-sheet .cs-hero-head { grid-template-columns: auto minmax(0, 1fr); }
+  .chronicle-hero-sheet .cs-prog { grid-column: 1 / -1; justify-items: start; }
+}
