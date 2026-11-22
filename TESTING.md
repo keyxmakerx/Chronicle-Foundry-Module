@@ -346,6 +346,21 @@ In **Chronicle Sync → Settings → What syncs**.
 - [ ] Nothing in the Dashboard activity log or Chronicle's sync history shows the item swap coming back as a Foundry change
 - [ ] As a non-GM player nothing is swapped on their client (only the GM's client applies it)
 
+### Chronicle hero sheet (Draw Steel)
+Pick it on a hero: open the hero, title bar menu (three dots) -> Sheet -> Sheet: "Chronicle hero sheet" -> Save. Draw Steel's sheet stays the world's default.
+- [ ] The hero opens with the portrait, name, "Level N · class · subclass", origin chips (a missing one dashed, "Still to choose"), Level, XP and Victories; below, the characteristic and combat boxes, Stamina with its bar, recoveries, the heroic resource and surges, then potency, damage, conditions and skills; then the tabs, Abilities open
+- [ ] Light and dark interface themes both read cleanly
+- [ ] Click a characteristic box -> Draw Steel's roll dialog for it
+- [ ] Type a new Stamina, temporary Stamina, recoveries, heroic resource or surges value -> it saves; the bar turns amber at or under the winded figure and red at 0 or less
+- [ ] Hero token, recovery heart and surge bolt buttons do what they do on Draw Steel's sheet
+- [ ] An active effect that sets one of those values greys its field out, as on Draw Steel's sheet
+- [ ] Take Respite, and Level up when it shows, work
+- [ ] Abilities: use one, its three-dot menu, right click, unfold its description, drag to reorder; Features, Equipment, Projects, Effects and Biography tabs work as on Draw Steel's sheet; drop a treasure on Projects -> it becomes a project
+- [ ] Scroll down -> the tab row stays pinned at the top; change Stamina while scrolled -> the page stays where it was
+- [ ] Edit mode (padlock in the title bar): the name field, origin chips with remove and add, XP and Victories fields, and Draw Steel's characteristic, combat, movement, damage and skill editors
+- [ ] A player who owns the hero sees the same; an Observer cannot roll or change values; a Limited viewer sees only the header and the Biography tab
+- [ ] Switch the hero back to Draw Steel's sheet -> Draw Steel's sheet, nothing lost
+
 ### Foundry -> Chronicle
 - [ ] Create character Actor in Foundry -> Page created in Chronicle with mapped fields
 - [ ] Update Actor ability scores -> Chronicle page fields_data updates

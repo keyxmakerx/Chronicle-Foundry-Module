@@ -33,6 +33,7 @@
     "styles/quests.css",
     "styles/sky-clock.css",
     "styles/chronicle-sheet.css",
+    "styles/hero-looks.css",
     "styles/table-view.css"
   ],
   "languages": [
