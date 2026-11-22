@@ -121,3 +121,23 @@ test('the looks after the hall keep every colour in their token block', () => {
     assert.deepEqual(rest.match(COLOUR), null, id);
   }
 });
+
+test('no selector in a look asks for the window inside itself', () => {
+  for (const id of LOOKS) {
+    for (const list of selectors(read(sheetFor(id)))) {
+      for (const sel of splitList(list)) {
+        assert.ok((sel.match(/\.chronicle-hero-sheet\b/g) ?? []).length <= 1, `${id}: ${sel.trim()}`);
+      }
+    }
+  }
+});
+
+test('every container a look\'s queries name is declared, in its stylesheet or the sheet\'s', () => {
+  const declared = (css) => new Set([...noComments(css).matchAll(/container(?:-name)?:\s*([a-z][\w-]*)/g)].map((m) => m[1]));
+  const base = declared(read('styles/hero-looks.css'));
+  for (const id of LOOKS) {
+    const css = read(sheetFor(id));
+    const names = new Set([...base, ...declared(css)]);
+    for (const m of noComments(css).matchAll(/@container\s+([a-z][\w-]*)\s*\(/g)) assert.ok(names.has(m[1]), `${id}: ${m[1]}`);
+  }
+});
