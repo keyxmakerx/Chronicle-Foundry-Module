@@ -16,6 +16,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
 import { HERO_LOOKS } from '../scripts/_hero-looks.mjs';
+import { makeChronicleHeroSheet } from '../scripts/hero-looks.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const LOOKS_DIR = resolve(ROOT, 'templates/hero-looks');
@@ -31,6 +32,12 @@ const KNOWN_ACTIONS = new Set([
   'viewDoc', 'deleteDoc', 'toggleDocumentDescription', 'documentListContext', 'toggleMode',
   'createPseudoDocument', 'deletePseudoDocument', 'renderPseudoDocumentSheet',
 ]);
+
+/** The sheet's own actions: the portrait menu and the card's way back to the full sheet. */
+const CHRONICLE_ACTIONS = new Set(['csPortraitMenu', 'csUnfold', 'csFold', 'csLookPicker']);
+
+/** The parts each look draws with its own templates. */
+const LOOK_PARTS = ['header', 'stats', 'card'];
 
 /** Draw Steel's stat editors, as its own stats template includes them. */
 const DS_STAT_PARTIALS = ['characteristics', 'combat', 'movement', 'immunities-weaknesses']
@@ -136,24 +143,31 @@ function tags(src) {
 test('every look in the catalogue has its templates, and every template folder is a look', () => {
   assert.deepEqual(looksOnDisk(), HERO_LOOKS.map((l) => l.id).sort());
   for (const look of HERO_LOOKS) {
-    for (const part of ['header', 'stats']) {
+    for (const part of LOOK_PARTS) {
       assert.ok(existsSync(join(LOOKS_DIR, look.id, `${part}.hbs`)), `${look.id}/${part}.hbs`);
     }
   }
 });
 
+test('the sheet handles each of its own actions', () => {
+  const Sheet = makeChronicleHeroSheet(class { static PARTS = {}; static TABS = {}; });
+  assert.deepEqual(Object.keys(Sheet.DEFAULT_OPTIONS.actions).sort(), [...CHRONICLE_ACTIONS].sort());
+  for (const name of CHRONICLE_ACTIONS) assert.ok(!KNOWN_ACTIONS.has(name), `${name} would hide a Draw Steel action`);
+});
+
 for (const look of looksOnDisk()) {
   const header = read(join(LOOKS_DIR, look, 'header.hbs'));
   const stats = read(join(LOOKS_DIR, look, 'stats.hbs'));
+  const card = read(join(LOOKS_DIR, look, 'card.hbs'));
 
-  test(`${look}: every action is one Draw Steel handles`, () => {
+  test(`${look}: every action is one Draw Steel or the sheet handles`, () => {
     for (const file of templatesOf(look)) {
       const src = read(file);
       for (const m of src.matchAll(/data-action="(\{\{[^}]*\}\}|[^"]*)"/g)) {
         // A computed action names each choice as a quoted string.
         const names = m[1].startsWith('{{') ? [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]) : [m[1]];
         assert.ok(names.length, `${file}: no action in ${m[0]}`);
-        for (const name of names) assert.ok(KNOWN_ACTIONS.has(name), `${file}: unknown action ${name}`);
+        for (const name of names) assert.ok(KNOWN_ACTIONS.has(name) || CHRONICLE_ACTIONS.has(name), `${file}: unknown action ${name}`);
       }
     }
   });
@@ -173,9 +187,10 @@ for (const look of looksOnDisk()) {
 
   test(`${look}: header keeps the portrait, name, origins, level and respite`, () => {
     const h = flat(header);
-    assert.match(h, /"showPortraitArtwork"/);
-    assert.match(h, /"editImage"/);
-    assert.match(h, /data-edit="img"/);
+    // The portrait opens the portrait menu, which runs Draw Steel's showPortraitArtwork
+    // and editImage on the image; Foundry's file picker reads data-edit off it.
+    assert.match(h, /<button type="button" class="cs-portrait-btn" data-action="csPortraitMenu" aria-haspopup="menu"/);
+    assert.match(h, /<img class="cs-portrait" [^>]*data-edit="img"/);
     assert.match(h, /--avatar-object-fit/);
     assert.match(h, /formInput fields\.name value=source\.name/);
     for (const type of ['ancestry', 'culture', 'career', 'class']) {
@@ -224,6 +239,17 @@ for (const look of looksOnDisk()) {
     const s = flat(stats);
     for (const partial of DS_STAT_PARTIALS) assert.ok(s.includes(`{{> "${partial}"`), partial);
     assert.ok(s.includes(DS_SKILLS_INPUT), 'skills editor differs from Draw Steel\'s');
+  });
+
+  test(`${look}: the card's characteristics roll as Draw Steel's do, and it offers only what the viewer may do`, () => {
+    const c = flat(card);
+    assert.match(c, /data-action="roll" data-roll-type="characteristic" data-characteristic="\{\{key\}\}"/);
+    assert.match(c, /\{\{disabled \(not @root\.owner\)\}\}/);
+    assert.match(c, /\{\{#if editable\}\}[^{]*?data-action="takeRespite"/);
+    assert.match(c, /data-action="csUnfold" data-tab="abilities"/);
+    assert.match(c, /data-action="csPortraitMenu" aria-haspopup="menu"/);
+    // Read-only: the card changes nothing by typing.
+    assert.doesNotMatch(c, /formInput|formGroup|<input|<select|<textarea|contenteditable/);
   });
 
   test(`${look}: the boxes are not a tab, so they stay above the tab row`, () => {

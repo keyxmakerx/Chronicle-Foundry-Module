@@ -26,8 +26,6 @@
       },
       "Remove": "Remove",
       "StillToChoose": "Still to choose",
-      "ShowPortrait": "Show the portrait",
-      "ChangePortrait": "Change the portrait",
       "LevelN": "Level {level}",
       "HeroToken": "Hero token",
       "Thresholds": "Winded {winded} · Dying 0 · Dead {dead}",
@@ -44,7 +42,48 @@
       "Strong": "Strong",
       "Damage": "Damage",
       "Conditions": "Conditions",
-      "Choose": "Choose"
+      "Choose": "Choose",
+      "Fold": "Fold to a card",
+      "Unfold": "Open the full sheet",
+      "Card": {
+        "Abilities": "Abilities",
+        "Respite": "Respite",
+        "Open": "Open"
+      },
+      "Picker": {
+        "Title": "Sheet look",
+        "Heading": "Sheet look for {name}",
+        "Now": "Now",
+        "Locked": "Your GM has set the look for every hero",
+        "Plus": "Draw Steel Plus",
+        "PlusNote": "Offered only while that module is switched on in this world",
+        "Found": "found installed",
+        "DrawSteel": "Draw Steel's own sheet",
+        "DrawSteelNote": "Always here, so nobody gets stuck on a look they dislike",
+        "Failed": "The sheet look could not be changed."
+      },
+      "Portrait": {
+        "Menu": "Picture and token",
+        "Choose": "Choose a picture file",
+        "ChooseNote": "Foundry's file picker",
+        "Full": "See the full picture",
+        "FullNote": "Opens it large",
+        "FullNoteGM": "Opens it large, for you or shown to everyone",
+        "Token": "See the token",
+        "TokenNote": "What stands on the map",
+        "Change": "Change picture or token",
+        "ChangeNote": "Opens the hero's page in Chronicle"
+      },
+      "Settings": {
+        "Default": {
+          "Name": "Default hero sheet look",
+          "Hint": "The look a Chronicle hero sheet uses until its owner picks one."
+        },
+        "Lock": {
+          "Name": "Lock hero sheet looks",
+          "Hint": "Every Chronicle hero sheet uses the default look and players can't change it. Draw Steel's own sheet stays open to them."
+        }
+      }
     },
     "Table": {
       "Name": "At this table",

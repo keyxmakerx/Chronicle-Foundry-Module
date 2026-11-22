@@ -1,0 +1,49 @@
+{{!-- The folded sheet: a small card that sits beside the map. Picture, name,
+level and class, Stamina, recoveries, the five characteristics, then
+Abilities, Respite and Open. The characteristic buttons keep Draw Steel's roll
+attributes, so a roll works folded too. Never drawn for a Limited viewer. --}}
+<section class="cs-card" style="{{#if avatarProperties.objectFit}}--avatar-object-fit: {{avatarProperties.objectFit}};{{/if}}{{#if avatarProperties.objectPosition}} --avatar-object-position: {{avatarProperties.objectPosition}};{{/if}}">
+  <button type="button" class="cs-card-art" data-action="csPortraitMenu" aria-haspopup="menu" aria-label="{{localize "CHRONICLE.HeroSheet.Portrait.Menu"}}">
+    <img src="{{document.img}}" alt="" inert>
+  </button>
+  <div class="cs-card-body">
+    <h1 class="cs-card-name">{{document.name}}</h1>
+    <p class="cs-card-sub">
+      {{localize "CHRONICLE.HeroSheet.LevelN" level=system.level}}{{#with document.system.class as |cls|}} · {{cls.name}}{{/with}}
+    </p>
+    <div class="cs-card-stam" data-band="{{chronicle.stamina.band}}">
+      <span class="cs-bar" role="presentation"><i style="width: {{chronicle.stamina.fill}}%"></i></span>
+      <span class="cs-card-num" data-tooltip-text="{{systemFields.stamina.label}}"><b>{{system.stamina.value}}</b> / {{system.stamina.max}}</span>
+    </div>
+    {{#if chronicle.recoveryDots}}
+    <div class="cs-card-rec" data-tooltip-text="{{systemFields.recoveries.label}}: {{system.recoveries.value}} / {{system.recoveries.max}}">
+      {{#each chronicle.recoveryDots as |on|}}<i class="{{#if on}}on{{/if}}"></i>{{/each}}
+    </div>
+    {{else}}
+    <p class="cs-card-sub">{{systemFields.recoveries.label}} {{system.recoveries.value}} / {{system.recoveries.max}}</p>
+    {{/if}}
+    <div class="cs-card-chars">
+      {{#each characteristics as |chr key|}}
+      <button
+        type="button"
+        class="cs-card-chr"
+        data-action="roll"
+        data-roll-type="characteristic"
+        data-characteristic="{{key}}"
+        data-tooltip-text="{{localize "DRAW_STEEL.ROLL.Prompt" prompt=chr.field.label}}"
+        {{disabled (not @root.owner)}}
+      >
+        <b>{{numberFormat chr.value sign=true}}</b>
+        <span>{{chr.field.label}}</span>
+      </button>
+      {{/each}}
+    </div>
+    <div class="cs-card-actions">
+      <button type="button" class="cs-btn" data-action="csUnfold" data-tab="abilities">{{localize "CHRONICLE.HeroSheet.Card.Abilities"}}</button>
+      {{#if editable}}
+      <button type="button" class="cs-btn" data-action="takeRespite">{{localize "CHRONICLE.HeroSheet.Card.Respite"}}</button>
+      {{/if}}
+      <button type="button" class="cs-btn cs-btn-main" data-action="csUnfold">{{localize "CHRONICLE.HeroSheet.Card.Open"}}</button>
+    </div>
+  </div>
+</section>
