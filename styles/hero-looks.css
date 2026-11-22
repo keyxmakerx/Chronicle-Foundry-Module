@@ -97,6 +97,8 @@
 }
 .chronicle-hero-sheet .cs-line a { color: inherit; text-decoration: none; }
 .chronicle-hero-sheet .cs-line a:hover { color: var(--cs-page-accent); text-decoration: underline; text-underline-offset: 3px; }
+/* The subclass reads quieter than the class, as on Chronicle's sheet. */
+.chronicle-hero-sheet .cs-line-item + .cs-line-item { font-weight: 400; color: var(--cs-page-body); }
 .chronicle-hero-sheet .cs-chips {
   display: flex;
   flex-wrap: wrap;
@@ -328,6 +330,8 @@
 }
 .chronicle-hero-sheet .cs-res .cs-field { display: grid; justify-items: start; gap: 0; }
 .chronicle-hero-sheet .cs-res-n { display: flex; align-items: center; gap: 4px; }
+/* A class's own resource names can be long ("Epic Resource"); they wrap rather than cut. */
+.chronicle-hero-sheet .cs-res .cs-lab { white-space: normal; overflow-wrap: anywhere; }
 
 /* Stamina, recoveries, heroic resource, surges. */
 /* One row: Stamina and recoveries wide, then a column per resource (the epic one from level 10). */
