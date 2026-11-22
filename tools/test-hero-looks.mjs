@@ -341,8 +341,9 @@ test('the GM\'s world default stands in for a hero with no look, and a lock over
 
 test('the look picker: the looks, then Draw Steel Plus when it is on, then Draw Steel\'s own sheet, always', () => {
   const ids = (rows) => rows.map((r) => r.id);
+  const looks = HERO_LOOKS.map((l) => l.id);
   const plain = pickerRows({ current: 'chronicle' });
-  assert.deepEqual(ids(plain), ['chronicle', 'hall', DRAW_STEEL_SHEET]);
+  assert.deepEqual(ids(plain), [...looks, DRAW_STEEL_SHEET]);
   assert.deepEqual(plain[0], {
     kind: 'look', id: 'chronicle', label: 'CHRONICLE.HeroSheet.Looks.chronicle', note: null,
     tag: 'CHRONICLE.HeroSheet.Picker.Now', checked: true, disabled: false,
@@ -351,15 +352,15 @@ test('the look picker: the looks, then Draw Steel Plus when it is on, then Draw 
     kind: 'look', id: 'hall', label: 'CHRONICLE.HeroSheet.Looks.hall', note: null,
     tag: null, checked: false, disabled: false,
   });
-  assert.equal(plain[2].kind, 'sheet');
-  assert.equal(plain[2].checked, false);
+  assert.equal(plain.at(-1).kind, 'sheet');
+  assert.equal(plain.at(-1).checked, false);
   assert.equal(pickerRows({ current: 'hall' }).find((r) => r.checked).id, 'hall');
   const plus = pickerRows({ current: 'chronicle', plusActive: true, registered: () => true });
-  assert.deepEqual(ids(plus), ['chronicle', 'hall', DRAW_STEEL_PLUS_SHEET, DRAW_STEEL_SHEET]);
-  assert.equal(plus[2].tag, 'CHRONICLE.HeroSheet.Picker.Found');
+  assert.deepEqual(ids(plus), [...looks, DRAW_STEEL_PLUS_SHEET, DRAW_STEEL_SHEET]);
+  assert.equal(plus[looks.length].tag, 'CHRONICLE.HeroSheet.Picker.Found');
   // Installed but its sheet not registered (an older Draw Steel Plus): not offered.
-  assert.deepEqual(ids(pickerRows({ current: 'chronicle', plusActive: true, registered: (id) => id !== DRAW_STEEL_PLUS_SHEET })), ['chronicle', 'hall', DRAW_STEEL_SHEET]);
-  assert.deepEqual(ids(pickerRows({ current: 'chronicle', plusActive: false })), ['chronicle', 'hall', DRAW_STEEL_SHEET]);
+  assert.deepEqual(ids(pickerRows({ current: 'chronicle', plusActive: true, registered: (id) => id !== DRAW_STEEL_PLUS_SHEET })), [...looks, DRAW_STEEL_SHEET]);
+  assert.deepEqual(ids(pickerRows({ current: 'chronicle', plusActive: false })), [...looks, DRAW_STEEL_SHEET]);
 });
 
 test('a locked look: nobody picks another look, each is told why, and the way back to Draw Steel stays open', () => {
@@ -1050,4 +1051,49 @@ test('the hall\'s moves: each has its Calm, and every font it uses ships with it
   }
   for (const f of ['Cinzel-OFL.txt', 'EBGaramond-OFL.txt']) assert.match(read(`fonts/${f}`), /SIL Open Font License/);
   assert.ok(JSON.parse(read('module.json')).styles.indexOf('styles/hero-look-hall.css') > JSON.parse(read('module.json')).styles.indexOf('styles/hero-looks.css'));
+});
+
+test('every look after the first draws its own header and boxes, opens at its size in the dark theme and plays its opening', async () => {
+  const Sheet = makeChronicleHeroSheet(fakeBase());
+  for (const { id } of HERO_LOOKS.slice(1)) {
+    await withSettings({ heroSheetFolds: {}, heroLookDefault: 'chronicle', heroLookLocked: false }, async () => {
+      const hero = fakeHero({ flag: id, value: 40 });
+      const sheet = new Sheet(hero);
+      const parts = sheet._configureRenderParts({});
+      assert.equal(parts.header.template, lookTemplate(id, 'header'), id);
+      assert.equal(parts.stats.template, lookTemplate(id, 'stats'), id);
+      const options = { isFirstRender: true };
+      sheet._configureRenderOptions(options);
+      assert.deepEqual(options.position, { width: 1100, height: 760 }, id);
+      const { element } = fakeWindow();
+      element.classList.add('themed', 'theme-light');
+      sheet.element = element;
+      await sheet._onRender({}, { isFirstRender: true });
+      assert.ok(element.classList.contains('cs-move-open'), id);
+      assert.ok(element.classList.contains('cs-own-opening'), id);
+      assert.ok(element.classList.contains('theme-dark') && !element.classList.contains('theme-light'), id);
+      hero.system.stamina.value = 31;
+      await sheet._onRender({}, { isFirstRender: false });
+      assert.ok(element.classList.contains('cs-move-hit'), id);
+    });
+  }
+});
+
+test('a newer look\'s own figures reach its templates, and only its own', async () => {
+  const Sheet = makeChronicleHeroSheet(fakeBase());
+  const extras = {};
+  for (const { id } of HERO_LOOKS.slice(2)) {
+    extras[id] = await import(`../scripts/_hero-look-${id}.mjs`);
+    for (const [move, ms] of Object.entries(extras[id].MOVE_MS)) {
+      assert.ok(['open', 'hit', 'heal', 'level', 'editin', 'fold'].includes(move) && ms > 0 && ms <= 4000, `${id} ${move}`);
+    }
+  }
+  await withSettings({ heroSheetFolds: {}, heroLookDefault: 'chronicle', heroLookLocked: false }, async () => {
+    for (const { id } of HERO_LOOKS.slice(2)) {
+      const hero = fakeHero({ flag: id });
+      const { chronicle } = await new Sheet(hero)._preparePartContext('stats', {}, {});
+      const own = extras[id].lookContext(hero.system, { lang: 'en', config: undefined });
+      for (const key of Object.keys(own)) assert.deepEqual(chronicle[key], own[key], `${id} ${key}`);
+    }
+  });
 });

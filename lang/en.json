@@ -23,7 +23,9 @@
       "Name": "Chronicle hero sheet",
       "Looks": {
         "chronicle": "Chronicle",
-        "hall": "The portrait hall"
+        "hall": "The portrait hall",
+        "steel": "Steel and banner",
+        "glass": "Arcane glass"
       },
       "Remove": "Remove",
       "StillToChoose": "Still to choose",

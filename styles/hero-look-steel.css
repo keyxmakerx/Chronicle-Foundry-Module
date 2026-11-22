@@ -1,0 +1,60 @@
+/* The steel and banner look on the Chronicle hero sheet
+   (scripts/hero-looks.mjs, templates/hero-looks/steel/, signed as look B):
+   a hero in plate under a hanging banner: gunmetal plate with rivets, the
+   name in Oswald capitals, Stamina as a notched blade, shields for the
+   characteristics. Heavy and quick moves.
+
+   Always dark: the sheet puts the window in Foundry's dark theme. Every
+   colour is in the token block below, so a colour changes in one place;
+   rules below it read the tokens (color-mix() for a softer shade).
+   Unlayered and scoped to [data-cs-look="steel"], like hero-looks.css,
+   which it follows. */
+
+/* Oswald 600 is declared in chronicle-sheet.css; 500 and 700 here. */
+@font-face {
+  font-family: "Chronicle Oswald";
+  src: url("../fonts/Oswald-500-latin.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Chronicle Oswald";
+  src: url("../fonts/Oswald-700-latin.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* The look's values for the sheet's tokens, then its own --cs-steel-* ones.
+   Corners are 0px, not 0: the sheet's radii are min(…, var(--cs-hero-radius)). */
+.chronicle-hero-sheet[data-cs-look="steel"] {
+  --cs-hero-bg: #0e1013;
+  --cs-hero-panel: #16191e;
+  --cs-hero-tert: color-mix(in srgb, #e7b75a 8%, transparent);
+  --cs-hero-line: color-mix(in srgb, #e7b75a 18%, transparent);
+  --cs-hero-text: #ffffff;
+  --cs-hero-body: #c5cad1;
+  --cs-hero-muted: #aeb4bc;
+  --cs-hero-accent: #e7b75a;
+  --cs-hero-accent-strong: #e7b75a;
+  --cs-hero-accent-soft: color-mix(in srgb, #e7b75a 14%, transparent);
+  --cs-hero-on-accent: #1b1205;
+  --cs-hero-shadow: none;
+  --cs-hero-shadow-raised: 0 14px 30px #000e;
+  --cs-hero-shadow-pressed: inset 0 0 0 1px color-mix(in srgb, #e7b75a 35%, transparent);
+  --cs-hero-ok: #7ee08a;
+  --cs-hero-warn: #f2b84b;
+  --cs-hero-bad: #ff7a5c;
+  --cs-hero-face: "Chronicle Oswald", Oswald, "Arial Narrow", sans-serif;
+  --cs-hero-radius: 0px;
+  --cs-hero-pill: 0px;
+  color-scheme: dark;
+}
+
+/* A thin scrollbar in the look's colours: the scroll area keeps its room
+   so the layout does not shift, and the strip reads as part of the frame. */
+.chronicle-hero-sheet[data-cs-look="steel"] .window-content {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--cs-hero-accent) 50%, transparent) transparent;
+}

@@ -29,6 +29,8 @@ import {
   fitRenderParts, lookTemplate, pickerRows, plaqueMetal, portraitRows, recoveryDots, resolveLook, ringSegments,
   sheetChanges, skillNames, staminaView, withFold,
 } from './_hero-looks.mjs';
+import * as glassLook from './_hero-look-glass.mjs';
+import * as steelLook from './_hero-look-steel.mjs';
 
 /** The GM's default look for every hero, and whether players may change it. */
 export const LOOK_DEFAULT_SETTING = 'heroLookDefault';
@@ -40,16 +42,23 @@ export const FOLD_SETTING = 'heroSheetFolds';
 const CARD_WIDTH = 296;
 
 /** A look's own size for a hero's first open, where it differs from the sheet's. */
-const LOOK_SIZE = { hall: { width: 1100, height: 760 } };
+const LOOK_SIZE = {
+  hall: { width: 1100, height: 760 },
+  steel: { width: 1100, height: 760 },
+  glass: { width: 1100, height: 760 },
+};
+
+/** Each newer look's own figures and move timings (scripts/_hero-look-<look>.mjs). */
+const LOOK_EXTRAS = { steel: steelLook, glass: glassLook };
 
 /** Looks that play their own opening move, so Chronicle's window grow stays off them. */
-const OWN_OPENING_LOOKS = new Set(['hall']);
+const OWN_OPENING_LOOKS = new Set(['hall', 'steel', 'glass']);
 
 /**
  * Looks drawn dark whatever Foundry's theme, so Draw Steel's own fields and
  * editors inside them take Foundry's dark colours too.
  */
-const DARK_LOOKS = new Set(['hall']);
+const DARK_LOOKS = new Set(['hall', 'steel', 'glass']);
 
 /**
  * Put a window in Foundry's dark theme, or give back the theme classes it had.
@@ -396,7 +405,7 @@ export function makeChronicleHeroSheet(Base) {
       el.classList.remove(cls);
       void el.offsetWidth;
       el.classList.add(cls);
-      this.#moveTimers[move] = setTimeout(() => el.classList.remove(cls), MOVE_MS[move] ?? 1000);
+      this.#moveTimers[move] = setTimeout(() => el.classList.remove(cls), LOOK_EXTRAS[this.look]?.MOVE_MS?.[move] ?? MOVE_MS[move] ?? 1000);
     }
 
     /** @override */
@@ -613,6 +622,7 @@ export function makeChronicleHeroSheet(Base) {
         surgeDiamonds: countDiamonds(sys.hero?.surges),
         epicDiamonds: countDiamonds(sys.hero?.epic?.value),
         skills: skillNames(sys.skills?.value, globalThis.ds?.CONFIG?.skills?.list, i18n?.lang),
+        ...LOOK_EXTRAS[this.look]?.lookContext(sys, { lang: i18n?.lang, config: globalThis.ds?.CONFIG }),
       };
     }
   };

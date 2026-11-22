@@ -12,6 +12,8 @@
 export const HERO_LOOKS = Object.freeze([
   Object.freeze({ id: 'chronicle', label: 'CHRONICLE.HeroSheet.Looks.chronicle', parts: Object.freeze(['header', 'stats', 'card']) }),
   Object.freeze({ id: 'hall', label: 'CHRONICLE.HeroSheet.Looks.hall', parts: Object.freeze(['header', 'stats']) }),
+  Object.freeze({ id: 'steel', label: 'CHRONICLE.HeroSheet.Looks.steel', parts: Object.freeze(['header', 'stats']) }),
+  Object.freeze({ id: 'glass', label: 'CHRONICLE.HeroSheet.Looks.glass', parts: Object.freeze(['header', 'stats']) }),
 ]);
 
 export const DEFAULT_LOOK = HERO_LOOKS[0].id;

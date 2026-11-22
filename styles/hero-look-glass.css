@@ -1,0 +1,60 @@
+/* The arcane glass look on the Chronicle hero sheet
+   (scripts/hero-looks.mjs, templates/hero-looks/glass/, signed as look C):
+   a frosted glass panel floating over a dark violet field: the picture in a
+   glowing frame, the characteristics as hexes, soft teal light. Soft and
+   floating moves.
+
+   Always dark: the sheet puts the window in Foundry's dark theme. Every
+   colour is in the token block below, so a colour changes in one place;
+   rules below it read the tokens (color-mix() for a softer shade).
+   Unlayered and scoped to [data-cs-look="glass"], like hero-looks.css,
+   which it follows. */
+
+/* Inter 400 and 600 are declared in chronicle-sheet.css. */
+@font-face {
+  font-family: "Chronicle Chakra Petch";
+  src: url("../fonts/ChakraPetch-500-latin.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Chronicle Chakra Petch";
+  src: url("../fonts/ChakraPetch-600-latin.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* The look's values for the sheet's tokens, then its own --cs-glass-* ones.
+   Corners are 0px, not 0: the sheet's radii are min(…, var(--cs-hero-radius)). */
+.chronicle-hero-sheet[data-cs-look="glass"] {
+  --cs-hero-bg: #0b0a12;
+  --cs-hero-panel: #141a2a;
+  --cs-hero-tert: color-mix(in srgb, #5eead4 8%, transparent);
+  --cs-hero-line: color-mix(in srgb, #5eead4 18%, transparent);
+  --cs-hero-text: #f4f7ff;
+  --cs-hero-body: #c9d2e6;
+  --cs-hero-muted: #9aa6c2;
+  --cs-hero-accent: #5eead4;
+  --cs-hero-accent-strong: #5eead4;
+  --cs-hero-accent-soft: color-mix(in srgb, #5eead4 14%, transparent);
+  --cs-hero-on-accent: #04201c;
+  --cs-hero-shadow: none;
+  --cs-hero-shadow-raised: 0 14px 30px #000e;
+  --cs-hero-shadow-pressed: inset 0 0 0 1px color-mix(in srgb, #5eead4 35%, transparent);
+  --cs-hero-ok: #5eead4;
+  --cs-hero-warn: #fbbf24;
+  --cs-hero-bad: #fb7185;
+  --cs-hero-face: "Chronicle Chakra Petch", "Chakra Petch", "Chronicle Inter", sans-serif;
+  --cs-hero-radius: 0px;
+  --cs-hero-pill: 0px;
+  color-scheme: dark;
+}
+
+/* A thin scrollbar in the look's colours: the scroll area keeps its room
+   so the layout does not shift, and the strip reads as part of the frame. */
+.chronicle-hero-sheet[data-cs-look="glass"] .window-content {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--cs-hero-accent) 50%, transparent) transparent;
+}
