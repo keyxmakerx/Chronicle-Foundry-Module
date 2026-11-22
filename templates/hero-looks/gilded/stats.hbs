@@ -131,7 +131,7 @@ active-effect locks work. Edit: Draw Steel's own stat editors. --}}
         <span class="cs-gc-coin" aria-hidden="true"><b>{{numberFormat chr.value sign=true}}</b></span>
         <span class="cs-gc-rt">
           <span class="cs-gc-nm">{{chr.field.label}}</span>
-          <i class="cs-gc-rk" aria-hidden="true">{{localize (concat "CHRONICLE.HeroSheet.Metal." (lookup @root.chronicle.metals key))}}</i>
+          <i class="cs-gc-rk" aria-hidden="true">{{localize (concat "CHRONICLE.HeroSheet.Suit." (lookup @root.chronicle.metals key))}}</i>
         </span>
         <span class="cs-hidden-label">{{numberFormat chr.value sign=true}}</span>
       </button>
@@ -153,10 +153,10 @@ active-effect locks work. Edit: Draw Steel's own stat editors. --}}
         </button>
         {{/if}}
       </p>
-      {{#if chronicle.skills.length}}
-      <ul class="cs-gc-skill-list">{{#each chronicle.skills as |name|}}<li>{{name}}</li>{{/each}}</ul>
+      {{#if skills.list}}
+      <p class="cs-gc-skill-list">{{skills.list}}</p>
       {{else}}
-      <p class="cs-gc-none">{{#if skills.list}}{{skills.list}}{{else}}{{localize "COMMON.None"}}{{/if}}</p>
+      <p class="cs-gc-none">{{localize "COMMON.None"}}</p>
       {{/if}}
     </div>
   </div>

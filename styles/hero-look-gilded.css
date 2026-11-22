@@ -629,9 +629,7 @@
 
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-skills .cs-gc-k { display: flex; gap: 10px; }
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-skill-list { display: block; margin: 8px 0 0; padding: 0; list-style: none; font-style: italic; font-size: 14.5px; line-height: 1.45; color: var(--cs-gilded-soft); }
-.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-skill-list li { display: inline; }
-.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-skill-list li:not(:last-child)::after { content: ", "; }
-.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-skill-list li:last-child::after { content: "."; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-skill-list::after { content: "."; }
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-none { margin: 8px 0 0; font-style: italic; color: var(--cs-hero-muted); }
 
 /* Take Respite sits at the card's right foot. */

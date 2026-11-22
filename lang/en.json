@@ -45,6 +45,12 @@
         "bronze": "Bronze",
         "iron": "Iron"
       },
+      "Suit": {
+        "gold": "a master's gift",
+        "bronze": "a steady hand",
+        "iron": "the weakest suit"
+      },
+      "OfSubclass": "of the {name}",
       "HeroicResource": "Heroic resource",
       "EpicResource": "Epic resource",
       "Potency": "Potency",

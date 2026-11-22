@@ -97,7 +97,7 @@ its name, deleteDoc and addOrigin in Edit. --}}
     <h1 class="cs-name">{{document.name}}</h1>
     <p class="cs-sky-sub">
       {{#each document.system.subclasses as |sub|}}
-      <span class="cs-sky-subname" data-document-uuid="{{sub.uuid}}"><a data-action="viewDoc">{{sub.name}}</a></span>
+      <span class="cs-sky-subname" data-document-uuid="{{sub.uuid}}"><a data-action="viewDoc">{{localize "CHRONICLE.HeroSheet.OfSubclass" name=sub.name}}</a></span>
       {{/each}}
     </p>
     <p class="cs-sky-prog">
