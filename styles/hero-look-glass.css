@@ -1,14 +1,19 @@
 /* The arcane glass look on the Chronicle hero sheet
    (scripts/hero-looks.mjs, templates/hero-looks/glass/, signed as look C):
-   a frosted glass panel floating over a dark violet field: the picture in a
-   glowing frame, the characteristics as hexes, soft teal light. Soft and
-   floating moves.
+   frosted glass panels floating over a dark violet field: the picture in a
+   glowing ring that is also the Stamina gauge, the characteristics as hexes,
+   soft teal light, rounded corners. Soft and floating moves.
 
-   Always dark: the sheet puts the window in Foundry's dark theme. Every
-   colour is in the token block below, so a colour changes in one place;
-   rules below it read the tokens (color-mix() for a softer shade).
-   Unlayered and scoped to [data-cs-look="glass"], like hero-looks.css,
-   which it follows. */
+   Always dark: the sheet puts the window in Foundry's dark theme, so Draw
+   Steel's own fields and editors inside it match. Every colour is in the
+   token block below, so a colour changes in one place; rules below it read
+   the tokens (color-mix() for a softer shade). Unlayered and scoped to
+   [data-cs-look="glass"], like hero-looks.css, which it follows.
+
+   The glass only shows as glass where something is drawn behind it, so the
+   violet field is painted inside the window (.cs-glass-field, held still
+   while the page scrolls) and each panel blurs it. Blur is never animated:
+   the opening settles each part from a blur once, and Calm makes that a fade. */
 
 /* Inter 400 and 600 are declared in chronicle-sheet.css. */
 @font-face {
@@ -27,7 +32,8 @@
 }
 
 /* The look's values for the sheet's tokens, then its own --cs-glass-* ones.
-   Corners are 0px, not 0: the sheet's radii are min(…, var(--cs-hero-radius)). */
+   Corners are 18px, the signed panel's: the sheet's smaller radii are
+   min(…, var(--cs-hero-radius)). */
 .chronicle-hero-sheet[data-cs-look="glass"] {
   --cs-hero-bg: #0b0a12;
   --cs-hero-panel: #141a2a;
@@ -39,22 +45,1050 @@
   --cs-hero-accent: #5eead4;
   --cs-hero-accent-strong: #5eead4;
   --cs-hero-accent-soft: color-mix(in srgb, #5eead4 14%, transparent);
-  --cs-hero-on-accent: #04201c;
+  --cs-hero-on-accent: #06281f;
   --cs-hero-shadow: none;
-  --cs-hero-shadow-raised: 0 14px 30px #000e;
+  --cs-hero-shadow-raised: 0 14px 30px #000000e6, 0 0 0 1px color-mix(in srgb, #5eead4 40%, transparent);
   --cs-hero-shadow-pressed: inset 0 0 0 1px color-mix(in srgb, #5eead4 35%, transparent);
   --cs-hero-ok: #5eead4;
   --cs-hero-warn: #fbbf24;
   --cs-hero-bad: #fb7185;
   --cs-hero-face: "Chronicle Chakra Petch", "Chakra Petch", "Chronicle Inter", sans-serif;
-  --cs-hero-radius: 0px;
-  --cs-hero-pill: 0px;
+  --cs-hero-radius: 18px;
+  --cs-hero-pill: 999px;
+
+  /* The palette. */
+  --cs-glass-night: #0b0a12;
+  --cs-glass-wine: #1a0d14;
+  --cs-glass-crimson: #8f2233;
+  --cs-glass-plum: #4b2478;
+  --cs-glass-panel-a: #141a2a;
+  --cs-glass-panel-b: #0d1220;
+  --cs-glass-deep: #0e1424;
+  --cs-glass-teal: #5eead4;
+  --cs-glass-mint: #99f6e4;
+  --cs-glass-frost: #ccfbf1;
+  --cs-glass-periwinkle: #6366f1;
+  --cs-glass-indigo: #a5b4fc;
+  --cs-glass-violet: #c4b5fd;
+  --cs-glass-orange: #fdba74;
+  --cs-glass-rose: #fb7185;
+  --cs-glass-ink: #ffffff;
+  --cs-glass-sub: #a9b4c9;
+  --cs-glass-dim: #8ea0bd;
+  --cs-glass-pill: #dbe3f2;
+  --cs-glass-black: #000000;
+
+  /* Shades of them, named by their strength. */
+  --cs-glass-teal-06: color-mix(in srgb, var(--cs-glass-teal) 6%, transparent);
+  --cs-glass-teal-10: color-mix(in srgb, var(--cs-glass-teal) 10%, transparent);
+  --cs-glass-teal-16: color-mix(in srgb, var(--cs-glass-teal) 16%, transparent);
+  --cs-glass-teal-25: color-mix(in srgb, var(--cs-glass-teal) 25%, transparent);
+  --cs-glass-teal-35: color-mix(in srgb, var(--cs-glass-teal) 35%, transparent);
+  --cs-glass-teal-50: color-mix(in srgb, var(--cs-glass-teal) 50%, transparent);
+  --cs-glass-teal-70: color-mix(in srgb, var(--cs-glass-teal) 70%, transparent);
+  --cs-glass-ink-03: color-mix(in srgb, var(--cs-glass-ink) 3%, transparent);
+  --cs-glass-ink-06: color-mix(in srgb, var(--cs-glass-ink) 6%, transparent);
+  --cs-glass-ink-10: color-mix(in srgb, var(--cs-glass-ink) 10%, transparent);
+  --cs-glass-ink-16: color-mix(in srgb, var(--cs-glass-ink) 16%, transparent);
+  --cs-glass-ink-25: color-mix(in srgb, var(--cs-glass-ink) 25%, transparent);
+  --cs-glass-rose-35: color-mix(in srgb, var(--cs-glass-rose) 35%, transparent);
+  --cs-glass-rose-60: color-mix(in srgb, var(--cs-glass-rose) 60%, transparent);
+  --cs-glass-violet-18: color-mix(in srgb, var(--cs-glass-violet) 18%, transparent);
+
+  /* The panel: smoked glass, a teal hairline, a soft lift and glow. */
+  --cs-glass-fill: linear-gradient(160deg, color-mix(in srgb, var(--cs-glass-panel-a) 72%, transparent), color-mix(in srgb, var(--cs-glass-panel-b) 80%, transparent));
+  --cs-glass-fill-solid: linear-gradient(160deg, color-mix(in srgb, var(--cs-glass-panel-a) 96%, transparent), color-mix(in srgb, var(--cs-glass-panel-b) 98%, transparent));
+  --cs-glass-edge: color-mix(in srgb, var(--cs-glass-teal) 30%, transparent);
+  --cs-glass-lift: 0 24px 60px color-mix(in srgb, var(--cs-glass-black) 63%, transparent), inset 0 1px 0 color-mix(in srgb, var(--cs-glass-ink) 15%, transparent), 0 0 40px color-mix(in srgb, var(--cs-glass-teal) 10%, transparent);
+  --cs-glass-lift-low: 0 24px 60px color-mix(in srgb, var(--cs-glass-black) 63%, transparent), inset 0 1px 0 color-mix(in srgb, var(--cs-glass-ink) 15%, transparent), 0 0 40px color-mix(in srgb, var(--cs-glass-rose) 15%, transparent);
+  --cs-glass-glow: 0 0 16px color-mix(in srgb, var(--cs-glass-teal) 50%, transparent);
+  --cs-glass-ring-focus: 0 0 0 2px var(--cs-glass-panel-b), 0 0 0 3.5px var(--cs-glass-teal), 0 0 14px var(--cs-glass-teal-50);
+  --cs-glass-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --cs-glass-display: "Chronicle Chakra Petch", "Chakra Petch", "Chronicle Inter", sans-serif;
+  --cs-glass-text: "Chronicle Inter", Inter, system-ui, sans-serif;
+  --cs-glass-orb: 190px;
   color-scheme: dark;
 }
+
+.chronicle-hero-sheet[data-cs-look="glass"], .chronicle-hero-sheet[data-cs-look="glass"] *, .chronicle-hero-sheet[data-cs-look="glass"] *::before, .chronicle-hero-sheet[data-cs-look="glass"] *::after { box-sizing: border-box; }
 
 /* A thin scrollbar in the look's colours: the scroll area keeps its room
    so the layout does not shift, and the strip reads as part of the frame. */
 .chronicle-hero-sheet[data-cs-look="glass"] .window-content {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--cs-hero-accent) 50%, transparent) transparent;
+  scrollbar-color: var(--cs-glass-teal-50) transparent;
 }
+
+/* The title bar: the panel's dark with a teal hairline, the title in Chakra Petch. */
+.chronicle-hero-sheet[data-cs-look="glass"] .window-header {
+  background: var(--cs-glass-panel-b);
+  border-bottom: 1px solid var(--cs-glass-edge);
+  color: var(--cs-hero-body);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .window-header .window-title {
+  font-family: var(--cs-glass-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .window-header :is(button, a):hover { color: var(--cs-glass-teal); }
+
+/* ---- The full sheet: one grid, the glass laid over the violet field ---- */
+
+/* The window content is the grid. The tracks beside the glass are its
+   margin, so the sticky field can fill the whole box. The size container
+   gives the field and the sticky tab bar the window's own height. */
+.chronicle-hero-sheet[data-cs-look="glass"]:not(.cs-folded) .window-content {
+  display: grid;
+  grid-template-columns: 22px 28px var(--cs-glass-orb) minmax(0, 1fr) 28px 22px;
+  grid-template-rows: 22px 26px auto auto auto auto 26px 0 auto 22px;
+  align-content: start;
+  padding: 0;
+  container: cs-glass / size;
+  background: var(--cs-glass-night);
+  font-family: var(--cs-glass-text);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-head, .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-stats { display: contents; }
+
+/* The violet field: a wine-to-night wash, two soft lights that drift, a
+   faint grid. The field itself is a sticky box with no height, so it adds
+   nothing to the grid's rows; its sky is one window tall and is held still
+   while the glass scrolls over it, so the blur always has something behind it. */
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-field {
+  position: sticky;
+  top: 0;
+  z-index: 0;
+  grid-area: 1 / 1 / 11 / 7;
+  align-self: start;
+  height: 0;
+  pointer-events: none;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-sky {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100cqh;
+  overflow: hidden;
+  background: linear-gradient(160deg, var(--cs-glass-wine), var(--cs-glass-night));
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-sky i {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.8;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-sky i:nth-child(1) {
+  left: -200px;
+  top: -170px;
+  width: 760px;
+  height: 640px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--cs-glass-crimson) 90%, transparent), transparent);
+  animation: cs-glass-drift 18s ease-in-out infinite alternate;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-sky i:nth-child(2) {
+  right: -260px;
+  bottom: -280px;
+  width: 780px;
+  height: 660px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--cs-glass-plum) 95%, transparent), transparent);
+  animation: cs-glass-drift 22s ease-in-out infinite alternate-reverse;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-sky::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(0deg, var(--cs-glass-ink-06) 0 1px, transparent 1px 44px),
+    repeating-linear-gradient(90deg, var(--cs-glass-ink-06) 0 1px, transparent 1px 44px);
+}
+
+/* The big panel behind the header and the boxes: it blurs the field. */
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-pane {
+  position: relative;
+  z-index: 1;
+  grid-area: 2 / 2 / 8 / 6;
+  overflow: hidden;
+  border: 1px solid var(--cs-glass-edge);
+  border-radius: var(--cs-hero-radius);
+  background: var(--cs-glass-fill);
+  box-shadow: var(--cs-glass-lift);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  pointer-events: none;
+  transition: border-color 500ms ease, box-shadow 500ms ease;
+}
+/* A hit sends a ripple out from the picture. */
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-ripple {
+  position: absolute;
+  left: calc(28px - 1px + var(--cs-glass-orb) / 2);
+  top: calc(26px - 1px + var(--cs-glass-orb) / 2);
+  width: 10px;
+  height: 10px;
+  margin: -5px;
+  border: 2px solid var(--cs-glass-rose);
+  border-radius: 50%;
+  opacity: 0;
+}
+/* Hurt: the panel's edge and glow turn rose. */
+.chronicle-hero-sheet[data-cs-look="glass"]:has(.cs-glass-ring:is([data-band="winded"], [data-band="dying"], [data-band="dead"])) .cs-glass-pane {
+  border-color: var(--cs-glass-rose-60);
+  box-shadow: var(--cs-glass-lift-low);
+}
+
+/* Everything drawn on the glass sits above it. */
+.chronicle-hero-sheet[data-cs-look="glass"] :is(.cs-glass-orb, .cs-glass-ring, .cs-glass-id, .cs-glass-trk, .cs-glass-const, .cs-glass-grid, .cs-edit) {
+  position: relative;
+  z-index: 2;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-orb, .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-ring {
+  grid-area: 3 / 3 / 5 / 4;
+  align-self: start;
+  width: var(--cs-glass-orb);
+  height: var(--cs-glass-orb);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-id { grid-area: 3 / 4 / 4 / 5; min-width: 0; padding-left: 30px; container: cs-glass-id / inline-size; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-trk { grid-area: 4 / 4 / 5 / 5; padding-left: 30px; margin-top: 16px; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-const { grid-area: 5 / 3 / 6 / 5; margin-top: 24px; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-grid { grid-area: 6 / 3 / 7 / 5; margin-top: 24px; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-edit { grid-area: 5 / 3 / 7 / 5; margin-top: 18px; }
+
+/* ---- The picture in its ring ------------------------------------------ */
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-orb-art,
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-ring-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-orb-art circle, .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-ring-art circle { fill: none; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-ring-art { filter: drop-shadow(0 0 8px var(--cs-glass-teal-70)); transition: filter 500ms ease; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-dash {
+  stroke: var(--cs-glass-teal-35);
+  stroke-width: 1;
+  stroke-dasharray: 2 9;
+  transform-origin: 120px 120px;
+  animation: cs-glass-spin 40s linear infinite;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-groove { stroke: var(--cs-glass-ink-10); stroke-width: 6; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-fill {
+  stroke: var(--cs-glass-teal);
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dasharray 900ms cubic-bezier(0.3, 0, 0.2, 1), stroke 500ms ease;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-fill[stroke-dasharray^="0 "] { stroke-linecap: butt; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-seg { stroke: var(--cs-glass-violet-18); stroke-width: 3.5; transition: stroke 500ms ease; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-seg.on { stroke: var(--cs-glass-violet); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-ring:is([data-band="winded"], [data-band="dying"], [data-band="dead"]) .cs-glass-fill { stroke: var(--cs-glass-rose); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-ring:is([data-band="winded"], [data-band="dying"], [data-band="dead"]) .cs-glass-ring-art { filter: drop-shadow(0 0 10px var(--cs-glass-rose)); }
+
+/* The ring lets clicks through to the picture it wraps. */
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-ring { pointer-events: none; }
+/* The glow a heal blooms. */
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-ring::before {
+  content: "";
+  position: absolute;
+  inset: -22px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, transparent 58%, var(--cs-glass-teal-50) 70%, transparent 100%);
+  opacity: 0;
+}
+
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-pt {
+  position: absolute;
+  inset: calc(var(--cs-glass-orb) * 0.1368);
+  border-radius: 50%;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-pt .cs-portrait-btn {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 50%;
+  transition: box-shadow 250ms ease, transform 120ms var(--cs-glass-soft);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-pt .cs-portrait-btn:hover { box-shadow: 0 0 22px var(--cs-glass-teal-50); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-pt .cs-portrait-btn:active { transform: scale(0.98); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-pt .cs-portrait-btn:focus-visible { outline-offset: 4px; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-pt .cs-portrait {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  box-shadow: none;
+  object-fit: var(--avatar-object-fit, cover);
+  object-position: var(--avatar-object-position, 50% 20%);
+  transition: transform 500ms var(--cs-glass-soft), filter 500ms ease;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-pt .cs-portrait-btn:hover .cs-portrait { box-shadow: none; transform: scale(1.04); }
+/* A quiet inner edge, so a bright picture sits in the ring instead of burning through it. */
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-pt .cs-portrait-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px var(--cs-glass-teal-25), inset 0 0 26px color-mix(in srgb, var(--cs-glass-black) 45%, transparent);
+}
+/* No picture of their own: a teal rune on the field instead of Foundry's stand-in figure. */
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-sigil {
+  display: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, var(--cs-glass-deep), var(--cs-glass-panel-b));
+  stroke: var(--cs-glass-teal);
+  padding: 14%;
+  box-sizing: border-box;
+  opacity: 0.9;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-pt:has(.cs-portrait:is([src$="mystery-man.svg"], [src=""], :not([src]))) .cs-glass-sigil { display: block; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-pt:has(.cs-portrait:is([src$="mystery-man.svg"], [src=""], :not([src]))) .cs-portrait { opacity: 0; }
+/* Dying or dead: the picture drains of colour. */
+.chronicle-hero-sheet[data-cs-look="glass"]:has(.cs-glass-ring:is([data-band="dying"], [data-band="dead"])) .cs-glass-pt .cs-portrait { filter: grayscale(1) brightness(0.6); }
+
+/* The Stamina figure on the ring's foot. */
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-chip {
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  margin: 0;
+  padding: 2px 12px;
+  border: 1px solid var(--cs-glass-teal-50);
+  border-radius: var(--cs-hero-pill);
+  background: var(--cs-glass-panel-b);
+  transform: translateX(-50%);
+  font: 600 13px var(--cs-glass-display);
+  color: var(--cs-glass-mint);
+  white-space: nowrap;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-chip b { font-size: 18px; color: var(--cs-glass-ink); font-variant-numeric: tabular-nums; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-state {
+  margin-left: 8px;
+  font: 600 10px var(--cs-glass-display);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cs-glass-rose);
+}
+
+/* ---- Name, class, origins, XP ----------------------------------------- */
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-eye {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  min-width: 0;
+  margin: 2px 0 0;
+  font: 600 11px/1.5 var(--cs-glass-display);
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--cs-glass-teal);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-eye > * + *::before { content: "·"; margin: 0 0.6em; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-eye a { color: inherit; text-decoration: none; transition: color 200ms ease, text-shadow 250ms ease; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-eye a:hover { color: var(--cs-glass-frost); text-shadow: 0 0 10px var(--cs-glass-teal-70); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-subcls { letter-spacing: 0.2em; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-lvlup {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4em;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0 8px;
+  border: 1px solid var(--cs-glass-teal);
+  border-radius: var(--cs-hero-pill);
+  background: var(--cs-glass-teal-16);
+  box-shadow: var(--cs-glass-glow);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: var(--cs-glass-frost);
+  cursor: pointer;
+  transition: background-color 200ms ease, box-shadow 250ms ease, transform 120ms var(--cs-glass-soft);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-lvlup:hover:not(:disabled) { background: var(--cs-glass-teal-25); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-lvlup:active:not(:disabled) { transform: scale(0.97); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-lvlup:disabled { cursor: default; box-shadow: none; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-id .cs-name {
+  margin: 4px 0 0;
+  font: 600 clamp(32px, 6.4cqi, 52px)/1.05 var(--cs-glass-display);
+  letter-spacing: 0.02em;
+  color: var(--cs-glass-ink);
+  text-shadow: 0 0 24px var(--cs-glass-teal-35);
+  overflow-wrap: break-word;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-name-edit input {
+  height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--cs-glass-ink-16);
+  border-radius: 14px;
+  background: var(--cs-glass-ink-03);
+  font: 600 30px var(--cs-glass-display);
+  color: var(--cs-glass-ink);
+  transition: border-color 200ms ease, box-shadow 250ms ease;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-name-edit input:hover { border-color: var(--cs-glass-teal-35); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-name-edit input:focus { border-color: var(--cs-glass-teal); box-shadow: 0 0 0 3px var(--cs-glass-teal-16), 0 0 22px var(--cs-glass-teal-25); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-origins {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  font: 400 14px/1.5 var(--cs-glass-text);
+  color: var(--cs-glass-sub);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-origin + .cs-glass-origin::before { content: "·"; margin: 0 0.5em; color: var(--cs-hero-muted); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-origin a { color: inherit; text-decoration: none; transition: color 200ms ease, text-shadow 250ms ease; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-origin a:hover { color: var(--cs-glass-ink); text-shadow: 0 0 10px var(--cs-glass-teal-70); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-kind {
+  margin-right: 0.45em;
+  font: 600 9px var(--cs-glass-display);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--cs-hero-muted);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-del { margin-left: 0.4em; font-size: 12px; color: var(--cs-hero-muted); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-del:hover { color: var(--cs-glass-rose); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-todo { color: var(--cs-hero-muted); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-todo a { color: var(--cs-glass-teal); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-vic {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 6px 0 0;
+  font: 600 10.5px var(--cs-glass-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cs-hero-muted);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-vic b { font-size: 12px; color: var(--cs-hero-text); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-prog-edit { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-prog-edit label { font: 600 10px var(--cs-glass-display); letter-spacing: 0.16em; text-transform: uppercase; color: var(--cs-hero-muted); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-prog-edit input {
+  width: 72px;
+  border: 1px solid var(--cs-glass-ink-16);
+  border-radius: var(--cs-hero-pill);
+  background: var(--cs-glass-ink-03);
+  color: var(--cs-hero-text);
+  text-align: center;
+  transition: border-color 200ms ease, box-shadow 250ms ease;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-prog-edit input:hover { border-color: var(--cs-glass-teal-35); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-prog-edit input:focus { border-color: var(--cs-glass-teal); box-shadow: 0 0 0 3px var(--cs-glass-teal-16); }
+
+/* Take Respite: a small teal pill, top right of the glass. */
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-resp {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 6px 14px;
+  border: 1px solid var(--cs-glass-teal-50);
+  border-radius: var(--cs-hero-pill);
+  background: color-mix(in srgb, var(--cs-glass-panel-b) 60%, transparent);
+  box-shadow: none;
+  text-shadow: none;
+  font: 600 11px var(--cs-glass-display);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cs-glass-teal);
+  cursor: pointer;
+  transition: background-color 200ms ease, box-shadow 250ms ease, color 200ms ease, transform 120ms var(--cs-glass-soft);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-resp:hover { background-color: var(--cs-glass-teal-10); box-shadow: var(--cs-glass-glow); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-resp:active { transform: scale(0.97); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-resp:focus-visible { outline: none; background-color: var(--cs-glass-teal-10); box-shadow: var(--cs-glass-ring-focus); }
+
+/* ---- The tracker boxes -------------------------------------------------- */
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-trk {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 4px 7px;
+  border: 1px solid var(--cs-glass-ink-10);
+  border-radius: 10px;
+  background: var(--cs-glass-ink-03);
+  text-align: center;
+  transition: border-color 200ms ease, box-shadow 250ms ease, background-color 200ms ease;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-box:hover { border-color: var(--cs-glass-teal-35); background-color: var(--cs-glass-teal-06); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-box:has(input:focus) { border-color: var(--cs-glass-teal); background-color: var(--cs-glass-teal-06); box-shadow: 0 0 0 3px var(--cs-glass-teal-16), var(--cs-glass-glow); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-lb {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  box-shadow: none;
+  text-shadow: none;
+  font: 600 9.5px/1.3 var(--cs-glass-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cs-hero-muted);
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] button.cs-glass-lb {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-decoration-color: var(--cs-glass-ink-25);
+  text-underline-offset: 3px;
+  transition: color 200ms ease, text-decoration-color 200ms ease;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] button.cs-glass-lb:hover { color: var(--cs-glass-teal); text-decoration-color: var(--cs-glass-teal); }
+.chronicle-hero-sheet[data-cs-look="glass"] button.cs-glass-lb:active { color: var(--cs-glass-frost); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-n {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 1px;
+  font: 600 24px/1.1 var(--cs-glass-display);
+  color: var(--cs-glass-ink);
+  font-variant-numeric: tabular-nums;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] b.cs-glass-n { min-height: 34px; align-items: center; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-n small { font: 600 12px var(--cs-glass-display); color: var(--cs-hero-muted); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-primary .cs-field input[type="number"] { color: var(--cs-glass-violet); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-surges .cs-field input[type="number"] { color: var(--cs-glass-orange); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-box .cs-field { display: inline-flex; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-box .cs-field input[type="number"] {
+  field-sizing: fixed;
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 2px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  font-family: var(--cs-glass-display);
+  font-size: 24px;
+  font-weight: 600;
+  text-align: center;
+  color: inherit;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-n .cs-field { min-width: 0; flex: 0 1 auto; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-rec .cs-field input[type="number"], .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-stam .cs-glass-n .cs-field input[type="number"] { width: 3ch; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-box .cs-field input[type="number"]:hover { border-color: var(--cs-glass-ink-10); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-box .cs-field input[type="number"]:focus { border-color: transparent; background: none; outline: none; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-box .cs-field input[type="number"]:disabled { color: var(--cs-hero-muted); }
+/* Temporary Stamina: a small chip on the Stamina box's top edge. */
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-temp {
+  position: absolute;
+  left: 50%;
+  top: -10px;
+  gap: 4px;
+  align-items: center;
+  padding: 0 5px;
+  border: 1px solid var(--cs-glass-teal-35);
+  border-radius: var(--cs-hero-pill);
+  background: var(--cs-glass-panel-b);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  transition: border-color 200ms ease, box-shadow 250ms ease;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-temp > span { font: 600 8.5px/1.6 var(--cs-glass-display); letter-spacing: 0.08em; text-transform: uppercase; color: var(--cs-hero-muted); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-temp:focus-within { border-color: var(--cs-glass-teal); box-shadow: 0 0 10px var(--cs-glass-teal-50); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-box .cs-glass-temp input[type="number"] { width: 2.6ch; height: 18px; font-size: 11px; text-align: left; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-stam[data-band="winded"] .cs-glass-n, .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-stam:is([data-band="dying"], [data-band="dead"]) .cs-glass-n { color: var(--cs-glass-rose); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-stam[data-band="winded"] .cs-field input[type="number"], .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-stam:is([data-band="dying"], [data-band="dead"]) .cs-field input[type="number"] { color: var(--cs-glass-rose); }
+
+/* ---- The characteristics: hexes ---------------------------------------- */
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-const {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: center;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-line {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: 50%;
+  height: 1px;
+  background: repeating-linear-gradient(90deg, var(--cs-glass-teal-50) 0 3px, transparent 3px 8px);
+  transform-origin: left center;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-hx {
+  position: relative;
+  display: grid;
+  place-content: center;
+  justify-self: center;
+  width: min(104px, 100%);
+  height: auto;
+  aspect-ratio: 98 / 108;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  text-shadow: none;
+  text-align: center;
+  font: inherit;
+  cursor: pointer;
+  transition: transform 250ms var(--cs-glass-soft), filter 250ms ease;
+}
+/* The hexagon is drawn by layers, so the focus ring is not clipped away:
+   the rim, the face, then the light that comes on from inside. */
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-hx::before,
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-hx::after,
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-glow {
+  content: "";
+  position: absolute;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-hx::before { inset: 0; z-index: 0; background: linear-gradient(180deg, var(--cs-glass-teal), var(--cs-glass-periwinkle)); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-hx::after { inset: 2px; z-index: 0; background: var(--cs-glass-deep); transition: inset 200ms ease; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-glow {
+  inset: 2px;
+  z-index: 1;
+  background: radial-gradient(circle, var(--cs-glass-teal-35), transparent 70%);
+  opacity: 0;
+  transition: opacity 250ms ease;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-hx > b, .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-hx > .cs-glass-hx-name { position: relative; z-index: 2; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-hx b { display: block; font: 600 clamp(28px, 3.4cqi, 36px)/1 var(--cs-glass-display); color: var(--cs-glass-ink); text-shadow: 0 0 14px var(--cs-glass-teal-70); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-hx-name {
+  max-width: 80px;
+  margin: 3px auto 0;
+  overflow: hidden;
+  font: 600 9.5px var(--cs-glass-display);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--cs-glass-teal);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-hx:hover:not(:disabled) { transform: translateY(-3px); filter: drop-shadow(0 8px 14px color-mix(in srgb, var(--cs-glass-black) 70%, transparent)); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-hx:hover:not(:disabled) .cs-glass-glow, .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-hx:focus-visible .cs-glass-glow { opacity: 1; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-hx:active:not(:disabled) { transform: scale(0.96); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-hx:focus-visible {
+  outline: 2px solid var(--cs-glass-teal);
+  outline-offset: 4px;
+  border-radius: 14px;
+  filter: drop-shadow(0 0 8px var(--cs-glass-teal-70));
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-hx:focus-visible::before { background: linear-gradient(180deg, var(--cs-glass-mint), var(--cs-glass-indigo)); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-hx:focus-visible::after { inset: 3px; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-hx:disabled { cursor: default; }
+
+/* ---- Skills and body: two glass cells ---------------------------------- */
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 12px; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-cell {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--cs-glass-ink-10);
+  border-radius: 14px;
+  background: var(--cs-glass-ink-03);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-k {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font: 600 10px var(--cs-glass-display);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--cs-glass-teal);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-skill-list { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 0; padding: 0; list-style: none; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-skill-list li {
+  padding: 2px 9px;
+  border: 1px solid var(--cs-glass-ink-16);
+  border-radius: var(--cs-hero-pill);
+  font: 400 12px/1.5 var(--cs-glass-text);
+  color: var(--cs-glass-pill);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-none { margin: 8px 0 0; color: var(--cs-hero-muted); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-t { display: flex; flex-wrap: wrap; gap: 0 8px; margin: 4px 0 0; font: 400 13px/1.55 var(--cs-glass-text); color: var(--cs-hero-body); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-t b { font-weight: 600; color: var(--cs-hero-text); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 2px 8px;
+  border: 1px solid var(--cs-glass-teal-35);
+  border-radius: var(--cs-hero-pill);
+  background: none;
+  box-shadow: none;
+  font: 600 9px var(--cs-glass-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cs-glass-teal);
+  cursor: pointer;
+  transition: background-color 200ms ease, box-shadow 250ms ease, transform 120ms var(--cs-glass-soft);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-mini:hover { background: var(--cs-glass-teal-10); box-shadow: 0 0 12px var(--cs-glass-teal-35); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-mini:active { transform: scale(0.96); }
+
+/* Number fields in Draw Steel's editors and elsewhere: a rounded glass well. */
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-field input[type="number"] { font-family: var(--cs-glass-display); font-weight: 600; transition: border-color 200ms ease, box-shadow 250ms ease, background-color 200ms ease; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-field input[type="number"]:hover { border-color: var(--cs-glass-teal-35); background: var(--cs-glass-teal-06); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-field input[type="number"]:focus { border-color: var(--cs-glass-teal); box-shadow: 0 0 0 3px var(--cs-glass-teal-16); }
+
+/* ---- The tab bar: a floating pill of glass, pinned as the page scrolls --- */
+.chronicle-hero-sheet[data-cs-look="glass"]:not(.cs-folded) .window-content > nav.tabs {
+  position: sticky;
+  top: 10px;
+  z-index: 3;
+  grid-area: 8 / 2 / 11 / 6;
+  align-self: start;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  height: 44px;
+  margin: 14px 0 0;
+  padding: 6px;
+  overflow: hidden;
+  border: 1px solid var(--cs-glass-edge);
+  border-radius: var(--cs-hero-pill);
+  background: var(--cs-glass-fill);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--cs-glass-black) 50%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.chronicle-hero-sheet[data-cs-look="glass"]:not(.cs-folded) .window-content > nav.tabs > [data-tab] {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  margin: 0;
+  padding: 0 clamp(6px, 1.3cqi, 12px);
+  border: 1px solid transparent;
+  border-radius: var(--cs-hero-pill);
+  font: 600 11px var(--cs-glass-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--cs-glass-sub);
+  transition: color 200ms ease, border-color 200ms ease, background-color 200ms ease, box-shadow 250ms ease, transform 120ms ease;
+}
+.chronicle-hero-sheet[data-cs-look="glass"]:not(.cs-folded) .window-content > nav.tabs > [data-tab]:not(.active):hover { color: var(--cs-hero-text); border-color: var(--cs-glass-ink-16); background: var(--cs-glass-ink-06); }
+.chronicle-hero-sheet[data-cs-look="glass"]:not(.cs-folded) .window-content > nav.tabs > [data-tab]:active { transform: scale(0.97); }
+.chronicle-hero-sheet[data-cs-look="glass"]:not(.cs-folded) .window-content > nav.tabs > [data-tab].active {
+  border-color: transparent;
+  background: var(--cs-glass-teal);
+  box-shadow: var(--cs-glass-glow);
+  color: var(--cs-hero-on-accent);
+}
+.chronicle-hero-sheet[data-cs-look="glass"]:not(.cs-folded) .window-content > nav.tabs > [data-tab]:focus-visible { outline: none; box-shadow: var(--cs-glass-ring-focus); }
+
+/* ---- Draw Steel's tabs on glass ----------------------------------------- */
+.chronicle-hero-sheet[data-cs-look="glass"]:not(.cs-folded) .window-content > section.tab {
+  position: relative;
+  z-index: 1;
+  grid-area: 9 / 2 / 10 / 6;
+  min-width: 0;
+  margin: 72px 0 0;
+  padding: 16px 18px 20px;
+  border: 1px solid var(--cs-glass-edge);
+  border-radius: var(--cs-hero-radius);
+  background: var(--cs-glass-fill);
+  box-shadow: var(--cs-glass-lift);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+/* Headings: small teal capitals with a lit dot. */
+.chronicle-hero-sheet[data-cs-look="glass"] section.tab :is(fieldset legend, h3, h4),
+.chronicle-hero-sheet[data-cs-look="glass"] .item-list-container .item-header .item-name {
+  font: 600 10px var(--cs-glass-display);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--cs-glass-teal);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .item-list-container .item-header { border-bottom: 0; padding-bottom: 8px; font: 600 8.5px var(--cs-glass-display); letter-spacing: 0.16em; }
+.chronicle-hero-sheet[data-cs-look="glass"] .item-list-container .item-header .item-name { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.chronicle-hero-sheet[data-cs-look="glass"] .item-list-container .item-header .item-name::before {
+  content: "";
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--cs-glass-teal);
+  box-shadow: 0 0 8px var(--cs-glass-teal);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .item-list-container .item-list .item { border-bottom: 0; padding: 3px 0; }
+.chronicle-hero-sheet[data-cs-look="glass"] .item-list-container .item-row {
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--cs-glass-ink) 2%, transparent);
+  box-shadow: inset 0 0 0 1px var(--cs-glass-ink-06);
+  transition: background-color 200ms ease, box-shadow 250ms ease, transform 140ms var(--cs-glass-soft);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .item-list-container .item-row:hover {
+  background: var(--cs-glass-teal-06);
+  box-shadow: inset 0 0 0 1px var(--cs-glass-teal-50), inset 0 0 18px var(--cs-glass-teal-10), 0 0 16px -4px var(--cs-glass-teal-50);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .item-list-container .item-row:active { transform: scale(0.99); }
+.chronicle-hero-sheet[data-cs-look="glass"] .item-list-container .item:has(> .document-description.expanded) > .item-row {
+  border-left-color: transparent;
+  border-radius: 12px 12px 0 0;
+  background: var(--cs-glass-ink-06);
+  box-shadow: inset 0 0 0 1px var(--cs-glass-teal-25);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .item-list-container .item-row .item-name .name .label { font: 600 14.5px/1.2 var(--cs-glass-display); }
+.chronicle-hero-sheet[data-cs-look="glass"] .item-list-container .item-row .item-name img { border: 1px solid var(--cs-glass-teal-25); border-radius: 9px; }
+.chronicle-hero-sheet[data-cs-look="glass"] .item-list-container .item-row .item-name.rollable:hover .label { color: var(--cs-glass-frost); }
+.chronicle-hero-sheet[data-cs-look="glass"] .item-list-container .item-controls a:hover { color: var(--cs-glass-teal); }
+.chronicle-hero-sheet[data-cs-look="glass"] .item-list-container .item-controls a:focus-visible, .chronicle-hero-sheet[data-cs-look="glass"] .item-list-container .item-row:focus-visible { outline: none; box-shadow: var(--cs-glass-ring-focus); }
+.chronicle-hero-sheet[data-cs-look="glass"] .item-list-container .document-description.expanded { font-size: 14px; border-radius: 0 0 12px 12px; background: var(--cs-glass-ink-03); }
+.chronicle-hero-sheet[data-cs-look="glass"] section.tab fieldset { border-color: var(--cs-glass-ink-10); border-radius: 14px; }
+
+/* Edit mode: Draw Steel's editors in glass cells. */
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-edit { gap: 12px; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-edit fieldset {
+  border: 1px solid var(--cs-glass-ink-10);
+  border-radius: 14px;
+  background: var(--cs-glass-ink-03);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-edit legend { font-family: var(--cs-glass-display); letter-spacing: 0.22em; color: var(--cs-glass-teal); }
+
+/* Inputs in Draw Steel's editors: rounded glass wells with a teal focus. */
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-edit :is(input:not([type="checkbox"], [type="radio"]), select) {
+  border: 1px solid var(--cs-glass-ink-16);
+  border-radius: 8px;
+  background: var(--cs-glass-ink-03);
+  color: var(--cs-hero-text);
+  transition: border-color 200ms ease, box-shadow 250ms ease;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-edit :is(input:not([type="checkbox"], [type="radio"]), select):hover { border-color: var(--cs-glass-teal-35); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-edit :is(input:not([type="checkbox"], [type="radio"]), select):focus { border-color: var(--cs-glass-teal); box-shadow: 0 0 0 3px var(--cs-glass-teal-16); }
+
+/* ---- Narrower windows --------------------------------------------------- */
+@container cs-hero (max-width: 940px) {
+  .chronicle-hero-sheet[data-cs-look="glass"] .window-content { --cs-glass-orb: 160px; }
+  .chronicle-hero-sheet[data-cs-look="glass"]:not(.cs-folded) .window-content { grid-template-columns: 16px 22px var(--cs-glass-orb) minmax(0, 1fr) 22px 16px; }
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-id, .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-trk { padding-left: 22px; }
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-id .cs-name { font-size: clamp(30px, 5.6cqi, 46px); }
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-lb { font-size: 9px; letter-spacing: 0.08em; }
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-n, .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-n .cs-field input[type="number"] { font-size: 21px; }
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-ripple { left: calc(22px - 1px + var(--cs-glass-orb) / 2); top: calc(26px - 1px + var(--cs-glass-orb) / 2); }
+}
+@container cs-hero (max-width: 780px) {
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-trk { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 8px; }
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-trk > :last-child:nth-child(3n + 1) { grid-column: 1 / -1; }
+}
+/* Too narrow for the picture beside the name: the picture sits over it,
+   centred, and everything stacks. */
+@container cs-hero (max-width: 700px) {
+  .chronicle-hero-sheet[data-cs-look="glass"] .window-content { --cs-glass-orb: 150px; }
+  .chronicle-hero-sheet[data-cs-look="glass"]:not(.cs-folded) .window-content {
+    grid-template-columns: 12px 16px minmax(0, 1fr) 16px 12px;
+    grid-template-rows: 14px 22px auto auto auto auto auto 22px 0 auto 14px;
+  }
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-field { grid-area: 1 / 1 / 12 / 6; }
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-pane { grid-area: 2 / 2 / 9 / 5; }
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-orb, .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-ring { grid-area: 3 / 3 / 4 / 4; justify-self: center; }
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-id { grid-area: 4 / 3 / 5 / 4; padding-left: 0; margin-top: 16px; text-align: center; }
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-top { flex-direction: column-reverse; align-items: center; gap: 8px; }
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-eye, .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-origins, .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-vic, .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-prog-edit { justify-content: center; }
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-trk { grid-area: 5 / 3 / 6 / 4; padding-left: 0; margin-top: 18px; }
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-const { grid-area: 6 / 3 / 7 / 4; margin-top: 22px; }
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-grid { grid-area: 7 / 3 / 8 / 4; grid-template-columns: minmax(0, 1fr); margin-top: 22px; }
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-edit { grid-area: 5 / 3 / 8 / 4; }
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-hx { width: min(92px, 100%); }
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-ripple { left: 50%; top: calc(22px + var(--cs-glass-orb) / 2); margin-left: -5px; }
+  .chronicle-hero-sheet[data-cs-look="glass"]:not(.cs-folded) .window-content > nav.tabs { grid-area: 9 / 2 / 12 / 5; }
+  .chronicle-hero-sheet[data-cs-look="glass"]:not(.cs-folded) .window-content > section.tab { grid-area: 10 / 2 / 11 / 5; padding: 14px; }
+  .chronicle-hero-sheet[data-cs-look="glass"]:not(.cs-folded) .window-content > nav.tabs > [data-tab] { padding: 0 6px; font-size: 10px; letter-spacing: 0.06em; }
+}
+@container cs-hero (max-width: 560px) {
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-trk { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-trk > :last-child:nth-child(3n + 1) { grid-column: auto; }
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-trk > :last-child:nth-child(2n + 1) { grid-column: 1 / -1; }
+}
+
+/* ---- Folded: the card in glass ------------------------------------------ */
+/* The frame itself is the glass, so the map behind a folded card shows
+   through, blurred. */
+.chronicle-hero-sheet[data-cs-look="glass"].cs-folded {
+  overflow: hidden;
+  border: 1px solid var(--cs-glass-edge);
+  border-radius: var(--cs-hero-radius);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--cs-glass-panel-a) 85%, transparent), color-mix(in srgb, var(--cs-glass-panel-b) 90%, transparent));
+  box-shadow: var(--cs-glass-lift);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.chronicle-hero-sheet[data-cs-look="glass"].cs-folded .window-header { background: transparent; border-bottom: 0; }
+.chronicle-hero-sheet[data-cs-look="glass"].cs-folded .window-content {
+  background:
+    radial-gradient(80% 50% at 0 0, color-mix(in srgb, var(--cs-glass-crimson) 35%, transparent), transparent),
+    radial-gradient(80% 50% at 100% 100%, color-mix(in srgb, var(--cs-glass-plum) 50%, transparent), transparent);
+  border: 0;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-art {
+  position: relative;
+  width: 130px;
+  height: 130px;
+  margin: 4px auto 0;
+  border-radius: 50%;
+  background: var(--cs-glass-panel-b);
+  box-shadow: 0 0 0 3px var(--cs-glass-panel-b), 0 0 0 5px var(--cs-glass-teal), 0 0 22px var(--cs-glass-teal-50);
+  transition: box-shadow 250ms ease, transform 120ms var(--cs-glass-soft);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-art:hover { box-shadow: 0 0 0 3px var(--cs-glass-panel-b), 0 0 0 5px var(--cs-glass-mint), 0 0 30px var(--cs-glass-teal-70); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-art:active { transform: scale(0.98); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-art:focus-visible { outline-offset: 8px; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-art img { border-radius: 50%; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-art:has(img:is([src$="mystery-man.svg"], [src=""], :not([src]))) img { opacity: 0; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-art:has(img:is([src$="mystery-man.svg"], [src=""], :not([src])))::before {
+  content: "";
+  position: absolute;
+  inset: 24px;
+  background-color: var(--cs-glass-teal);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill-rule='evenodd' d='M50 14 80 31v38L50 86 20 69V31zM50 23 72 35.5v29L50 77 28 64.5v-29z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill-rule='evenodd' d='M50 14 80 31v38L50 86 20 69V31zM50 23 72 35.5v29L50 77 28 64.5v-29z'/%3E%3C/svg%3E") center / contain no-repeat;
+  opacity: 0.8;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-body { text-align: center; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-name { font: 600 22px/1.1 var(--cs-glass-display); color: var(--cs-glass-ink); text-shadow: 0 0 18px var(--cs-glass-teal-35); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-sub { font: 600 10px var(--cs-glass-display); letter-spacing: 0.2em; text-transform: uppercase; color: var(--cs-glass-teal); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-stam .cs-bar { background: var(--cs-glass-ink-10); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-stam .cs-bar i { background: var(--cs-glass-teal); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-stam:is([data-band="winded"], [data-band="dying"], [data-band="dead"]) .cs-bar i { background: var(--cs-glass-rose); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-num b { font-family: var(--cs-glass-display); color: var(--cs-glass-ink); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-rec { justify-content: center; gap: 6px; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-rec i { flex: none; width: 10px; height: 10px; border-radius: 50%; background: none; box-shadow: inset 0 0 0 1px var(--cs-glass-ink-25); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-rec i.on { background: var(--cs-glass-violet); box-shadow: none; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-chr { border-color: var(--cs-glass-ink-10); border-radius: 10px; background: var(--cs-glass-ink-03); transition: border-color 200ms ease, box-shadow 250ms ease, background-color 200ms ease, transform 120ms var(--cs-glass-soft); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-chr b { font-family: var(--cs-glass-display); color: var(--cs-glass-ink); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-chr span { font: 600 8.5px var(--cs-glass-display); letter-spacing: 0.04em; text-transform: uppercase; color: var(--cs-glass-teal); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-chr:hover:not(:disabled) { border-color: var(--cs-glass-teal); background: var(--cs-glass-teal-06); box-shadow: var(--cs-glass-glow); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-chr:active:not(:disabled) { transform: scale(0.96); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-actions .cs-btn {
+  border-color: var(--cs-glass-teal-35);
+  border-radius: var(--cs-hero-pill);
+  background: none;
+  font: 600 10px var(--cs-glass-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cs-glass-teal);
+  transition: background-color 200ms ease, box-shadow 250ms ease, transform 120ms var(--cs-glass-soft);
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-actions .cs-btn:hover { border-color: var(--cs-glass-teal); background: var(--cs-glass-teal-10); box-shadow: var(--cs-glass-glow); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-actions .cs-btn:active { transform: scale(0.97); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-actions .cs-btn-main { border-color: var(--cs-glass-teal); background: var(--cs-glass-teal); color: var(--cs-hero-on-accent); filter: none; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-card-actions .cs-btn-main:hover { background: var(--cs-glass-mint); filter: none; }
+
+/* ---- Menus: frosted glass that grows out of where you clicked ------------ */
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-menu {
+  padding: 5px;
+  border-color: var(--cs-glass-edge);
+  border-radius: 12px;
+  background: var(--cs-glass-fill-solid);
+  box-shadow: 0 22px 48px color-mix(in srgb, var(--cs-glass-black) 70%, transparent), 0 0 24px var(--cs-glass-teal-10), inset 0 1px 0 color-mix(in srgb, var(--cs-glass-ink) 12%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  backdrop-filter: blur(16px) saturate(1.3);
+  font: 13.5px/1.3 var(--cs-glass-text);
+  transform-origin: top left;
+  animation: cs-glass-menu-in 200ms var(--cs-glass-soft) both;
+}
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-menu.cs-menu-out { animation: cs-glass-menu-out 140ms ease-in both; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-menu-head { font: 600 9px var(--cs-glass-display); letter-spacing: 0.22em; color: var(--cs-glass-teal); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-menu hr { border: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--cs-glass-teal-35), transparent); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-menu-item { border-radius: 8px; transition: background-color 150ms ease, box-shadow 200ms ease, transform 100ms ease; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-menu-item:is(:hover, :focus-visible) { background: var(--cs-glass-teal-10); box-shadow: inset 0 0 0 1px var(--cs-glass-teal-25); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-menu-item:active:not([aria-disabled="true"]) { background: var(--cs-glass-teal-16); transform: scale(0.99); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-menu-item:is(:hover, :focus-visible) .cs-menu-icon { color: var(--cs-glass-teal); filter: drop-shadow(0 0 4px var(--cs-glass-teal)); }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-menu-tag { font-family: var(--cs-glass-display); color: var(--cs-glass-teal); }
+
+/* Without backdrop blur the panels would show the field through them
+   un-softened, so they go more opaque and the text keeps its contrast. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-pane, .chronicle-hero-sheet[data-cs-look="glass"]:not(.cs-folded) .window-content > section.tab, .chronicle-hero-sheet[data-cs-look="glass"]:not(.cs-folded) .window-content > nav.tabs, .chronicle-hero-sheet[data-cs-look="glass"].cs-folded {
+    background: var(--cs-glass-fill-solid);
+  }
+}
+
+/* ---- Moves: soft and floating ---------------------------------------------
+   The sheet puts a cs-move-* class on the window for each (scripts/hero-looks.mjs):
+   opening, a hit, a heal, a level gained, Edit mode entered, folding. Off and
+   reduced motion stop them with the rest of Chronicle's windows
+   (styles/chronicle-sync.css); Calm, below, keeps only the fades. */
+
+/* Opening: the panel settles into focus, then the hexes pop in one by one.
+   The blur is applied to each part once, never animated on the glass itself. */
+.chronicle-hero-sheet[data-cs-look="glass"].cs-move-open .cs-glass-pane { animation: cs-glass-settle 700ms var(--cs-glass-soft) both; }
+.chronicle-hero-sheet[data-cs-look="glass"].cs-move-open :is(.cs-glass-orb, .cs-glass-ring, .cs-glass-id, .cs-glass-trk, .cs-glass-grid, .cs-edit) { animation: cs-glass-focus 700ms var(--cs-glass-soft) both; }
+.chronicle-hero-sheet[data-cs-look="glass"].cs-move-open .cs-glass-hx { animation: cs-glass-pop 500ms calc(var(--i, 0) * 80ms + 350ms) cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+.chronicle-hero-sheet[data-cs-look="glass"].cs-move-open .cs-glass-line { animation: cs-glass-fade 600ms 500ms ease-out both; }
+.chronicle-hero-sheet[data-cs-look="glass"].cs-move-open .window-content > :is(nav.tabs, section.tab) { animation: cs-glass-fade 600ms 350ms ease-out both; }
+
+/* A hit: a rose ripple spreads from the picture and the glass shivers. */
+.chronicle-hero-sheet[data-cs-look="glass"].cs-move-hit .cs-glass-ripple { animation: cs-glass-ripple 900ms cubic-bezier(0.2, 0.7, 0.3, 1); }
+.chronicle-hero-sheet[data-cs-look="glass"].cs-move-hit :is(.cs-glass-pane, .cs-glass-orb, .cs-glass-ring, .cs-glass-id, .cs-glass-trk, .cs-glass-const, .cs-glass-grid) { animation: cs-glass-shiver 500ms ease-out; }
+
+/* A heal: the ring blooms. */
+.chronicle-hero-sheet[data-cs-look="glass"].cs-move-heal .cs-glass-ring::before { animation: cs-glass-bloom 1200ms ease-out; }
+
+/* A level gained: the hexes light one after another, a line draws between
+   them, the name glows. */
+.chronicle-hero-sheet[data-cs-look="glass"].cs-move-level .cs-glass-glow { animation: cs-glass-light 900ms calc(var(--i, 0) * 140ms) ease-out; }
+.chronicle-hero-sheet[data-cs-look="glass"].cs-move-level .cs-glass-line { animation: cs-glass-draw 1200ms linear; }
+.chronicle-hero-sheet[data-cs-look="glass"].cs-move-level .cs-glass-id .cs-name { animation: cs-glass-name 1200ms ease-out; }
+
+/* Edit mode: the editors arrive one after another. */
+.chronicle-hero-sheet[data-cs-look="glass"].cs-move-editin .cs-edit > * { animation: cs-glass-focus 400ms var(--cs-glass-soft) both; }
+.chronicle-hero-sheet[data-cs-look="glass"].cs-move-editin .cs-edit > :nth-child(2) { animation-delay: 45ms; }
+.chronicle-hero-sheet[data-cs-look="glass"].cs-move-editin .cs-edit > :nth-child(3) { animation-delay: 90ms; }
+.chronicle-hero-sheet[data-cs-look="glass"].cs-move-editin .cs-edit > :nth-child(4) { animation-delay: 135ms; }
+.chronicle-hero-sheet[data-cs-look="glass"].cs-move-editin .cs-edit > :nth-child(n + 5) { animation-delay: 180ms; }
+
+/* Folding: the card arrives out of a blur. */
+.chronicle-hero-sheet[data-cs-look="glass"].cs-move-fold .cs-card { animation: cs-glass-card-in 600ms var(--cs-glass-soft) both; }
+
+@keyframes cs-glass-drift { to { transform: translate(70px, 40px); } }
+@keyframes cs-glass-spin { to { transform: rotate(360deg); } }
+@keyframes cs-glass-fade { from { opacity: 0; } }
+@keyframes cs-glass-settle { from { opacity: 0; transform: scale(0.96); } }
+@keyframes cs-glass-focus { from { opacity: 0; filter: blur(8px); } }
+@keyframes cs-glass-pop { from { opacity: 0; transform: scale(0.6); } }
+@keyframes cs-glass-ripple { 0% { opacity: 0.9; transform: scale(1); } 100% { opacity: 0; transform: scale(70); } }
+@keyframes cs-glass-shiver { 20% { transform: translateX(-5px); } 45% { transform: translateX(4px); } 70% { transform: translateX(-2px); } }
+@keyframes cs-glass-bloom { 0% { opacity: 0; transform: scale(0.96); } 35% { opacity: 1; } 100% { opacity: 0; transform: scale(1.06); } }
+@keyframes cs-glass-light { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes cs-glass-draw { from { transform: scaleX(0); } }
+@keyframes cs-glass-name { 40% { text-shadow: 0 0 40px var(--cs-glass-teal), 0 0 90px var(--cs-glass-indigo); } }
+@keyframes cs-glass-menu-in { from { opacity: 0; transform: scale(0.96); } }
+@keyframes cs-glass-menu-out { to { opacity: 0; transform: scale(0.98); } }
+@keyframes cs-glass-card-in { from { opacity: 0; transform: translateX(60px) scale(0.9); filter: blur(8px); } }
+
+/* Calm: every move becomes a fade, the blur included; the drifting light
+   and the turning ring stop; nothing travels or scales. */
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="glass"] :is(.cs-glass-pane, .cs-glass-orb, .cs-glass-ring, .cs-glass-id, .cs-glass-trk, .cs-glass-const, .cs-glass-grid, .cs-edit, .cs-edit > *, .cs-glass-hx, .cs-glass-line, .cs-menu, .cs-card) { animation-name: cs-glass-fade; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="glass"] .cs-menu.cs-menu-out { animation-name: cs-glass-fade; animation-direction: reverse; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="glass"] :is(.cs-glass-sky i, .cs-glass-dash, .cs-glass-ripple, .cs-glass-glow, .cs-glass-id .cs-name) { animation: none; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-ring::before { animation: none; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="glass"] :is(.cs-glass-hx, .cs-portrait, .cs-card-art):hover { transform: none; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="glass"] :is(.cs-glass-hx, .cs-glass-resp, .cs-glass-lvlup, .cs-glass-mini, .cs-card-chr, .cs-card-actions .cs-btn, .cs-item-row):active { transform: none; }

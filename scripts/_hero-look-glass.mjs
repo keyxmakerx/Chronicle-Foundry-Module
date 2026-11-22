@@ -4,8 +4,11 @@
  * Pure: every figure comes from Draw Steel's prepared data.
  */
 
-/** How long this look's moves run (ms), where they differ from the shared timings. */
-export const MOVE_MS = Object.freeze({});
+/**
+ * How long this look's moves run (ms), where they differ from the shared timings.
+ * The heal's bloom runs 1200ms, a little past the shared 1050, so it is not cut short.
+ */
+export const MOVE_MS = Object.freeze({ heal: 1250 });
 
 /**
  * Figures only this look draws, added to its templates' chronicle.* context.
