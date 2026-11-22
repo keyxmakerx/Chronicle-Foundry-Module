@@ -1,55 +1,88 @@
-{{!-- Chronicle hero sheet header: portrait, name, class line, origin chips,
-level, XP and victories. A Limited viewer sees this part, so it shows only
-what Draw Steel's own header shows. Origins keep Draw Steel's markup: the
-item's uuid on the chip, viewDoc on its name, deleteDoc and addOrigin in Edit. --}}
-<header class="cs-hero-head" style="{{#if avatarProperties.objectFit}}--avatar-object-fit: {{avatarProperties.objectFit}};{{/if}}{{#if avatarProperties.objectPosition}} --avatar-object-position: {{avatarProperties.objectPosition}};{{/if}}">
+{{!-- The night sky header: the sky itself (stars, hills, the light a hit,
+a heal or a level-up sends across it), the hero's picture in a round moon,
+then the level and origins, the name, the subclass, XP and victories. A
+Limited viewer sees this part, so it shows only what Draw Steel's own header
+shows; the Stamina ring that circles the moon is drawn by the stats part.
+Origins keep Draw Steel's markup: the item's uuid on the entry, viewDoc on
+its name, deleteDoc and addOrigin in Edit. --}}
+<header class="cs-hero-head cs-sky-head" style="{{#if avatarProperties.objectFit}}--avatar-object-fit: {{avatarProperties.objectFit}};{{/if}}{{#if avatarProperties.objectPosition}} --avatar-object-position: {{avatarProperties.objectPosition}};{{/if}}">
   {{#*inline "csOrigin"}}
   {{#if originDoc}}
-  <li class="cs-chip" data-document-uuid="{{originDoc.uuid}}">
-    <span class="cs-chip-kind">{{localize (concat "TYPES.Item." originType)}}</span>
-    <a class="cs-chip-name" data-action="viewDoc">{{originDoc.name}}</a>
+  <li class="cs-sky-origin" data-document-uuid="{{originDoc.uuid}}">
+    {{#unless @root.isPlay}}<span class="cs-sky-kind">{{localize (concat "TYPES.Item." originType)}}</span>{{/unless}}
+    <a class="cs-sky-origin-name" data-action="viewDoc" data-tooltip="{{localize (concat "TYPES.Item." originType)}}">{{originDoc.name}}</a>
     {{#unless (or @root.isPlay noEdit)}}
-    <a class="cs-chip-del" data-action="deleteDoc" aria-label="{{localize "CHRONICLE.HeroSheet.Remove"}}" data-tooltip="CHRONICLE.HeroSheet.Remove"><i class="fa-solid fa-trash-can" inert></i></a>
+    <a class="cs-sky-del" data-action="deleteDoc" aria-label="{{localize "CHRONICLE.HeroSheet.Remove"}}" data-tooltip="CHRONICLE.HeroSheet.Remove"><i class="fa-solid fa-trash-can" inert></i></a>
     {{/unless}}
   </li>
   {{else}}
   {{#unless (and (not @root.isPlay) noEdit)}}
-  <li class="cs-chip cs-chip-todo">
-    <span class="cs-chip-kind">{{localize (concat "TYPES.Item." originType)}}</span>
+  <li class="cs-sky-origin cs-sky-todo">
     {{#if @root.isPlay}}
-    <span class="cs-chip-name">{{localize "CHRONICLE.HeroSheet.StillToChoose"}}</span>
+    <span>{{localize (concat "TYPES.Item." originType)}}: {{localize "CHRONICLE.HeroSheet.StillToChoose"}}</span>
     {{else}}
-    <a class="cs-chip-name" data-action="addOrigin" data-type="{{originType}}">{{localize "DRAW_STEEL.SHEET.Add" itemName=(localize (concat "TYPES.Item." originType))}}</a>
+    <a data-action="addOrigin" data-type="{{originType}}">{{localize "DRAW_STEEL.SHEET.Add" itemName=(localize (concat "TYPES.Item." originType))}}</a>
     {{/if}}
   </li>
   {{/unless}}
   {{/if}}
   {{/inline}}
 
-  {{!-- The portrait menu offers the full picture, the token and, in Edit
-  mode, Foundry's file picker, which reads data-edit off the picture. --}}
-  <button type="button" class="cs-portrait-btn" data-action="csPortraitMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize "CHRONICLE.HeroSheet.Portrait.Menu"}}" data-tooltip="CHRONICLE.HeroSheet.Portrait.Menu">
-    <img class="cs-portrait" src="{{document.img}}" alt="{{document.name}}" {{#unless isPlay}}data-edit="img"{{/unless}}>
-  </button>
-
-  <div class="cs-id">
-    {{#if isPlay}}
-    <h1 class="cs-name">{{document.name}}</h1>
-    {{else}}
-    <div class="cs-name-edit">
-      {{formInput fields.name value=source.name placeholder=(localize "DOCUMENT.FIELDS.name.label")}}
+  {{!-- The sky stays put while the page scrolls over it. Only opacity and
+  transform ever move here: some stars twinkle, the rest hold still. --}}
+  <div class="cs-sky-layer" aria-hidden="true">
+    <div class="cs-sky-sky">
+      <div class="cs-sky-stars"><i class="tw1" style="--x:85.8;--y:68.7;--s:1.5"></i><i class="tw2" style="--x:46.6;--y:41.1;--s:2.5"></i><i class="tw3" style="--x:19.6;--y:64.5;--s:1.5"></i><i class="tw1" style="--x:62.7;--y:63.6;--s:1.5"></i><i class="tw2" style="--x:44.8;--y:12.2;--s:1"></i><i class="tw3" style="--x:80.3;--y:55.8;--s:1.5"></i><i class="tw1" style="--x:59.4;--y:32.3;--s:1"></i><i class="tw2" style="--x:65.1;--y:49.6;--s:1.5"></i><i class="tw3" style="--x:62.1;--y:66.7;--s:1"></i><i class="tw1" style="--x:6.8;--y:16.0;--s:1"></i><i class="tw2" style="--x:59.8;--y:62.5;--s:1"></i><i class="tw3" style="--x:44.2;--y:67.6;--s:1"></i><i class="tw1" style="--x:23.9;--y:24.2;--s:1.5"></i><i class="tw2" style="--x:65.9;--y:37.1;--s:1"></i><i class="tw3" style="--x:40.9;--y:44.6;--s:1"></i><i class="tw1" style="--x:9.2;--y:21.1;--s:2.5"></i><i class="tw2" style="--x:23.5;--y:23.8;--s:2.5"></i><i class="tw3" style="--x:56.2;--y:9.5;--s:1"></i><i class="tw1" style="--x:84.0;--y:31.5;--s:1"></i><i class="tw2" style="--x:84.0;--y:1.0;--s:1"></i><i class="tw3" style="--x:91.9;--y:5.1;--s:1"></i><i class="tw1" style="--x:97.1;--y:32.4;--s:1.5"></i><i class="tw2" style="--x:56.5;--y:16.7;--s:1"></i><i class="tw3" style="--x:27.4;--y:7.9;--s:2"></i><i class="tw1" style="--x:2.5;--y:33.4;--s:1"></i><i class="tw2" style="--x:14.2;--y:56.9;--s:1"></i><i class="tw3" style="--x:6.9;--y:64.0;--s:1"></i><i class="tw1" style="--x:67.8;--y:15.9;--s:1"></i><i class="tw2" style="--x:19.7;--y:58.8;--s:1.5"></i><i class="tw3" style="--x:42.1;--y:31.3;--s:1"></i><i style="--x:42.2;--y:17.8;--s:1.5"></i><i style="--x:85.7;--y:78.0;--s:1"></i><i style="--x:30.8;--y:70.9;--s:1.5"></i><i style="--x:19.4;--y:79.7;--s:1"></i><i style="--x:63.9;--y:8.9;--s:1.5"></i><i style="--x:21.9;--y:21.4;--s:1"></i><i style="--x:60.8;--y:66.6;--s:2.5"></i><i style="--x:8.2;--y:8.1;--s:1.5"></i><i style="--x:63.4;--y:2.2;--s:1.5"></i><i style="--x:37.4;--y:36.8;--s:1"></i><i style="--x:48.4;--y:46.4;--s:1.5"></i><i style="--x:38.8;--y:50.6;--s:2.5"></i><i style="--x:90.0;--y:65.6;--s:1"></i><i style="--x:72.1;--y:13.5;--s:1"></i><i style="--x:93.2;--y:16.5;--s:2"></i><i style="--x:87.5;--y:48.7;--s:1.5"></i><i style="--x:5.6;--y:9.6;--s:1.5"></i><i style="--x:95.3;--y:19.8;--s:1.5"></i><i style="--x:39.4;--y:34.2;--s:2"></i><i style="--x:49.1;--y:42.1;--s:1.5"></i><i style="--x:96.8;--y:11.0;--s:2"></i><i style="--x:55.8;--y:68.3;--s:1.5"></i><i style="--x:8.3;--y:17.8;--s:1.5"></i><i style="--x:74.4;--y:6.5;--s:1"></i><i style="--x:44.7;--y:5.8;--s:1.5"></i><i style="--x:28.6;--y:42.9;--s:1"></i><i style="--x:10.0;--y:11.9;--s:1"></i><i style="--x:97.1;--y:52.9;--s:1.5"></i><i style="--x:52.2;--y:75.8;--s:2"></i><i style="--x:4.4;--y:2.4;--s:1.5"></i><i style="--x:69.7;--y:77.1;--s:1"></i><i style="--x:59.6;--y:6.9;--s:1"></i><i style="--x:72.6;--y:26.2;--s:1"></i><i style="--x:8.4;--y:44.1;--s:1"></i><i style="--x:5.4;--y:75.0;--s:2"></i><i style="--x:70.0;--y:63.7;--s:2"></i><i style="--x:35.5;--y:55.1;--s:1"></i><i style="--x:86.4;--y:34.0;--s:1"></i><i style="--x:4.0;--y:40.5;--s:2.5"></i><i style="--x:62.2;--y:31.2;--s:1"></i><i style="--x:2.2;--y:6.7;--s:1.5"></i><i style="--x:63.7;--y:79.5;--s:1"></i></div>
+      <div class="cs-sky-aurora"></div>
+      <div class="cs-sky-red"></div>
+      <i class="cs-sky-shoot"></i>
+      <svg class="cs-sky-hills" viewBox="0 0 1100 160" preserveAspectRatio="none" focusable="false">
+        <path class="far" d="M0 160V96l90-40 70 34 120-70 110 60 90-30 130 52 100-66 120 58 110-38 160 50v90z"/>
+        <path class="near" d="M0 160v-36l140-34 120 26 160-44 170 40 150-30 180 38 180-28v68z"/>
+      </svg>
     </div>
-    {{/if}}
-    <p class="cs-line">
-      <span class="cs-line-level">{{localize "CHRONICLE.HeroSheet.LevelN" level=system.level}}</span>
+  </div>
+
+  <div class="cs-sky-moon">
+    <svg class="cs-sky-rings" viewBox="0 0 340 340" aria-hidden="true" focusable="false">
+      <circle class="cs-sky-orbit" cx="170" cy="170" r="164"/>
+      <circle class="cs-sky-track" cx="170" cy="170" r="146"/>
+    </svg>
+    <div class="cs-sky-disc">
+      {{!-- Shown where the hero has no picture of their own. --}}
+      <svg class="cs-sky-face" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+        <circle class="m1" cx="34" cy="36" r="11"/>
+        <circle class="m2" cx="62" cy="30" r="6"/>
+        <circle class="m3" cx="58" cy="62" r="15"/>
+        <circle class="m4" cx="30" cy="68" r="7"/>
+        <circle class="m5" cx="76" cy="50" r="4"/>
+      </svg>
+      {{!-- The whole disc is the portrait button. Its menu offers the full
+      picture, the token and, in Edit mode, Foundry's file picker, which reads
+      data-edit off the picture. --}}
+      <button type="button" class="cs-portrait-btn" data-action="csPortraitMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize "CHRONICLE.HeroSheet.Portrait.Menu"}}" data-tooltip="CHRONICLE.HeroSheet.Portrait.Menu">
+        <img class="cs-portrait" src="{{document.img}}" alt="{{document.name}}" {{#unless isPlay}}data-edit="img"{{/unless}}>
+      </button>
+      <div class="cs-sky-ecl" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <div class="cs-sky-id">
+    <ul class="cs-sky-eye">
+      <li class="cs-sky-lvl">
+        {{#if system.advancementReady}}
+        <button type="button" class="cs-sky-lvlup" {{disabled (not editable)}} data-action="levelUp" data-tooltip="DRAW_STEEL.SHEET.LevelUp">
+          <i class="cs-sky-ready" aria-hidden="true"></i>{{localize "CHRONICLE.HeroSheet.LevelN" level=system.level}} <i class="fa-solid fa-up-long" inert></i>
+        </button>
+        {{else}}
+        <span>{{localize "CHRONICLE.HeroSheet.LevelN" level=system.level}}</span>
+        {{/if}}
+      </li>
+      {{#if isPlay}}
       {{#with document.system.class as |cls|}}
-      <span class="cs-line-item" data-document-uuid="{{cls.uuid}}"><a data-action="viewDoc">{{cls.name}}</a></span>
+      <li class="cs-sky-origin" data-document-uuid="{{cls.uuid}}"><a data-action="viewDoc">{{cls.name}}</a></li>
       {{/with}}
-      {{#each document.system.subclasses as |sub|}}
-      <span class="cs-line-item" data-document-uuid="{{sub.uuid}}"><a data-action="viewDoc">{{sub.name}}</a></span>
-      {{/each}}
-    </p>
-    <ul class="cs-chips">
+      {{/if}}
       {{> csOrigin originDoc=document.system.ancestry originType="ancestry"}}
       {{> csOrigin originDoc=document.system.culture originType="culture"}}
       {{> csOrigin originDoc=document.system.career originType="career"}}
@@ -60,45 +93,35 @@ item's uuid on the chip, viewDoc on its name, deleteDoc and addOrigin in Edit. -
       {{/each}}
       {{/unless}}
     </ul>
-  </div>
-
-  <div class="cs-prog">
-    <dl>
-      <div class="cs-prog-level">
-        <dt>{{localize "DRAW_STEEL.Item.class.FIELDS.level.label"}}</dt>
-        <dd>
-          {{#if system.advancementReady}}
-          <button type="button" class="cs-level-up" {{disabled (not editable)}} data-action="levelUp" data-tooltip="DRAW_STEEL.SHEET.LevelUp">
-            {{system.level}} <i class="fa-solid fa-up-long" inert></i>
-          </button>
-          {{else}}
-          {{system.level}}
-          {{/if}}
-        </dd>
-      </div>
-      {{#if isPlay}}
-      <div>
-        <dt>{{systemFields.hero.fields.xp.label}}</dt>
-        <dd>{{system.hero.xp}}{{#if system.nextLevelXP}}<small> / {{system.nextLevelXP}}</small>{{/if}}</dd>
-      </div>
-      <div>
-        <dt>{{systemFields.hero.fields.victories.label}}</dt>
-        <dd>{{system.hero.victories}}{{#if system.victoriesMax}}<small> / {{system.victoriesMax}}</small>{{/if}}</dd>
-      </div>
-      {{/if}}
-    </dl>
-    {{#unless isPlay}}
-    <div class="cs-prog-edit">
+    {{#if isPlay}}
+    <h1 class="cs-name">{{document.name}}</h1>
+    <p class="cs-sky-sub">
+      {{#each document.system.subclasses as |sub|}}
+      <span class="cs-sky-subname" data-document-uuid="{{sub.uuid}}"><a data-action="viewDoc">{{sub.name}}</a></span>
+      {{/each}}
+    </p>
+    <p class="cs-sky-prog">
+      <span>{{systemFields.hero.fields.xp.label}} <b>{{system.hero.xp}}</b>{{#if system.nextLevelXP}}/{{system.nextLevelXP}}{{/if}}</span>
+      <span>{{systemFields.hero.fields.victories.label}} <b>{{system.hero.victories}}</b>{{#if system.victoriesMax}}/{{system.victoriesMax}}{{/if}}</span>
+    </p>
+    {{else}}
+    <div class="cs-name-edit">
+      {{formInput fields.name value=source.name placeholder=(localize "DOCUMENT.FIELDS.name.label")}}
+    </div>
+    <div class="cs-sky-prog-edit">
       {{formGroup systemFields.hero.fields.xp value=systemSource.hero.xp classes="xp"}}
       {{formGroup systemFields.hero.fields.victories value=systemSource.hero.victories classes="victories"}}
     </div>
-    {{/unless}}
-    {{#if isPlay}}
-    {{#if editable}}
-    <button type="button" class="cs-btn cs-respite" data-action="takeRespite">
-      <i class="fa-solid fa-bed" inert></i> {{localize "DRAW_STEEL.Actor.hero.TakeRespite"}}
-    </button>
-    {{/if}}
     {{/if}}
   </div>
+
+  {{#if isPlay}}
+  {{#if editable}}
+  <div class="cs-sky-rest">
+    <button type="button" class="cs-sky-btn cs-respite" data-action="takeRespite">
+      <i class="fa-solid fa-bed" inert></i> {{localize "DRAW_STEEL.Actor.hero.TakeRespite"}}
+    </button>
+  </div>
+  {{/if}}
+  {{/if}}
 </header>

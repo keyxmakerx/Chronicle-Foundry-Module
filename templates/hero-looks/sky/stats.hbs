@@ -1,189 +1,153 @@
-{{!-- Chronicle hero sheet boxes, shown above the tabs. Play: characteristic
-and combat boxes, then Stamina, recoveries, heroic resource and surges, then
-potency, damage, conditions and skills. Inputs and buttons keep Draw Steel's
-names, data-source="false" and actions, so its handlers and active-effect
-locks work. Edit: Draw Steel's own stat editors. --}}
-<section class="cs-hero-stats stats">
+{{!-- The night sky's boxes. Play: the Stamina ring round the moon (recoveries
+as arcs inside it), the big thin numbers for Stamina, recoveries, the heroic
+resource, surges and speed, the five characteristics as a constellation (each
+star rolls its characteristic), and the skills. Inputs and buttons keep Draw
+Steel's names, data-source="false" and actions, so its handlers and
+active-effect locks work. Edit: Draw Steel's own stat editors. --}}
+<section class="cs-sky-stats stats">
   {{#if isPlay}}
-  <div class="cs-row cs-row-numbers">
-    <div class="cs-group cs-chars">
-      {{#each characteristics as |chr key|}}
-      <button
-        type="button"
-        class="cs-box cs-num cs-roll"
-        data-action="roll"
-        data-roll-type="characteristic"
-        data-characteristic="{{key}}"
-        data-tooltip-text="{{localize "DRAW_STEEL.ROLL.Prompt" prompt=chr.field.label}}"
-        {{disabled (not @root.owner)}}
-      >
-        <span class="cs-lab">{{chr.field.label}}</span>
-        <span class="cs-big">{{numberFormat chr.value sign=true}}</span>
-      </button>
-      {{/each}}
-    </div>
-    <div class="cs-group cs-combat">
-      <div class="cs-box cs-num"{{#if movement.list}} data-tooltip-text="{{movement.list}}"{{/if}}>
-        <span class="cs-lab">{{systemFields.movement.fields.value.label}}</span>
-        <span class="cs-big">{{system.movement.value}}</span>
-      </div>
-      <div class="cs-box cs-num"{{#if combatTooltip}} data-tooltip-html="{{combatTooltip}}"{{/if}}>
-        <span class="cs-lab">{{systemFields.combat.fields.stability.label}}</span>
-        <span class="cs-big">{{system.combat.stability}}</span>
-      </div>
-      <div class="cs-box cs-num">
-        <span class="cs-lab">{{systemFields.movement.fields.disengage.label}}</span>
-        <span class="cs-big">{{system.movement.disengage}}</span>
-      </div>
-      <div class="cs-box cs-num">
-        <span class="cs-lab">{{systemFields.combat.fields.size.label}}</span>
-        <span class="cs-big">{{system.combat.size}}</span>
-      </div>
-    </div>
-  </div>
+  {{!-- Over the moon the header draws: same box, so the arcs sit on its rings. --}}
+  <svg class="cs-sky-ring" data-band="{{chronicle.stamina.band}}" viewBox="0 0 340 340" aria-hidden="true" focusable="false">
+    <circle class="cs-sky-fill" cx="170" cy="170" r="146" pathLength="100" stroke-dasharray="{{chronicle.stamina.fill}} 100" transform="rotate(-90 170 170)"/>
+    {{#each chronicle.ring as |seg|}}
+    <circle class="cs-sky-seg{{#if seg.on}} on{{/if}}" cx="170" cy="170" r="132" pathLength="100" stroke-dasharray="{{seg.dash}}" stroke-dashoffset="{{seg.offset}}" transform="rotate(-90 170 170)"/>
+    {{/each}}
+  </svg>
 
-  <div class="cs-row cs-row-vitals">
-    <div class="cs-box cs-stamina" data-band="{{chronicle.stamina.band}}">
-      <div class="cs-box-head">
-        <span class="cs-lab">{{systemFields.stamina.label}}</span>
-        {{#if editable}}
-        <button type="button" class="cs-mini" data-action="spendStaminaHeroToken" data-tooltip="DRAW_STEEL.Setting.HeroTokens.RegainStamina.tooltip">
-          <i class="fa-solid fa-circle-bolt" inert></i> {{localize "CHRONICLE.HeroSheet.HeroToken"}}
-        </button>
-        {{/if}}
-      </div>
-      <div class="cs-stam-n">
-        <label class="cs-field cs-field-big">
-          <span class="cs-hidden-label">{{systemFields.stamina.fields.value.label}}</span>
-          {{formInput systemFields.stamina.fields.value value=system.stamina.value dataset=datasets.notSource}}
-        </label>
-        <span class="cs-of">/ {{system.stamina.max}}</span>
-        <label class="cs-field cs-temp">
-          <span>{{systemFields.stamina.fields.temporary.label}}</span>
-          {{formInput systemFields.stamina.fields.temporary value=system.stamina.temporary dataset=datasets.notSource}}
-        </label>
-      </div>
-      <div class="cs-bar" role="presentation">
-        <i style="width: {{chronicle.stamina.fill}}%"></i>
-        {{#if chronicle.stamina.windedAt}}<u style="left: {{chronicle.stamina.windedAt}}%"></u>{{/if}}
-      </div>
-      <p class="cs-sub">
-        {{localize "CHRONICLE.HeroSheet.Thresholds" winded=system.stamina.winded dead=system.stamina.min}}
-        {{#if (eq chronicle.stamina.band "winded")}}<strong class="cs-state">{{localize "CHRONICLE.HeroSheet.Winded"}}</strong>{{/if}}
-        {{#if (eq chronicle.stamina.band "dying")}}<strong class="cs-state">{{localize "CHRONICLE.HeroSheet.Dying"}}</strong>{{/if}}
-        {{#if (eq chronicle.stamina.band "dead")}}<strong class="cs-state">{{localize "CHRONICLE.HeroSheet.Dead"}}</strong>{{/if}}
-      </p>
-    </div>
-
-    <div class="cs-box cs-recoveries">
-      <div class="cs-box-head">
-        <span class="cs-lab">{{systemFields.recoveries.label}}</span>
-        {{#if editable}}
-        <button type="button" class="cs-mini" data-action="spendRecovery" data-tooltip="DRAW_STEEL.Actor.base.SpendRecovery.tooltip" aria-label="{{localize "CHRONICLE.HeroSheet.SpendRecovery"}}">
-          <i class="fa-solid fa-heart-pulse" inert></i>
-        </button>
-        {{/if}}
-      </div>
-      <div class="cs-stam-n">
-        <label class="cs-field cs-field-mid">
-          <span class="cs-hidden-label">{{systemFields.recoveries.fields.value.label}}</span>
-          {{formInput systemFields.recoveries.fields.value value=system.recoveries.value dataset=datasets.notSource}}
-        </label>
-        <span class="cs-of">/ {{system.recoveries.max}}</span>
-      </div>
-      {{#if chronicle.recoveryDots}}
-      <div class="cs-dots" role="presentation">{{#each chronicle.recoveryDots as |on|}}<i class="{{#unless on}}off{{/unless}}"></i>{{/each}}</div>
+  <div class="cs-sky-nums" data-band="{{chronicle.stamina.band}}">
+    <div class="cs-sky-num cs-sky-stamina">
+      <label class="cs-field cs-sky-big">
+        <span class="cs-hidden-label">{{systemFields.stamina.fields.value.label}}</span>
+        {{formInput systemFields.stamina.fields.value value=system.stamina.value dataset=datasets.notSource}}
+      </label>
+      {{#if editable}}
+      <button type="button" class="cs-sky-k" data-action="spendStaminaHeroToken" data-tooltip="DRAW_STEEL.Setting.HeroTokens.RegainStamina.tooltip">{{localize "CHRONICLE.HeroSheet.OfStamina" max=system.stamina.max}}</button>
+      {{else}}
+      <span class="cs-sky-k">{{localize "CHRONICLE.HeroSheet.OfStamina" max=system.stamina.max}}</span>
       {{/if}}
-      <p class="cs-sub">{{localize "CHRONICLE.HeroSheet.RecoveryHeals" n=system.recoveries.recoveryValue}}</p>
+      {{#if (eq chronicle.stamina.band "winded")}}<strong class="cs-sky-state">{{localize "CHRONICLE.HeroSheet.Winded"}}</strong>{{/if}}
+      {{#if (eq chronicle.stamina.band "dying")}}<strong class="cs-sky-state">{{localize "CHRONICLE.HeroSheet.Dying"}}</strong>{{/if}}
+      {{#if (eq chronicle.stamina.band "dead")}}<strong class="cs-sky-state">{{localize "CHRONICLE.HeroSheet.Dead"}}</strong>{{/if}}
+      <label class="cs-field cs-sky-temp">
+        <span>{{systemFields.stamina.fields.temporary.label}}</span>
+        {{formInput systemFields.stamina.fields.temporary value=system.stamina.temporary dataset=datasets.notSource}}
+      </label>
     </div>
 
-    <div class="cs-box cs-res">
-      <label class="cs-field cs-field-mid">
-        <span class="cs-lab">{{system.hero.primary.label}}</span>
+    <div class="cs-sky-num cs-sky-rec">
+      <label class="cs-field cs-sky-big">
+        <span class="cs-hidden-label">{{systemFields.recoveries.fields.value.label}}</span>
+        {{formInput systemFields.recoveries.fields.value value=system.recoveries.value dataset=datasets.notSource}}
+        <small>/{{system.recoveries.max}}</small>
+      </label>
+      {{#if editable}}
+      <button type="button" class="cs-sky-k" data-action="spendRecovery" data-tooltip="DRAW_STEEL.Actor.base.SpendRecovery.tooltip" aria-label="{{localize "CHRONICLE.HeroSheet.SpendRecovery"}}">{{systemFields.recoveries.label}}</button>
+      {{else}}
+      <span class="cs-sky-k">{{systemFields.recoveries.label}}</span>
+      {{/if}}
+    </div>
+
+    <div class="cs-sky-num cs-sky-primary">
+      <label class="cs-field cs-sky-big">
+        <span class="cs-hidden-label">{{system.hero.primary.label}}</span>
         {{formInput systemFields.hero.fields.primary.fields.value value=system.hero.primary.value dataset=datasets.notSource}}
       </label>
-      <p class="cs-sub">{{localize "CHRONICLE.HeroSheet.HeroicResource"}}</p>
-    </div>
-
-    <div class="cs-box cs-res">
-      <span class="cs-lab">{{systemFields.hero.fields.surges.label}}</span>
-      <div class="cs-res-n">
-        <label class="cs-field cs-field-mid">
-          <span class="cs-hidden-label">{{systemFields.hero.fields.surges.label}}</span>
-          {{formInput systemFields.hero.fields.surges value=system.hero.surges dataset=datasets.notSource}}
-        </label>
-        {{#if editable}}
-        <button type="button" class="cs-mini" data-action="gainSurges" data-tooltip="DRAW_STEEL.Setting.HeroTokens.GainSurges.tooltip" aria-label="{{localize "DRAW_STEEL.Setting.HeroTokens.GainSurges.label"}}">
-          <i class="fa-solid fa-circle-bolt" inert></i>
-        </button>
-        {{/if}}
-      </div>
+      <span class="cs-sky-k">{{system.hero.primary.label}}</span>
     </div>
 
     {{#if chronicle.showEpic}}
-    <div class="cs-box cs-res">
-      <label class="cs-field cs-field-mid">
-        <span class="cs-lab">{{system.hero.epic.label}}</span>
+    <div class="cs-sky-num cs-sky-epic">
+      <label class="cs-field cs-sky-big">
+        <span class="cs-hidden-label">{{system.hero.epic.label}}</span>
         {{formInput systemFields.hero.fields.epic.fields.value value=system.hero.epic.value dataset=datasets.notSource}}
       </label>
-      <p class="cs-sub">{{localize "CHRONICLE.HeroSheet.EpicResource"}}</p>
+      <span class="cs-sky-k">{{system.hero.epic.label}}</span>
     </div>
     {{/if}}
-  </div>
 
-  <div class="cs-row cs-row-facts">
-    {{#with system.potency as |potency|}}
-    <div class="cs-box cs-potency">
-      <span class="cs-lab">{{localize "CHRONICLE.HeroSheet.Potency"}}</span>
-      <dl class="cs-pot">
-        <div><dt>{{localize "CHRONICLE.HeroSheet.Weak"}}</dt><dd>{{potency.weak}}</dd></div>
-        <div><dt>{{localize "CHRONICLE.HeroSheet.Average"}}</dt><dd>{{potency.average}}</dd></div>
-        <div><dt>{{localize "CHRONICLE.HeroSheet.Strong"}}</dt><dd>{{potency.strong}}</dd></div>
-      </dl>
-    </div>
-    {{/with}}
-    <div class="cs-box cs-damage">
-      <span class="cs-lab">{{localize "CHRONICLE.HeroSheet.Damage"}}</span>
-      <dl class="cs-kv">
-        <div>
-          <dt>{{systemFields.damage.fields.immunities.label}}</dt>
-          <dd>{{#if damageIW.immunities}}{{{damageIW.immunities}}}{{else}}{{localize "COMMON.None"}}{{/if}}</dd>
-        </div>
-        <div>
-          <dt>{{systemFields.damage.fields.weaknesses.label}}</dt>
-          <dd>{{#if damageIW.weaknesses}}{{{damageIW.weaknesses}}}{{else}}{{localize "COMMON.None"}}{{/if}}</dd>
-        </div>
-      </dl>
-    </div>
-    <div class="cs-box cs-conditions">
-      <span class="cs-lab">{{localize "CHRONICLE.HeroSheet.Conditions"}}</span>
-      {{#if chronicle.conditions.length}}
-      <ul class="cs-tags">
-        {{#each chronicle.conditions as |c|}}
-        <li>{{#if c.img}}<img src="{{c.img}}" alt="" inert>{{/if}}{{c.name}}</li>
-        {{/each}}
-      </ul>
+    <div class="cs-sky-num cs-sky-surges">
+      <label class="cs-field cs-sky-big">
+        <span class="cs-hidden-label">{{systemFields.hero.fields.surges.label}}</span>
+        {{formInput systemFields.hero.fields.surges value=system.hero.surges dataset=datasets.notSource}}
+      </label>
+      {{#if editable}}
+      <button type="button" class="cs-sky-k" data-action="gainSurges" data-tooltip="DRAW_STEEL.Setting.HeroTokens.GainSurges.tooltip" aria-label="{{localize "DRAW_STEEL.Setting.HeroTokens.GainSurges.label"}}">{{systemFields.hero.fields.surges.label}}</button>
       {{else}}
-      <span class="cs-val">{{localize "COMMON.None"}}</span>
+      <span class="cs-sky-k">{{systemFields.hero.fields.surges.label}}</span>
       {{/if}}
     </div>
-    <div class="cs-box cs-skills">
-      <div class="cs-box-head">
-        <span class="cs-lab">{{systemFields.skills.fields.value.label}}</span>
-        {{#if unfilledSkill}}
-        <button
-          type="button"
-          class="cs-mini"
-          data-action="fillTrait"
-          data-type="skill"
-          data-tooltip-text="{{localize "DRAW_STEEL.ADVANCEMENT.FillTrait.button" type=(localize "TYPES.Advancement.skill")}}"
-        >
-          <i class="fa-solid fa-clipboard-question" inert></i> {{localize "CHRONICLE.HeroSheet.Choose"}}
-        </button>
-        {{/if}}
-      </div>
-      <p class="cs-plain">{{#if skills.list}}{{skills.list}}{{else}}{{localize "COMMON.None"}}{{/if}}</p>
+
+    <div class="cs-sky-num cs-sky-speed">
+      <b class="cs-sky-big">{{system.movement.value}}</b>
+      <span class="cs-sky-k">{{systemFields.movement.fields.value.label}}</span>
     </div>
+
+    <p class="cs-sky-facts">
+      <span>{{systemFields.combat.fields.size.label}} {{system.combat.size}}</span>
+      <span{{#if combatTooltip}} data-tooltip-html="{{combatTooltip}}"{{/if}}>{{systemFields.combat.fields.stability.label}} {{system.combat.stability}}</span>
+      <span>{{systemFields.movement.fields.disengage.label}} {{system.movement.disengage}}</span>
+      {{#if movement.list}}<span>{{movement.list}}</span>{{/if}}
+      <span>{{localize "CHRONICLE.HeroSheet.RecoveryHeals" n=system.recoveries.recoveryValue}}</span>
+      {{#if damageIW.immunities}}<span>{{systemFields.damage.fields.immunities.label}}: {{{damageIW.immunities}}}</span>{{/if}}
+      {{#if damageIW.weaknesses}}<span>{{systemFields.damage.fields.weaknesses.label}}: {{{damageIW.weaknesses}}}</span>{{/if}}
+    </p>
+  </div>
+
+  {{!-- The characteristics: the sky is drawn in SVG (lines and star shapes,
+  scaled from one 590 by 240 space); each star's name and number is a real
+  button on top of it, so it takes focus and rolls like Draw Steel's. --}}
+  <div class="cs-sky-const">
+    <svg class="cs-sky-lines" viewBox="0 0 590 240" aria-hidden="true" focusable="false">
+      <g class="cs-sky-links">
+        {{#each chronicle.constellation.links as |link|}}
+        <path class="cs-sky-link" style="--i: {{link.i}}" pathLength="1" d="{{link.d}}"/>
+        {{/each}}
+      </g>
+      {{#each characteristics as |chr key|}}
+      {{#with (lookup @root.chronicle.constellation.stars key) as |st|}}
+      <g class="cs-sky-star t{{st.tier}}" style="--i: {{@index}}" transform="translate({{st.x}} {{st.y}})">
+        <circle class="cs-sky-halo" r="{{st.halo}}"/>
+        <path class="cs-sky-core" d="{{st.path}}"/>
+      </g>
+      {{/with}}
+      {{/each}}
+    </svg>
+    {{#each characteristics as |chr key|}}
+    {{#with (lookup @root.chronicle.constellation.stars key) as |st|}}
+    <button
+      type="button"
+      class="cs-sky-pl t{{st.tier}}"
+      style="--x: {{st.x}}; --y: {{st.y}}; --halo: {{st.halo}}; --i: {{@index}}"
+      data-action="roll" data-roll-type="characteristic" data-characteristic="{{key}}"
+      data-tooltip-text="{{localize "DRAW_STEEL.ROLL.Prompt" prompt=chr.field.label}}"
+      {{disabled (not @root.owner)}}
+    >
+      <b>{{numberFormat chr.value sign=true}}</b>
+      <span>{{chr.field.label}}</span>
+    </button>
+    {{/with}}
+    {{/each}}
+  </div>
+
+  <div class="cs-sky-skills">
+    <p class="cs-sky-k">
+      {{systemFields.skills.fields.value.label}}
+      {{#if unfilledSkill}}
+      <button
+        type="button"
+        class="cs-sky-mini"
+        data-action="fillTrait" data-type="skill"
+        data-tooltip-text="{{localize "DRAW_STEEL.ADVANCEMENT.FillTrait.button" type=(localize "TYPES.Advancement.skill")}}"
+      >
+        <i class="fa-solid fa-clipboard-question" inert></i> {{localize "CHRONICLE.HeroSheet.Choose"}}
+      </button>
+      {{/if}}
+    </p>
+    {{#if chronicle.skills.length}}
+    <ul class="cs-sky-skill-list">{{#each chronicle.skills as |name|}}<li>{{name}}</li>{{/each}}</ul>
+    {{else}}
+    <p class="cs-sky-none">{{#if skills.list}}{{skills.list}}{{else}}{{localize "COMMON.None"}}{{/if}}</p>
+    {{/if}}
   </div>
   {{else}}
   <div class="cs-edit standard-form">
