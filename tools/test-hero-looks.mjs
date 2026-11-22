@@ -1089,11 +1089,27 @@ test('a newer look\'s own figures reach its templates, and only its own', async 
     }
   }
   await withSettings({ heroSheetFolds: {}, heroLookDefault: 'chronicle', heroLookLocked: false }, async () => {
+    const shared = new Set(Object.keys((await new Sheet(fakeHero())._preparePartContext('stats', {}, {})).chronicle));
+    const ownKeys = {};
     for (const { id } of HERO_LOOKS.slice(2)) {
       const hero = fakeHero({ flag: id });
       const { chronicle } = await new Sheet(hero)._preparePartContext('stats', {}, {});
       const own = extras[id].lookContext(hero.system, { lang: 'en', config: undefined });
-      for (const key of Object.keys(own)) assert.deepEqual(chronicle[key], own[key], `${id} ${key}`);
+      ownKeys[id] = Object.keys(own);
+      for (const key of ownKeys[id]) assert.deepEqual(chronicle[key], own[key], `${id} ${key}`);
+      for (const key of Object.keys(chronicle)) assert.ok(shared.has(key) || key in own, `${id} gets ${key}`);
     }
+    // At least one look adds figures, so the checks above test something.
+    assert.ok(Object.values(ownKeys).some((keys) => keys.length), 'no look adds figures');
   });
+});
+
+test('Chronicle\'s "Finish your hero" line gets a place in every look that lays the window out as a grid', () => {
+  const base = read('styles/hero-looks.css');
+  const rule = base.match(/\.chronicle-hero-sheet\[data-cs-look\]:not\(\[data-cs-look="chronicle"\]\):not\(\.cs-folded\) \.window-content > \.chronicle-finish-hero \{([^}]*)\}/)?.[1] ?? '';
+  // Spans every column after the placed parts, and stays in view at the window's foot.
+  assert.match(rule, /grid-column: 1 \/ -1;/);
+  assert.match(rule, /position: sticky;/);
+  assert.match(rule, /bottom: 0;/);
+  assert.match(read('scripts/finish-hero.mjs'), /querySelector\('\.window-content'\)/);
 });
