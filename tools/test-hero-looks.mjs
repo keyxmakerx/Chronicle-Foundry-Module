@@ -44,7 +44,11 @@ function fakeBase() {
       this.renders = [];
       this.positions = [];
     }
-    render(options) { this.renders.push(options); return this; }
+    render(options) {
+      this.renders.push(options);
+      if (this.failRender?.(options)) throw new Error('Failed to render: card template');
+      return this;
+    }
     _configureRenderOptions(options) { options.isFirstRender ??= false; }
     _configureRenderParts() { return structuredClone(this.constructor.PARTS); }
     setPosition(p) { this.positions.push(p); Object.assign(this.position, p); }
@@ -57,7 +61,34 @@ function fakeBase() {
 
 function fakeClassList() {
   const set = new Set();
-  return { toggle: (c, on) => (on ? set.add(c) : set.delete(c)), contains: (c) => set.has(c) };
+  return {
+    toggle: (c, on) => (on ? set.add(c) : set.delete(c)),
+    contains: (c) => set.has(c),
+    add: (...c) => c.forEach((x) => set.add(x)),
+    remove: (...c) => c.forEach((x) => set.delete(x)),
+  };
+}
+
+/** A sheet window whose title bar holds the two frame buttons. */
+function fakeWindow() {
+  const button = (action) => {
+    const attrs = {};
+    return {
+      hidden: false, dataset: { action }, classList: fakeClassList(),
+      setAttribute: (k, v) => { attrs[k] = String(v); }, getAttribute: (k) => attrs[k] ?? null, hasAttribute: (k) => k in attrs,
+      querySelector: () => null,
+    };
+  };
+  const fold = button('csFold');
+  const look = button('csLookPicker');
+  const header = { querySelector: (sel) => (sel.includes('csFold') ? fold : sel.includes('csLookPicker') ? look : null) };
+  const removed = [];
+  const element = {
+    dataset: {}, classList: fakeClassList(),
+    querySelector: (sel) => (sel === '.window-header' ? header : null),
+    querySelectorAll: () => [{ remove: () => removed.push(1) }],
+  };
+  return { element, fold, look, removed };
 }
 
 function fakeHero({ value = 40, max = 60, statuses = [], level = 3, flag, limited = false } = {}) {
@@ -437,7 +468,6 @@ test('a Limited viewer never gets the card, whatever was saved, since it shows S
     await Sheet.DEFAULT_OPTIONS.actions.csFold.call(sheet);
     assert.equal(sheet.folded, false);
     assert.equal(sheet.renders.length, 0);
-    assert.deepEqual(sheet._getFrameButtons({}).map((b) => b.action), ['csLookPicker']);
   });
 });
 
@@ -495,15 +525,31 @@ test('Fold saves the state for this player, draws the card, and Open goes back t
   });
 });
 
-test('the title bar gets Fold for anyone past Limited and Sheet look for owners', async () => {
+test('the title bar shows Fold past Limited and Sheet look to owners, and follows a permission change', async () => {
   const Sheet = makeChronicleHeroSheet(fakeBase());
   await withSettings({ heroSheetFolds: {} }, async () => {
-    const owner = new Sheet(fakeHero());
-    const buttons = owner._getFrameButtons({});
+    const hero = fakeHero({ limited: true });
+    hero.isOwner = false;
+    const sheet = new Sheet(hero);
+    // Both are built with the window, whoever opens it, so either can appear later.
+    const buttons = sheet._getFrameButtons({});
     assert.deepEqual(buttons.map((b) => b.action), ['csFold', 'csLookPicker']);
     assert.equal(buttons[0].label, 'CHRONICLE.HeroSheet.Fold');
-    const observer = new Sheet({ ...fakeHero(), isOwner: false });
-    assert.deepEqual(observer._getFrameButtons({}).map((b) => b.action), ['csFold']);
+    const { element, fold, look } = fakeWindow();
+    sheet.element = element;
+    await sheet._onRender({}, { isFirstRender: true });
+    assert.deepEqual([fold.hidden, look.hidden], [true, true], 'Limited');
+    hero.limited = false;
+    await sheet._onRender({}, {});
+    assert.deepEqual([fold.hidden, look.hidden], [false, true], 'raised to Observer');
+    hero.isOwner = true;
+    await sheet._onRender({}, {});
+    assert.deepEqual([fold.hidden, look.hidden], [false, false], 'made an owner');
+    assert.equal(look.getAttribute('aria-haspopup'), 'menu');
+    hero.isOwner = false;
+    hero.limited = true;
+    await sheet._onRender({}, {});
+    assert.deepEqual([fold.hidden, look.hidden], [true, true], 'lowered to Limited');
   });
 });
 
@@ -609,4 +655,68 @@ test('opened as the card, the full sheet\'s templates are loaded too, so Open ha
   } finally {
     globalThis.foundry = saved;
   }
+});
+
+test('a card that fails to draw when folding opens the full sheet, saved open, and tells the player once', async () => {
+  const Sheet = makeChronicleHeroSheet(fakeBase());
+  const warned = [];
+  const savedUi = globalThis.ui;
+  globalThis.ui = { notifications: { warn: (m) => warned.push(m) } };
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    await withSettings({ heroSheetFolds: {} }, async (store) => {
+      const sheet = new Sheet(fakeHero());
+      sheet.failRender = (o) => o?.parts?.includes('card');
+      const { element, removed } = fakeWindow();
+      sheet.element = element;
+      await sheet._onRender({}, { isFirstRender: true });
+      await Sheet.DEFAULT_OPTIONS.actions.csFold.call(sheet);
+      assert.equal(sheet.folded, false);
+      assert.deepEqual(store.heroSheetFolds, {}, 'saved open, so the next open is the full sheet');
+      assert.deepEqual(sheet.renders.map((o) => o.parts), [['card'], undefined]);
+      assert.equal(sheet.renders[1].force, true);
+      assert.ok(removed.length >= 1, 'the half-drawn card is cleared');
+      assert.deepEqual(sheet.positions.at(-1), { left: 100, top: 50, width: 820, height: 780 });
+      assert.deepEqual(warned, ['CHRONICLE.HeroSheet.CardFailed']);
+      await Sheet.DEFAULT_OPTIONS.actions.csFold.call(sheet);
+      assert.equal(warned.length, 1, 'told once');
+    });
+  } finally {
+    globalThis.ui = savedUi;
+    console.warn = warn;
+  }
+});
+
+test('a hero saved folded whose card fails on opening opens as the full sheet instead', async () => {
+  const Sheet = makeChronicleHeroSheet(fakeBase());
+  const warned = [];
+  const savedUi = globalThis.ui;
+  globalThis.ui = { notifications: { warn: (m) => warned.push(m) } };
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    await withSettings({ heroSheetFolds: { 'Actor~hero1': { folded: true, left: 30, top: 40 } } }, async (store) => {
+      const sheet = new Sheet(fakeHero());
+      sheet.failRender = (o) => o?.parts?.includes('card');
+      await sheet.render({ force: true });
+      assert.equal(sheet.folded, false);
+      assert.deepEqual(sheet.renders.map((o) => o.parts), [['card'], undefined]);
+      assert.equal(store.heroSheetFolds['Actor~hero1'].folded, false);
+      assert.deepEqual(sheet.positions.at(-1), { width: 820, height: 780 });
+      assert.equal(warned.length, 1);
+    });
+  } finally {
+    globalThis.ui = savedUi;
+    console.warn = warn;
+  }
+});
+
+test('a failure drawing the full sheet is not swallowed', async () => {
+  const Sheet = makeChronicleHeroSheet(fakeBase());
+  await withSettings({ heroSheetFolds: {} }, async () => {
+    const sheet = new Sheet(fakeHero());
+    sheet.failRender = () => true;
+    await assert.rejects(sheet.render({ force: true }), /Failed to render/);
+  });
 });

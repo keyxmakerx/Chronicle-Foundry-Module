@@ -45,6 +45,7 @@
       "Choose": "Choose",
       "Fold": "Fold to a card",
       "Unfold": "Open the full sheet",
+      "CardFailed": "The small card couldn't be drawn, so the full sheet is open instead.",
       "Card": {
         "Abilities": "Abilities",
         "Respite": "Respite",
@@ -72,7 +73,8 @@
         "Token": "See the token",
         "TokenNote": "What stands on the map",
         "Change": "Change picture or token",
-        "ChangeNote": "Opens the hero's page in Chronicle"
+        "ChangeNote": "Opens the hero's page in Chronicle",
+        "Failed": "That picture couldn't be opened."
       },
       "Settings": {
         "Default": {

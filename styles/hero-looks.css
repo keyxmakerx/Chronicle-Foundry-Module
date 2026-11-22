@@ -635,6 +635,9 @@
   color: var(--cs-page-accent-strong);
 }
 
+/* A title bar button this viewer may not use, hidden over Foundry's own display rule. */
+.chronicle-hero-sheet .window-header [hidden] { display: none !important; }
+
 /* Folded: the whole sheet is a small card that sits beside the map. Draw
    Steel's own 605px minimum width would stop it shrinking. */
 .chronicle-hero-sheet.cs-folded:not(.minimizing, .maximizing, .minimized) { min-width: 0; }

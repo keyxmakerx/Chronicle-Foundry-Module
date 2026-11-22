@@ -457,3 +457,30 @@ test('a redraw with the portrait menu open closes it and puts focus on the new p
   await sheet._onRender({}, {});
   assert.equal(doc.activeElement, fresh);
 }));
+
+test('a picture or token window that fails says so instead of failing quietly', () => withGlobals(async () => {
+  const warned = [];
+  const { Sheet, sheet, root, portrait } = sheetFor();
+  globalThis.ui = { notifications: { warn: (m) => warned.push(m) } };
+  sheet.options.actions.showPortraitArtwork = () => { throw new Error('no image'); };
+  sheet.options.actions.showTokenArtwork = async () => { throw new Error('no token'); };
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    Sheet.DEFAULT_OPTIONS.actions.csPortraitMenu.call(sheet, {}, portrait);
+    fire(items(menuOf(root))[0], 'click');
+    fire(menuOf(root), 'animationend');
+    Sheet.DEFAULT_OPTIONS.actions.csPortraitMenu.call(sheet, {}, portrait);
+    fire(items(menuOf(root))[1], 'click');
+    await new Promise((r) => setImmediate(r));
+  } finally {
+    console.warn = warn;
+  }
+  assert.deepEqual(warned, ['CHRONICLE.HeroSheet.Portrait.Failed', 'CHRONICLE.HeroSheet.Portrait.Failed']);
+}));
+
+test('the look picker does not open for someone who no longer owns the hero', () => withGlobals(async () => {
+  const { Sheet, sheet, root, anchor } = sheetFor({ isOwner: false });
+  Sheet.DEFAULT_OPTIONS.actions.csLookPicker.call(sheet, {}, anchor);
+  assert.equal(menuOf(root), null);
+}));

@@ -123,6 +123,9 @@ export function makeChronicleHeroSheet(Base) {
     /** The menu button that had focus when a redraw closed its menu. */
     #refocus = null;
 
+    /** Whether this window already told the player the card failed. */
+    #cardFailureTold = false;
+
     /** The look this hero is drawn in. */
     get look() {
       return resolveLook(this.document?.getFlag?.(FLAG_SCOPE, LOOK_FLAG), {
@@ -164,23 +167,50 @@ export function makeChronicleHeroSheet(Base) {
     }
 
     /** @override */
-    render(options = {}, _options = {}) {
+    async render(options = {}, _options = {}) {
       // Foundry's older render(true) form.
       if (typeof options === 'boolean') options = Object.assign(_options, { force: options });
-      if (options && typeof options === 'object') {
-        // Folding, or a permission change (a Limited viewer never folds), swaps
-        // card and full sheet. Foundry replaces only the parts it draws, so the
-        // old ones go first and the new state is drawn whole.
-        const want = this.folded ? 'card' : 'full';
-        if (this.#drawn && this.#drawn !== want) {
-          for (const el of this.element?.querySelectorAll?.('.window-content > [data-application-part]') ?? []) el.remove();
-          delete options.parts;
-        }
-        // Draw Steel asks for "stats" on a combat change; folded, that is the card.
-        const parts = fitRenderParts(options.parts, { folded: this.folded, known: Object.keys(this.constructor.PARTS) });
-        if (parts) options.parts = parts;
+      if (!options || typeof options !== 'object') return super.render(options, _options);
+      // Folding, or a permission change (a Limited viewer never folds), swaps
+      // card and full sheet. Foundry replaces only the parts it draws, so the
+      // old ones go first and the new state is drawn whole.
+      const folded = this.folded;
+      if (this.#drawn && this.#drawn !== (folded ? 'card' : 'full')) {
+        for (const el of this.element?.querySelectorAll?.('.window-content > [data-application-part]') ?? []) el.remove();
+        delete options.parts;
       }
-      return super.render(options, _options);
+      // Draw Steel asks for "stats" on a combat change; folded, that is the card.
+      const parts = fitRenderParts(options.parts, { folded, known: Object.keys(this.constructor.PARTS) });
+      if (parts) options.parts = parts;
+      try {
+        return await super.render(options, _options);
+      } catch (err) {
+        if (!folded) throw err;
+        return this.#openFullAfterCardFailure(err);
+      }
+    }
+
+    /**
+     * The card failed to draw. Saved folded, the hero would fail again on
+     * every open and leave no window to reach the picker or Foundry's sheet
+     * chooser, so it is saved open and the full sheet drawn instead.
+     */
+    async #openFullAfterCardFailure(err) {
+      console.warn('Chronicle Sync | hero card could not be drawn; opening the full sheet', err);
+      clearTimeout(this.#placeTimer);
+      this.#folded = false;
+      this.#saveFold({ folded: false });
+      if (!this.#cardFailureTold) {
+        this.#cardFailureTold = true;
+        globalThis.ui?.notifications?.warn(globalThis.game?.i18n?.localize('CHRONICLE.HeroSheet.CardFailed') ?? 'CHRONICLE.HeroSheet.CardFailed');
+      }
+      for (const el of this.element?.querySelectorAll?.('.window-content > [data-application-part]') ?? []) el.remove();
+      this.#drawn = null;
+      const full = this.#fullPosition ?? { width: this.options.position?.width, height: this.options.position?.height };
+      this.#fullPosition = null;
+      await super.render({ force: true });
+      this.setPosition({ ...full });
+      return this;
     }
 
     /** @override */
@@ -298,20 +328,22 @@ export function makeChronicleHeroSheet(Base) {
      */
     _getFrameButtons(options) {
       const buttons = [...(super._getFrameButtons?.(options) ?? [])];
-      if (!this.document?.limited) {
-        buttons.push({ icon: this.folded ? UNFOLD_ICON : FOLD_ICON, label: this.folded ? 'CHRONICLE.HeroSheet.Unfold' : 'CHRONICLE.HeroSheet.Fold', action: 'csFold' });
-      }
-      if (this.document?.isOwner) {
-        buttons.push({ icon: 'fa-solid fa-palette', label: 'CHRONICLE.HeroSheet.Picker.Title', action: 'csLookPicker' });
-      }
+      // Both always, hidden by #syncTitleBar while the viewer may not use them,
+      // so a permission change while the sheet is open shows or hides them.
+      buttons.push({ icon: this.folded ? UNFOLD_ICON : FOLD_ICON, label: this.folded ? 'CHRONICLE.HeroSheet.Unfold' : 'CHRONICLE.HeroSheet.Fold', action: 'csFold' });
+      buttons.push({ icon: 'fa-solid fa-palette', label: 'CHRONICLE.HeroSheet.Picker.Title', action: 'csLookPicker' });
       return buttons;
     }
 
-    /** The Fold button's icon and name follow the fold; the picker button says it opens a menu. */
+    /**
+     * The title bar buttons for this viewer, on every redraw: Fold past
+     * Limited, Sheet look for owners. Fold's icon and name follow the fold.
+     */
     #syncTitleBar() {
       const header = this.window?.header ?? this.element.querySelector('.window-header');
       const fold = header?.querySelector('[data-action="csFold"]');
       if (fold) {
+        fold.hidden = !!this.document?.limited;
         const label = globalThis.game?.i18n?.localize(this.folded ? 'CHRONICLE.HeroSheet.Unfold' : 'CHRONICLE.HeroSheet.Fold') ?? '';
         const icon = fold.querySelector('i') ?? fold;
         icon.classList.remove(...`${FOLD_ICON} ${UNFOLD_ICON}`.split(' '));
@@ -321,6 +353,7 @@ export function makeChronicleHeroSheet(Base) {
       }
       const look = header?.querySelector('[data-action="csLookPicker"]');
       if (look) {
+        look.hidden = !this.document?.isOwner;
         look.setAttribute('aria-haspopup', 'menu');
         if (!look.hasAttribute('aria-expanded')) look.setAttribute('aria-expanded', 'false');
       }
@@ -337,6 +370,8 @@ export function makeChronicleHeroSheet(Base) {
       this.#saveFold({ folded });
       if (tab && this.tabGroups) this.tabGroups.primary = tab;
       await this.render();
+      // The card failed and the full sheet opened instead, already in place.
+      if (this.folded !== folded) return;
       const full = this.#fullPosition ?? { width: this.options.position?.width, height: this.options.position?.height };
       this.setPosition(folded ? this.#cardPosition() : { ...full });
       if (!folded) this.#fullPosition = null;
@@ -353,6 +388,7 @@ export function makeChronicleHeroSheet(Base) {
 
     /** The look picker, under the title bar's Sheet look button. */
     static #onLookPicker(event, target) {
+      if (!this.document?.isOwner) return;
       const i18n = globalThis.game.i18n;
       const anchor = target ?? this.window?.header?.querySelector?.('[data-action="csLookPicker"]');
       const registered = globalThis.CONFIG?.Actor?.sheetClasses?.hero ?? {};
@@ -431,7 +467,17 @@ export function makeChronicleHeroSheet(Base) {
           }
           // Draw Steel's and Foundry's own handlers; the file picker reads data-edit off the portrait.
           const portrait = this.element.querySelector('.cs-portrait') ?? target;
-          inheritedAction(this, action)?.call(this, pickEvent, portrait);
+          const handler = inheritedAction(this, action);
+          if (!handler) return;
+          const failed = (err) => {
+            console.warn(`Chronicle Sync | ${action} failed`, err);
+            globalThis.ui?.notifications?.warn(i18n.localize('CHRONICLE.HeroSheet.Portrait.Failed'));
+          };
+          try {
+            handler.call(this, pickEvent, portrait)?.catch?.(failed);
+          } catch (err) {
+            failed(err);
+          }
         },
       });
     }
