@@ -4,8 +4,10 @@
  * sheet handlers read. Nothing reports a broken one: a missing attribute
  * just makes a button or drop do nothing until someone clicks it in a live
  * world. So every look's header and stats templates are scanned here for
- * the actions, input names and attributes Draw Steel's sheet code reads,
- * and the header for anything a Limited viewer must not see.
+ * the actions, input names and attributes Draw Steel's sheet code reads.
+ * Every field they read must be one Draw Steel's own hero templates read, and
+ * the header, which a Limited viewer gets with the tab row and Biography,
+ * may read only what Draw Steel's header reads.
  */
 
 import test from 'node:test';
@@ -44,8 +46,78 @@ const PLAY_INPUTS = [
   'systemFields.hero.fields.epic.fields.value value=system.hero.epic.value',
 ];
 
-/** Hero data a Limited viewer never sees, so it never goes in a header. */
-const NOT_IN_HEADER = /\b(stamina|recoveries|characteristics?|hero\.primary|hero\.epic|surges|potency|statuses|conditions|skills|kits|biography|director|damageIW|chronicle\.)/;
+/**
+ * Every form field Draw Steel 1.1.2's hero header, stats and stat partials
+ * read, copied from those templates (a trailing `.label` dropped). A path
+ * outside this list is a field Draw Steel doesn't have where we think it is:
+ * formInput would get undefined and Edit mode would break.
+ */
+const DS_FIELDS = new Set([
+  'systemFields.characteristics', 'systemFields.combat', 'systemFields.combat.fields.size',
+  'systemFields.combat.fields.size.fields.letter', 'systemFields.combat.fields.size.fields.value',
+  'systemFields.combat.fields.stability', 'systemFields.damage.fields.immunities',
+  'systemFields.damage.fields.weaknesses', 'systemFields.hero.fields.epic.fields.value',
+  'systemFields.hero.fields.primary.fields.value', 'systemFields.hero.fields.surges',
+  'systemFields.hero.fields.victories', 'systemFields.hero.fields.xp', 'systemFields.movement',
+  'systemFields.movement.fields.disengage', 'systemFields.movement.fields.hover',
+  'systemFields.movement.fields.types', 'systemFields.movement.fields.value', 'systemFields.recoveries',
+  'systemFields.recoveries.fields.max', 'systemFields.recoveries.fields.value', 'systemFields.skills.fields.value',
+  'systemFields.stamina', 'systemFields.stamina.fields.temporary', 'systemFields.stamina.fields.value',
+  'systemSource.combat.size.letter', 'systemSource.combat.size.value', 'systemSource.combat.stability',
+  'systemSource.damage.immunities', 'systemSource.damage.weaknesses', 'systemSource.hero.victories',
+  'systemSource.hero.xp', 'systemSource.movement.disengage', 'systemSource.movement.hover',
+  'systemSource.movement.types', 'systemSource.movement.value', 'systemSource.skills.value',
+]);
+
+/** Draw Steel 1.1.2's skills editor, copied from its hero stats template. */
+const DS_SKILLS_INPUT = '{{formInput systemFields.skills.fields.value value=systemSource.skills.value options=skills.options dataset=datasets.isSource}}';
+
+/**
+ * What Draw Steel 1.1.2's hero header reads: portrait, name, class,
+ * subclasses, origins, level, XP and victories. A Limited viewer gets the
+ * header, so ours reads nothing else. Block and partial parameters are
+ * listed by the names our header gives them.
+ */
+const HEADER_MAY_READ = new Set([
+  'document.img', 'document.name', 'document.system.class', 'document.system.subclasses',
+  'document.system.ancestry', 'document.system.culture', 'document.system.career',
+  'cls.uuid', 'cls.name', 'sub.uuid', 'sub.name', 'subclass', 'originDoc', 'originDoc.uuid', 'originDoc.name',
+  'originType', 'noEdit', 'isPlay', '@root.isPlay', 'editable',
+  'avatarProperties.objectFit', 'avatarProperties.objectPosition', 'fields.name', 'source.name',
+  'system.level', 'system.advancementReady', 'system.hero.xp', 'system.nextLevelXP', 'system.hero.victories',
+  'system.victoriesMax', 'systemFields.hero.fields.xp.label', 'systemFields.hero.fields.victories.label',
+  'systemFields.hero.fields.xp', 'systemFields.hero.fields.victories', 'systemSource.hero.xp', 'systemSource.hero.victories',
+]);
+
+/** Template helpers, keywords and literals, which are not data. */
+const HELPERS = new Set([
+  'if', 'unless', 'each', 'with', 'else', 'as', 'this', 'localize', 'concat', 'ifThen', 'disabled', 'not', 'or',
+  'and', 'eq', 'formInput', 'formGroup', 'numberFormat', 'lookup', 'true', 'false', 'null',
+]);
+
+/** Every data path a template reads, from each {{…}} expression. */
+function dataPaths(src) {
+  const paths = new Set();
+  for (const m of src.matchAll(/\{\{\{?([\s\S]*?)\}?\}\}/g)) {
+    let body = m[1].trim();
+    if (/^(\/|else\b|#\*inline)/.test(body)) continue;
+    const partial = body.startsWith('>');
+    body = body.replace(/^[#>~]\s*/, '')
+      .replace(/"[^"]*"/g, ' ')
+      .replace(/\|[^|]*\|/g, ' ')
+      .replace(/[\w-]+=/g, ' ')
+      .replace(/[()]/g, ' ');
+    const words = body.split(/\s+/).filter(Boolean);
+    if (partial) words.shift();
+    for (const w of words) if (!HELPERS.has(w) && !/^-?\d/.test(w)) paths.add(w);
+  }
+  return [...paths];
+}
+
+/** Each systemFields/systemSource path a template reads, without a trailing `.label`. */
+function fieldPaths(src) {
+  return [...new Set([...src.matchAll(/\bsystem(?:Fields|Source)\.[\w.]+/g)].map((m) => m[0].replace(/\.label$/, '')))];
+}
 
 function looksOnDisk() {
   if (!existsSync(LOOKS_DIR)) return [];
@@ -120,9 +192,16 @@ for (const look of looksOnDisk()) {
     assert.match(h, /formGroup systemFields\.hero\.fields\.victories value=systemSource\.hero\.victories/);
   });
 
-  test(`${look}: header shows nothing a Limited viewer may not see`, () => {
-    const m = header.match(NOT_IN_HEADER);
-    assert.equal(m, null, `header names ${m?.[0]}`);
+  test(`${look}: header reads only what Draw Steel's header reads, since a Limited viewer sees it`, () => {
+    const extra = dataPaths(header).filter((p) => !HEADER_MAY_READ.has(p));
+    assert.deepEqual(extra, [], `header reads ${extra.join(', ')}`);
+  });
+
+  test(`${look}: every field is one Draw Steel's own hero templates read`, () => {
+    for (const file of templatesOf(look)) {
+      const unknown = fieldPaths(read(file)).filter((p) => !DS_FIELDS.has(p));
+      assert.deepEqual(unknown, [], `${file} reads fields Draw Steel's hero sheet doesn't: ${unknown.join(', ')}`);
+    }
   });
 
   test(`${look}: stats keeps Draw Steel's inputs, effect locks and buttons`, () => {
@@ -144,7 +223,7 @@ for (const look of looksOnDisk()) {
   test(`${look}: Edit mode is Draw Steel's own stat editors`, () => {
     const s = flat(stats);
     for (const partial of DS_STAT_PARTIALS) assert.ok(s.includes(`{{> "${partial}"`), partial);
-    assert.match(s, /formInput systemFields\.skills\.fields\.value value=systemSource\.skills\.value options=skills\.options dataset=datasets\.isSource/);
+    assert.ok(s.includes(DS_SKILLS_INPUT), 'skills editor differs from Draw Steel\'s');
   });
 
   test(`${look}: the boxes are not a tab, so they stay above the tab row`, () => {
@@ -153,3 +232,12 @@ for (const look of looksOnDisk()) {
     assert.doesNotMatch(root.attrs, /data-tab=|\bclass="[^"]*\btab\b/);
   });
 }
+
+test('the path readers catch a Limited leak and a field Draw Steel lacks', () => {
+  const leak = '{{#if (eq system.hero.primary.value 2)}}<b>{{system.stamina.value}}</b>{{/if}}{{> csOrigin originDoc=document.system.kits}}';
+  const extra = dataPaths(leak).filter((p) => !HEADER_MAY_READ.has(p));
+  assert.deepEqual(extra.sort(), ['document.system.kits', 'system.hero.primary.value', 'system.stamina.value']);
+  assert.deepEqual(dataPaths('{{#each document.system.subclasses as |sub|}}<a>{{sub.name}}</a>{{/each}}'), ['document.system.subclasses', 'sub.name']);
+  const wrong = '{{formInput systemFields.hero.fields.skills value=systemSource.hero.skills}}';
+  assert.deepEqual(fieldPaths(wrong).filter((p) => !DS_FIELDS.has(p)), ['systemFields.hero.fields.skills', 'systemSource.hero.skills']);
+});

@@ -39,10 +39,15 @@
   --cs-page-muted: #6b7280;
   --cs-page-line: #e5e7eb;
   --cs-page-accent: #6366f1;
+  /* The accent as text or as a filled button's face: the plain accent is
+     just under 4.5:1 for small text on these surfaces. */
+  --cs-page-accent-strong: #4f46e5;
   --cs-page-accent-soft: #eef2ff;
   --cs-page-dm: #b45309;
   --cs-page-dm-soft: #fef6e7;
   --cs-page-shadow: 0 1px 2px rgba(17, 24, 39, 0.06), 0 1px 3px rgba(17, 24, 39, 0.08);
+  --cs-page-shadow-raised: 0 6px 16px -4px rgba(17, 24, 39, 0.12), 0 2px 4px -2px rgba(17, 24, 39, 0.06);
+  --cs-page-shadow-pressed: inset 0 1px 3px rgba(17, 24, 39, 0.18);
 }
 
 .theme-dark,
@@ -74,8 +79,11 @@ body:not(.theme-dark):not(.theme-light) #sidebar {
   --cs-page-muted: #9ca3af;
   --cs-page-line: #334155;
   --cs-page-accent: #818cf8;
+  --cs-page-accent-strong: #a5b4fc;
   --cs-page-accent-soft: #2a2f5e;
   --cs-page-dm: #f5b544;
   --cs-page-dm-soft: #33270d;
   --cs-page-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.4);
+  --cs-page-shadow-raised: 0 6px 16px -4px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.4);
+  --cs-page-shadow-pressed: inset 0 1px 3px rgba(0, 0, 0, 0.5);
 }

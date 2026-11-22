@@ -357,8 +357,9 @@ Pick it on a hero: open the hero, title bar menu (three dots) -> Sheet -> Sheet:
 - [ ] Take Respite, and Level up when it shows, work
 - [ ] Abilities: use one, its three-dot menu, right click, unfold its description, drag to reorder; Features, Equipment, Projects, Effects and Biography tabs work as on Draw Steel's sheet; drop a treasure on Projects -> it becomes a project
 - [ ] Scroll down -> the tab row stays pinned at the top; change Stamina while scrolled -> the page stays where it was
+- [ ] Press Tab until Stamina's number is reached -> a clear accent ring shows around it
 - [ ] Edit mode (padlock in the title bar): the name field, origin chips with remove and add, XP and Victories fields, and Draw Steel's characteristic, combat, movement, damage and skill editors
-- [ ] A player who owns the hero sees the same; an Observer cannot roll or change values; a Limited viewer sees only the header and the Biography tab
+- [ ] A player who owns the hero sees the same; an Observer cannot roll or change values; a Limited viewer sees only the header (picture, name, class, origins, level, XP and victories), the tab row and the Biography tab, as on Draw Steel's sheet
 - [ ] Switch the hero back to Draw Steel's sheet -> Draw Steel's sheet, nothing lost
 
 ### Foundry -> Chronicle

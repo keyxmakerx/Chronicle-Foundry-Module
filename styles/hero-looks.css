@@ -96,7 +96,7 @@
   font-weight: 400;
 }
 .chronicle-hero-sheet .cs-line a { color: inherit; text-decoration: none; }
-.chronicle-hero-sheet .cs-line a:hover { color: var(--cs-page-accent); text-decoration: underline; text-underline-offset: 3px; }
+.chronicle-hero-sheet .cs-line a:hover { color: var(--cs-page-accent-strong); text-decoration: underline; text-underline-offset: 3px; }
 /* The subclass reads quieter than the class, as on Chronicle's sheet. */
 .chronicle-hero-sheet .cs-line-item + .cs-line-item { font-weight: 400; color: var(--cs-page-body); }
 .chronicle-hero-sheet .cs-chips {
@@ -136,7 +136,7 @@
   border-style: dashed;
   background: none;
   font-weight: 500;
-  color: var(--cs-page-accent);
+  color: var(--cs-page-accent-strong);
 }
 .chronicle-hero-sheet .cs-chip-todo:hover { box-shadow: none; }
 
@@ -196,13 +196,13 @@
   background: none;
   font-size: 12px;
   font-weight: 600;
-  color: var(--cs-page-accent);
+  color: var(--cs-page-accent-strong);
 }
 .chronicle-hero-sheet .cs-level-up {
   padding: 0 8px;
-  border-color: var(--cs-page-accent);
+  border-color: var(--cs-page-accent-strong);
   border-radius: 8px;
-  background: var(--cs-page-accent);
+  background: var(--cs-page-accent-strong);
   color: var(--cs-on-accent);
   font-size: 18px;
   font-weight: 700;
@@ -252,9 +252,9 @@
 }
 .chronicle-hero-sheet button.cs-box:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--cs-page-accent) 55%, transparent);
-  box-shadow: 0 6px 16px -4px rgb(0 0 0 / 0.12), 0 2px 4px -2px rgb(0 0 0 / 0.06);
+  box-shadow: var(--cs-page-shadow-raised);
 }
-.chronicle-hero-sheet button.cs-box:active:not(:disabled) { box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.18); }
+.chronicle-hero-sheet button.cs-box:active:not(:disabled) { box-shadow: var(--cs-page-shadow-pressed); }
 .chronicle-hero-sheet button.cs-box:disabled { cursor: default; }
 .chronicle-hero-sheet .cs-lab {
   display: block;
@@ -321,7 +321,7 @@
 .chronicle-hero-sheet .cs-field input[type="number"]::-webkit-inner-spin-button,
 .chronicle-hero-sheet .cs-field input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .chronicle-hero-sheet .cs-field input[type="number"]:hover { border-color: var(--cs-page-line); background: var(--cs-page-tert); }
-.chronicle-hero-sheet .cs-field input[type="number"]:focus { border-color: var(--cs-page-accent); background: var(--cs-page-panel); outline: none; }
+.chronicle-hero-sheet .cs-field input[type="number"]:focus { border-color: var(--cs-page-accent); background: var(--cs-page-panel); }
 .chronicle-hero-sheet .cs-field input[type="number"]:disabled { color: var(--cs-page-muted); }
 .chronicle-hero-sheet .cs-field-big input[type="number"] { height: 42px; width: 4ch; font-size: 32px; }
 /* Where the browser can size a field to its number, it does, so "74 / 96" reads as one figure. */
@@ -389,7 +389,7 @@
 .chronicle-hero-sheet .cs-stamina:is([data-band="dying"], [data-band="dead"]) .cs-state { color: var(--cs-bad); }
 .chronicle-hero-sheet .cs-dots { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 0; }
 .chronicle-hero-sheet .cs-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--cs-page-body); }
-.chronicle-hero-sheet .cs-dots i.off { background: none; box-shadow: inset 0 0 0 1.5px var(--cs-page-line); }
+.chronicle-hero-sheet .cs-dots i.off { background: none; box-shadow: inset 0 0 0 1.5px var(--cs-page-muted); }
 
 /* Potency, damage, conditions, skills. */
 .chronicle-hero-sheet .cs-row-facts {
@@ -472,8 +472,8 @@
 }
 .chronicle-hero-sheet .window-content > nav.tabs > [data-tab]:hover { color: var(--cs-page-text); }
 .chronicle-hero-sheet .window-content > nav.tabs > [data-tab].active {
-  color: var(--cs-page-accent);
-  border-bottom-color: var(--cs-page-accent);
+  color: var(--cs-page-accent-strong);
+  border-bottom-color: var(--cs-page-accent-strong);
 }
 
 /* Draw Steel's lists (abilities, features, equipment, projects): a heading
@@ -527,10 +527,12 @@
 }
 .chronicle-hero-sheet .item-list-container .item-row .item-name .name .label { font-size: 14px; font-weight: 600; }
 .chronicle-hero-sheet .item-list-container .item-row .item-name .keywords { font-size: 12px; color: var(--cs-page-muted); }
-.chronicle-hero-sheet .item-list-container .item-row .item-name.rollable:hover .label { color: var(--cs-page-accent); text-shadow: none; }
+/* Muted grey is just under 4.5:1 on the hover shade, so it darkens with the row. */
+.chronicle-hero-sheet .item-list-container .item-row:hover .item-name .keywords { color: var(--cs-page-body); }
+.chronicle-hero-sheet .item-list-container .item-row .item-name.rollable:hover .label { color: var(--cs-page-accent-strong); text-shadow: none; }
 .chronicle-hero-sheet .item-list-container :is(.item-controls) { width: 56px; }
 .chronicle-hero-sheet .item-list-container .item-controls a { color: var(--cs-page-muted); }
-.chronicle-hero-sheet .item-list-container .item-controls a:hover { color: var(--cs-page-accent); text-shadow: none; }
+.chronicle-hero-sheet .item-list-container .item-controls a:hover { color: var(--cs-page-accent-strong); text-shadow: none; }
 .chronicle-hero-sheet .item-list-container .document-description.expanded { padding: 8px 12px 12px; }
 
 /* Narrower windows: the boxes wrap instead of shrinking past reading. */
