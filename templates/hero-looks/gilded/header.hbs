@@ -1,104 +1,119 @@
-{{!-- Chronicle hero sheet header: portrait, name, class line, origin chips,
-level, XP and victories. A Limited viewer sees this part, so it shows only
-what Draw Steel's own header shows. Origins keep Draw Steel's markup: the
-item's uuid on the chip, viewDoc on its name, deleteDoc and addOrigin in Edit. --}}
-<header class="cs-hero-head" style="{{#if avatarProperties.objectFit}}--avatar-object-fit: {{avatarProperties.objectFit}};{{/if}}{{#if avatarProperties.objectPosition}} --avatar-object-position: {{avatarProperties.objectPosition}};{{/if}}">
+{{!-- The gilded card header: the card's frame and corners, the picture under
+an arch with the level medal on its foot, then the name, class and origins,
+the subclass, XP and victories. A Limited viewer sees this part, so it shows
+only what Draw Steel's own header shows. Origins keep Draw Steel's markup:
+the item's uuid on the entry, viewDoc on its name, deleteDoc and addOrigin
+in Edit. --}}
+<header class="cs-hero-head cs-gc-head" style="{{#if avatarProperties.objectFit}}--avatar-object-fit: {{avatarProperties.objectFit}};{{/if}}{{#if avatarProperties.objectPosition}} --avatar-object-position: {{avatarProperties.objectPosition}};{{/if}}">
   {{#*inline "csOrigin"}}
   {{#if originDoc}}
-  <li class="cs-chip" data-document-uuid="{{originDoc.uuid}}">
-    <span class="cs-chip-kind">{{localize (concat "TYPES.Item." originType)}}</span>
-    <a class="cs-chip-name" data-action="viewDoc">{{originDoc.name}}</a>
+  <li class="cs-gc-origin" data-document-uuid="{{originDoc.uuid}}">
+    {{#unless @root.isPlay}}<span class="cs-gc-kind">{{localize (concat "TYPES.Item." originType)}}</span>{{/unless}}
+    <a class="cs-gc-origin-name" data-action="viewDoc" data-tooltip="{{localize (concat "TYPES.Item." originType)}}">{{originDoc.name}}</a>
     {{#unless (or @root.isPlay noEdit)}}
-    <a class="cs-chip-del" data-action="deleteDoc" aria-label="{{localize "CHRONICLE.HeroSheet.Remove"}}" data-tooltip="CHRONICLE.HeroSheet.Remove"><i class="fa-solid fa-trash-can" inert></i></a>
+    <a class="cs-gc-del" data-action="deleteDoc" aria-label="{{localize "CHRONICLE.HeroSheet.Remove"}}" data-tooltip="CHRONICLE.HeroSheet.Remove"><i class="fa-solid fa-trash-can" inert></i></a>
     {{/unless}}
   </li>
   {{else}}
   {{#unless (and (not @root.isPlay) noEdit)}}
-  <li class="cs-chip cs-chip-todo">
-    <span class="cs-chip-kind">{{localize (concat "TYPES.Item." originType)}}</span>
+  <li class="cs-gc-origin cs-gc-todo">
     {{#if @root.isPlay}}
-    <span class="cs-chip-name">{{localize "CHRONICLE.HeroSheet.StillToChoose"}}</span>
+    <span>{{localize (concat "TYPES.Item." originType)}}: {{localize "CHRONICLE.HeroSheet.StillToChoose"}}</span>
     {{else}}
-    <a class="cs-chip-name" data-action="addOrigin" data-type="{{originType}}">{{localize "DRAW_STEEL.SHEET.Add" itemName=(localize (concat "TYPES.Item." originType))}}</a>
+    <a data-action="addOrigin" data-type="{{originType}}">{{localize "DRAW_STEEL.SHEET.Add" itemName=(localize (concat "TYPES.Item." originType))}}</a>
     {{/if}}
   </li>
   {{/unless}}
   {{/if}}
   {{/inline}}
 
-  {{!-- The portrait menu offers the full picture, the token and, in Edit
-  mode, Foundry's file picker, which reads data-edit off the picture. --}}
-  <button type="button" class="cs-portrait-btn" data-action="csPortraitMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize "CHRONICLE.HeroSheet.Portrait.Menu"}}" data-tooltip="CHRONICLE.HeroSheet.Portrait.Menu">
-    <img class="cs-portrait" src="{{document.img}}" alt="{{document.name}}" {{#unless isPlay}}data-edit="img"{{/unless}}>
-  </button>
-
-  <div class="cs-id">
-    {{#if isPlay}}
-    <h1 class="cs-name">{{document.name}}</h1>
-    {{else}}
-    <div class="cs-name-edit">
-      {{formInput fields.name value=source.name placeholder=(localize "DOCUMENT.FIELDS.name.label")}}
-    </div>
-    {{/if}}
-    <p class="cs-line">
-      <span class="cs-line-level">{{localize "CHRONICLE.HeroSheet.LevelN" level=system.level}}</span>
-      {{#with document.system.class as |cls|}}
-      <span class="cs-line-item" data-document-uuid="{{cls.uuid}}"><a data-action="viewDoc">{{cls.name}}</a></span>
-      {{/with}}
-      {{#each document.system.subclasses as |sub|}}
-      <span class="cs-line-item" data-document-uuid="{{sub.uuid}}"><a data-action="viewDoc">{{sub.name}}</a></span>
-      {{/each}}
-    </p>
-    <ul class="cs-chips">
-      {{> csOrigin originDoc=document.system.ancestry originType="ancestry"}}
-      {{> csOrigin originDoc=document.system.culture originType="culture"}}
-      {{> csOrigin originDoc=document.system.career originType="career"}}
-      {{#unless isPlay}}
-      {{> csOrigin originDoc=document.system.class originType="class"}}
-      {{#each document.system.subclasses as |subclass|}}
-      {{> csOrigin originDoc=subclass originType="subclass" noEdit=true}}
-      {{/each}}
-      {{/unless}}
-    </ul>
+  {{!-- The gold borders, corner flourishes and the foil light lie over the
+  whole window, held still while the card scrolls under them. --}}
+  <div class="cs-gc-frame" aria-hidden="true">
+    <i class="cs-gc-fade"></i>
+    <i class="cs-gc-corner cs-gc-tl"></i><i class="cs-gc-corner cs-gc-tr"></i><i class="cs-gc-corner cs-gc-bl"></i><i class="cs-gc-corner cs-gc-br"></i>
+    <i class="cs-gc-gem cs-gc-gem-top"></i><i class="cs-gc-gem cs-gc-gem-foot"></i>
+    <span class="cs-gc-foilbox"><span class="cs-gc-foil"></span></span>
   </div>
 
-  <div class="cs-prog">
-    <dl>
-      <div class="cs-prog-level">
-        <dt>{{localize "DRAW_STEEL.Item.class.FIELDS.level.label"}}</dt>
-        <dd>
-          {{#if system.advancementReady}}
-          <button type="button" class="cs-level-up" {{disabled (not editable)}} data-action="levelUp" data-tooltip="DRAW_STEEL.SHEET.LevelUp">
-            {{system.level}} <i class="fa-solid fa-up-long" inert></i>
-          </button>
-          {{else}}
-          {{system.level}}
-          {{/if}}
-        </dd>
+  <div class="cs-gc-mid">
+    <div class="cs-gc-arch">
+      <div class="cs-gc-archin">
+        {{!-- Shown where the hero has no picture of their own. --}}
+        <svg class="cs-gc-crest" viewBox="0 0 600 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+          <g fill="none" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M300 170c110 30 150 60 150 60v170c0 110-70 180-150 230-80-50-150-120-150-230V230s40-30 150-60z"/>
+            <path d="M300 250v270M276 300h48M288 520h24l-12 40z"/>
+          </g>
+        </svg>
+        {{!-- The whole picture is the portrait button. Its menu offers the full
+        picture, the token and, in Edit mode, Foundry's file picker, which reads
+        data-edit off the picture. --}}
+        <button type="button" class="cs-portrait-btn" data-action="csPortraitMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize "CHRONICLE.HeroSheet.Portrait.Menu"}}" data-tooltip="CHRONICLE.HeroSheet.Portrait.Menu">
+          <img class="cs-portrait" src="{{document.img}}" alt="{{document.name}}" {{#unless isPlay}}data-edit="img"{{/unless}}>
+        </button>
+        <div class="cs-gc-veil" aria-hidden="true"></div>
+        <div class="cs-gc-crack" aria-hidden="true"></div>
       </div>
+    </div>
+
+    {{!-- The level medal; with a level ready it is the level-up button. --}}
+    {{#if system.advancementReady}}
+    <button type="button" class="cs-gc-medal cs-gc-lvlup" {{disabled (not editable)}} data-action="levelUp" aria-label="{{localize "CHRONICLE.HeroSheet.LevelN" level=system.level}}" data-tooltip="DRAW_STEEL.SHEET.LevelUp">
+      <span aria-hidden="true">{{localize "CHRONICLE.HeroSheet.LevelN" level=""}}</span><b aria-hidden="true">{{system.level}}</b><i class="fa-solid fa-up-long" inert></i>
+    </button>
+    {{else}}
+    <div class="cs-gc-medal" role="img" aria-label="{{localize "CHRONICLE.HeroSheet.LevelN" level=system.level}}">
+      <span aria-hidden="true">{{localize "CHRONICLE.HeroSheet.LevelN" level=""}}</span><b aria-hidden="true">{{system.level}}</b>
+    </div>
+    {{/if}}
+
+    <div class="cs-gc-plate">
       {{#if isPlay}}
-      <div>
-        <dt>{{systemFields.hero.fields.xp.label}}</dt>
-        <dd>{{system.hero.xp}}{{#if system.nextLevelXP}}<small> / {{system.nextLevelXP}}</small>{{/if}}</dd>
-      </div>
-      <div>
-        <dt>{{systemFields.hero.fields.victories.label}}</dt>
-        <dd>{{system.hero.victories}}{{#if system.victoriesMax}}<small> / {{system.victoriesMax}}</small>{{/if}}</dd>
+      <h1 class="cs-name">{{document.name}}</h1>
+      {{else}}
+      <div class="cs-name-edit">
+        {{formInput fields.name value=source.name placeholder=(localize "DOCUMENT.FIELDS.name.label")}}
       </div>
       {{/if}}
-    </dl>
-    {{#unless isPlay}}
-    <div class="cs-prog-edit">
-      {{formGroup systemFields.hero.fields.xp value=systemSource.hero.xp classes="xp"}}
-      {{formGroup systemFields.hero.fields.victories value=systemSource.hero.victories classes="victories"}}
+      <ul class="cs-gc-origins">
+        {{#if isPlay}}
+        {{#with document.system.class as |cls|}}
+        <li class="cs-gc-origin" data-document-uuid="{{cls.uuid}}"><a class="cs-gc-origin-name" data-action="viewDoc">{{cls.name}}</a></li>
+        {{/with}}
+        {{/if}}
+        {{> csOrigin originDoc=document.system.ancestry originType="ancestry"}}
+        {{> csOrigin originDoc=document.system.culture originType="culture"}}
+        {{> csOrigin originDoc=document.system.career originType="career"}}
+        {{#unless isPlay}}
+        {{> csOrigin originDoc=document.system.class originType="class"}}
+        {{#each document.system.subclasses as |subclass|}}
+        {{> csOrigin originDoc=subclass originType="subclass" noEdit=true}}
+        {{/each}}
+        {{/unless}}
+      </ul>
+      {{#if isPlay}}
+      <p class="cs-gc-sub">
+        {{#each document.system.subclasses as |sub|}}<span data-document-uuid="{{sub.uuid}}"><a data-action="viewDoc">{{sub.name}}</a></span>{{/each}}
+      </p>
+      <p class="cs-gc-vic">
+        <span>{{systemFields.hero.fields.xp.label}} <b>{{system.hero.xp}}</b>{{#if system.nextLevelXP}}/{{system.nextLevelXP}}{{/if}}</span>
+        <span>{{systemFields.hero.fields.victories.label}} <b>{{system.hero.victories}}</b>{{#if system.victoriesMax}}/{{system.victoriesMax}}{{/if}}</span>
+      </p>
+      {{else}}
+      <div class="cs-gc-prog-edit">
+        {{formGroup systemFields.hero.fields.xp value=systemSource.hero.xp classes="xp"}}
+        {{formGroup systemFields.hero.fields.victories value=systemSource.hero.victories classes="victories"}}
+      </div>
+      {{/if}}
     </div>
-    {{/unless}}
-    {{#if isPlay}}
-    {{#if editable}}
-    <button type="button" class="cs-btn cs-respite" data-action="takeRespite">
+  </div>
+
+  {{#if isPlay}}{{#if editable}}
+  <div class="cs-gc-foot">
+    <button type="button" class="cs-gc-btn cs-respite" data-action="takeRespite">
       <i class="fa-solid fa-bed" inert></i> {{localize "DRAW_STEEL.Actor.hero.TakeRespite"}}
     </button>
-    {{/if}}
-    {{/if}}
   </div>
+  {{/if}}{{/if}}
 </header>

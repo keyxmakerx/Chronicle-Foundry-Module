@@ -1,36 +1,82 @@
 /* The gilded card look on the Chronicle hero sheet (scripts/hero-looks.mjs,
    templates/hero-looks/gilded/, signed as look D): a playing card in the
-   hand: deep navy inside gold borders, the picture under an arch, the
-   characteristics as medallions. It flips in and tilts when hit.
+   hand. Deep navy inside layered gold borders, the picture under an arch with
+   the level on a gold medal at its foot, the name in Cinzel capitals, the
+   characteristics as gold medallions. It flips in when opened, tilts when
+   hit, and foil light runs across the gold.
 
-   Always dark: the sheet puts the window in Foundry's dark theme. Every
-   colour is in the token block below, so a colour changes in one place;
-   rules below it read the tokens (color-mix() for a softer shade).
-   Unlayered and scoped to [data-cs-look="gilded"], like hero-looks.css,
-   which it follows. */
+   Always dark: the sheet puts the window in Foundry's dark theme, so Draw
+   Steel's own fields and editors inside it match. Every colour is in the
+   token block below, so a colour changes in one place; the rules under it
+   read the tokens (color-mix() for a softer shade). Unlayered and scoped to
+   [data-cs-look="gilded"], like hero-looks.css, which it follows. */
 
 /* Uses "Chronicle Cinzel" and "Chronicle Garamond", declared in hero-look-hall.css. */
 
 /* The look's values for the sheet's tokens, then its own --cs-gilded-* ones.
    Corners are 0px, not 0: the sheet's radii are min(…, var(--cs-hero-radius)). */
 .chronicle-hero-sheet[data-cs-look="gilded"] {
-  --cs-hero-bg: #05070d;
-  --cs-hero-panel: #0c1424;
-  --cs-hero-tert: color-mix(in srgb, #d9a520 8%, transparent);
-  --cs-hero-line: color-mix(in srgb, #d9a520 18%, transparent);
-  --cs-hero-text: #fff7e0;
-  --cs-hero-body: #d8d2bf;
-  --cs-hero-muted: #a9a28e;
-  --cs-hero-accent: #d9a520;
-  --cs-hero-accent-strong: #d9a520;
-  --cs-hero-accent-soft: color-mix(in srgb, #d9a520 14%, transparent);
-  --cs-hero-on-accent: #1c1503;
+  --cs-gilded-bg: #05070d;
+  --cs-gilded-navy: #0c1424;
+  --cs-gilded-navy-hi: #18284a;
+  --cs-gilded-navy-lo: #080d18;
+  --cs-gilded-well: #070c17;
+  --cs-gilded-pip: #0a1020;
+  --cs-gilded-gold: #d9a520;
+  --cs-gilded-gold-hi: #fff3c4;
+  --cs-gilded-gold-pale: #fbe7a1;
+  --cs-gilded-gold-warm: #e9c46a;
+  --cs-gilded-gold-dark: #b8860b;
+  --cs-gilded-gold-deep: #8a5f17;
+  --cs-gilded-gold-ink: #3a2600;
+  --cs-gilded-shine: #fff8dd;
+  --cs-gilded-white: #ffffff;
+  --cs-gilded-ink: #fff7e0;
+  --cs-gilded-soft: #c9d2e6;
+  --cs-gilded-dim: #93a0bd;
+  --cs-gilded-violet: #a78bfa;
+  --cs-gilded-violet-hi: #f3e8ff;
+  --cs-gilded-violet-mid: #8b5cf6;
+  --cs-gilded-violet-deep: #4c1d95;
+  --cs-gilded-ember: #fb923c;
+  --cs-gilded-ember-hi: #ffedd5;
+  --cs-gilded-ember-mid: #f97316;
+  --cs-gilded-ember-deep: #7c2d12;
+  --cs-gilded-blood: #b3121f;
+  --cs-gilded-crack: #ff5a6a;
+  --cs-gilded-rose: #fda4af;
+  --cs-gilded-shade: #000000;
+  --cs-gilded-display: "Chronicle Cinzel", Cinzel, Georgia, serif;
+  --cs-gilded-line: color-mix(in srgb, var(--cs-gilded-gold) 20%, transparent);
+  --cs-gilded-line-hi: color-mix(in srgb, var(--cs-gilded-gold) 60%, transparent);
+  --cs-gilded-hatch: color-mix(in srgb, var(--cs-gilded-white) 2%, transparent);
+  --cs-gilded-sheet: linear-gradient(160deg, var(--cs-gilded-gold-hi), var(--cs-gilded-gold) 35%, var(--cs-gilded-gold-pale) 60%, var(--cs-gilded-gold-deep));
+  --cs-gilded-coin: radial-gradient(circle at 35% 30%, var(--cs-gilded-gold-hi), var(--cs-gilded-gold) 55%, var(--cs-gilded-gold-deep));
+  --cs-gilded-letters: linear-gradient(180deg, var(--cs-gilded-shine), var(--cs-gilded-gold-warm) 60%, var(--cs-gilded-gold-dark));
+  --cs-gilded-button: linear-gradient(180deg, var(--cs-gilded-gold-pale), var(--cs-gilded-gold));
+  --cs-gilded-card: radial-gradient(70% 60% at 50% 35%, var(--cs-gilded-navy-hi), var(--cs-gilded-navy) 60%, var(--cs-gilded-navy-lo));
+  --cs-gilded-foil-line: linear-gradient(100deg, transparent, color-mix(in srgb, var(--cs-gilded-gold-hi) 12%, transparent) 40%, color-mix(in srgb, var(--cs-gilded-shine) 24%, transparent) 50%, color-mix(in srgb, var(--cs-gilded-gold-hi) 12%, transparent) 60%, transparent);
+  --cs-gilded-shadow-deep: 0 18px 40px color-mix(in srgb, var(--cs-gilded-shade) 65%, transparent);
+  --cs-gilded-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --cs-gc-pad: 56px;
+
+  --cs-hero-bg: var(--cs-gilded-bg);
+  --cs-hero-panel: var(--cs-gilded-navy);
+  --cs-hero-tert: color-mix(in srgb, var(--cs-gilded-gold) 8%, transparent);
+  --cs-hero-line: color-mix(in srgb, var(--cs-gilded-gold) 22%, transparent);
+  --cs-hero-text: var(--cs-gilded-ink);
+  --cs-hero-body: var(--cs-gilded-soft);
+  --cs-hero-muted: var(--cs-gilded-dim);
+  --cs-hero-accent: var(--cs-gilded-gold);
+  --cs-hero-accent-strong: var(--cs-gilded-gold-warm);
+  --cs-hero-accent-soft: color-mix(in srgb, var(--cs-gilded-gold) 14%, transparent);
+  --cs-hero-on-accent: var(--cs-gilded-gold-ink);
   --cs-hero-shadow: none;
-  --cs-hero-shadow-raised: 0 14px 30px #000e;
-  --cs-hero-shadow-pressed: inset 0 0 0 1px color-mix(in srgb, #d9a520 35%, transparent);
+  --cs-hero-shadow-raised: 0 14px 30px color-mix(in srgb, var(--cs-gilded-shade) 80%, transparent), 0 0 0 1px color-mix(in srgb, var(--cs-gilded-gold) 55%, transparent);
+  --cs-hero-shadow-pressed: inset 0 0 0 1px color-mix(in srgb, var(--cs-gilded-gold) 35%, transparent);
   --cs-hero-ok: #9be38a;
   --cs-hero-warn: #f2b84b;
-  --cs-hero-bad: #f08a7e;
+  --cs-hero-bad: var(--cs-gilded-rose);
   --cs-hero-face: "Chronicle Garamond", "EB Garamond", Georgia, serif;
   --cs-hero-radius: 0px;
   --cs-hero-pill: 0px;
@@ -41,5 +87,1025 @@
    so the layout does not shift, and the strip reads as part of the frame. */
 .chronicle-hero-sheet[data-cs-look="gilded"] .window-content {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--cs-hero-accent) 50%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--cs-gilded-gold) 50%, transparent) transparent;
 }
+
+/* The title bar: navy with a gold hairline, the title in Cinzel. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .window-header {
+  background: var(--cs-gilded-bg);
+  border-bottom: 1px solid var(--cs-hero-line);
+  color: var(--cs-gilded-soft);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .window-header .window-title {
+  font-family: var(--cs-gilded-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .window-header :is(button, a):hover { color: var(--cs-gilded-gold-pale); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .window-content { font-size: 15px; }
+
+/* ---- The full sheet: nav on top, three columns, the tab under ----------- */
+
+/* The window is the card. Row 1 the tabs, row 2 the card (the left and
+   right boxes either side of the picture), the rows between hold what the
+   narrower layouts move down, row 6 the open tab. The gold frame lies over
+   all of it, held still while the tab scrolls. */
+.chronicle-hero-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 356px) minmax(0, 1fr);
+  grid-template-rows: repeat(6, auto);
+  align-content: start;
+  column-gap: 28px;
+  row-gap: 0;
+  padding: 0 var(--cs-gc-pad);
+  container: cs-gilded / size;
+  background:
+    repeating-linear-gradient(45deg, var(--cs-gilded-hatch) 0 1px, transparent 1px 9px),
+    repeating-linear-gradient(-45deg, var(--cs-gilded-hatch) 0 1px, transparent 1px 9px),
+    var(--cs-gilded-card),
+    var(--cs-gilded-bg);
+  --cs-gc-ah: clamp(300px, calc(100cqh - 305px), 440px);
+  --cs-gc-aw: calc(var(--cs-gc-ah) * 0.727);
+}
+/* The header and the boxes are placed straight on the window's grid. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-head { display: contents; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-stats:not(.cs-gc-stats-edit) { display: contents; }
+
+/* ---- The frame: two gold borders, flourished corners, gems, foil ------- */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-frame {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  grid-area: 1 / 1 / -1 / -1;
+  align-self: start;
+  height: 0;
+  margin-inline: calc(-1 * var(--cs-gc-pad));
+  pointer-events: none;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-frame > * { position: absolute; pointer-events: none; }
+/* A border drawn with the gold gradient: the gradient shows only in the ring a mask leaves. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-frame::before,
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-frame::after {
+  content: "";
+  position: absolute;
+  background: var(--cs-gilded-sheet);
+  -webkit-mask: linear-gradient(var(--cs-gilded-shade) 0 0) content-box, linear-gradient(var(--cs-gilded-shade) 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(var(--cs-gilded-shade) 0 0) content-box exclude, linear-gradient(var(--cs-gilded-shade) 0 0);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-frame::before {
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  height: calc(100cqh - 28px);
+  padding: 2.5px;
+  border-radius: 10px;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-frame::after {
+  top: 24px;
+  left: 24px;
+  right: 24px;
+  height: calc(100cqh - 48px);
+  padding: 1px;
+  border-radius: 5px;
+  opacity: 0.7;
+}
+/* The corner flourish is a shape the gold shows through; bottom corners mirror the top. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-corner {
+  width: 60px;
+  height: 60px;
+  background: var(--cs-gilded-sheet);
+  -webkit-mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'><path d='M0 60C0 24 24 0 60 0M0 40C0 18 18 0 40 0M10 10c14 0 22 8 22 22M10 10c0 14 8 22 22 22' fill='none' stroke='black' stroke-width='1.6'/><circle cx='10' cy='10' r='3.5'/></svg>") center / 100% 100% no-repeat;
+  mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'><path d='M0 60C0 24 24 0 60 0M0 40C0 18 18 0 40 0M10 10c14 0 22 8 22 22M10 10c0 14 8 22 22 22' fill='none' stroke='black' stroke-width='1.6'/><circle cx='10' cy='10' r='3.5'/></svg>") center / 100% 100% no-repeat;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-tl { top: 24px; left: 24px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-tr { top: 24px; right: 24px; transform: scaleX(-1); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-bl { top: calc(100cqh - 84px); left: 24px; transform: scaleY(-1); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-br { top: calc(100cqh - 84px); right: 24px; transform: scale(-1, 1) scaleY(-1); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-gem {
+  left: calc(50% - 5px);
+  width: 10px;
+  height: 10px;
+  background: var(--cs-gilded-gold);
+  transform: rotate(45deg);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-gem-top { top: 10px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-gem-foot { top: calc(100cqh - 20px); }
+/* The card's foot fades to navy, so a tall name or a scrolled tab slides
+   under the border instead of across it. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-fade {
+  top: calc(100cqh - 48px);
+  left: 14px;
+  right: 14px;
+  height: 34px;
+  background: linear-gradient(transparent, var(--cs-gilded-navy-lo));
+}
+/* Foil light: a slanted band that crosses the card now and then. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-foilbox {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100cqh;
+  overflow: hidden;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-foil {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 320px;
+  background: var(--cs-gilded-foil-line);
+  transform: translateX(-460px) skewX(-16deg);
+  animation: cs-gilded-foil 9s ease-in-out infinite;
+}
+
+/* ---- The tabs: capitals with a gold diamond between, along the top ------- */
+.chronicle-hero-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content > nav.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 20px;
+  margin: 0 calc(-1 * var(--cs-gc-pad));
+  padding: 34px max(var(--cs-gc-pad), 76px) 10px;
+  border: 0;
+  background: linear-gradient(color-mix(in srgb, var(--cs-gilded-navy-lo) 90%, transparent) 78%, transparent);
+  backdrop-filter: blur(5px);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content > nav.tabs > [data-tab] {
+  position: relative;
+  margin: 0;
+  padding: 4px 1px 3px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  font: 600 10.5px var(--cs-gilded-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cs-gilded-dim);
+  transition: color 200ms ease, border-color 200ms ease;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content > nav.tabs > [data-tab] + [data-tab]::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -12px;
+  width: 4px;
+  height: 4px;
+  margin-top: -2px;
+  background: var(--cs-gilded-gold);
+  transform: rotate(45deg);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content > nav.tabs > [data-tab]:hover { color: var(--cs-gilded-gold-hi); }
+.chronicle-hero-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content > nav.tabs > [data-tab].active {
+  color: var(--cs-gilded-gold-pale);
+  border-bottom-color: var(--cs-gilded-gold);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content > nav.tabs > [data-tab]:focus-visible { outline-offset: 3px; }
+
+/* ---- Small parts shared by the columns ---------------------------------- */
+
+/* Labels: small gold Cinzel capitals; a label that is a button is underlined. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-k {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  font: 600 9.5px/1.3 var(--cs-gilded-display);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--cs-gilded-gold-warm);
+  overflow-wrap: anywhere;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] button.cs-gc-k {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--cs-gilded-gold) 45%, transparent);
+  text-underline-offset: 5px;
+  transition: color 200ms ease, text-decoration-color 200ms ease;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] button.cs-gc-k:hover { color: var(--cs-gilded-gold-hi); text-decoration-color: var(--cs-gilded-gold-pale); }
+.chronicle-hero-sheet[data-cs-look="gilded"] button.cs-gc-k:active { color: var(--cs-gilded-gold-pale); }
+
+/* Small quiet buttons: hero token, choose a skill. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 3px 7px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: none;
+  box-shadow: none;
+  font: 600 9px var(--cs-gilded-display);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cs-gilded-gold-warm);
+  cursor: pointer;
+  transition: border-color 200ms ease, background-color 200ms ease, color 200ms ease;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-mini:hover { border-color: var(--cs-gilded-line-hi); background: color-mix(in srgb, var(--cs-gilded-gold) 10%, transparent); color: var(--cs-gilded-gold-hi); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-mini:active { background: color-mix(in srgb, var(--cs-gilded-gold) 20%, transparent); }
+
+/* The gold button: Take Respite. Foil light crosses it on hover. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-btn {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: auto;
+  height: auto;
+  min-height: 30px;
+  margin: 0;
+  padding: 7px 14px 6px;
+  overflow: hidden;
+  border: 1px solid var(--cs-gilded-gold-deep);
+  border-radius: 2px;
+  background: var(--cs-gilded-button);
+  box-shadow: inset 0 1px 0 var(--cs-gilded-shine), 0 2px 8px color-mix(in srgb, var(--cs-gilded-shade) 55%, transparent);
+  text-shadow: none;
+  font: 600 9.5px var(--cs-gilded-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cs-gilded-gold-ink);
+  cursor: pointer;
+  transition: filter 200ms ease, transform 100ms ease;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-btn::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: -1;
+  width: 55%;
+  background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--cs-gilded-shine) 90%, transparent) 50%, transparent);
+  transform: translateX(-130%) skewX(-18deg);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-btn:hover { filter: brightness(1.07); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-btn:hover::before { animation: cs-gilded-sweep 600ms cubic-bezier(0.3, 0.6, 0.3, 1); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-btn:active { transform: scale(0.98); }
+
+/* Number fields: a gold underline; typing in one brightens it from the centre. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-field input[type="number"] {
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(var(--cs-gilded-gold-pale), var(--cs-gilded-gold-pale)) 50% 100% / 0 1.5px no-repeat,
+    linear-gradient(transparent, transparent) 0 100% / 100% 1px no-repeat;
+  color: var(--cs-gilded-white);
+  font-family: var(--cs-gilded-display);
+  font-weight: 600;
+  transition: background-size 250ms ease-out;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-field input[type="number"]:hover {
+  background:
+    linear-gradient(var(--cs-gilded-gold-pale), var(--cs-gilded-gold-pale)) 50% 100% / 0 1.5px no-repeat,
+    linear-gradient(var(--cs-gilded-line-hi), var(--cs-gilded-line-hi)) 0 100% / 100% 1px no-repeat;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-field input[type="number"]:focus {
+  outline: 1px solid var(--cs-gilded-line-hi);
+  outline-offset: 3px;
+  background:
+    linear-gradient(var(--cs-gilded-gold-pale), var(--cs-gilded-gold-pale)) 50% 100% / 100% 1.5px no-repeat,
+    linear-gradient(var(--cs-gilded-line-hi), var(--cs-gilded-line-hi)) 0 100% / 100% 1px no-repeat;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-field input[type="number"]:disabled { color: var(--cs-hero-muted); }
+
+/* A gold line with a diamond in the middle. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-orn {
+  position: relative;
+  height: 9px;
+  margin: 2px 0;
+  background: linear-gradient(90deg, transparent, var(--cs-gilded-gold) 20%, var(--cs-gilded-gold) 44%, transparent 44%, transparent 56%, var(--cs-gilded-gold) 56%, var(--cs-gilded-gold) 80%, transparent) center / 100% 1px no-repeat;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-orn::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px;
+  background: var(--cs-gilded-gold);
+  transform: rotate(45deg);
+}
+
+/* ---- Left of the picture: Stamina dial, pips, facts --------------------- */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-left {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  min-width: 0;
+  padding: 16px 0 24px;
+  container: cs-gc-left / inline-size;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-dial {
+  --cs-gc-band: var(--cs-gilded-white);
+  position: relative;
+  width: 100%;
+  aspect-ratio: 300 / 170;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-dial[data-band="winded"] { --cs-gc-band: var(--cs-gilded-rose); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-dial:is([data-band="dying"], [data-band="dead"]) { --cs-gc-band: var(--cs-gilded-crack); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-dial-art { display: block; width: 100%; height: 100%; overflow: visible; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-s0 { stop-color: var(--cs-gilded-gold-hi); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-s1 { stop-color: var(--cs-gilded-gold); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-s2 { stop-color: var(--cs-gilded-gold-pale); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-s3 { stop-color: var(--cs-gilded-gold-deep); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-dial-art path { fill: none; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-rays { stroke: url("#cs-gc-gold"); stroke-width: 1; opacity: 0.5; transform-origin: 150px 150px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-track { stroke: color-mix(in srgb, var(--cs-gilded-white) 10%, transparent); stroke-width: 12; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-fill {
+  stroke: url("#cs-gc-gold");
+  stroke-width: 12;
+  stroke-linecap: round;
+  transition: stroke-dasharray 800ms cubic-bezier(0.3, 0.9, 0.3, 1);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-fill[stroke-dasharray^="0 "] { stroke-linecap: butt; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-base { stroke: url("#cs-gc-gold"); stroke-width: 1.5; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-dv {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 15%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-stam input[type="number"] {
+  height: 1.12em;
+  min-width: 1.4ch;
+  font-size: clamp(34px, 20cqi, 58px);
+  line-height: 1;
+  text-align: center;
+  color: var(--cs-gc-band);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-of {
+  font: 600 9px var(--cs-gilded-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--cs-gilded-gold-warm);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-state {
+  margin-top: 2px;
+  font: 600 9px var(--cs-gilded-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cs-gc-band);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-dial-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2px 12px;
+  margin-top: -16px;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-temp { align-items: center; gap: 6px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-temp > span {
+  font: 600 8.5px var(--cs-gilded-display);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--cs-gilded-dim);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-temp input[type="number"] { height: 22px; width: 3ch; font-size: 13px; text-align: center; }
+
+/* Recoveries, the heroic resource, surges: the name, round pips, the number. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-res {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "k p n";
+  align-items: center;
+  gap: 4px 8px;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-res > .cs-gc-k { grid-area: k; justify-self: start; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-res > .cs-gc-pips { grid-area: p; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-res > .cs-gc-n { grid-area: n; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-pips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-pips i {
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--cs-gilded-line-hi);
+  border-radius: 50%;
+  background: var(--cs-gilded-pip);
+  transition: background 400ms ease, box-shadow 400ms ease;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-pips i.on {
+  background: var(--cs-gilded-coin);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--cs-gilded-gold-warm) 55%, transparent);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] :is(.cs-gc-primary, .cs-gc-epic) .cs-gc-pips i { border-color: color-mix(in srgb, var(--cs-gilded-violet) 60%, transparent); }
+.chronicle-hero-sheet[data-cs-look="gilded"] :is(.cs-gc-primary, .cs-gc-epic) .cs-gc-pips i.on {
+  background: radial-gradient(circle at 35% 30%, var(--cs-gilded-violet-hi), var(--cs-gilded-violet-mid) 60%, var(--cs-gilded-violet-deep));
+  box-shadow: 0 0 10px var(--cs-gilded-violet);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-surges .cs-gc-pips i { border-color: color-mix(in srgb, var(--cs-gilded-ember) 60%, transparent); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-surges .cs-gc-pips i.on {
+  background: radial-gradient(circle at 35% 30%, var(--cs-gilded-ember-hi), var(--cs-gilded-ember-mid) 60%, var(--cs-gilded-ember-deep));
+  box-shadow: 0 0 10px var(--cs-gilded-ember);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-n { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: 2px; font: 600 13px var(--cs-gilded-display); color: var(--cs-hero-muted); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-n input[type="number"] { height: 26px; font-size: 17px; text-align: right; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-n small { font-size: 12px; }
+/* A narrow column puts the pips under the name and number. */
+@container cs-gc-left (max-width: 250px) {
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-res { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "k n" "p p"; }
+}
+
+@container cs-gc-left (max-width: 290px) {
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-pips { gap: 4px; }
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-pips i { width: 11px; height: 11px; }
+}
+
+/* Speed, stability, size, disengage: four small figures under a gold line. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px 0;
+  margin: 0;
+  text-align: center;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-fact { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-fact i {
+  max-width: 100%;
+  font: 600 8.5px/1.3 var(--cs-gilded-display);
+  font-style: normal;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cs-gilded-dim);
+  overflow-wrap: anywhere;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-fact b { margin-top: 2px; font: 600 24px/1.1 var(--cs-gilded-display); color: var(--cs-gilded-white); }
+@container cs-gc-left (max-width: 250px) {
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 8px; }
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-it { margin: 0; font-style: italic; font-size: 15.5px; line-height: 1.4; color: var(--cs-gilded-soft); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-it > span + span::before { content: " "; }
+
+/* ---- Right of the picture: characteristics as medallions, skills -------- */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-right {
+  grid-column: 3;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+  padding: 20px 0 64px;
+  container: cs-gc-right / inline-size;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-chars { display: flex; flex-direction: column; gap: 9px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  text-shadow: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: transform 220ms var(--cs-gilded-ease);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-coin {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, var(--cs-gilded-navy-hi) 58%, transparent 60%),
+    conic-gradient(from 0deg, var(--cs-gilded-gold-hi), var(--cs-gilded-gold), var(--cs-gilded-gold-deep), var(--cs-gilded-gold-pale), var(--cs-gilded-gold), var(--cs-gilded-gold-hi));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--cs-gilded-gold) 33%, transparent), 0 4px 10px color-mix(in srgb, var(--cs-gilded-shade) 55%, transparent);
+  transition: filter 200ms ease, transform 300ms var(--cs-gilded-ease);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-coin b { font: 600 22px var(--cs-gilded-display); color: var(--cs-gilded-white); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-rt { display: flex; flex-direction: column; min-width: 0; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-nm {
+  font: 600 14px/1.25 var(--cs-gilded-display);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--cs-gilded-white);
+  overflow-wrap: anywhere;
+  transition: color 200ms ease;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-rk { font-style: italic; font-size: 14px; color: var(--cs-gilded-dim); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-row:hover:not(:disabled) { transform: translateX(3px); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-row:hover:not(:disabled) .cs-gc-coin { filter: brightness(1.18) drop-shadow(0 0 8px color-mix(in srgb, var(--cs-gilded-gold-warm) 55%, transparent)); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-row:hover:not(:disabled) .cs-gc-nm { color: var(--cs-gilded-gold-pale); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-row:active:not(:disabled) { transform: translateX(1px) scale(0.98); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-row:disabled { cursor: default; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-row:focus-visible { outline-offset: 4px; }
+
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-skills .cs-gc-k { display: flex; gap: 10px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-skill-list { display: block; margin: 8px 0 0; padding: 0; list-style: none; font-style: italic; font-size: 14.5px; line-height: 1.45; color: var(--cs-gilded-soft); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-skill-list li { display: inline; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-skill-list li:not(:last-child)::after { content: ", "; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-skill-list li:last-child::after { content: "."; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-none { margin: 8px 0 0; font-style: italic; color: var(--cs-hero-muted); }
+
+/* Take Respite sits at the card's right foot. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-foot {
+  grid-column: 3;
+  grid-row: 2;
+  align-self: end;
+  justify-self: end;
+  padding-bottom: 46px;
+}
+
+/* ---- Middle: the picture under an arch, the medal, the name ------------- */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-mid {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  padding: 10px 0 34px;
+  container: cs-gc-mid / inline-size;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-arch {
+  position: relative;
+  flex: none;
+  width: var(--cs-gc-aw);
+  height: var(--cs-gc-ah);
+  padding: 5px;
+  border-radius: calc(var(--cs-gc-aw) / 2) calc(var(--cs-gc-aw) / 2) 6px 6px;
+  background: var(--cs-gilded-sheet);
+  box-shadow: var(--cs-gilded-shadow-deep), 0 0 0 9px var(--cs-gilded-navy), 0 0 0 10px color-mix(in srgb, var(--cs-gilded-gold) 53%, transparent);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-archin {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: calc(var(--cs-gc-aw) / 2 - 5px) calc(var(--cs-gc-aw) / 2 - 5px) 3px 3px;
+  background: var(--cs-gilded-pip);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-archin .cs-portrait-btn {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-archin .cs-portrait-btn:active { transform: none; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-archin .cs-portrait-btn:focus-visible { outline-offset: -4px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-archin .cs-portrait {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  object-fit: var(--avatar-object-fit, cover);
+  object-position: var(--avatar-object-position, 50% 20%);
+  transition: transform 700ms var(--cs-gilded-ease), filter 600ms ease;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-archin .cs-portrait-btn:hover .cs-portrait { box-shadow: none; transform: scale(1.02); }
+/* A soft shadow round the edge keeps a bright picture inside its gold. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-veil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 34px color-mix(in srgb, var(--cs-gilded-shade) 50%, transparent);
+  background: linear-gradient(0deg, color-mix(in srgb, var(--cs-gilded-shade) 40%, transparent), transparent 22%);
+}
+/* No picture of their own: a gold crest on navy instead of Foundry's stand-in figure. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-crest {
+  display: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(70% 60% at 50% 40%, var(--cs-gilded-navy-hi), var(--cs-gilded-navy-lo));
+  stroke: var(--cs-gilded-gold);
+  opacity: 0.85;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-archin:has(.cs-portrait:is([src$="mystery-man.svg"], [src=""], :not([src]))) .cs-gc-crest { display: block; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-archin:has(.cs-portrait:is([src$="mystery-man.svg"], [src=""], :not([src]))) .cs-portrait { opacity: 0; }
+/* Dying or dead: the picture drains of colour. */
+.chronicle-hero-sheet[data-cs-look="gilded"]:has(.cs-gc-dial:is([data-band="dying"], [data-band="dead"])) .cs-gc-archin .cs-portrait { filter: grayscale(0.9) brightness(0.6); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-crack {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    linear-gradient(115deg, transparent 47%, var(--cs-gilded-crack) 49.5%, var(--cs-gilded-white) 50%, var(--cs-gilded-crack) 50.5%, transparent 53%),
+    radial-gradient(circle, color-mix(in srgb, var(--cs-gilded-blood) 40%, transparent), transparent 70%);
+}
+
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-medal {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 66px;
+  height: 66px;
+  margin: -34px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--cs-gilded-coin);
+  box-shadow: 0 0 0 4px var(--cs-gilded-navy), 0 0 0 5px var(--cs-gilded-gold), 0 6px 14px color-mix(in srgb, var(--cs-gilded-shade) 65%, transparent);
+  text-shadow: none;
+  color: var(--cs-gilded-gold-ink);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-medal span { font: 600 7.5px/1 var(--cs-gilded-display); letter-spacing: 0.18em; text-transform: uppercase; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-medal b { font: 600 26px/1 var(--cs-gilded-display); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-medal i { position: absolute; bottom: 4px; font-size: 9px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] button.cs-gc-medal { cursor: pointer; transition: transform 200ms var(--cs-gilded-ease), filter 200ms ease; }
+.chronicle-hero-sheet[data-cs-look="gilded"] button.cs-gc-medal:hover:not(:disabled) { transform: scale(1.06); filter: brightness(1.08); }
+.chronicle-hero-sheet[data-cs-look="gilded"] button.cs-gc-medal:active:not(:disabled) { transform: scale(0.97); }
+.chronicle-hero-sheet[data-cs-look="gilded"] button.cs-gc-medal:disabled { cursor: default; }
+/* A level is ready: a gold glow breathes round the medal. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-lvlup::after {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--cs-gilded-gold-warm) 70%, transparent), transparent 70%);
+  animation: cs-gilded-breathe 2.4s ease-in-out infinite;
+}
+
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-plate { display: flex; flex-direction: column; align-items: center; width: 100%; margin-top: 10px; text-align: center; }
+/* Sized to the column; a name too long for it breaks between words, and
+   only splits a word too long for the line on its own. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-plate .cs-name {
+  margin: 0;
+  max-width: 100%;
+  font: 600 clamp(22px, 10.4cqi, 40px)/1.08 var(--cs-gilded-display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--cs-gilded-letters);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 6px var(--cs-gilded-shade));
+  overflow-wrap: break-word;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-name-edit input {
+  height: 44px;
+  font: 600 26px var(--cs-gilded-display);
+  text-align: center;
+  color: var(--cs-gilded-gold-pale);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-origins {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font: 600 10.5px/1.7 var(--cs-gilded-display);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--cs-gilded-soft);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-origin:not(:last-child)::after { content: "·"; margin: 0 0.7em; color: var(--cs-gilded-gold); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-origin a { color: inherit; text-decoration: none; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-origin a:hover { color: var(--cs-gilded-gold-hi); text-decoration: underline; text-decoration-color: var(--cs-gilded-line-hi); text-underline-offset: 4px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-kind { margin-right: 0.5em; font-size: 8.5px; color: var(--cs-gilded-dim); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-del { margin-left: 0.4em; font-size: 11px; color: var(--cs-gilded-dim); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-del:hover { color: var(--cs-hero-bad); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-todo { color: var(--cs-gilded-dim); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-todo a { color: var(--cs-gilded-gold-warm); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-sub { margin: 4px 0 0; font-style: italic; font-size: 16px; line-height: 1.3; color: var(--cs-gilded-dim); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-sub > span + span::before { content: " · "; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-sub a { color: inherit; text-decoration: none; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-sub a:hover { color: var(--cs-gilded-gold-pale); text-decoration: underline; text-underline-offset: 3px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-vic {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px 18px;
+  margin: 6px 0 0;
+  font: 600 9.5px var(--cs-gilded-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cs-gilded-dim);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-vic b { font-size: 11px; color: var(--cs-gilded-white); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-prog-edit { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; margin-top: 10px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-prog-edit input { width: 72px; }
+
+/* ---- Draw Steel's tabs on the card -------------------------------------- */
+.chronicle-hero-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content > section.tab {
+  grid-column: 1 / -1;
+  grid-row: 6;
+  min-width: 0;
+  padding: 18px 0 44px;
+}
+/* Lists: no boxes, a hairline under each row; hover is a gold wash. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .item-list-container .item-header {
+  border-bottom: 0;
+  font: 600 8.5px var(--cs-gilded-display);
+  letter-spacing: 0.16em;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .item-list-container .item-header .item-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+  font: 600 10.5px var(--cs-gilded-display);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--cs-gilded-gold-warm);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .item-list-container .item-header .item-name::after {
+  content: "";
+  flex: 1;
+  min-width: 20px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--cs-gilded-line-hi), transparent);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .item-list-container .item-list .item {
+  border-bottom: 0;
+  background: linear-gradient(90deg, transparent, var(--cs-gilded-line) 18%, var(--cs-gilded-line) 82%, transparent) 0 100% / 100% 1px no-repeat;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .item-list-container .item-row { transition: background 250ms ease, box-shadow 250ms ease; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .item-list-container .item-row:hover {
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--cs-gilded-gold) 13%, transparent) 30%, color-mix(in srgb, var(--cs-gilded-gold) 13%, transparent) 70%, transparent);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .item-list-container .item:has(> .document-description.expanded) > .item-row {
+  border-left-color: transparent;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--cs-gilded-navy-hi) 60%, transparent), transparent);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .item-list-container .item-row:focus-visible { box-shadow: inset 0 0 0 1px var(--cs-gilded-gold-warm); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .item-list-container .item-row .item-name .name .label { font: 600 15px/1.2 var(--cs-hero-face); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .item-list-container .item-row:hover .item-name .name .label { color: var(--cs-gilded-gold-pale); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .item-list-container .item-row .item-name .keywords { font-style: italic; font-size: 13px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .item-list-container .item-row .item-name img { border-color: var(--cs-gilded-line); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .item-list-container .item-row:hover .item-name img { border-color: var(--cs-gilded-gold-warm); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .item-list-container .document-description.expanded { font-size: 15px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] section.tab :is(fieldset legend, h3, h4) {
+  font: 600 10px var(--cs-gilded-display);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--cs-gilded-gold-warm);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] section.tab fieldset { border-color: var(--cs-hero-line); border-radius: 0; }
+
+/* Edit mode: Draw Steel's editors on the card's navy, square. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-stats-edit { grid-column: 1 / -1; grid-row: 3; padding-bottom: 30px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-edit { margin-top: 0; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-edit fieldset { border-color: var(--cs-hero-line); background: color-mix(in srgb, var(--cs-gilded-navy) 85%, transparent); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-edit legend { font-family: var(--cs-gilded-display); letter-spacing: 0.22em; color: var(--cs-gilded-gold-warm); }
+
+/* ---- Narrower windows --------------------------------------------------- */
+@container cs-hero (max-width: 940px) {
+  .chronicle-hero-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content {
+    --cs-gc-pad: 44px;
+    --cs-gc-ah: clamp(280px, min(calc(100cqh - 305px), 385px), 440px);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 284px) minmax(0, 1fr);
+    column-gap: 20px;
+  }
+}
+/* Too narrow for the boxes either side of the picture: the picture comes
+   first, then the two boxes side by side, then Take Respite. */
+@container cs-hero (max-width: 760px) {
+  .chronicle-hero-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content {
+    --cs-gc-pad: 30px;
+    --cs-gc-ah: clamp(300px, 62cqw, 400px);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 20px;
+  }
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-mid { grid-column: 1 / -1; padding-bottom: 20px; }
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-left { grid-column: 1; grid-row: 3; padding: 6px 0 20px; }
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-right { grid-column: 2; grid-row: 3; padding: 6px 0 20px; }
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-foot { grid-column: 1 / -1; grid-row: 4; justify-self: center; padding: 0 0 26px; }
+  .chronicle-hero-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content > nav.tabs { gap: 4px 17px; padding-inline: 62px; }
+  .chronicle-hero-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content > nav.tabs > [data-tab] { letter-spacing: 0.13em; }
+  .chronicle-hero-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content > nav.tabs > [data-tab] + [data-tab]::before { left: -10px; }
+}
+@container cs-hero (max-width: 560px) {
+  .chronicle-hero-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content {
+    --cs-gc-pad: 24px;
+    --cs-gc-ah: clamp(260px, 70cqw, 360px);
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-left { grid-column: 1; grid-row: 3; padding-bottom: 12px; }
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-right { grid-column: 1; grid-row: 4; padding-bottom: 12px; }
+  .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-foot { grid-row: 5; }
+  .chronicle-hero-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content > nav.tabs { gap: 4px 14px; }
+  .chronicle-hero-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content > nav.tabs > [data-tab] + [data-tab]::before { left: -9px; }
+}
+
+/* ---- Folded: the card in the hand, a small card with the picture under an arch ---- */
+.chronicle-hero-sheet[data-cs-look="gilded"].cs-folded .window-content {
+  background:
+    repeating-linear-gradient(45deg, var(--cs-gilded-hatch) 0 1px, transparent 1px 9px),
+    repeating-linear-gradient(-45deg, var(--cs-gilded-hatch) 0 1px, transparent 1px 9px),
+    var(--cs-gilded-card),
+    var(--cs-gilded-bg);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card { position: relative; }
+/* Two gold lines inside the edge, over everything. */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 2px var(--cs-gilded-navy),
+    inset 0 0 0 3.5px var(--cs-gilded-gold),
+    inset 0 0 0 7px var(--cs-gilded-navy),
+    inset 0 0 0 8px color-mix(in srgb, var(--cs-gilded-gold) 53%, transparent);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-art {
+  width: 150px;
+  height: 176px;
+  margin: 22px auto 0;
+  border-radius: 75px 75px 4px 4px;
+  background: var(--cs-gilded-pip);
+  box-shadow: 0 0 0 3px var(--cs-gilded-gold);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-art:focus-visible { outline-offset: 6px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-body { padding: 10px 22px 22px; text-align: center; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-name {
+  font: 600 22px/1.1 var(--cs-gilded-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cs-gilded-gold-pale);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-sub { margin: -2px 0 0; font: 600 9.5px/1.4 var(--cs-gilded-display); letter-spacing: 0.16em; text-transform: uppercase; color: var(--cs-gilded-gold-warm); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-stam .cs-bar { background: color-mix(in srgb, var(--cs-gilded-white) 12%, transparent); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-stam .cs-bar i { background: linear-gradient(90deg, var(--cs-gilded-gold), var(--cs-gilded-gold-hi)); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-stam[data-band="winded"] .cs-bar i { background: linear-gradient(90deg, var(--cs-gilded-rose), var(--cs-gilded-white)); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-stam:is([data-band="dying"], [data-band="dead"]) .cs-bar i { background: linear-gradient(90deg, var(--cs-gilded-blood), var(--cs-gilded-crack)); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-num b { font-family: var(--cs-gilded-display); color: var(--cs-gilded-white); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-rec { justify-content: center; gap: 6px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-rec i { flex: none; width: 9px; height: 9px; border: 1px solid var(--cs-gilded-line-hi); border-radius: 50%; background: var(--cs-gilded-pip); box-shadow: none; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-rec i.on { background: var(--cs-gilded-coin); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-chars { gap: 5px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-chr {
+  align-content: center;
+  aspect-ratio: 1;
+  padding: 0;
+  border-color: var(--cs-gilded-line-hi);
+  border-radius: 50%;
+  background: var(--cs-gilded-navy);
+  transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms var(--cs-gilded-ease);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-chr b { font: 600 14px/1.1 var(--cs-gilded-display); color: var(--cs-gilded-white); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-chr span { font: 600 7px var(--cs-gilded-display); letter-spacing: 0; color: var(--cs-gilded-soft); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-chr:hover:not(:disabled) { border-color: var(--cs-gilded-gold-pale); box-shadow: 0 0 10px color-mix(in srgb, var(--cs-gilded-gold-warm) 45%, transparent); transform: translateY(-2px); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-chr:active:not(:disabled) { transform: scale(0.96); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-actions .cs-btn {
+  position: relative;
+  min-height: 30px;
+  padding: 7px 4px 6px;
+  border-color: var(--cs-gilded-line-hi);
+  border-radius: 2px;
+  background: transparent;
+  font: 600 9.5px var(--cs-gilded-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cs-gilded-gold-pale);
+  transition: border-color 200ms ease, background-color 200ms ease, color 200ms ease, transform 100ms ease;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-actions .cs-btn:hover { border-color: var(--cs-gilded-gold-pale); background: color-mix(in srgb, var(--cs-gilded-gold) 14%, transparent); color: var(--cs-gilded-gold-hi); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-actions .cs-btn:active { transform: scale(0.98); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-actions .cs-btn-main { border-color: var(--cs-gilded-gold-deep); background: var(--cs-gilded-button); color: var(--cs-gilded-gold-ink); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-card-actions .cs-btn-main:hover { border-color: var(--cs-gilded-gold-deep); background: var(--cs-gilded-button); color: var(--cs-gilded-gold-ink); filter: brightness(1.07); }
+/* Folding turns the card over. */
+.chronicle-hero-sheet[data-cs-look="gilded"].cs-move-fold .cs-card { animation: cs-gilded-turn 700ms var(--cs-gilded-ease) both; }
+
+/* ---- Menus: navy enamel with a gold edge; they flap open like card stock -- */
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-menu {
+  padding: 6px;
+  border-color: var(--cs-gilded-line-hi);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--cs-gilded-navy) 97%, transparent);
+  box-shadow: 0 22px 50px color-mix(in srgb, var(--cs-gilded-shade) 80%, transparent), inset 0 0 0 3px var(--cs-gilded-navy), inset 0 0 0 4px color-mix(in srgb, var(--cs-gilded-gold) 40%, transparent);
+  font: 15px/1.25 var(--cs-hero-face);
+  transform-origin: 50% 0;
+  animation: cs-gilded-flap-in 240ms var(--cs-gilded-ease) both;
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-menu.cs-menu-out { animation: cs-gilded-flap-out 200ms ease-in both; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-menu-head { font: 600 8.5px var(--cs-gilded-display); letter-spacing: 0.22em; color: var(--cs-gilded-gold-warm); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-menu hr { border: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--cs-gilded-line-hi), transparent); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-menu-item { padding: 7px 12px 7px 10px; border-radius: 1px; transition: background 200ms ease, box-shadow 200ms ease, color 200ms ease; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-menu-item:is(:hover, :focus-visible) {
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--cs-gilded-gold) 17%, transparent) 30%, color-mix(in srgb, var(--cs-gilded-gold) 17%, transparent) 70%, transparent);
+  color: var(--cs-gilded-gold-pale);
+}
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-menu-item:focus-visible { box-shadow: inset 0 0 0 1px var(--cs-gilded-gold-warm); outline: none; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-menu-item:active:not([aria-disabled="true"]) { background: color-mix(in srgb, var(--cs-gilded-gold) 26%, transparent); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-menu-icon { color: var(--cs-gilded-gold-warm); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-menu-item:is(:hover, :focus-visible) .cs-menu-text small { color: var(--cs-gilded-soft); }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-menu-text small { font-style: italic; font-size: 13.5px; }
+.chronicle-hero-sheet[data-cs-look="gilded"] .cs-menu-tag { font-family: var(--cs-gilded-display); color: var(--cs-gilded-gold-warm); }
+
+/* ---- Moves: a card in the hand ------------------------------------------
+   The sheet puts a cs-move-* class on the window for each (scripts/hero-looks.mjs):
+   opening, a hit, a heal, a level gained, Edit mode entered, folding. Off and
+   reduced motion stop them with the rest of Chronicle's windows
+   (styles/chronicle-sync.css); Calm, below, keeps only the fades. */
+
+/* Opening: the card flips in, then the characteristics are dealt. */
+.chronicle-hero-sheet[data-cs-look="gilded"].cs-move-open { animation: cs-gilded-flip 800ms var(--cs-gilded-ease) both; }
+.chronicle-hero-sheet[data-cs-look="gilded"].cs-move-open .cs-gc-row { animation: cs-gilded-deal 450ms calc(var(--i, 0) * 70ms + 450ms) cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+
+/* A hit: the card tilts and a red crack flashes across the picture. */
+.chronicle-hero-sheet[data-cs-look="gilded"].cs-move-hit { animation: cs-gilded-tilt 700ms cubic-bezier(0.3, 0.6, 0.3, 1); }
+.chronicle-hero-sheet[data-cs-look="gilded"].cs-move-hit .cs-gc-crack { animation: cs-gilded-crack 700ms ease-out; }
+
+/* A heal: the rays round the dial swell. */
+.chronicle-hero-sheet[data-cs-look="gilded"].cs-move-heal .cs-gc-rays { animation: cs-gilded-rays 1000ms ease-out; }
+
+/* A level gained: the medal spins, foil runs across the gold, the coins turn. */
+.chronicle-hero-sheet[data-cs-look="gilded"].cs-move-level .cs-gc-medal { animation: cs-gilded-medal 1200ms cubic-bezier(0.3, 0.7, 0.2, 1); }
+.chronicle-hero-sheet[data-cs-look="gilded"].cs-move-level .cs-gc-foil { animation: cs-gilded-foil-fast 1100ms ease-out; }
+.chronicle-hero-sheet[data-cs-look="gilded"].cs-move-level .cs-gc-rays { animation: cs-gilded-rays 1400ms ease-out; }
+.chronicle-hero-sheet[data-cs-look="gilded"].cs-move-level .cs-gc-coin { animation: cs-gilded-coin 800ms ease-out; }
+
+/* Edit mode: one foil sweep across the card, the editors rise in. */
+.chronicle-hero-sheet[data-cs-look="gilded"].cs-move-editin .cs-gc-foil { animation: cs-gilded-foil-fast 1100ms ease-out; }
+.chronicle-hero-sheet[data-cs-look="gilded"].cs-move-editin .cs-edit > * { animation: cs-gilded-rise 400ms var(--cs-gilded-ease) both; }
+.chronicle-hero-sheet[data-cs-look="gilded"].cs-move-editin .cs-edit > :nth-child(2) { animation-delay: 45ms; }
+.chronicle-hero-sheet[data-cs-look="gilded"].cs-move-editin .cs-edit > :nth-child(3) { animation-delay: 90ms; }
+.chronicle-hero-sheet[data-cs-look="gilded"].cs-move-editin .cs-edit > :nth-child(4) { animation-delay: 135ms; }
+.chronicle-hero-sheet[data-cs-look="gilded"].cs-move-editin .cs-edit > :nth-child(n + 5) { animation-delay: 180ms; }
+
+@keyframes cs-gilded-foil {
+  0%, 55% { transform: translateX(-460px) skewX(-16deg); }
+  100% { transform: translateX(calc(100cqw + 400px)) skewX(-16deg); }
+}
+@keyframes cs-gilded-foil-fast {
+  from { transform: translateX(-460px) skewX(-16deg); }
+  to { transform: translateX(calc(100cqw + 400px)) skewX(-16deg); }
+}
+@keyframes cs-gilded-sweep {
+  from { transform: translateX(-130%) skewX(-18deg); }
+  to { transform: translateX(260%) skewX(-18deg); }
+}
+@keyframes cs-gilded-flip { from { opacity: 0; transform: perspective(1800px) rotateY(-70deg) scale(0.92); } }
+@keyframes cs-gilded-turn { from { opacity: 0; transform: perspective(900px) rotateY(120deg); } }
+@keyframes cs-gilded-deal { from { opacity: 0; transform: translateX(30px) rotate(4deg); } }
+@keyframes cs-gilded-tilt {
+  18% { transform: perspective(1800px) rotateX(5deg) rotateY(-7deg) translateY(4px); }
+  50% { transform: perspective(1800px) rotateX(-2deg) rotateY(4deg); }
+}
+@keyframes cs-gilded-crack { 0% { opacity: 0; } 10% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes cs-gilded-rays { 40% { opacity: 1; transform: scale(1.12); } }
+@keyframes cs-gilded-medal {
+  35% { transform: perspective(500px) translateY(-22px) rotateY(360deg) scale(1.2); }
+  100% { transform: perspective(500px) rotateY(720deg); }
+}
+@keyframes cs-gilded-coin { to { transform: rotate(360deg); } }
+@keyframes cs-gilded-breathe { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+@keyframes cs-gilded-rise { from { opacity: 0; transform: translateY(10px); } }
+@keyframes cs-gilded-fade { from { opacity: 0; } }
+@keyframes cs-gilded-glow { 40% { opacity: 1; } }
+@keyframes cs-gilded-flap-in { from { opacity: 0; transform: perspective(700px) rotateX(-78deg); } }
+@keyframes cs-gilded-flap-out { to { opacity: 0; transform: perspective(700px) rotateX(-60deg); } }
+
+/* Calm: every move becomes a fade; nothing flips, tilts or travels, and
+   the foil and the breathing glow stop. */
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="gilded"].cs-move-open { animation-name: cs-gilded-fade; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="gilded"].cs-move-hit { animation: none; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="gilded"] :is(.cs-gc-row, .cs-edit > *, .cs-menu, .cs-menu-item, .cs-card) { animation-name: cs-gilded-fade; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="gilded"] .cs-menu.cs-menu-out { animation-name: cs-gilded-fade; animation-direction: reverse; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-rays { animation-name: cs-gilded-glow; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="gilded"] :is(.cs-gc-foil, .cs-gc-medal, .cs-gc-coin) { animation: none; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-lvlup::after { animation: none; opacity: 0.7; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="gilded"] :is(.cs-gc-row, .cs-gc-medal, .cs-card-chr):hover { transform: none; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-btn:hover::before { animation: none; }
