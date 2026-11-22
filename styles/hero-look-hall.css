@@ -75,6 +75,13 @@
   color-scheme: dark;
 }
 
+/* A thin gold scrollbar: the scroll area keeps its room so the layout does
+   not shift, and the strip reads as part of the frame. */
+.chronicle-hero-sheet[data-cs-look="hall"] .window-content {
+  scrollbar-width: thin;
+  scrollbar-color: var(--cs-hall-gold-soft) transparent;
+}
+
 /* The title bar: black with a gold hairline, the title in Cinzel. */
 .chronicle-hero-sheet[data-cs-look="hall"] .window-header {
   background: #05080a;
@@ -879,7 +886,7 @@
 .chronicle-hero-sheet[data-cs-look="hall"] .cs-menu {
   padding: 4px;
   border-color: var(--cs-hall-gold-soft);
-  background: #05080af7;
+  background: #05080a;
   box-shadow: 0 24px 50px #000d, 0 0 0 1px #000;
   font: 15px/1.25 var(--cs-hero-face);
   animation: cs-hall-menu-in 220ms var(--cs-hall-slow) both;

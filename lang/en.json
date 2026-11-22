@@ -23,7 +23,11 @@
       "Name": "Chronicle hero sheet",
       "Looks": {
         "chronicle": "Chronicle",
-        "hall": "The portrait hall"
+        "hall": "The portrait hall",
+        "steel": "Steel and banner",
+        "glass": "Arcane glass",
+        "gilded": "The gilded card",
+        "sky": "Night sky"
       },
       "Remove": "Remove",
       "StillToChoose": "Still to choose",
@@ -41,6 +45,12 @@
         "bronze": "Bronze",
         "iron": "Iron"
       },
+      "Suit": {
+        "gold": "a master's gift",
+        "bronze": "a steady hand",
+        "iron": "the weakest suit"
+      },
+      "OfSubclass": "of the {name}",
       "HeroicResource": "Heroic resource",
       "EpicResource": "Epic resource",
       "Potency": "Potency",

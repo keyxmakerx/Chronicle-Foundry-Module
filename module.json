@@ -35,6 +35,10 @@
     "styles/chronicle-sheet.css",
     "styles/hero-looks.css",
     "styles/hero-look-hall.css",
+    "styles/hero-look-steel.css",
+    "styles/hero-look-glass.css",
+    "styles/hero-look-gilded.css",
+    "styles/hero-look-sky.css",
     "styles/table-view.css"
   ],
   "languages": [

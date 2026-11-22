@@ -1,0 +1,1168 @@
+/* The night sky look on the Chronicle hero sheet (scripts/hero-looks.mjs,
+   templates/hero-looks/sky/, signed as look E): a night sky over a distant
+   mountain line, the hero's picture in a round moon ringed by Stamina and
+   recoveries, the name in light spaced capitals, big thin numbers, and the
+   five characteristics as a constellation whose stars roll. Slow and
+   weightless moves: stars twinkle, the lines draw themselves, a hit
+   eclipses the moon, a heal brings an aurora, a level-up a shooting star.
+
+   Always dark: the sheet puts the window in Foundry's dark theme, so Draw
+   Steel's own fields and editors inside it match. Every colour is in the
+   token block below, so a colour changes in one place; the rules under it
+   read the tokens (color-mix() for a softer shade). Unlayered and scoped to
+   [data-cs-look="sky"], like hero-looks.css, which it follows. */
+
+@font-face {
+  font-family: "Chronicle Josefin";
+  src: url("../fonts/JosefinSans-300-latin.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Chronicle Josefin";
+  src: url("../fonts/JosefinSans-400-latin.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Chronicle Josefin";
+  src: url("../fonts/JosefinSans-600-latin.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Chronicle Cormorant";
+  src: url("../fonts/CormorantGaramond-400-italic-latin.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* The look's values for the sheet's tokens, then its own --cs-sky-* ones.
+   The only place a colour is written. Corners are in px: the sheet's radii
+   are min(…, var(--cs-hero-radius)). */
+.chronicle-hero-sheet[data-cs-look="sky"] {
+  --cs-hero-bg: #070b1e;
+  --cs-hero-panel: #0b1030;
+  --cs-hero-tert: color-mix(in srgb, #c7d2fe 8%, transparent);
+  --cs-hero-line: color-mix(in srgb, #c7d2fe 20%, transparent);
+  --cs-hero-text: #e6e9ff;
+  --cs-hero-body: #c9d0f5;
+  --cs-hero-muted: #98a2d6;
+  --cs-hero-accent: #fde68a;
+  --cs-hero-accent-strong: #fde68a;
+  --cs-hero-accent-soft: color-mix(in srgb, #fde68a 14%, transparent);
+  --cs-hero-on-accent: #1a1530;
+  --cs-hero-shadow: none;
+  --cs-hero-shadow-raised: 0 16px 36px #000d, 0 0 0 1px color-mix(in srgb, #c7d2fe 18%, transparent);
+  --cs-hero-shadow-pressed: inset 0 0 0 1px color-mix(in srgb, #fde68a 40%, transparent);
+  --cs-hero-ok: #a7f3d0;
+  --cs-hero-warn: #fdba74;
+  --cs-hero-bad: #fda4af;
+  --cs-hero-face: "Chronicle Josefin", "Josefin Sans", "Century Gothic", sans-serif;
+  --cs-hero-radius: 14px;
+  --cs-hero-pill: 999px;
+  --cs-sky-display: "Chronicle Josefin", "Josefin Sans", "Century Gothic", sans-serif;
+  --cs-sky-serif: "Chronicle Cormorant", "Cormorant Garamond", "EB Garamond", Georgia, serif;
+  /* The sky, top to horizon, and the two mountain ridges and the eclipse. */
+  --cs-sky-top: #060919;
+  --cs-sky-high: #101638;
+  --cs-sky-low: #2a1f52;
+  --cs-sky-horizon: #4a2a5e;
+  --cs-sky-far: #0a0d20;
+  --cs-sky-near: #06081a;
+  --cs-sky-eclipse: #050714;
+  /* Light: stars, the moon's warm gold, periwinkle for quiet lines, ink for the big type. */
+  --cs-sky-star: #ffffff;
+  --cs-sky-ink: #ffffff;
+  --cs-sky-gold: #fde68a;
+  --cs-sky-gold-pale: #fff8dc;
+  --cs-sky-peri: #c7d2fe;
+  --cs-sky-seg: #a5b4fc;
+  --cs-sky-soft: #b8c0ee;
+  --cs-sky-dim: #98a2d6;
+  --cs-sky-violet: #c4b5fd;
+  --cs-sky-ember: #fdba74;
+  --cs-sky-rose: #fb7185;
+  --cs-sky-blood: #b3121f;
+  --cs-sky-aurora-a: #34d399;
+  --cs-sky-aurora-b: #a7f3d0;
+  --cs-sky-aurora-c: #818cf8;
+  --cs-sky-moon-a: #cfd5f2;
+  --cs-sky-moon-b: #6f78a8;
+  --cs-sky-mask: #000000;
+  --cs-sky-menu: #0a0e2a;
+  /* A dark halo round the italic lines, so a star just beside a word does not read as punctuation. */
+  --cs-sky-text-halo: 0 0 2px var(--cs-sky-top), 0 0 5px var(--cs-sky-top), 0 0 9px color-mix(in srgb, var(--cs-sky-top) 80%, transparent);
+  --cs-sky-card-mid: #141a40;
+  --cs-sky-card-low: #3a2658;
+  --cs-sky-shadow: #000000cc;
+  --cs-sky-star-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 0L12.9 7.1L20 10L12.9 12.9L10 20L7.1 12.9L0 10L7.1 7.1Z'/%3E%3C/svg%3E");
+  /* Softer shades used again and again. */
+  --cs-sky-line: color-mix(in srgb, #c7d2fe 22%, transparent);
+  --cs-sky-line-strong: color-mix(in srgb, #c7d2fe 45%, transparent);
+  --cs-sky-wash: color-mix(in srgb, #c7d2fe 8%, transparent);
+  --cs-sky-gold-soft: color-mix(in srgb, #fde68a 45%, transparent);
+  --cs-sky-gold-wash: color-mix(in srgb, #fde68a 12%, transparent);
+  --cs-sky-glow: color-mix(in srgb, #fde68a 70%, transparent);
+  --cs-sky-gradient: linear-gradient(180deg, #060919 0, #101638 46%, #2a1f52 82%, #4a2a5e 100%);
+  --cs-sky-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --cs-sky-gutter: 36px;
+  color-scheme: dark;
+}
+
+/* A thin scrollbar in the look's colours: the scroll area keeps its room
+   so the layout does not shift, and the strip reads as part of the frame. */
+.chronicle-hero-sheet[data-cs-look="sky"] .window-content {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--cs-sky-peri) 40%, transparent) transparent;
+  font-size: 15px;
+}
+
+/* The title bar: the sky's own top colour, with a faint line under it. */
+.chronicle-hero-sheet[data-cs-look="sky"] .window-header {
+  background: var(--cs-sky-top);
+  border-bottom: 1px solid var(--cs-sky-line);
+  color: var(--cs-sky-soft);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .window-header .window-title {
+  font-family: var(--cs-sky-display);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .window-header :is(button, a):hover { color: var(--cs-sky-gold); }
+.chronicle-hero-sheet[data-cs-look="sky"] .window-header :is(button, a):focus-visible { outline: 1px solid var(--cs-sky-gold); outline-offset: 2px; }
+
+/* ---- The full sheet ----------------------------------------------------
+   One grid the sheet's parts spread into (the header and the boxes are
+   display: contents, so each piece takes its own cell): the tab row on top;
+   below it the moon on the left, the name and the numbers on the right; the
+   constellation under them, the skills under the moon. The sky is a layer
+   that stays put while the page scrolls over it. */
+.chronicle-hero-sheet[data-cs-look="sky"]:not(.cs-folded) .window-content {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: var(--cs-sky-gutter) minmax(240px, 340px) 40px minmax(0, 1fr) var(--cs-sky-gutter);
+  grid-template-rows: auto auto auto auto auto 1fr;
+  align-content: start;
+  padding: 0;
+  container: cs-sky / size;
+  background: var(--cs-sky-gradient);
+  color: var(--cs-hero-body);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-head,
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-stats { display: contents; }
+
+/* ---- The sky ----------------------------------------------------------- */
+/* A zero-height sticky cell over the whole grid, so the sky it holds is
+   pinned to the top of the window while the content scrolls. */
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-layer {
+  position: sticky;
+  top: 0;
+  z-index: -1;
+  grid-area: 1 / 1 / -1 / -1;
+  align-self: start;
+  width: 100%;
+  height: 0;
+  pointer-events: none;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-sky {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* Past the content box, so it fills the strip the scrollbar gutter reserves. */
+  width: calc(100cqw + 24px);
+  height: 100cqh;
+  overflow: hidden;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-stars i {
+  position: absolute;
+  left: calc(var(--x) * 1%);
+  top: calc(var(--y) * 1%);
+  width: calc(var(--s) * 1px);
+  height: calc(var(--s) * 1px);
+  border-radius: 50%;
+  background: var(--cs-sky-star);
+  box-shadow: 0 0 calc(var(--s) * 2px) var(--cs-sky-peri);
+  opacity: 0.6;
+}
+/* Thirty stars twinkle, each on its own rhythm; the rest hold still. */
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-stars .tw1 { animation: cs-sky-twinkle 3.2s ease-in-out infinite; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-stars .tw2 { animation: cs-sky-twinkle 4.7s ease-in-out -1.5s infinite; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-stars .tw3 { animation: cs-sky-twinkle 6.1s ease-in-out -3s infinite; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-hills {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 150px;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-hills .far { fill: var(--cs-sky-far); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-hills .near { fill: var(--cs-sky-near); }
+/* Light a move sends across: all dark until its move plays. */
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-aurora {
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  top: 8%;
+  height: 46%;
+  opacity: 0;
+  background: linear-gradient(100deg, transparent 10%, color-mix(in srgb, var(--cs-sky-aurora-a) 38%, transparent) 35%, color-mix(in srgb, var(--cs-sky-aurora-b) 52%, transparent) 50%, color-mix(in srgb, var(--cs-sky-aurora-c) 38%, transparent) 68%, transparent 90%);
+  -webkit-mask-image: linear-gradient(180deg, transparent, var(--cs-sky-mask) 40%, var(--cs-sky-mask) 60%, transparent);
+  mask-image: linear-gradient(180deg, transparent, var(--cs-sky-mask) 40%, var(--cs-sky-mask) 60%, transparent);
+  transform: skewY(-6deg);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-red {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: linear-gradient(0deg, color-mix(in srgb, var(--cs-sky-blood) 73%, transparent), transparent 60%);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-shoot {
+  position: absolute;
+  left: 62%;
+  top: 6%;
+  width: 150px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--cs-sky-star), transparent);
+  transform: rotate(152deg);
+  transform-origin: 0 50%;
+  opacity: 0;
+}
+
+/* ---- The moon ---------------------------------------------------------- */
+/* The header draws the picture and its outer rings; the boxes draw the
+   Stamina ring in the same cell, so a Limited viewer sees the moon without it. */
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-moon,
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-ring {
+  grid-column: 2;
+  grid-row: 2 / 4;
+  place-self: start center;
+  width: min(100%, 340px);
+  aspect-ratio: 1;
+  margin-top: 22px;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-moon { position: relative; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-ring { position: relative; z-index: 1; overflow: visible; pointer-events: none; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-rings {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-rings circle,
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-ring circle { fill: none; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-orbit {
+  stroke: var(--cs-sky-line-strong);
+  stroke-width: 1;
+  stroke-dasharray: 1 7;
+  transform-origin: 170px 170px;
+  animation: cs-sky-spin 90s linear infinite;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-track { stroke: color-mix(in srgb, var(--cs-sky-star) 8%, transparent); stroke-width: 5; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-fill {
+  stroke: var(--cs-sky-gold);
+  stroke-width: 5;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 6px var(--cs-sky-gold));
+  transition: stroke-dasharray 1.1s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.6s ease;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-fill[stroke-dasharray^="0 "] { stroke-linecap: butt; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-ring:is([data-band="winded"], [data-band="dying"], [data-band="dead"]) .cs-sky-fill {
+  stroke: var(--cs-sky-rose);
+  filter: drop-shadow(0 0 6px var(--cs-sky-rose));
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-seg { stroke: color-mix(in srgb, var(--cs-sky-seg) 22%, transparent); stroke-width: 3; transition: stroke 0.6s ease; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-seg.on { stroke: var(--cs-sky-seg); }
+
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-disc {
+  position: absolute;
+  inset: 14.7%;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--cs-sky-menu);
+  box-shadow: 0 0 0 1px var(--cs-sky-gold-soft), 0 0 60px color-mix(in srgb, var(--cs-sky-peri) 22%, transparent);
+}
+/* A quiet inner shade, so a bright picture settles into the night. */
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-disc::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: inset 0 0 26px 4px color-mix(in srgb, var(--cs-sky-top) 60%, transparent);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-disc .cs-portrait-btn {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-disc .cs-portrait-btn:active { transform: none; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-disc .cs-portrait-btn:focus-visible { outline: 2px solid var(--cs-sky-gold); outline-offset: -5px; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-disc .cs-portrait {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  box-shadow: none;
+  object-fit: var(--avatar-object-fit, cover);
+  object-position: var(--avatar-object-position, 50% 20%);
+  transition: transform 1.2s var(--cs-sky-ease);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-disc .cs-portrait-btn:hover .cs-portrait { box-shadow: none; transform: scale(1.025); }
+/* No picture of their own: a pale moon with a few seas instead of Foundry's stand-in figure. */
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-face {
+  display: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 36% 30%, var(--cs-sky-moon-a), var(--cs-sky-moon-b) 85%);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-face circle { fill: color-mix(in srgb, var(--cs-sky-moon-b) 38%, transparent); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-disc:has(.cs-portrait:is([src$="mystery-man.svg"], [src=""], :not([src]))) .cs-sky-face { display: block; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-disc:has(.cs-portrait:is([src$="mystery-man.svg"], [src=""], :not([src]))) .cs-portrait { opacity: 0; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-ecl {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--cs-sky-eclipse);
+  opacity: var(--rest, 0);
+  pointer-events: none;
+  transition: opacity 1s ease;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .window-content:has(.cs-sky-nums[data-band="winded"]) .cs-sky-ecl { --rest: 0.35; }
+/* Dying shades the moon but keeps the face readable; only death covers it. */
+.chronicle-hero-sheet[data-cs-look="sky"] .window-content:has(.cs-sky-nums[data-band="dying"]) .cs-sky-ecl { --rest: 0.55; }
+.chronicle-hero-sheet[data-cs-look="sky"] .window-content:has(.cs-sky-nums[data-band="dead"]) .cs-sky-ecl { --rest: 0.8; }
+
+/* ---- The name ---------------------------------------------------------- */
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-id {
+  grid-column: 4;
+  grid-row: 2;
+  align-self: start;
+  min-width: 0;
+  padding-top: 20px;
+  container: cs-sky-id / inline-size;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-eye {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 400 11.5px/1.7 var(--cs-sky-display);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--cs-sky-gold);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-eye > li { display: inline-flex; align-items: baseline; position: relative; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-eye > li:not(:last-child)::after { content: "·"; margin: 0 0.7em 0 0.55em; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-eye a { color: inherit; text-decoration: none; cursor: pointer; transition: color 0.3s ease, text-shadow 0.3s ease; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-eye a:hover { color: var(--cs-sky-ink); text-shadow: 0 0 10px var(--cs-sky-glow); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-eye a:active,
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-sub a:active { color: var(--cs-sky-gold-pale); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-eye a:focus-visible { outline: 1px solid var(--cs-sky-gold); outline-offset: 4px; border-radius: 99px; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-kind {
+  margin-right: 0.5em;
+  font-size: 8.5px;
+  letter-spacing: 0.2em;
+  color: var(--cs-hero-muted);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-del { margin-left: 0.5em; font-size: 11px; color: var(--cs-hero-muted); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-del:hover { color: var(--cs-hero-bad); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-todo { color: var(--cs-hero-muted); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-todo a { color: var(--cs-sky-gold); }
+/* A level is ready: a star beside the level pulses, with an arrow after it. */
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-lvlup {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35em;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: var(--cs-sky-gold-pale);
+  text-shadow: 0 0 12px var(--cs-sky-gold);
+  cursor: pointer;
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-lvlup:hover:not(:disabled) { color: var(--cs-sky-ink); text-shadow: 0 0 18px var(--cs-sky-gold); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-lvlup:active:not(:disabled) { transform: scale(0.97); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-lvlup:focus-visible { outline: 1px solid var(--cs-sky-gold); outline-offset: 5px; border-radius: 99px; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-lvlup .fa-solid { animation: cs-sky-float 2.4s ease-in-out infinite; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-ready {
+  position: absolute;
+  left: -2em;
+  top: 50%;
+  width: 1.7em;
+  height: 1.7em;
+  margin-top: -0.95em;
+  background-color: var(--cs-sky-gold);
+  -webkit-mask: var(--cs-sky-star-mask) center / contain no-repeat;
+  mask: var(--cs-sky-star-mask) center / contain no-repeat;
+  animation: cs-sky-pulse 2.4s ease-in-out infinite;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-lvlup:disabled { cursor: default; }
+
+/* Sized to the column: a name too long for it breaks between words, and
+   only splits a word too long for the line on its own. */
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-id .cs-name {
+  margin: 10px 0 0;
+  font: 300 clamp(30px, 9.8cqi, 66px)/1.04 var(--cs-sky-display);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cs-sky-ink);
+  text-shadow: 0 0 30px color-mix(in srgb, var(--cs-sky-peri) 40%, transparent);
+  overflow-wrap: break-word;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-name-edit input {
+  height: 52px;
+  font: 300 30px var(--cs-sky-display);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cs-sky-ink);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-sub {
+  margin: 4px 0 0;
+  font: italic 400 20px/1.3 var(--cs-sky-serif);
+  color: var(--cs-sky-soft);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-subname + .cs-sky-subname::before { content: " · "; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-sub a { color: inherit; text-decoration: none; cursor: pointer; transition: color 0.3s ease, text-shadow 0.3s ease; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-sub a:hover { color: var(--cs-sky-ink); text-shadow: 0 0 10px var(--cs-sky-glow); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-sub a:focus-visible { outline: 1px solid var(--cs-sky-gold); outline-offset: 3px; border-radius: 99px; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-prog {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 22px;
+  margin: 6px 0 0;
+  font: 400 10px/1.6 var(--cs-sky-display);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--cs-sky-dim);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-prog b { font-weight: 400; color: var(--cs-sky-gold); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-prog-edit { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-prog-edit input { width: 72px; }
+
+/* Take Respite: a thin pill that glows. */
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-rest { grid-column: 2; grid-row: 5; align-self: start; justify-self: start; margin-top: 14px; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-btn,
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-actions .cs-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: auto;
+  height: auto;
+  min-height: 34px;
+  margin: 0;
+  padding: 9px 18px 8px;
+  border: 1px solid var(--cs-sky-gold-soft);
+  border-radius: 99px;
+  background: none;
+  box-shadow: none;
+  text-shadow: none;
+  font: 400 10.5px/1 var(--cs-sky-display);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--cs-sky-gold);
+  cursor: pointer;
+  transition: color 0.3s ease, border-color 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease, transform 0.1s ease;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-btn:hover,
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-actions .cs-btn:hover { border-color: var(--cs-sky-gold); background: var(--cs-sky-gold-wash); box-shadow: 0 0 18px color-mix(in srgb, var(--cs-sky-gold) 22%, transparent); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-btn:active,
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-actions .cs-btn:active { transform: scale(0.97); background: color-mix(in srgb, var(--cs-sky-gold) 22%, transparent); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-btn:focus-visible,
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-actions .cs-btn:focus-visible { outline: 1px solid var(--cs-sky-gold); outline-offset: 3px; }
+
+/* ---- The numbers ------------------------------------------------------- */
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-nums {
+  grid-column: 4;
+  grid-row: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 14px 30px;
+  min-width: 0;
+  margin-top: 12px;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-num { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-k {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  font: 400 9.5px/1.5 var(--cs-sky-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cs-sky-dim);
+  text-align: left;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] button.cs-sky-k {
+  cursor: pointer;
+  background: radial-gradient(circle, var(--cs-sky-dim) 0.8px, transparent 1.2px) left bottom / 5px 2px repeat-x;
+  padding-bottom: 3px;
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] button.cs-sky-k:hover { color: var(--cs-sky-gold); text-shadow: 0 0 10px color-mix(in srgb, var(--cs-sky-gold) 55%, transparent); }
+.chronicle-hero-sheet[data-cs-look="sky"] button.cs-sky-k:active { color: var(--cs-sky-gold-pale); }
+.chronicle-hero-sheet[data-cs-look="sky"] button.cs-sky-k:focus-visible { outline: 1px solid var(--cs-sky-gold); outline-offset: 4px; border-radius: 99px; }
+.chronicle-hero-sheet[data-cs-look="sky"] button.cs-sky-k:disabled { cursor: default; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-big { font: 300 40px/1 var(--cs-sky-display); color: var(--cs-sky-ink); font-variant-numeric: tabular-nums; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-primary .cs-sky-big { color: var(--cs-sky-violet); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-epic .cs-sky-big { color: var(--cs-sky-violet); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-surges .cs-sky-big { color: var(--cs-sky-ember); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-speed .cs-sky-big { display: block; height: 50px; line-height: 48px; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-big small { font-size: 13px; font-weight: 400; color: var(--cs-sky-dim); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-nums .cs-field.cs-sky-big { align-items: baseline; gap: 4px; }
+/* The number is the field: a dotted line shows under it on hover, a solid gold one when typing. */
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-nums .cs-field input[type="number"],
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-prog-edit input[type="number"] {
+  height: 46px;
+  min-width: 1.4ch;
+  padding: 0 2px 4px;
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(var(--cs-sky-gold), var(--cs-sky-gold)) left bottom / 0 1px no-repeat,
+    radial-gradient(circle, var(--cs-sky-peri) 0.9px, transparent 1.3px) left bottom / 5px 0 repeat-x;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  transition: background-size 0.35s ease-out, text-shadow 0.3s ease;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-nums .cs-field input[type="number"]:hover { background-size: 0 1px, 5px 2px; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-nums .cs-field input[type="number"]:focus {
+  outline: none;
+  background-color: transparent;
+  background-size: 100% 1px, 5px 0;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--cs-sky-gold) 55%, transparent);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-nums .cs-field input[type="number"]:focus-visible { outline: 1px solid var(--cs-sky-gold); outline-offset: 3px; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-nums .cs-field input[type="number"]:disabled { color: var(--cs-hero-muted); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-stamina .cs-sky-big input[type="number"] { min-width: 2ch; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-state {
+  margin-top: 2px;
+  font: 400 9px/1.3 var(--cs-sky-display);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--cs-sky-ember);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-nums[data-band="dying"] .cs-sky-state,
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-nums[data-band="dead"] .cs-sky-state { color: var(--cs-hero-bad); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-temp { align-items: center; gap: 8px; margin-top: 2px; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-temp > span {
+  font: 400 8.5px/1.5 var(--cs-sky-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cs-sky-dim);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-nums .cs-sky-temp input[type="number"] {
+  height: 20px;
+  min-width: 2ch;
+  padding: 0 2px 2px;
+  font: 400 12px/1 var(--cs-sky-display);
+  color: var(--cs-sky-ink);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-facts {
+  flex: 1 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 18px;
+  margin: 2px 0 0;
+  font: italic 400 15px/1.4 var(--cs-sky-serif);
+  color: var(--cs-sky-soft);
+  text-shadow: var(--cs-sky-text-halo);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 3px 9px;
+  border: 1px solid var(--cs-sky-line-strong);
+  border-radius: 99px;
+  background: none;
+  box-shadow: none;
+  font: 400 8.5px/1.2 var(--cs-sky-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cs-sky-gold);
+  cursor: pointer;
+  transition: border-color 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-mini:hover { border-color: var(--cs-sky-gold); background: var(--cs-sky-gold-wash); box-shadow: 0 0 12px color-mix(in srgb, var(--cs-sky-gold) 25%, transparent); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-mini:active { transform: scale(0.97); background: color-mix(in srgb, var(--cs-sky-gold) 22%, transparent); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-mini:focus-visible { outline: 1px solid var(--cs-sky-gold); outline-offset: 3px; }
+
+/* ---- The constellation ------------------------------------------------- */
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-const {
+  --u: calc(100cqi / 590);
+  position: relative;
+  grid-column: 4;
+  grid-row: 4 / 6;
+  justify-self: start;
+  width: 100%;
+  max-width: 590px;
+  aspect-ratio: 590 / 240;
+  margin-top: 26px;
+  container: cs-sky-const / inline-size;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-link {
+  fill: none;
+  stroke: var(--cs-sky-peri);
+  stroke-opacity: 0.55;
+  stroke-width: 1;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-halo { fill: var(--cs-sky-gold); opacity: 0.13; transform-box: fill-box; transform-origin: center; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-core {
+  fill: var(--cs-sky-gold-pale);
+  filter: drop-shadow(0 0 6px var(--cs-sky-gold));
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cs-sky-star 5s ease-in-out calc(var(--i) * -1.1s) infinite;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-star.t0 .cs-sky-core { fill: var(--cs-sky-soft); filter: none; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-star.t0 .cs-sky-halo { fill: var(--cs-sky-peri); opacity: 0.08; }
+/* Each star's number and name is a button on the star, so it takes focus and rolls. */
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-pl {
+  position: absolute;
+  left: calc(var(--u) * (var(--x) - 50));
+  top: calc(var(--u) * (var(--y) - var(--halo)));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: calc(var(--u) * 100);
+  height: auto;
+  margin: 0;
+  padding: calc(var(--u) * var(--halo) * 2 - 2px) 0 2px;
+  border: 0;
+  border-radius: 99px;
+  background: none;
+  box-shadow: none;
+  text-shadow: none;
+  font: inherit;
+  color: var(--cs-sky-ink);
+  cursor: pointer;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-pl::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: calc(var(--u) * var(--halo));
+  width: calc(var(--u) * var(--halo) * 2.6);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--cs-sky-gold) 38%, transparent), transparent 68%);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.7);
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+  pointer-events: none;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-pl b { font: 300 max(16px, calc(var(--u) * 22))/1.15 var(--cs-sky-display); font-variant-numeric: tabular-nums; transition: text-shadow 0.3s ease; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-pl span {
+  flex: none;
+  font: 400 9.5px/1.4 var(--cs-sky-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cs-sky-dim);
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-pl:hover:not(:disabled)::before,
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-pl:focus-visible::before { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-pl:hover:not(:disabled) b,
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-pl:focus-visible b { text-shadow: 0 0 14px var(--cs-sky-glow); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-pl:hover:not(:disabled) span,
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-pl:focus-visible span { color: var(--cs-sky-ink); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-pl:active:not(:disabled)::before { transform: translate(-50%, -50%) scale(0.85); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-pl:focus-visible { outline: 1px solid var(--cs-sky-gold); outline-offset: 2px; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-pl:disabled { cursor: default; }
+
+/* ---- The skills -------------------------------------------------------- */
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-skills { grid-column: 2; grid-row: 4; align-self: start; margin-top: 30px; min-width: 0; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-skills .cs-sky-k { display: flex; gap: 10px; font-size: 9.5px; letter-spacing: 0.3em; color: var(--cs-sky-gold); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-skill-list {
+  display: flex;
+  flex-wrap: wrap;
+  /* Each name carries its dot in front; the list starts one dot's width to
+     the left and that strip is clipped, so a line never begins or ends with
+     a stray dot that reads as a full stop. */
+  margin: 6px 0 0 -1.4em;
+  padding: 0;
+  list-style: none;
+  font: italic 400 16px/1.5 var(--cs-sky-serif);
+  color: var(--cs-hero-body);
+  text-shadow: var(--cs-sky-text-halo);
+  clip-path: inset(-12px -12px -12px 1.4em);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-skill-list li::before { content: "·"; display: inline-block; width: 1.4em; text-align: center; color: var(--cs-sky-dim); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-none { margin: 6px 0 0; font: italic 400 16px var(--cs-sky-serif); color: var(--cs-hero-muted); }
+
+/* ---- The tab row: thin capitals on the sky, the open one gold with a star dot */
+.chronicle-hero-sheet[data-cs-look="sky"]:not(.cs-folded) .window-content > nav.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0 22px;
+  margin: 0;
+  padding: 16px var(--cs-sky-gutter) 14px;
+  border: 0;
+  background: linear-gradient(180deg, var(--cs-sky-top) 62%, transparent);
+}
+.chronicle-hero-sheet[data-cs-look="sky"]:not(.cs-folded) .window-content > nav.tabs > [data-tab] {
+  position: relative;
+  margin: 0;
+  padding: 6px 0 12px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  text-shadow: none;
+  font: 400 11px/1.2 var(--cs-sky-display);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--cs-sky-dim);
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+}
+.chronicle-hero-sheet[data-cs-look="sky"]:not(.cs-folded) .window-content > nav.tabs > [data-tab]:hover { color: var(--cs-sky-ink); text-shadow: 0 0 10px var(--cs-sky-glow); }
+.chronicle-hero-sheet[data-cs-look="sky"]:not(.cs-folded) .window-content > nav.tabs > [data-tab]:active { color: var(--cs-sky-gold-pale); }
+.chronicle-hero-sheet[data-cs-look="sky"]:not(.cs-folded) .window-content > nav.tabs > [data-tab].active { color: var(--cs-sky-gold); }
+.chronicle-hero-sheet[data-cs-look="sky"]:not(.cs-folded) .window-content > nav.tabs > [data-tab].active::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: var(--cs-sky-gold);
+  box-shadow: 0 0 8px var(--cs-sky-gold);
+}
+.chronicle-hero-sheet[data-cs-look="sky"]:not(.cs-folded) .window-content > nav.tabs > [data-tab]:focus-visible { outline: 1px solid var(--cs-sky-gold); outline-offset: 3px; border-radius: 99px; }
+
+.chronicle-hero-sheet[data-cs-look="sky"]:not(.cs-folded) .window-content > section.tab {
+  grid-column: 2 / 5;
+  grid-row: 6;
+  min-width: 0;
+  padding: 26px 0 36px 18px;
+}
+
+/* ---- Draw Steel's tabs in the sky -------------------------------------
+   Lists: no boxes, a faint hairline under each row; hover is a soft glow
+   with a small star before the row. */
+.chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .item-header {
+  border-bottom: 0;
+  font: 400 8.5px/1.4 var(--cs-sky-display);
+  letter-spacing: 0.14em;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .item-header .item-name {
+  display: flex;
+  white-space: nowrap;
+  align-items: center;
+  gap: 12px;
+  font: 400 10px var(--cs-sky-display);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--cs-sky-gold);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .item-header .item-name::after {
+  content: "";
+  flex: 1;
+  min-width: 24px;
+  height: 2px;
+  background: radial-gradient(circle, var(--cs-sky-line-strong) 0.8px, transparent 1.2px) 0 0 / 6px 2px repeat-x;
+  -webkit-mask-image: linear-gradient(90deg, var(--cs-sky-mask) 40%, transparent);
+  mask-image: linear-gradient(90deg, var(--cs-sky-mask) 40%, transparent);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .item-list .item {
+  border-bottom: 0;
+  background: linear-gradient(90deg, transparent, var(--cs-sky-line) 10%, var(--cs-sky-line) 90%, transparent) left bottom / 100% 1px no-repeat;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .item-row {
+  position: relative;
+  border-left: 0;
+  border-radius: 14px;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .item-row::before {
+  content: "";
+  position: absolute;
+  left: -16px;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  background-color: var(--cs-sky-gold);
+  -webkit-mask: var(--cs-sky-star-mask) center / contain no-repeat;
+  mask: var(--cs-sky-star-mask) center / contain no-repeat;
+  opacity: 0;
+  transform: scale(0.3) rotate(-45deg);
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+  pointer-events: none;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .item-row:hover {
+  background: radial-gradient(60% 150% at 22px 50%, color-mix(in srgb, var(--cs-sky-peri) 14%, transparent), transparent 70%);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .item-row:hover::before,
+.chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .item:has(> .document-description.expanded) > .item-row::before { opacity: 1; transform: none; }
+.chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .item:has(> .document-description.expanded) > .item-row {
+  border-radius: 14px 14px 0 0;
+  background: radial-gradient(60% 150% at 22px 50%, color-mix(in srgb, var(--cs-sky-peri) 18%, transparent), transparent 70%);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .item-row:focus-within { box-shadow: inset 0 0 0 1px var(--cs-sky-gold-soft); }
+.chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .item-row .item-name .name .label {
+  font: 400 14px/1.25 var(--cs-sky-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .item-row .item-name .keywords { font: italic 400 14.5px var(--cs-sky-serif); }
+.chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .item-row .item-name img { border: 1px solid var(--cs-sky-line); border-radius: 50%; }
+.chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .item-row:hover .item-name .label { color: var(--cs-sky-ink); text-shadow: 0 0 12px color-mix(in srgb, var(--cs-sky-peri) 55%, transparent); }
+.chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .item-controls a:focus-visible { outline: 1px solid var(--cs-sky-gold); outline-offset: 2px; border-radius: 50%; }
+.chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .document-description.expanded { font: italic 400 15.5px/1.45 var(--cs-sky-serif); }
+.draw-steel.actor.chronicle-hero-sheet[data-cs-look="sky"] .item-list-container :is(.item-cost, .item-distance, .item-target) { width: 84px; }
+.chronicle-hero-sheet[data-cs-look="sky"] section.tab :is(fieldset legend, h3, h4) {
+  font: 400 10px var(--cs-sky-display);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--cs-sky-gold);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] section.tab fieldset { border-color: var(--cs-sky-line); border-radius: 14px; }
+
+/* Edit mode: Draw Steel's editors, boxless groups titled like the sections. */
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-edit {
+  grid-column: 2 / 5;
+  grid-row: 4;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px 32px;
+  margin-top: 24px;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-edit fieldset { border: 0; border-radius: 0; background: none; padding: 2px 2px 8px; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-edit legend {
+  width: 100%;
+  padding: 0 0 6px;
+  font: 400 10px var(--cs-sky-display);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--cs-sky-gold);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] :is(.cs-edit, .cs-sky-head) :is(input[type="text"], input[type="number"], select) {
+  border: 0;
+  border-bottom: 1px dotted var(--cs-sky-line-strong);
+  border-radius: 0;
+  background: none;
+  color: var(--cs-sky-ink);
+  font-family: var(--cs-sky-display);
+  font-weight: 300;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] :is(.cs-edit, .cs-sky-head) :is(input[type="text"], input[type="number"], select):hover { border-bottom-color: var(--cs-sky-peri); }
+.chronicle-hero-sheet[data-cs-look="sky"] :is(.cs-edit, .cs-sky-head) :is(input[type="text"], input[type="number"], select):focus {
+  border-bottom: 1px solid var(--cs-sky-gold);
+  outline: none;
+  box-shadow: 0 8px 14px -12px var(--cs-sky-gold);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] :is(.cs-edit, .cs-sky-head) :is(input, select, button):focus-visible { outline: 1px solid var(--cs-sky-gold); outline-offset: 3px; }
+.chronicle-hero-sheet[data-cs-look="sky"] :is(.cs-edit, .cs-sky-head) :is(select option, optgroup) { background: var(--cs-sky-menu); color: var(--cs-sky-ink); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-edit :is(label, .form-group > label) { font-family: var(--cs-sky-display); color: var(--cs-sky-dim); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-prog-edit label { font: 400 9px var(--cs-sky-display); letter-spacing: 0.2em; text-transform: uppercase; color: var(--cs-sky-dim); }
+
+/* ---- Folded: the card is a small night sky -----------------------------
+   The picture in a round moon, the name in thin capitals, everything
+   centred. The card's markup is the sheet's own; only its dress is here. */
+.chronicle-hero-sheet[data-cs-look="sky"].cs-folded .window-content {
+  border: 1px solid var(--cs-sky-line);
+  border-top: 0;
+  background:
+    radial-gradient(1px 1px at 12% 24%, var(--cs-sky-star), transparent),
+    radial-gradient(1px 1px at 86% 18%, var(--cs-sky-star), transparent),
+    radial-gradient(1.5px 1.5px at 92% 52%, var(--cs-sky-gold), transparent),
+    radial-gradient(1px 1px at 8% 66%, var(--cs-sky-peri), transparent),
+    linear-gradient(180deg, var(--cs-sky-top), var(--cs-sky-card-mid) 60%, var(--cs-sky-card-low));
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-art {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  margin: 18px auto 0;
+  border-radius: 50%;
+  background: var(--cs-sky-menu);
+  box-shadow: 0 0 0 1px var(--cs-sky-gold-soft), 0 0 0 9px var(--cs-sky-top), 0 0 0 10px color-mix(in srgb, var(--cs-sky-gold) 33%, transparent), 0 0 40px color-mix(in srgb, var(--cs-sky-peri) 33%, transparent);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-art img { border-radius: 50%; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-art:hover img { transform: scale(1.04); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-art:focus-visible { outline: 2px solid var(--cs-sky-gold); outline-offset: 14px; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-body { text-align: center; padding: 18px 16px 16px; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-name {
+  font: 300 24px/1.15 var(--cs-sky-display);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cs-sky-ink);
+  text-shadow: 0 0 22px color-mix(in srgb, var(--cs-sky-peri) 40%, transparent);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-sub {
+  font: 400 9.5px/1.5 var(--cs-sky-display);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--cs-sky-gold);
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-stam .cs-bar { height: 3px; background: color-mix(in srgb, var(--cs-sky-star) 14%, transparent); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-stam .cs-bar i { background: var(--cs-sky-gold); box-shadow: 0 0 8px var(--cs-sky-gold); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-stam[data-band="winded"] .cs-bar i,
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-stam:is([data-band="dying"], [data-band="dead"]) .cs-bar i { background: var(--cs-sky-rose); box-shadow: 0 0 8px var(--cs-sky-rose); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-num { font: 400 10px var(--cs-sky-display); letter-spacing: 0.1em; color: var(--cs-sky-dim); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-num b { font: 300 20px var(--cs-sky-display); color: var(--cs-sky-ink); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-rec { justify-content: center; gap: 8px; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-rec i { flex: none; width: 5px; height: 5px; border-radius: 50%; background: none; box-shadow: inset 0 0 0 1px var(--cs-sky-dim); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-rec i.on { background: var(--cs-sky-peri); box-shadow: 0 0 6px var(--cs-sky-peri); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-chars { gap: 2px; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-chr { border: 0; border-radius: 12px; background: none; padding: 4px 0 5px; transition: background-color 0.3s ease, box-shadow 0.3s ease; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-chr b { font: 300 18px var(--cs-sky-display); color: var(--cs-sky-ink); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-chr span { font: 400 7.5px var(--cs-sky-display); letter-spacing: 0.08em; text-transform: uppercase; color: var(--cs-sky-dim); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-chr:hover:not(:disabled) { background: var(--cs-sky-wash); box-shadow: 0 0 14px color-mix(in srgb, var(--cs-sky-gold) 28%, transparent); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-chr:focus-visible { outline: 1px solid var(--cs-sky-gold); outline-offset: 1px; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-actions .cs-btn { padding: 8px 4px 7px; font-size: 9px; letter-spacing: 0.14em; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-card-actions .cs-btn-main { background: var(--cs-sky-gold-wash); border-color: var(--cs-sky-gold); color: var(--cs-sky-gold); filter: none; }
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-fold .cs-card { animation: cs-sky-card-in 1s var(--cs-sky-ease) both; }
+
+/* ---- Menus: deep indigo; a line draws down the left joining a star beside each entry */
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-menu {
+  padding: 6px 6px 6px 5px;
+  border-color: var(--cs-sky-line-strong);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--cs-sky-high), var(--cs-sky-menu));
+  box-shadow: 0 22px 60px var(--cs-sky-shadow), 0 0 40px color-mix(in srgb, var(--cs-sky-peri) 8%, transparent);
+  font: italic 400 16px/1.25 var(--cs-sky-serif);
+  animation: cs-sky-menu-in 0.3s ease-out both;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-menu::before {
+  content: "";
+  position: absolute;
+  left: 16px;
+  top: 14px;
+  bottom: 14px;
+  width: 1px;
+  pointer-events: none;
+  transform-origin: top;
+  background: linear-gradient(transparent, var(--cs-sky-line-strong) 18%, var(--cs-sky-line-strong) 82%, transparent);
+  animation: cs-sky-draw-down 0.42s 0.04s cubic-bezier(0.3, 0.6, 0.3, 1) both;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-menu.cs-menu-out { animation: cs-sky-menu-out 0.3s ease-in both; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-menu-head { font: 400 8.5px var(--cs-sky-display); letter-spacing: 0.28em; padding-left: 27px; color: var(--cs-sky-dim); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-menu hr { margin: 5px 10px 5px 27px; border: 0; height: 2px; background: radial-gradient(circle, var(--cs-sky-line-strong) 0.7px, transparent 1.1px) 0 0 / 5px 2px repeat-x; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-menu-item {
+  position: relative;
+  padding: 7px 14px 7px 27px;
+  border-radius: 10px;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-menu-item::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  margin-top: -11px;
+  background-color: var(--cs-sky-gold);
+  -webkit-mask: var(--cs-sky-star-mask) center / contain no-repeat;
+  mask: var(--cs-sky-star-mask) center / contain no-repeat;
+  opacity: 0.4;
+  transform: scale(0.6);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  pointer-events: none;
+}
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-menu-item:is(:hover, :focus-visible)::before { opacity: 1; transform: scale(1.05); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-menu-item[aria-checked="true"]::before { opacity: 0.95; transform: scale(0.85); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-menu-item[aria-disabled="true"]::before { opacity: 0.2; transform: scale(0.5); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-menu-item:is(:hover, :focus-visible) { background: var(--cs-sky-wash); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-menu-item:focus-visible { outline: 1px solid var(--cs-sky-gold); outline-offset: -2px; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-menu-icon { color: var(--cs-sky-peri); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-menu-text small { font-size: 13.5px; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-menu-tag { font: 400 8px var(--cs-sky-display); letter-spacing: 0.2em; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-menu:not(.cs-menu-out) .cs-menu-item { animation: cs-sky-item-in 0.35s ease-out both; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-menu .cs-menu-item:nth-of-type(2) { animation-delay: 45ms; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-menu .cs-menu-item:nth-of-type(3) { animation-delay: 90ms; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-menu .cs-menu-item:nth-of-type(4) { animation-delay: 135ms; }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-menu .cs-menu-item:nth-of-type(n + 5) { animation-delay: 180ms; }
+
+/* ---- Narrower windows -------------------------------------------------- */
+@container cs-hero (max-width: 940px) {
+  .chronicle-hero-sheet[data-cs-look="sky"]:not(.cs-folded) .window-content { grid-template-columns: var(--cs-sky-gutter) minmax(220px, 290px) 32px minmax(0, 1fr) var(--cs-sky-gutter); }
+}
+/* Too narrow for the moon beside the name: one centred column, the tabs
+   a row at the top, the constellation scaled to the width. */
+@container cs-hero (max-width: 760px) {
+  .chronicle-hero-sheet[data-cs-look="sky"]:not(.cs-folded) .window-content {
+    --cs-sky-gutter: 22px;
+    grid-template-columns: var(--cs-sky-gutter) minmax(0, 1fr) var(--cs-sky-gutter);
+    grid-template-rows: auto auto auto auto auto auto auto 1fr;
+  }
+  .chronicle-hero-sheet[data-cs-look="sky"]:not(.cs-folded) .window-content > nav.tabs { justify-content: flex-start; gap: 0 16px; padding-bottom: 8px; }
+  .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-moon,
+  .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-ring { grid-column: 2; grid-row: 2; width: min(100%, 280px); margin-top: 10px; }
+  .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-id { grid-column: 2; grid-row: 3; padding-top: 14px; text-align: center; }
+  .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-eye { justify-content: center; }
+  .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-prog { justify-content: center; }
+  .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-prog-edit { justify-content: center; }
+  .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-nums { grid-column: 2; grid-row: 4; justify-content: center; margin-top: 18px; }
+  .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-num { align-items: center; }
+  .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-facts { justify-content: center; text-align: center; }
+  .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-const { grid-column: 2; grid-row: 5; justify-self: center; margin-top: 28px; }
+  .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-skills { grid-column: 2; grid-row: 6; margin-top: 26px; }
+  .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-rest { grid-column: 2; grid-row: 7; }
+  .chronicle-hero-sheet[data-cs-look="sky"] .cs-edit { grid-column: 2; grid-row: 4; }
+  .chronicle-hero-sheet[data-cs-look="sky"]:not(.cs-folded) .window-content > section.tab { grid-column: 1 / -1; grid-row: 8; padding: 22px var(--cs-sky-gutter) 30px calc(var(--cs-sky-gutter) + 14px); }
+  .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-hills { height: 110px; }
+}
+@container cs-hero (max-width: 500px) {
+  .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-nums { gap: 12px 22px; }
+  .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-big { font-size: 34px; }
+}
+
+/* ---- Moves: slow and weightless ------------------------------------------
+   The sheet puts a cs-move-* class on the window for each (scripts/hero-looks.mjs):
+   opening, a hit, a heal, a level gained, Edit mode entered. Off and
+   reduced motion stop them with the rest of Chronicle's windows
+   (styles/chronicle-sync.css); Calm, below, keeps only short fades. */
+
+/* Opening: the moon rises out of the dark, the name fades in, the stars come
+   on one by one and the constellation draws itself between them. */
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-open :is(.cs-sky-moon, .cs-sky-ring) { animation: cs-sky-moon-in 1.2s var(--cs-sky-ease) both; }
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-open .cs-sky-id { animation: cs-sky-fade 1s 0.3s ease-out both; }
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-open .cs-sky-nums { animation: cs-sky-fade 0.9s 0.6s ease-out both; }
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-open .cs-sky-skills { animation: cs-sky-fade 0.9s 1.1s ease-out both; }
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-open .cs-sky-link { animation: cs-sky-draw 0.7s calc(var(--i) * 0.22s + 0.3s) ease-out both; }
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-open .cs-sky-star { animation: cs-sky-fade 0.6s calc(var(--i) * 0.22s + 0.2s) ease-out both; }
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-open .cs-sky-pl { animation: cs-sky-fade 0.6s calc(var(--i) * 0.22s + 0.2s) ease-out both; }
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-open .window-content > :is(nav.tabs, section.tab) { animation: cs-sky-fade 0.8s 0.5s ease-out both; }
+
+/* A hit: the horizon flushes red, the moon is eclipsed and slowly clears,
+   a star falls. */
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-hit .cs-sky-red { animation: cs-sky-red 1.2s ease-out; }
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-hit .cs-sky-ecl { animation: cs-sky-eclipse 1s ease-out; }
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-hit .cs-sky-shoot { animation: cs-sky-fall 0.8s ease-in; }
+
+/* A heal: an aurora drifts across the sky. */
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-heal .cs-sky-aurora { animation: cs-sky-aurora 2.2s ease-in-out; }
+
+/* A level gained: a shooting star crosses, the lines draw again and each star flares. */
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-level .cs-sky-shoot { animation: cs-sky-shoot 1.1s cubic-bezier(0.3, 0.1, 0.6, 1); }
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-level .cs-sky-link { animation: cs-sky-draw 0.7s calc(var(--i) * 0.2s + 0.5s) ease-out both; }
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-level .cs-sky-halo { animation: cs-sky-nova 1.2s calc(var(--i) * 0.2s + 0.5s) ease-out; }
+
+/* Edit mode: the editors fade in one after another. */
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-editin .cs-edit > * { animation: cs-sky-fade 0.6s ease-out both; }
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-editin .cs-edit > :nth-child(2) { animation-delay: 35ms; }
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-editin .cs-edit > :nth-child(3) { animation-delay: 70ms; }
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-editin .cs-edit > :nth-child(4) { animation-delay: 105ms; }
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-editin .cs-edit > :nth-child(n + 5) { animation-delay: 140ms; }
+.chronicle-hero-sheet[data-cs-look="sky"].cs-move-editin .cs-name-edit input { animation: cs-sky-fade 0.6s ease-out both; }
+
+@keyframes cs-sky-fade { from { opacity: 0; } }
+@keyframes cs-sky-twinkle { 0%, 100% { opacity: 0.9; } 50% { opacity: 0.25; } }
+@keyframes cs-sky-spin { to { transform: rotate(360deg); } }
+@keyframes cs-sky-star { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+@keyframes cs-sky-pulse { 0%, 100% { transform: scale(0.75); opacity: 0.65; } 50% { transform: scale(1.25); opacity: 1; } }
+@keyframes cs-sky-float { 50% { transform: translateY(-2px); } }
+@keyframes cs-sky-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes cs-sky-moon-in { from { opacity: 0; transform: translateY(60px); } }
+@keyframes cs-sky-red { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes cs-sky-eclipse { 0% { opacity: 0.9; } }
+@keyframes cs-sky-fall {
+  0% { opacity: 0; transform: rotate(100deg) translateX(0); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(100deg) translateX(420px); }
+}
+@keyframes cs-sky-aurora {
+  0% { opacity: 0; transform: skewY(-6deg) translateX(-8%); }
+  40% { opacity: 1; }
+  100% { opacity: 0; transform: skewY(-6deg) translateX(8%); }
+}
+@keyframes cs-sky-shoot {
+  0% { opacity: 0; transform: rotate(152deg) translateX(0); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(152deg) translateX(620px); }
+}
+@keyframes cs-sky-nova { 0% { opacity: 0.13; transform: scale(1); } 30% { opacity: 0.7; transform: scale(1.9); } 100% { opacity: 0.13; transform: scale(1); } }
+@keyframes cs-sky-card-in { from { opacity: 0; transform: translateY(50px); } }
+@keyframes cs-sky-menu-in { from { opacity: 0; transform: translateY(-3px); } }
+@keyframes cs-sky-menu-out { to { opacity: 0; } }
+@keyframes cs-sky-item-in { from { opacity: 0; transform: translateX(-3px); } }
+@keyframes cs-sky-draw-down { from { transform: scaleY(0); } }
+
+/* ---- Calm: every move becomes a short fade ------------------------------
+   The stars stop twinkling and the rings stop drifting; the constellation
+   appears without drawing, nothing travels, and no star shoots or falls. The
+   eclipse, the red horizon and the aurora are a brief fade of the same light. */
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"] :is(.cs-sky-stars i, .cs-sky-orbit, .cs-sky-core, .cs-sky-ready, .cs-sky-lvlup .fa-solid) { animation: none; }
+/* Only what a move already animates at Full is renamed to the fade, and only in that move. */
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"].cs-move-open :is(.cs-sky-moon, .cs-sky-ring, .cs-sky-id, .cs-sky-nums, .cs-sky-skills, .cs-sky-link, .cs-sky-star, .cs-sky-pl, .window-content > :is(nav.tabs, section.tab)) {
+  animation-name: cs-sky-fade;
+  animation-duration: 0.35s;
+  animation-delay: 0s;
+}
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"].cs-move-level .cs-sky-link,
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"].cs-move-editin :is(.cs-edit > *, .cs-name-edit input),
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"].cs-move-fold .cs-card {
+  animation-name: cs-sky-fade;
+  animation-duration: 0.35s;
+  animation-delay: 0s;
+}
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"] :is(.cs-sky-shoot, .cs-sky-halo),
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"] .cs-menu::before { animation: none; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"].cs-move-hit .cs-sky-red { animation-duration: 0.6s; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"].cs-move-hit .cs-sky-ecl { animation-duration: 0.5s; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"].cs-move-heal .cs-sky-aurora { animation: cs-sky-aurora-fade 1.2s ease-in-out; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"] :is(.cs-menu, .cs-menu-item) { animation-name: cs-sky-fade; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"] .cs-menu.cs-menu-out { animation-name: cs-sky-fade; animation-direction: reverse; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"] :is(.cs-sky-disc .cs-portrait-btn, .cs-card-art):hover .cs-portrait,
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"] .cs-card-art:hover img { transform: none; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="sky"] .item-list-container .item-row::before { transform: none; }
+@keyframes cs-sky-aurora-fade { 0%, 100% { opacity: 0; } 50% { opacity: 0.8; } }

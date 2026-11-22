@@ -41,6 +41,24 @@
   font-synthesis-weight: none;
 }
 
+/* Chronicle's "Finish your hero" line (scripts/finish-hero.mjs) goes first in
+   the window content. A look that lays the content out as a grid has no cell
+   for it, so it spans the grid after everything and stays at the window's
+   foot, opaque over what scrolls under it. */
+.chronicle-hero-sheet[data-cs-look]:not([data-cs-look="chronicle"]):not(.cs-folded) .window-content > .chronicle-finish-hero {
+  grid-column: 1 / -1;
+  position: sticky;
+  bottom: 0;
+  z-index: 6;
+  margin: 0;
+  border: 1px solid var(--cs-hero-line);
+  border-left: 2px solid var(--cs-hero-accent);
+  border-radius: min(4px, var(--cs-hero-radius));
+  background: color-mix(in srgb, var(--cs-hero-accent) 14%, var(--cs-hero-bg));
+  color: var(--cs-hero-text);
+  font-family: var(--cs-hero-face);
+}
+
 /* One page that scrolls, with the tabs pinned under the title bar once the
    boxes scroll away, instead of a scroll area per tab. */
 .chronicle-hero-sheet .window-content {

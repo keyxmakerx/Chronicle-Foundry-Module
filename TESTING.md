@@ -367,7 +367,7 @@ Needs Draw Steel 1.1.0 or later; on an older Draw Steel the sheet is not offered
 - [ ] Click a characteristic on the card -> Draw Steel's roll dialog for it; Respite -> Draw Steel's respite
 - [ ] Abilities on the card -> the full sheet, on the Abilities tab; Open -> the full sheet at the size and place it had before folding
 - [ ] Close the card and open the hero again -> it opens as the card, where it was left. A second player on another computer still gets the full sheet until they fold it themselves
-- [ ] Sheet look -> a menu headed "Sheet look for <hero>": "Chronicle", ticked and marked "now", "The portrait hall", a line, then "Draw Steel's own sheet". With Draw Steel Plus switched on, "Draw Steel Plus", marked "found installed", sits above it. Arrow keys move, Escape closes it and puts focus back on the palette button, a click elsewhere closes it
+- [ ] Sheet look -> a menu headed "Sheet look for <hero>": "Chronicle", ticked and marked "now", "The portrait hall", "Steel and banner", "Arcane glass", "The gilded card", "Night sky", a line, then "Draw Steel's own sheet". With Draw Steel Plus switched on, "Draw Steel Plus", marked "found installed", sits above it. Arrow keys move, Escape closes it and puts focus back on the palette button, a click elsewhere closes it. In every look the menu is solid: nothing of the sheet shows through it
 - [ ] Pick "Draw Steel's own sheet" -> the window closes and the hero opens in Draw Steel's sheet (come back through Sheet configuration). With Draw Steel Plus on, pick it -> the hero opens in Draw Steel Plus's sheet
 - [ ] Click the portrait -> a menu: "See the full picture" (the GM can show it to everyone from there), "See the token" (for owners, when the hero has its own token picture), and "Change picture or token", which opens the hero's Chronicle page in a pop-up window. That last row shows only on a hero linked to Chronicle, for the GM or a player whose Foundry user is linked to a Chronicle account
 - [ ] In Edit mode, the portrait menu starts with "Choose a picture file" -> Foundry's file picker; the picked picture becomes the portrait
@@ -396,6 +396,82 @@ Open a hero in the Chronicle hero sheet, then palette button in the title bar ->
 - [ ] A Limited viewer sees the hall's picture, name, class, origins, level, XP and victories, the tab rail and Biography, and nothing else; when the GM damages or heals the hero, the picture doesn't jolt or flash for them
 - [ ] Module settings now show "Default hero sheet look" and "Lock hero sheet looks" (GM only). Set the default to "The portrait hall" -> a hero that never picked a look opens in the hall. Turn the lock on -> every hero shows the default look; the Sheet look menu greys out the other looks with a note ("Your GM has set the look for every hero" for a player, "Locked to the world's default look in the module settings" for the GM), and "Draw Steel's own sheet" still works for both
 - [ ] Picking the hall changes nothing in Chronicle: the hero's history in Chronicle shows no new entry
+
+#### The steel and banner look
+Open a hero in the Chronicle hero sheet, then palette button in the title bar -> "Steel and banner".
+- [ ] The window grows to about 1100 by 760 and turns to dark steel with a thin frame and rivets: a red banner down the left with the hero's picture in a gold shield, the level medal, the class and subclass; the name in capitals with the origins, XP, Victories and Take Respite; a red Stamina blade, pips for recoveries, the heroic resource and surges, five shields, Movement and Combat plates and the skills; the tabs as slanted plates, Abilities open and amber
+- [ ] The banner sways slightly and holds still with Motion on Calm; on first opening it unfurls, the name and blade slide in and the shields drop in turn, within about a second and a half; Calm -> only fades; Off -> no movement at all. The same with the computer's "reduce motion" setting on
+- [ ] Pictures: try a bright picture, a wide landscape picture and a hero with no picture of its own. Each stays inside the shield, and with no picture a gold emblem stands in
+- [ ] A long name (about 20 letters) wraps between words, never mid-word
+- [ ] Foundry's light theme: the sheet stays dark and readable; switch the hero back to "Chronicle" -> the light look returns
+- [ ] Shields: hover turns the rim amber, a press sinks it, click -> Draw Steel's roll dialog
+- [ ] Damage the hero -> the plate jolts, the blade flashes white and drops in notches with sparks off its tip; at or under the winded figure the blade turns amber with a "Winded" tag, at 0 or less a "Dying" tag and a grey banner. Heal it -> a shine runs along the blade
+- [ ] With Level up showing, an amber arrow, a glow and a gentle rock show on the medal; level the hero up -> the medal spins, the banner is hoisted, the tabs clack down and the shields drop in again
+- [ ] Type in Stamina, temporary Stamina, recoveries, heroic resource and surges -> each saves; the Stamina (hero token), Recoveries and Surges labels work as on Draw Steel's sheet; Take Respite works
+- [ ] Drag the window narrower: about 820 wide everything still fits; under about 760 the banner becomes a pennant across the top and the boxes and tabs go under it; no sideways scroll down to about 640
+- [ ] Every tab works as on Draw Steel's sheet, in steel and amber
+- [ ] Edit mode (padlock): the name field, origins with remove and add, XP and Victories fields and Draw Steel's editors, sliding in one after another
+- [ ] Fold -> the card on steel with a short banner picture and all five characteristic names readable; Open -> the full sheet again
+- [ ] Press Tab through the sheet -> a clear ring or bar shows on each shield, label, tab, button and field
+- [ ] A Limited viewer sees the banner, name, class, origins, level, XP and victories, the tab row and Biography, and nothing else; no jolt or shine when the GM damages or heals the hero
+
+#### The arcane glass look
+Open a hero in the Chronicle hero sheet, then palette button in the title bar -> "Arcane glass".
+- [ ] The window grows to about 1100 by 760 on a dark violet field with a wine-red glow top left and a plum glow bottom right: one frosted glass panel with the hero's picture in a teal ring that is also the Stamina gauge, "Level N · class · subclass", the name, the origins, XP and Victories, Take Respite as a pill top right, a row of tracker boxes, five hexagons and Skills and Combat cells; a floating pill of tabs under it, Abilities open
+- [ ] The glass blurs the field: the faint grid is crisp beside the panel and soft inside it
+- [ ] On first opening, the panel settles into focus out of a blur and the hexagons pop in one by one, within about a second and a half; set Motion (module settings) to Calm -> only fades, the lights and ring do not move, a hit only tints the panel rose and nothing scales; Off -> no movement at all. The same with the computer's "reduce motion" setting on
+- [ ] Pictures: try a bright picture, a wide landscape picture and a hero with no picture of its own. The bright one stays inside the ring, the wide one fills the circle without stretching, and with no picture a teal hexagon rune stands in
+- [ ] A long name (about 20 letters) wraps between words, never mid-word
+- [ ] Foundry's light theme: the look stays dark and readable; switch the hero back to "Chronicle" -> the light look returns
+- [ ] Hexagons: hover lifts and lights one; click -> Draw Steel's roll dialog for that characteristic
+- [ ] With no temporary Stamina, damage the hero (its token on the map, or type a lower Stamina) -> a rose ripple spreads from the picture and the glass shivers; at or under the winded figure the ring turns rose and the pill says "Winded", at 0 or less "Dying" and the picture greys. Heal it -> the ring blooms with light and turns teal again
+- [ ] With Level up showing, level the hero up -> the hexagons light one after another, a line draws between them and the name glows
+- [ ] Type in Stamina, temporary Stamina, recoveries, heroic resource and surges -> each saves; the Stamina, Recoveries and Surges buttons work as on Draw Steel's sheet; Take Respite works
+- [ ] Drag the window narrower: about 820 wide everything fits; under about 780 the tracker boxes go three across; under about 700 the picture centres over the name and everything stacks; no sideways scroll
+- [ ] Every tab (Abilities, Features, Equipment, Projects, Effects, Biography) works as on Draw Steel's sheet, on glass; scrolling a long tab keeps the tab pill pinned
+- [ ] Edit mode (padlock): the name field, origins with remove and add, XP and Victories fields, and Draw Steel's editors in glass cells, arriving one after another
+- [ ] Fold -> the card in glass with a round teal-ringed picture and all five characteristic names readable; over a busy map it shows the map blurred through; Open -> the full sheet again, at its size
+- [ ] Press Tab through the sheet -> a clear teal ring shows on each hexagon, button and field
+- [ ] A Limited viewer sees the picture ring (no Stamina), name, class, origins, level, XP and victories, the tab pill and Biography, and nothing else; when the GM damages or heals the hero, the picture doesn't ripple or shiver for them
+
+#### The gilded card look
+Open a hero in the Chronicle hero sheet, then palette button in the title bar -> "The gilded card".
+- [ ] The window grows to about 1100 by 760 and turns navy and gold with a double gold border and flourished corners: tabs along the top; the picture under an arch in the middle with a gold Level medal on its foot, the name in gold capitals, origins, subclass, XP and Victories under it; left, the Stamina dial, rows of round pips and Speed, Stability, Size, Disengage; right, five gold-ringed medallions and the skills; Take Respite at the right foot
+- [ ] On first opening the card turns in from its edge and the medallions are dealt in one after another, all within about a second and a half; now and then light crosses the gold. Motion Calm (module settings) -> only fades and no light; Off -> no movement at all. The same with the computer's "reduce motion" setting on
+- [ ] Pictures: a bright picture, a wide landscape picture and a hero with no picture of its own all sit under the arch without stretching; with no picture a gold crest stands in
+- [ ] A long name (about 20 letters, two words) wraps between words, never mid-word, and the card, Take Respite and XP stay inside the gold border, also in a window about 600 high
+- [ ] Foundry's light theme: the card stays dark and readable; switch the hero back to "Chronicle" -> the light look returns
+- [ ] Medallions: the phrase under a name is "a master's gift" for 2 or more, "a steady hand" for 1, "the weakest suit" for 0 or less; hover nudges a medallion; click -> Draw Steel's roll dialog
+- [ ] Damage the hero -> the card tilts and a red crack flashes across the picture; at or under the winded figure the Stamina number turns pink and says "Winded", at 0 or less red, "Dying", and the picture loses its colour. Heal it -> the dial's rays swell
+- [ ] With Level up showing (the medal shows an arrow and glows), level the hero up -> the medal spins and light runs across the gold
+- [ ] Type in Stamina, temporary Stamina, recoveries, heroic resource and surges -> each saves; the hero token, Recoveries and Surges buttons work as on Draw Steel's sheet; Take Respite works
+- [ ] Drag the window narrower: about 820 wide everything fits; under about 760 the picture comes first, the two boxes sit side by side under it; the tab row never touches the corners
+- [ ] Every tab works as on Draw Steel's sheet in navy and gold; the tab row stays pinned and the border stays on the window while scrolling
+- [ ] Scroll a long tab to its end, at full size, about 640 wide and in Edit mode -> the page fades out just above the gold foot; no words or fields show under the frame's bottom edge, its corner flourishes or outside the border, and the last line can be scrolled clear of the foot
+- [ ] Edit mode (padlock): one light sweep; the name field, origins with remove and add, XP and Victories on the card, Draw Steel's editors under it
+- [ ] Fold -> the card turns over into a small gold-edged card with five round medallions; Open -> the full card again
+- [ ] Press Tab through the sheet -> a clear gold ring shows on each medallion, button, label and field, and round the whole arch for the picture
+- [ ] A Limited viewer sees the picture, name, class, origins, level, XP and victories, the tab row and Biography, and nothing else; when the GM damages or heals the hero nothing tilts, flashes or loses colour for them
+
+#### The night sky look
+Open a hero in the Chronicle hero sheet, then palette button in the title bar -> "Night sky".
+- [ ] The window grows to about 1100 by 760 and turns to a night sky with stars and a mountain line: the hero's picture in a round moon on the left with a gold Stamina ring and a ring of recovery arcs round it; on the right "Level N · class · origins", the name in thin capitals, the subclass, XP and Victories, then big thin numbers for Stamina, Recoveries, the heroic resource, Surges and Speed; the five characteristics below as a constellation of stars joined by lines; the skills under the moon; the tabs as thin capitals across the top right, Abilities open
+- [ ] On first opening, the moon rises, the name fades in, the stars come on and the lines draw between them, all within about two and a half seconds; set Motion (module settings) to Calm -> only short fades and no twinkling; Off -> no movement at all, stars included. The same with the computer's "reduce motion" setting on
+- [ ] Pictures: try a bright picture, a wide landscape picture and a hero with no picture of its own. Each fills the round moon without stretching, and with no picture a pale moon with a few darker seas stands in
+- [ ] A long name (about 20 letters) wraps between words, never mid-word, and nothing overlaps
+- [ ] Foundry's light theme: the sky stays dark and readable; switch the hero back to "Chronicle" -> the light look returns
+- [ ] Stars: a characteristic of 3 or more is the biggest star, 0 or less the smallest; the five stars never change place; hover glows a star and brightens its number; click it -> Draw Steel's roll dialog
+- [ ] Damage the hero (its token on the map, or type a lower Stamina) -> the horizon flushes red, the moon is eclipsed and clears, a star falls; at or under the winded figure the ring turns rose and says "Winded", at 0 or less darker and "Dying", the moon dimmed but the face still recognisable. Heal it -> an aurora drifts across and the ring turns gold again
+- [ ] With Level up showing, a star pulses beside the level; level the hero up -> a shooting star crosses and the stars flare in turn
+- [ ] Type in Stamina, temporary Stamina, recoveries, heroic resource and surges -> each saves; the hero token, spend a recovery and gain surges buttons work as on Draw Steel's sheet
+- [ ] The five big numbers (Stamina, Recoveries, the heroic resource, Surges, Speed) and their labels sit on one line. The skills are in alphabetical order with a small dot between names, and no line of skills starts or ends with a dot
+- [ ] Drag the window narrower: about 820 wide everything still fits; under about 760 the moon goes to the top, centred, with everything in one column and the tabs a row; no sideways scroll at 640
+- [ ] Every tab (Abilities, Features, Equipment, Projects, Effects, Biography) works as on Draw Steel's sheet, in the sky's colours; scrolling keeps the tab row at the top and the sky still
+- [ ] Edit mode (padlock): the name field, origins with remove and add, XP and Victories fields, and Draw Steel's editors, fading in one after another
+- [ ] Fold -> the card as a small night sky, with all five characteristic names readable; Open -> the sky again, at its size
+- [ ] Press Tab through the sheet -> a thin gold ring shows on each star, button, tab and field
+- [ ] A Limited viewer sees the moon with the picture (no Stamina ring), name, class, origins, level, XP and victories, the tab row and Biography, and nothing else; when the GM damages or heals the hero, nothing flashes or falls for them
+- [ ] Picking the night sky changes nothing in Chronicle: the hero's history in Chronicle shows no new entry
 
 ### Foundry -> Chronicle
 - [ ] Create character Actor in Foundry -> Page created in Chronicle with mapped fields

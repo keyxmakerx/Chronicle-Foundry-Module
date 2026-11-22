@@ -8,7 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { closeHeroMenu, openHeroMenu } from '../scripts/hero-menu.mjs';
-import { DRAW_STEEL_PLUS_SHEET, DRAW_STEEL_SHEET } from '../scripts/_hero-looks.mjs';
+import { DRAW_STEEL_PLUS_SHEET, DRAW_STEEL_SHEET, HERO_LOOKS } from '../scripts/_hero-looks.mjs';
 import { makeChronicleHeroSheet } from '../scripts/hero-looks.mjs';
 
 /** A stand-in element: attributes, children, listeners that bubble, focus and a box. */
@@ -352,13 +352,13 @@ test('the look picker lists the look, Draw Steel Plus when it is on, and Draw St
   const { Sheet, sheet, root, anchor } = sheetFor({ plus: true });
   Sheet.DEFAULT_OPTIONS.actions.csLookPicker.call(sheet, {}, anchor);
   assert.deepEqual(labels(root), [
-    'CHRONICLE.HeroSheet.Looks.chronicle', 'CHRONICLE.HeroSheet.Looks.hall', 'CHRONICLE.HeroSheet.Picker.Plus', 'CHRONICLE.HeroSheet.Picker.DrawSteel',
+    ...HERO_LOOKS.map((l) => l.label), 'CHRONICLE.HeroSheet.Picker.Plus', 'CHRONICLE.HeroSheet.Picker.DrawSteel',
   ]);
   assert.match(menuOf(root).querySelector('.cs-menu-head').textContent, /Picker\.Heading \{"name":"Ash"\}/);
   assert.equal(items(menuOf(root))[0].getAttribute('aria-checked'), 'true');
   assert.equal(items(menuOf(root))[1].getAttribute('aria-checked'), 'false');
   // The other sheets are plain rows after a line, not choices of a look.
-  assert.equal(items(menuOf(root))[3].getAttribute('role'), 'menuitem');
+  assert.equal(items(menuOf(root))[HERO_LOOKS.length + 1].getAttribute('role'), 'menuitem');
   assert.equal(menuOf(root).querySelectorAll('hr').length, 1);
 }));
 
@@ -372,7 +372,7 @@ test('picking a look stores it on the hero, picking another sheet stores that; t
   };
   await pick(0);
   await pick(1);
-  await pick(2);
+  await pick(HERO_LOOKS.length);
   assert.deepEqual(calls, [
     ['update', { 'flags.chronicle-sync.heroLook': 'hall' }, { chronicleSync: true }],
     ['update', { 'flags.core.sheetClass': DRAW_STEEL_SHEET }, { chronicleSync: true }],

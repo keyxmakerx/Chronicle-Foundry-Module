@@ -1,0 +1,1024 @@
+/* The steel and banner look on the Chronicle hero sheet
+   (scripts/hero-looks.mjs, templates/hero-looks/steel/): a hero in plate
+   under a hanging banner. Gunmetal plate with rivets and a hairline frame,
+   the hero's picture in a cloth banner down the left, the name in Oswald
+   capitals, Stamina as a blade that drops in notches, shields for the
+   characteristics and a medal for the level. Square corners, heavy and
+   quick moves: things snap rather than ease, a press sinks 2px.
+
+   Always dark: the sheet puts the window in Foundry's dark theme. Every
+   colour is in the token block below, so a colour changes in one place;
+   rules below it read the tokens (color-mix() for a softer shade).
+   Unlayered and scoped to [data-cs-look="steel"], like hero-looks.css,
+   which it follows. */
+
+/* Oswald 600 is declared in chronicle-sheet.css; 500 and 700 here. */
+@font-face {
+  font-family: "Chronicle Oswald";
+  src: url("../fonts/Oswald-500-latin.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Chronicle Oswald";
+  src: url("../fonts/Oswald-700-latin.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* The look's values for the sheet's tokens, then its own --cs-steel-* ones.
+   Every colour in this file is in this block. Corners are 0px, not 0: the
+   sheet's radii are min(…, var(--cs-hero-radius)), which needs a length. */
+.chronicle-hero-sheet[data-cs-look="steel"] {
+  --cs-hero-bg: #0e1013;
+  --cs-hero-panel: #16191e;
+  --cs-hero-tert: color-mix(in srgb, #e7b75a 8%, transparent);
+  --cs-hero-line: color-mix(in srgb, #ffffff 11%, transparent);
+  --cs-hero-text: #ffffff;
+  --cs-hero-body: #c5cad1;
+  --cs-hero-muted: #aeb4bc;
+  --cs-hero-accent: #e7b75a;
+  --cs-hero-accent-strong: #e7b75a;
+  --cs-hero-accent-soft: color-mix(in srgb, #e7b75a 14%, transparent);
+  --cs-hero-on-accent: #1b1205;
+  --cs-hero-shadow: none;
+  --cs-hero-shadow-raised: 0 14px 30px #000000ee;
+  --cs-hero-shadow-pressed: inset 0 0 0 1px color-mix(in srgb, #e7b75a 35%, transparent);
+  --cs-hero-ok: #7ee08a;
+  --cs-hero-warn: #f2b84b;
+  --cs-hero-bad: #ff7a5c;
+  --cs-hero-face: "Chronicle Inter", Inter, system-ui, sans-serif;
+  --cs-hero-radius: 0px;
+  --cs-hero-pill: 0px;
+  --cs-steel-display: "Chronicle Oswald", Oswald, "Arial Narrow", sans-serif;
+  --cs-steel-black: #000000;
+  --cs-steel-white: #ffffff;
+  --cs-steel-ink: #0c0d0f;
+  --cs-steel-well: #0a0b0d;
+  --cs-steel-plate-hi: #3d424a;
+  --cs-steel-plate-mid: #1c1f24;
+  --cs-steel-plate-lo: #0e1013;
+  --cs-steel-raise: #2a2e35;
+  --cs-steel-raise-hi: #3a3f47;
+  --cs-steel-pale: #eef0f3;
+  --cs-steel-rim-mid: #8d949e;
+  --cs-steel-face-hi: #262a31;
+  --cs-steel-face-lo: #121417;
+  --cs-steel-gold-hi: #fff1c2;
+  --cs-steel-gold: #e7b75a;
+  --cs-steel-gold-soft: #f0c98a;
+  --cs-steel-gold-deep: #b8892f;
+  --cs-steel-gold-lo: #8a5f17;
+  --cs-steel-cloth-hi: #9a2030;
+  --cs-steel-cloth-mid: #5e0f1c;
+  --cs-steel-cloth-lo: #3c0912;
+  --cs-steel-red: #d1362b;
+  --cs-steel-blade-hi: #c8322a;
+  --cs-steel-blade-lo: #8f1d2c;
+  --cs-steel-wind-hi: #b45309;
+  --cs-steel-wind-lo: #7c2d12;
+  --cs-steel-rivet-hi: #d0d4da;
+  --cs-steel-rivet-mid: #5b6068;
+  --cs-steel-rivet-lo: #1b1d20;
+  --cs-steel-spark: #ffd9a0;
+  --cs-steel-silver-hi: #f4f6f8;
+  --cs-steel-silver-lo: #9aa1ab;
+  --cs-steel-insight-hi: #ddd6fe;
+  --cs-steel-insight-lo: #7c3aed;
+  --cs-steel-insight-edge: #a78bfa;
+  --cs-steel-surge-hi: #fed7aa;
+  --cs-steel-surge-lo: #ea580c;
+  --cs-steel-surge-edge: #ff8a5c;
+  --cs-steel-card-lo: #16181c;
+  --cs-steel-dim: #7d838c;
+  --cs-steel-tag: #e3e6ea;
+  color-scheme: dark;
+}
+
+/* A thin amber scrollbar: the scroll area keeps its room so the layout does
+   not shift, and the strip reads as part of the frame. */
+.chronicle-hero-sheet[data-cs-look="steel"] .window-content {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--cs-steel-gold) 50%, transparent) transparent;
+}
+
+/* The title bar: a dark steel strip with a hairline, the title in Oswald. */
+.chronicle-hero-sheet[data-cs-look="steel"] { background: var(--cs-steel-plate-lo); }
+.chronicle-hero-sheet[data-cs-look="steel"] .window-header {
+  background: var(--cs-steel-ink);
+  border-bottom: 1px solid var(--cs-hero-line);
+  color: var(--cs-steel-tag);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .window-header .window-title {
+  font-family: var(--cs-steel-display);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .window-header :is(button, a):hover { color: var(--cs-steel-gold); }
+.chronicle-hero-sheet[data-cs-look="steel"] .window-content { font-size: 14px; }
+
+/* ---- The full sheet: banner | name, boxes, tabs ----------------------- */
+
+/* The plate: steel with fine brushing and a pale wash from the top right.
+   The content box is the size the banner and frame hang from. */
+.chronicle-hero-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content {
+  display: grid;
+  grid-template-columns: 292px minmax(0, 1fr);
+  grid-template-rows: auto auto auto 1fr;
+  align-content: start;
+  padding: 0;
+  container: cs-steel / size;
+  background:
+    repeating-linear-gradient(100deg, color-mix(in srgb, var(--cs-steel-white) 3%, transparent) 0 2px, transparent 2px 5px),
+    radial-gradient(60% 40% at 80% 10%, color-mix(in srgb, var(--cs-steel-white) 7%, transparent), transparent),
+    radial-gradient(120% 90% at 70% 0, var(--cs-steel-plate-hi), var(--cs-steel-plate-mid) 55%, var(--cs-steel-plate-lo));
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-head { display: contents; }
+
+/* The hairline frame and four rivets, held still while the page scrolls. */
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-frame {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  align-self: start;
+  height: 100cqh;
+  pointer-events: none;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-frame::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 1px solid color-mix(in srgb, var(--cs-steel-white) 11%, transparent);
+  box-shadow: inset 0 0 0 3px var(--cs-steel-ink), inset 0 0 0 4px color-mix(in srgb, var(--cs-steel-white) 7%, transparent);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-frame i {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--cs-steel-rivet-hi), var(--cs-steel-rivet-mid) 60%, var(--cs-steel-rivet-lo));
+  box-shadow: 0 1px 2px var(--cs-steel-black);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-frame i:nth-child(1) { left: 12px; top: 12px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-frame i:nth-child(2) { right: 12px; top: 12px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-frame i:nth-child(3) { left: 12px; bottom: 12px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-frame i:nth-child(4) { right: 12px; bottom: 12px; }
+
+/* ---- The banner: three layers, so the shadow survives the cut and the
+   sway moves a finished picture instead of redrawing it. ---------------- */
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-banner {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  grid-column: 1;
+  grid-row: 1 / -1;
+  align-self: start;
+  width: 210px;
+  height: calc(100cqh - 78px);
+  margin-left: 46px;
+  transform-origin: 50% 0;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-hang {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 0;
+  filter: drop-shadow(0 14px 22px color-mix(in srgb, var(--cs-steel-black) 65%, transparent));
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-cloth {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 30px 12px 0;
+  overflow: hidden;
+  container: cs-steel-cloth / inline-size;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 91%, 0 100%);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 34px, color-mix(in srgb, var(--cs-steel-black) 10%, transparent) 34px 36px, color-mix(in srgb, var(--cs-steel-white) 4%, transparent) 36px 70px),
+    linear-gradient(180deg, var(--cs-steel-cloth-hi), var(--cs-steel-cloth-mid) 70%, var(--cs-steel-cloth-lo));
+  box-shadow: inset 0 0 0 5px var(--cs-steel-cloth-mid), inset 0 0 0 6px color-mix(in srgb, var(--cs-steel-gold) 60%, transparent);
+}
+/* A tall window keeps the banner's V; a short one hides the lowest lines. */
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-cloth > * { flex: none; max-width: 100%; }
+
+/* The picture, in a shield rimmed with gold. */
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-crest {
+  position: relative;
+  width: min(150px, 100%);
+  aspect-ratio: 150 / 178;
+  clip-path: polygon(0 0, 100% 0, 100% 62%, 50% 100%, 0 62%);
+  background: linear-gradient(160deg, var(--cs-steel-gold-hi), var(--cs-steel-gold) 50%, var(--cs-steel-gold-lo));
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-crest .cs-portrait-btn {
+  position: absolute;
+  inset: 4px;
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  overflow: hidden;
+  clip-path: polygon(0 0, 100% 0, 100% 62%, 50% 100%, 0 62%);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-crest .cs-portrait-btn:active { transform: none; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-crest .cs-portrait {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: var(--cs-steel-ink);
+  box-shadow: none;
+  object-fit: var(--avatar-object-fit, cover);
+  object-position: var(--avatar-object-position, 50% 20%);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-crest .cs-portrait-btn:hover .cs-portrait { box-shadow: none; filter: brightness(1.12); }
+/* The ring around a cut shape would be cut with it, so it is drawn on the
+   unclipped frame of the shield. */
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-crest .cs-portrait-btn:focus-visible { outline: none; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-crest:has(.cs-portrait-btn:focus-visible)::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  outline: 2px solid var(--cs-hero-accent);
+  outline-offset: 1px;
+  z-index: 2;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-crest:has(.cs-portrait-btn:focus-visible) { clip-path: none; background: none; overflow: visible; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-crest:has(.cs-portrait-btn:focus-visible) .cs-portrait-btn { overflow: hidden; }
+/* No picture of their own: a sword and banner in gold on steel, instead of Foundry's stand-in figure. */
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-emblem {
+  display: none;
+  position: absolute;
+  inset: 4px;
+  width: calc(100% - 8px);
+  height: calc(100% - 8px);
+  clip-path: polygon(0 0, 100% 0, 100% 62%, 50% 100%, 0 62%);
+  background: radial-gradient(90% 70% at 50% 25%, var(--cs-steel-face-hi), var(--cs-steel-face-lo));
+  stroke: var(--cs-steel-gold);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-crest:has(.cs-portrait:is([src$="mystery-man.svg"], [src=""], :not([src]))) .cs-steel-emblem { display: block; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-crest:has(.cs-portrait:is([src$="mystery-man.svg"], [src=""], :not([src]))) .cs-portrait { opacity: 0; }
+
+/* The level medal. */
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-lvl {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  margin: 14px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--cs-steel-gold-hi), var(--cs-steel-gold) 55%, var(--cs-steel-gold-lo));
+  box-shadow: 0 0 0 3px var(--cs-steel-cloth-mid), 0 0 0 4px var(--cs-steel-gold);
+  color: var(--cs-steel-cloth-lo);
+  font: 700 28px/1 var(--cs-steel-display);
+  text-shadow: none;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-lvl b { font-weight: 700; }
+.chronicle-hero-sheet[data-cs-look="steel"] button.cs-steel-lvl { cursor: pointer; }
+.chronicle-hero-sheet[data-cs-look="steel"] button.cs-steel-lvl:hover:not(:disabled) { filter: brightness(1.12); }
+.chronicle-hero-sheet[data-cs-look="steel"] button.cs-steel-lvl:active:not(:disabled) { translate: 0 2px; }
+.chronicle-hero-sheet[data-cs-look="steel"] button.cs-steel-lvl:disabled { cursor: default; }
+.chronicle-hero-sheet[data-cs-look="steel"] button.cs-steel-lvl:focus-visible { outline: 2px solid var(--cs-steel-white); outline-offset: 5px; }
+/* Level ready: a stencilled amber arrow, a glow ring and a gentle rock on
+   the banner. A viewer who cannot level the hero sees the plain medal. */
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-lvlup i {
+  position: absolute;
+  right: -22px;
+  top: -6px;
+  width: 18px;
+  height: 20px;
+  background: var(--cs-steel-gold);
+  clip-path: polygon(50% 0, 100% 50%, 70% 50%, 70% 100%, 30% 100%, 30% 50%, 0 50%);
+  font-size: 0;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-lvlup:disabled i { display: none; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-lvlup:not(:disabled) {
+  transform-origin: 50% -14px;
+  box-shadow: 0 0 0 3px var(--cs-steel-cloth-mid), 0 0 0 4px var(--cs-steel-gold), 0 0 0 7px color-mix(in srgb, var(--cs-steel-gold) 25%, transparent), 0 0 20px color-mix(in srgb, var(--cs-steel-gold) 60%, transparent);
+  animation: cs-steel-rock 2.2s infinite;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-cls {
+  margin: 12px 0 0;
+  font: 700 clamp(15px, 11cqi, 26px)/1.15 var(--cs-steel-display);
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--cs-steel-white);
+  overflow-wrap: break-word;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-col {
+  margin: 4px 0 0;
+  font: 500 12px/1.5 var(--cs-steel-display);
+  letter-spacing: 0.2em;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--cs-steel-gold-soft);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-subcls { display: block; }
+.chronicle-hero-sheet[data-cs-look="steel"] :is(.cs-steel-cls, .cs-steel-subcls) a { color: inherit; text-decoration: none; background: linear-gradient(var(--cs-steel-gold), var(--cs-steel-gold)) 50% 100% / 0 2px no-repeat; }
+.chronicle-hero-sheet[data-cs-look="steel"] :is(.cs-steel-cls, .cs-steel-subcls) a:hover { color: var(--cs-steel-white); background-size: 100% 2px; }
+.chronicle-hero-sheet[data-cs-look="steel"] :is(.cs-steel-cls, .cs-steel-subcls) a:focus-visible { outline: 2px solid var(--cs-steel-white); outline-offset: 2px; }
+/* Down: the banner greys, as cloth does when its bearer falls. */
+.chronicle-hero-sheet[data-cs-look="steel"] .window-content:has(.cs-steel-blade:is([data-band="dying"], [data-band="dead"])) .cs-steel-hang { filter: drop-shadow(0 14px 22px color-mix(in srgb, var(--cs-steel-black) 65%, transparent)) grayscale(0.8) brightness(0.7); }
+
+/* ---- The name, origins, XP and victories ------------------------------ */
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-id {
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 16px;
+  min-width: 0;
+  margin-right: 46px;
+  padding-top: 36px;
+  container: cs-steel-id / inline-size;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-id > :is(.cs-name, .cs-name-edit, .cs-steel-prog-edit) { grid-column: 1 / -1; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-id .cs-name {
+  font: 700 clamp(34px, 8cqi, 62px)/1.02 var(--cs-steel-display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cs-steel-white);
+  text-shadow: 0 2px 0 var(--cs-steel-black);
+  overflow-wrap: break-word;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-name-edit input {
+  height: 62px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--cs-steel-well) 80%, transparent);
+  box-shadow: inset 0 3px 6px var(--cs-steel-black), inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 8%, transparent), inset 0 -2px 0 var(--cs-steel-gold);
+  color: var(--cs-steel-white);
+  font: 700 clamp(30px, 7cqi, 52px) var(--cs-steel-display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-name-edit input:focus { box-shadow: inset 0 3px 6px var(--cs-steel-black), inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-gold) 55%, transparent), inset 0 -3px 0 var(--cs-steel-gold); outline: none; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 400 14px/1.5 var(--cs-steel-display);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cs-hero-body);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sub > li + li::before {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 10px;
+  vertical-align: middle;
+  background: var(--cs-steel-gold);
+  transform: rotate(45deg);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-vit b { font-weight: 600; color: var(--cs-hero-body); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-origin a { color: inherit; text-decoration: none; background: linear-gradient(var(--cs-steel-gold), var(--cs-steel-gold)) 0 100% / 0 2px no-repeat; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-origin a:hover { color: var(--cs-steel-white); background-size: 100% 2px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-origin a:focus-visible { outline: 2px solid var(--cs-hero-accent); outline-offset: 2px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-kind { margin-right: 6px; font-size: 10px; letter-spacing: 0.2em; color: var(--cs-steel-gold); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-del { margin-left: 0.4em; font-size: 12px; color: var(--cs-hero-muted); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-del:hover { color: var(--cs-steel-white); background: var(--cs-steel-red); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-todo { color: var(--cs-hero-muted); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-todo a { color: var(--cs-steel-gold); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-prog-edit { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-prog-edit input { width: 72px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-prog-edit label { font: 500 11px var(--cs-steel-display); letter-spacing: 0.16em; text-transform: uppercase; color: var(--cs-steel-gold); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-prog-edit input { height: 28px; border: 0; border-radius: 0; background: var(--cs-steel-well); box-shadow: inset 0 2px 4px var(--cs-steel-black), inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 9%, transparent); color: var(--cs-steel-white); font: 500 15px var(--cs-steel-display); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-prog-edit input:focus { outline: none; box-shadow: inset 0 2px 4px var(--cs-steel-black), inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-gold) 60%, transparent), inset 0 -2px 0 var(--cs-steel-gold); }
+
+/* Buttons: amber parallelograms. A press sinks them 2px; the cut sides would
+   hide an outline, so keyboard focus is a bar along the top and bottom. */
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 7px 20px;
+  border: 0;
+  border-radius: 0;
+  background: var(--cs-steel-gold);
+  box-shadow: inset 0 -2px 0 var(--cs-steel-gold-deep);
+  color: var(--cs-steel-ink);
+  font: 600 12px/1.2 var(--cs-steel-display);
+  letter-spacing: 0.16em;
+  text-shadow: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-btn:hover { background: var(--cs-steel-gold-soft); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-btn:active { translate: 0 2px; background: var(--cs-steel-gold-deep); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-btn:focus-visible { outline: none; background: var(--cs-steel-gold-soft); box-shadow: inset 0 3px 0 var(--cs-steel-ink), inset 0 -3px 0 var(--cs-steel-ink); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-id .cs-steel-btn { grid-row: 2; grid-column: 2; }
+.chronicle-hero-sheet[data-cs-look="steel"] :is(.cs-steel-mini) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  margin: 0 0 0 8px;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 0;
+  background: var(--cs-steel-raise);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 15%, transparent);
+  color: var(--cs-steel-gold);
+  font: 500 10.5px/1.4 var(--cs-steel-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-mini:hover { background: var(--cs-steel-gold); color: var(--cs-steel-ink); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-mini:active { translate: 0 2px; }
+
+/* Number fields: dark wells, an amber edge at once on focus. */
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-field input[type="number"] {
+  height: 30px;
+  color: var(--cs-steel-white);
+  font-family: var(--cs-steel-display);
+  font-weight: 500;
+  transition: none;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-field input[type="number"]:hover { border-color: transparent; background: var(--cs-steel-well); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 20%, transparent); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-field input[type="number"]:focus { border-color: transparent; background: var(--cs-steel-well); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-gold) 60%, transparent), inset 0 -2px 0 var(--cs-steel-gold); outline: none; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-field input[type="number"]:disabled { color: var(--cs-hero-muted); }
+
+/* ---- The boxes -------------------------------------------------------- */
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-stats {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  margin-right: 46px;
+  padding-top: 18px;
+  color: var(--cs-hero-body);
+  container: cs-steel-stats / inline-size;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-k {
+  display: inline-block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  font: 500 11px/1.5 var(--cs-steel-display);
+  letter-spacing: 0.2em;
+  text-shadow: none;
+  text-transform: uppercase;
+  color: var(--cs-steel-gold);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] button.cs-steel-k {
+  width: auto;
+  height: auto;
+  cursor: pointer;
+  background: linear-gradient(var(--cs-steel-gold), var(--cs-steel-gold)) 0 100% / 100% 1px no-repeat;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] button.cs-steel-k:hover { color: var(--cs-steel-white); background-size: 100% 2px; }
+.chronicle-hero-sheet[data-cs-look="steel"] button.cs-steel-k:active { translate: 0 1px; }
+.chronicle-hero-sheet[data-cs-look="steel"] button.cs-steel-k:focus-visible { outline-offset: 3px; }
+
+/* Stamina: a blade whose red drops in notches. Text sits on the blade; the
+   number is Draw Steel's own field. */
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-vitals { display: grid; gap: 12px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-blade { position: relative; height: 40px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-edge { position: absolute; inset: 0; pointer-events: none; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-edge::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--cs-steel-ink);
+  clip-path: polygon(0 0, 96% 0, 100% 50%, 96% 100%, 0 100%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 13%, transparent);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-fillwrap {
+  position: absolute;
+  inset: 3px;
+  overflow: hidden;
+  clip-path: polygon(0 0, 96% 0, 100% 50%, 96% 100%, 0 100%);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 50%;
+  transform: scaleX(calc(var(--fill, 0) / 100));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--cs-steel-white) 30%, transparent), transparent 2px),
+    linear-gradient(180deg, var(--cs-steel-blade-hi), var(--cs-steel-blade-lo));
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-blade[data-band="winded"] .cs-steel-fill {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--cs-steel-white) 30%, transparent), transparent 2px),
+    linear-gradient(180deg, var(--cs-steel-wind-hi), var(--cs-steel-wind-lo));
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 40%, color-mix(in srgb, var(--cs-steel-white) 67%, transparent) 50%, transparent 60%);
+  transform: translateX(-100%);
+  opacity: 0;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--winded, 50) * 1%);
+  width: 2px;
+  background: color-mix(in srgb, var(--cs-steel-ink) 80%, transparent);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sparks { position: absolute; right: 8px; top: 50%; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sparks i {
+  position: absolute;
+  width: 10px;
+  height: 2px;
+  background: var(--cs-steel-spark);
+  opacity: 0;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sparks i:nth-child(1) { --a: -50deg; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sparks i:nth-child(2) { --a: -20deg; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sparks i:nth-child(3) { --a: 15deg; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sparks i:nth-child(4) { --a: 40deg; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sparks i:nth-child(5) { --a: 70deg; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-read {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4.5% 0 12px;
+  overflow: hidden;
+  color: var(--cs-steel-white);
+  font: 500 14px/1 var(--cs-steel-display);
+  letter-spacing: 0.14em;
+  text-shadow: 0 1px 2px color-mix(in srgb, var(--cs-steel-black) 80%, transparent);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-stam input[type="number"] { height: 32px; font-size: 24px; font-weight: 500; text-shadow: inherit; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-of { margin-left: -6px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-read .cs-steel-k { color: var(--cs-steel-white); font-size: 14px; letter-spacing: 0.14em; background-image: linear-gradient(var(--cs-steel-white), var(--cs-steel-white)); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-wind { font-style: normal; font-size: 11px; }
+/* Winded, dying and dead say so in the tag, not twice. */
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-blade:not([data-band="healthy"]) .cs-steel-wind { display: none; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-state {
+  padding: 3px 8px;
+  background: color-mix(in srgb, var(--cs-steel-ink) 85%, transparent);
+  font: 600 11px/1 var(--cs-steel-display);
+  color: var(--cs-steel-gold);
+  text-shadow: none;
+  clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-temp { margin-left: 4px; align-items: center; gap: 4px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-temp > span { font-size: 10px; letter-spacing: 0.14em; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-temp input[type="number"] { height: 24px; width: 3ch; font-size: 14px; text-align: center; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-read .cs-field { text-shadow: inherit; }
+
+/* Recoveries, heroic resource, surges: slanted pips. */
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-pipsrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-grp { display: inline-flex; align-items: center; gap: 6px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-pips { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 2px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-pips i {
+  width: 19px;
+  height: 11px;
+  background: var(--cs-steel-ink);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 15%, transparent);
+  transform: skewX(-20deg);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-rec .cs-steel-pips i.on { background: linear-gradient(180deg, var(--cs-steel-silver-hi), var(--cs-steel-silver-lo)); }
+.chronicle-hero-sheet[data-cs-look="steel"] :is(.cs-steel-primary, .cs-steel-epic) .cs-steel-pips i { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-insight-edge) 53%, transparent); }
+.chronicle-hero-sheet[data-cs-look="steel"] :is(.cs-steel-primary, .cs-steel-epic) .cs-steel-pips i.on { background: linear-gradient(180deg, var(--cs-steel-insight-hi), var(--cs-steel-insight-lo)); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-surges .cs-steel-pips i { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-surge-edge) 53%, transparent); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-surges .cs-steel-pips i.on { background: linear-gradient(180deg, var(--cs-steel-surge-hi), var(--cs-steel-surge-lo)); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-n { display: inline-flex; align-items: baseline; gap: 2px; font: 500 13px var(--cs-steel-display); color: var(--cs-hero-muted); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-n input[type="number"] { height: 22px; font-size: 14px; text-align: right; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-n small { font-size: 12px; }
+
+/* The characteristics: steel-rimmed shields that roll when pressed. The cut
+   is drawn on the layers, so the focus ring is not clipped away. */
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-shields { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sh {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: 124px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  text-shadow: none;
+  font: inherit;
+  cursor: pointer;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sh::before,
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sh::after {
+  content: "";
+  position: absolute;
+  clip-path: polygon(0 0, 100% 0, 100% 58%, 50% 100%, 0 58%);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sh::before { inset: 0; background: linear-gradient(160deg, var(--cs-steel-pale), var(--cs-steel-rim-mid) 40%, var(--cs-steel-raise-hi)); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sh::after { inset: 4px; background: linear-gradient(180deg, var(--cs-steel-face-hi), var(--cs-steel-face-lo)); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sh > * { position: relative; z-index: 1; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sh b { margin-top: -14px; font: 700 44px/1 var(--cs-steel-display); color: var(--cs-steel-white); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sh span {
+  max-width: calc(100% - 10px);
+  overflow: hidden;
+  font: 500 11px/1.4 var(--cs-steel-display);
+  letter-spacing: 0.18em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--cs-steel-gold);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sh:hover:not(:disabled)::before,
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sh:focus-visible::before { background: linear-gradient(160deg, var(--cs-steel-gold-hi), var(--cs-steel-gold) 45%, var(--cs-steel-gold-lo)); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sh:active:not(:disabled) { translate: 0 2px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sh:disabled { cursor: default; }
+
+/* Movement, combat and skills: dark plates with a cut corner. */
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-plate {
+  min-width: 0;
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--cs-steel-ink) 60%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 11%, transparent);
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-wide { grid-column: 1 / -1; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-plate p { margin: 0; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-big { font: 700 30px/1.1 var(--cs-steel-display); color: var(--cs-steel-white); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-big small { font: 400 12px var(--cs-steel-display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--cs-hero-muted); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-text { display: flex; flex-wrap: wrap; gap: 0 14px; margin-top: 2px; font-size: 13px; color: var(--cs-hero-body); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-skills .cs-steel-k { display: flex; align-items: center; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0 0; padding: 0; list-style: none; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-tags li {
+  padding: 3px 9px;
+  background: var(--cs-steel-raise);
+  font: 500 11.5px/1.4 var(--cs-steel-display);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cs-steel-tag);
+  transform: skewX(-10deg);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-none { margin: 6px 0 0; color: var(--cs-hero-muted); }
+
+/* ---- The tabs: slanted plates, the open one amber --------------------- */
+.chronicle-hero-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content > nav.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  grid-column: 2;
+  grid-row: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 18px 46px 0 0;
+  padding: 8px 0;
+  border: 0;
+  background: color-mix(in srgb, var(--cs-steel-plate-lo) 94%, transparent);
+}
+.chronicle-hero-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content > nav.tabs > [data-tab] {
+  flex: 1 1 auto;
+  max-width: 190px;
+  margin: 0;
+  padding: 9px 12px;
+  border: 0;
+  background: color-mix(in srgb, var(--cs-steel-ink) 60%, transparent);
+  text-align: center;
+  font: 500 12px/1.2 var(--cs-steel-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--cs-hero-muted);
+  clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+  transition: none;
+}
+.chronicle-hero-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content > nav.tabs > [data-tab]:hover { color: var(--cs-steel-white); background: var(--cs-steel-raise); }
+.chronicle-hero-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content > nav.tabs > [data-tab]:active { translate: 0 2px; }
+.chronicle-hero-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content > nav.tabs > [data-tab].active { color: var(--cs-steel-ink); background: linear-gradient(180deg, var(--cs-steel-gold-soft), var(--cs-steel-gold)); border: 0; }
+.chronicle-hero-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content > nav.tabs > [data-tab].active:hover { background: linear-gradient(180deg, var(--cs-steel-gold-hi), var(--cs-steel-gold-soft)); }
+.chronicle-hero-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content > nav.tabs > [data-tab]:focus-visible { outline: none; color: var(--cs-steel-white); box-shadow: inset 0 -3px 0 var(--cs-steel-gold); }
+.chronicle-hero-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content > nav.tabs > [data-tab].active:focus-visible { color: var(--cs-steel-ink); box-shadow: inset 0 -3px 0 var(--cs-steel-ink); }
+.chronicle-hero-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content > section.tab {
+  grid-column: 2;
+  grid-row: 4;
+  min-width: 0;
+  margin-right: 46px;
+  padding: 14px 0 30px;
+}
+
+/* ---- Draw Steel's tabs in steel --------------------------------------- */
+/* Each group's heading is an amber-barred plate; each entry a dark plate with
+   a cut corner that lights an amber edge on hover and a bar when open. */
+.chronicle-hero-sheet[data-cs-look="steel"] .item-list-container .item-header {
+  padding: 0 8px 0 0;
+  margin-bottom: 6px;
+  border-bottom: 2px solid var(--cs-steel-raise);
+  border-radius: 0;
+  font: 500 10px/1.3 var(--cs-steel-display);
+  letter-spacing: 0.16em;
+  color: var(--cs-hero-muted);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .item-list-container .item-header .item-name {
+  display: block;
+  flex: 0 1 auto;
+  align-self: flex-start;
+  margin-right: auto;
+  padding: 4px 18px 3px 11px;
+  font: 600 11.5px/1.4 var(--cs-steel-display);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--cs-steel-gold);
+  background: linear-gradient(180deg, var(--cs-steel-raise-hi), var(--cs-steel-raise));
+  box-shadow: inset 3px 0 0 var(--cs-steel-gold), inset 0 1px 0 color-mix(in srgb, var(--cs-steel-white) 8%, transparent);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 9px) 100%, 0 100%);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .item-list-container .item-list { display: grid; gap: 5px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .item-list-container .item-list .item { border: 0; background: none; }
+.chronicle-hero-sheet[data-cs-look="steel"] .item-list-container .item-list .item:nth-child(even) { background: none; }
+.chronicle-hero-sheet[data-cs-look="steel"] .item-list-container .item-row {
+  min-height: 44px;
+  padding: 2px 8px;
+  border: 0;
+  background: color-mix(in srgb, var(--cs-steel-ink) 60%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 11%, transparent);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  transition: none;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .item-list-container .item-row:hover { background: var(--cs-steel-raise); box-shadow: inset 0 0 0 1px var(--cs-steel-gold); }
+.chronicle-hero-sheet[data-cs-look="steel"] .item-list-container .item-row:active { translate: 0 2px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .item-list-container .item:has(> .document-description.expanded) > .item-row { background: color-mix(in srgb, var(--cs-steel-ink) 87%, transparent); box-shadow: inset 3px 0 0 var(--cs-steel-gold), inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 15%, transparent); }
+.chronicle-hero-sheet[data-cs-look="steel"] .item-list-container .item-row .item-name .name .label { font: 600 15px/1.2 var(--cs-steel-display); letter-spacing: 0.06em; text-transform: uppercase; }
+.chronicle-hero-sheet[data-cs-look="steel"] .item-list-container .item-row .item-name.rollable:hover .label { color: var(--cs-steel-gold-soft); }
+.chronicle-hero-sheet[data-cs-look="steel"] .item-list-container .item-row .item-name .keywords { font-size: 12.5px; color: var(--cs-hero-muted); }
+.chronicle-hero-sheet[data-cs-look="steel"] .item-list-container .item-row:hover .item-name .keywords { color: var(--cs-hero-body); }
+.chronicle-hero-sheet[data-cs-look="steel"] .item-list-container .item-row .item-name img { border: 0; border-radius: 0; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 12%, transparent); }
+.chronicle-hero-sheet[data-cs-look="steel"] .item-list-container .item-controls a:hover { color: var(--cs-steel-gold); }
+.chronicle-hero-sheet[data-cs-look="steel"] .item-list-container .item-controls a:focus-visible { outline: 2px solid var(--cs-hero-accent); outline-offset: 1px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .item-list-container .document-description.expanded { padding: 8px 12px 12px; font-size: 14.5px; }
+.draw-steel.actor.chronicle-hero-sheet[data-cs-look="steel"] .item-list-container :is(.item-cost, .item-distance, .item-target) { width: 84px; }
+.chronicle-hero-sheet[data-cs-look="steel"] section.tab :is(fieldset legend, h3, h4) {
+  font: 600 11.5px var(--cs-steel-display);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--cs-steel-gold);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] section.tab fieldset { border-color: color-mix(in srgb, var(--cs-steel-white) 13%, transparent); border-radius: 0; }
+.chronicle-hero-sheet[data-cs-look="steel"] section.tab :is(a, button):focus-visible { outline: 2px solid var(--cs-hero-accent); outline-offset: 2px; }
+
+/* Edit mode: Draw Steel's editors as dark plates. */
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-edit fieldset { border: 0; background: color-mix(in srgb, var(--cs-steel-ink) 60%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 11%, transparent); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-edit legend { padding: 4px 16px 3px 10px; font: 600 11.5px var(--cs-steel-display); letter-spacing: 0.18em; color: var(--cs-steel-gold); background: linear-gradient(180deg, var(--cs-steel-raise-hi), var(--cs-steel-raise)); box-shadow: inset 3px 0 0 var(--cs-steel-gold); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-edit :is(input, select):not([type="checkbox"]):not([type="radio"]) { border: 0; border-radius: 0; background-color: var(--cs-steel-well); box-shadow: inset 0 2px 4px var(--cs-steel-black), inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 9%, transparent); color: var(--cs-steel-white); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-edit :is(input, select):not([type="checkbox"]):not([type="radio"]):focus { outline: none; box-shadow: inset 0 2px 4px var(--cs-steel-black), inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-gold) 60%, transparent), inset 0 -2px 0 var(--cs-steel-gold); }
+
+/* ---- Narrower windows -------------------------------------------------- */
+@container cs-hero (max-width: 940px) {
+  .chronicle-hero-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content { grid-template-columns: 240px minmax(0, 1fr); }
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-banner { width: 176px; margin-left: 24px; }
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-cloth { padding-top: 24px; }
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-col { font-size: 11px; letter-spacing: 0.14em; }
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-id { margin-right: 28px; padding-top: 30px; }
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-stats { margin-right: 28px; }
+  .chronicle-hero-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content > nav.tabs { margin-right: 28px; }
+  .chronicle-hero-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content > nav.tabs > [data-tab] { padding: 9px 8px; letter-spacing: 0.1em; }
+  .chronicle-hero-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content > section.tab { margin-right: 28px; }
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-shields { gap: 8px; }
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sh { height: 104px; }
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sh b { font-size: 36px; }
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-sh span { font-size: 10px; letter-spacing: 0.1em; }
+}
+/* Too narrow for the banner beside the boxes: it becomes a pennant across
+   the top, the picture and medal on its left, the class beside them. */
+@container cs-hero (max-width: 760px) {
+  .chronicle-hero-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto 1fr;
+  }
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-banner {
+    position: relative;
+    z-index: 3;
+    grid-row: 1;
+    width: auto;
+    height: auto;
+    margin: 22px 28px 0;
+  }
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-hang { position: relative; inset: auto; }
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-cloth {
+    position: relative;
+    inset: auto;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-areas: "crest lvl cls" "crest lvl col";
+    align-content: center;
+    align-items: center;
+    justify-items: start;
+    column-gap: 16px;
+    padding: 20px 28px 52px;
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%);
+  }
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-crest { grid-area: crest; width: 84px; }
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-lvl { grid-area: lvl; width: 48px; height: 48px; margin: 0; font-size: 24px; }
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-cls { grid-area: cls; margin: 0; align-self: end; text-align: left; font-size: 24px; }
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-col { grid-area: col; margin: 2px 0 0; align-self: start; text-align: left; }
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-id { grid-column: 1; grid-row: 2; margin: 0 28px; padding-top: 22px; }
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-stats { grid-column: 1; grid-row: 3; margin: 0 28px; }
+  .chronicle-hero-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content > nav.tabs { grid-column: 1; grid-row: 4; margin: 18px 28px 0; }
+  .chronicle-hero-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content > section.tab { grid-column: 1; grid-row: 5; margin: 0 28px; }
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container cs-steel-stats (max-width: 520px) {
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-wind { display: none; }
+}
+@container cs-steel-stats (max-width: 400px) {
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-temp > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+}
+@container cs-steel-stats (max-width: 470px) {
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-shields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@container cs-steel-id (max-width: 520px) {
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-id .cs-steel-btn { grid-row: auto; grid-column: 1 / -1; justify-self: start; margin-top: 4px; }
+}
+@container cs-steel (max-width: 520px) {
+  .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-cols { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---- Folded: the card on steel, its picture on a short banner ----------- */
+.chronicle-hero-sheet[data-cs-look="steel"].cs-folded .window-content { background: linear-gradient(160deg, var(--cs-steel-plate-hi), var(--cs-steel-card-lo)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 16%, transparent); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-art {
+  width: auto;
+  height: 150px;
+  margin: 0 60px;
+  padding: 12px 18px 28px;
+  background: linear-gradient(180deg, var(--cs-steel-cloth-hi), var(--cs-steel-cloth-mid));
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 88%, 0 100%);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-art img {
+  clip-path: polygon(0 0, 100% 0, 100% 62%, 50% 100%, 0 62%);
+  object-position: var(--avatar-object-position, 50% 20%);
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-art:hover img { transform: none; filter: brightness(1.12); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-art:focus-visible { outline: 2px solid var(--cs-hero-accent); outline-offset: -4px; clip-path: none; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-name { font: 700 24px/1.1 var(--cs-steel-display); letter-spacing: 0.08em; text-transform: uppercase; color: var(--cs-steel-white); overflow-wrap: break-word; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-sub { font: 500 11px var(--cs-steel-display); letter-spacing: 0.16em; text-transform: uppercase; color: var(--cs-steel-gold); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-stam .cs-bar { height: 10px; background: var(--cs-steel-ink); clip-path: polygon(0 0, 95% 0, 100% 50%, 95% 100%, 0 100%); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-stam .cs-bar i { background: linear-gradient(180deg, var(--cs-steel-blade-hi), var(--cs-steel-blade-lo)); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-stam[data-band="winded"] .cs-bar i { background: linear-gradient(180deg, var(--cs-steel-wind-hi), var(--cs-steel-wind-lo)); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-stam .cs-bar u { display: none; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-num b { font-family: var(--cs-steel-display); font-weight: 700; color: var(--cs-steel-white); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-rec { gap: 4px; padding: 0 2px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-rec i { height: 9px; background: var(--cs-steel-ink); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 15%, transparent); transform: skewX(-20deg); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-rec i.on { background: linear-gradient(180deg, var(--cs-steel-silver-hi), var(--cs-steel-silver-lo)); box-shadow: none; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-chr { padding: 4px 1px 5px; border: 0; background: color-mix(in srgb, var(--cs-steel-ink) 60%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 15%, transparent); transition: none; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-chr b { font-family: var(--cs-steel-display); font-weight: 700; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-chr span { font: 500 8px var(--cs-steel-display); letter-spacing: 0.06em; text-transform: uppercase; color: var(--cs-steel-gold); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-chr:hover:not(:disabled) { background: var(--cs-steel-raise); box-shadow: inset 0 0 0 1px var(--cs-steel-gold); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-chr:active:not(:disabled) { translate: 0 2px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-actions .cs-btn {
+  margin: 0;
+  padding: 7px 4px;
+  border: 0;
+  background: color-mix(in srgb, var(--cs-steel-white) 7%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 20%, transparent);
+  font: 500 10.5px var(--cs-steel-display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: none;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-actions .cs-btn:hover { background: var(--cs-steel-raise-hi); box-shadow: inset 0 0 0 1px var(--cs-steel-gold); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-actions .cs-btn:active { translate: 0 2px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-actions .cs-btn-main { background: var(--cs-steel-gold); box-shadow: inset 0 -2px 0 var(--cs-steel-gold-deep); color: var(--cs-steel-ink); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-card-actions .cs-btn-main:hover { background: var(--cs-steel-gold-soft); box-shadow: inset 0 -2px 0 var(--cs-steel-gold-deep); filter: none; }
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-fold .cs-card { animation: cs-steel-card-in 350ms cubic-bezier(0.3, 1.5, 0.6, 1) both; }
+
+/* ---- Menus: a steel plate under an amber rule -------------------------- */
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-menu {
+  padding: 5px;
+  border: 0;
+  background: linear-gradient(180deg, var(--cs-steel-plate-hi), var(--cs-steel-plate-mid) 60%, var(--cs-steel-card-lo));
+  box-shadow: 0 22px 44px color-mix(in srgb, var(--cs-steel-black) 85%, transparent), 0 0 0 1px var(--cs-steel-black), inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 12%, transparent), inset 0 2px 0 var(--cs-steel-gold);
+  font: 500 14px/1.25 var(--cs-hero-face);
+  animation: cs-steel-menu-in 140ms ease-out both;
+}
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-menu.cs-menu-out { animation: cs-steel-menu-out 90ms steps(2) both; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-menu-head { font: 600 10px var(--cs-steel-display); letter-spacing: 0.2em; color: var(--cs-steel-gold); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-menu hr { height: 2px; border: 0; background: var(--cs-steel-ink); box-shadow: 0 1px 0 color-mix(in srgb, var(--cs-steel-white) 7%, transparent); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-menu-item { padding: 7px 12px 7px 10px; transition: none; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-menu-item:is(:hover, :focus-visible) { background: var(--cs-steel-gold); color: var(--cs-steel-ink); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-menu-item:focus-visible { outline: none; box-shadow: inset 5px 0 0 var(--cs-steel-ink); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-menu-item:active:not([aria-disabled="true"]) { background: var(--cs-steel-gold-deep); color: var(--cs-steel-ink); translate: 0 2px; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-menu-item:is(:hover, :focus-visible) :is(.cs-menu-icon, .cs-menu-text small, .cs-menu-tag) { color: var(--cs-steel-ink); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-menu-label { font-weight: 600; }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-menu-tag { font-family: var(--cs-steel-display); }
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-menu-item[aria-checked="true"] .cs-menu-icon { color: var(--cs-steel-gold); }
+
+/* ---- Moves: heavy and quick ---------------------------------------------
+   The sheet puts a cs-move-* class on the window for each (scripts/hero-looks.mjs):
+   opening, a hit, a heal, a level gained, Edit mode entered. Off and
+   reduced motion stop them with the rest of Chronicle's windows
+   (styles/chronicle-sync.css); Calm, below, keeps only the fades. */
+
+/* Ambient: the banner sways a little, on its finished picture. */
+.chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-hang { animation: cs-steel-sway 7s ease-in-out infinite; }
+
+/* Opening: the banner unfurls, the name and blade slide in, shields drop. */
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-open .cs-steel-banner { animation: cs-steel-unfurl 700ms cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-open :is(.cs-steel-id, .cs-steel-vitals) { animation: cs-steel-slide 350ms 150ms cubic-bezier(0.2, 0.9, 0.2, 1) both; }
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-open .cs-steel-sh { animation: cs-steel-drop 380ms calc(var(--i, 0) * 70ms + 300ms) cubic-bezier(0.3, 1.5, 0.6, 1) both; }
+
+/* A hit: the plate jolts, the blade flashes white and drops in notches,
+   sparks fly off its tip. */
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-hit .window-content { animation: cs-steel-jolt 320ms steps(1); }
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-hit .cs-steel-edge::before { animation: cs-steel-white 250ms ease-out; }
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-hit .cs-steel-fill { animation: cs-steel-notch 450ms steps(5, end); }
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-hit .cs-steel-sparks i { animation: cs-steel-spark 500ms ease-out; }
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-hit .cs-steel-sparks i:nth-child(2) { animation-delay: 30ms; }
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-hit .cs-steel-sparks i:nth-child(3) { animation-delay: 50ms; }
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-hit .cs-steel-sparks i:nth-child(5) { animation-delay: 40ms; }
+
+/* A heal: a shine runs along the blade. */
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-heal .cs-steel-shine { animation: cs-steel-shine 700ms ease-out; }
+
+/* A level gained: the medal spins, the banner is hoisted, the tabs clack
+   down and the shields drop in again. */
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-level .cs-steel-lvl { animation: cs-steel-medal 1100ms cubic-bezier(0.3, 0.7, 0.2, 1); }
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-level .cs-steel-banner { animation: cs-steel-hoist 900ms cubic-bezier(0.3, 1.3, 0.5, 1); }
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-level .window-content > nav.tabs > [data-tab] { animation: cs-steel-clack 200ms steps(2) both; }
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-level .cs-steel-sh { animation: cs-steel-drop 380ms calc(var(--i, 0) * 70ms + 500ms) cubic-bezier(0.3, 1.5, 0.6, 1) both; }
+
+/* Edit mode: the editors slide in one after another. */
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-editin .cs-edit > * { animation: cs-steel-slide 250ms cubic-bezier(0.2, 0.9, 0.2, 1) both; }
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-editin .cs-edit > :nth-child(2) { animation-delay: 45ms; }
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-editin .cs-edit > :nth-child(3) { animation-delay: 90ms; }
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-editin .cs-edit > :nth-child(4) { animation-delay: 135ms; }
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-editin .cs-edit > :nth-child(n + 5) { animation-delay: 180ms; }
+.chronicle-hero-sheet[data-cs-look="steel"].cs-move-editin .cs-name-edit input { animation: cs-steel-fade 300ms ease-out both; }
+
+@keyframes cs-steel-fade { from { opacity: 0; } }
+@keyframes cs-steel-sway { 25% { transform: skewX(0.6deg); } 75% { transform: skewX(-0.5deg); } }
+@keyframes cs-steel-unfurl { from { transform: scaleY(0.02); } }
+@keyframes cs-steel-drop { from { opacity: 0; transform: translateY(-28px); } }
+@keyframes cs-steel-slide { from { opacity: 0; transform: translateX(-24px); } }
+@keyframes cs-steel-jolt {
+  0% { transform: translate(7px, -4px); }
+  25% { transform: translate(-5px, 3px); }
+  50% { transform: translate(3px, -1px); }
+  75% { transform: translate(-1px, 1px); }
+  100% { transform: none; }
+}
+@keyframes cs-steel-white { from { background-color: var(--cs-steel-white); } }
+@keyframes cs-steel-notch { from { transform: scaleX(min(1, calc((var(--fill, 0) + 16) / 100))); } }
+@keyframes cs-steel-spark {
+  0% { opacity: 1; transform: rotate(var(--a)) translateX(0) scaleX(1); }
+  100% { opacity: 0; transform: rotate(var(--a)) translateX(46px) scaleX(0.3); }
+}
+@keyframes cs-steel-shine { from { opacity: 1; transform: translateX(-100%); } to { opacity: 1; transform: translateX(100%); } }
+@keyframes cs-steel-glow { 40% { opacity: 0.55; } }
+@keyframes cs-steel-clack { from { transform: translateY(-3px); } }
+@keyframes cs-steel-medal {
+  0% { transform: rotateY(0) scale(1); }
+  40% { transform: rotateY(540deg) scale(1.25); }
+  100% { transform: rotateY(720deg) scale(1); }
+}
+@keyframes cs-steel-rock { 0%, 56%, 100% { rotate: 0deg; } 62% { rotate: -11deg; } 70% { rotate: 9deg; } 78% { rotate: -5deg; } 86% { rotate: 2deg; } }
+@keyframes cs-steel-hoist { 30% { transform: translateY(-26px); } }
+@keyframes cs-steel-card-in { from { opacity: 0; transform: translateY(-40px); } }
+@keyframes cs-steel-menu-in { from { opacity: 0; transform: translateY(-4px); } }
+@keyframes cs-steel-menu-out { to { opacity: 0; } }
+
+/* Calm: every move becomes a fade. Nothing travels or turns, the banner
+   holds still, and the white flash stays since it only changes colour. */
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="steel"] :is(.cs-steel-banner, .cs-steel-id, .cs-steel-vitals, .cs-steel-sh, .cs-edit > *, .cs-card, .cs-menu, .window-content > nav.tabs > [data-tab]) { animation-name: cs-steel-fade; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="steel"] .cs-menu.cs-menu-out { animation-name: cs-steel-fade; animation-direction: reverse; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="steel"] :is(.cs-steel-hang, .cs-steel-lvl, .cs-steel-fill, .cs-steel-sparks i) { animation: none; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="steel"].cs-move-hit .window-content { animation: none; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="steel"] .cs-steel-shine { transform: none; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="steel"].cs-move-heal .cs-steel-shine { animation-name: cs-steel-glow; }
+html[data-cs-motion="calm"] .chronicle-hero-sheet[data-cs-look="steel"] :is(button, a, [data-tab], .item-row, .cs-menu-item):active { translate: none !important; }
