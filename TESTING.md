@@ -439,7 +439,7 @@ Open a hero in the Chronicle hero sheet, then palette button in the title bar ->
 - [ ] The window grows to about 1100 by 760 and turns navy and gold with a double gold border and flourished corners: tabs along the top; the picture under an arch in the middle with a gold Level medal on its foot, the name in gold capitals, origins, subclass, XP and Victories under it; left, the Stamina dial, rows of round pips and Speed, Stability, Size, Disengage; right, five gold-ringed medallions and the skills; Take Respite at the right foot
 - [ ] On first opening the card turns in from its edge and the medallions are dealt in one after another, all within about a second and a half; now and then light crosses the gold. Motion Calm (module settings) -> only fades and no light; Off -> no movement at all. The same with the computer's "reduce motion" setting on
 - [ ] Pictures: a bright picture, a wide landscape picture and a hero with no picture of its own all sit under the arch without stretching; with no picture a gold crest stands in
-- [ ] A long name (about 20 letters, two words) wraps between words, never mid-word
+- [ ] A long name (about 20 letters, two words) wraps between words, never mid-word, and the card, Take Respite and XP stay inside the gold border, also in a window about 600 high
 - [ ] Foundry's light theme: the card stays dark and readable; switch the hero back to "Chronicle" -> the light look returns
 - [ ] Medallions: the phrase under a name is "a master's gift" for 2 or more, "a steady hand" for 1, "the weakest suit" for 0 or less; hover nudges a medallion; click -> Draw Steel's roll dialog
 - [ ] Damage the hero -> the card tilts and a red crack flashes across the picture; at or under the winded figure the Stamina number turns pink and says "Winded", at 0 or less red, "Dying", and the picture loses its colour. Heal it -> the dial's rays swell
@@ -449,7 +449,7 @@ Open a hero in the Chronicle hero sheet, then palette button in the title bar ->
 - [ ] Every tab works as on Draw Steel's sheet in navy and gold; the tab row stays pinned and the border stays on the window while scrolling
 - [ ] Edit mode (padlock): one light sweep; the name field, origins with remove and add, XP and Victories on the card, Draw Steel's editors under it
 - [ ] Fold -> the card turns over into a small gold-edged card with five round medallions; Open -> the full card again
-- [ ] Press Tab through the sheet -> a clear gold ring shows on each medallion, button, label and field
+- [ ] Press Tab through the sheet -> a clear gold ring shows on each medallion, button, label and field, and round the whole arch for the picture
 - [ ] A Limited viewer sees the picture, name, class, origins, level, XP and victories, the tab row and Biography, and nothing else; when the GM damages or heals the hero nothing tilts, flashes or loses colour for them
 
 #### The night sky look
