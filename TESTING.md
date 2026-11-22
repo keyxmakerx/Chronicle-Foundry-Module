@@ -406,7 +406,7 @@ Open a hero in the Chronicle hero sheet, then palette button in the title bar ->
 - [ ] Foundry's light theme: the sheet stays dark and readable; switch the hero back to "Chronicle" -> the light look returns
 - [ ] Shields: hover turns the rim amber, a press sinks it, click -> Draw Steel's roll dialog
 - [ ] Damage the hero -> the plate jolts, the blade flashes white and drops in notches with sparks off its tip; at or under the winded figure the blade turns amber with a "Winded" tag, at 0 or less a "Dying" tag and a grey banner. Heal it -> a shine runs along the blade
-- [ ] With Level up showing, a red arrow sits on the medal; level the hero up -> the medal spins, the banner is hoisted, the tabs clack down and the shields drop in again
+- [ ] With Level up showing, an amber arrow, a glow and a gentle rock show on the medal; level the hero up -> the medal spins, the banner is hoisted, the tabs clack down and the shields drop in again
 - [ ] Type in Stamina, temporary Stamina, recoveries, heroic resource and surges -> each saves; the Stamina (hero token), Recoveries and Surges labels work as on Draw Steel's sheet; Take Respite works
 - [ ] Drag the window narrower: about 820 wide everything still fits; under about 760 the banner becomes a pennant across the top and the boxes and tabs go under it; no sideways scroll down to about 640
 - [ ] Every tab works as on Draw Steel's sheet, in steel and amber
@@ -419,7 +419,7 @@ Open a hero in the Chronicle hero sheet, then palette button in the title bar ->
 Open a hero in the Chronicle hero sheet, then palette button in the title bar -> "Arcane glass".
 - [ ] The window grows to about 1100 by 760 on a dark violet field with a wine-red glow top left and a plum glow bottom right: one frosted glass panel with the hero's picture in a teal ring that is also the Stamina gauge, "Level N · class · subclass", the name, the origins, XP and Victories, Take Respite as a pill top right, a row of tracker boxes, five hexagons and Skills and Combat cells; a floating pill of tabs under it, Abilities open
 - [ ] The glass blurs the field: the faint grid is crisp beside the panel and soft inside it
-- [ ] On first opening, the panel settles into focus out of a blur and the hexagons pop in one by one, within about a second and a half; set Motion (module settings) to Calm -> only fades, the lights stop drifting and the ring stops turning; Off -> no movement at all. The same with the computer's "reduce motion" setting on
+- [ ] On first opening, the panel settles into focus out of a blur and the hexagons pop in one by one, within about a second and a half; set Motion (module settings) to Calm -> only fades, the lights and ring do not move, a hit only tints the panel rose and nothing scales; Off -> no movement at all. The same with the computer's "reduce motion" setting on
 - [ ] Pictures: try a bright picture, a wide landscape picture and a hero with no picture of its own. The bright one stays inside the ring, the wide one fills the circle without stretching, and with no picture a teal hexagon rune stands in
 - [ ] A long name (about 20 letters) wraps between words, never mid-word
 - [ ] Foundry's light theme: the look stays dark and readable; switch the hero back to "Chronicle" -> the light look returns
