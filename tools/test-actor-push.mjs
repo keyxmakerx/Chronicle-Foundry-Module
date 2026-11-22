@@ -32,7 +32,7 @@ function applyFlags(flags, data) {
 const actorDoc = (over = {}) => {
   const flags = { entityId: 'ent-1', chronicleUpdatedAt: 'V1', ...(over.flags || {}) };
   return {
-    id: 'a1', name: 'Hero', type: 'character', items: { contents: [] }, flags,
+    id: 'a1', name: 'Hero', type: 'character', items: { contents: [] }, flags, folder: { id: 'sorted' },
     system: { attributes: { hp: { value: 12 }, ac: { value: 15 } }, details: { biography: 'b' } },
     getFlag: (_s, k) => flags[k],
     setFlag: async (_s, k, v) => { flags[k] = v; },
