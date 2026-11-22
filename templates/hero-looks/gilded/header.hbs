@@ -1,0 +1,104 @@
+{{!-- Chronicle hero sheet header: portrait, name, class line, origin chips,
+level, XP and victories. A Limited viewer sees this part, so it shows only
+what Draw Steel's own header shows. Origins keep Draw Steel's markup: the
+item's uuid on the chip, viewDoc on its name, deleteDoc and addOrigin in Edit. --}}
+<header class="cs-hero-head" style="{{#if avatarProperties.objectFit}}--avatar-object-fit: {{avatarProperties.objectFit}};{{/if}}{{#if avatarProperties.objectPosition}} --avatar-object-position: {{avatarProperties.objectPosition}};{{/if}}">
+  {{#*inline "csOrigin"}}
+  {{#if originDoc}}
+  <li class="cs-chip" data-document-uuid="{{originDoc.uuid}}">
+    <span class="cs-chip-kind">{{localize (concat "TYPES.Item." originType)}}</span>
+    <a class="cs-chip-name" data-action="viewDoc">{{originDoc.name}}</a>
+    {{#unless (or @root.isPlay noEdit)}}
+    <a class="cs-chip-del" data-action="deleteDoc" aria-label="{{localize "CHRONICLE.HeroSheet.Remove"}}" data-tooltip="CHRONICLE.HeroSheet.Remove"><i class="fa-solid fa-trash-can" inert></i></a>
+    {{/unless}}
+  </li>
+  {{else}}
+  {{#unless (and (not @root.isPlay) noEdit)}}
+  <li class="cs-chip cs-chip-todo">
+    <span class="cs-chip-kind">{{localize (concat "TYPES.Item." originType)}}</span>
+    {{#if @root.isPlay}}
+    <span class="cs-chip-name">{{localize "CHRONICLE.HeroSheet.StillToChoose"}}</span>
+    {{else}}
+    <a class="cs-chip-name" data-action="addOrigin" data-type="{{originType}}">{{localize "DRAW_STEEL.SHEET.Add" itemName=(localize (concat "TYPES.Item." originType))}}</a>
+    {{/if}}
+  </li>
+  {{/unless}}
+  {{/if}}
+  {{/inline}}
+
+  {{!-- The portrait menu offers the full picture, the token and, in Edit
+  mode, Foundry's file picker, which reads data-edit off the picture. --}}
+  <button type="button" class="cs-portrait-btn" data-action="csPortraitMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize "CHRONICLE.HeroSheet.Portrait.Menu"}}" data-tooltip="CHRONICLE.HeroSheet.Portrait.Menu">
+    <img class="cs-portrait" src="{{document.img}}" alt="{{document.name}}" {{#unless isPlay}}data-edit="img"{{/unless}}>
+  </button>
+
+  <div class="cs-id">
+    {{#if isPlay}}
+    <h1 class="cs-name">{{document.name}}</h1>
+    {{else}}
+    <div class="cs-name-edit">
+      {{formInput fields.name value=source.name placeholder=(localize "DOCUMENT.FIELDS.name.label")}}
+    </div>
+    {{/if}}
+    <p class="cs-line">
+      <span class="cs-line-level">{{localize "CHRONICLE.HeroSheet.LevelN" level=system.level}}</span>
+      {{#with document.system.class as |cls|}}
+      <span class="cs-line-item" data-document-uuid="{{cls.uuid}}"><a data-action="viewDoc">{{cls.name}}</a></span>
+      {{/with}}
+      {{#each document.system.subclasses as |sub|}}
+      <span class="cs-line-item" data-document-uuid="{{sub.uuid}}"><a data-action="viewDoc">{{sub.name}}</a></span>
+      {{/each}}
+    </p>
+    <ul class="cs-chips">
+      {{> csOrigin originDoc=document.system.ancestry originType="ancestry"}}
+      {{> csOrigin originDoc=document.system.culture originType="culture"}}
+      {{> csOrigin originDoc=document.system.career originType="career"}}
+      {{#unless isPlay}}
+      {{> csOrigin originDoc=document.system.class originType="class"}}
+      {{#each document.system.subclasses as |subclass|}}
+      {{> csOrigin originDoc=subclass originType="subclass" noEdit=true}}
+      {{/each}}
+      {{/unless}}
+    </ul>
+  </div>
+
+  <div class="cs-prog">
+    <dl>
+      <div class="cs-prog-level">
+        <dt>{{localize "DRAW_STEEL.Item.class.FIELDS.level.label"}}</dt>
+        <dd>
+          {{#if system.advancementReady}}
+          <button type="button" class="cs-level-up" {{disabled (not editable)}} data-action="levelUp" data-tooltip="DRAW_STEEL.SHEET.LevelUp">
+            {{system.level}} <i class="fa-solid fa-up-long" inert></i>
+          </button>
+          {{else}}
+          {{system.level}}
+          {{/if}}
+        </dd>
+      </div>
+      {{#if isPlay}}
+      <div>
+        <dt>{{systemFields.hero.fields.xp.label}}</dt>
+        <dd>{{system.hero.xp}}{{#if system.nextLevelXP}}<small> / {{system.nextLevelXP}}</small>{{/if}}</dd>
+      </div>
+      <div>
+        <dt>{{systemFields.hero.fields.victories.label}}</dt>
+        <dd>{{system.hero.victories}}{{#if system.victoriesMax}}<small> / {{system.victoriesMax}}</small>{{/if}}</dd>
+      </div>
+      {{/if}}
+    </dl>
+    {{#unless isPlay}}
+    <div class="cs-prog-edit">
+      {{formGroup systemFields.hero.fields.xp value=systemSource.hero.xp classes="xp"}}
+      {{formGroup systemFields.hero.fields.victories value=systemSource.hero.victories classes="victories"}}
+    </div>
+    {{/unless}}
+    {{#if isPlay}}
+    {{#if editable}}
+    <button type="button" class="cs-btn cs-respite" data-action="takeRespite">
+      <i class="fa-solid fa-bed" inert></i> {{localize "DRAW_STEEL.Actor.hero.TakeRespite"}}
+    </button>
+    {{/if}}
+    {{/if}}
+  </div>
+</header>

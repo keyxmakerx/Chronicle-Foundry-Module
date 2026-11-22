@@ -25,7 +25,9 @@
         "chronicle": "Chronicle",
         "hall": "The portrait hall",
         "steel": "Steel and banner",
-        "glass": "Arcane glass"
+        "glass": "Arcane glass",
+        "gilded": "The gilded card",
+        "sky": "Night sky"
       },
       "Remove": "Remove",
       "StillToChoose": "Still to choose",

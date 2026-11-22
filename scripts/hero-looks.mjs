@@ -30,6 +30,8 @@ import {
   sheetChanges, skillNames, staminaView, withFold,
 } from './_hero-looks.mjs';
 import * as glassLook from './_hero-look-glass.mjs';
+import * as gildedLook from './_hero-look-gilded.mjs';
+import * as skyLook from './_hero-look-sky.mjs';
 import * as steelLook from './_hero-look-steel.mjs';
 
 /** The GM's default look for every hero, and whether players may change it. */
@@ -46,19 +48,21 @@ const LOOK_SIZE = {
   hall: { width: 1100, height: 760 },
   steel: { width: 1100, height: 760 },
   glass: { width: 1100, height: 760 },
+  gilded: { width: 1100, height: 760 },
+  sky: { width: 1100, height: 760 },
 };
 
 /** Each newer look's own figures and move timings (scripts/_hero-look-<look>.mjs). */
-const LOOK_EXTRAS = { steel: steelLook, glass: glassLook };
+const LOOK_EXTRAS = { steel: steelLook, glass: glassLook, gilded: gildedLook, sky: skyLook };
 
 /** Looks that play their own opening move, so Chronicle's window grow stays off them. */
-const OWN_OPENING_LOOKS = new Set(['hall', 'steel', 'glass']);
+const OWN_OPENING_LOOKS = new Set(['hall', 'steel', 'glass', 'gilded', 'sky']);
 
 /**
  * Looks drawn dark whatever Foundry's theme, so Draw Steel's own fields and
  * editors inside them take Foundry's dark colours too.
  */
-const DARK_LOOKS = new Set(['hall', 'steel', 'glass']);
+const DARK_LOOKS = new Set(['hall', 'steel', 'glass', 'gilded', 'sky']);
 
 /**
  * Put a window in Foundry's dark theme, or give back the theme classes it had.

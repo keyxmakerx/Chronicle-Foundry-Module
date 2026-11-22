@@ -1,0 +1,72 @@
+/* The night sky look on the Chronicle hero sheet (scripts/hero-looks.mjs,
+   templates/hero-looks/sky/, signed as look E): a night sky: the
+   characteristics as a constellation, the picture in a moon, stars that
+   twinkle. Slow and weightless moves.
+
+   Always dark: the sheet puts the window in Foundry's dark theme. Every
+   colour is in the token block below, so a colour changes in one place;
+   rules below it read the tokens (color-mix() for a softer shade).
+   Unlayered and scoped to [data-cs-look="sky"], like hero-looks.css,
+   which it follows. */
+
+@font-face {
+  font-family: "Chronicle Josefin";
+  src: url("../fonts/JosefinSans-300-latin.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Chronicle Josefin";
+  src: url("../fonts/JosefinSans-400-latin.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Chronicle Josefin";
+  src: url("../fonts/JosefinSans-600-latin.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Chronicle Cormorant";
+  src: url("../fonts/CormorantGaramond-400-italic-latin.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* The look's values for the sheet's tokens, then its own --cs-sky-* ones.
+   Corners are 0px, not 0: the sheet's radii are min(…, var(--cs-hero-radius)). */
+.chronicle-hero-sheet[data-cs-look="sky"] {
+  --cs-hero-bg: #070b1e;
+  --cs-hero-panel: #0e1430;
+  --cs-hero-tert: color-mix(in srgb, #fde68a 8%, transparent);
+  --cs-hero-line: color-mix(in srgb, #fde68a 18%, transparent);
+  --cs-hero-text: #e6e9ff;
+  --cs-hero-body: #c7cdf0;
+  --cs-hero-muted: #9aa2cc;
+  --cs-hero-accent: #fde68a;
+  --cs-hero-accent-strong: #fde68a;
+  --cs-hero-accent-soft: color-mix(in srgb, #fde68a 14%, transparent);
+  --cs-hero-on-accent: #1a1503;
+  --cs-hero-shadow: none;
+  --cs-hero-shadow-raised: 0 14px 30px #000e;
+  --cs-hero-shadow-pressed: inset 0 0 0 1px color-mix(in srgb, #fde68a 35%, transparent);
+  --cs-hero-ok: #86efac;
+  --cs-hero-warn: #fbbf24;
+  --cs-hero-bad: #fda4af;
+  --cs-hero-face: "Chronicle Josefin", "Josefin Sans", "Century Gothic", sans-serif;
+  --cs-hero-radius: 0px;
+  --cs-hero-pill: 0px;
+  color-scheme: dark;
+}
+
+/* A thin scrollbar in the look's colours: the scroll area keeps its room
+   so the layout does not shift, and the strip reads as part of the frame. */
+.chronicle-hero-sheet[data-cs-look="sky"] .window-content {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--cs-hero-accent) 50%, transparent) transparent;
+}
