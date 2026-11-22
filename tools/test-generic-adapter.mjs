@@ -12,7 +12,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { getNestedValue, extractCollectionField, buildChronicleFields, normalizeFoundryValue } =
+const { getNestedValue, extractCollectionField, buildChronicleFields, normalizeFoundryValue, isPlaceholderName } =
   await import('../scripts/adapters/generic-adapter.mjs');
 
 // ── Foundry-ish data structures for the normalizer tests ──────────────────
@@ -159,6 +159,20 @@ test('buildChronicleFields leaves out a single-item field the actor has no item 
   assert.equal(out.ancestry, 'Hakaan');
   assert.equal(out.stamina_current, 21);
   for (const key of ['kit', 'complication', 'level']) assert.ok(!(key in out), `${key} must be left out, not sent empty`);
+});
+
+test('a single-item field whose item still has Foundry\'s new-item name is left out, not sent as the pick', () => {
+  const field = { key: 'complication', type: 'string', foundry_collection: 'items', foundry_item_type: ['complication'], foundry_item_single: true };
+  for (const name of ['Complication', 'New Complication', ' complication ']) {
+    const actor = { items: new FakeCollection([{ name, type: 'complication' }]) };
+    assert.equal(extractCollectionField(actor, field), '', name);
+    assert.ok(!('complication' in buildChronicleFields(actor, [field])), name + ' must be left out');
+  }
+  const real = { items: new FakeCollection([{ name: 'Complicated Past', type: 'complication' }]) };
+  assert.equal(extractCollectionField(real, field), 'Complicated Past');
+  assert.equal(isPlaceholderName({ name: 'New Title', type: 'title' }), true);
+  assert.equal(isPlaceholderName({ name: 'Fury', type: 'class' }), false);
+  assert.equal(isPlaceholderName({ name: 'Class' }), false, 'no type, no placeholder');
 });
 
 test('buildChronicleFields sets null for a missing scalar path', () => {
