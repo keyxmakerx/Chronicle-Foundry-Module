@@ -193,14 +193,27 @@
 }
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-gem-top { top: 10px; }
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-gem-foot { top: calc(100cqh - 20px); }
-/* The card's foot fades to navy, so a tall name or a scrolled tab slides
-   under the border instead of across it. */
+/* The scrolling page ends inside the frame: below the inner border the
+   card is solid navy, the page fades out just above it, and the foot
+   corners are navy behind their flourishes, so nothing that scrolls shows
+   under the gold or outside it. */
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-fade {
-  top: calc(100cqh - 48px);
-  left: 14px;
-  right: 14px;
-  height: 34px;
-  background: linear-gradient(transparent, var(--cs-gilded-navy-lo));
+  z-index: -1;
+  top: calc(100cqh - 104px);
+  left: 0;
+  right: 0;
+  height: 104px;
+  background:
+    radial-gradient(74px 74px at 24px calc(100% - 24px), var(--cs-gilded-navy-lo) 50%, transparent),
+    radial-gradient(74px 74px at calc(100% - 24px) calc(100% - 24px), var(--cs-gilded-navy-lo) 50%, transparent),
+    linear-gradient(transparent calc(100% - 64px), var(--cs-gilded-navy-lo) calc(100% - 26px));
+}
+/* Room after the open tab so its last line can scroll clear of the foot. */
+.chronicle-hero-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content::after {
+  content: "";
+  grid-column: 1 / -1;
+  grid-row: 7;
+  height: 52px;
 }
 /* Foil light: a slanted band that crosses the card now and then. */
 .chronicle-hero-sheet[data-cs-look="gilded"] .cs-gc-foilbox {
@@ -1047,7 +1060,7 @@
   padding: 6px;
   border-color: var(--cs-gilded-line-hi);
   border-radius: 3px;
-  background: color-mix(in srgb, var(--cs-gilded-navy) 97%, transparent);
+  background: var(--cs-gilded-navy);
   box-shadow: 0 22px 50px color-mix(in srgb, var(--cs-gilded-shade) 80%, transparent), inset 0 0 0 3px var(--cs-gilded-navy), inset 0 0 0 4px color-mix(in srgb, var(--cs-gilded-gold) 40%, transparent);
   font: 15px/1.25 var(--cs-hero-face);
   transform-origin: 50% 0;

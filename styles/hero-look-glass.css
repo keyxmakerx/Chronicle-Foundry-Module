@@ -614,7 +614,7 @@
 .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-temp {
   position: absolute;
   left: 50%;
-  top: -10px;
+  top: -11px;
   gap: 4px;
   align-items: center;
   padding: 0 5px;
@@ -627,7 +627,7 @@
 }
 .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-temp > span { font: 600 8.5px/1.6 var(--cs-glass-display); letter-spacing: 0.04em; text-transform: uppercase; color: var(--cs-hero-muted); }
 .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-temp:focus-within { border-color: var(--cs-glass-teal); box-shadow: 0 0 10px var(--cs-glass-teal-50); }
-.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-box .cs-glass-temp input[type="number"] { width: 2.6ch; height: 18px; font-size: 11px; text-align: left; }
+.chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-box .cs-glass-temp input[type="number"] { width: 2.6ch; height: 15px; font-size: 11px; text-align: left; }
 .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-stam[data-band="winded"] .cs-glass-n, .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-stam:is([data-band="dying"], [data-band="dead"]) .cs-glass-n { color: var(--cs-glass-rose); }
 .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-stam[data-band="winded"] .cs-field input[type="number"], .chronicle-hero-sheet[data-cs-look="glass"] .cs-glass-stam:is([data-band="dying"], [data-band="dead"]) .cs-field input[type="number"] { color: var(--cs-glass-rose); }
 
@@ -1015,7 +1015,7 @@
   padding: 5px;
   border-color: var(--cs-glass-edge);
   border-radius: 12px;
-  background: var(--cs-glass-fill-solid);
+  background: linear-gradient(160deg, var(--cs-glass-panel-a), var(--cs-glass-panel-b));
   box-shadow: 0 22px 48px color-mix(in srgb, var(--cs-glass-black) 70%, transparent), 0 0 24px var(--cs-glass-teal-10), inset 0 1px 0 color-mix(in srgb, var(--cs-glass-ink) 12%, transparent);
   -webkit-backdrop-filter: blur(16px) saturate(1.3);
   backdrop-filter: blur(16px) saturate(1.3);

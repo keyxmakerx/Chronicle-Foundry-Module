@@ -95,6 +95,8 @@
   --cs-sky-moon-b: #6f78a8;
   --cs-sky-mask: #000000;
   --cs-sky-menu: #0a0e2a;
+  /* A dark halo round the italic lines, so a star just beside a word does not read as punctuation. */
+  --cs-sky-text-halo: 0 0 2px var(--cs-sky-top), 0 0 5px var(--cs-sky-top), 0 0 9px color-mix(in srgb, var(--cs-sky-top) 80%, transparent);
   --cs-sky-card-mid: #141a40;
   --cs-sky-card-low: #3a2658;
   --cs-sky-shadow: #000000cc;
@@ -188,7 +190,7 @@
   border-radius: 50%;
   background: var(--cs-sky-star);
   box-shadow: 0 0 calc(var(--s) * 2px) var(--cs-sky-peri);
-  opacity: 0.85;
+  opacity: 0.6;
 }
 /* Thirty stars twinkle, each on its own rhythm; the rest hold still. */
 .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-stars .tw1 { animation: cs-sky-twinkle 3.2s ease-in-out infinite; }
@@ -341,7 +343,9 @@
   transition: opacity 1s ease;
 }
 .chronicle-hero-sheet[data-cs-look="sky"] .window-content:has(.cs-sky-nums[data-band="winded"]) .cs-sky-ecl { --rest: 0.35; }
-.chronicle-hero-sheet[data-cs-look="sky"] .window-content:has(.cs-sky-nums:is([data-band="dying"], [data-band="dead"])) .cs-sky-ecl { --rest: 0.8; }
+/* Dying shades the moon but keeps the face readable; only death covers it. */
+.chronicle-hero-sheet[data-cs-look="sky"] .window-content:has(.cs-sky-nums[data-band="dying"]) .cs-sky-ecl { --rest: 0.55; }
+.chronicle-hero-sheet[data-cs-look="sky"] .window-content:has(.cs-sky-nums[data-band="dead"]) .cs-sky-ecl { --rest: 0.8; }
 
 /* ---- The name ---------------------------------------------------------- */
 .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-id {
@@ -536,6 +540,7 @@
 .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-primary .cs-sky-big { color: var(--cs-sky-violet); }
 .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-epic .cs-sky-big { color: var(--cs-sky-violet); }
 .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-surges .cs-sky-big { color: var(--cs-sky-ember); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-speed .cs-sky-big { display: block; height: 50px; line-height: 48px; }
 .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-big small { font-size: 13px; font-weight: 400; color: var(--cs-sky-dim); }
 .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-nums .cs-field.cs-sky-big { align-items: baseline; gap: 4px; }
 /* The number is the field: a dotted line shows under it on hover, a solid gold one when typing. */
@@ -595,6 +600,7 @@
   margin: 2px 0 0;
   font: italic 400 15px/1.4 var(--cs-sky-serif);
   color: var(--cs-sky-soft);
+  text-shadow: var(--cs-sky-text-halo);
 }
 .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-mini {
   display: inline-flex;
@@ -718,13 +724,18 @@
 .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-skill-list {
   display: flex;
   flex-wrap: wrap;
-  margin: 6px 0 0;
+  /* Each name carries its dot in front; the list starts one dot's width to
+     the left and that strip is clipped, so a line never begins or ends with
+     a stray dot that reads as a full stop. */
+  margin: 6px 0 0 -1.4em;
   padding: 0;
   list-style: none;
   font: italic 400 16px/1.5 var(--cs-sky-serif);
   color: var(--cs-hero-body);
+  text-shadow: var(--cs-sky-text-halo);
+  clip-path: inset(-12px -12px -12px 1.4em);
 }
-.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-skill-list li:not(:last-child)::after { content: "·"; margin: 0 0.5em; color: var(--cs-sky-dim); }
+.chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-skill-list li::before { content: "·"; display: inline-block; width: 1.4em; text-align: center; color: var(--cs-sky-dim); }
 .chronicle-hero-sheet[data-cs-look="sky"] .cs-sky-none { margin: 6px 0 0; font: italic 400 16px var(--cs-sky-serif); color: var(--cs-hero-muted); }
 
 /* ---- The tab row: thin capitals on the sky, the open one gold with a star dot */
@@ -965,7 +976,7 @@
   padding: 6px 6px 6px 5px;
   border-color: var(--cs-sky-line-strong);
   border-radius: 14px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--cs-sky-high) 97%, transparent), color-mix(in srgb, var(--cs-sky-menu) 97%, transparent));
+  background: linear-gradient(180deg, var(--cs-sky-high), var(--cs-sky-menu));
   box-shadow: 0 22px 60px var(--cs-sky-shadow), 0 0 40px color-mix(in srgb, var(--cs-sky-peri) 8%, transparent);
   font: italic 400 16px/1.25 var(--cs-sky-serif);
   animation: cs-sky-menu-in 0.3s ease-out both;
