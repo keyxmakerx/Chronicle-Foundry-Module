@@ -366,7 +366,7 @@ Needs Draw Steel 1.1.0 or later; on an older Draw Steel the sheet is not offered
 - [ ] Click a characteristic on the card -> Draw Steel's roll dialog for it; Respite -> Draw Steel's respite
 - [ ] Abilities on the card -> the full sheet, on the Abilities tab; Open -> the full sheet at the size and place it had before folding
 - [ ] Close the card and open the hero again -> it opens as the card, where it was left. A second player on another computer still gets the full sheet until they fold it themselves
-- [ ] Sheet look -> a menu headed "Sheet look for <hero>": "Chronicle", ticked and marked "now", a line, then "Draw Steel's own sheet". With Draw Steel Plus switched on, "Draw Steel Plus", marked "found installed", sits above it. Arrow keys move, Escape closes it and puts focus back on the palette button, a click elsewhere closes it
+- [ ] Sheet look -> a menu headed "Sheet look for <hero>": "Chronicle", ticked and marked "now", "The portrait hall", a line, then "Draw Steel's own sheet". With Draw Steel Plus switched on, "Draw Steel Plus", marked "found installed", sits above it. Arrow keys move, Escape closes it and puts focus back on the palette button, a click elsewhere closes it
 - [ ] Pick "Draw Steel's own sheet" -> the window closes and the hero opens in Draw Steel's sheet (come back through Sheet configuration). With Draw Steel Plus on, pick it -> the hero opens in Draw Steel Plus's sheet
 - [ ] Click the portrait -> a menu: "See the full picture" (the GM can show it to everyone from there), "See the token" (for owners, when the hero has its own token picture), and "Change picture or token", which opens the hero's Chronicle page in a pop-up window. That last row shows only on a hero linked to Chronicle, for the GM or a player whose Foundry user is linked to a Chronicle account
 - [ ] In Edit mode, the portrait menu starts with "Choose a picture file" -> Foundry's file picker; the picked picture becomes the portrait
@@ -375,6 +375,26 @@ Needs Draw Steel 1.1.0 or later; on an older Draw Steel the sheet is not offered
 - [ ] Fold, open, the two menus and picking a look change nothing in Chronicle: the hero's history in Chronicle shows no new entry
 - [ ] Switch the hero back to Draw Steel's sheet -> Draw Steel's sheet, nothing lost
 - [ ] On a world with Draw Steel older than 1.1 (if one is to hand): the Sheet list has no "Chronicle hero sheet"
+
+#### The portrait hall look
+Open a hero in the Chronicle hero sheet, then palette button in the title bar -> "The portrait hall".
+- [ ] The window grows to about 1100 by 760 and turns black and gold: the hero's picture fills the left, with "Level N · class · subclass", the name, the origins, XP, Victories and Take Respite over its foot, a thin gold frame round the window; on the right the Stamina ring, recoveries, heroic resource and surges as rows of diamonds, the combat line, five six-sided plaques and the skills; the tabs run down a gold rail on the far right, Abilities open
+- [ ] On first opening, the picture fades up, the name and boxes rise in turn and the plaques flip in, all within about a second and a half; set Motion (module settings) to Calm -> only fades; Off -> no movement at all. The same with the computer's "reduce motion" setting on
+- [ ] Pictures: try a bright picture, a wide landscape picture and a hero with no picture of its own. The name stays readable over the bright one, the wide one fills the left without stretching, and with no picture a gold shield outline stands in
+- [ ] A long name (about 20 letters) stays on one line at full size and wraps between words, never mid-word, when narrower
+- [ ] Foundry's light theme: the hall stays dark and readable; switch the hero back to "Chronicle" -> the light look returns
+- [ ] Plaques: a characteristic of 2 or more is gold, 1 bronze, 0 or less iron; hover lifts a plaque; click it -> Draw Steel's roll dialog
+- [ ] Damage the hero (its token on the map, or type a lower Stamina) -> the picture jolts, its edges flash red and the Stamina number thumps; at or under the winded figure the ring turns amber and says "Winded", at 0 or less red and "Dying". Heal it -> the ring glows for a moment and turns back to green
+- [ ] With Level up showing, the level glints; level the hero up -> a gold light sweeps across the window
+- [ ] Type in Stamina, temporary Stamina, recoveries, heroic resource and surges -> each saves; the hero token, recovery heart and surge bolt buttons work as on Draw Steel's sheet
+- [ ] Drag the window narrower: about 820 wide everything still fits beside the picture; under about 760 the picture becomes a banner across the top, the boxes go under it and the tabs become a row
+- [ ] Every tab (Abilities, Features, Equipment, Projects, Effects, Biography) works as on Draw Steel's sheet, in black and gold; ability names have room beside Cost, Distance and Target
+- [ ] Edit mode (padlock): the name field, origins with remove and add, XP and Victories fields, and Draw Steel's editors on the right, rising in one after another
+- [ ] Fold -> the card in black and gold, with all five characteristic names readable; Open -> the hall again, at its size
+- [ ] Press Tab through the sheet -> a clear gold ring shows on each plaque, button and field
+- [ ] A Limited viewer sees the hall's picture, name, class, origins, level, XP and victories, the tab rail and Biography, and nothing else
+- [ ] Module settings now show "Default hero sheet look" and "Lock hero sheet looks" (GM only). Set the default to "The portrait hall" -> a hero that never picked a look opens in the hall. Turn the lock on -> every hero shows the default look; the Sheet look menu greys out the other looks with a note ("Your GM has set the look for every hero" for a player, "Locked to the world's default look in the module settings" for the GM), and "Draw Steel's own sheet" still works for both
+- [ ] Picking the hall changes nothing in Chronicle: the hero's history in Chronicle shows no new entry
 
 ### Foundry -> Chronicle
 - [ ] Create character Actor in Foundry -> Page created in Chronicle with mapped fields

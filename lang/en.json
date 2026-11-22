@@ -22,7 +22,8 @@
     "HeroSheet": {
       "Name": "Chronicle hero sheet",
       "Looks": {
-        "chronicle": "Chronicle"
+        "chronicle": "Chronicle",
+        "hall": "The portrait hall"
       },
       "Remove": "Remove",
       "StillToChoose": "Still to choose",
@@ -34,6 +35,12 @@
       "Dead": "Dead",
       "SpendRecovery": "Spend a recovery",
       "RecoveryHeals": "Each recovery heals {n}",
+      "OfStamina": "of {max} Stamina",
+      "Metal": {
+        "gold": "Gold",
+        "bronze": "Bronze",
+        "iron": "Iron"
+      },
       "HeroicResource": "Heroic resource",
       "EpicResource": "Epic resource",
       "Potency": "Potency",
@@ -56,6 +63,7 @@
         "Heading": "Sheet look for {name}",
         "Now": "Now",
         "Locked": "Your GM has set the look for every hero",
+        "LockedGM": "Locked to the world's default look in the module settings",
         "Plus": "Draw Steel Plus",
         "PlusNote": "Offered only while that module is switched on in this world",
         "Found": "found installed",

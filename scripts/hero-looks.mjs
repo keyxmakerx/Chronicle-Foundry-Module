@@ -25,8 +25,9 @@ import { FLAG_SCOPE, MODULE_ID, syncOptions } from './constants.mjs';
 import { closeHeroMenu, openHeroMenu } from './hero-menu.mjs';
 import {
   DEFAULT_LOOK, DRAW_STEEL_PLUS_MODULE, HERO_LOOKS, LOOK_FLAG,
-  chronicleParts, chroniclePageUrl, chronicleTabs, conditionList, drawSteelSupported, fitRenderParts,
-  pickerRows, portraitRows, recoveryDots, resolveLook, staminaView, withFold,
+  allLookTemplates, chronicleParts, chroniclePageUrl, chronicleTabs, conditionList, countDiamonds, drawSteelSupported,
+  fitRenderParts, lookTemplate, pickerRows, plaqueMetal, portraitRows, recoveryDots, resolveLook, ringSegments,
+  sheetChanges, skillNames, staminaView, withFold,
 } from './_hero-looks.mjs';
 
 /** The GM's default look for every hero, and whether players may change it. */
@@ -37,6 +38,42 @@ export const FOLD_SETTING = 'heroSheetFolds';
 
 /** The folded card's width; its height follows its content. */
 const CARD_WIDTH = 296;
+
+/** A look's own size for a hero's first open, where it differs from the sheet's. */
+const LOOK_SIZE = { hall: { width: 1100, height: 760 } };
+
+/** Looks that play their own opening move, so Chronicle's window grow stays off them. */
+const OWN_OPENING_LOOKS = new Set(['hall']);
+
+/**
+ * Looks drawn dark whatever Foundry's theme, so Draw Steel's own fields and
+ * editors inside them take Foundry's dark colours too.
+ */
+const DARK_LOOKS = new Set(['hall']);
+
+/**
+ * Put a window in Foundry's dark theme, or give back the theme classes it had.
+ * What it had is kept on the window, so switching to a look that follows
+ * Foundry's theme restores it.
+ * @param {HTMLElement} el
+ * @param {boolean} dark
+ */
+export function forceDarkTheme(el, dark) {
+  if (!el?.classList || !el.dataset) return;
+  const kept = el.dataset.csTheme;
+  if (dark && kept === undefined) {
+    el.dataset.csTheme = ['themed', 'theme-light', 'theme-dark'].filter((c) => el.classList.contains(c)).join(' ');
+    el.classList.remove('theme-light');
+    el.classList.add('themed', 'theme-dark');
+  } else if (!dark && kept !== undefined) {
+    el.classList.remove('themed', 'theme-light', 'theme-dark');
+    if (kept) el.classList.add(...kept.split(' '));
+    delete el.dataset.csTheme;
+  }
+}
+
+/** How long each of a look's moves runs, so its class comes off after (ms). */
+const MOVE_MS = { open: 1500, hit: 950, heal: 1050, level: 2200, editin: 900 };
 
 /** The title bar's Fold button: fold in, or open out. */
 const FOLD_ICON = 'fa-solid fa-down-left-and-up-right-to-center';
@@ -125,6 +162,12 @@ export function makeChronicleHeroSheet(Base) {
 
     /** Whether this window already told the player the card failed. */
     #cardFailureTold = false;
+
+    /** Stamina, level and mode at the last draw, for the look's moves. */
+    #seen = null;
+
+    /** The timers taking each move's class off again. */
+    #moveTimers = {};
 
     /** The look this hero is drawn in. */
     get look() {
@@ -216,18 +259,21 @@ export function makeChronicleHeroSheet(Base) {
     /** @override */
     _configureRenderOptions(options) {
       super._configureRenderOptions(options);
+      if (!options.isFirstRender) return;
       // Open straight into the card, so the full sheet never flashes first.
-      if (options.isFirstRender && this.folded) options.position = { ...(options.position ?? {}), ...this.#cardPosition() };
+      if (this.folded) options.position = { ...(options.position ?? {}), ...this.#cardPosition() };
+      else if (LOOK_SIZE[this.look]) options.position = { ...(options.position ?? {}), ...LOOK_SIZE[this.look] };
     }
 
     /** @override */
     async _preFirstRender(context, options) {
       await super._preFirstRender?.(context, options);
-      // Opened as the card, the full sheet's templates must still be ready for Open.
-      if (!this.folded) return;
-      const templates = Object.values(this.constructor.PARTS).flatMap((p) => [p.template, ...(p.templates ?? [])]).filter(Boolean);
+      // Every look's templates, so changing the look draws at once. Opened as
+      // the card, the full sheet's partials must still be ready for Open.
+      const templates = [...allLookTemplates()];
+      if (this.folded) templates.push(...Object.values(this.constructor.PARTS).flatMap((p) => [p.template, ...(p.templates ?? [])]));
       try {
-        await globalThis.foundry?.applications?.handlebars?.loadTemplates?.(templates);
+        await globalThis.foundry?.applications?.handlebars?.loadTemplates?.([...new Set(templates.filter(Boolean))]);
       } catch (err) {
         console.warn('Chronicle Sync | hero sheet templates not preloaded', err);
       }
@@ -236,8 +282,15 @@ export function makeChronicleHeroSheet(Base) {
     /** @override */
     _configureRenderParts(options) {
       const parts = super._configureRenderParts(options);
-      if (this.folded) return { card: parts.card ?? { ...this.constructor.PARTS.card } };
+      const look = this.look;
+      // Each part in the look's own template, or the Chronicle look's.
+      const inLook = (id, part) => {
+        const template = lookTemplate(look, id);
+        return template && part ? { ...part, template } : part;
+      };
+      if (this.folded) return { card: inLook('card', parts.card ?? { ...this.constructor.PARTS.card }) };
       delete parts.card;
+      for (const id of Object.keys(parts)) parts[id] = inLook(id, parts[id]);
       return parts;
     }
 
@@ -247,6 +300,9 @@ export function makeChronicleHeroSheet(Base) {
       // On the frame, so the first paint already has the look and the fold.
       if (frame?.dataset) frame.dataset.csLook = this.look;
       frame?.classList?.toggle('cs-folded', this.folded);
+      // Read by Chronicle's window grow (scripts/motion.mjs), which this look's opening replaces.
+      frame?.classList?.toggle('cs-own-opening', OWN_OPENING_LOOKS.has(this.look) && !this.folded);
+      forceDarkTheme(frame, DARK_LOOKS.has(this.look));
       return frame;
     }
 
@@ -287,7 +343,14 @@ export function makeChronicleHeroSheet(Base) {
       if (!this.element) return;
       this.element.dataset.csLook = this.look;
       this.element.classList.toggle('cs-folded', this.folded);
+      this.element.classList.toggle('cs-own-opening', OWN_OPENING_LOOKS.has(this.look) && !this.folded);
+      forceDarkTheme(this.element, DARK_LOOKS.has(this.look));
       this.#drawn = this.folded ? 'card' : 'full';
+      try {
+        this.#playMoves(options);
+      } catch (err) {
+        console.warn('Chronicle Sync | hero sheet move not played', err);
+      }
       if (this.#refocus) {
         this.element.querySelector(`[data-action="${this.#refocus}"]`)?.focus?.();
         this.#refocus = null;
@@ -301,6 +364,32 @@ export function makeChronicleHeroSheet(Base) {
         const content = this.element.querySelector('.window-content');
         if (content) content.scrollTop = this.#scrollTop;
       }
+    }
+
+    /**
+     * The look's own moves: its opening on the first draw, then a hit, a
+     * heal, a level gained or Edit mode entered, each a class on the window
+     * that the look's CSS animates and the motion level can stop.
+     */
+    #playMoves(options) {
+      const sys = this.document?.system ?? {};
+      const now = { stamina: sys.stamina?.value ?? null, level: sys.level ?? null, isPlay: this.isPlayMode !== false };
+      const before = this.#seen;
+      this.#seen = now;
+      if (this.folded || !OWN_OPENING_LOOKS.has(this.look)) return;
+      const moves = options?.isFirstRender ? ['open'] : sheetChanges(before, now);
+      for (const move of moves) this.#play(move);
+    }
+
+    #play(move) {
+      const el = this.element;
+      const cls = `cs-move-${move}`;
+      clearTimeout(this.#moveTimers[move]);
+      // Taken off and put back, so a second hit restarts the move.
+      el.classList.remove(cls);
+      void el.offsetWidth;
+      el.classList.add(cls);
+      this.#moveTimers[move] = setTimeout(() => el.classList.remove(cls), MOVE_MS[move] ?? 1000);
     }
 
     /** @override */
@@ -502,6 +591,13 @@ export function makeChronicleHeroSheet(Base) {
         recoveryDots: recoveryDots(sys.recoveries?.value, sys.recoveries?.max),
         conditions: conditionList(actor.statuses ?? [], effects, staminaStates),
         showEpic: (sys.level ?? 0) >= 10,
+        // The portrait hall's plaques, ring and diamonds.
+        metals: Object.fromEntries(Object.entries(sys.characteristics ?? {}).map(([key, c]) => [key, plaqueMetal(c?.value)])),
+        ring: ringSegments(sys.recoveries?.value, sys.recoveries?.max),
+        primaryDiamonds: countDiamonds(sys.hero?.primary?.value),
+        surgeDiamonds: countDiamonds(sys.hero?.surges),
+        epicDiamonds: countDiamonds(sys.hero?.epic?.value),
+        skills: skillNames(sys.skills?.value, globalThis.ds?.CONFIG?.skills?.list, i18n?.lang),
       };
     }
   };

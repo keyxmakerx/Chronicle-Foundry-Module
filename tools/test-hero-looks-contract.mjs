@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
-import { HERO_LOOKS } from '../scripts/_hero-looks.mjs';
+import { HERO_LOOKS, lookTemplate } from '../scripts/_hero-looks.mjs';
 import { makeChronicleHeroSheet } from '../scripts/hero-looks.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -140,13 +140,29 @@ function tags(src) {
   return [...src.matchAll(/<([a-zA-Z][a-zA-Z0-9-]*)((?:[^>"]|"[^"]*")*)>/g)].map((m) => ({ name: m[1].toLowerCase(), attrs: m[2] }));
 }
 
+/** The file on disk a look draws a part with, its own or the first look's. */
+function partFile(look, part) {
+  const path = lookTemplate(look, part);
+  assert.ok(path, `${look} has no ${part} template`);
+  return resolve(ROOT, path.replace(/^modules\/chronicle-sync\//, ''));
+}
+
 test('every look in the catalogue has its templates, and every template folder is a look', () => {
   assert.deepEqual(looksOnDisk(), HERO_LOOKS.map((l) => l.id).sort());
+  // The first look draws every part, so the others can fall back to it.
+  assert.deepEqual([...HERO_LOOKS[0].parts].sort(), [...LOOK_PARTS].sort());
   for (const look of HERO_LOOKS) {
-    for (const part of LOOK_PARTS) {
-      assert.ok(existsSync(join(LOOKS_DIR, look.id, `${part}.hbs`)), `${look.id}/${part}.hbs`);
-    }
+    const files = templatesOf(look.id).map((f) => f.slice(f.lastIndexOf('/') + 1)).sort();
+    assert.deepEqual(files, look.parts.map((p) => `${p}.hbs`).sort(), `${look.id}: its folder holds exactly the parts it draws`);
+    for (const part of LOOK_PARTS) assert.ok(existsSync(partFile(look.id, part)), `${look.id}/${part}`);
   }
+});
+
+test('a look without its own template for a part draws the first look\'s', () => {
+  assert.equal(lookTemplate('hall', 'header'), 'modules/chronicle-sync/templates/hero-looks/hall/header.hbs');
+  assert.equal(lookTemplate('hall', 'card'), 'modules/chronicle-sync/templates/hero-looks/chronicle/card.hbs');
+  assert.equal(lookTemplate('nope', 'stats'), 'modules/chronicle-sync/templates/hero-looks/chronicle/stats.hbs');
+  assert.equal(lookTemplate('hall', 'tabs'), null);
 });
 
 test('the sheet handles each of its own actions', () => {
@@ -156,9 +172,9 @@ test('the sheet handles each of its own actions', () => {
 });
 
 for (const look of looksOnDisk()) {
-  const header = read(join(LOOKS_DIR, look, 'header.hbs'));
-  const stats = read(join(LOOKS_DIR, look, 'stats.hbs'));
-  const card = read(join(LOOKS_DIR, look, 'card.hbs'));
+  const header = read(partFile(look, 'header'));
+  const stats = read(partFile(look, 'stats'));
+  const card = read(partFile(look, 'card'));
 
   test(`${look}: every action is one Draw Steel or the sheet handles`, () => {
     for (const file of templatesOf(look)) {

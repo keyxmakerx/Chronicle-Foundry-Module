@@ -352,24 +352,31 @@ test('the look picker lists the look, Draw Steel Plus when it is on, and Draw St
   const { Sheet, sheet, root, anchor } = sheetFor({ plus: true });
   Sheet.DEFAULT_OPTIONS.actions.csLookPicker.call(sheet, {}, anchor);
   assert.deepEqual(labels(root), [
-    'CHRONICLE.HeroSheet.Looks.chronicle', 'CHRONICLE.HeroSheet.Picker.Plus', 'CHRONICLE.HeroSheet.Picker.DrawSteel',
+    'CHRONICLE.HeroSheet.Looks.chronicle', 'CHRONICLE.HeroSheet.Looks.hall', 'CHRONICLE.HeroSheet.Picker.Plus', 'CHRONICLE.HeroSheet.Picker.DrawSteel',
   ]);
   assert.match(menuOf(root).querySelector('.cs-menu-head').textContent, /Picker\.Heading \{"name":"Ash"\}/);
   assert.equal(items(menuOf(root))[0].getAttribute('aria-checked'), 'true');
+  assert.equal(items(menuOf(root))[1].getAttribute('aria-checked'), 'false');
   // The other sheets are plain rows after a line, not choices of a look.
-  assert.equal(items(menuOf(root))[2].getAttribute('role'), 'menuitem');
+  assert.equal(items(menuOf(root))[3].getAttribute('role'), 'menuitem');
   assert.equal(menuOf(root).querySelectorAll('hr').length, 1);
 }));
 
-test('picking another sheet stores it as the hero\'s sheet; picking the current look writes nothing', () => withGlobals(async () => {
+test('picking a look stores it on the hero, picking another sheet stores that; the current look writes nothing', () => withGlobals(async () => {
   const { Sheet, sheet, root, anchor, calls } = sheetFor();
-  Sheet.DEFAULT_OPTIONS.actions.csLookPicker.call(sheet, {}, anchor);
-  fire(items(menuOf(root))[0], 'click');
-  fire(menuOf(root), 'animationend');
-  Sheet.DEFAULT_OPTIONS.actions.csLookPicker.call(sheet, {}, anchor);
-  fire(items(menuOf(root))[1], 'click');
-  await new Promise((r) => setImmediate(r));
-  assert.deepEqual(calls, [['update', { 'flags.core.sheetClass': DRAW_STEEL_SHEET }, { chronicleSync: true }]]);
+  const pick = async (i) => {
+    Sheet.DEFAULT_OPTIONS.actions.csLookPicker.call(sheet, {}, anchor);
+    fire(items(menuOf(root))[i], 'click');
+    fire(menuOf(root), 'animationend');
+    await new Promise((r) => setImmediate(r));
+  };
+  await pick(0);
+  await pick(1);
+  await pick(2);
+  assert.deepEqual(calls, [
+    ['update', { 'flags.chronicle-sync.heroLook': 'hall' }, { chronicleSync: true }],
+    ['update', { 'flags.core.sheetClass': DRAW_STEEL_SHEET }, { chronicleSync: true }],
+  ]);
 }));
 
 test('a picker write that fails tells the player and leaves the sheet as it was', () => withGlobals(async () => {

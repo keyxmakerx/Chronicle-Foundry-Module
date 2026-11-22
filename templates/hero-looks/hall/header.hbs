@@ -1,0 +1,101 @@
+{{!-- The portrait hall header: the hero's picture fills the left of the
+window, with the level and class, the name, the origins, XP and victories
+set over its foot. A Limited viewer sees this part, so it shows only what
+Draw Steel's own header shows. Origins keep Draw Steel's markup: the item's
+uuid on the entry, viewDoc on its name, deleteDoc and addOrigin in Edit. --}}
+<header class="cs-hero-head cs-hall-head" style="{{#if avatarProperties.objectFit}}--avatar-object-fit: {{avatarProperties.objectFit}};{{/if}}{{#if avatarProperties.objectPosition}} --avatar-object-position: {{avatarProperties.objectPosition}};{{/if}}">
+  {{#*inline "csOrigin"}}
+  {{#if originDoc}}
+  <li class="cs-hall-origin" data-document-uuid="{{originDoc.uuid}}">
+    {{#unless @root.isPlay}}<span class="cs-hall-kind">{{localize (concat "TYPES.Item." originType)}}</span>{{/unless}}
+    <a class="cs-hall-origin-name" data-action="viewDoc" data-tooltip="{{localize (concat "TYPES.Item." originType)}}">{{originDoc.name}}</a>
+    {{#unless (or @root.isPlay noEdit)}}
+    <a class="cs-hall-del" data-action="deleteDoc" aria-label="{{localize "CHRONICLE.HeroSheet.Remove"}}" data-tooltip="CHRONICLE.HeroSheet.Remove"><i class="fa-solid fa-trash-can" inert></i></a>
+    {{/unless}}
+  </li>
+  {{else}}
+  {{#unless (and (not @root.isPlay) noEdit)}}
+  <li class="cs-hall-origin cs-hall-todo">
+    {{#if @root.isPlay}}
+    <span>{{localize (concat "TYPES.Item." originType)}}: {{localize "CHRONICLE.HeroSheet.StillToChoose"}}</span>
+    {{else}}
+    <a data-action="addOrigin" data-type="{{originType}}">{{localize "DRAW_STEEL.SHEET.Add" itemName=(localize (concat "TYPES.Item." originType))}}</a>
+    {{/if}}
+  </li>
+  {{/unless}}
+  {{/if}}
+  {{/inline}}
+
+  <div class="cs-hall-art">
+    {{!-- Shown where the hero has no picture of their own. --}}
+    <svg class="cs-hall-crest" viewBox="0 0 600 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+      <g fill="none" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+        <path d="M300 170c110 30 150 60 150 60v170c0 110-70 180-150 230-80-50-150-120-150-230V230s40-30 150-60z"/>
+        <path d="M300 250v270M276 300h48M288 520h24l-12 40z"/>
+      </g>
+    </svg>
+    {{!-- The whole picture is the portrait button. Its menu offers the full
+    picture, the token and, in Edit mode, Foundry's file picker, which reads
+    data-edit off the picture. --}}
+    <button type="button" class="cs-portrait-btn" data-action="csPortraitMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize "CHRONICLE.HeroSheet.Portrait.Menu"}}" data-tooltip="CHRONICLE.HeroSheet.Portrait.Menu">
+      <img class="cs-portrait" src="{{document.img}}" alt="{{document.name}}" {{#unless isPlay}}data-edit="img"{{/unless}}>
+    </button>
+    <div class="cs-hall-veil" aria-hidden="true"></div>
+    <div class="cs-hall-flash" aria-hidden="true"></div>
+  </div>
+  {{!-- The gold frame and the level-up light reach across the whole window. --}}
+  <div class="cs-hall-frame" aria-hidden="true"></div>
+  <div class="cs-hall-sweep" aria-hidden="true"></div>
+
+  <div class="cs-hall-id">
+    <p class="cs-hall-eye">
+      {{#if system.advancementReady}}
+      <button type="button" class="cs-hall-lvl cs-hall-lvlup" {{disabled (not editable)}} data-action="levelUp" data-tooltip="DRAW_STEEL.SHEET.LevelUp">
+        {{localize "CHRONICLE.HeroSheet.LevelN" level=system.level}} <i class="fa-solid fa-up-long" inert></i>
+      </button>
+      {{else}}
+      <span class="cs-hall-lvl">{{localize "CHRONICLE.HeroSheet.LevelN" level=system.level}}</span>
+      {{/if}}
+      {{#with document.system.class as |cls|}}
+      <span class="cs-hall-cls" data-document-uuid="{{cls.uuid}}"><a data-action="viewDoc">{{cls.name}}</a></span>
+      {{/with}}
+      {{#each document.system.subclasses as |sub|}}
+      <span class="cs-hall-cls cs-hall-sub" data-document-uuid="{{sub.uuid}}"><a data-action="viewDoc">{{sub.name}}</a></span>
+      {{/each}}
+    </p>
+    {{#if isPlay}}
+    <h1 class="cs-name">{{document.name}}</h1>
+    {{else}}
+    <div class="cs-name-edit">
+      {{formInput fields.name value=source.name placeholder=(localize "DOCUMENT.FIELDS.name.label")}}
+    </div>
+    {{/if}}
+    <ul class="cs-hall-origins">
+      {{> csOrigin originDoc=document.system.ancestry originType="ancestry"}}
+      {{> csOrigin originDoc=document.system.culture originType="culture"}}
+      {{> csOrigin originDoc=document.system.career originType="career"}}
+      {{#unless isPlay}}
+      {{> csOrigin originDoc=document.system.class originType="class"}}
+      {{#each document.system.subclasses as |subclass|}}
+      {{> csOrigin originDoc=subclass originType="subclass" noEdit=true}}
+      {{/each}}
+      {{/unless}}
+    </ul>
+    {{#if isPlay}}
+    <p class="cs-hall-vic">
+      <span>{{systemFields.hero.fields.xp.label}} <b>{{system.hero.xp}}</b>{{#if system.nextLevelXP}}/{{system.nextLevelXP}}{{/if}}</span>
+      <span>{{systemFields.hero.fields.victories.label}} <b>{{system.hero.victories}}</b>{{#if system.victoriesMax}}/{{system.victoriesMax}}{{/if}}</span>
+    </p>
+    {{#if editable}}
+    <button type="button" class="cs-hall-btn cs-respite" data-action="takeRespite">
+      <i class="fa-solid fa-bed" inert></i> {{localize "DRAW_STEEL.Actor.hero.TakeRespite"}}
+    </button>
+    {{/if}}
+    {{else}}
+    <div class="cs-hall-prog-edit">
+      {{formGroup systemFields.hero.fields.xp value=systemSource.hero.xp classes="xp"}}
+      {{formGroup systemFields.hero.fields.victories value=systemSource.hero.victories classes="victories"}}
+    </div>
+    {{/if}}
+  </div>
+</header>
