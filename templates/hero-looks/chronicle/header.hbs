@@ -26,14 +26,11 @@ item's uuid on the chip, viewDoc on its name, deleteDoc and addOrigin in Edit. -
   {{/if}}
   {{/inline}}
 
-  <img
-    class="cs-portrait"
-    src="{{document.img}}"
-    alt="{{document.name}}"
-    data-action="{{ifThen isPlay "showPortraitArtwork" "editImage"}}"
-    {{#unless isPlay}}data-edit="img"{{/unless}}
-    data-tooltip="{{ifThen isPlay "CHRONICLE.HeroSheet.ShowPortrait" "CHRONICLE.HeroSheet.ChangePortrait"}}"
-  >
+  {{!-- The portrait menu offers the full picture, the token and, in Edit
+  mode, Foundry's file picker, which reads data-edit off the picture. --}}
+  <button type="button" class="cs-portrait-btn" data-action="csPortraitMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize "CHRONICLE.HeroSheet.Portrait.Menu"}}" data-tooltip="CHRONICLE.HeroSheet.Portrait.Menu">
+    <img class="cs-portrait" src="{{document.img}}" alt="{{document.name}}" {{#unless isPlay}}data-edit="img"{{/unless}}>
+  </button>
 
   <div class="cs-id">
     {{#if isPlay}}

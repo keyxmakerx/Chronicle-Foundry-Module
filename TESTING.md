@@ -360,6 +360,19 @@ Needs Draw Steel 1.1.0 or later; on an older Draw Steel the sheet is not offered
 - [ ] Press Tab until Stamina's number is reached -> a clear accent ring shows around it
 - [ ] Edit mode (padlock in the title bar): the name field, origin chips with remove and add, XP and Victories fields, and Draw Steel's characteristic, combat, movement, damage and skill editors
 - [ ] A player who owns the hero sees the same; an Observer cannot roll or change values; a Limited viewer sees only the header (picture, name, class, origins, level, XP and victories), the tab row and the Biography tab, as on Draw Steel's sheet
+- [ ] Title bar: beside the padlock, a Fold button (two arrows) and a Sheet look button (palette)
+- [ ] Fold -> the window shrinks to a small card: picture, name, "Level N · class", the Stamina bar and number, recovery marks, the five characteristics, then Abilities, Respite and Open. Drag it beside the map
+- [ ] With the card out, damage the hero's token on the map -> the card's Stamina changes within a moment; the bar turns amber at the winded figure
+- [ ] Click a characteristic on the card -> Draw Steel's roll dialog for it; Respite -> Draw Steel's respite
+- [ ] Abilities on the card -> the full sheet, on the Abilities tab; Open -> the full sheet at the size and place it had before folding
+- [ ] Close the card and open the hero again -> it opens as the card, where it was left. A second player on another computer still gets the full sheet until they fold it themselves
+- [ ] Sheet look -> a menu headed "Sheet look for <hero>": "Chronicle", ticked and marked "now", a line, then "Draw Steel's own sheet". With Draw Steel Plus switched on, "Draw Steel Plus", marked "found installed", sits above it. Arrow keys move, Escape closes it and puts focus back on the palette button, a click elsewhere closes it
+- [ ] Pick "Draw Steel's own sheet" -> the window closes and the hero opens in Draw Steel's sheet (come back through Sheet configuration). With Draw Steel Plus on, pick it -> the hero opens in Draw Steel Plus's sheet
+- [ ] Click the portrait -> a menu: "See the full picture" (the GM can show it to everyone from there), "See the token" (for owners, when the hero has its own token picture), and "Change picture or token", which opens the hero's Chronicle page in a pop-up window. That last row shows only on a hero linked to Chronicle, for the GM or a player whose Foundry user is linked to a Chronicle account
+- [ ] In Edit mode, the portrait menu starts with "Choose a picture file" -> Foundry's file picker; the picked picture becomes the portrait
+- [ ] An Observer has Fold but no Sheet look button, and the portrait menu shows only "See the full picture"; a Limited viewer has neither button, never gets the card, and gets the same one-row portrait menu
+- [ ] With the sheet open on a player's screen, the GM changes that player's permission on the hero (Limited, Observer, Owner) -> Fold and Sheet look appear and disappear to match; a player lowered to Limited while the card is out gets the Limited view, with no card left behind
+- [ ] Fold, open, the two menus and picking a look change nothing in Chronicle: the hero's history in Chronicle shows no new entry
 - [ ] Switch the hero back to Draw Steel's sheet -> Draw Steel's sheet, nothing lost
 - [ ] On a world with Draw Steel older than 1.1 (if one is to hand): the Sheet list has no "Chronicle hero sheet"
 
