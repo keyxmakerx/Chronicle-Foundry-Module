@@ -347,7 +347,7 @@ In **Chronicle Sync → Settings → What syncs**.
 - [ ] As a non-GM player nothing is swapped on their client (only the GM's client applies it)
 
 ### Chronicle hero sheet (Draw Steel)
-Pick it on a hero: open the hero, title bar menu (three dots) -> Sheet -> Sheet: "Chronicle hero sheet" -> Save. Draw Steel's sheet stays the world's default.
+Needs Draw Steel 1.1.0 or later; on an older Draw Steel the sheet is not offered. Pick it on a hero: open the hero, title bar menu (three dots) -> Sheet -> Sheet: "Chronicle hero sheet" -> Save. Draw Steel's sheet stays the world's default.
 - [ ] The hero opens with the portrait, name, "Level N · class · subclass", origin chips (a missing one dashed, "Still to choose"), Level, XP and Victories; below, the characteristic and combat boxes, Stamina with its bar, recoveries, the heroic resource and surges, then potency, damage, conditions and skills; then the tabs, Abilities open
 - [ ] Light and dark interface themes both read cleanly
 - [ ] Click a characteristic box -> Draw Steel's roll dialog for it
@@ -361,6 +361,7 @@ Pick it on a hero: open the hero, title bar menu (three dots) -> Sheet -> Sheet:
 - [ ] Edit mode (padlock in the title bar): the name field, origin chips with remove and add, XP and Victories fields, and Draw Steel's characteristic, combat, movement, damage and skill editors
 - [ ] A player who owns the hero sees the same; an Observer cannot roll or change values; a Limited viewer sees only the header (picture, name, class, origins, level, XP and victories), the tab row and the Biography tab, as on Draw Steel's sheet
 - [ ] Switch the hero back to Draw Steel's sheet -> Draw Steel's sheet, nothing lost
+- [ ] On a world with Draw Steel older than 1.1 (if one is to hand): the Sheet list has no "Chronicle hero sheet"
 
 ### Foundry -> Chronicle
 - [ ] Create character Actor in Foundry -> Page created in Chronicle with mapped fields

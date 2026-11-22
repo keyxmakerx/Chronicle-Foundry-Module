@@ -4,8 +4,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  DEFAULT_LOOK, HERO_LOOKS, LOOK_FLAG,
-  chronicleParts, chronicleTabs, conditionList, recoveryDots, resolveLook, staminaView,
+  DEFAULT_LOOK, HERO_LOOKS, LOOK_FLAG, MIN_DRAW_STEEL,
+  chronicleParts, chronicleTabs, conditionList, drawSteelSupported, recoveryDots, resolveLook, staminaView,
 } from '../scripts/_hero-looks.mjs';
 import { HERO_SHEET_CLASS, makeChronicleHeroSheet, registerHeroLooks } from '../scripts/hero-looks.mjs';
 
@@ -217,6 +217,16 @@ test('a redraw keeps the place the page was scrolled to', async () => {
   assert.equal(content.scrollTop, 340);
 });
 
+test('drawSteelSupported: Draw Steel 1.1.0 or later, plain versions only', () => {
+  assert.equal(MIN_DRAW_STEEL, '1.1.0');
+  for (const v of ['1.1.0', '1.1.2', '1.2', '1.2.3', '1.10.0', '2', '2.0.0', ' 1.1.2 ']) {
+    assert.equal(drawSteelSupported(v), true, v);
+  }
+  for (const v of ['0.10.2', '0.9', '1.0.9', '1.0', '1', undefined, null, '', 'latest', '1.1.0-beta', 'v1.2', '1.2.3.4', '1..2', 1.2]) {
+    assert.equal(drawSteelSupported(v), false, String(v));
+  }
+});
+
 test('registration: Draw Steel heroes only, never the default sheet', () => {
   const saved = { game: globalThis.game, ds: globalThis.ds, foundry: globalThis.foundry };
   const calls = [];
@@ -225,10 +235,16 @@ test('registration: Draw Steel heroes only, never the default sheet', () => {
     globalThis.game = { system: { id: 'dnd5e' } };
     globalThis.ds = { applications: { sheets: { DrawSteelHeroSheet: fakeBase() } } };
     assert.equal(registerHeroLooks(), false);
-    globalThis.game = { system: { id: 'draw-steel' } };
+    globalThis.game = { system: { id: 'draw-steel', version: '1.1.2' } };
     globalThis.ds = undefined;
     assert.equal(registerHeroLooks(), false);
     globalThis.ds = { applications: { sheets: { DrawSteelHeroSheet: fakeBase() } } };
+    for (const version of ['0.10.2', undefined, 'odd']) {
+      globalThis.game = { system: { id: 'draw-steel', version } };
+      assert.equal(registerHeroLooks(), false, `Draw Steel ${version}`);
+    }
+    assert.equal(calls.length, 0);
+    globalThis.game = { system: { id: 'draw-steel', version: '1.1.2' } };
     assert.equal(registerHeroLooks(), true);
     assert.equal(calls.length, 1);
     const [scope, Sheet, options] = calls[0];

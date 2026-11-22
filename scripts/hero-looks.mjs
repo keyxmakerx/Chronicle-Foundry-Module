@@ -16,7 +16,9 @@
  */
 
 import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
-import { LOOK_FLAG, chronicleParts, chronicleTabs, conditionList, recoveryDots, resolveLook, staminaView } from './_hero-looks.mjs';
+import {
+  LOOK_FLAG, chronicleParts, chronicleTabs, conditionList, drawSteelSupported, recoveryDots, resolveLook, staminaView,
+} from './_hero-looks.mjs';
 
 /** The id Foundry stores for the sheet; renaming the class orphans every hero's choice. */
 export const HERO_SHEET_CLASS = `${MODULE_ID}.ChronicleHeroSheet`;
@@ -117,12 +119,14 @@ export function makeChronicleHeroSheet(Base) {
 }
 
 /**
- * Register the sheet for heroes when the world runs Draw Steel. Never the
- * default, so Draw Steel's sheet (or another module's) stays the world's.
+ * Register the sheet for heroes when the world runs Draw Steel 1.1 or later.
+ * Never the default, so Draw Steel's sheet (or another module's) stays the
+ * world's.
  * @returns {boolean} whether it registered
  */
 export function registerHeroLooks() {
   if (globalThis.game?.system?.id !== 'draw-steel') return false;
+  if (!drawSteelSupported(globalThis.game.system.version)) return false;
   const Base = globalThis.ds?.applications?.sheets?.DrawSteelHeroSheet;
   if (typeof Base !== 'function') return false;
   const Sheet = makeChronicleHeroSheet(Base);

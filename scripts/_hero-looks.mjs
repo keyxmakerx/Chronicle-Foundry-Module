@@ -16,6 +16,30 @@ export const DEFAULT_LOOK = HERO_LOOKS[0].id;
 export const LOOK_FLAG = 'heroLook';
 
 /**
+ * The oldest Draw Steel the sheet is built for. Before 1.1 skills lived at
+ * system.hero.skills and the hero templates differ, so the sheet would break.
+ */
+export const MIN_DRAW_STEEL = '1.1.0';
+
+/**
+ * Whether a Draw Steel system version is MIN_DRAW_STEEL or later. Only plain
+ * dotted numbers count: a missing or odd version is not offered the sheet.
+ * @param {unknown} version  game.system.version
+ * @returns {boolean}
+ */
+export function drawSteelSupported(version) {
+  const parse = (v) => (typeof v === 'string' && /^\d+(?:\.\d+){0,2}$/.test(v.trim()) ? v.trim().split('.').map(Number) : null);
+  const have = parse(version);
+  if (!have) return false;
+  const need = parse(MIN_DRAW_STEEL);
+  for (let i = 0; i < need.length; i++) {
+    const h = have[i] ?? 0;
+    if (h !== need[i]) return h > need[i];
+  }
+  return true;
+}
+
+/**
  * The look to draw: the hero's own choice when it is a known look, else the default.
  * @param {unknown} flag
  * @returns {string}
