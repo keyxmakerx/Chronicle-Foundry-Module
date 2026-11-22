@@ -28,7 +28,7 @@ function applyFlags(flags, data) {
 function actor(id, entityId, version, over = {}) {
   const flags = { entityId, chronicleUpdatedAt: version };
   const a = {
-    id, name: id, type: 'character', flags, writes: [],
+    id, name: id, type: 'character', flags, writes: [], folder: { id: 'sorted' },
     getFlag: (_s, k) => flags[k],
     setFlag: async (_s, k, v) => { flags[k] = v; a.writes.push(`flag ${k}`); },
     unsetFlag: async (_s, k) => { delete flags[k]; a.writes.push(`unset ${k}`); },

@@ -38,6 +38,7 @@ import { planLayerEffects, layeredFieldKeys, storedLayers, LAYER_FLAG } from './
 import { bringsInActor } from './_actor-catch-up.mjs';
 import { PictureStore } from './picture-store.mjs';
 import { heroChoice, heroPictureIds, heroPicturePlan, HERO_PICTURES_FLAG } from './_hero-pictures.mjs';
+import { folderKindFor, needsPlacing, FOLDER_PLACED_FLAG, ACTOR_FOLDER_FLAG, HEROES } from './_actor-folder.mjs';
 import { CLASS_PICK_FLAG, classPick, pickToFinish, pickChanged } from './_finish-hero.mjs';
 
 /** How long a read of the campaign's pick-list entries is reused. */
@@ -352,6 +353,7 @@ export class ActorSync {
     }
 
     await this._reconcileClaimOwnership();
+    await this._placeLooseActors();
     await this._syncAllLayers(feed?.mode === 'delta' ? feed.changes : null);
 
     // Surface unresolved character links (broken / missing) so the GM can
@@ -748,6 +750,7 @@ export class ActorSync {
       await this._recordClassPick(actor, entity);
       await this._syncLayers(actor, entity.id);
       await this._applyClaimOwnership(actor, entity.owner_user_id ?? null, null);
+      await this._placeInFolder(actor, entity);
 
       // Create sync mapping (idempotent — tolerates a pre-existing
       // Chronicle mapping pointing at a stale Foundry id, which is
@@ -1008,6 +1011,7 @@ export class ActorSync {
         await this._setActorFlag(actor, 'chronicleOwnerUserId', nextOwner);
         await this._applyClaimOwnership(actor, nextOwner, previousOwner);
       }
+      await this._placeInFolder(actor, entity);
 
       console.debug(`Chronicle: Updated actor "${actor.name}" from entity`);
       return true;
@@ -1015,6 +1019,52 @@ export class ActorSync {
       console.error(`Chronicle: Failed to update actor "${actor.name}"`, err);
       return false;
     }
+  }
+
+  /**
+   * Put a Chronicle character's actor into the Heroes or NPCs folder, once,
+   * and only while it sits outside every folder. A failure leaves it loose.
+   * @param {Actor} actor
+   * @param {object} entity
+   * @private
+   */
+  async _placeInFolder(actor, entity) {
+    try {
+      if (!needsPlacing(actor, FLAG_SCOPE)) return;
+      const kind = folderKindFor({ entity, actor, pcSubtypeId: this._pcSubtypeId });
+      const folder = await this._actorFolder(kind);
+      if (!folder) return;
+      await actor.update({
+        folder: folder.id,
+        [`flags.${FLAG_SCOPE}.${FOLDER_PLACED_FLAG}`]: true,
+      }, syncOptions({ [APPLY_OPTION]: true }));
+    } catch (err) {
+      console.warn(`Chronicle: could not place "${actor?.name}" in a folder`, err);
+    }
+  }
+
+  /** Sort linked actors that were made before folders existed. */
+  async _placeLooseActors() {
+    for (const actor of game.actors.contents) {
+      const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
+      if (!entityId || actor.type !== this._actorType) continue;
+      await this._placeInFolder(actor, { owner_user_id: actor.getFlag(FLAG_SCOPE, 'chronicleOwnerUserId') ?? null });
+    }
+  }
+
+  /** One folder per kind, even when two actors arrive at once. */
+  _actorFolder(kind) {
+    this._folderPromises ??= {};
+    this._folderPromises[kind] ??= (async () => {
+      const found = game.folders.find((f) => f.type === 'Actor' && f.getFlag(FLAG_SCOPE, ACTOR_FOLDER_FLAG) === kind);
+      if (found) return found;
+      return Folder.create({
+        name: game.i18n.localize(kind === HEROES ? 'CHRONICLE.Actors.HeroesFolder' : 'CHRONICLE.Actors.NpcsFolder'),
+        type: 'Actor',
+        flags: { [FLAG_SCOPE]: { [ACTOR_FOLDER_FLAG]: kind } },
+      }, syncOptions());
+    })().finally(() => { delete this._folderPromises[kind]; });
+    return this._folderPromises[kind];
   }
 
   /**

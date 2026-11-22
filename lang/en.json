@@ -243,6 +243,10 @@
     "Creatures": {
       "Folder": "Chronicle: Creatures"
     },
+    "Actors": {
+      "HeroesFolder": "Chronicle: Heroes",
+      "NpcsFolder": "Chronicle: NPCs"
+    },
     "PlayerLink": {
       "Title": "Link to Chronicle",
       "Intro": "Type the code from your Chronicle account. In Chronicle, open the hero you claimed and press <strong>Link to Foundry</strong>; the code is good for 10 minutes. You do this once.",
