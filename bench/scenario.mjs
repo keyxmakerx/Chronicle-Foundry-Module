@@ -4,7 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import { seedCampaign } from './chronicle.mjs';
-import { newWorld, closeWorld, settle, traffic } from './world.mjs';
+import { newWorld, closeWorld, settle, waitFor, traffic } from './world.mjs';
 
 export const FLAG = 'chronicle-sync';
 export const linked = (world) => world.game.journal.contents.filter((j) => j.getFlag(FLAG, 'entityId'));
@@ -28,6 +28,9 @@ export async function assertHealthy(world, seed, since = 0) {
   // Server errors and dropped requests fail anything; a refused write fails
   // too, except a 409 (a version check doing its job). A 404 on a read is
   // normal (lookups, pages removed in Chronicle).
+  // A request still in flight has no status yet (the module's own timers can
+  // fire while this runs), so it is read only once answered.
+  await waitFor(() => traffic.inflight === 0, 15000, 'module requests to finish');
   const failed = traffic.requests.slice(since).filter((r) => r.status >= 500 || r.status === 0
     || (r.method !== 'GET' && r.status >= 400 && r.status !== 409));
   assert.deepEqual(failed.map((r) => `${r.method} ${r.url} ${r.status}`), [], 'no failed requests');

@@ -4,6 +4,7 @@
 #
 #   CHRONICLE_DIR=../Chronicle bench/run.sh            # all bench files
 #   CHRONICLE_DIR=../Chronicle bench/run.sh journals   # one area
+#   BENCH_CONCURRENCY=1 bench/run.sh                   # one file at a time
 #
 # DATABASE_URL / REDIS_URL point at a MariaDB / Redis you already run (CI
 # services). Without them the script starts Chronicle's own no-Docker test
@@ -74,8 +75,10 @@ curl -fsS "http://127.0.0.1:$PORT/health" >/dev/null || { tail -40 "$WORK/server
 FILES=("$HERE"/*.bench.mjs)
 [ $# -gt 0 ] && FILES=("${@/#/$HERE/}") && FILES=("${FILES[@]/%/.bench.mjs}")
 
+# Each file is its own node process with its own owner account, campaigns and
+# API keys on this one Chronicle, so files can run side by side.
 status=0
-CHRONICLE_URL="http://127.0.0.1:$PORT" node --test --test-concurrency=1 --test-reporter=spec "${FILES[@]}" || status=$?
+CHRONICLE_URL="http://127.0.0.1:$PORT" node --test --test-concurrency="${BENCH_CONCURRENCY:-4}" --test-reporter=spec "${FILES[@]}" || status=$?
 if [ "$status" -ne 0 ]; then
   echo "---- Chronicle errors during the run ----"
   grep -E 'level=(ERROR|WARN)' "$WORK/server.log" | tail -40 || true
