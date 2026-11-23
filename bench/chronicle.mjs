@@ -75,12 +75,20 @@ let owner = null;
  */
 async function ownerSession() {
   if (owner) return owner;
-  const tag = Date.now().toString(36);
+  // The pid keeps two files started in the same millisecond apart.
+  const tag = `${Date.now().toString(36)}-${process.pid}`;
   const web = webSession();
   await web.get('/register');
   const displayName = `Bench GM ${tag}`;
   const password = 'bench-password-1';
-  const res = await web.post('/register', { email: `gm-${tag}@bench.test`, display_name: displayName, password, confirm: password });
+  // Chronicle allows 5 sign-ups a minute per address and each file signs up
+  // once, so a short file finishing early can be refused; wait it out.
+  let res;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    res = await web.post('/register', { email: `gm-${tag}@bench.test`, display_name: displayName, password, confirm: password });
+    if (res.status !== 429) break;
+    await new Promise((r) => setTimeout(r, (Number(res.headers.get('retry-after')) || 10) * 1000));
+  }
   if (res.status !== 303) throw new Error(`register failed: HTTP ${res.status}`);
   owner = { web, displayName };
   return owner;
