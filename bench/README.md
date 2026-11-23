@@ -18,7 +18,10 @@ delete that comes back, an edit that never leaves Foundry).
   (Chronicle `fields_data.hp` ↔ Foundry `system.hp`), because a fresh
   Chronicle has no system package installed. `benchCreatureFields` stands
   in the same way for a system's creature fields (the campaign's own
-  Creature type, `challenge_rating` ↔ `system.cr`, Foundry-owned `hp`).
+  Creature type, `challenge_rating` ↔ `system.cr`, Foundry-owned `hp`). `benchItemFields` stands in for a system's item fields after the
+  campaign's Items switched to them (Draw Steel's treasures): the Items'
+  `type` as `system.category`, `rarity` as a section of the words, passed
+  as `openWorld(world, { itemFields })`.
 - `chronicle.mjs` also makes maps (`seed.createMap`), through the owner's
   web route with the campaign's maps add-on switched on, since the sync API
   only reads maps.

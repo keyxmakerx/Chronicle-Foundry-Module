@@ -48,8 +48,9 @@ export function relationMeta(rel) {
 
 /**
  * @param {object[]} relations  The character's relations (`GET /entities/:id/relations`).
- * @param {Array<{id: string, relationId: *, entityId: string|null, quantity?: number, equipped?: boolean}>} items
- *   The actor's items as they stand.
+ * @param {Array<{id: string, relationId: *, entityId: string|null, quantity?: number, equipped?: boolean, equippedPath?: string}>} items
+ *   The actor's items as they stand; `equippedPath` is where an item keeps
+ *   equipped (EQUIPPED_FLAG for a treasure, else `system.equipped`).
  * @returns {{create: object[], update: Array<{id: string, change: object}>, adopt: Array<{id: string, relationId: *}>, unlink: string[]}}
  *   `create`: relations with no item yet. `adopt`: an item with the same
  *   Chronicle item and no live relation (a Foundry push not recorded yet, or
@@ -96,21 +97,43 @@ export function planInventory(relations, items) {
   return plan;
 }
 
+/**
+ * Where an item keeps Chronicle's equipped state. A Draw Steel treasure has
+ * no equipped field, so it is kept in a flag: the next quantity push then
+ * sends Chronicle's own value back rather than false.
+ */
+export const EQUIPPED_FLAG = `flags.${FLAG_SCOPE}.equipped`;
+
 /** The item fields to write so it matches the relation, or null when it already does. */
 function metaChange(meta, item) {
   const change = {};
   if (meta.quantity !== undefined && meta.quantity !== item.quantity) change['system.quantity'] = meta.quantity;
-  if (meta.equipped !== undefined && meta.equipped !== item.equipped) change['system.equipped'] = meta.equipped;
+  if (meta.equipped !== undefined && meta.equipped !== item.equipped) change[item.equippedPath || 'system.equipped'] = meta.equipped;
   return Object.keys(change).length ? change : null;
 }
 
-/** New Foundry item data for a relation. */
-export function itemDataFor(rel) {
+/**
+ * New Foundry item data for a relation. With a `treasure` (the system's item
+ * preset names its Foundry item type) the page's treasure data goes in, and
+ * equipped is kept in a flag.
+ * @param {object} rel
+ * @param {{type?: string, system?: object, flags?: object}} [treasure]
+ */
+export function itemDataFor(rel, treasure = null) {
   const meta = relationMeta(rel);
+  const link = { relationId: rel.id, entityId: rel.targetEntityId };
+  if (treasure?.type) {
+    return {
+      name: rel.targetEntityName || 'Unknown Item',
+      type: treasure.type,
+      flags: { [FLAG_SCOPE]: { ...link, ...(treasure.flags || {}), equipped: meta.equipped ?? false } },
+      system: { ...(treasure.system || {}), quantity: meta.quantity ?? 1 },
+    };
+  }
   return {
     name: rel.targetEntityName || 'Unknown Item',
     type: 'equipment',
-    flags: { [FLAG_SCOPE]: { relationId: rel.id, entityId: rel.targetEntityId } },
+    flags: { [FLAG_SCOPE]: link },
     system: { quantity: meta.quantity ?? 1, equipped: meta.equipped ?? false },
   };
 }

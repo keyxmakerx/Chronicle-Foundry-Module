@@ -7,7 +7,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { planInventory, itemDataFor, relationMeta, HAS_ITEM } from '../scripts/_inventory-plan.mjs';
+import { planInventory, itemDataFor, relationMeta, HAS_ITEM, EQUIPPED_FLAG } from '../scripts/_inventory-plan.mjs';
 
 const rel = (id, target, meta, over = {}) => ({ id, relationType: HAS_ITEM, sourceEntityId: 'hero', targetEntityId: target, targetEntityName: target, metadata: meta, ...over });
 const item = (id, relationId, entityId, quantity = 1, equipped = false) => ({ id, relationId, entityId, quantity, equipped });
@@ -41,6 +41,27 @@ test('itemDataFor links the item to its relation and Chronicle item', () => {
     system: { quantity: 2, equipped: true },
   });
   assert.equal(itemDataFor({ id: 5, targetEntityId: 'x' }).name, 'Unknown Item');
+});
+
+test('a treasure keeps equipped in a flag, so the plan writes the flag', () => {
+  // A Draw Steel treasure has no system.equipped; Chronicle's value lives in a flag.
+  const treasure = { ...item('a', 1, 'ring', 1, undefined), equippedPath: EQUIPPED_FLAG };
+  assert.deepEqual(planInventory([rel(1, 'ring', { quantity: 1, equipped: true })], [treasure]),
+    { ...empty, update: [{ id: 'a', change: { 'flags.chronicle-sync.equipped': true } }] });
+  assert.deepEqual(planInventory([rel(1, 'ring', { quantity: 1, equipped: true })], [{ ...treasure, equipped: true }]), empty);
+});
+
+test('itemDataFor makes a treasure with the page\'s data when the preset names one', () => {
+  const data = itemDataFor(rel(4, 'Rope of Climbing', { quantity: 2, equipped: true }), {
+    type: 'treasure', system: { category: 'trinket', keywords: ['magic'], quantity: 9 }, flags: { treasureSig: 'x' },
+  });
+  assert.deepEqual(data, {
+    name: 'Rope of Climbing', type: 'treasure',
+    flags: { 'chronicle-sync': { relationId: 4, entityId: 'Rope of Climbing', treasureSig: 'x', equipped: true } },
+    // The relation's quantity wins; a treasure has no equipped field.
+    system: { category: 'trinket', keywords: ['magic'], quantity: 2 },
+  });
+  assert.equal(itemDataFor(rel(4, 'sword', {}), null).type, 'equipment', 'no preset type keeps plain items');
 });
 
 test('relationMeta tolerates bad metadata', () => {

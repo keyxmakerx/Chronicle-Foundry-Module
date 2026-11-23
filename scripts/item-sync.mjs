@@ -7,8 +7,11 @@
  * When a Chronicle relation is created/updated, the Foundry Actor inventory
  * is updated.
  *
- * System-specific field mapping for items uses the same adapter pattern as
- * actor-sync.mjs, loading item field definitions from the /item-fields API.
+ * When the system's item preset names a Foundry item type (Draw Steel's
+ * `treasure`, served by /item-fields only once the campaign's Items have
+ * switched to the system's fields), a carried item arrives as that type with
+ * the page's treasure data (_treasure-item.mjs) and is rewritten when the page
+ * changes. That data is Chronicle's alone: nothing of it is read back.
  *
  * Sync flow:
  * - Chronicle → Foundry: a relation event or a change-feed entry for a
@@ -21,11 +24,22 @@ import { getSetting, getUserMappings } from './settings.mjs';
 import { FLAG_SCOPE, APPLY_OPTION } from './constants.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { collapseChanges } from './_change-feed.mjs';
-import { HAS_ITEM, planInventory, itemDataFor, hasItemBody } from './_inventory-plan.mjs';
+import { HAS_ITEM, EQUIPPED_FLAG, planInventory, itemDataFor, hasItemBody } from './_inventory-plan.mjs';
+import { treasureUpdate, treasureSignature, expandPaths } from './_treasure-item.mjs';
 import { itemsToRemove } from './_stash-reconcile.mjs';
 import { sendsChangeHere, memberOf, ownsCharacter } from './_change-author.mjs';
 import { ASK, askModel, playersCanView } from './_player-asks.mjs';
 import { getPlayerAsks, playerName } from './player-asks.mjs';
+
+/**
+ * An item's equipped state and where it keeps it: `system.equipped` when the
+ * item type has one, else the flag a treasure keeps Chronicle's value in.
+ * @param {Item} item
+ */
+function equippedOf(item) {
+  if (item.system?.equipped !== undefined) return { equipped: item.system.equipped };
+  return { equipped: item.getFlag(FLAG_SCOPE, 'equipped'), equippedPath: EQUIPPED_FLAG };
+}
 
 /** The actor linked to a Chronicle character, or null. */
 function linkedActor(entityId) {
@@ -47,6 +61,9 @@ export class ItemSync {
 
     /** @type {object|null} Item field definitions from API. */
     this._itemFields = null;
+
+    /** @type {string|null} Foundry item type the item preset makes (`treasure`), or null for plain items. */
+    this._itemType = null;
 
     /** @type {number|null} Cached Chronicle entity type ID for items. */
     this._itemTypeId = null;
@@ -102,6 +119,10 @@ export class ItemSync {
    */
   async onMessage(msg) {
     if (!this._api || !getSetting('syncCharacters')) return;
+    if (msg?.type === 'entity.updated') {
+      await this._refreshTreasures([msg.payload?.id ?? msg.resourceId]);
+      return;
+    }
     if (!String(msg?.type || '').startsWith('relation.')) return;
     const p = msg.payload || {};
     if (p.relationType && p.relationType !== HAS_ITEM) return;
@@ -174,10 +195,15 @@ export class ItemSync {
   async onInitialSync({ feed } = {}) {
     if (!this._api || !getSetting('syncCharacters')) return;
 
+    // A switch to the system's item fields may have happened since the last connect.
+    await this._loadItemFields();
+
     let actors;
+    let pages = null;
     if (feed?.mode === 'delta') {
       const changed = collapseChanges(feed.changes, 'relation');
       actors = [...changed.keys()].map(linkedActor).filter(Boolean);
+      pages = [...collapseChanges(feed.changes, 'entity').keys()];
     } else {
       actors = game.actors.filter((a) => a.getFlag(FLAG_SCOPE, 'entityId'));
     }
@@ -192,6 +218,7 @@ export class ItemSync {
       }
     }
     if (errors) throw new Error(`inventory catch-up failed for ${errors} character(s)`);
+    await this._refreshTreasures(pages);
   }
 
   /**
@@ -239,7 +266,7 @@ export class ItemSync {
       relationId: i.getFlag(FLAG_SCOPE, 'relationId') ?? null,
       entityId: i.getFlag(FLAG_SCOPE, 'entityId') ?? null,
       quantity: i.system?.quantity,
-      equipped: i.system?.equipped,
+      ...equippedOf(i),
     }));
     const plan = planInventory(list, items);
     // The only delete: an item a stash move the GM just applied took off
@@ -269,7 +296,9 @@ export class ItemSync {
       await actor.items.get(id)?.update(change, opts());
     }
     if (plan.create.length) {
-      await actor.createEmbeddedDocuments('Item', plan.create.map((r) => itemDataFor(r)), opts());
+      const data = [];
+      for (const r of plan.create) data.push(itemDataFor(r, await this._treasureFor(r.targetEntityId)));
+      await actor.createEmbeddedDocuments('Item', data, opts());
     }
     // Never deleted: the item stays in Foundry, only its link is dropped.
     for (const id of unlink) {
@@ -500,7 +529,7 @@ export class ItemSync {
       if (userId !== game.user.id && !(await this._playerHolds(entityId, relationId, userId))) return;
       const meta = {
         quantity: item.system?.quantity ?? 1,
-        equipped: item.system?.equipped ?? false,
+        equipped: equippedOf(item).equipped ?? false,
       };
 
       // Flat route PUT /relations/:relationId. Chronicle's UpdateRelation
@@ -575,6 +604,85 @@ export class ItemSync {
   }
 
   /**
+   * The treasure data for a new item of the preset's Foundry type, or null
+   * for a plain item. A page players cannot open in Chronicle gives its name
+   * only, since the item sits on a hero players see; a failed read does too.
+   * @param {string} entityId - the Chronicle item page.
+   * @returns {Promise<{type: string, system: object, flags: object}|null>}
+   * @private
+   */
+  async _treasureFor(entityId) {
+    if (!this._itemType) return null;
+    const built = await this._treasureUpdate(entityId);
+    if (!built) return { type: this._itemType, system: {}, flags: {} };
+    return {
+      type: this._itemType,
+      system: expandPaths(built.update).system || {},
+      flags: { treasureSig: built.sig },
+    };
+  }
+
+  /**
+   * An item page's treasure data as dot paths, with every mapped value it
+   * lacks cleared, or null when the page could not be read.
+   * @private
+   */
+  async _treasureUpdate(entityId) {
+    if (!entityId || !this._itemType) return null;
+    try {
+      const [entity, perms] = await Promise.all([
+        this._api.get(`/entities/${entityId}`),
+        this._api.get(`/entities/${entityId}/permissions`).catch(() => null),
+      ]);
+      const choicesFor = (path) => foundry.utils.getProperty(globalThis.CONFIG, path) ?? null;
+      const { update, unknown } = treasureUpdate({
+        entity, fields: this._itemFields, choicesFor, showWords: playersCanView(entity, perms), clear: true,
+      });
+      if (unknown.length) console.debug(`Chronicle: "${entity?.name}" values with no Draw Steel equivalent were left out: ${unknown.join('; ')}`);
+      return { update, sig: treasureSignature(update) };
+    } catch (err) {
+      console.warn(`Chronicle: Failed to read item page ${entityId} for its treasure data`, err);
+      return null;
+    }
+  }
+
+  /**
+   * Rewrite the sync-made treasures of the given item pages (every linked
+   * one when `entityIds` is null) where the page's data changed. Only
+   * Chronicle writes these values, so the write simply replaces them.
+   * @param {string[]|null} entityIds
+   * @private
+   */
+  async _refreshTreasures(entityIds) {
+    if (!this._itemType) return;
+    const wanted = entityIds ? new Set(entityIds.filter(Boolean).map(String)) : null;
+    if (wanted && !wanted.size) return;
+    const byPage = new Map();
+    for (const actor of game.actors.contents) {
+      if (!actor.getFlag(FLAG_SCOPE, 'entityId')) continue;
+      for (const item of actor.items) {
+        const page = item.getFlag(FLAG_SCOPE, 'entityId');
+        if (!page || item.type !== this._itemType || !item.getFlag(FLAG_SCOPE, 'relationId')) continue;
+        if (wanted && !wanted.has(String(page))) continue;
+        if (!byPage.has(page)) byPage.set(page, []);
+        byPage.get(page).push(item);
+      }
+    }
+    for (const [page, items] of byPage) {
+      const built = await this._treasureUpdate(page);
+      if (!built) continue;
+      for (const item of items) {
+        if (item.getFlag(FLAG_SCOPE, 'treasureSig') === built.sig) continue;
+        try {
+          await item.update({ ...built.update, [`flags.${FLAG_SCOPE}.treasureSig`]: built.sig }, { [APPLY_OPTION]: true });
+        } catch (err) {
+          console.warn(`Chronicle: Failed to refresh treasure "${item.name}"`, err);
+        }
+      }
+    }
+  }
+
+  /**
    * Load item field definitions from the Chronicle API.
    * @private
    */
@@ -586,6 +694,7 @@ export class ItemSync {
       const result = await this._api.get(`/systems/${matchedSystem}/item-fields`);
       if (result?.fields) {
         this._itemFields = result.fields;
+        this._itemType = result.fields.length && result.foundry_item_type ? result.foundry_item_type : null;
         console.debug(`Chronicle: Loaded ${result.fields.length} item field definitions`);
       }
     } catch (err) {

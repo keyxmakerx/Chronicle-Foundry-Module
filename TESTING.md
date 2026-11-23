@@ -346,6 +346,15 @@ In **Chronicle Sync → Settings → What syncs**.
 - [ ] Nothing in the Dashboard activity log or Chronicle's sync history shows the item swap coming back as a Foundry change
 - [ ] As a non-GM player nothing is swapped on their client (only the GM's client applies it)
 
+### Carried treasures (Draw Steel, after Items switch to the treasure fields)
+- [ ] Before the switch: give a hero an item in Chronicle -> Foundry behaves as before (no treasure data)
+- [ ] In Chronicle, Items list -> **Switch to Draw Steel fields**; fill an item's Type (Leveled), Kind (Weapon), Echelon (2nd), Keywords (Magic, Medium Weapon) and Effect; reconnect the module (or reload the world)
+- [ ] Give a hero that item in Chronicle -> a **treasure** appears on the sheet: category Leveled, kind Weapon, echelon 2, keywords Magic and Medium, and the Effect under a heading in its description
+- [ ] Edit the Effect in Chronicle -> within a few seconds the treasure's description changes; editing the treasure's words in Foundry changes nothing in Chronicle
+- [ ] Change the treasure's quantity in Foundry -> Chronicle's inventory shows the new quantity, and an item marked equipped in Chronicle stays equipped
+- [ ] An item page only the Director team can see arrives as a treasure with its name only
+- [ ] "Copied from" (the Director's note) never appears on the treasure
+
 ### Chronicle hero sheet (Draw Steel)
 Needs Draw Steel 1.1.0 or later; on an older Draw Steel the sheet is not offered. Pick it on a hero: open the hero, title bar menu (three dots) -> Sheet -> Sheet: "Chronicle hero sheet" -> Save. Draw Steel's sheet stays the world's default.
 - [ ] The hero opens with the portrait, name, "Level N · class · subclass", origin chips (a missing one dashed, "Still to choose"), Level, XP and Victories; below, the characteristic and combat boxes, Stamina with its bar, recoveries, the heroic resource and surges, then potency, damage, conditions and skills; then the tabs, Abilities open
