@@ -10,12 +10,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { satchelTab, SATCHEL_TABS, stashActor } from '../scripts/_satchel.mjs';
+import { satchelTab, SATCHEL_TABS, showCutscenesTab, stashActor } from '../scripts/_satchel.mjs';
 
 const read = (p) => readFile(new URL(`../${p}`, import.meta.url), 'utf8');
 
-test('four tabs, and an unknown one falls back to the notebook', () => {
-  assert.deepEqual(SATCHEL_TABS, ['notebook', 'quests', 'stash', 'crafting']);
+test('five tabs, and an unknown one falls back to the notebook', () => {
+  assert.deepEqual(SATCHEL_TABS, ['notebook', 'quests', 'stash', 'crafting', 'cutscenes']);
+  assert.equal(satchelTab('cutscenes'), 'cutscenes');
   assert.equal(satchelTab('crafting'), 'crafting');
   assert.equal(satchelTab('stash'), 'stash');
   assert.equal(satchelTab('nope'), 'notebook');
@@ -91,4 +92,16 @@ test('the Crafting tab reloads each time, waits for a GM, and is closed with the
   assert.match(src, /Hooks\.off\('userConnected', this\._gmHook\);/);
   const button = await read('scripts/crafting-button.mjs');
   assert.match(button, /openSatchel\('crafting', \{ actor \}\)/);
+});
+
+test('the Cut scenes tab shows when Chronicle has them on or a scene is held, and reloads each time', async () => {
+  assert.equal(showCutscenesTab({ available: true, remembered: 0 }), true);
+  assert.equal(showCutscenesTab({ available: false, remembered: 1 }), true);
+  assert.equal(showCutscenesTab({ available: false, remembered: 0 }), false);
+  const src = await read('scripts/satchel.mjs');
+  assert.match(src, /else if \(this\.tab === 'cutscenes'\) this\._showCutscenes\(\);/);
+  // A hidden tab is never the one shown.
+  assert.match(src, /\?\.hidden\) this\.tab = 'notebook';/);
+  assert.match(src, /this\._closeCrafting\(\);\s*this\._closeCutscenes\(\);/);
+  assert.match(src, /Hooks\.off\(CHANGED_HOOK, this\._scenesHook\)/);
 });

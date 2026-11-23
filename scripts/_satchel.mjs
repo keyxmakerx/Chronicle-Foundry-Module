@@ -4,7 +4,7 @@
  */
 
 /** The Satchel's tabs, in the order they are drawn. */
-export const SATCHEL_TABS = ['notebook', 'quests', 'stash', 'crafting'];
+export const SATCHEL_TABS = ['notebook', 'quests', 'stash', 'crafting', 'cutscenes'];
 
 /** A known tab, or the notebook for anything else. */
 export function satchelTab(tab) {
@@ -26,4 +26,14 @@ export function stashActor(user, actors, { linked, allowed }) {
   return (Array.isArray(actors) ? actors : [])
     .filter(ok)
     .sort((a, b) => String(a.name).localeCompare(String(b.name)) || String(a.id).localeCompare(String(b.id)))[0] ?? null;
+}
+
+/**
+ * Whether the Cut scenes tab is offered: when Chronicle has the add-on on,
+ * or when this client already holds a scene it may watch again.
+ * @param {{available: boolean, remembered: number}} p
+ * @returns {boolean}
+ */
+export function showCutscenesTab({ available, remembered }) {
+  return !!available || remembered > 0;
 }

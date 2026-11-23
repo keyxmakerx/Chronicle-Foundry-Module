@@ -3,7 +3,7 @@
  *
  * Loads files from vendor/chronicle/ (Chronicle's page scripts and
  * stylesheets, copied unchanged) into the Foundry page, once each and in
- * order. Those scripts register themselves on a page global named Chronicle;
+ * order. Most of those scripts register themselves on a page global named Chronicle;
  * one stand-in serves every vendored widget (the shop room, the Sky Clock's
  * sky and the Crafting block), and one that something else put there is
  * never replaced.
@@ -49,6 +49,15 @@ export async function loadVendored(files) {
   const s = chronicleShim();
   for (const file of files) await loadOne(file);
   return s;
+}
+
+/**
+ * Load vendored files that stand alone (they set their own global and read
+ * no Chronicle page globals, like the cut scene engine), so no stand-in is
+ * made for them.
+ */
+export async function loadStandalone(files) {
+  for (const file of files) await loadOne(file);
 }
 
 const styleLoads = new Map();

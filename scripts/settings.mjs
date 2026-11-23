@@ -370,6 +370,17 @@ export function registerSettings() {
     default: false,
   });
 
+  // Internal: whether Chronicle has the Cut scenes add-on on. The GM client
+  // reads Chronicle's add-on list and writes it; players read it for the
+  // Satchel's Cut scenes tab, which redraws when it changes.
+  game.settings.register(MODULE_ID, 'cutscenesAvailable', {
+    scope: 'world',
+    config: false,
+    type: Boolean,
+    default: false,
+    onChange: () => Hooks.callAll('chronicleCutscenesChanged'),
+  });
+
   // Internal: Chronicle user → Foundry user ID mapping (not shown in settings UI).
   // Stored as JSON: { "chronicle-user-uuid": "foundry-user-id", ... }
   game.settings.register(MODULE_ID, 'userMappings', {

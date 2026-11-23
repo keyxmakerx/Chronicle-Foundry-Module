@@ -2,12 +2,12 @@
  * Chronicle Sync - Satchel
  *
  * The player's own things in one window: the notebook (Chronicle's Journal
- * in a frame), the quest board, their character's stash and their hero's
- * crafting. Each tab is the module's existing window drawn inside the
+ * in a frame), the quest board, their character's stash, their hero's
+ * crafting and the cut scenes they may watch again. Each tab is the module's existing window drawn inside the
  * Satchel rather than a copy of it, so the board's live refresh, the stash's
  * moves and the notebook's Connect step all keep working unchanged. Tabs
- * load the first time they are shown; Crafting reloads each time, so the
- * spoils tray is never stale. Every user gets one; the GM's Stash tab points
+ * load the first time they are shown; Crafting and Cut scenes reload each
+ * time, so the spoils tray and the watch-again list are never stale. Every user gets one; the GM's Stash tab points
  * at the DM Screen, and the GM's Crafting tab shows the hero whose sheet
  * button opened it.
  */
@@ -18,9 +18,11 @@ import { FrameHost } from './player-notebook.mjs';
 import { QuestBoardWindow, QuestSheetWindow } from './quest-board.mjs';
 import { StashesWindow } from './stash-window.mjs';
 import { canOpenStashes, stashesAvailable } from './stash-client.mjs';
-import { satchelTab, SATCHEL_TABS, stashActor } from './_satchel.mjs';
+import { satchelTab, SATCHEL_TABS, showCutscenesTab, stashActor } from './_satchel.mjs';
 import { craftingAvailable } from './crafting-relay.mjs';
 import { mountCraftingTab } from './crafting-tab.mjs';
+import { mountCutscenesTab } from './cutscene-tab.mjs';
+import { CHANGED_HOOK, cutscenesAvailable, rememberedShowings } from './cutscenes.mjs';
 
 const { ApplicationV2 } = foundry.applications.api;
 
@@ -96,6 +98,8 @@ class SatchelWindow extends ApplicationV2 {
     this.craftActor = null;
     this._craftSeq = 0;
     this._gmHook = null;
+    this._cutscenes = null;
+    this._scenesHook = null;
   }
 
   /** @override */
@@ -132,14 +136,23 @@ class SatchelWindow extends ApplicationV2 {
     }
     content.replaceChildren(root);
     this._root = root;
+    // The Cut scenes tab appears once Chronicle has them on or a scene arrives.
+    this._scenesHook = Hooks.on(CHANGED_HOOK, () => this._offerCutscenes());
+    this._offerCutscenes();
     this.show(this.tab);
+  }
+
+  _offerCutscenes() {
+    const btn = this._root?.querySelector('[data-satchel-tab="cutscenes"]');
+    if (btn) btn.hidden = !showCutscenesTab({ available: cutscenesAvailable(), remembered: rememberedShowings().length });
   }
 
   /** Show one tab, loading it the first time. */
   show(tab, { noteId = '' } = {}) {
     this.tab = satchelTab(tab);
+    if (!this._root) { lastTab = this.tab; return; }
+    if (this._root.querySelector(`[data-satchel-tab="${this.tab}"]`)?.hidden) this.tab = 'notebook';
     lastTab = this.tab;
-    if (!this._root) return;
     for (const btn of this._root.querySelectorAll('[data-satchel-tab]')) {
       const on = btn.dataset.satchelTab === this.tab;
       btn.classList.toggle('active', on);
@@ -151,6 +164,7 @@ class SatchelWindow extends ApplicationV2 {
     else if (this.tab === 'quests' && !this._board && !this._sheet) this._showBoard();
     else if (this.tab === 'stash' && !this._stash) this._showStash();
     else if (this.tab === 'crafting') this._showCrafting();
+    else if (this.tab === 'cutscenes') this._showCutscenes();
   }
 
   _showNotebook(noteId) {
@@ -238,6 +252,17 @@ class SatchelWindow extends ApplicationV2 {
     }
   }
 
+  _showCutscenes() {
+    this._closeCutscenes();
+    this._offerCutscenes();
+    this._cutscenes = mountCutscenesTab(this._panes.cutscenes);
+  }
+
+  _closeCutscenes() {
+    this._cutscenes?.destroy();
+    this._cutscenes = null;
+  }
+
   _closeCrafting() {
     this._crafting?.destroy();
     this._crafting = null;
@@ -251,6 +276,9 @@ class SatchelWindow extends ApplicationV2 {
   _onClose(options) {
     this._craftSeq++;
     this._closeCrafting();
+    this._closeCutscenes();
+    if (this._scenesHook !== null) Hooks.off(CHANGED_HOOK, this._scenesHook);
+    this._scenesHook = null;
     this._notebook?.destroy();
     this._notebook = null;
     for (const child of [this._board, this._sheet, this._stash]) child?.close();
@@ -265,7 +293,7 @@ class SatchelWindow extends ApplicationV2 {
 
 /**
  * Open the Satchel, or bring it forward, on a tab.
- * @param {string} [tab] - notebook, quests, stash or crafting; the last one shown when left out
+ * @param {string} [tab] - notebook, quests, stash, crafting or cutscenes; the last one shown when left out
  * @param {{noteId?: string, actor?: Actor}} [opts] - a note to show in the
  *   notebook; the hero whose crafting to show (a sheet's Crafting button)
  */
