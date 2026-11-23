@@ -42,7 +42,9 @@ database, runs the scenarios and stops it. It uses `DATABASE_URL` and
 MariaDB (`tools/start-test-db.sh` in that checkout) and a local `redis-server`. Needs Go,
 Node 22 (built-in `WebSocket`) and the `mysql` client. `BENCH_VERBOSE=1`
 shows the module's own console output; `BENCH_KEEP_LOG=1` keeps the
-server log.
+server log. The area files run four at a time against the one Chronicle,
+each with its own owner account, campaigns and key; `BENCH_CONCURRENCY=1`
+runs them one after another.
 
 CI runs it on every pull request (`.github/workflows/sync-bench.yml`)
 against the Chronicle branch with the same name as the PR branch, or
