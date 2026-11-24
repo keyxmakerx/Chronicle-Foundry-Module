@@ -6,7 +6,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openWorld, closeWorld, settle, recordRequests, waitFor } from './world.mjs';
+import { openWorld, closeWorld, settle, recordRequests, waitFor, benchItemFields, benchItemConfig } from './world.mjs';
 import { FLAG, writes, scenario } from './scenario.mjs';
 
 const ON = { syncCharacters: true };
@@ -141,4 +141,48 @@ test('an item dragged to another character is its own copy: nothing deleted, the
   assert.equal(itemsOf(actor).length, 1);
   assert.equal(itemsOf(taker).length, 1);
   assertNoDuplicateItems(world);
+}, { settings: ON }));
+
+test('a carried item becomes a treasure filled from its page, the page\'s edits follow, and only quantity and equipped go back', () => scenario('chr-items-treasure', async ({ seed, world }) => {
+  globalThis.CONFIG = benchItemConfig;
+  const TREASURE = { ...MODULES, itemFields: benchItemFields };
+  try {
+    await openWorld(world, TREASURE);
+    const { hero, item, actor } = await heroAndItem(seed, world, 'Ring of Tides');
+    await seed.chronicle.put(`/entities/${item.id}/fields`, { fields_data: { type: 'Trinket', rarity: 'Breathe water.' } });
+    const rel = await seed.chronicle.post(`/entities/${hero.id}/relations`, {
+      target_entity_id: item.id, relation_type: 'Has Item', reverse_relation_type: 'In Inventory Of', metadata: { quantity: 1, equipped: true },
+    });
+    await waitFor(() => itemFor(actor, item.id), 10000, 'treasure added');
+    const ring = itemFor(actor, item.id);
+    assert.equal(ring.type, 'treasure');
+    assert.equal(ring.system.category, 'trinket');
+    assert.equal(ring.system.description.value, '<h4>Effect</h4><p>Breathe water.</p>');
+    assert.equal(ring.system.equipped, undefined, 'a treasure has no equipped field');
+    assert.equal(ring.getFlag(FLAG, 'equipped'), true, 'Chronicle\'s equipped is kept in a flag');
+
+    // Words are written only in Chronicle: an edit there reaches the treasure.
+    await seed.chronicle.put(`/entities/${item.id}/fields`, { fields_data: { type: 'Trinket', rarity: 'Breathe water and speak with fish.' } });
+    await waitFor(() => itemFor(actor, item.id)?.system?.description?.value?.includes('speak with fish'), 10000, 'words refreshed');
+
+    // Foundry sends back quantity, with Chronicle's equipped value, and nothing of the page.
+    const reqs = await recordRequests(async () => {
+      await itemFor(actor, item.id).update({ 'system.quantity': 3 });
+      await settle();
+    });
+    assert.deepEqual(writes(reqs).map((r) => `${r.method} ${r.url.replace(/^.*\/api\/v1\/campaigns\/[^/]+/, '')}`), [`PUT /relations/${rel.id}`]);
+    const [after] = (await seed.chronicle.get(`/entities/${hero.id}/relations`)).filter((r) => r.relationType === 'Has Item');
+    const meta = typeof after.metadata === 'string' ? JSON.parse(after.metadata) : after.metadata;
+    assert.equal(meta.quantity, 3);
+    assert.equal(meta.equipped, true, 'equipped is not reset to false');
+    await closeWorld(world);
+
+    // A reopen with nothing changed rewrites nothing.
+    const before = world.log.writes.length;
+    await openWorld(world, TREASURE);
+    assert.deepEqual(world.log.writes.slice(before).filter((w) => w.type === 'Item').map((w) => `${w.op} ${JSON.stringify(w.change || {})}`), [], 'reopen wrote no item');
+    assertNoDuplicateItems(world);
+  } finally {
+    delete globalThis.CONFIG;
+  }
 }, { settings: ON }));

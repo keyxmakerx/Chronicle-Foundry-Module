@@ -114,6 +114,26 @@ export const benchCreatureFields = {
   ],
 };
 
+/**
+ * A system's item fields once the campaign's Items have switched to them,
+ * standing in for the Draw Steel package the same way. The bench campaign's
+ * Items have only Type, Rarity and Requires Attunement, and the sync API
+ * cannot add fields, so Type carries the treasure's category and Rarity its
+ * words here; keywords are covered by tools/test-treasure-item.mjs. The
+ * CONFIG list is the slice of Draw Steel's that these fields read.
+ */
+export const benchItemFields = {
+  system_id: 'bench',
+  foundry_item_type: 'treasure',
+  fields: [
+    { key: 'type', label: 'Type', foundry_path: 'system.category', foundry_choices: 'DRAW_STEEL.equipment.categories' },
+    { key: 'rarity', label: 'Effect', foundry_path: 'system.description.value', foundry_format: 'html_section' },
+  ],
+};
+export const benchItemConfig = {
+  DRAW_STEEL: { equipment: { categories: { consumable: {}, trinket: {}, leveled: {}, artifact: {} } } },
+};
+
 /** A new, empty Foundry world wired to `seed`'s campaign. */
 export function newWorld(seed, { settings = {}, systemId } = {}) {
   const world = installFoundry({
@@ -138,7 +158,7 @@ export function newWorld(seed, { settings = {}, systemId } = {}) {
 }
 
 /** The GM opens the world: start sync and wait for the first pull to finish. */
-export async function openWorld(world, { modules = ['journals'] } = {}) {
+export async function openWorld(world, { modules = ['journals'], itemFields = null } = {}) {
   const m = await loadModule();
   // Re-install this world's globals (another scenario may have run since).
   Object.assign(globalThis, world.globals ??= {
@@ -166,7 +186,17 @@ export async function openWorld(world, { modules = ['journals'] } = {}) {
     creatures._loadDefs = async () => benchCreatureFields;
     sm.registerModule(creatures);
   }
-  if (modules.includes('items')) sm.registerModule(new m.ItemSync());
+  if (modules.includes('items')) {
+    const items = new m.ItemSync();
+    if (itemFields) {
+      // Stands in for item-fields after the campaign's switch, as above.
+      items._loadItemFields = async function () {
+        this._itemFields = itemFields.fields;
+        this._itemType = itemFields.foundry_item_type;
+      };
+    }
+    sm.registerModule(items);
+  }
   if (modules.includes('playerAsks')) sm.registerModule(world.playerAsks = new m.PlayerAsks());
   if (modules.includes('maps')) sm.registerModule(new m.MapSync());
   world.syncManager = sm;

@@ -204,9 +204,28 @@ older Chronicle has no route (404). Both leave creature sync off.
 Re-verify by: 2026-11-11 (Chronicle `internal/systems/manifest.go` `CreatureFieldsForAPI`, `internal/plugins/syncapi/api_handler.go` `GetCreatureFields`; keyxmakerx/Chronicle#1311)
 
 #### GET /systems/:systemId/item-fields
-Returns item preset field definitions. Same shape as character-fields.
+Returns item preset field definitions. Same shape as character-fields, plus
+`foundry_item_type` (Draw Steel: `"treasure"`), the Foundry item type a
+carried item becomes. A preset that reaches a campaign only through the
+owner's one-time switch (Draw Steel's treasure fields for Items) answers
+`{"system_id": "...", "fields": []}` until the campaign's Items have switched,
+and `has_item_fields` on `GET /systems` is false until then, so the module
+keeps making plain items.
 
-**Used by:** `item-sync.mjs`
+Item fields use the creature formats `set` and `integer`, and two more:
+`treasure_keywords` (a comma list resolved against
+`CONFIG.DRAW_STEEL.equipment`: the shared keywords, "Light Weapon" or
+"Medium Armor" in their kind's list, then the item's kind and category lists)
+and `html_section` (the field's text as a headed section of
+`system.description.value`; several fields share that path). An `integer`
+project goal is set only when the text is one number. A value with no
+Foundry equivalent is left out and logged. A field without `foundry_path`
+(the Director's "Copied from") never reaches Foundry.
+
+**Used by:** `item-sync.mjs`, `_treasure-item.mjs` (loaded at init and on each
+connect)
+
+Re-verify by: 2026-12-22 (Chronicle `internal/plugins/syncapi/api_handler.go` `GetItemFields` and `itemPresetFor`, `internal/systems/manifest.go` `presetFieldsForAPI`; the Draw Steel package's `drawsteel-item` preset)
 
 #### GET /system-entries?fieldKey=ancestry
 The campaign's own pick-list entries (a homebrew ancestry, kit, culture...),
