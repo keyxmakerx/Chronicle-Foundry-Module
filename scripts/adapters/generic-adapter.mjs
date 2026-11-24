@@ -302,6 +302,11 @@ export function extractCollectionField(actor, field) {
     // Single-item collapse: "exactly one X item" fields (class/ancestry/kit)
     // want the item's NAME as a plain string, not a one-element JSON array.
     // Uses the first projected path when a projection is given, else item.name.
+    // A joined field (foundry_item_join) holds several picks, such as a
+    // tactician's two kits: every real item's name, joined as Chronicle stores them.
+    if (field.foundry_item_single && field.foundry_item_join && !proj) {
+      return contents.filter((it) => it && !isPlaceholderName(it) && it.name).map((it) => it.name).join(', ');
+    }
     if (field.foundry_item_single) {
       const first = contents[0];
       if (!first) return '';
