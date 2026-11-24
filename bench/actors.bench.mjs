@@ -572,3 +572,153 @@ test('a layer put on while Foundry was closed arrives on open from the feed, and
   assert.deepEqual(world.log.writes.slice(before).filter((w) => w.type === 'ActiveEffect'), [], 'an unchanged layer writes nothing');
   await closeWorld(world);
 }, { settings: ON }));
+
+// Under Draw Steel an NPC's character page becomes the system's NPC actor
+// type (the bench hero type is the adapter's `character`).
+const DRAW_STEEL = { settings: ON, systemId: 'draw-steel' };
+
+/** The world's actor types: Draw Steel's NPC type exists unless left out. */
+function actorTypes(world, types = ['character', 'npc']) {
+  world.game.documentTypes = { Actor: types };
+}
+
+/** A character page made in Chronicle with its fields already filled in. */
+async function characterWith(seed, name, fields, extra = {}) {
+  const types = await seed.chronicle.entityTypes();
+  const type = types.find((t) => t.slug === 'character' || /character/i.test(t.name));
+  await seed.declareFields(type.id, CHARACTER_FIELDS);
+  return seed.chronicle.post('/entities', { name, entity_type_id: type.id, is_private: false, fields_data: fields, ...extra });
+}
+
+/** Counts the GM's yes/no questions while `world` is open. */
+function countQuestions(world) {
+  const api = world.globals.foundry.applications.api;
+  const original = api.DialogV2.confirm;
+  const seen = { asked: 0, restore: () => { api.DialogV2.confirm = original; } };
+  api.DialogV2.confirm = async (...args) => { seen.asked++; return original(...args); };
+  return seen;
+}
+
+/** The world as it was before sync told heroes and NPCs apart: an NPC page's actor made as a hero. */
+async function legacyNpcHero(seed, world) {
+  actorTypes(world, ['character']);
+  await openWorld(world, MODULES);
+  const npc = await characterWith(seed, 'Orsen Vey', { hp: 0 }, { is_private: true });
+  const hero = await characterWith(seed, 'Saatraaol', { hp: 20, kit: 'Homebrew Kit' });
+  await waitFor(() => actorFor(world, npc.id) && actorFor(world, hero.id), 10000, 'actors created');
+  await settle();
+  const orsen = actorFor(world, npc.id);
+  assert.equal(orsen.type, 'character', 'made as a hero');
+  await orsen.createEmbeddedDocuments('Item', [{ name: 'Human', type: 'ancestry' }, { name: 'Knife', type: 'treasure' }], { chronicleSyncApply: true });
+  await orsen.update({ 'system.biography': { value: '<p>Owes the guild.</p>' } }, { chronicleSyncApply: true });
+  await closeWorld(world);
+  actorTypes(world);
+  return { npc, hero, orsen };
+}
+
+test('under Draw Steel an NPC page becomes an NPC actor sharing only its name and visibility, a hero page stays a hero, and a GM\'s own NPC is never sent', () => scenario('chr-npc-page', async ({ seed, world }) => {
+  actorTypes(world);
+  await openWorld(world, MODULES);
+  const npc = await characterWith(seed, 'Factor Brenn', { hp: 9 }, { is_private: true });
+  const hero = await characterWith(seed, 'Tyne', { hp: 18, kit: 'Homebrew Kit' });
+  await waitFor(() => actorFor(world, npc.id) && actorFor(world, hero.id), 10000, 'actors created');
+  await settle();
+  const brenn = actorFor(world, npc.id);
+  assert.equal(brenn.type, 'npc', 'NPC page: NPC actor');
+  assert.equal(brenn.system.hp, undefined, 'no hero fields on it');
+  assert.equal(brenn.prototypeToken.hidden, true, 'a private page starts hidden');
+  assert.equal(actorFor(world, hero.id).type, 'character', 'hero page: hero actor');
+  assert.equal(actorFor(world, hero.id).system.hp, 18);
+
+  const edits = await recordRequests(async () => {
+    await brenn.update({ 'system.hp': 4 });
+    await brenn.update({ name: 'Factor Brenn the Elder' });
+    await settle();
+  });
+  assert.deepEqual(writes(edits).filter((r) => r.url === `/entities/${npc.id}/fields`).map((r) => r.method), [], 'NPC stats not sent as hero fields');
+  const page = await seed.chronicle.get(`/entities/${npc.id}`);
+  assert.equal(page.name, 'Factor Brenn the Elder', 'a rename is sent');
+  assert.equal(page.fields_data?.hp, 9, 'Chronicle fields untouched');
+
+  await seed.chronicle.put(`/entities/${npc.id}/fields`, { fields_data: { hp: 2 } });
+  await seed.chronicle.put(`/entities/${npc.id}`, { name: 'Factor Brenn' });
+  await waitFor(() => brenn.name === 'Factor Brenn', 10000, 'Chronicle rename applied');
+  await settle();
+  assert.equal(brenn.system.hp, 4, 'Chronicle fields not applied to an NPC');
+
+  const made = await recordRequests(async () => {
+    await Actor.create({ name: 'Goblin Sniper', type: 'npc' });
+    await settle();
+  });
+  assert.deepEqual(writes(made).filter((r) => r.url.startsWith('/entities')).map((r) => `${r.method} ${r.url}`), [], 'a GM\'s own NPC makes no page');
+}, DRAW_STEEL));
+
+test('an NPC page\'s actor made as a hero is offered as an NPC once on open; yes switches it, keeping its link, notes and items an NPC can hold', () => scenario('fvtt-npc-legacy-switch', async ({ seed, world }) => {
+  const { npc, hero, orsen } = await legacyNpcHero(seed, world);
+  globalThis.CONFIG = { Item: { dataModels: { ancestry: { metadata: { invalidActorTypes: ['npc'] } } } } };
+  world.answerConfirm = true;
+  try {
+    const questions = countQuestions(world);
+    const reqs = await recordRequests(async () => {
+      await openWorld(world, MODULES);
+      await waitFor(() => orsen.type === 'npc', 10000, 'switched to an NPC');
+      await settle();
+    });
+    assert.equal(questions.asked, 1, 'asked once');
+    assert.equal(orsen.getFlag(FLAG, 'entityId'), npc.id, 'still linked');
+    assert.deepEqual(orsen.items.map((i) => i.name), ['Knife'], 'hero-only item gone, the rest kept');
+    assert.equal(orsen.system.biography?.value, '<p>Owes the guild.</p>', 'notes kept');
+    assert.equal(orsen.system.hp, undefined, 'hero data gone');
+    assert.equal(actorFor(world, hero.id).type, 'character', 'the hero is left alone');
+    assert.deepEqual(writes(reqs).filter((r) => r.url.startsWith('/entities')).map((r) => `${r.method} ${r.url}`), [], 'nothing written in Chronicle');
+    questions.restore();
+    await closeWorld(world);
+
+    const again = countQuestions(world);
+    const later = await recordRequests(async () => {
+      await openWorld(world, MODULES);
+      await seed.chronicle.put(`/entities/${npc.id}`, { name: 'Orsen Vey of Saltreach' });
+      await waitFor(() => orsen.name === 'Orsen Vey of Saltreach', 10000, 'rename applied');
+      await settle();
+    });
+    assert.equal(again.asked, 0, 'not asked again');
+    assert.equal(orsen.type, 'npc');
+    assert.deepEqual(later.filter((r) => r.method === 'GET' && r.url.startsWith('/entities?')).map((r) => r.url), [], 'no character list');
+    again.restore();
+  } finally {
+    delete globalThis.CONFIG;
+  }
+}, DRAW_STEEL));
+
+test('a No to switching an NPC page\'s hero actor is remembered: it stays a hero and is not offered again', () => scenario('fvtt-npc-legacy-declined', async ({ seed, world }) => {
+  const { npc, orsen } = await legacyNpcHero(seed, world);
+  world.answerConfirm = false;
+  const questions = countQuestions(world);
+  await openWorld(world, MODULES);
+  await waitFor(() => world.log.notifications.info.some((m) => m.includes('CHRONICLE.ActorType.Declined')), 10000, 'the No recorded');
+  await settle();
+  assert.equal(questions.asked, 1, 'asked once');
+  assert.equal(orsen.type, 'character', 'left as a hero');
+  questions.asked = 0;
+  await seed.chronicle.put(`/entities/${npc.id}/fields`, { fields_data: { hp: 3 } });
+  await waitFor(() => orsen.system.hp === 3, 10000, 'Chronicle edit applied');
+  await settle();
+  assert.equal(questions.asked, 0, 'not offered again');
+  questions.restore();
+}, DRAW_STEEL));
+
+test('an NPC actor whose page becomes a hero in Chronicle is offered as a hero; yes switches it and applies the page', () => scenario('chr-npc-becomes-hero', async ({ seed, world }) => {
+  actorTypes(world);
+  world.answerConfirm = true;
+  await openWorld(world, MODULES);
+  const e = await characterWith(seed, 'Pell Ashcombe', { hp: 7 });
+  await waitFor(() => actorFor(world, e.id), 10000, 'actor created');
+  await settle();
+  const actor = actorFor(world, e.id);
+  assert.equal(actor.type, 'npc');
+  await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: { hp: 7, kit: 'Homebrew Kit' } });
+  await waitFor(() => actor.type === 'character', 10000, 'switched to a hero');
+  await waitFor(() => actor.system.hp === 7, 10000, 'page applied');
+  await settle();
+  assert.equal(actor.getFlag(FLAG, 'entityId'), e.id, 'still linked');
+}, DRAW_STEEL));
