@@ -18,6 +18,7 @@ const CHARACTER_FIELDS = [
   { key: 'hp', type: 'number' },
   { key: 'ancestry', type: 'text' },
   { key: 'kit', type: 'text' },
+  { key: 'subclass', type: 'text' },
 ];
 
 /** A character made in Chronicle by someone else. */
