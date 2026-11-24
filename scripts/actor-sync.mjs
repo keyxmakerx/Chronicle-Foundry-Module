@@ -1620,6 +1620,24 @@ export class ActorSync {
   }
 
   /**
+   * Read the field definitions again. The adapter is built once when the
+   * world loads, so a system package updated in Chronicle since then would
+   * keep being pushed in its old shape (a newly mapped field never sent)
+   * until a reload. A failed read keeps the adapter in hand, and a module
+   * that started without one stays off: its hooks were never registered.
+   * @returns {Promise<boolean>} true when the definitions changed.
+   */
+  async refreshAdapter() {
+    if (!this._adapter) return false;
+    const fresh = await this._loadAdapter();
+    if (!fresh) return false;
+    const before = this._adapter;
+    this._adapter = fresh;
+    if (fresh.characterTypeSlug !== before.characterTypeSlug) await this._resolveCharacterTypeId();
+    return JSON.stringify(fresh.fieldDefs) !== JSON.stringify(before.fieldDefs);
+  }
+
+  /**
    * Resolve the character entity type ID and (when the PC-claiming addon is
    * active) the "Player Characters" sub-type ID in a single `/entity-types`
    * call.
