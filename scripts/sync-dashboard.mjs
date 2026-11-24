@@ -3103,6 +3103,11 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
     // 2. Characters — re-push every LINKED actor so stale fields refresh.
     const actorSync = find('ActorSync');
     if (actorSync?.repushActor && sm?.pushGate?.('characters') !== 'drop') {
+      // A package updated in Chronicle since the world loaded maps new
+      // fields; re-pushing with the definitions read at load would leave
+      // them out on every hero.
+      try { await actorSync.refreshAdapter?.(); }
+      catch (err) { console.error('Chronicle: reading the character fields again failed', err); }
       const chars = actorSync.getSyncedActors?.() ?? [];
       let pushed = 0;
       for (const c of chars) {

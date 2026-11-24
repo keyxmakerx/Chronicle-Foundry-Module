@@ -377,6 +377,37 @@ test('a character claimed in Chronicle gives the mapped Foundry player Owner on 
   assert.equal(actor.ownership.benchPlayer00001, 3, 'unclaim leaves Foundry ownership alone');
 }, { settings: ON }));
 
+test('a hero older than the last sync, claimed later by a linked player with no hero here, gets its actor, owned by them and set as their character', () => scenario('chr-claim-brings-hero', async ({ seed, world }) => {
+  await seed.enableClaiming();
+  // Made before the world ever connected: the first connect imports nothing,
+  // so this page has no actor, as a GM's unimported hero would.
+  const e = await chronicleCharacter(seed, 'Waiting Hero', 9);
+  const player = {
+    id: 'benchNewPlayer01', name: 'New Player', isGM: false, role: 1, flags: {}, character: null,
+    async update(change) { Object.assign(player, change); },
+  };
+  world.game.users.set(player.id, player);
+  await openWorld(world, MODULES);
+  assert.ok(!actorFor(world, e.id), 'not brought in on connect while unclaimed');
+
+  const members = await seed.chronicle.get('/members');
+  const member = (Array.isArray(members) ? members : members.data).find((m) => m.display_name === seed.displayName);
+  const memberId = String(member.user_id ?? member.id);
+  await world.game.settings.set('chronicle-sync', 'userMappings', JSON.stringify({ [memberId]: player.id }));
+  await settle();
+
+  const reqs = await recordRequests(async () => {
+    await seed.assignOwner(e.id, memberId);
+    await waitFor(() => actorFor(world, e.id)?.ownership?.[player.id] === 3, 10000, 'the claimed hero arrived, owned by its player');
+    await settle();
+  });
+  const actor = actorFor(world, e.id);
+  assert.equal(actor.system.hp, 9, 'with the character\'s fields');
+  assert.equal(player.character, actor.id, 'it is the player\'s character');
+  assert.deepEqual(writes(reqs).filter((r) => !/\/sync\/(mappings|players)/.test(r.url)).map((r) => `${r.method} ${r.url}`), [], 'nothing else written to Chronicle');
+  assert.equal(world.game.actors.filter((a) => a.name === 'Waiting Hero').length, 1, 'one actor');
+}, { settings: ON }));
+
 test('a Foundry player added after connect, named like the claimant, is linked and owns the claimed actor without the GM', () => scenario('fvtt-player-added-later', async ({ seed, world }) => {
   await seed.enableClaiming();
   // The GM's Foundry name differs, so the campaign's one member starts unlinked.
