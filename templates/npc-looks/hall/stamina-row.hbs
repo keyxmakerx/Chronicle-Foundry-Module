@@ -1,0 +1,32 @@
+{{!-- Stamina for an NPC who has a stat block, as a gold-edged bar under the
+negotiation (the ring there is Interest). The same Draw Steel inputs as the
+monster's ring, and the same squad rule. --}}
+<div class="cs-hall-stamrow" data-band="{{npc.chronicle.stamina.band}}">
+  <span class="cs-hall-k">{{systemFields.stamina.label}}</span>
+  <span class="cs-hall-bar" role="presentation">
+    <i style="width: {{npc.chronicle.stamina.fill}}%"></i>
+    {{#if npc.chronicle.stamina.windedAt}}<u style="left: {{npc.chronicle.stamina.windedAt}}%"></u>{{/if}}
+  </span>
+  <span class="cs-hall-n">
+    <label class="cs-field cs-hall-stam">
+      {{#if isSingleSquadMinion}}
+      <span class="cs-hidden-label">{{localize "TYPES.CombatantGroup.squad"}}</span>
+      <input type="number" name="squadStaminaValue" value="{{combatGroup.system.staminaValue}}">
+      {{else}}
+      <span class="cs-hidden-label">{{systemFields.stamina.fields.value.label}}</span>
+      {{formInput systemFields.stamina.fields.value value=system.stamina.value dataset=datasets.notSource}}
+      {{/if}}
+    </label>
+    <small>/ {{#if isSingleSquadMinion}}{{combatGroup.system.staminaMax}}{{else}}{{system.stamina.max}}{{/if}}</small>
+  </span>
+  <span class="cs-hall-stamnote">
+    <label class="cs-field cs-hall-temp">
+      <span>{{systemFields.stamina.fields.temporary.label}}</span>
+      {{formInput systemFields.stamina.fields.temporary value=system.stamina.temporary dataset=datasets.notSource}}
+    </label>
+    <span class="cs-hall-wat">{{localize "CHRONICLE.HeroSheet.Thresholds" winded=system.stamina.winded dead=system.stamina.min}}</span>
+    {{#if (eq npc.chronicle.stamina.band "winded")}}<strong class="cs-hall-state">{{localize "CHRONICLE.HeroSheet.Winded"}}</strong>{{/if}}
+    {{#if (eq npc.chronicle.stamina.band "dying")}}<strong class="cs-hall-state">{{localize "CHRONICLE.HeroSheet.Dying"}}</strong>{{/if}}
+    {{#if (eq npc.chronicle.stamina.band "dead")}}<strong class="cs-hall-state">{{localize "CHRONICLE.HeroSheet.Dead"}}</strong>{{/if}}
+  </span>
+</div>

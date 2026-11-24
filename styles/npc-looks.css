@@ -281,6 +281,8 @@
   background: var(--cs-hero-dm);
   color: var(--cs-hero-bg, #111);
 }
+/* The mark takes the tab's colour, or a look's amber mark vanishes on the pressed tab. */
+.chronicle-npc-sheet nav.tabs .cs-only-you-tab .cs-dm-mark { color: inherit; }
 .chronicle-npc-sheet nav.tabs .cs-only-you-tab:focus-visible {
   outline: 2px solid var(--cs-hero-dm);
   outline-offset: 2px;

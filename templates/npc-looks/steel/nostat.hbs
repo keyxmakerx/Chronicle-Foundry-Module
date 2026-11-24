@@ -1,0 +1,9 @@
+{{!-- The honest empty place for a stat block an NPC doesn't have yet: no
+made-up numbers, and Edit mode to set them. --}}
+{{#unless npc.statBlock}}
+<div class="cs-nostat cs-steel-plate cs-steel-wide">
+  <b>{{localize "CHRONICLE.NpcSheet.NoStats.Title"}}</b>
+  <p>{{localize (ifThen editable "CHRONICLE.NpcSheet.NoStats.Body" "CHRONICLE.NpcSheet.NoStats.BodyView")}}</p>
+  {{#if editable}}<button type="button" class="cs-quiet" data-action="toggleMode">{{localize "CHRONICLE.NpcSheet.NoStats.Edit"}}</button>{{/if}}
+</div>
+{{/unless}}

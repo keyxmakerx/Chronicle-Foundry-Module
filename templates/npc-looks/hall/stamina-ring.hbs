@@ -1,0 +1,38 @@
+{{!-- The monster's Stamina ring: it empties as the creature is hurt, with a
+gold bar where it becomes winded and one arc inside for each villain action
+it still has. Draw Steel's current and temporary Stamina inputs
+(data-source="false", so effect locks work). A minion in a single squad shows
+the squad's Stamina, as Draw Steel's own sheet does. --}}
+<div class="cs-hall-ring cs-hall-stamina" data-band="{{npc.chronicle.stamina.band}}">
+  <svg class="cs-hall-ring-art" viewBox="0 0 200 200" aria-hidden="true" focusable="false">
+    <circle class="cs-hall-ticks" cx="100" cy="100" r="95" pathLength="42"/>
+    <circle class="cs-hall-track" cx="100" cy="100" r="82"/>
+    <circle class="cs-hall-fill" cx="100" cy="100" r="82" pathLength="100" stroke-dasharray="{{npc.chronicle.stamina.fill}} 100" transform="rotate(-90 100 100)"/>
+    {{#if npc.chronicle.stamina.windedAt}}<circle class="cs-hall-wmark" cx="100" cy="100" r="82" pathLength="100" stroke-dasharray="0.7 99.3" stroke-dashoffset="-{{npc.chronicle.stamina.windedAt}}" transform="rotate(-90 100 100)"/>{{/if}}
+    {{#each npc.look.villainArcs as |seg|}}
+    <circle class="cs-hall-seg{{#if seg.on}} on{{/if}}" cx="100" cy="100" r="65" pathLength="100" stroke-dasharray="{{seg.dash}}" stroke-dashoffset="{{seg.offset}}" transform="rotate(-90 100 100)"/>
+    {{/each}}
+  </svg>
+  <div class="cs-hall-rv">
+    <label class="cs-field cs-hall-stam">
+      {{#if isSingleSquadMinion}}
+      <span class="cs-hidden-label">{{localize "TYPES.CombatantGroup.squad"}}</span>
+      <input type="number" name="squadStaminaValue" value="{{combatGroup.system.staminaValue}}">
+      {{else}}
+      <span class="cs-hidden-label">{{systemFields.stamina.fields.value.label}}</span>
+      {{formInput systemFields.stamina.fields.value value=system.stamina.value dataset=datasets.notSource}}
+      {{/if}}
+    </label>
+    <span class="cs-hall-of">{{localize "CHRONICLE.HeroSheet.OfStamina" max=(ifThen isSingleSquadMinion combatGroup.system.staminaMax system.stamina.max)}}</span>
+    {{#if (eq npc.chronicle.stamina.band "winded")}}<strong class="cs-hall-state">{{localize "CHRONICLE.HeroSheet.Winded"}}</strong>{{/if}}
+    {{#if (eq npc.chronicle.stamina.band "dying")}}<strong class="cs-hall-state">{{localize "CHRONICLE.HeroSheet.Dying"}}</strong>{{/if}}
+    {{#if (eq npc.chronicle.stamina.band "dead")}}<strong class="cs-hall-state">{{localize "CHRONICLE.HeroSheet.Dead"}}</strong>{{/if}}
+  </div>
+  <div class="cs-hall-ring-foot">
+    <label class="cs-field cs-hall-temp">
+      <span>{{systemFields.stamina.fields.temporary.label}}</span>
+      {{formInput systemFields.stamina.fields.temporary value=system.stamina.temporary dataset=datasets.notSource}}
+    </label>
+    <span class="cs-hall-wat">{{localize "CHRONICLE.HeroSheet.Thresholds" winded=system.stamina.winded dead=system.stamina.min}}</span>
+  </div>
+</div>

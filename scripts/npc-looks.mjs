@@ -27,11 +27,18 @@ import { chroniclePageUrl, conditionList, drawSteelSupported, staminaView } from
 import { LINK_FLAG, TALK_FLAG, castAction } from './npc-presence.mjs';
 import { isTalkLive } from './_npc-presence.mjs';
 import { SHOWN_FLAG } from './_negotiation-mirror.mjs';
+import * as hallNpc from './_npc-look-hall.mjs';
+import * as glassNpc from './_npc-look-glass.mjs';
+import * as gildedNpc from './_npc-look-gilded.mjs';
+import * as skyNpc from './_npc-look-sky.mjs';
 import {
-  NPC_ONLY, SHAPE_FLAG, SHAPES, VILLAIN_FLAG,
+  NPC_MOVE_MS, NPC_ONLY, SHAPE_FLAG, SHAPES, VILLAIN_FLAG,
   allNpcLookTemplates, hasStatBlock, negotiationView, npcChanges, npcLook, npcLookTemplate, npcPageId, npcParts, onlyYouView,
   npcTabs, openingTab, pageChips, pageText, peopleRows, sheetShape, villainKey, villainMarks, withVillainUse,
 } from './_npc-looks.mjs';
+
+/** Each look's own figures for its templates, as `npc.look` (scripts/_npc-look-<look>.mjs). */
+const NPC_LOOK_EXTRAS = { hall: hallNpc, glass: glassNpc, gilded: gildedNpc, sky: skyNpc };
 
 /** The id Foundry stores for the sheet; renaming the class orphans every actor's choice. */
 export const NPC_SHEET_CLASS = `${MODULE_ID}.ChronicleNpcSheet`;
@@ -195,6 +202,11 @@ export function makeChronicleNpcSheet(Base) {
     }
 
     /** @override */
+    _csMoveMs(move) {
+      return NPC_MOVE_MS[this.look]?.[move] ?? super._csMoveMs(move);
+    }
+
+    /** @override */
     _configureRenderOptions(options) {
       super._configureRenderOptions(options);
       // The first tab follows the moment the sheet is opened in, once.
@@ -242,6 +254,17 @@ export function makeChronicleNpcSheet(Base) {
       } catch (err) {
         console.warn('Chronicle Sync | NPC sheet figures unavailable', err);
         this.#model = { shape: this.shape, chronicle: {} };
+      }
+      // A look's figures failing leaves its boxes empty, never the sheet undrawn.
+      try {
+        const sys = this.document.system ?? {};
+        this.#model.look = NPC_LOOK_EXTRAS[this.look]?.npcLookContext?.(this.#model, sys, {
+          characteristics: sys.characteristics ?? {},
+          lang: globalThis.game?.i18n?.lang,
+        }) ?? {};
+      } catch (err) {
+        console.warn('Chronicle Sync | NPC look figures unavailable', err);
+        this.#model.look = {};
       }
       context.npc = this.#model;
       return context;

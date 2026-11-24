@@ -1,0 +1,340 @@
+/* The portrait hall look on the Chronicle NPC and monster sheet
+   (templates/npc-looks/hall/, scripts/npc-looks.mjs). The hero hall's picture,
+   frame, ring, diamonds, plaques, rail and moves already draw this window
+   (styles/hero-look-hall.css, which it follows); this file adds only what an
+   NPC or monster has and a hero does not.
+
+   The monster's ring is Stamina with its villain actions left as the inner
+   arcs; the NPC's ring is Interest with Patience as the inner arcs. Villain
+   actions, Malice, Patience and Interest are rows of diamonds, and the
+   motivations and pitfalls are plaques: gold when found, iron once appealed
+   to, veiled while hidden, blood red for a pitfall. Every state is in words
+   as well. Director-only things keep the amber edge, the mark and the words. */
+
+/* The look's own colours, in one place. Ember is the villain actions, blood
+   the pitfalls and Malice, pale blue Patience. */
+.chronicle-npc-sheet[data-cs-look="hall"] {
+  --cs-hall-ember: #e2531c;
+  --cs-hall-ember-soft: #ff8a5c;
+  --cs-hall-blood: #b4231b;
+  --cs-hall-patience: #9fc7ff;
+  --cs-hero-dm: #f59e0b;
+  --cs-hero-dm-soft: #f59e0b14;
+}
+
+/* ---- Header: the small kind word stays in play, an NPC's chips need it ---- */
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-kindw { margin-right: 0.45em; color: #b9b29c; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-origin-name { font-style: italic; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-eye .cs-hall-meta::before { content: none; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-eye .cs-hall-meta { margin-left: 0.6em; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-note { margin: 8px 0 0; font: italic 14px var(--cs-hero-face); color: #9aa39c; text-shadow: 0 1px 8px #000; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-vic .cs-dm-only { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; padding-left: 10px; box-shadow: inset 2px 0 0 var(--cs-hero-dm); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-vic .cs-dm-mark { color: var(--cs-hero-dm); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-vic .cs-dm-words { margin: 0; font: italic 600 13px var(--cs-hero-face); letter-spacing: 0; text-transform: none; color: var(--cs-hero-dm); text-shadow: 0 1px 8px #000; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-talk { pointer-events: auto; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-talk::before { content: ""; width: 7px; height: 7px; border-radius: 50%; border: 1px solid currentColor; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-talk[aria-pressed="true"] { border-color: var(--cs-hall-gold); background-size: 0 100%; background-color: transparent; color: var(--cs-hall-gold); box-shadow: 0 0 18px #f4d58d33; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-talk[aria-pressed="true"]::before { border: 0; background: var(--cs-hero-ok); box-shadow: 0 0 8px var(--cs-hero-ok); animation: cs-hall-npc-breathe 2.4s ease-in-out infinite; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-talk[aria-pressed="true"]:hover { background-size: 100% 100%; color: var(--cs-hero-on-accent); }
+
+/* ---- The rings ------------------------------------------------------------ */
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-wmark { stroke: #fff3c4; stroke-width: 15; fill: none; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-wat { font: 600 8px var(--cs-hall-display); letter-spacing: 0.16em; text-transform: uppercase; color: var(--cs-hero-muted); text-align: center; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-state:empty { display: none; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-ring-foot { flex-direction: column; gap: 4px; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-stamina .cs-hall-ring-foot { flex-direction: row; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-stamina .cs-hall-wat { flex-basis: 100%; }
+
+/* Interest: red at the bottom of the offers, gold in the middle, green at the top. */
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-interest { --cs-hall-stam-a: #fff1b0; --cs-hall-stam-b: #e2b13c; --cs-hall-stam-glow: #f4d58d66; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-interest:is([data-band="i0"], [data-band="i1"]) { --cs-hall-stam-a: #ff9a8a; --cs-hall-stam-b: #dc2626; --cs-hall-stam-glow: #dc262666; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-interest[data-band="i2"] { --cs-hall-stam-a: #ffd27a; --cs-hall-stam-b: #f59e0b; --cs-hall-stam-glow: #f59e0b66; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-interest:is([data-band="i4"], [data-band="i5"]) { --cs-hall-stam-a: #b6ff8a; --cs-hall-stam-b: #22c55e; --cs-hall-stam-glow: #22c55e55; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-interest[data-band="none"] { --cs-hall-stam-a: #9aa39c; --cs-hall-stam-b: #5a6068; --cs-hall-stam-glow: #0000; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-big { font: 600 58px/1 var(--cs-hall-display); color: var(--cs-hall-ink); text-shadow: 0 0 18px #ffffff33; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-interest .cs-hall-state { max-width: 112px; font-size: 10px; letter-spacing: 0.1em; text-align: center; }
+/* Patience arcs are pale blue, so the inner ring never reads as Interest's gold. */
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-interest .cs-hall-seg { stroke: #9fc7ff2e; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-interest .cs-hall-seg.on { stroke: #b9d6ff; filter: drop-shadow(0 0 3px var(--cs-hall-patience)); }
+/* Villain actions left: ember arcs. */
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-stamina .cs-hall-seg { stroke: #ff8a5c2e; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-stamina .cs-hall-seg.on { stroke: var(--cs-hall-ember-soft); filter: drop-shadow(0 0 3px var(--cs-hall-ember)); }
+
+/* ---- Diamond rows ----------------------------------------------------------- */
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-pat .cs-hall-pips i { border-color: #9fc7ff88; background: #0d1522; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-pat .cs-hall-pips i.on { background: linear-gradient(135deg, #e6f1ff, #6aa2e8); box-shadow: 0 0 8px #9fc7ff99; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-n b { font: 600 18px var(--cs-hall-display); color: var(--cs-hall-ink); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-answer { font: italic 15.5px var(--cs-hero-face); color: #d5ddd5; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-answer b { font: 600 15px var(--cs-hall-display); font-style: normal; letter-spacing: 0.04em; color: var(--cs-hall-gold); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-over { font: 600 10px var(--cs-hall-display); letter-spacing: 0.16em; text-transform: uppercase; color: var(--cs-hero-bad); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-noneg { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-noneg > p { margin: 0; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-link { font: italic 15px var(--cs-hero-face); color: var(--cs-hall-gold); }
+
+/* Villain actions: a diamond for each, numbered, in order. Used ones are dark
+   and crossed, the next burns; the words are on each mark and in the line under. */
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-va { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "k p" "s s"; row-gap: 4px; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-va .cs-hall-vsub { grid-area: s; font: italic 14px var(--cs-hero-face); color: #9aa39c; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-vds { gap: 4px 8px; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-vd {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: #fff3e8;
+  font: 600 11px var(--cs-hall-display);
+}
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-vd::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px solid #ff8a5c99;
+  background: linear-gradient(135deg, #ffd0b0, var(--cs-hall-ember));
+  box-shadow: 0 0 8px #e2531c88;
+  transform: rotate(45deg);
+  transition: background 300ms ease, box-shadow 300ms ease, border-color 300ms ease;
+}
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-vd b { position: relative; font-weight: 600; text-shadow: 0 0 4px #5a1a06; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-vd.used { color: #8d948d; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-vd.used::before { background: #120806; border-color: #ff8a5c44; box-shadow: none; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-vd.used b { text-decoration: line-through; text-shadow: none; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-vd.next::before { animation: cs-hall-npc-burn 2.2s ease-in-out infinite; }
+.chronicle-npc-sheet[data-cs-look="hall"] button.cs-hall-vd { cursor: pointer; }
+.chronicle-npc-sheet[data-cs-look="hall"] button.cs-hall-vd:hover::before { border-color: #ffd0b0; }
+.chronicle-npc-sheet[data-cs-look="hall"] button.cs-hall-vd:focus-visible { outline: 1px solid var(--cs-hall-gold); outline-offset: 1px; }
+
+/* Malice: only the Director sees it, so the row carries the amber edge, the mark and the words. */
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-malice { margin-left: -12px; padding: 4px 0 4px 10px; box-shadow: inset 2px 0 0 var(--cs-hero-dm); background: linear-gradient(90deg, var(--cs-hero-dm-soft), #f59e0b00 70%); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-malice .cs-hall-k { flex-direction: column; align-items: flex-start; gap: 1px; color: var(--cs-hero-dm); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-malice .cs-dm-mark { font: inherit; letter-spacing: inherit; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-malice .cs-dm-words { margin: 0; font: italic 600 12px var(--cs-hero-face); letter-spacing: 0; text-transform: none; color: var(--cs-hero-dm); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-malice .cs-hall-pips i { width: 8px; height: 8px; border-color: #c2414188; background: #1a0707; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-malice .cs-hall-pips i.on { background: linear-gradient(135deg, #ffb4b4, #b91c1c); box-shadow: 0 0 7px #ef444488; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-malice .cs-hall-n input[type="number"] { width: 3ch; min-width: 3ch; }
+
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-cond { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "k p"; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-cond .cs-hall-k { grid-area: k; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-conds { grid-area: p; display: flex; flex-wrap: wrap; gap: 2px 12px; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-conds b { display: inline-flex; align-items: center; gap: 5px; font: italic 600 15px var(--cs-hero-face); color: #f0b3a6; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-conds img { width: 16px; height: 16px; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-cond .cs-hall-none { grid-area: p; margin: 0; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-fs {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0 4px;
+  border: 0;
+  border-bottom: 1px solid var(--cs-hall-gold-soft);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  font: inherit;
+  color: var(--cs-hero-body);
+  cursor: pointer;
+}
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-fs:hover { border-bottom-color: var(--cs-hall-gold); background: #f4d58d12; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-fs b { font: 600 16px var(--cs-hall-display); color: var(--cs-hall-ink); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-statline { display: flex; flex-direction: column; gap: 6px; }
+
+/* An NPC's stat block: Stamina as a thin gold-edged bar. */
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-stamrow {
+  --b-a: #b6ff8a; --b-b: #22c55e;
+  display: grid;
+  grid-template-columns: auto minmax(60px, 1fr) auto;
+  grid-template-areas: "k bar n" ". note note";
+  align-items: center;
+  gap: 4px 14px;
+}
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-stamrow[data-band="winded"] { --b-a: #ffd27a; --b-b: #f59e0b; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-stamrow:is([data-band="dying"], [data-band="dead"]) { --b-a: #ff9a8a; --b-b: #dc2626; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-stamrow > .cs-hall-k { grid-area: k; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-stamrow > .cs-hall-bar { grid-area: bar; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-stamrow > .cs-hall-n { grid-area: n; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-stamrow > .cs-hall-stamnote { grid-area: note; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-bar { position: relative; height: 8px; border: 1px solid #f4d58d44; background: #ffffff10; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-bar i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, var(--b-b), var(--b-a)); box-shadow: 0 0 10px var(--b-b); transition: width 700ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-bar u { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: #fff3c4; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-stamrow .cs-hall-stam input[type="number"] { width: 4ch; height: 34px; font-size: 28px; text-align: right; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-stamnote { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-stamnote .cs-hall-state { margin: 0; color: var(--b-a); }
+
+/* No stat block yet: the hall's gold dashed edge, a place for something, not a thing. */
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-nostat { margin-top: 0; border-color: #f4d58d55; background: #f4d58d0a; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-nostat b { font: 600 10px var(--cs-hall-display); letter-spacing: 0.2em; text-transform: uppercase; color: var(--cs-hall-gold); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-nostat p { font: italic 15px/1.4 var(--cs-hero-face); color: #cfd8cf; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-nostat .cs-quiet { font: 600 9.5px var(--cs-hall-display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--cs-hall-gold); }
+
+/* Next villain action. */
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-nextline { margin: 6px 0 0; font: 600 15px var(--cs-hall-display); letter-spacing: 0.04em; color: #ffb38a; }
+
+/* ---- Motivations and pitfalls as plaques ---------------------------------- */
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-motives { margin: 0; padding: 0; list-style: none; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-motive { cursor: default; text-align: center; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-motive:hover { transform: none; filter: none; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-motive[data-state="used"] { --m: linear-gradient(160deg, #9aa0a6, #5a6068 50%, #2a2e33); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-motive[data-state="found"][data-kind="motivation"] { --m: linear-gradient(160deg, #fff1b0, #d9a520 45%, #7a5408); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-motive[data-state="found"][data-kind="pitfall"] { --m: linear-gradient(160deg, #ffb0a0, #b4231b 45%, #4a0a07); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-motive[data-state="hidden"] { --m: repeating-linear-gradient(135deg, #3a3f44 0 6px, #22262a 6px 12px); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-motive b {
+  max-width: calc(100% - 14px);
+  font-size: min(16px, calc(108px / var(--len, 6)));
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-shadow: none;
+  white-space: nowrap;
+}
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-motive i { max-width: calc(100% - 22px); font-size: 7px; letter-spacing: 0.16em; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-motive[data-state="hidden"] i { background: none; color: #7c847d; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-motive[data-kind="pitfall"][data-state="found"] i { background: none; color: #ffc4b8; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-motive .cs-hall-word { max-width: calc(100% - 26px); margin-top: 6px; overflow: visible; font-size: 7px; line-height: 1.25; letter-spacing: 0.1em; text-align: center; white-space: normal; color: #9aa39c; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-motive[data-state="found"] .cs-hall-word { color: #fff1b0; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-motive[data-kind="pitfall"][data-state="found"] .cs-hall-word { color: #ffb0a0; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-motive[data-state="used"] b { color: #8d948d; text-decoration: line-through; text-decoration-color: #f4d58d88; text-decoration-thickness: 1px; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-motive[data-state="hidden"] b { color: #9aa39c; font-style: italic; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-motive[data-state="hidden"]::after { background: radial-gradient(90% 60% at 50% 0, #1a1d20, #0a0c0e 70%); }
+
+/* ---- The Talk and People panes, in the hall's capitals and Garamond ------- */
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-pane { padding: 0 0 14px; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-pane-h { margin-top: 0; padding: 0 0 8px; border-bottom: 1px solid #f4d58d26; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-pane-h h3 { font: 600 10px var(--cs-hall-display); letter-spacing: 0.24em; text-transform: uppercase; color: var(--cs-hall-gold); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-pane-h small { font: italic 14px var(--cs-hero-face); letter-spacing: 0; text-transform: none; color: var(--cs-hero-muted); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-pane-body { padding: 12px 0 16px; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-prose, .chronicle-npc-sheet[data-cs-look="hall"] .cs-rows li { font-family: var(--cs-hero-face); font-size: 15.5px; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-rows li { padding: 9px 4px; border-bottom-color: #f4d58d17; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-rows li > span:first-child { font-weight: 400; color: var(--cs-hero-text); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-rows li em { font-style: italic; font-size: 15px; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-rows li small.cs-dm-mark { font: 600 9px var(--cs-hall-display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--cs-hero-dm); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-rows li.cs-dm-only { padding-left: 10px; box-shadow: inset 2px 0 0 var(--cs-hero-dm); background: linear-gradient(90deg, var(--cs-hero-dm-soft), #f59e0b00 70%); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-quiet { color: var(--cs-hall-gold); font-family: var(--cs-hero-face); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-legend { font: italic 14px var(--cs-hero-face); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-motives .cs-chip { border: 1px solid #f4d58d66; background: #f4d58d12; font: 600 14px var(--cs-hero-face); color: var(--cs-hero-text); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-motives .cs-chip:hover { box-shadow: none; border-color: var(--cs-hall-gold); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-motives .cs-chip-kind { font: 600 8px var(--cs-hall-display); letter-spacing: 0.16em; color: var(--cs-hall-gold); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-motives .cs-chip[data-kind="pitfall"] { border-color: #f08a7e77; background: #b4231b1f; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-motives .cs-chip[data-kind="pitfall"] .cs-chip-kind { color: #ffb0a0; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-motives .cs-chip[data-state="hidden"] { border-style: dashed; background: none; color: #9aa39c; font-style: italic; font-weight: 400; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-chip-state { font: italic 13px var(--cs-hero-face); color: #9aa39c; }
+
+/* ---- The Director's drawer --------------------------------------------- */
+/* It takes the open tab's place, and its tab turns with the rail's. */
+.chronicle-npc-sheet[data-cs-look="hall"]:not(.cs-folded) .window-content > .cs-only-you { grid-column: 2; grid-row: 2; margin: 18px 26px 30px 30px; }
+.chronicle-npc-sheet[data-cs-look="hall"]:not(.cs-folded) .window-content > nav.tabs > .cs-only-you-tab {
+  align-self: center;
+  margin: 10px 0 0;
+  padding: 10px 4px;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font: 600 9.5px var(--cs-hall-display);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+@container cs-hero (max-width: 760px) {
+  .chronicle-npc-sheet[data-cs-look="hall"]:not(.cs-folded) .window-content > .cs-only-you { grid-column: 1; grid-row: 4; margin: 16px 20px 26px; }
+  .chronicle-npc-sheet[data-cs-look="hall"]:not(.cs-folded) .window-content > nav.tabs > .cs-only-you-tab { margin: 6px 0 6px auto; padding: 4px 10px; writing-mode: horizontal-tb; transform: none; }
+}
+
+/* ---- Folded: the card's diamonds, marks and chips in the hall ----------- */
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-dots i { width: 8px; height: 8px; border: 1px solid #f4d58d77; border-radius: 0; background: linear-gradient(135deg, #fff1b0, #d9a520); box-shadow: none; transform: rotate(45deg); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-dots i.off { background: #15120a; box-shadow: none; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-dots { gap: 6px; padding: 0 2px; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-meter b { font-family: var(--cs-hall-display); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-card .cs-offer { font: italic 14px var(--cs-hero-face); color: #d5ddd5; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-card .cs-offer b { font: 600 13px var(--cs-hall-display); font-style: normal; color: var(--cs-hall-gold); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-card .cs-lab { font: 600 8px var(--cs-hall-display); letter-spacing: 0.18em; text-transform: uppercase; color: var(--cs-hall-gold); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-card .cs-motives .cs-chip { font-size: 12.5px; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-card .cs-va-pips { gap: 4px; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-card .cs-va-mark {
+  height: 24px;
+  border-radius: 0;
+  box-shadow: inset 0 0 0 1px #ff8a5c99;
+  background: linear-gradient(135deg, #ffd0b044, #e2531c66);
+  color: #fff3e8;
+  font: 600 11px var(--cs-hall-display);
+}
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-card button.cs-va-mark:hover { box-shadow: inset 0 0 0 1px #ffd0b0; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-card .cs-va-mark.used { background: #120806; box-shadow: inset 0 0 0 1px #ff8a5c44; color: #8d948d; text-decoration: line-through; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-card .cs-va-mark.next { box-shadow: inset 0 0 0 1.5px var(--cs-hall-ember-soft), 0 0 8px #e2531c88; color: #ffb38a; animation: cs-hall-npc-burn 2.2s ease-in-out infinite; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-card-malice { border-radius: 0; background: linear-gradient(90deg, var(--cs-hero-dm-soft), #f59e0b00 70%); font: 600 9px var(--cs-hall-display); letter-spacing: 0.14em; text-transform: uppercase; }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-card-malice input { border-radius: 0; border-color: #f59e0b66; font-family: var(--cs-hall-display); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-card .cs-talking { color: var(--cs-hero-ok); }
+.chronicle-npc-sheet[data-cs-look="hall"] .cs-card-actions .cs-talk-btn[aria-pressed="true"] { border-color: var(--cs-hall-gold); color: var(--cs-hall-gold); }
+
+/* ---- Narrow windows ------------------------------------------------------- */
+@container cs-hall (max-width: 860px) {
+  .chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-big { font-size: 46px; }
+  .chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-interest .cs-hall-state { max-width: 92px; font-size: 8.5px; }
+}
+/* Beside the picture in a narrow window the middle column holds three plaques a row; stacked under the banner it has room for five. */
+@container cs-hall (min-width: 761px) and (max-width: 840px) {
+  .chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-motives { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+/* A narrow column puts the label over the diamonds, which would otherwise wrap. */
+@container cs-hall-col (max-width: 260px) {
+  .chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-va { grid-template-columns: minmax(0, 1fr); grid-template-areas: "k" "p" "s"; }
+  .chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-cond { grid-template-columns: minmax(0, 1fr); grid-template-areas: "k" "p"; }
+}
+@container cs-hall (max-width: 480px) {
+  .chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-motives { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-stamrow { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "k n" "bar bar" "note note"; }
+}
+
+/* ---- New moves (the hero's open, hit and heal already play) --------------- */
+/* A villain action used: an ember light crosses the sheet and the next diamond flares. */
+.chronicle-npc-sheet[data-cs-look="hall"].cs-move-va .cs-hall-sweep { background: linear-gradient(100deg, #0000, #ff6a3d44 45%, #ffb38a88 50%, #ff6a3d44 55%, #0000); animation: cs-hall-sweep 1.3s cubic-bezier(0.3, 0.6, 0.3, 1); }
+.chronicle-npc-sheet[data-cs-look="hall"].cs-move-va .cs-hall-flash { background: radial-gradient(80% 90% at 40% 45%, #0000 40%, #e2531c99 100%); animation: cs-hall-flash 1.1s ease-out; }
+.chronicle-npc-sheet[data-cs-look="hall"].cs-move-va .cs-hall-vd.next::before { animation: cs-hall-npc-spend 900ms ease-out, cs-hall-npc-burn 2.2s 900ms ease-in-out infinite; }
+.chronicle-npc-sheet[data-cs-look="hall"].cs-move-va .cs-hall-stamina .cs-hall-seg.on { animation: cs-hall-npc-arc 900ms ease-out; }
+.chronicle-npc-sheet[data-cs-look="hall"].cs-move-va .cs-hall-nextline { animation: cs-hall-rise 600ms 300ms both; }
+/* Malice gained: the row pulses once and the number thuds. */
+.chronicle-npc-sheet[data-cs-look="hall"].cs-move-malice .cs-hall-malice .cs-hall-pips i.on:last-of-type { animation: cs-hall-npc-spend 700ms ease-out; }
+.chronicle-npc-sheet[data-cs-look="hall"].cs-move-malice .cs-hall-malice input { animation: cs-hall-thud 450ms; }
+/* Winded: a slow red breath crosses the picture and the word rises. */
+.chronicle-npc-sheet[data-cs-look="hall"].cs-move-winded .cs-hall-flash { animation: cs-hall-flash 1.6s ease-in-out; }
+.chronicle-npc-sheet[data-cs-look="hall"].cs-move-winded .cs-hall-state { animation: cs-hall-rise 500ms 200ms both; }
+/* Interest up: the ring blooms and the numbers glow. */
+.chronicle-npc-sheet[data-cs-look="hall"].cs-move-up .cs-hall-ring-art { animation: cs-hall-bloom 1s ease-out; }
+.chronicle-npc-sheet[data-cs-look="hall"].cs-move-up :is(.cs-hall-big, .cs-hall-state, .cs-hall-answer b) { animation: cs-hall-npc-glow 900ms ease-out; }
+/* Interest or Patience down: the ring shudders. */
+.chronicle-npc-sheet[data-cs-look="hall"].cs-move-down .cs-hall-ring { animation: cs-hall-npc-shudder 400ms ease-out; }
+/* A pitfall found: the red shadow and recoil of a hit, and the ring shudders. */
+.chronicle-npc-sheet[data-cs-look="hall"].cs-move-pit .cs-hall-flash { animation: cs-hall-flash 900ms ease-out; }
+.chronicle-npc-sheet[data-cs-look="hall"].cs-move-pit .cs-hall-art .cs-portrait { animation: cs-hall-recoil 500ms cubic-bezier(0.3, 0.7, 0.3, 1); }
+.chronicle-npc-sheet[data-cs-look="hall"].cs-move-pit .cs-hall-ring { animation: cs-hall-npc-shudder 500ms ease-out; }
+.chronicle-npc-sheet[data-cs-look="hall"].cs-move-pit .cs-hall-big { animation: cs-hall-thud 450ms cubic-bezier(0.2, 0.9, 0.3, 1); }
+/* Found: the found plaques turn in turn and a sheen crosses each. */
+.chronicle-npc-sheet[data-cs-look="hall"].cs-move-reveal .cs-hall-motive[data-state="found"] { animation: cs-hall-flip 800ms calc(var(--i, 0) * 90ms) cubic-bezier(0.3, 0.7, 0.2, 1) both; }
+.chronicle-npc-sheet[data-cs-look="hall"].cs-move-reveal .cs-hall-motive[data-state="found"]::after { animation: cs-hall-sheen 900ms calc(var(--i, 0) * 90ms + 500ms) ease-out; }
+
+@keyframes cs-hall-npc-breathe { 50% { opacity: 0.45; } }
+@keyframes cs-hall-npc-burn { 0%, 100% { box-shadow: 0 0 6px #e2531c88; } 50% { box-shadow: 0 0 16px #ff8a3c, 0 0 2px #fff3; } }
+@keyframes cs-hall-npc-spend { 0% { transform: rotate(45deg) scale(1.9); box-shadow: 0 0 24px #ff8a3c; background: #ffd0b0; } 100% { transform: rotate(45deg) scale(1); } }
+@keyframes cs-hall-npc-arc { 0% { filter: drop-shadow(0 0 12px #ff8a3c); } }
+@keyframes cs-hall-npc-shudder { 20% { transform: translateX(-4px); } 40% { transform: translateX(4px); } 60% { transform: translateX(-2px); } 80% { transform: translateX(1px); } }
+@keyframes cs-hall-npc-glow { 30% { color: #fff; text-shadow: 0 0 22px #f4d58d, 0 0 50px #f4d58d88; } }
+
+/* Calm: every move becomes a short fade; glows stay. */
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="hall"] :is(.cs-hall-malice input, .cs-hall-big, .cs-hall-state, .cs-hall-answer b, .cs-hall-nextline, .cs-hall-motive, .cs-hall-stamina .cs-hall-seg.on) { animation: none; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="hall"] :is(.cs-hall-ring, .cs-hall-ring-art, .cs-hall-malice .cs-hall-pips i) { animation: none; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="hall"].cs-move-va .cs-hall-flash { animation: cs-hall-fade 600ms ease-out; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="hall"].cs-move-winded .cs-hall-flash { animation: cs-hall-fade 600ms ease-out; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="hall"].cs-move-pit .cs-hall-flash { animation: cs-hall-fade 600ms ease-out; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="hall"].cs-move-up :is(.cs-hall-ring-art, .cs-hall-big) { animation: cs-hall-fade 500ms ease-out; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="hall"].cs-move-reveal .cs-hall-motive[data-state="found"] { animation: cs-hall-fade 500ms ease-out; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="hall"].cs-move-malice .cs-hall-malice { animation: cs-hall-fade 500ms ease-out; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="hall"].cs-move-va .cs-hall-sweep { animation: none; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="hall"].cs-move-va .cs-hall-vd.next::before { animation: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-vd.next::before,
+  .chronicle-npc-sheet[data-cs-look="hall"] .cs-hall-talk::before,
+  .chronicle-npc-sheet[data-cs-look="hall"] .cs-card .cs-va-mark.next { animation: none; }
+}

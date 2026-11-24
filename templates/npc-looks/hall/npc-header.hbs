@@ -1,0 +1,55 @@
+{{!-- The portrait hall's NPC header: the picture fills the left of the window
+with the level and role, the name, the page's chips, Impression (the Director
+only) and the Talking switch set over its foot. A Limited viewer sees this
+part, so everything past Draw Steel's own header is for the Director only. --}}
+<header class="cs-hero-head cs-hall-head cs-npc-head" style="{{#if avatarProperties.objectFit}}--avatar-object-fit: {{avatarProperties.objectFit}};{{/if}}{{#if avatarProperties.objectPosition}} --avatar-object-position: {{avatarProperties.objectPosition}};{{/if}}">
+  <div class="cs-hall-art">
+    {{!-- Shown where the actor has no picture of its own. --}}
+    <svg class="cs-hall-crest" viewBox="0 0 600 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+      <g fill="none" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+        <path d="M300 170c110 30 150 60 150 60v170c0 110-70 180-150 230-80-50-150-120-150-230V230s40-30 150-60z"/>
+        <path d="M300 250v270M276 300h48M288 520h24l-12 40z"/>
+      </g>
+    </svg>
+    <button type="button" class="cs-portrait-btn" data-action="csPortraitMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize "CHRONICLE.HeroSheet.Portrait.Menu"}}" data-tooltip="CHRONICLE.HeroSheet.Portrait.Menu">
+      <img class="cs-portrait" src="{{document.img}}" alt="{{document.name}}" {{#unless isPlay}}data-edit="img"{{/unless}}>
+    </button>
+    <div class="cs-hall-veil" aria-hidden="true"></div>
+    <div class="cs-hall-flash" aria-hidden="true"></div>
+  </div>
+  <div class="cs-hall-frame" aria-hidden="true"></div>
+  <div class="cs-hall-sweep" aria-hidden="true"></div>
+
+  <div class="cs-hall-id">
+    <p class="cs-hall-eye">
+      <span class="cs-hall-lvl">{{localize "CHRONICLE.HeroSheet.LevelN" level=system.monster.level}}</span>
+      {{#if system.monster.organizationLabel}}<span class="cs-hall-cls">{{system.monster.organizationLabel}}</span>{{/if}}
+      {{#if system.monster.roleLabel}}<span class="cs-hall-cls cs-hall-sub">{{system.monster.roleLabel}}</span>{{/if}}
+      {{#unless isPlay}}
+      <button type="button" class="cs-hall-mini cs-hall-meta" data-action="editMonsterMetadata" data-tooltip="CHRONICLE.NpcSheet.EditMetadata" aria-label="{{localize "CHRONICLE.NpcSheet.EditMetadata"}}"><i class="fa-solid fa-gear" inert></i></button>
+      {{/unless}}
+    </p>
+    {{#if isPlay}}
+    <h1 class="cs-name">{{document.name}}</h1>
+    {{else}}
+    <div class="cs-name-edit">
+      {{formInput fields.name value=source.name placeholder=(localize "DOCUMENT.FIELDS.name.label")}}
+    </div>
+    {{/if}}
+    {{#if npc.page.chips.length}}
+    <ul class="cs-hall-origins">
+      {{#each npc.page.chips as |chip|}}
+      <li class="cs-hall-origin"><span class="cs-hall-kind cs-hall-kindw">{{chip.kind}}</span><span class="cs-hall-origin-name">{{chip.name}}</span></li>
+      {{/each}}
+    </ul>
+    {{/if}}
+    {{#if npc.isGM}}
+    <p class="cs-hall-vic">
+      <span class="cs-dm-only" data-tooltip="CHRONICLE.NpcSheet.ImpressionTip"><span class="cs-dm-mark">{{localize "CHRONICLE.NpcSheet.Impression"}}</span> <b>{{npc.negotiation.impressionText}}</b> <small class="cs-dm-words">{{localize "CHRONICLE.NpcSheet.OnlyYou"}}</small></span>
+    </p>
+    {{/if}}
+    {{#if npc.talk.show}}
+    <button type="button" class="cs-hall-btn cs-talk-btn cs-hall-talk" data-action="csTalk" aria-pressed="{{#if npc.talk.pressed}}true{{else}}false{{/if}}" data-tooltip="CHRONICLE.NpcSheet.TalkingTip">{{localize "CHRONICLE.NpcSheet.Talking"}}</button>
+    {{/if}}
+  </div>
+</header>

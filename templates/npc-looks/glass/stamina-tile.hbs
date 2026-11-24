@@ -1,0 +1,28 @@
+{{!-- The Stamina tile: Draw Steel's current and temporary Stamina inputs
+(data-source="false", so effect locks work), the maximum beside them, and with
+showState the words for a winded, dying or dead creature. A minion in a single
+squad shows the squad's Stamina, as Draw Steel's own sheet does. --}}
+<div class="cs-glass-box cs-glass-stam cs-dr-stam" data-band="{{npc.chronicle.stamina.band}}">
+  <span class="cs-glass-lb">{{systemFields.stamina.label}}</span>
+  <span class="cs-glass-n">
+    <label class="cs-field">
+      {{#if isSingleSquadMinion}}
+      <span class="cs-hidden-label">{{localize "TYPES.CombatantGroup.squad"}}</span>
+      <input type="number" name="squadStaminaValue" value="{{combatGroup.system.staminaValue}}">
+      {{else}}
+      <span class="cs-hidden-label">{{systemFields.stamina.fields.value.label}}</span>
+      {{formInput systemFields.stamina.fields.value value=system.stamina.value dataset=datasets.notSource}}
+      {{/if}}
+    </label>
+    <small>/ {{#if isSingleSquadMinion}}{{combatGroup.system.staminaMax}}{{else}}{{system.stamina.max}}{{/if}}</small>
+  </span>
+  <label class="cs-field cs-glass-temp">
+    <span>{{systemFields.stamina.fields.temporary.label}}</span>
+    {{formInput systemFields.stamina.fields.temporary value=system.stamina.temporary dataset=datasets.notSource}}
+  </label>
+  {{#if showState}}
+  {{#if (eq npc.chronicle.stamina.band "winded")}}<strong class="cs-dr-stam-state">{{localize "CHRONICLE.HeroSheet.Winded"}}</strong>{{/if}}
+  {{#if (eq npc.chronicle.stamina.band "dying")}}<strong class="cs-dr-stam-state">{{localize "CHRONICLE.HeroSheet.Dying"}}</strong>{{/if}}
+  {{#if (eq npc.chronicle.stamina.band "dead")}}<strong class="cs-dr-stam-state">{{localize "CHRONICLE.HeroSheet.Dead"}}</strong>{{/if}}
+  {{/if}}
+</div>

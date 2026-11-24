@@ -1,0 +1,108 @@
+{{!-- Arcane glass NPC boxes, above the tabs. Play: Interest as the ring that
+wraps the picture, in five steps, with Patience as the arcs inside it; tiles
+for Interest and Patience (a number and five steps each), Impression for the
+Director only (amber edge, mark and words) and, when there is a stat block,
+Stamina with its inputs, Speed, Stability and Free strike; the page's
+motivations and pitfalls as hexes on the dotted line, each with its state in
+words; then what the NPC would answer now beside either the combat figures or
+an honest empty place for a stat block (no made-up numbers). Edit: Draw
+Steel's own stat editors. --}}
+<section class="cs-hero-stats stats cs-npc-stats cs-glass-stats">
+  {{#if isPlay}}
+  <div class="cs-glass-ring cs-dr-ring cs-dr-int" data-band="{{npc.look.interest.band}}">
+    <svg class="cs-glass-ring-art" viewBox="0 0 240 240" aria-hidden="true" focusable="false">
+      <g mask="url(#cs-npc-glass-steps)"><circle class="cs-glass-fill" cx="120" cy="120" r="106" pathLength="100" stroke-dasharray="{{npc.look.interest.fill}} 100" transform="rotate(90 120 120)"/></g>
+      {{#each npc.look.patienceArcs as |seg|}}
+      <circle class="cs-glass-seg{{#if seg.on}} on{{/if}}" cx="120" cy="120" r="95" pathLength="100" stroke-dasharray="{{seg.dash}}" stroke-dashoffset="{{seg.offset}}" transform="rotate(90 120 120)"/>
+      {{/each}}
+    </svg>
+    {{#if npc.negotiation.has}}
+    <span class="cs-dr-wat">{{localize "CHRONICLE.NpcSheet.Look.InnerPatience"}}</span>
+    <p class="cs-glass-chip"><b>{{npc.negotiation.interestText}}</b>/<span>5</span><strong class="cs-glass-state cs-dr-chip-k">{{localize "CHRONICLE.NpcSheet.Interest"}}</strong></p>
+    {{/if}}
+  </div>
+
+  {{#if (or npc.negotiation.has npc.statBlock)}}
+  <div class="cs-glass-trk">
+    {{#if npc.negotiation.has}}
+    <div class="cs-glass-box cs-glass-plain cs-dr-tint" data-band="{{npc.look.interest.band}}">
+      <span class="cs-glass-lb">{{localize "CHRONICLE.NpcSheet.Interest"}}</span>
+      <span class="cs-glass-n"><b>{{npc.negotiation.interestText}}</b><small>/5</small></span>
+      <span class="cs-dr-bar" role="img" aria-label="{{localize "CHRONICLE.NpcSheet.OfFive" n=npc.negotiation.interestText}}">{{#each npc.negotiation.interestPips as |on|}}<i class="{{#if on}}on{{/if}}"></i>{{/each}}</span>
+    </div>
+    <div class="cs-glass-box cs-glass-plain cs-dr-tpat">
+      <span class="cs-glass-lb">{{localize "CHRONICLE.NpcSheet.Patience"}}</span>
+      <span class="cs-glass-n"><b>{{npc.negotiation.patienceText}}</b><small>/5</small></span>
+      <span class="cs-dr-bar" role="img" aria-label="{{localize "CHRONICLE.NpcSheet.OfFive" n=npc.negotiation.patienceText}}">{{#each npc.negotiation.patiencePips as |on|}}<i class="{{#if on}}on{{/if}}"></i>{{/each}}</span>
+    </div>
+    {{#if npc.isGM}}
+    <div class="cs-glass-box cs-glass-plain cs-dr-dm cs-dm-only" data-tooltip="CHRONICLE.NpcSheet.ImpressionTip">
+      <span class="cs-dr-only cs-dm-mark">{{localize "CHRONICLE.NpcSheet.OnlyYou"}}</span>
+      <span class="cs-glass-lb">{{localize "CHRONICLE.NpcSheet.Impression"}}</span>
+      <b class="cs-glass-n">{{npc.negotiation.impressionText}}</b>
+    </div>
+    {{/if}}
+    {{/if}}
+    {{#if npc.statBlock}}
+    {{> "modules/chronicle-sync/templates/npc-looks/glass/stamina-tile.hbs" showState=true}}
+    {{> "modules/chronicle-sync/templates/npc-looks/glass/combat-tiles.hbs"}}
+    {{/if}}
+  </div>
+  {{/if}}
+
+  {{#if npc.negotiation.rows.length}}
+  <div class="cs-glass-const cs-dr-motives">
+    <span class="cs-glass-line" aria-hidden="true"></span>
+    <ul class="cs-dr-hexes" role="list">
+      {{#each npc.negotiation.rows as |row|}}
+      <li class="cs-glass-hx cs-dr-motive" role="listitem" data-motive="{{row.key}}" data-kind="{{row.kind}}" data-state="{{row.state}}" style="--i: {{@index}}">
+        <span class="cs-glass-glow" aria-hidden="true"></span>
+        <svg class="cs-dr-dash" viewBox="0 0 98 108" preserveAspectRatio="none" aria-hidden="true" focusable="false"><polygon points="49,1.5 97,27.5 97,80.5 49,106.5 1,80.5 1,27.5"/></svg>
+        <span class="cs-dr-q" aria-hidden="true">?</span>
+        <i class="cs-dr-kind">{{localize (concat "CHRONICLE.NpcSheet.Kind." row.kind)}}</i>
+        <b>{{row.label}}</b>
+        <span class="cs-dr-word">{{localize (concat "CHRONICLE.NpcSheet.State." row.state)}}</span>
+      </li>
+      {{/each}}
+    </ul>
+  </div>
+  {{/if}}
+
+  <div class="cs-glass-grid">
+    <div class="cs-glass-cell cs-dr-now" data-band="{{npc.look.interest.band}}">
+      {{#if npc.negotiation.has}}
+      <p class="cs-glass-k">{{localize "CHRONICLE.NpcSheet.Look.AnswerNow"}}</p>
+      {{#if npc.negotiation.answer}}
+      <p class="cs-dr-answer"><b>{{localize npc.negotiation.answer}}</b>{{#if npc.negotiation.over}}<span class="cs-dr-over">{{localize "CHRONICLE.NpcSheet.Over"}}</span>{{/if}}</p>
+      {{/if}}
+      <p class="cs-glass-t cs-dr-seen">{{localize (concat "CHRONICLE.NpcSheet.Seen." npc.negotiation.source (ifThen npc.negotiation.shown "Shown" "Hidden"))}}</p>
+      {{else}}
+      <p class="cs-glass-k">{{localize "CHRONICLE.NpcSheet.Negotiation"}}</p>
+      <p class="cs-glass-t">{{localize "CHRONICLE.NpcSheet.NoNegotiation"}}</p>
+      {{#if npc.pageUrl}}<p class="cs-glass-t"><button type="button" class="cs-quiet cs-dr-link" data-action="csOpenPage">{{localize "CHRONICLE.NpcSheet.OpenPage"}}</button></p>{{/if}}
+      {{/if}}
+    </div>
+    {{#if npc.statBlock}}
+    {{> "modules/chronicle-sync/templates/npc-looks/glass/combat-cell.hbs"}}
+    {{else}}
+    <div class="cs-glass-cell cs-nostat">
+      <b class="cs-glass-k">{{localize "CHRONICLE.NpcSheet.NoStats.Title"}}</b>
+      <p>{{localize (ifThen editable "CHRONICLE.NpcSheet.NoStats.Body" "CHRONICLE.NpcSheet.NoStats.BodyView")}}</p>
+      {{#if editable}}<button type="button" class="cs-quiet cs-dr-link" data-action="toggleMode">{{localize "CHRONICLE.NpcSheet.NoStats.Edit"}}</button>{{/if}}
+    </div>
+    {{/if}}
+    {{#if npc.statBlock}}
+    <div class="cs-glass-cell cs-dr-chars">
+      {{#each characteristics as |chr key|}}
+      <button type="button" class="cs-dr-chr" data-action="roll" data-roll-type="characteristic" data-characteristic="{{key}}" data-tooltip-text="{{localize "DRAW_STEEL.ROLL.Prompt" prompt=chr.field.label}}" {{disabled (not @root.owner)}}>
+        <b>{{numberFormat chr.value sign=true}}</b>
+        <span>{{chr.field.label}}</span>
+      </button>
+      {{/each}}
+    </div>
+    {{/if}}
+  </div>
+  {{else}}
+  {{> "modules/chronicle-sync/templates/npc-looks/edit-stats.hbs"}}
+  {{/if}}
+</section>

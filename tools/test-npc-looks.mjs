@@ -13,6 +13,7 @@ import {
   negotiationView, npcChanges, npcLook, npcLookTemplate, npcPageId, npcParts, npcTabs, onlyYouView, openingTab, pageChips,
   pageText, peopleRows, sheetShape, villainKey, villainMarks, withVillainUse,
 } from '../scripts/_npc-looks.mjs';
+import { HERO_LOOKS } from '../scripts/_hero-looks.mjs';
 
 test('sheetShape: a hand pick wins, a creature page is a monster, a character page an NPC', () => {
   assert.equal(sheetShape({ flag: 'monster', pageId: 'p1' }), 'monster');
@@ -32,10 +33,13 @@ test('npcPageId: the page character sync made it from, then the creature page, t
   assert.equal(npcPageId({ pageId: '' }), null);
 });
 
-test('templates: a look without NPC templates draws the Chronicle look, shared panes stay shared', () => {
-  assert.equal(npcLook('hall'), 'chronicle');
-  assert.equal(npcLook('chronicle'), 'chronicle');
+test('templates: every hero look has NPC templates, a look without them draws the Chronicle look, shared panes stay shared', () => {
+  for (const { id } of HERO_LOOKS) assert.equal(npcLook(id), id);
+  assert.equal(npcLook('someday'), 'chronicle');
+  assert.equal(npcLookTemplate('someday', 'npc', 'header'), `${NPC_LOOK_DIR}/chronicle/npc-header.hbs`);
   assert.equal(npcLookTemplate('chronicle', 'npc', 'header'), `${NPC_LOOK_DIR}/chronicle/npc-header.hbs`);
+  assert.equal(npcLookTemplate('hall', 'npc', 'stats'), `${NPC_LOOK_DIR}/hall/npc-stats.hbs`);
+  // The dramatic looks restyle the Chronicle card, as the hero sheet's do.
   assert.equal(npcLookTemplate('sky', 'monster', 'card'), `${NPC_LOOK_DIR}/chronicle/monster-card.hbs`);
   assert.equal(npcLookTemplate('chronicle', 'npc', 'talk'), null);
   assert.equal(npcLookTemplate('chronicle', 'boss', 'header'), null);

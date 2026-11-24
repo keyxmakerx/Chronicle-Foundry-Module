@@ -1,0 +1,66 @@
+{{!-- Arcane glass NPC header: the picture in its glowing ring, level and role
+above the name, and on the Director's screen the page's chips beside it and the
+Talking switch (the token's talking glow) top right as a pill. The ring's
+groove is cut into five steps here, because Interest fills it in the stats
+part; the mask is defined once, in this part, and the stats part uses it. A
+Limited viewer sees this part, so everything past Draw Steel's own header is
+for the Director only. Impression is a Director-only tile in the stats part. --}}
+<header class="cs-hero-head cs-glass-head cs-npc-head" style="{{#if avatarProperties.objectFit}}--avatar-object-fit: {{avatarProperties.objectFit}};{{/if}}{{#if avatarProperties.objectPosition}} --avatar-object-position: {{avatarProperties.objectPosition}};{{/if}}">
+  <div class="cs-glass-field" aria-hidden="true"><div class="cs-glass-sky"><i></i><i></i></div></div>
+  <div class="cs-glass-pane" aria-hidden="true"><span class="cs-glass-ripple"></span><span class="cs-glass-ripple cs-dr-ripple"></span></div>
+
+  <div class="cs-glass-orb">
+    <svg class="cs-glass-orb-art" viewBox="0 0 240 240" aria-hidden="true" focusable="false">
+      <defs>
+        <mask id="cs-npc-glass-steps" maskUnits="userSpaceOnUse" x="-20" y="-20" width="280" height="280">
+          <rect x="-20" y="-20" width="280" height="280" fill="#fff"/>
+          <circle cx="120" cy="120" r="106" fill="none" stroke="#000" stroke-width="14" pathLength="100" stroke-dasharray="1.4 18.6" stroke-dashoffset="0.7" transform="rotate(90 120 120)"/>
+        </mask>
+      </defs>
+      <circle class="cs-glass-dash" cx="120" cy="120" r="116"/>
+      <circle class="cs-glass-groove" cx="120" cy="120" r="106" mask="url(#cs-npc-glass-steps)"/>
+    </svg>
+    <div class="cs-glass-pt">
+      <svg class="cs-glass-sigil" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+        <g fill="none" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">
+          <path d="M50 14 80 31v38L50 86 20 69V31z"/>
+          <path d="M50 30 66 39v22L50 70 34 61V39z"/>
+          <path d="M50 14v16M80 31 66 39M80 69 66 61M50 86V70M20 69l14-8M20 31l14 8"/>
+        </g>
+      </svg>
+      <button type="button" class="cs-portrait-btn" data-action="csPortraitMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize "CHRONICLE.HeroSheet.Portrait.Menu"}}" data-tooltip="CHRONICLE.HeroSheet.Portrait.Menu">
+        <img class="cs-portrait" src="{{document.img}}" alt="{{document.name}}" {{#unless isPlay}}data-edit="img"{{/unless}}>
+      </button>
+    </div>
+  </div>
+
+  <div class="cs-glass-id">
+    <div class="cs-glass-top">
+      <p class="cs-glass-eye">
+        <span class="cs-glass-lvl">{{localize "CHRONICLE.HeroSheet.LevelN" level=system.monster.level}}</span>
+        {{#if system.monster.organizationLabel}}<span class="cs-glass-cls">{{system.monster.organizationLabel}}</span>{{/if}}
+        {{#if system.monster.roleLabel}}<span class="cs-glass-cls cs-glass-subcls">{{system.monster.roleLabel}}</span>{{/if}}
+        {{#unless isPlay}}
+        <button type="button" class="cs-mini" data-action="editMonsterMetadata" data-tooltip="CHRONICLE.NpcSheet.EditMetadata" aria-label="{{localize "CHRONICLE.NpcSheet.EditMetadata"}}"><i class="fa-solid fa-gear" inert></i></button>
+        {{/unless}}
+      </p>
+      {{#if npc.talk.show}}
+      <button type="button" class="cs-glass-resp cs-dr-talk" data-action="csTalk" aria-pressed="{{#if npc.talk.pressed}}true{{else}}false{{/if}}" data-tooltip="CHRONICLE.NpcSheet.TalkingTip"><i class="cs-dr-dot" aria-hidden="true"></i>{{localize "CHRONICLE.NpcSheet.Talking"}}</button>
+      {{/if}}
+    </div>
+    {{#if isPlay}}
+    <h1 class="cs-name">{{document.name}}</h1>
+    {{else}}
+    <div class="cs-name-edit">
+      {{formInput fields.name value=source.name placeholder=(localize "DOCUMENT.FIELDS.name.label")}}
+    </div>
+    {{/if}}
+    {{#if npc.page.chips.length}}
+    <ul class="cs-glass-origins">
+      {{#each npc.page.chips as |chip|}}
+      <li class="cs-glass-origin"><span class="cs-glass-kind">{{chip.kind}}</span><span class="cs-glass-origin-name">{{chip.name}}</span></li>
+      {{/each}}
+    </ul>
+    {{/if}}
+  </div>
+</header>

@@ -1,0 +1,377 @@
+/* The arcane glass look on the Chronicle NPC and monster sheet
+   (scripts/npc-looks.mjs, templates/npc-looks/glass/). The sheet is the hero
+   glass sheet with new parts, so the violet field, the smoked panel, the
+   picture in its glowing ring, the tracker boxes, the hexes on their dotted
+   line, the two glass cells, the pill tab bar and the opening, hit and heal
+   moves all come from hero-look-glass.css, which this file follows. What is
+   new here: the ring as Stamina with a winded tick (or as Interest in five
+   steps), Malice and Impression as tiles with the Director's amber edge,
+   villain actions as pills in order, and motivations and pitfalls as hexes
+   that are lit, dimmed or still dashed.
+
+   Blur is never animated on the glass: the moves below settle a part out of
+   a blur once, and Calm turns that into a plain fade. Looped glow (the next
+   villain action, the Talking dot) stops for Calm and reduced motion. */
+
+/* The look's own colours. The sheet is always dark, so the Director's amber
+   is the bright one rather than the paper sheet's brown. */
+.chronicle-npc-sheet[data-cs-look="glass"] {
+  --cs-hero-dm: #f5b544;
+  --cs-hero-dm-soft: color-mix(in srgb, #f5b544 14%, transparent);
+  /* Villain actions burn between the look's rose and orange, so they never read as a hurt (rose) or a surge (orange). */
+  --cs-dr-ember: color-mix(in srgb, var(--cs-glass-rose) 55%, var(--cs-glass-orange));
+  --cs-dr-ember-35: color-mix(in srgb, var(--cs-dr-ember) 35%, transparent);
+  --cs-dr-amber-35: color-mix(in srgb, var(--cs-hero-dm) 35%, transparent);
+}
+
+/* ---- Header ------------------------------------------------------------- */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-token { display: inline-flex; align-items: center; gap: 8px; font: 400 12.5px var(--cs-glass-text); letter-spacing: 0; text-transform: none; color: var(--cs-glass-sub); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-token::before { content: ""; width: 9px; height: 9px; border: 1.5px solid var(--cs-glass-teal); border-radius: 50%; box-shadow: 0 0 6px var(--cs-glass-teal-50); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-glass-origin-name { color: inherit; }
+/* Draw Steel's metadata gear sits in the class line without the dot the line puts between its parts. */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-glass-eye .cs-mini {
+  align-self: center;
+  width: 24px;
+  min-height: 24px;
+  height: 24px;
+  margin: 0 0 0 0.6em;
+  padding: 0;
+  border: 1px solid var(--cs-glass-teal-35);
+  border-radius: 50%;
+  background: none;
+  font-size: 11px;
+  letter-spacing: 0;
+  color: var(--cs-glass-teal);
+  cursor: pointer;
+}
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-glass-eye .cs-mini::before { content: none; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-glass-eye .cs-mini:hover { background: var(--cs-glass-teal-10); box-shadow: var(--cs-glass-glow); }
+/* Talking: Take Respite's pill, lit while the token glows. */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-talk[aria-pressed="true"] { border-color: var(--cs-glass-teal); background-color: var(--cs-glass-teal-10); box-shadow: var(--cs-glass-glow); color: var(--cs-glass-frost); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-dot { width: 7px; height: 7px; border: 1px solid currentColor; border-radius: 50%; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-talk[aria-pressed="true"] .cs-dr-dot { border-color: var(--cs-glass-teal); background: var(--cs-glass-teal); box-shadow: 0 0 8px var(--cs-glass-teal); animation: cs-glass-npc-breathe 2.4s ease-in-out infinite; }
+
+/* ---- The ring ----------------------------------------------------------- */
+/* The gauge rises from the chip at the ring's foot, so the winded point (half
+   Stamina) sits at the top, in plain sight, instead of under the chip. */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-wmark { stroke: var(--cs-glass-frost); stroke-width: 15; filter: drop-shadow(0 0 3px var(--cs-glass-ink)); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-wat { position: absolute; left: 50%; top: -19px; transform: translateX(-50%); font: 600 8.5px var(--cs-glass-display); letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap; color: var(--cs-glass-sub); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-ring:is([data-band="winded"], [data-band="dying"], [data-band="dead"]) .cs-dr-wat { color: var(--cs-glass-rose); }
+/* The monster's inner arcs are its villain actions, lit until spent. They are
+   thinner than the hero's recoveries, so the Stamina fill stays the ring's
+   loudest line. */
+.chronicle-npc-sheet[data-cs-look="glass"].cs-shape-monster .cs-glass-seg { stroke: color-mix(in srgb, var(--cs-dr-ember) 14%, transparent); stroke-width: 2.5; }
+.chronicle-npc-sheet[data-cs-look="glass"].cs-shape-monster .cs-glass-seg.on { stroke: color-mix(in srgb, var(--cs-dr-ember) 80%, transparent); }
+
+/* Interest is the NPC's ring, in five steps: rose while they'd refuse, orange
+   at "No, but…", teal once they'd say yes, mint at the top. Patience keeps the
+   violet of the hero's inner arcs. */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-int { --cs-dr-int: var(--cs-glass-teal); --cs-dr-int-glow: var(--cs-glass-teal-70); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-int:is([data-band="i0"], [data-band="i1"]) { --cs-dr-int: var(--cs-glass-rose); --cs-dr-int-glow: var(--cs-glass-rose-60); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-int[data-band="i2"] { --cs-dr-int: var(--cs-glass-orange); --cs-dr-int-glow: color-mix(in srgb, var(--cs-glass-orange) 60%, transparent); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-int[data-band="i5"] { --cs-dr-int: var(--cs-glass-mint); --cs-dr-int-glow: var(--cs-glass-mint); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-int .cs-glass-fill { stroke: var(--cs-dr-int); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-int .cs-glass-ring-art { filter: drop-shadow(0 0 8px var(--cs-dr-int-glow)); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-int .cs-glass-chip b { color: var(--cs-glass-ink); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-chip-k { color: var(--cs-hero-muted); }
+/* A talk going badly hurts the glass the way a winded hero does: the panel's edge turns rose. */
+.chronicle-npc-sheet[data-cs-look="glass"]:has(.cs-dr-int:is([data-band="i0"], [data-band="i1"])) .cs-glass-pane { border-color: var(--cs-glass-rose-60); box-shadow: var(--cs-glass-lift-low); }
+
+/* ---- Tiles -------------------------------------------------------------- */
+.chronicle-npc-sheet[data-cs-look="glass"] span.cs-glass-n { min-height: 34px; align-items: center; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-glass-n b { font: inherit; color: inherit; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-stam .cs-glass-n small { white-space: nowrap; }
+/* The Stamina number's box fits three digits and the maximum beside it. */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-stam .cs-glass-n .cs-field input[type="number"] { width: 3.2ch; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-stam-state { font: 600 8.5px var(--cs-glass-display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--cs-glass-rose); }
+/* Free strike is a button: it takes the tile's look, not Foundry's button. */
+.chronicle-npc-sheet[data-cs-look="glass"] button.cs-dr-act {
+  width: auto;
+  height: auto;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-shadow: none;
+  cursor: pointer;
+}
+.chronicle-npc-sheet[data-cs-look="glass"] button.cs-dr-act:hover { border-color: var(--cs-glass-teal-35); background-color: var(--cs-glass-teal-06); }
+.chronicle-npc-sheet[data-cs-look="glass"] button.cs-dr-act:active { transform: scale(0.97); }
+.chronicle-npc-sheet[data-cs-look="glass"] button.cs-dr-act:focus-visible { outline: none; box-shadow: var(--cs-glass-ring-focus); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-tint { --cs-dr-int: var(--cs-glass-teal); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-tint:is([data-band="i0"], [data-band="i1"]) { --cs-dr-int: var(--cs-glass-rose); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-tint[data-band="i2"] { --cs-dr-int: var(--cs-glass-orange); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-tint[data-band="i5"] { --cs-dr-int: var(--cs-glass-mint); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-tint .cs-glass-n b { color: var(--cs-glass-ink); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-tpat .cs-glass-n b { color: var(--cs-glass-violet); }
+/* Interest and Patience carry a five-step bar under the number. */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-bar { display: flex; gap: 4px; width: min(110px, 76%); margin: 2px auto; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-bar i { flex: 1; height: 4px; border-radius: 2px; background: var(--cs-glass-ink-10); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-tint .cs-dr-bar i.on { background: var(--cs-dr-int); box-shadow: 0 0 6px var(--cs-glass-teal-50); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-tpat .cs-dr-bar i.on { background: var(--cs-glass-violet); box-shadow: 0 0 6px var(--cs-glass-violet-18); }
+
+/* Malice and Impression: only the Director sees them, so the tile carries the
+   amber edge, the mark and the words "only you" on a chip like Temporary's. */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-dm { border-color: var(--cs-dr-amber-35); background: linear-gradient(160deg, color-mix(in srgb, var(--cs-hero-dm) 9%, transparent), transparent 70%); box-shadow: inset 2px 0 0 var(--cs-hero-dm); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-dm .cs-glass-lb { color: var(--cs-hero-dm); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-dm:hover { border-color: var(--cs-hero-dm); background-color: transparent; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-only { position: absolute; left: 50%; top: -9px; display: inline-flex; align-items: center; gap: 4px; padding: 0 7px; border: 1px solid var(--cs-dr-amber-35); border-radius: var(--cs-hero-pill); background: var(--cs-glass-panel-b); transform: translateX(-50%); font: 600 8.5px/1.6 var(--cs-glass-display); letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; color: var(--cs-hero-dm); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-only.cs-dm-mark::before { letter-spacing: 0; }
+
+/* ---- Hexes -------------------------------------------------------------- */
+/* The monster's characteristics glow from inside by how strong they are. */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-lit .cs-glass-glow { opacity: var(--lit, 0); }
+
+/* Motivations and pitfalls sit on the dotted line when there are five, as the
+   hero's characteristics do; any other count is centred without the line,
+   which would run past the outer hexes. More than five wrap. Lit teal when
+   found, dimmed and struck once appealed to, a faint dashed outline with a "?"
+   while not found, lit rose for a pitfall. The name is never hidden from the
+   Director, and the state is always spelled out under it. */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motives { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-evenly; gap: 16px 0; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-hexes { display: contents; margin: 0; padding: 0; list-style: none; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motives:not(:has(.cs-dr-motive:nth-child(5):last-child)) { justify-content: center; gap: 16px 40px; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motives:not(:has(.cs-dr-motive:nth-child(5):last-child)) .cs-glass-line { display: none; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive { flex: none; grid-template-rows: auto auto auto; row-gap: 2px; cursor: default; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive:hover:not(:disabled), .chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive:active:not(:disabled) { transform: none; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive:hover:not(:disabled) .cs-glass-glow { opacity: 0; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive[data-state="found"]:hover:not(:disabled) .cs-glass-glow { opacity: 1; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive > :is(.cs-dr-kind, b, .cs-dr-word) { position: relative; z-index: 2; transition: color 400ms ease, opacity 400ms ease; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-kind { max-width: 84px; font: 600 7.5px var(--cs-glass-display); font-style: normal; letter-spacing: 0.16em; text-transform: uppercase; color: var(--cs-glass-sub); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-glass-hx.cs-dr-motive b { max-width: 84px; font: 600 15.5px/1.1 var(--cs-glass-display); letter-spacing: 0.01em; text-wrap: balance; overflow-wrap: anywhere; text-shadow: none; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive .cs-dr-word { max-width: 84px; font: 600 8px var(--cs-glass-display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--cs-glass-sub); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-dash { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; overflow: visible; opacity: 0; transition: opacity 400ms ease; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-dash polygon { fill: none; stroke: var(--cs-glass-teal-50); stroke-width: 1.5; stroke-dasharray: 4 5; vector-effect: non-scaling-stroke; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-q { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; font: 600 72px/1 var(--cs-glass-display); color: var(--cs-glass-teal); opacity: 0; transition: opacity 500ms ease; pointer-events: none; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive::before, .chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive::after { transition: opacity 400ms ease; }
+
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive[data-state="found"] .cs-glass-glow { opacity: 1; background: radial-gradient(circle, var(--cs-glass-teal-50), transparent 72%); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-glass-hx.cs-dr-motive[data-state="found"] b { color: var(--cs-glass-ink); text-shadow: 0 0 12px var(--cs-glass-teal-70); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive[data-state="found"] .cs-dr-word { color: var(--cs-glass-mint); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive[data-state="found"] { filter: drop-shadow(0 0 10px var(--cs-glass-teal-35)); }
+
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive[data-state="used"]::before { background: linear-gradient(180deg, var(--cs-glass-ink-25), var(--cs-glass-ink-10)); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive[data-state="used"]::after { background: var(--cs-glass-panel-b); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-glass-hx.cs-dr-motive[data-state="used"] b { color: var(--cs-glass-dim); text-decoration: line-through; text-decoration-color: var(--cs-glass-teal-50); text-decoration-thickness: 1.5px; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive[data-state="used"] :is(.cs-dr-kind, .cs-dr-word) { color: var(--cs-hero-muted); }
+
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive[data-state="hidden"]::before { opacity: 0; }
+/* The face stays solid so the dotted line never runs through the name; the faintness is the dashed rim and the muted words. */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive[data-state="hidden"]::after { inset: 0; background: var(--cs-glass-panel-b); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive[data-state="hidden"] .cs-dr-dash { opacity: 1; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive[data-state="hidden"] .cs-dr-q { opacity: 0.2; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-glass-hx.cs-dr-motive[data-state="hidden"] b { color: var(--cs-glass-sub); font-weight: 500; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive[data-state="hidden"] :is(.cs-dr-kind, .cs-dr-word) { color: var(--cs-hero-muted); }
+
+/* A pitfall burns rose: its rim, its glow and its words. */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive[data-kind="pitfall"]::before { background: linear-gradient(180deg, var(--cs-glass-rose), var(--cs-glass-crimson)); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive[data-kind="pitfall"] .cs-glass-glow { background: radial-gradient(circle, var(--cs-glass-rose-35), transparent 72%); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive[data-kind="pitfall"][data-state="found"] { filter: drop-shadow(0 0 10px var(--cs-glass-rose-35)); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-glass-hx.cs-dr-motive[data-kind="pitfall"][data-state="found"] b { text-shadow: 0 0 12px var(--cs-glass-rose-60); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive[data-kind="pitfall"][data-state="found"] .cs-dr-word { color: var(--cs-glass-rose); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive[data-kind="pitfall"] .cs-dr-kind { color: color-mix(in srgb, var(--cs-glass-rose) 80%, var(--cs-glass-sub)); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive[data-kind="pitfall"] .cs-dr-dash polygon { stroke: var(--cs-glass-rose-60); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motive[data-kind="pitfall"] .cs-dr-q { color: var(--cs-glass-rose); }
+
+/* ---- The two glass cells ------------------------------------------------ */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-solo { grid-template-columns: minmax(0, 1fr); }
+/* The count sits in the heading line without making it taller than its neighbour's. */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-left { margin: -4px 0 -4px auto; line-height: 1.2; font: 600 10px var(--cs-glass-display); letter-spacing: 0.08em; text-transform: none; color: var(--cs-hero-muted); }
+/* Villain actions: pills in order on a dotted line. A spent one is dim and
+   struck, the next one burns, and each says so in a small chip. */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-vas { display: flex; flex-wrap: wrap; align-items: center; gap: 22px 22px; margin: 18px 0 0; padding: 0; list-style: none; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-vas li { position: relative; display: flex; min-width: 0; max-width: 100%; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-vas li + li::before { content: ""; position: absolute; right: 100%; top: 50%; width: 22px; height: 1px; background: repeating-linear-gradient(90deg, var(--cs-glass-teal-35) 0 3px, transparent 3px 8px); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-vmark { position: relative; display: inline-flex; align-items: center; gap: 7px; width: auto; max-width: 100%; height: auto; min-width: 0; margin: 0; padding: 4px 12px 4px 4px; border: 1px solid var(--cs-glass-ink-16); border-radius: var(--cs-hero-pill); background: var(--cs-glass-panel-b); box-shadow: none; text-shadow: none; font: 600 12px var(--cs-glass-display); letter-spacing: 0.02em; text-align: left; color: var(--cs-hero-body); transition: border-color 400ms ease, box-shadow 400ms ease, color 400ms ease, opacity 400ms ease, transform 120ms var(--cs-glass-soft); }
+.chronicle-npc-sheet[data-cs-look="glass"] button.cs-dr-vmark { cursor: pointer; }
+.chronicle-npc-sheet[data-cs-look="glass"] button.cs-dr-vmark:hover { border-color: var(--cs-glass-teal-50); box-shadow: 0 0 12px var(--cs-glass-teal-25); }
+.chronicle-npc-sheet[data-cs-look="glass"] button.cs-dr-vmark:active { transform: scale(0.97); }
+.chronicle-npc-sheet[data-cs-look="glass"] button.cs-dr-vmark:focus-visible { outline: none; box-shadow: var(--cs-glass-ring-focus); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-vmark i { display: grid; place-items: center; flex: none; width: 20px; height: 20px; border: 1px solid currentColor; border-radius: 50%; font: 600 11px var(--cs-glass-display); font-style: normal; color: var(--cs-glass-sub); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-vname { min-width: 0; white-space: nowrap; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-vmark.used { border-style: dashed; color: var(--cs-hero-muted); opacity: 0.75; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-vmark.used .cs-dr-vname { text-decoration: line-through; text-decoration-color: var(--cs-glass-ink-25); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-vmark.used i { border-color: transparent; background: var(--cs-glass-ink-10); color: var(--cs-hero-muted); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-vmark.next { border-color: var(--cs-dr-ember); color: var(--cs-glass-ink); box-shadow: 0 0 14px var(--cs-dr-ember-35), inset 0 0 12px color-mix(in srgb, var(--cs-dr-ember) 14%, transparent); animation: cs-glass-npc-burn 2.6s ease-in-out infinite; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-vmark.next i { border-color: transparent; background: var(--cs-dr-ember); color: var(--cs-glass-night); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-tag { position: absolute; left: 50%; top: -10px; padding: 0 6px; border: 1px solid var(--cs-glass-ink-16); border-radius: var(--cs-hero-pill); background: var(--cs-glass-panel-b); transform: translateX(-50%); font: 600 8px/1.6 var(--cs-glass-display); font-style: normal; letter-spacing: 0.12em; text-transform: uppercase; color: var(--cs-hero-muted); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-vmark.next .cs-dr-tag { border-color: var(--cs-dr-ember-35); color: var(--cs-dr-ember); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-next { display: flex; gap: 8px; margin: 12px 0 0; font: 400 13px/1.5 var(--cs-glass-text); color: var(--cs-hero-body); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-next b { font-weight: 600; color: var(--cs-glass-ink); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-next-k { flex: none; padding-top: 2px; font: 600 9px/1.6 var(--cs-glass-display); letter-spacing: 0.18em; text-transform: uppercase; color: var(--cs-dr-ember); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-cond { align-items: center; gap: 8px; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-cond .cs-glass-skill-list { margin: 0; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-cond .cs-glass-skill-list li { border-color: var(--cs-glass-rose-60); background: var(--cs-glass-rose-20); color: var(--cs-glass-ink); }
+
+/* If they answered now: the answer large, in the ring's colour. */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-answer { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; margin: 6px 0 4px; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-answer b { font: 600 24px/1.15 var(--cs-glass-display); color: var(--cs-glass-teal); text-shadow: 0 0 16px var(--cs-glass-teal-35); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-now:is([data-band="i0"], [data-band="i1"]) .cs-dr-answer b { color: var(--cs-glass-rose); text-shadow: 0 0 16px var(--cs-glass-rose-35); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-now[data-band="i2"] .cs-dr-answer b { color: var(--cs-glass-orange); text-shadow: none; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-now[data-band="i5"] .cs-dr-answer b { color: var(--cs-glass-mint); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-over { font: 400 13px var(--cs-glass-text); color: var(--cs-hero-body); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-seen { align-items: center; color: var(--cs-glass-sub); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-seen::before { content: ""; flex: none; width: 16px; height: 16px; background: var(--cs-glass-teal); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1.2 8c3-5 10.6-5 13.6 0-3 5-10.6 5-13.6 0z' fill='none' stroke='%23000' stroke-width='1.5'/%3E%3Ccircle cx='8' cy='8' r='2.4'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1.2 8c3-5 10.6-5 13.6 0-3 5-10.6 5-13.6 0z' fill='none' stroke='%23000' stroke-width='1.5'/%3E%3Ccircle cx='8' cy='8' r='2.4'/%3E%3C/svg%3E") center / contain no-repeat; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-link { padding: 0; color: var(--cs-glass-teal); text-decoration: none; cursor: pointer; transition: color 200ms ease, text-shadow 250ms ease; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-link:hover { color: var(--cs-glass-frost); text-decoration: none; text-shadow: 0 0 10px var(--cs-glass-teal-70); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-link:focus-visible { outline: none; box-shadow: var(--cs-glass-ring-focus); border-radius: 6px; }
+/* No stat block yet: the cell keeps a dashed edge, a place for something, not a thing. */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-glass-cell.cs-nostat { display: block; margin: 0; padding: 12px 14px; border: 1px dashed var(--cs-glass-teal-35); border-radius: 14px; background: var(--cs-glass-ink-03); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-nostat p { margin: 8px 0; font: 400 13px/1.5 var(--cs-glass-text); color: var(--cs-hero-body); }
+/* An NPC with a stat block: its five characteristics as small glass pills that roll. */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-chars { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-chr { display: inline-flex; flex: 1 1 0; align-items: baseline; justify-content: center; gap: 8px; width: auto; min-width: 0; height: auto; margin: 0; padding: 4px 12px; border: 1px solid var(--cs-glass-teal-35); border-radius: var(--cs-hero-pill); background: none; box-shadow: none; text-shadow: none; font: inherit; color: var(--cs-glass-ink); cursor: pointer; transition: border-color 200ms ease, background-color 200ms ease, box-shadow 250ms ease, transform 120ms var(--cs-glass-soft); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-chr b { font: 600 18px var(--cs-glass-display); font-variant-numeric: tabular-nums; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-chr span { font: 600 9.5px var(--cs-glass-display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--cs-glass-teal); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-chr:hover:not(:disabled) { border-color: var(--cs-glass-teal); background: var(--cs-glass-teal-10); box-shadow: var(--cs-glass-glow); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-chr:active:not(:disabled) { transform: scale(0.97); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-chr:focus-visible { outline: none; box-shadow: var(--cs-glass-ring-focus); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-chr:disabled { cursor: default; }
+
+/* ---- The Talk and People panes, on glass -------------------------------- */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-pane-h { border-bottom-color: var(--cs-glass-ink-10); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-pane-h h3 { display: flex; align-items: center; gap: 8px; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-pane-h h3::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--cs-glass-teal); box-shadow: 0 0 8px var(--cs-glass-teal); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-pane-h small { font: 600 10px var(--cs-glass-display); letter-spacing: 0.12em; color: var(--cs-hero-muted); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-prose { font-family: var(--cs-glass-text); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-rows li { border-bottom-color: var(--cs-glass-ink-06); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-rows li > span:first-child { font-family: var(--cs-glass-display); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-rows li.cs-dm-only { box-shadow: inset 2px 0 0 var(--cs-hero-dm); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-rows li small.cs-dm-mark { color: var(--cs-hero-dm); font-family: var(--cs-glass-display); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-quiet { color: var(--cs-glass-teal); font-family: var(--cs-glass-display); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-pane-h .cs-quiet { padding: 3px 12px; border: 1px solid var(--cs-glass-teal-35); border-radius: var(--cs-hero-pill); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-pane-h .cs-quiet:hover { background: var(--cs-glass-teal-10); text-decoration: none; }
+/* The chips in the Talk pane are glass pills; the state is spelled out in each. */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-motives .cs-chip { border: 1px solid var(--cs-glass-teal-35); border-radius: var(--cs-hero-pill); background: var(--cs-glass-teal-06); color: var(--cs-glass-ink); font-family: var(--cs-glass-text); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-motives .cs-chip-kind { font-family: var(--cs-glass-display); letter-spacing: 0.12em; color: var(--cs-glass-teal); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-motives .cs-chip[data-state="hidden"] { border-style: dashed; background: none; color: var(--cs-hero-body); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-motives .cs-chip[data-kind="pitfall"] { border-color: var(--cs-glass-rose-60); background: var(--cs-glass-rose-20); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-motives .cs-chip[data-kind="pitfall"] .cs-chip-kind { color: var(--cs-glass-rose); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-motives .cs-chip[data-state="hidden"][data-kind="pitfall"] { background: none; }
+
+/* ---- Narrower windows --------------------------------------------------- */
+@container cs-hero (max-width: 940px) {
+  .chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-vas { gap: 18px 14px; }
+  .chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-vas li + li::before { display: none; }
+  .chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-chars { gap: 6px; }
+  .chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-chr { padding: 4px 8px; gap: 6px; }
+}
+@container cs-hero (max-width: 700px) {
+  .chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-chr { flex: 1 1 40%; }
+  .chronicle-npc-sheet[data-cs-look="glass"] .cs-glass-hx.cs-dr-motive b { max-width: 78px; font-size: 14px; }
+}
+@container cs-hero (max-width: 560px) {
+  .chronicle-npc-sheet[data-cs-look="glass"] .cs-dr-motives .cs-glass-line { display: none; }
+}
+
+/* ---- The Director's drawer: in the open tab's place --------------------- */
+.chronicle-npc-sheet[data-cs-look="glass"]:not(.cs-folded) .window-content > .cs-only-you { position: relative; z-index: 1; grid-area: 9 / 2 / 10 / 6; margin: 72px 0 0; }
+@container cs-hero (max-width: 700px) {
+  .chronicle-npc-sheet[data-cs-look="glass"]:not(.cs-folded) .window-content > .cs-only-you { grid-area: 10 / 2 / 11 / 5; }
+}
+
+/* ---- Folded: the card in glass ------------------------------------------ */
+/* The card's own parts, drawn in the look's glass; the frame, the picture ring
+   and the buttons come from the hero glass. */
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-card-meters { justify-content: center; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-card-meters .cs-meter b { font-family: var(--cs-glass-display); color: var(--cs-glass-ink); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-card .cs-meter .cs-lab { font: 600 9px var(--cs-glass-display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--cs-glass-teal); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-card .cs-meter .cs-dots i { background: var(--cs-glass-teal); box-shadow: 0 0 6px var(--cs-glass-teal-50); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-card .cs-meter .cs-dots i.off { background: none; box-shadow: inset 0 0 0 1.5px var(--cs-glass-ink-25); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-card .cs-offer { color: var(--cs-hero-body); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-card .cs-offer b { color: var(--cs-glass-teal); font-family: var(--cs-glass-display); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-card .cs-motives { justify-content: center; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-talking { color: var(--cs-glass-teal); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-talk-btn[aria-pressed="true"] { border-color: var(--cs-glass-teal); background: var(--cs-glass-teal-10); box-shadow: var(--cs-glass-glow); color: var(--cs-glass-frost); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-talk-btn[aria-pressed="true"]::before { background: var(--cs-glass-teal); box-shadow: 0 0 8px var(--cs-glass-teal); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-card .cs-va-pips { justify-content: center; }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-card .cs-va-mark { border-radius: var(--cs-hero-pill); box-shadow: inset 0 0 0 1px var(--cs-glass-ink-16); font-family: var(--cs-glass-display); color: var(--cs-glass-sub); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-card button.cs-va-mark:hover { box-shadow: inset 0 0 0 1px var(--cs-glass-teal-50), 0 0 10px var(--cs-glass-teal-25); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-card .cs-va-mark.used { background: var(--cs-glass-ink-10); box-shadow: none; color: var(--cs-hero-muted); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-card .cs-va-mark.next { background: none; box-shadow: inset 0 0 0 1.5px var(--cs-dr-ember), 0 0 10px var(--cs-dr-ember-35); color: var(--cs-glass-ink); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-card .cs-card-malice { padding: 4px 8px 4px 10px; border: 1px solid var(--cs-dr-amber-35); border-radius: 10px; background: color-mix(in srgb, var(--cs-hero-dm) 8%, transparent); box-shadow: inset 2px 0 0 var(--cs-hero-dm); font-family: var(--cs-glass-display); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-card .cs-card-malice input { border-color: var(--cs-dr-amber-35); border-radius: 8px; background: var(--cs-glass-ink-03); font-family: var(--cs-glass-display); }
+.chronicle-npc-sheet[data-cs-look="glass"] .cs-card .cs-card-malice input:focus { border-color: var(--cs-hero-dm); box-shadow: 0 0 0 3px var(--cs-dr-amber-35); outline: none; }
+
+/* ---- Moves: soft and floating --------------------------------------------
+   The sheet puts a cs-move-* class on the window for about a second (hit,
+   heal and open are the hero glass's own and play on the same parts). */
+/* A villain action: two ember ripples leave the picture, the ring flares, the
+   next pill takes the fire and what it does settles out of a blur. */
+.chronicle-npc-sheet[data-cs-look="glass"].cs-move-va .cs-glass-ripple { border-color: var(--cs-dr-ember); animation: cs-glass-ripple 1100ms cubic-bezier(0.2, 0.7, 0.3, 1); }
+.chronicle-npc-sheet[data-cs-look="glass"].cs-move-va .cs-glass-ripple.cs-dr-ripple { animation-delay: 180ms; }
+.chronicle-npc-sheet[data-cs-look="glass"].cs-move-va .cs-glass-ring-art { animation: cs-glass-npc-ember 1200ms ease-out; }
+.chronicle-npc-sheet[data-cs-look="glass"].cs-move-va .cs-dr-vmark.next { animation: cs-glass-npc-kindle 900ms 200ms var(--cs-glass-soft) both; }
+.chronicle-npc-sheet[data-cs-look="glass"].cs-move-va .cs-dr-next { animation: cs-glass-focus 700ms 250ms var(--cs-glass-soft) both; }
+
+/* Malice gained: the tile breathes out an amber pulse and its number swells. */
+.chronicle-npc-sheet[data-cs-look="glass"].cs-move-malice .cs-dr-dm:has(input[data-setting="malice"]) { animation: cs-glass-npc-pulse 800ms ease-out; }
+.chronicle-npc-sheet[data-cs-look="glass"].cs-move-malice .cs-dr-dm input[data-setting="malice"] { animation: cs-glass-npc-count 600ms var(--cs-glass-soft); }
+
+/* Winded: the ring's light dims, then breathes twice, slowly, into the look's
+   rose; the word arrives on the chip out of a blur. */
+.chronicle-npc-sheet[data-cs-look="glass"].cs-move-winded .cs-dr-ring .cs-glass-ring-art { animation: cs-glass-npc-winded 1700ms ease-in-out; }
+.chronicle-npc-sheet[data-cs-look="glass"].cs-move-winded :is(.cs-glass-state, .cs-dr-wat) { animation: cs-glass-focus 700ms 300ms var(--cs-glass-soft) both; }
+.chronicle-npc-sheet[data-cs-look="glass"].cs-move-winded .cs-dr-wmark { animation: cs-glass-npc-tick 1700ms ease-in-out; }
+
+/* Interest up: a teal ripple, the ring blooms as it fills, the number glows
+   and the answer settles into focus. */
+.chronicle-npc-sheet[data-cs-look="glass"].cs-move-up .cs-glass-ripple.cs-dr-ripple { border-color: var(--cs-glass-teal); animation: cs-glass-ripple 1000ms cubic-bezier(0.2, 0.7, 0.3, 1); }
+.chronicle-npc-sheet[data-cs-look="glass"].cs-move-up .cs-glass-ring::before { animation: cs-glass-bloom 1000ms ease-out; }
+.chronicle-npc-sheet[data-cs-look="glass"].cs-move-up :is(.cs-glass-chip b, .cs-dr-tint .cs-glass-n b) { animation: cs-glass-npc-glow 900ms ease-out; }
+.chronicle-npc-sheet[data-cs-look="glass"]:is(.cs-move-up, .cs-move-down, .cs-move-pit) .cs-dr-answer { animation: cs-glass-focus 600ms var(--cs-glass-soft); }
+
+/* Interest down: the ring's light dips and a soft rose ripple leaves the
+   picture, then Patience's number settles back. */
+.chronicle-npc-sheet[data-cs-look="glass"].cs-move-down .cs-glass-ripple:not(.cs-dr-ripple) { border-color: var(--cs-glass-rose); animation: cs-glass-ripple 1000ms cubic-bezier(0.2, 0.7, 0.3, 1); }
+.chronicle-npc-sheet[data-cs-look="glass"].cs-move-down .cs-dr-ring .cs-glass-ring-art { animation: cs-glass-npc-dim 1000ms ease-in-out; }
+.chronicle-npc-sheet[data-cs-look="glass"].cs-move-down .cs-dr-tpat .cs-glass-n b { animation: cs-glass-npc-count 500ms var(--cs-glass-soft) reverse; }
+
+/* A pitfall: the rose ripple and shiver of a hit. */
+.chronicle-npc-sheet[data-cs-look="glass"].cs-move-pit .cs-glass-ripple:not(.cs-dr-ripple) { animation: cs-glass-ripple 900ms cubic-bezier(0.2, 0.7, 0.3, 1); }
+.chronicle-npc-sheet[data-cs-look="glass"].cs-move-pit :is(.cs-glass-pane, .cs-glass-orb, .cs-glass-ring, .cs-glass-id, .cs-glass-trk, .cs-glass-const, .cs-glass-grid) { animation: cs-glass-shiver 500ms ease-out; }
+
+/* A motivation or pitfall found: the lit hexes bloom out of a blur, one after
+   another, with the glow flaring behind each. */
+.chronicle-npc-sheet[data-cs-look="glass"].cs-move-reveal .cs-dr-motive[data-state="found"] { animation: cs-glass-npc-focus 850ms calc(var(--i, 0) * 90ms) var(--cs-glass-soft) both; }
+.chronicle-npc-sheet[data-cs-look="glass"].cs-move-reveal .cs-dr-motive[data-state="found"] .cs-glass-glow { animation: cs-glass-npc-flare 850ms calc(var(--i, 0) * 90ms) ease-out; }
+
+@keyframes cs-glass-npc-breathe { 50% { opacity: 0.4; } }
+@keyframes cs-glass-npc-burn { 50% { box-shadow: 0 0 22px var(--cs-dr-ember-35), inset 0 0 16px color-mix(in srgb, var(--cs-dr-ember) 22%, transparent); } }
+@keyframes cs-glass-npc-kindle { 0% { box-shadow: none; border-color: var(--cs-glass-ink-16); filter: blur(3px); opacity: 0.5; } 60% { box-shadow: 0 0 28px var(--cs-dr-ember); filter: none; opacity: 1; } }
+@keyframes cs-glass-npc-ember { 30% { filter: drop-shadow(0 0 16px var(--cs-dr-ember)) drop-shadow(0 0 4px var(--cs-dr-ember)); } }
+@keyframes cs-glass-npc-pulse { 0% { box-shadow: inset 2px 0 0 var(--cs-hero-dm), 0 0 0 0 var(--cs-dr-amber-35); } 35% { box-shadow: inset 2px 0 0 var(--cs-hero-dm), 0 0 0 7px var(--cs-dr-amber-35), 0 0 26px color-mix(in srgb, var(--cs-hero-dm) 50%, transparent); border-color: var(--cs-hero-dm); } 100% { box-shadow: inset 2px 0 0 var(--cs-hero-dm), 0 0 0 14px transparent; } }
+@keyframes cs-glass-npc-count { 40% { transform: scale(1.25); text-shadow: 0 0 18px currentColor; } }
+/* Chrome draws a wrong colour when a keyframe blends into a colour mixed with
+   transparent, so the winded breath and the dip keep one opaque colour and
+   change blur, width, opacity or brightness instead. */
+@keyframes cs-glass-npc-winded { 0% { filter: drop-shadow(0 0 8px var(--cs-glass-teal)) brightness(1); } 25% { filter: drop-shadow(0 0 2px var(--cs-glass-rose)) brightness(0.5); } 50% { filter: drop-shadow(0 0 16px var(--cs-glass-rose)) brightness(1.15); } 72% { filter: drop-shadow(0 0 4px var(--cs-glass-rose)) brightness(0.7); } 100% { filter: drop-shadow(0 0 10px var(--cs-glass-rose)) brightness(1); } }
+@keyframes cs-glass-npc-dim { 40% { filter: drop-shadow(0 0 2px var(--cs-glass-rose)) brightness(0.55); } }
+@keyframes cs-glass-npc-tick { 50% { stroke: var(--cs-glass-rose); } }
+@keyframes cs-glass-npc-glow { 35% { text-shadow: 0 0 18px var(--cs-glass-teal), 0 0 40px var(--cs-glass-teal-50); } }
+@keyframes cs-glass-npc-focus { 0% { opacity: 0.35; filter: blur(6px); transform: scale(0.86); } 55% { opacity: 1; filter: blur(0) drop-shadow(0 0 22px var(--cs-glass-teal-70)); transform: scale(1.06); } 100% { transform: scale(1); } }
+@keyframes cs-glass-npc-flare { 0% { opacity: 0; } 45% { opacity: 1; transform: scale(1.15); } }
+
+/* Calm: the new moves keep only their fades. Nothing blurs, scales or
+   travels, and the loops stop. */
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="glass"] .cs-glass-ripple { animation: none; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="glass"] :is(.cs-dr-ring .cs-glass-ring-art, .cs-dr-wmark, .cs-dr-dm, .cs-dr-dm input, .cs-dr-tpat .cs-glass-n b, .cs-dr-tint .cs-glass-n b, .cs-glass-chip b, .cs-dr-motive .cs-glass-glow, .cs-dr-vmark.next, .cs-dr-talk .cs-dr-dot) { animation: none; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="glass"] :is(.cs-dr-next, .cs-dr-answer, .cs-glass-state, .cs-dr-wat, .cs-dr-motive[data-state="found"]) { animation-name: cs-glass-fade; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="glass"].cs-move-pit :is(.cs-glass-pane, .cs-glass-orb, .cs-glass-ring, .cs-glass-id, .cs-glass-trk, .cs-glass-const, .cs-glass-grid) { animation: none; }
+/* A pitfall under Calm only tints the panel rose and back, as a hit does. */
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="glass"].cs-move-pit .cs-glass-pane::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--cs-glass-rose-20);
+  animation: cs-glass-tint 900ms ease-out both;
+}
+/* Nothing scales under Calm, hovered or pressed. */
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="glass"] :is(.cs-dr-chr, .cs-dr-vmark, button.cs-dr-act):is(:hover, :active) { transform: none !important; }
+
+/* Reduced motion stops everything here, as it does for the rest of Chronicle's windows. */
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-cs-motion="full"]) .chronicle-npc-sheet[data-cs-look="glass"],
+  html:not([data-cs-motion="full"]) .chronicle-npc-sheet[data-cs-look="glass"] *,
+  html:not([data-cs-motion="full"]) .chronicle-npc-sheet[data-cs-look="glass"] *::before,
+  html:not([data-cs-motion="full"]) .chronicle-npc-sheet[data-cs-look="glass"] *::after { animation: none !important; }
+}

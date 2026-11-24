@@ -1,0 +1,24 @@
+{{!-- The Stamina number: Draw Steel's current and temporary Stamina inputs
+(data-source="false", so effect locks work), what it is out of, the state
+in words when winded or worse, and the thresholds. A minion in a single
+squad shows the squad's Stamina, as Draw Steel's own sheet does. --}}
+<div class="cs-sky-num cs-sky-stamina">
+  <label class="cs-field cs-sky-big">
+    {{#if isSingleSquadMinion}}
+    <span class="cs-hidden-label">{{localize "TYPES.CombatantGroup.squad"}}</span>
+    <input type="number" name="squadStaminaValue" value="{{combatGroup.system.staminaValue}}">
+    {{else}}
+    <span class="cs-hidden-label">{{systemFields.stamina.fields.value.label}}</span>
+    {{formInput systemFields.stamina.fields.value value=system.stamina.value dataset=datasets.notSource}}
+    {{/if}}
+  </label>
+  <span class="cs-sky-k">{{localize "CHRONICLE.HeroSheet.OfStamina" max=(ifThen isSingleSquadMinion combatGroup.system.staminaMax system.stamina.max)}}</span>
+  {{#if (eq npc.chronicle.stamina.band "winded")}}<strong class="cs-sky-state">{{localize "CHRONICLE.HeroSheet.Winded"}}</strong>{{/if}}
+  {{#if (eq npc.chronicle.stamina.band "dying")}}<strong class="cs-sky-state">{{localize "CHRONICLE.HeroSheet.Dying"}}</strong>{{/if}}
+  {{#if (eq npc.chronicle.stamina.band "dead")}}<strong class="cs-sky-state">{{localize "CHRONICLE.HeroSheet.Dead"}}</strong>{{/if}}
+  <label class="cs-field cs-sky-temp">
+    <span>{{systemFields.stamina.fields.temporary.label}}</span>
+    {{formInput systemFields.stamina.fields.temporary value=system.stamina.temporary dataset=datasets.notSource}}
+  </label>
+  <span class="cs-sn-wat">{{localize "CHRONICLE.HeroSheet.Thresholds" winded=system.stamina.winded dead=system.stamina.min}}</span>
+</div>
