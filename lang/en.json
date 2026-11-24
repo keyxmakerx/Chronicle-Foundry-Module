@@ -1496,6 +1496,7 @@
       }
     },
     "Dice": {
+      "SyncName": "Sync with Chronicle",
       "Heading": "Dice So Nice",
       "Intro": "The Chronicle rune dice play in Dice So Nice, another author's module. This checks what your own client found, so a change on their side shows up here instead of as silently missing dice.",
       "State": "State",

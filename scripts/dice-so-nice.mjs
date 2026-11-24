@@ -16,10 +16,16 @@
 import { MODULE_ID } from './constants.mjs';
 import { log } from './logger.mjs';
 import { DSN_ID, OPTIONAL_API, REQUIRED_API, judgeDiceSoNice } from './_dice-so-nice-check.mjs';
-import { MANIFEST_PATH, appearanceFor, buildRegistrations, critRegistrations, critSfx, readManifest } from './_rune-dice.mjs';
+import {
+  MANIFEST_PATH, appearanceFor, buildRegistrations, critRegistrations, critSfx, readLook,
+  readManifest, syncRegistrations,
+} from './_rune-dice.mjs';
 
 /** After our ready, how long Dice So Nice gets to start before the check calls it stuck. */
 const START_GRACE_MS = 30000;
+
+/** World setting holding the campaign's dice pick, so every client can follow it. */
+export const LOOK_SETTING = 'diceLook';
 
 /** The file check asks for at most this many files at once. */
 const FILE_CHECK_BATCH = 8;
@@ -31,6 +37,9 @@ const state = {
   manifest: null,
   registration: null,
   files: null,
+  dice3d: null,
+  plan: null,
+  syncedSet: null,
   registered: { colorsets: new Set(), systems: new Set(), defaults: new Map() },
 };
 
@@ -110,6 +119,10 @@ async function onDiceReady(dice3d) {
     for (const id of state.registered.systems) await attempt('preload', id, () => dice3d.preloadPresets(id));
   }
 
+  state.dice3d = dice3d;
+  state.plan = plan;
+  await applySync();
+
   state.registration = {
     colorsets: state.registered.colorsets.size,
     systems: state.registered.systems.size,
@@ -118,6 +131,49 @@ async function onDiceReady(dice3d) {
     errors,
     files: plan.files,
   };
+}
+
+/**
+ * The world setting the active GM writes the campaign's dice pick into. Not
+ * secret: it is the same look every player's Chronicle table already shows.
+ */
+export function registerDiceLookSetting() {
+  game.settings.register(MODULE_ID, LOOK_SETTING, {
+    scope: 'world',
+    config: false,
+    type: String,
+    default: '',
+    onChange: () => { applySync().catch((err) => log.warn('Dice So Nice: sync look not updated', err)); },
+  });
+}
+
+/**
+ * (Re)register "Sync with Chronicle" from the stored pick. Dice So Nice keys
+ * themes and dice systems by id, so registering again replaces the copy and
+ * a player who chose it follows the change on their next roll.
+ */
+async function applySync() {
+  const dice3d = state.dice3d;
+  if (!dice3d || !state.plan) return;
+  let raw = '';
+  try {
+    raw = game.settings.get(MODULE_ID, LOOK_SETTING);
+  } catch {
+    raw = '';
+  }
+  const sync = syncRegistrations(state.plan, readLook(raw), game.i18n.localize('CHRONICLE.Dice.SyncName'));
+  if (!sync) return;
+  try {
+    await dice3d.addColorset(sync.colorset, 'default');
+    if (sync.system) {
+      dice3d.addSystem(sync.system, 'default');
+      for (const p of sync.presets) dice3d.addDicePreset(p);
+      if (sync.set !== state.syncedSet && typeof dice3d.preloadPresets === 'function') await dice3d.preloadPresets(sync.system.id);
+    }
+    state.syncedSet = sync.set;
+  } catch (err) {
+    log.warn('Dice So Nice: "Sync with Chronicle" not registered', err);
+  }
 }
 
 /**

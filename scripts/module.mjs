@@ -50,7 +50,8 @@ import { openSatchel } from './satchel.mjs';
 import { addChronicleControls } from './_scene-controls.mjs';
 import { registerShortcuts } from './_keybindings.mjs';
 import { registerMotion } from './motion.mjs';
-import { registerDiceSoNice } from './dice-so-nice.mjs';
+import { registerDiceLookSetting, registerDiceSoNice } from './dice-so-nice.mjs';
+import { diceLookSync } from './dice-look-sync.mjs';
 import { registerDiceTray, registerDiceTraySetting } from './dice-tray.mjs';
 import { questLive, registerQuestBoard } from './quest-board.mjs';
 import { CutsceneRelay, registerCutscenes } from './cutscenes.mjs';
@@ -111,6 +112,7 @@ Hooks.once('init', () => {
   try {
     // Every client, not only the GM: each one registers the rune dice with
     // its own Dice So Nice, which starts after Foundry's ready.
+    registerDiceLookSetting();
     registerDiceSoNice();
   } catch (err) {
     console.warn('Chronicle Sync | Dice So Nice bridge unavailable', err);
@@ -197,6 +199,7 @@ Hooks.once('ready', async () => {
   syncManager.registerModule(npcSpotlightRelay);
   syncManager.registerModule(negotiationMirror);
   syncManager.registerModule(rollRelay);
+  syncManager.registerModule(diceLookSync);
   syncManager.registerModule(questLive);
   syncManager.registerModule(new CutsceneRelay());
 
