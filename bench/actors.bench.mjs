@@ -360,7 +360,7 @@ test('a hero older than the last sync, claimed later by a linked player with no 
   };
   world.game.users.set(player.id, player);
   await openWorld(world, MODULES);
-  assert.equal(actorFor(world, e.id), undefined, 'not brought in on connect while unclaimed');
+  assert.ok(!actorFor(world, e.id), 'not brought in on connect while unclaimed');
 
   const members = await seed.chronicle.get('/members');
   const member = (Array.isArray(members) ? members : members.data).find((m) => m.display_name === seed.displayName);
