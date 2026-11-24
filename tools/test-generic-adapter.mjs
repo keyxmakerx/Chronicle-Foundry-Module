@@ -245,3 +245,16 @@ test('buildChronicleFields serializes actor.statuses (Set) for conditions', () =
   ]);
   assert.deepEqual(JSON.parse(out.conditions_json), ['slowed', 'weakened']);
 });
+
+test('extractCollectionField join → every matching item name, comma-joined (a tactician\'s two kits)', () => {
+  const actor = { items: { contents: [
+    { id: 'k1', name: 'Shining Armor', type: 'kit' },
+    { id: 'k2', name: 'New Kit', type: 'kit' },
+    { id: 'k3', name: 'Spellsword', type: 'kit' },
+    { id: 'c1', name: 'Tactician', type: 'class' },
+  ] } };
+  const def = { key: 'kit', type: 'string', foundry_collection: 'items', foundry_item_type: ['kit'], foundry_item_single: true, foundry_item_join: true };
+  assert.equal(extractCollectionField(actor, def), 'Shining Armor, Spellsword');
+  assert.equal(extractCollectionField(actor, { ...def, foundry_item_join: false }), 'Shining Armor', 'without join, the first');
+  assert.equal(extractCollectionField({ items: { contents: [] } }, def), '');
+});
