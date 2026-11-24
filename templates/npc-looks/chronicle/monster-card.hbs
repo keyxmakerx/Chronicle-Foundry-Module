@@ -1,0 +1,56 @@
+{{!-- The folded monster: a small card beside the map. Picture, name, level
+and role, Stamina, the characteristics (rolling through Draw Steel), the
+villain action marks, and Malice for the Director only, with the mark and
+the words. Never drawn for a Limited viewer. --}}
+<section class="cs-card cs-npc-card" style="{{#if avatarProperties.objectFit}}--avatar-object-fit: {{avatarProperties.objectFit}};{{/if}}{{#if avatarProperties.objectPosition}} --avatar-object-position: {{avatarProperties.objectPosition}};{{/if}}">
+  <button type="button" class="cs-card-art" data-action="csPortraitMenu" aria-haspopup="menu" aria-label="{{localize "CHRONICLE.HeroSheet.Portrait.Menu"}}">
+    <img src="{{document.img}}" alt="" inert>
+  </button>
+  <div class="cs-card-body">
+    <h1 class="cs-card-name">{{document.name}}</h1>
+    <p class="cs-card-sub">
+      {{localize "CHRONICLE.HeroSheet.LevelN" level=system.monster.level}}{{#if system.monster.organizationLabel}} · {{system.monster.organizationLabel}}{{/if}}{{#if system.monster.roleLabel}} · {{system.monster.roleLabel}}{{/if}}
+    </p>
+    <div class="cs-card-stam" data-band="{{npc.chronicle.stamina.band}}">
+      <span class="cs-bar" role="presentation"><i style="width: {{npc.chronicle.stamina.fill}}%"></i>{{#if npc.chronicle.stamina.windedAt}}<u style="left: {{npc.chronicle.stamina.windedAt}}%"></u>{{/if}}</span>
+      <span class="cs-card-num" data-tooltip-text="{{systemFields.stamina.label}}"><b>{{system.stamina.value}}</b> / {{system.stamina.max}}</span>
+    </div>
+    <div class="cs-card-chars">
+      {{#each characteristics as |chr key|}}
+      <button
+        type="button"
+        class="cs-card-chr"
+        data-action="roll"
+        data-roll-type="characteristic"
+        data-characteristic="{{key}}"
+        data-tooltip-text="{{localize "DRAW_STEEL.ROLL.Prompt" prompt=chr.field.label}}"
+        {{disabled (not @root.owner)}}
+      >
+        <b>{{numberFormat chr.value sign=true}}</b>
+        <span>{{chr.field.label}}</span>
+      </button>
+      {{/each}}
+    </div>
+    {{#if npc.villain.total}}
+    <div class="cs-va-pips" aria-label="{{localize "CHRONICLE.NpcSheet.Villain.Title"}}">
+      {{#each npc.villain.marks as |m|}}
+      {{#if @root.npc.villain.canMark}}
+      <button type="button" class="cs-va-mark {{m.state}}" data-action="csVillain" data-item-id="{{m.id}}" aria-pressed="{{#if (eq m.state "used")}}true{{else}}false{{/if}}" aria-label="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}" data-tooltip-text="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}">{{m.order}}</button>
+      {{else}}
+      <span class="cs-va-mark {{m.state}}" role="img" aria-label="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}">{{m.order}}</span>
+      {{/if}}
+      {{/each}}
+    </div>
+    {{/if}}
+    {{#if showMalice}}
+    <label class="cs-card-malice cs-dm-only">
+      <span class="cs-dm-mark">{{malice.label}} · {{localize "CHRONICLE.NpcSheet.OnlyYou"}}</span>
+      <input type="number" step="1" data-setting="malice" value="{{malice.value}}">
+    </label>
+    {{/if}}
+    <div class="cs-card-actions">
+      <button type="button" class="cs-btn" data-action="csUnfold" data-tab="abilities">{{localize "CHRONICLE.HeroSheet.Card.Abilities"}}</button>
+      <button type="button" class="cs-btn cs-btn-main" data-action="csUnfold">{{localize "CHRONICLE.HeroSheet.Card.Open"}}</button>
+    </div>
+  </div>
+</section>

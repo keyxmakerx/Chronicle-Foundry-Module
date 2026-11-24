@@ -1,0 +1,33 @@
+{{!-- The Stamina box: Draw Steel's current and temporary Stamina inputs
+(data-source="false", so effect locks work), the bar with the winded mark and
+the thresholds. A minion in a single squad shows the squad's Stamina, as Draw
+Steel's own sheet does. --}}
+<div class="cs-box cs-stamina" data-band="{{npc.chronicle.stamina.band}}">
+  <div class="cs-box-head"><span class="cs-lab">{{systemFields.stamina.label}}</span></div>
+  <div class="cs-stam-n">
+    <label class="cs-field cs-field-big">
+      {{#if isSingleSquadMinion}}
+      <span class="cs-hidden-label">{{localize "TYPES.CombatantGroup.squad"}}</span>
+      <input type="number" name="squadStaminaValue" value="{{combatGroup.system.staminaValue}}">
+      {{else}}
+      <span class="cs-hidden-label">{{systemFields.stamina.fields.value.label}}</span>
+      {{formInput systemFields.stamina.fields.value value=system.stamina.value dataset=datasets.notSource}}
+      {{/if}}
+    </label>
+    <span class="cs-of">/ {{#if isSingleSquadMinion}}{{combatGroup.system.staminaMax}}{{else}}{{system.stamina.max}}{{/if}}</span>
+    <label class="cs-field cs-temp">
+      <span>{{systemFields.stamina.fields.temporary.label}}</span>
+      {{formInput systemFields.stamina.fields.temporary value=system.stamina.temporary dataset=datasets.notSource}}
+    </label>
+  </div>
+  <div class="cs-bar" role="presentation">
+    <i style="width: {{npc.chronicle.stamina.fill}}%"></i>
+    {{#if npc.chronicle.stamina.windedAt}}<u style="left: {{npc.chronicle.stamina.windedAt}}%"></u>{{/if}}
+  </div>
+  <p class="cs-sub">
+    {{localize "CHRONICLE.HeroSheet.Thresholds" winded=system.stamina.winded dead=system.stamina.min}}
+    {{#if (eq npc.chronicle.stamina.band "winded")}}<strong class="cs-state">{{localize "CHRONICLE.HeroSheet.Winded"}}</strong>{{/if}}
+    {{#if (eq npc.chronicle.stamina.band "dying")}}<strong class="cs-state">{{localize "CHRONICLE.HeroSheet.Dying"}}</strong>{{/if}}
+    {{#if (eq npc.chronicle.stamina.band "dead")}}<strong class="cs-state">{{localize "CHRONICLE.HeroSheet.Dead"}}</strong>{{/if}}
+  </p>
+</div>

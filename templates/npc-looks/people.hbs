@@ -1,0 +1,20 @@
+{{!-- The NPC's People tab: who the page is linked to in Chronicle, read live
+on the Director's screen (the only screen that draws this tab) and never
+saved in Foundry. A Director-only link carries the mark and the words. --}}
+<section class="tab cs-people {{tab.cssClass}}" data-group="primary" data-tab="people">
+  <div class="cs-pane">
+    <div class="cs-pane-h">
+      <h3>{{localize "CHRONICLE.NpcSheet.Tabs.people"}}</h3>
+      <small>{{localize "CHRONICLE.NpcSheet.People.Note"}}</small>
+    </div>
+    {{#if npc.people.length}}
+    <ul class="cs-rows">
+      {{#each npc.people as |p|}}
+      <li{{#if p.dmOnly}} class="cs-dm-only"{{/if}}><span>{{p.name}}</span><em>{{p.how}}</em>{{#if p.dmOnly}}<small class="cs-dm-mark">{{localize "CHRONICLE.NpcSheet.OnlyYou"}}</small>{{/if}}</li>
+      {{/each}}
+    </ul>
+    {{else}}
+    <div class="cs-pane-body"><p class="cs-prose cs-muted">{{localize (ifThen npc.liveFailed "CHRONICLE.NpcSheet.Offline" "CHRONICLE.NpcSheet.People.None")}}</p></div>
+    {{/if}}
+  </div>
+</section>

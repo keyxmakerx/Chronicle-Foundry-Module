@@ -13,7 +13,16 @@
  * stays in Chronicle for the Director's screen.
  */
 
+import { FLAG_SCOPE } from './constants.mjs';
 import { normalizeName } from './_npc-presence.mjs';
+
+/**
+ * Whether the Director has shown the meters to players. Not a secret: it
+ * tells a player's sheet that the actor's Interest and Patience are real,
+ * not Draw Steel's starting values.
+ */
+export const SHOWN_FLAG = 'negotiationShown';
+export const SHOWN_PATH = `flags.${FLAG_SCOPE}.${SHOWN_FLAG}`;
 
 /** Chronicle's slug for a motivation that Foundry's system spells differently. */
 const SLUG_TO_FOUNDRY = Object.freeze({ 'higher-authority': 'authority' });
@@ -62,8 +71,8 @@ function foundOnList(found, list) {
 /**
  * Turn the tracker's GM half into the actor update players may see: found
  * motivations and pitfalls always, so lists saved by an older mirror are
- * replaced, and interest and patience only once the Director has shown them.
- * Impression and unfound entries never leave Chronicle.
+ * replaced, interest and patience only once the Director has shown them, and
+ * whether they are shown. Impression and unfound entries never leave Chronicle.
  * @param {object|null} gm
  * @returns {object|null} Update object, or null when there is nothing to mirror.
  */
@@ -73,6 +82,7 @@ export function toFoundryNegotiation(gm) {
   const update = {
     'system.negotiation.motivations': mapKeys(foundOnList(found.motivations, gm.motivations)),
     'system.negotiation.pitfalls': mapKeys(foundOnList(found.pitfalls, gm.pitfalls)),
+    [SHOWN_PATH]: gm.shown === true,
   };
   if (gm.shown === true) {
     update['system.negotiation.interest'] = clampPoints(gm.interest) ?? 0;
@@ -110,14 +120,14 @@ function asList(v) {
  * so an unchanged tracker causes no actor write.
  * @param {object} update - From toFoundryNegotiation.
  * @param {object|null} current - `actor.system.negotiation` (Sets allowed).
+ * @param {unknown} [shownNow] - the actor's shown flag.
  * @returns {object|null} Changed fields, or null when nothing differs.
  */
-export function negotiationChanges(update, current) {
+export function negotiationChanges(update, current, shownNow) {
   if (!update) return null;
   const out = {};
   for (const [path, next] of Object.entries(update)) {
-    const field = path.slice('system.negotiation.'.length);
-    const have = current?.[field];
+    const have = path === SHOWN_PATH ? shownNow === true : current?.[path.slice('system.negotiation.'.length)];
     const same = Array.isArray(next)
       ? JSON.stringify(asList(have)) === JSON.stringify(next)
       : have === next;

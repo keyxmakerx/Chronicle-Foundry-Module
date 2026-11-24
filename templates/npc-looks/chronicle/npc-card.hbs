@@ -1,0 +1,50 @@
+{{!-- The folded NPC: a small card beside the map for the talk. Picture, name,
+level, Talking, then Interest and Patience, what the NPC would answer now and
+the motivations and pitfalls the party has found (the Director also sees the
+rest, marked). Never drawn for a Limited viewer. --}}
+<section class="cs-card cs-npc-card" style="{{#if avatarProperties.objectFit}}--avatar-object-fit: {{avatarProperties.objectFit}};{{/if}}{{#if avatarProperties.objectPosition}} --avatar-object-position: {{avatarProperties.objectPosition}};{{/if}}">
+  <button type="button" class="cs-card-art" data-action="csPortraitMenu" aria-haspopup="menu" aria-label="{{localize "CHRONICLE.HeroSheet.Portrait.Menu"}}">
+    <img src="{{document.img}}" alt="" inert>
+  </button>
+  <div class="cs-card-body">
+    <h1 class="cs-card-name">{{document.name}}</h1>
+    <p class="cs-card-sub">
+      {{localize "CHRONICLE.HeroSheet.LevelN" level=system.monster.level}}{{#if system.monster.roleLabel}} · {{system.monster.roleLabel}}{{/if}}
+      {{#if npc.talk.pressed}} · <span class="cs-talking">{{localize "CHRONICLE.NpcSheet.Talking"}}</span>{{/if}}
+    </p>
+    {{#if npc.negotiation.has}}
+    <div class="cs-card-meters">
+      <div class="cs-meter">
+        <span class="cs-lab">{{localize "CHRONICLE.NpcSheet.Interest"}}</span>
+        <span><b>{{npc.negotiation.interestText}}</b><span class="cs-dots" role="img" aria-label="{{localize "CHRONICLE.NpcSheet.OfFive" n=npc.negotiation.interestText}}">{{#each npc.negotiation.interestPips as |on|}}<i class="{{#unless on}}off{{/unless}}"></i>{{/each}}</span></span>
+      </div>
+      <div class="cs-meter">
+        <span class="cs-lab">{{localize "CHRONICLE.NpcSheet.Patience"}}</span>
+        <span><b>{{npc.negotiation.patienceText}}</b><span class="cs-dots" role="img" aria-label="{{localize "CHRONICLE.NpcSheet.OfFive" n=npc.negotiation.patienceText}}">{{#each npc.negotiation.patiencePips as |on|}}<i class="{{#unless on}}off{{/unless}}"></i>{{/each}}</span></span>
+      </div>
+    </div>
+    {{#if npc.negotiation.answer}}<p class="cs-offer">{{localize "CHRONICLE.NpcSheet.IfAnswered"}} <b>{{localize npc.negotiation.answer}}</b></p>{{/if}}
+    {{#unless npc.negotiation.shown}}<p class="cs-offer cs-muted">{{localize (concat "CHRONICLE.NpcSheet.Seen." npc.negotiation.source "Hidden")}}</p>{{/unless}}
+    {{#if npc.negotiation.rows.length}}
+    <ul class="cs-motives">
+      {{#each npc.negotiation.rows as |row|}}
+      <li class="cs-chip" data-state="{{row.state}}" data-kind="{{row.kind}}">
+        {{#if (eq row.kind "pitfall")}}<span class="cs-chip-kind">{{localize "CHRONICLE.NpcSheet.Kind.pitfall"}}</span>{{/if}}
+        <span class="cs-chip-name">{{row.label}}</span>
+        {{#unless (eq row.state "found")}}<span class="cs-chip-state">{{localize (concat "CHRONICLE.NpcSheet.State." row.state)}}</span>{{/unless}}
+      </li>
+      {{/each}}
+    </ul>
+    {{/if}}
+    {{else}}
+    <p class="cs-offer">{{localize "CHRONICLE.NpcSheet.NoNegotiation"}}</p>
+    {{/if}}
+    <div class="cs-card-actions">
+      {{#if npc.talk.show}}
+      <button type="button" class="cs-btn cs-talk-btn" data-action="csTalk" aria-pressed="{{#if npc.talk.pressed}}true{{else}}false{{/if}}">{{localize "CHRONICLE.NpcSheet.Talking"}}</button>
+      {{/if}}
+      <button type="button" class="cs-btn" data-action="csUnfold" data-tab="talk">{{localize "CHRONICLE.NpcSheet.Tabs.talk"}}</button>
+      <button type="button" class="cs-btn cs-btn-main" data-action="csUnfold">{{localize "CHRONICLE.HeroSheet.Card.Open"}}</button>
+    </div>
+  </div>
+</section>

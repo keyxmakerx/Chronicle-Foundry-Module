@@ -40,6 +40,7 @@
     "styles/hero-look-glass.css",
     "styles/hero-look-gilded.css",
     "styles/hero-look-sky.css",
+    "styles/npc-looks.css",
     "styles/table-view.css"
   ],
   "languages": [
