@@ -83,11 +83,18 @@ test('toFoundryNegotiation: empty or invalid gm gives null', () => {
 const actors = [
   { id: 'a1', name: 'Captain Varra', type: 'npc' },
   { id: 'a2', name: 'Other', type: 'npc', linkedEntityId: 'e1' },
-  { id: 'a3', name: 'Captain Varra', type: 'character', isHero: true },
+  { id: 'a3', name: 'Captain Varra', type: 'hero', pageId: 'e7' },
 ];
 
 test('pickNegotiationActors: explicit link wins over a name match', () => {
   assert.deepEqual(pickNegotiationActors({ entityId: 'e1', pageName: 'Captain Varra', actors }), ['a2']);
+});
+
+test('pickNegotiationActors: an NPC actor made from the page by character sync is the page\'s', () => {
+  const synced = [...actors, { id: 'a5', name: 'Orsen Vey', type: 'npc', pageId: 'e5' }];
+  assert.deepEqual(pickNegotiationActors({ entityId: 'e5', pageName: 'Somebody else', actors: synced }), ['a5']);
+  // Another page's synced NPC is never taken by its name.
+  assert.deepEqual(pickNegotiationActors({ entityId: 'e9', pageName: 'Orsen Vey', actors: synced }), []);
 });
 
 test('pickNegotiationActors: unique NPC name match when nothing is linked', () => {
@@ -99,9 +106,7 @@ test('pickNegotiationActors: ties, heroes, non-NPCs and other pages links are le
   assert.deepEqual(pickNegotiationActors({ entityId: 'e9', pageName: 'Captain Varra', actors: dup }), []);
   assert.deepEqual(pickNegotiationActors({ entityId: 'e9', pageName: 'Other', actors }), []);
   assert.deepEqual(pickNegotiationActors({ entityId: 'e9', pageName: '', actors }), []);
-  assert.deepEqual(pickNegotiationActors({
-    entityId: 'e9', pageName: 'Hero', actors: [{ id: 'h', name: 'Hero', type: 'npc', isHero: true }],
-  }), []);
+  assert.deepEqual(pickNegotiationActors({ entityId: 'e7', pageName: 'Captain Varra', actors: [actors[2]] }), []);
 });
 
 test('negotiationChanges: only differing fields, Sets compare as sets, same gives null', () => {

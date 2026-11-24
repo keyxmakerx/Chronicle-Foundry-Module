@@ -51,7 +51,8 @@ async function mirrorEntity(api, entityId) {
       id: a.id,
       name: a.name,
       type: a.type,
-      isHero: !!a.getFlag(FLAG_SCOPE, 'entityId'),
+      // Set by character sync, which makes Draw Steel NPC pages NPC actors.
+      pageId: a.getFlag(FLAG_SCOPE, 'entityId') ?? null,
       linkedEntityId: a.getFlag(FLAG_SCOPE, LINK_FLAG) ?? null,
     }));
     for (const id of pickNegotiationActors({ entityId, pageName: page?.name, actors })) {

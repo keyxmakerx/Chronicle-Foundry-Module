@@ -82,21 +82,22 @@ export function toFoundryNegotiation(gm) {
 }
 
 /**
- * Which NPC actors a page's negotiation belongs to. An explicit link wins
- * and takes every actor carrying it; otherwise exactly one NPC whose name
- * matches the page's. Heroes are never touched: character sync owns them.
+ * Which NPC actors a page's negotiation belongs to. An NPC actor character
+ * sync made from this page, or one linked to it by a dropped journal, wins
+ * and takes every such actor; otherwise exactly one NPC whose name matches
+ * the page's. Hero actors are never touched: character sync owns them.
  *
- * @param {{entityId: string, pageName: string, actors: Array<{id: string, name: string, type: string, isHero?: boolean, linkedEntityId?: string|null}>}} q
+ * @param {{entityId: string, pageName: string, actors: Array<{id: string, name: string, type: string, pageId?: string|null, linkedEntityId?: string|null}>}} q
  * @returns {string[]} Actor ids.
  */
 export function pickNegotiationActors({ entityId, pageName, actors }) {
-  const npcs = (actors || []).filter((a) => a?.id && a.type === 'npc' && !a.isHero);
-  const linked = npcs.filter((a) => a.linkedEntityId === entityId);
+  const npcs = (actors || []).filter((a) => a?.id && a.type === 'npc');
+  const linked = npcs.filter((a) => a.linkedEntityId === entityId || (a.pageId && a.pageId === entityId));
   if (linked.length) return linked.map((a) => a.id);
-  // Another page's explicit link must not be stolen by a name coincidence.
+  // Another page's link or synced actor must not be taken by a name coincidence.
   const want = normalizeName(pageName);
   if (!want) return [];
-  const named = npcs.filter((a) => !a.linkedEntityId && normalizeName(a.name) === want);
+  const named = npcs.filter((a) => !a.linkedEntityId && !a.pageId && normalizeName(a.name) === want);
   return named.length === 1 ? [named[0].id] : [];
 }
 
