@@ -26,7 +26,7 @@ import { planClaimOwnership } from './_claim-ownership-plan.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { walkEntityPages, unwrapEntityList } from './_entity-page-walk.mjs';
 import { JournalPushDebouncer } from './_journal-push-debounce.mjs';
-import { mergeChanges, changeTouchesPath } from './_actor-field-diff.mjs';
+import { mergeChanges, changeTouchesPath, ITEMS_CHANGED } from './_actor-field-diff.mjs';
 import { collapseChanges } from './_change-feed.mjs';
 import { planActorApply } from './_actor-apply-plan.mjs';
 import { planIdentityItems, identityFieldTypes, identityPicks } from './_identity-item-plan.mjs';
@@ -126,6 +126,13 @@ export class ActorSync {
     this._onCreateActor = this._handleCreateActor.bind(this);
     this._onUpdateActor = this._handleUpdateActor.bind(this);
     this._onDeleteActor = this._handleDeleteActor.bind(this);
+    this._onCreateItem = (item, options, userId) => this._handleItemChange(item, 'changed', options, userId);
+    this._onUpdateItem = (item, change, options, userId) => {
+      // A flag-only write (an inventory link) changes nothing a field reads.
+      if (change && !('name' in change) && !('system' in change) && !('type' in change)) return;
+      this._handleItemChange(item, 'changed', options, userId);
+    };
+    this._onDeleteItem = (item, options, userId) => this._handleItemChange(item, 'deleted', options, userId);
   }
 
   /**
@@ -175,6 +182,9 @@ export class ActorSync {
     Hooks.on('createActor', this._onCreateActor);
     Hooks.on('updateActor', this._onUpdateActor);
     Hooks.on('deleteActor', this._onDeleteActor);
+    Hooks.on('createItem', this._onCreateItem);
+    Hooks.on('updateItem', this._onUpdateItem);
+    Hooks.on('deleteItem', this._onDeleteItem);
     globalThis.window?.addEventListener?.('beforeunload', this._onBeforeUnload);
 
     console.debug(`Chronicle: Actor sync initialized (adapter: ${this._adapter.systemId}, actorType: ${this._actorType})`);
@@ -797,6 +807,9 @@ export class ActorSync {
     Hooks.off('createActor', this._onCreateActor);
     Hooks.off('updateActor', this._onUpdateActor);
     Hooks.off('deleteActor', this._onDeleteActor);
+    Hooks.off('createItem', this._onCreateItem);
+    Hooks.off('updateItem', this._onUpdateItem);
+    Hooks.off('deleteItem', this._onDeleteItem);
     globalThis.window?.removeEventListener?.('beforeunload', this._onBeforeUnload);
     this._actorPushDebouncer.flushAll();
   }
@@ -1378,6 +1391,7 @@ export class ActorSync {
     // An NPC sends only its name and visibility: its system data is the GM's
     // stat block, not the page's hero fields.
     const sent = this._isLinkedNpc(actor) ? (change.name !== undefined ? { name: change.name } : {}) : change;
+    const items = sent[ITEMS_CHANGED];
 
     // Sync visibility: Foundry prototypeToken.hidden → Chronicle is_private.
     // Await this before field sync to avoid inconsistent state.
@@ -1389,10 +1403,14 @@ export class ActorSync {
     const gate = this._pushGate();
     if (gate === 'drop') return;
     if (gate === 'hold') {
-      if (!hiddenChanged && !sent.system && !sent.name) return;
+      if (!hiddenChanged && !sent.system && !sent.name && !items) return;
       const byPlayer = userId !== game.user.id;
-      const diff = sent.system || sent.name !== undefined
-        ? { ...(sent.system ? { system: sent.system } : {}), ...(sent.name !== undefined ? { name: sent.name } : {}) }
+      const diff = sent.system || sent.name !== undefined || items
+        ? {
+          ...(sent.system ? { system: sent.system } : {}),
+          ...(sent.name !== undefined ? { name: sent.name } : {}),
+          ...(items ? { [ITEMS_CHANGED]: items } : {}),
+        }
         : null;
       this._syncManager.holdChange({
         key: `actor:${actor.id}`, part: 'characters', kind: 'actor.update', label: actor.name,
@@ -1411,13 +1429,32 @@ export class ActorSync {
     // Only push field/name changes if system data or name changed. The diff
     // is kept (merged with the burst's earlier ones) so the push can send
     // just the mapped fields that changed.
-    if (!sent.system && !sent.name) return;
+    if (!sent.system && !sent.name && !items) return;
     this._pendingChanges.set(actor.id, mergeChanges(this._pendingChanges.get(actor.id), sent));
     this._pendingAuthors.set(actor.id, userId);
     if (userId !== game.user.id) {
       this._pendingPlayers.set(actor.id, (this._pendingPlayers.get(actor.id) ?? new Set()).add(userId));
     }
     this._actorPushDebouncer.schedule(actor.id, actor, entityId);
+  }
+
+  /**
+   * An embedded item that a single-item field reads (a complication, an
+   * ancestry, the class) was made, edited or removed on a linked character.
+   * Foundry fires no actor update for that, so it joins the actor's pending
+   * push as its own kind of change, with the same gates and debounce.
+   * @param {Item} item
+   * @param {'changed'|'deleted'} how
+   * @param {object} options
+   * @param {string} userId
+   * @private
+   */
+  _handleItemChange(item, how, options, userId) {
+    if (options?.[APPLY_OPTION]) return;
+    const actor = item?.parent;
+    if (!actor || actor.documentName !== 'Actor') return;
+    if (!this._adapter?.itemFieldTypes?.has(item.type)) return;
+    this._handleUpdateActor(actor, { [ITEMS_CHANGED]: { [item.type]: how } }, {}, userId);
   }
 
   /**
@@ -1474,7 +1511,7 @@ export class ActorSync {
       // fall back to the full set, but only when system data changed.
       const fields = this._withoutLayered(actor, typeof this._adapter.toChronicleFieldsChanged === 'function'
         ? this._adapter.toChronicleFieldsChanged(actor, change)
-        : (change.system ? this._adapter.toChronicleFields(actor) : null));
+        : (change.system || change[ITEMS_CHANGED] ? this._adapter.toChronicleFields(actor) : null));
 
       if (fields && Object.keys(fields).length > 0) {
         // A player's change is judged by Chronicle as that player: the keys

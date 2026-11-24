@@ -259,6 +259,34 @@ test('a Chronicle ancestry pick swaps the actor\'s ancestry item from a compendi
   await closeWorld(world);
 }, { settings: ON }));
 
+test('an origin item added, swapped or removed on the sheet in Foundry reaches Chronicle with no other edit', () => scenario('fdy-identity-item-push', async ({ seed, world }) => {
+  await openWorld(world, { modules: ['journals', 'actors', 'items'] });
+  const e = await chronicleCharacter(seed, 'Orla', 10);
+  await waitFor(() => actorFor(world, e.id), 10000, 'actor created');
+  await settle();
+  const actor = actorFor(world, e.id);
+  const ancestry = async () => (await seed.chronicle.get(`/entities/${e.id}`)).fields_data?.ancestry;
+
+  // The GM drags an ancestry onto the sheet: no actor field changes.
+  await actor.createEmbeddedDocuments('Item', [{ name: 'Dwarf', type: 'ancestry' }]);
+  await settle();
+  assert.equal(await ancestry(), 'Dwarf', 'ancestry pushed');
+
+  // Swapped for another: the old one goes, the new one arrives.
+  const old = actor.items.find((i) => i.type === 'ancestry');
+  await actor.deleteEmbeddedDocuments('Item', [old.id]);
+  await actor.createEmbeddedDocuments('Item', [{ name: 'Orc', type: 'ancestry' }]);
+  await settle();
+  assert.equal(await ancestry(), 'Orc', 'swap pushed');
+
+  // Removed with nothing in its place: Chronicle drops the pick too.
+  await actor.deleteEmbeddedDocuments('Item', [actor.items.find((i) => i.type === 'ancestry').id]);
+  await settle();
+  assert.equal((await ancestry()) ?? '', '', 'removal pushed');
+  assert.equal(actor.items.filter((i) => i.type === 'ancestry').length, 0, 'the clear does not come back as an item');
+  await closeWorld(world);
+}, { settings: ON }));
+
 test('a class picked in Chronicle is noted on the actor for its player and never embedded, and the note goes once a class is on the sheet', () => scenario('chr-class-pick', async ({ seed, world }) => {
   await openWorld(world, { modules: ['journals', 'actors', 'items'] });
   const e = await chronicleCharacter(seed, 'Tyne', 10);
