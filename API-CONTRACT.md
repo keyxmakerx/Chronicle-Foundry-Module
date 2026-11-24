@@ -1940,10 +1940,13 @@ worlds where `game.system.id` is `draw-steel`, and only for `systemId`
 `{ "systemId", "key", "public": {...}, "gm": {...}, "isGm": true, "updatedAt" }`
 
 (the `gm` half is present only for an owner-level key; a 404 means an older
-Chronicle or no such page and is ignored quietly) and copies interest and
-patience (clamped 0 to 5), motivations, pitfalls (`higher-authority` becomes
-the system's `authority`; unknown slugs are dropped) and impression (only
-when the tracker has one) onto `system.negotiation` of the NPC actors linked
+Chronicle or no such page and is ignored quietly) and copies only what
+players may know onto `system.negotiation`, because an actor document
+reaches players' browsers: the motivations and pitfalls in `gm.found` that
+are still on the NPC's lists (`higher-authority` becomes the system's
+`authority`; unknown slugs are dropped), and interest and patience (clamped
+0 to 5) only when `gm.shown` is true. Impression and unfound entries stay in
+Chronicle. The update goes to the NPC actors linked
 to that page (actor flag `npcEntityId`, else a unique NPC name match; heroes
 never). It runs once more when a GM links a page by dropping its journal on a
 token. Nothing is written back: edits on the Foundry sheet don't sync to
