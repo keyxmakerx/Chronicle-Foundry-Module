@@ -40,6 +40,13 @@ root. There is no `package.json`.
 - [ ] Bind a key to "Open the Chronicle Sync dashboard", press it as the GM: the dashboard opens; as a player the GM-only two are not listed
 - [ ] With the world not connected, a key bound to the notebook does nothing and Foundry's own use of that key still works
 
+## Shared rolls
+
+- [ ] As a player whose hero is linked to a Foundry actor, open the hero's page in Chronicle, press Might, then Roll -> Foundry chat shows the roll under the hero's name and portrait (on the hero's token when it is on the scene), not the player's name
+- [ ] The same from the Table tab's power roll line (a characteristic showing the hero's number) -> the hero speaks; a plain d20 from the Table -> the player's name, as before
+- [ ] As the GM, roll from a player's hero sheet -> the hero speaks
+- [ ] A hero with no linked actor in Foundry -> the roll shows under the player's name, no console errors
+
 ## Dice So Nice
 
 - [ ] Without Dice So Nice installed: roll `/r 1d20` as GM and as a player; both get Foundry's normal roll card and no console errors. Chronicle Sync → Problems → Health shows Dice So Nice "Not in use"

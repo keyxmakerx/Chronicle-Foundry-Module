@@ -23,6 +23,7 @@ const MAX_SIDES = 1000;
 const MAX_DICE = 100;
 const MAX_LABEL = 200;
 const MAX_NAME = 100;
+const MAX_CHARACTER_ID = 64;
 const SEEN_LIMIT = 500;
 
 const isInt = (n) => Number.isInteger(n);
@@ -99,6 +100,33 @@ export function flavorFor(payload) {
 }
 
 /**
+ * The hero a roll was made for (`characterId`, a Chronicle page id), or null.
+ * Chronicle sends it only for a roll of the hero's own numbers, after checking
+ * the roller plays that hero.
+ */
+export function characterIdOf(payload) {
+  const id = typeof payload?.characterId === 'string' ? payload.characterId.trim() : '';
+  return id && id.length <= MAX_CHARACTER_ID ? id : null;
+}
+
+/**
+ * The chat speaker for a roll made as a hero. Foundry's own speaker for the
+ * linked actor (`ChatMessage.getSpeaker({actor})`, which picks its token on
+ * the scene) is used when it names that actor; otherwise the actor alone
+ * speaks, under its name. Null with no actor, so the roller's name stays.
+ * @param {{actor?: string, token?: string|null, scene?: string|null, alias?: string}|null} speaker
+ * @param {{id: string, name?: string}|null} actor
+ */
+export function heroSpeaker(speaker, actor) {
+  if (!actor?.id) return null;
+  const fits = speaker && speaker.actor === actor.id;
+  const alias = String((fits && speaker.alias) || actor.name || '').slice(0, MAX_NAME);
+  if (!alias) return null;
+  if (!fits) return { scene: null, actor: actor.id, token: null, alias };
+  return { scene: speaker.scene ?? null, actor: actor.id, token: speaker.token ?? null, alias };
+}
+
+/**
  * The ChatMessage data for an incoming roll.
  * @param {object} payload - A roll that passed judgeIncoming.
  * @param {object} ctx
@@ -106,12 +134,14 @@ export function flavorFor(payload) {
  * @param {string|null} [ctx.rollerFoundryId] - Foundry user linked to the roller.
  * @param {string} [ctx.fallbackAlias] - Speaker name when Chronicle sent none.
  * @param {string|null} [ctx.authorId] - Foundry user the message is from.
+ * @param {object|null} [ctx.speaker] - The hero's actor as speaker (heroSpeaker);
+ *   without it the roller's name speaks.
  */
-export function buildChatData(payload, { gmIds = [], rollerFoundryId = null, fallbackAlias = '', authorId = null } = {}) {
+export function buildChatData(payload, { gmIds = [], rollerFoundryId = null, fallbackAlias = '', authorId = null, speaker = null } = {}) {
   const rolls = [buildRollData(payload)];
   const data = {
     content: String(payload.total),
-    speaker: { alias: String(payload.rollerName || fallbackAlias).slice(0, MAX_NAME) },
+    speaker: speaker ?? { alias: String(payload.rollerName || fallbackAlias).slice(0, MAX_NAME) },
     flavor: flavorFor(payload),
     rolls,
     flags: { [FLAG_SCOPE]: { [ROLL_FLAG]: { id: payload.id, origin: 'chronicle' } } },

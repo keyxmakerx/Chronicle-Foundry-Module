@@ -13,8 +13,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
-  SeenRolls, buildChatData, buildRollData, hasRollMessage, isRouteMissing,
-  judgeIncoming, modeOf, postBodies,
+  SeenRolls, buildChatData, buildRollData, characterIdOf, hasRollMessage, heroSpeaker,
+  isRouteMissing, judgeIncoming, modeOf, postBodies,
 } from '../scripts/_roll-relay.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -66,6 +66,42 @@ test('a missing roller name falls back; a gm or blind roll is never public', () 
   for (const mode of ['gm', 'blind']) {
     assert.ok(buildChatData(payload({ mode }), { gmIds: GMS }).whisper.length);
   }
+});
+
+test('a roll from a hero sheet names its hero; anything else names none', () => {
+  assert.equal(characterIdOf(payload({ characterId: 'hero-1' })), 'hero-1');
+  assert.equal(characterIdOf(payload({ characterId: '  hero-1 ' })), 'hero-1');
+  for (const characterId of [undefined, '', '   ', 42, null, {}, 'x'.repeat(65)]) {
+    assert.equal(characterIdOf(payload({ characterId })), null, String(characterId));
+  }
+});
+
+test('a hero roll speaks as the linked actor, on its token when Foundry picks one', () => {
+  const actor = { id: 'a1', name: 'Saatraaol' };
+  assert.deepEqual(
+    heroSpeaker({ scene: 's1', actor: 'a1', token: 't1', alias: 'Saatraaol' }, actor),
+    { scene: 's1', actor: 'a1', token: 't1', alias: 'Saatraaol' },
+  );
+  // No token on the scene: Foundry's speaker has the actor alone.
+  assert.deepEqual(heroSpeaker({ scene: null, actor: 'a1', token: null, alias: '' }, actor),
+    { scene: null, actor: 'a1', token: null, alias: 'Saatraaol' });
+  // A speaker for some other actor is not trusted; the hero's actor speaks alone.
+  assert.deepEqual(heroSpeaker({ scene: 's1', actor: 'a2', token: 't9', alias: 'Other' }, actor),
+    { scene: null, actor: 'a1', token: null, alias: 'Saatraaol' });
+  assert.deepEqual(heroSpeaker(null, actor), { scene: null, actor: 'a1', token: null, alias: 'Saatraaol' });
+  assert.equal(heroSpeaker({ actor: 'a1' }, null), null);
+  assert.equal(heroSpeaker(null, { id: 'a1', name: '' }), null);
+});
+
+test('chat data uses the hero speaker when there is one and the roller name otherwise', () => {
+  const speaker = { scene: null, actor: 'a1', token: null, alias: 'Saatraaol' };
+  const hero = buildChatData(payload({ characterId: 'hero-1' }), { gmIds: GMS, speaker });
+  assert.deepEqual(hero.speaker, speaker);
+  assert.equal(hero.flavor, 'Brutal Slam (Tier 3)');
+  assert.deepEqual(buildChatData(payload({ characterId: 'hero-1' }), { gmIds: GMS }).speaker, { alias: 'Mara' });
+  // A gm roll made as a hero is still only whispered.
+  const gm = buildChatData(payload({ mode: 'gm', characterId: 'hero-1' }), { gmIds: GMS, rollerFoundryId: 'p1', speaker });
+  assert.deepEqual(gm.whisper.sort(), ['gm1', 'gm2', 'p1']);
 });
 
 test('hidden, self, foundry-origin and diceless rolls are not posted', () => {
@@ -151,6 +187,10 @@ test('wiring: roll. is allowed, the relay is registered, and gated to the active
   assert.match(src, /activeGM\?\.isSelf/);
   assert.doesNotMatch(src, /_syncing/);
   assert.match(src, /ChatMessage\.create\(data, syncOptions\(\)\)/);
+  // The hero's actor is found by the link flag and spoken through Foundry's own speaker.
+  assert.match(src, /getFlag\(FLAG_SCOPE, 'entityId'\) === id/);
+  assert.match(src, /ChatMessage\.getSpeaker\(\{ actor \}\)/);
+  assert.match(src, /speaker: this\._heroSpeaker\(payload\)/);
   assert.match(src, /options\?\.chronicleSync\) return/);
   assert.match(src, /_routeMissing/);
   assert.ok(JSON.parse(read('lang/en.json')).CHRONICLE.Rolls.FallbackName);

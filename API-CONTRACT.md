@@ -630,7 +630,8 @@ Envelope `{type, campaignId, resourceId: <roll id>, payload}`, payload:
   "rollerName": "Mara", "label": "Brutal Slam", "formula": "2d10+2",
   "dice": [{"sides": 10, "value": 7}, {"sides": 10, "value": 9}], "modifier": 2,
   "total": 18, "outcome": "Tier 3", "why": "", "from": "",
-  "mode": "public|gm|blind|self", "hidden": true, "createdAt": "<RFC3339>" }
+  "mode": "public|gm|blind|self", "hidden": true, "characterId": "<hero page id, optional>",
+  "createdAt": "<RFC3339>" }
 ```
 
 Chronicle filters the audience: the module's socket gets public, gm and blind
@@ -640,12 +641,17 @@ are not in `/sync/changes`, so a reconnect never replays them. The allowlist
 includes the `roll.` prefix. On the **active GM's client only**, a roll with
 `origin` `chronicle`, not `hidden` and not `self` is posted to chat as a real
 Roll built from the given dice (never re-rolled, so Dice So Nice animates
-it), speaker `rollerName`, flavor `label` (and `outcome`), flag
+it), speaker `rollerName` or, when `characterId` is set and an actor's
+`entityId` flag matches it, that actor (Foundry's `ChatMessage.getSpeaker`),
+flavor `label` (and `outcome`), flag
 `flags["chronicle-sync"].roll = {id, origin: "chronicle"}`. `public` is an
 ordinary public message; `gm` is whispered to the GM users and the Foundry
 user linked to `rollerId`; `blind` is a blind whisper to the GM users. Each
 roll id posts once (a bounded in-memory set, and an existing message with the
-flag). `tools/test-roll-relay.mjs`.
+flag). `characterId` comes only on a Table roll of a hero's own numbers
+(Chronicle's hero sheet, the Table's power roll line), after Chronicle
+checked the roller has claimed that hero or is a Director, and, for a public
+roll, that every player may see the page; it is not in the roll log. `tools/test-roll-relay.mjs`.
 
 Re-verify by: 2027-01-28 (Chronicle's rolls route and `roll.made` broadcast; keyxmakerx/Chronicle-Foundry-Module#240)
 
