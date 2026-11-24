@@ -1,0 +1,260 @@
+/* The Chronicle NPC and monster sheet (scripts/npc-looks.mjs), in the
+   Chronicle look. It is the hero sheet with new parts, so it carries the
+   .chronicle-hero-sheet class and every rule in hero-looks.css applies; this
+   file adds only what the hero sheet has no part for: the negotiation, the
+   Talk and People panes, the villain action marks and the Director-only
+   marks. Scoped to .chronicle-npc-sheet, so the hero sheet is untouched.
+   Another look overrides these under its [data-cs-look]. */
+
+.chronicle-npc-sheet {
+  /* Director-only things: Chronicle's amber, with the mark and the words. */
+  --cs-hero-dm: var(--cs-page-dm);
+  --cs-hero-dm-soft: var(--cs-page-dm-soft);
+}
+
+/* Director-only: the amber edge, the ⊘ mark and the words, never colour
+   alone, because several looks are gold or amber themselves. */
+.chronicle-npc-sheet .cs-dm-mark::before { content: "⊘ "; letter-spacing: 0; }
+.chronicle-npc-sheet .cs-prog .cs-dm-only {
+  padding-left: 8px;
+  box-shadow: inset 2px 0 0 var(--cs-hero-dm);
+}
+.chronicle-npc-sheet .cs-prog .cs-dm-only dt { color: var(--cs-hero-dm); }
+.chronicle-npc-sheet .cs-prog .cs-dm-only input {
+  width: 4ch;
+  min-width: 52px;
+  height: auto;
+  padding: 0 4px;
+  border: 1px solid var(--cs-hero-line);
+  border-radius: min(6px, var(--cs-hero-radius));
+  background: var(--cs-hero-panel);
+  color: var(--cs-hero-text);
+  font: inherit;
+  text-align: center;
+}
+.chronicle-npc-sheet .cs-dm-words,
+.chronicle-npc-sheet .cs-prog dd .cs-dm-words {
+  display: block;
+  margin-top: 2px;
+  color: var(--cs-hero-dm);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-transform: none;
+}
+.chronicle-npc-sheet .cs-fight-note { margin: 0; }
+
+/* Talking: the token's glow, pressed while it is on. */
+.chronicle-npc-sheet .cs-talk-btn { display: inline-flex; align-items: center; gap: 7px; }
+.chronicle-npc-sheet .cs-talk-btn[aria-pressed="true"] {
+  border-color: var(--cs-hero-accent);
+  background: var(--cs-hero-accent-soft);
+  color: var(--cs-hero-accent-strong);
+}
+.chronicle-npc-sheet .cs-talk-btn[aria-pressed="true"]::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cs-hero-ok);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cs-hero-ok) 25%, transparent);
+}
+.chronicle-npc-sheet .cs-talking { color: var(--cs-hero-ok); font-weight: 600; }
+
+/* No stat block yet: Chronicle's dashed edge, a place for something, not a thing. */
+.chronicle-npc-sheet .cs-nostat {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  align-items: center;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px dashed var(--cs-hero-line);
+  border-radius: var(--cs-hero-radius);
+}
+.chronicle-npc-sheet .cs-nostat b { font-size: 14px; font-weight: 600; color: var(--cs-hero-text); }
+.chronicle-npc-sheet .cs-nostat p { grid-column: 1; margin: 0; font-size: 13px; color: var(--cs-hero-body); }
+.chronicle-npc-sheet .cs-nostat .cs-quiet { grid-column: 2; grid-row: 1 / span 2; }
+.chronicle-npc-sheet .cs-quiet {
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--cs-hero-accent-strong);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.chronicle-npc-sheet .cs-quiet:hover { text-decoration: underline; text-underline-offset: 3px; }
+.chronicle-npc-sheet .cs-quiet:focus-visible { outline: 2px solid var(--cs-hero-accent); outline-offset: 2px; }
+
+/* Row two: Stamina beside the negotiation for an NPC, so nothing jumps when a talk turns into a fight. */
+.chronicle-npc-sheet .cs-row-npc { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.75fr); gap: 8px; }
+.chronicle-npc-sheet .cs-row-npc.cs-no-stam { grid-template-columns: minmax(0, 1fr); }
+.chronicle-npc-sheet .cs-neg .cs-box-head { flex-wrap: wrap; row-gap: 0; }
+.chronicle-npc-sheet .cs-neg .cs-box-head .cs-lab { overflow: visible; white-space: normal; text-overflow: clip; }
+.chronicle-npc-sheet .cs-neg .cs-box-head .cs-sub { margin: 0; }
+.chronicle-npc-sheet .cs-neg-meters { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 4px; }
+.chronicle-npc-sheet .cs-meter { display: grid; gap: 4px; }
+.chronicle-npc-sheet .cs-meter > span { display: flex; align-items: center; gap: 8px; }
+.chronicle-npc-sheet .cs-meter b {
+  min-width: 1ch;
+  color: var(--cs-hero-text);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.chronicle-npc-sheet .cs-meter .cs-dots { gap: 5px; margin: 0; }
+.chronicle-npc-sheet .cs-meter .cs-dots i { width: 10px; height: 10px; }
+.chronicle-npc-sheet .cs-offer { margin: 8px 0 0; color: var(--cs-hero-body); font-size: 13px; }
+.chronicle-npc-sheet .cs-offer b { color: var(--cs-hero-text); font-weight: 600; }
+
+/* Row two for a monster: Stamina, damage, conditions, villain actions. */
+.chronicle-npc-sheet .cs-row-mon {
+  display: grid;
+  grid-template-columns: minmax(0, 2.1fr) minmax(0, 1.3fr) minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+@container cs-hero (max-width: 760px) {
+  .chronicle-npc-sheet .cs-row-mon { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .chronicle-npc-sheet .cs-row-npc { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Villain actions: one mark each, in order. Used ones are struck through and
+   say so; the next is ringed. They belong to the fight and clear with it. */
+.chronicle-npc-sheet .cs-va-pips { display: flex; gap: 6px; margin: 8px 0 0; }
+.chronicle-npc-sheet .cs-va-mark {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  height: 26px;
+  min-width: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: min(6px, var(--cs-hero-radius));
+  background: none;
+  box-shadow: inset 0 0 0 1.5px var(--cs-hero-line);
+  color: var(--cs-hero-text);
+  font: 600 12px var(--cs-hero-face);
+}
+.chronicle-npc-sheet button.cs-va-mark { cursor: pointer; }
+.chronicle-npc-sheet button.cs-va-mark:hover { box-shadow: inset 0 0 0 1.5px var(--cs-hero-accent); }
+.chronicle-npc-sheet button.cs-va-mark:focus-visible { outline: 2px solid var(--cs-hero-accent); outline-offset: 2px; }
+.chronicle-npc-sheet .cs-va-mark.used { background: var(--cs-hero-tert); box-shadow: none; color: var(--cs-hero-muted); text-decoration: line-through; }
+.chronicle-npc-sheet .cs-va-mark.next { box-shadow: inset 0 0 0 2px var(--cs-hero-accent); color: var(--cs-hero-accent-strong); }
+
+/* Draw Steel's Abilities list: a villain action used this fight is dimmed and says "Used". */
+.chronicle-npc-sheet .item.cs-used .item-row { opacity: 0.6; }
+.chronicle-npc-sheet .cs-used-word {
+  margin-left: 6px;
+  color: var(--cs-hero-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* The Talk and People panes. */
+.chronicle-npc-sheet .cs-pane { padding: 4px 0 8px; }
+.chronicle-npc-sheet .cs-pane-h {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  padding: 0 8px 6px;
+  border-bottom: 1px solid var(--cs-hero-line);
+}
+.chronicle-npc-sheet .cs-pane-h h3 { margin: 0; padding: 0; border: 0; color: var(--cs-hero-text); font-size: 16px; font-weight: 600; }
+.chronicle-npc-sheet .cs-pane-h small {
+  color: var(--cs-hero-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.chronicle-npc-sheet .cs-pane-body { padding: 10px 8px 18px; }
+.chronicle-npc-sheet .cs-prose { max-width: 68ch; margin: 0 0 8px; color: var(--cs-hero-body); font-size: 14px; }
+.chronicle-npc-sheet .cs-muted { color: var(--cs-hero-muted); }
+.chronicle-npc-sheet .cs-motives { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.chronicle-npc-sheet .cs-motives .cs-chip { cursor: default; }
+.chronicle-npc-sheet .cs-motives .cs-chip[data-state="hidden"] { border-style: dashed; background: none; color: var(--cs-hero-body); font-weight: 500; }
+.chronicle-npc-sheet .cs-motives .cs-chip[data-state="used"] .cs-chip-name {
+  color: var(--cs-hero-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--cs-hero-muted);
+}
+.chronicle-npc-sheet .cs-motives .cs-chip[data-kind="pitfall"] .cs-chip-kind { color: var(--cs-hero-bad); }
+.chronicle-npc-sheet .cs-chip-state { color: var(--cs-hero-muted); font-size: 11.5px; font-weight: 500; }
+.chronicle-npc-sheet .cs-legend { margin: 8px 0 0; color: var(--cs-hero-muted); font-size: 12px; }
+.chronicle-npc-sheet .cs-offline { padding: 0 8px; }
+.chronicle-npc-sheet .cs-rows { margin: 0; padding: 0; list-style: none; }
+.chronicle-npc-sheet .cs-rows li {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--cs-hero-line);
+  color: var(--cs-hero-text);
+  font-size: 14px;
+}
+.chronicle-npc-sheet .cs-rows li > span:first-child { flex: 1; min-width: 0; font-weight: 600; }
+.chronicle-npc-sheet .cs-rows li em { color: var(--cs-hero-body); font-size: 13px; font-style: normal; }
+.chronicle-npc-sheet .cs-rows li.cs-dm-only { box-shadow: inset 2px 0 0 var(--cs-hero-dm); }
+.chronicle-npc-sheet .cs-rows li small.cs-dm-mark { color: var(--cs-hero-dm); font-size: 12px; font-weight: 600; }
+.chronicle-npc-sheet .cs-log { margin-top: 10px; }
+.chronicle-npc-sheet .cs-log li > span:first-child { font-weight: 500; }
+
+/* The Talk tab shows the negotiation, so in play Biography doesn't repeat it.
+   Edit mode keeps Draw Steel's editors, and a Limited viewer, who has no Talk
+   tab, still reads it there. */
+.chronicle-npc-sheet.cs-has-talk.cs-play .tab.biography fieldset.negotiation { display: none; }
+
+/* Edit mode: the shape is picked here. */
+.chronicle-npc-sheet .cs-shape-pick .cs-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.chronicle-npc-sheet .cs-shape-pick .cs-btn[aria-pressed="true"] {
+  border-color: var(--cs-hero-accent);
+  background: var(--cs-hero-accent-soft);
+  color: var(--cs-hero-accent-strong);
+}
+
+/* Folded cards: the hero sheet's card, with the talk or the fight added. */
+.chronicle-npc-sheet .cs-card-meters { display: flex; gap: 18px; }
+.chronicle-npc-sheet .cs-card-meters .cs-meter b { font-size: 18px; }
+.chronicle-npc-sheet .cs-card .cs-offer { margin: 0; font-size: 12.5px; }
+.chronicle-npc-sheet .cs-card .cs-motives .cs-chip { padding: 2px 7px; font-size: 12px; }
+.chronicle-npc-sheet .cs-card .cs-va-pips { margin: 0; }
+.chronicle-npc-sheet .cs-card-stam .cs-bar { position: relative; }
+.chronicle-npc-sheet .cs-card-stam .cs-bar u {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--cs-hero-text);
+  opacity: 0.5;
+}
+.chronicle-npc-sheet .cs-card-malice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-left: 8px;
+  box-shadow: inset 2px 0 0 var(--cs-hero-dm);
+  color: var(--cs-hero-dm);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.chronicle-npc-sheet .cs-card-malice input {
+  width: 56px;
+  height: 26px;
+  border: 1px solid var(--cs-hero-line);
+  border-radius: min(6px, var(--cs-hero-radius));
+  background: var(--cs-hero-panel);
+  color: var(--cs-hero-text);
+  font: 600 15px var(--cs-hero-face);
+  text-align: center;
+}

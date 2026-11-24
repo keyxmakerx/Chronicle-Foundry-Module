@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
-  isNegotiationMessage, toFoundryNegotiation, pickNegotiationActors, negotiationChanges,
+  isNegotiationMessage, toFoundryNegotiation, pickNegotiationActors, negotiationChanges, SHOWN_PATH,
 } from '../scripts/_negotiation-mirror.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -41,9 +41,16 @@ test('toFoundryNegotiation: saves only found entries still on the list, with the
   assert.deepEqual(u, {
     'system.negotiation.motivations': ['authority', 'greed'],
     'system.negotiation.pitfalls': ['justice'],
+    'flags.chronicle-sync.negotiationShown': true,
     'system.negotiation.interest': 3,
     'system.negotiation.patience': 2,
   });
+});
+
+test('toFoundryNegotiation: says whether the meters are shown, so players never read starting values', () => {
+  assert.equal(toFoundryNegotiation({ interest: 3, motivations: [] })[SHOWN_PATH], false);
+  assert.equal(toFoundryNegotiation({ interest: 3, shown: true, motivations: [] })[SHOWN_PATH], true);
+  assert.equal(SHOWN_PATH, 'flags.chronicle-sync.negotiationShown');
 });
 
 test('toFoundryNegotiation: an unfound motivation or pitfall never reaches the actor', () => {
@@ -112,11 +119,12 @@ test('pickNegotiationActors: ties, heroes, non-NPCs and other pages links are le
 test('negotiationChanges: only differing fields, Sets compare as sets, same gives null', () => {
   const u = toFoundryNegotiation({ interest: 2, patience: 3, shown: true, motivations: ['greed', 'power'], pitfalls: [], found: { motivations: ['greed', 'power'] } });
   const same = { interest: 2, patience: 3, impression: 1, motivations: new Set(['power', 'greed']), pitfalls: new Set() };
-  assert.equal(negotiationChanges(u, same), null);
-  assert.deepEqual(negotiationChanges(u, { ...same, patience: 1, motivations: new Set(['greed']) }), {
+  assert.equal(negotiationChanges(u, same, true), null);
+  assert.deepEqual(negotiationChanges(u, { ...same, patience: 1, motivations: new Set(['greed']) }, true), {
     'system.negotiation.patience': 3,
     'system.negotiation.motivations': ['greed', 'power'],
   });
+  assert.deepEqual(negotiationChanges(u, same, undefined), { 'flags.chronicle-sync.negotiationShown': true });
   assert.ok(negotiationChanges(u, undefined));
   assert.equal(negotiationChanges(null, same), null);
 });

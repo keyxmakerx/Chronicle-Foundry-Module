@@ -19,6 +19,98 @@
       "Setting": "Show synced journals as Chronicle pages",
       "SettingHint": "Synced journals open in Chronicle's page look. Turn it off to give them Foundry's journal sheet back. A journal you set to another sheet keeps it."
     },
+    "NpcSheet": {
+      "Name": "Chronicle NPC and monster sheet",
+      "Tabs": {
+        "talk": "Talk",
+        "people": "People"
+      },
+      "Shape": {
+        "Legend": "Sheet shape",
+        "npc": "Talk first (NPC)",
+        "monster": "Stat block first (monster)",
+        "Hint": "Chosen from its Chronicle page: a character page is an NPC, a creature page or a bestiary monster is a monster. Pick here to change it for this actor."
+      },
+      "Keyword": "Keyword",
+      "Faction": "Faction",
+      "Tag": "Tag",
+      "EditMetadata": "Level, organization, role and keywords",
+      "OnlyYou": "only you",
+      "MaliceTip": "Only you see Malice. Draw Steel's own number, shared by every monster.",
+      "InFight": "In this fight",
+      "Impression": "Impression",
+      "ImpressionTip": "Only you see Impression.",
+      "Talking": "Talking",
+      "TalkingTip": "Turns this token's talking glow on and off, as its token HUD does",
+      "FreeStrikeTip": "Make a free strike",
+      "Negotiation": "Negotiation",
+      "Interest": "Interest",
+      "Patience": "Patience",
+      "OfFive": "{n} of 5",
+      "IfAnswered": "If they answered now:",
+      "Answer": {
+        "0": "No, and…",
+        "1": "No.",
+        "2": "No, but…",
+        "3": "Yes, but…",
+        "4": "Yes.",
+        "5": "Yes, and…"
+      },
+      "Over": "the talk is over",
+      "NoNegotiation": "No negotiation on the page yet.",
+      "OpenPage": "Open the page in Chronicle ↗",
+      "Seen": {
+        "chronicleShown": "Players see Interest and Patience",
+        "chronicleHidden": "Players don't see Interest and Patience yet",
+        "playersShown": "Shown by the Director",
+        "playersHidden": "The Director hasn't shown these yet",
+        "offlineShown": "Chronicle couldn't be reached: what players see",
+        "offlineHidden": "Chronicle couldn't be reached: what players see",
+        "actorShown": "From this actor",
+        "actorHidden": "From this actor"
+      },
+      "NoStats": {
+        "Title": "No stat block yet",
+        "Body": "This sheet shows no fight numbers until it has a stat block, rather than Draw Steel's empty defaults. Set them in Edit mode, or drop a monster's abilities here.",
+        "Edit": "Edit mode",
+        "BodyView": "This sheet shows no fight numbers until it has a stat block, rather than Draw Steel's empty defaults."
+      },
+      "Villain": {
+        "Title": "Villain actions",
+        "Used": "Used",
+        "Left": "{left} of {total} left this fight",
+        "NoFight": "Marks start when a fight does",
+        "Failed": "The villain action mark could not be saved.",
+        "State": {
+          "used": "{order}. {name}: used this fight",
+          "next": "{order}. {name}: next",
+          "unused": "{order}. {name}"
+        }
+      },
+      "Kind": {
+        "motivation": "Motivation",
+        "pitfall": "Pitfall"
+      },
+      "State": {
+        "found": "found",
+        "used": "appealed to",
+        "hidden": "not found yet"
+      },
+      "Talk": {
+        "Motives": "Motivations and pitfalls",
+        "LogCount": "Argument log ({count})",
+        "Legend": "Dashed: the party hasn't found it. Struck through: already appealed to, so it won't move them again.",
+        "None": "Nothing found yet.",
+        "NoneGM": "No motivations or pitfalls on the page yet.",
+        "FromPage": "From the page",
+        "FromPageNote": "Read from Chronicle, never saved in Foundry"
+      },
+      "People": {
+        "Note": "From the page's links in Chronicle",
+        "None": "The page has no links yet."
+      },
+      "Offline": "Chronicle couldn't be reached, so this shows only what the actor holds."
+    },
     "HeroSheet": {
       "Name": "Chronicle hero sheet",
       "Looks": {

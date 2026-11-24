@@ -44,6 +44,7 @@ import { registerShopRoomSocket, registerShopJournalButton } from './shop-room-w
 import { watchMentionLinks } from './mention-links.mjs';
 import { applyChronicleSheetSetting, registerChronicleSheet } from './chronicle-sheet.mjs';
 import { registerHeroLooks } from './hero-looks.mjs';
+import { registerNpcLooks } from './npc-looks.mjs';
 import { registerTableView } from './table-view.mjs';
 import { notebookAvailable, openCalendarWindow, registerPlayerNotebook } from './player-notebook.mjs';
 import { openSatchel } from './satchel.mjs';
@@ -147,6 +148,14 @@ Hooks.once('init', () => {
     registerHeroLooks();
   } catch (err) {
     console.warn('Chronicle Sync | Chronicle hero sheet unavailable', err);
+  }
+
+  // Draw Steel NPCs and monsters get the Chronicle NPC sheet as a choice, after
+  // the hero sheet, whose look settings it shares.
+  try {
+    registerNpcLooks(() => syncManager?.api ?? null);
+  } catch (err) {
+    console.warn('Chronicle Sync | Chronicle NPC sheet unavailable', err);
   }
 
   // Register Handlebars helpers used by dashboard/shop templates.

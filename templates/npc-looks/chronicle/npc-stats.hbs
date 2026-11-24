@@ -1,0 +1,46 @@
+{{!-- Chronicle NPC sheet boxes, above the tabs. Play: the stat block, or an
+honest empty place for one (no made-up numbers), then Stamina beside the
+negotiation: Interest and Patience as numbers and pips, and what the NPC would
+answer now. Edit: Draw Steel's own stat editors. --}}
+<section class="cs-hero-stats stats cs-npc-stats">
+  {{#if isPlay}}
+  {{#if npc.statBlock}}
+  {{> "modules/chronicle-sync/templates/npc-looks/chronicle/numbers-row.hbs"}}
+  {{else}}
+  <div class="cs-nostat">
+    <b>{{localize "CHRONICLE.NpcSheet.NoStats.Title"}}</b>
+    <p>{{localize (ifThen editable "CHRONICLE.NpcSheet.NoStats.Body" "CHRONICLE.NpcSheet.NoStats.BodyView")}}</p>
+    {{#if editable}}<button type="button" class="cs-quiet" data-action="toggleMode">{{localize "CHRONICLE.NpcSheet.NoStats.Edit"}}</button>{{/if}}
+  </div>
+  {{/if}}
+  <div class="cs-row cs-row-npc {{#unless npc.statBlock}}cs-no-stam{{/unless}}">
+    {{#if npc.statBlock}}{{> "modules/chronicle-sync/templates/npc-looks/chronicle/stamina-box.hbs"}}{{/if}}
+    <div class="cs-box cs-neg">
+      <div class="cs-box-head">
+        <span class="cs-lab">{{localize "CHRONICLE.NpcSheet.Negotiation"}}</span>
+        {{#if npc.negotiation.has}}<span class="cs-sub">{{localize (concat "CHRONICLE.NpcSheet.Seen." npc.negotiation.source (ifThen npc.negotiation.shown "Shown" "Hidden"))}}</span>{{/if}}
+      </div>
+      {{#if npc.negotiation.has}}
+      <div class="cs-neg-meters">
+        <div class="cs-meter">
+          <span class="cs-lab">{{localize "CHRONICLE.NpcSheet.Interest"}}</span>
+          <span><b>{{npc.negotiation.interestText}}</b><span class="cs-dots" role="img" aria-label="{{localize "CHRONICLE.NpcSheet.OfFive" n=npc.negotiation.interestText}}">{{#each npc.negotiation.interestPips as |on|}}<i class="{{#unless on}}off{{/unless}}"></i>{{/each}}</span></span>
+        </div>
+        <div class="cs-meter">
+          <span class="cs-lab">{{localize "CHRONICLE.NpcSheet.Patience"}}</span>
+          <span><b>{{npc.negotiation.patienceText}}</b><span class="cs-dots" role="img" aria-label="{{localize "CHRONICLE.NpcSheet.OfFive" n=npc.negotiation.patienceText}}">{{#each npc.negotiation.patiencePips as |on|}}<i class="{{#unless on}}off{{/unless}}"></i>{{/each}}</span></span>
+        </div>
+      </div>
+      {{#if npc.negotiation.answer}}
+      <p class="cs-offer">{{localize "CHRONICLE.NpcSheet.IfAnswered"}} <b>{{localize npc.negotiation.answer}}</b>{{#if npc.negotiation.over}} · {{localize "CHRONICLE.NpcSheet.Over"}}{{/if}}</p>
+      {{/if}}
+      {{else}}
+      <p class="cs-offer">{{localize "CHRONICLE.NpcSheet.NoNegotiation"}}</p>
+      {{#if npc.pageUrl}}<button type="button" class="cs-quiet" data-action="csOpenPage">{{localize "CHRONICLE.NpcSheet.OpenPage"}}</button>{{/if}}
+      {{/if}}
+    </div>
+  </div>
+  {{else}}
+  {{> "modules/chronicle-sync/templates/npc-looks/edit-stats.hbs"}}
+  {{/if}}
+</section>

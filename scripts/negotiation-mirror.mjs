@@ -3,12 +3,14 @@
  *
  * When the Draw Steel negotiation tracker changes on a Chronicle NPC page,
  * the active GM's client copies the part players may know onto that NPC's
- * actor, on Draw Steel worlds only: found motivations and pitfalls, and the
- * meters once shown. Edits on the Foundry sheet are not sent back. A failure is logged for the GM, never
- * shown to players. Pure rules live in _negotiation-mirror.mjs.
+ * actor, on Draw Steel worlds only: found motivations and pitfalls, the
+ * meters once shown, and whether they are shown. Every GM's open Chronicle
+ * NPC sheet for the page reads the full tracker again. Edits on the Foundry
+ * sheet are not sent back. A failure is logged for the GM, never shown to
+ * players. Pure rules live in _negotiation-mirror.mjs.
  */
 
-import { FLAG_SCOPE } from './constants.mjs';
+import { FLAG_SCOPE, syncOptions } from './constants.mjs';
 import { log } from './logger.mjs';
 import { LINK_FLAG, syncedPages, onNpcLinked } from './npc-presence.mjs';
 import {
@@ -16,6 +18,7 @@ import {
   toFoundryNegotiation,
   pickNegotiationActors,
   negotiationChanges,
+  SHOWN_FLAG,
 } from './_negotiation-mirror.mjs';
 
 const SYSTEM_ID = 'draw-steel';
@@ -57,9 +60,10 @@ async function mirrorEntity(api, entityId) {
     }));
     for (const id of pickNegotiationActors({ entityId, pageName: page?.name, actors })) {
       const actor = game.actors.get(id);
-      const changes = negotiationChanges(update, actor?.system?.negotiation);
+      const changes = negotiationChanges(update, actor?.system?.negotiation, actor?.getFlag(FLAG_SCOPE, SHOWN_FLAG));
       // SetField values are updated with arrays; Foundry casts them to Sets.
-      if (changes) await actor.update(changes);
+      // Sync's own write, so character sync's hooks don't send it back.
+      if (changes) await actor.update(changes, syncOptions());
     }
   } catch (err) {
     log.warn('Negotiation mirror failed', err);
@@ -82,6 +86,8 @@ export const negotiationMirror = {
   destroy() { this._api = null; },
   onMessage(msg) {
     if (!isNegotiationMessage(msg)) return;
+    // Every GM's open NPC sheet for the page reads it again; only one GM writes.
+    globalThis.Hooks?.callAll?.('chronicleSyncNegotiation', msg.resourceId);
     mirrorEntity(this._api, msg.resourceId);
   },
 };

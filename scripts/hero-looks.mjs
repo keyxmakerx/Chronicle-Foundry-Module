@@ -24,7 +24,7 @@
 import { FLAG_SCOPE, MODULE_ID, syncOptions } from './constants.mjs';
 import { closeHeroMenu, openHeroMenu } from './hero-menu.mjs';
 import {
-  DEFAULT_LOOK, DRAW_STEEL_PLUS_MODULE, HERO_LOOKS, LOOK_FLAG,
+  DEFAULT_LOOK, DRAW_STEEL_PLUS_MODULE, DRAW_STEEL_PLUS_SHEET, DRAW_STEEL_SHEET, HERO_LOOKS, LOOK_FLAG,
   allLookTemplates, chronicleParts, chroniclePageUrl, chronicleTabs, conditionList, countDiamonds, drawSteelSupported,
   fitRenderParts, lookTemplate, pickerRows, plaqueMetal, portraitRows, recoveryDots, resolveLook, ringSegments,
   sheetChanges, skillNames, staminaView, withFold,
@@ -288,7 +288,7 @@ export function makeChronicleHeroSheet(Base) {
       await super._preFirstRender?.(context, options);
       // Every look's templates, so changing the look draws at once. Opened as
       // the card, the full sheet's partials must still be ready for Open.
-      const templates = [...allLookTemplates()];
+      const templates = [...this._csAllTemplates()];
       if (this.folded) templates.push(...Object.values(this.constructor.PARTS).flatMap((p) => [p.template, ...(p.templates ?? [])]));
       try {
         await globalThis.foundry?.applications?.handlebars?.loadTemplates?.([...new Set(templates.filter(Boolean))]);
@@ -303,7 +303,7 @@ export function makeChronicleHeroSheet(Base) {
       const look = this.look;
       // Each part in the look's own template, or the Chronicle look's.
       const inLook = (id, part) => {
-        const template = lookTemplate(look, id);
+        const template = this._csLookTemplate(look, id);
         return template && part ? { ...part, template } : part;
       };
       if (this.folded) return { card: inLook('card', parts.card ?? { ...this.constructor.PARTS.card }) };
@@ -329,7 +329,7 @@ export function makeChronicleHeroSheet(Base) {
       await super._preparePartContext(partId, context, options);
       if (partId === 'stats' || partId === 'card') {
         try {
-          context.chronicle = this.#statsModel();
+          context.chronicle = this._csStatsModel();
         } catch (err) {
           console.warn('Chronicle Sync | hero sheet boxes unavailable', err);
           context.chronicle = {};
@@ -390,12 +390,11 @@ export function makeChronicleHeroSheet(Base) {
      * that the look's CSS animates and the motion level can stop.
      */
     #playMoves(options) {
-      const sys = this.document?.system ?? {};
-      const now = { stamina: sys.stamina?.value ?? null, level: sys.level ?? null, isPlay: this.isPlayMode !== false };
+      const now = this._csMoveState();
       const before = this.#seen;
       this.#seen = now;
       if (this.folded || !OWN_OPENING_LOOKS.has(this.look)) return;
-      let moves = options?.isFirstRender ? ['open'] : sheetChanges(before, now);
+      let moves = options?.isFirstRender ? ['open'] : this._csMoves(before, now);
       // Draw Steel shows a Limited viewer no Stamina, so no hit or heal either.
       if (this.document?.limited) moves = moves.filter((m) => m !== 'hit' && m !== 'heal');
       for (const move of moves) this.#play(move);
@@ -409,7 +408,63 @@ export function makeChronicleHeroSheet(Base) {
       el.classList.remove(cls);
       void el.offsetWidth;
       el.classList.add(cls);
-      this.#moveTimers[move] = setTimeout(() => el.classList.remove(cls), LOOK_EXTRAS[this.look]?.MOVE_MS?.[move] ?? MOVE_MS[move] ?? 1000);
+      this.#moveTimers[move] = setTimeout(() => el.classList.remove(cls), this._csMoveMs(move));
+    }
+
+    /*
+     * What a sheet built on this one changes: its templates, its boxes'
+     * figures, the moves it plays, the other sheets the picker offers and the
+     * Chronicle page it belongs to. The defaults are the hero sheet's.
+     */
+
+    /** The template a look draws one part with. */
+    _csLookTemplate(look, partId) {
+      return lookTemplate(look, partId);
+    }
+
+    /** Every template to load before the first draw. */
+    _csAllTemplates() {
+      return allLookTemplates();
+    }
+
+    /** The figures the boxes and the card show, as `context.chronicle`. */
+    _csStatsModel() {
+      return this.#statsModel();
+    }
+
+    /** What the moves compare between two draws. */
+    _csMoveState() {
+      const sys = this.document?.system ?? {};
+      return { stamina: sys.stamina?.value ?? null, level: sys.level ?? null, isPlay: this.isPlayMode !== false };
+    }
+
+    /** The moves a change between two draws plays. */
+    _csMoves(before, now) {
+      return sheetChanges(before, now);
+    }
+
+    /** Play one of the look's moves now. */
+    _csPlay(move) {
+      if (this.element && !this.folded && OWN_OPENING_LOOKS.has(this.look)) this.#play(move);
+    }
+
+    /** How long a move runs in this look (ms). */
+    _csMoveMs(move) {
+      return LOOK_EXTRAS[this.look]?.MOVE_MS?.[move] ?? MOVE_MS[move] ?? 1000;
+    }
+
+    /** The other sheets the look picker offers, by the ids Foundry stores. */
+    _csPickerSheets() {
+      return {
+        registered: globalThis.CONFIG?.Actor?.sheetClasses?.hero ?? {},
+        drawSteelSheet: DRAW_STEEL_SHEET,
+        plusSheet: DRAW_STEEL_PLUS_SHEET,
+      };
+    }
+
+    /** The Chronicle page this actor follows, or null. */
+    _csPageId() {
+      return this.document?.getFlag?.(FLAG_SCOPE, 'entityId') ?? null;
     }
 
     /** @override */
@@ -502,13 +557,15 @@ export function makeChronicleHeroSheet(Base) {
       if (!this.document?.isOwner) return;
       const i18n = globalThis.game.i18n;
       const anchor = target ?? this.window?.header?.querySelector?.('[data-action="csLookPicker"]');
-      const registered = globalThis.CONFIG?.Actor?.sheetClasses?.hero ?? {};
+      const { registered, drawSteelSheet, plusSheet } = this._csPickerSheets();
       const rows = pickerRows({
         current: this.look,
         locked: setting(LOOK_LOCK_SETTING, false) === true,
         isGM: !!globalThis.game.user?.isGM,
-        plusActive: !!globalThis.game.modules?.get?.(DRAW_STEEL_PLUS_MODULE)?.active,
+        plusActive: !!plusSheet && !!globalThis.game.modules?.get?.(DRAW_STEEL_PLUS_MODULE)?.active,
         registered: (id) => id in registered,
+        drawSteelSheet,
+        plusSheet,
       });
       openHeroMenu(this.element, anchor, {
         label: i18n.localize('CHRONICLE.HeroSheet.Picker.Title'),
@@ -556,7 +613,7 @@ export function makeChronicleHeroSheet(Base) {
       const url = chroniclePageUrl({
         apiUrl: setting('apiUrl', ''),
         campaignId: setting('campaignId', ''),
-        entityId: actor.getFlag?.(FLAG_SCOPE, 'entityId'),
+        entityId: this._csPageId(),
       });
       // As Draw Steel's "View Token Artwork": not a random image, not the stock token.
       const token = actor.prototypeToken;

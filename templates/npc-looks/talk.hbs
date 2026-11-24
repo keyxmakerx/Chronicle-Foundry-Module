@@ -1,0 +1,52 @@
+{{!-- The NPC's Talk tab: the motivations and pitfalls with their states and
+the argument log, then the page's own words. On the Director's screen these
+are read from Chronicle and never saved in Foundry; a player's screen shows
+what the actor holds, which is only what players may know. The state is
+always words as well as a look. --}}
+<section class="tab cs-talk {{tab.cssClass}}" data-group="primary" data-tab="talk">
+  <div class="cs-pane">
+    <div class="cs-pane-h">
+      <h3>{{localize "CHRONICLE.NpcSheet.Talk.Motives"}}</h3>
+      {{#if npc.negotiation.log.length}}
+      <button type="button" class="cs-quiet" data-action="csToggleLog" aria-expanded="false" aria-controls="{{concat rootId "-cs-log"}}">{{localize "CHRONICLE.NpcSheet.Talk.LogCount" count=npc.negotiation.log.length}}</button>
+      {{/if}}
+    </div>
+    <div class="cs-pane-body">
+      {{#if npc.negotiation.rows.length}}
+      <ul class="cs-motives">
+        {{#each npc.negotiation.rows as |row|}}
+        <li class="cs-chip" data-state="{{row.state}}" data-kind="{{row.kind}}" data-motive="{{row.key}}">
+          <span class="cs-chip-kind">{{localize (concat "CHRONICLE.NpcSheet.Kind." row.kind)}}</span>
+          <span class="cs-chip-name">{{row.label}}</span>
+          {{#unless (eq row.state "found")}}<span class="cs-chip-state">{{localize (concat "CHRONICLE.NpcSheet.State." row.state)}}</span>{{/unless}}
+        </li>
+        {{/each}}
+      </ul>
+      {{#if npc.isGM}}<p class="cs-legend">{{localize "CHRONICLE.NpcSheet.Talk.Legend"}}</p>{{/if}}
+      {{else}}
+      <p class="cs-prose cs-muted">{{localize (ifThen npc.isGM "CHRONICLE.NpcSheet.Talk.NoneGM" "CHRONICLE.NpcSheet.Talk.None")}}</p>
+      {{/if}}
+      {{#if npc.negotiation.log.length}}
+      <ol class="cs-rows cs-log" id="{{concat rootId "-cs-log"}}" hidden>
+        {{#each npc.negotiation.log as |entry|}}
+        <li><span>{{entry.text}}</span></li>
+        {{/each}}
+      </ol>
+      {{/if}}
+    </div>
+
+    {{#if npc.page.open.length}}
+    <div class="cs-pane-h">
+      <h3>{{localize "CHRONICLE.NpcSheet.Talk.FromPage"}}</h3>
+      <small>{{localize "CHRONICLE.NpcSheet.Talk.FromPageNote"}}</small>
+    </div>
+    <div class="cs-pane-body">
+      {{#each npc.page.open as |para|}}<p class="cs-prose">{{para}}</p>{{/each}}
+      {{#if npc.pageUrl}}<button type="button" class="cs-quiet" data-action="csOpenPage">{{localize "CHRONICLE.NpcSheet.OpenPage"}}</button>{{/if}}
+    </div>
+    {{/if}}
+    {{#if npc.liveFailed}}
+    <p class="cs-legend cs-offline">{{localize "CHRONICLE.NpcSheet.Offline"}}</p>
+    {{/if}}
+  </div>
+</section>

@@ -1,0 +1,54 @@
+{{!-- Chronicle monster sheet header: portrait, name, level, organization and
+role, keyword chips; Level, EV and Malice on the right. A Limited viewer sees
+this part, so it shows only what Draw Steel's own NPC header shows, and
+Malice only to the Director, with the amber edge, the mark and the words. --}}
+<header class="cs-hero-head cs-npc-head" style="{{#if avatarProperties.objectFit}}--avatar-object-fit: {{avatarProperties.objectFit}};{{/if}}{{#if avatarProperties.objectPosition}} --avatar-object-position: {{avatarProperties.objectPosition}};{{/if}}">
+  <button type="button" class="cs-portrait-btn" data-action="csPortraitMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize "CHRONICLE.HeroSheet.Portrait.Menu"}}" data-tooltip="CHRONICLE.HeroSheet.Portrait.Menu">
+    <img class="cs-portrait" src="{{document.img}}" alt="{{document.name}}" {{#unless isPlay}}data-edit="img"{{/unless}}>
+  </button>
+
+  <div class="cs-id">
+    {{#if isPlay}}
+    <h1 class="cs-name">{{document.name}}</h1>
+    {{else}}
+    <div class="cs-name-edit">
+      {{formInput fields.name value=source.name placeholder=(localize "DOCUMENT.FIELDS.name.label")}}
+    </div>
+    {{/if}}
+    <p class="cs-line">
+      <span class="cs-line-level">{{localize "CHRONICLE.HeroSheet.LevelN" level=system.monster.level}}</span>
+      {{#if system.monster.organizationLabel}}<span class="cs-line-item">{{system.monster.organizationLabel}}</span>{{/if}}
+      {{#if system.monster.roleLabel}}<span class="cs-line-item">{{system.monster.roleLabel}}</span>{{/if}}
+      {{#unless isPlay}}
+      <button type="button" class="cs-mini" data-action="editMonsterMetadata" data-tooltip="CHRONICLE.NpcSheet.EditMetadata" aria-label="{{localize "CHRONICLE.NpcSheet.EditMetadata"}}"><i class="fa-solid fa-gear" inert></i></button>
+      {{/unless}}
+    </p>
+    {{#if monsterKeywords.length}}
+    <ul class="cs-chips">
+      {{#each monsterKeywords as |keyword|}}
+      <li class="cs-chip"><span class="cs-chip-kind">{{localize "CHRONICLE.NpcSheet.Keyword"}}</span><span class="cs-chip-name">{{keyword}}</span></li>
+      {{/each}}
+    </ul>
+    {{/if}}
+  </div>
+
+  <div class="cs-prog">
+    <dl>
+      <div class="cs-prog-level">
+        <dt>{{systemFields.monster.fields.level.label}}</dt>
+        <dd>{{system.monster.level}}</dd>
+      </div>
+      <div>
+        <dt>{{localize "DRAW_STEEL.Actor.base.EVLabel.Label"}}</dt>
+        <dd>{{system.evLabel}}</dd>
+      </div>
+      {{#if showMalice}}
+      <div class="cs-dm-only" data-tooltip="CHRONICLE.NpcSheet.MaliceTip">
+        <dt><span class="cs-dm-mark">{{malice.label}}</span></dt>
+        <dd><input type="number" step="1" data-setting="malice" value="{{malice.value}}" aria-label="{{malice.label}}, {{localize "CHRONICLE.NpcSheet.OnlyYou"}}"><small class="cs-dm-words">{{localize "CHRONICLE.NpcSheet.OnlyYou"}}</small></dd>
+      </div>
+      {{/if}}
+    </dl>
+    {{#if npc.villain.inFight}}<span class="cs-sub cs-fight-note">{{localize "CHRONICLE.NpcSheet.InFight"}}</span>{{/if}}
+  </div>
+</header>

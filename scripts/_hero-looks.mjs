@@ -97,10 +97,15 @@ export const DRAW_STEEL_PLUS_MODULE = 'draw-steel-plus';
  * hero uses the world's default look, so it greys out the other Chronicle
  * looks for everyone, the GM included (the GM is told where the lock is);
  * the other sheets stay open.
- * @param {{current: string, locked?: boolean, isGM?: boolean, plusActive?: boolean, registered?: (id: string) => boolean}} state
+ * An NPC sheet passes its own Draw Steel sheet id and no Plus sheet.
+ * @param {{current: string, locked?: boolean, isGM?: boolean, plusActive?: boolean, registered?: (id: string) => boolean,
+ *   drawSteelSheet?: string, plusSheet?: string|null}} state
  * @returns {{kind: 'look'|'sheet', id: string, label: string, note: string|null, tag: string|null, checked: boolean, disabled: boolean}[]}
  */
-export function pickerRows({ current, locked = false, isGM = false, plusActive = false, registered = () => true }) {
+export function pickerRows({
+  current, locked = false, isGM = false, plusActive = false, registered = () => true,
+  drawSteelSheet = DRAW_STEEL_SHEET, plusSheet = DRAW_STEEL_PLUS_SHEET,
+}) {
   const lockNote = isGM ? 'CHRONICLE.HeroSheet.Picker.LockedGM' : 'CHRONICLE.HeroSheet.Picker.Locked';
   const rows = HERO_LOOKS.map((l) => ({
     kind: 'look',
@@ -111,14 +116,14 @@ export function pickerRows({ current, locked = false, isGM = false, plusActive =
     checked: l.id === current,
     disabled: locked && l.id !== current,
   }));
-  if (plusActive && registered(DRAW_STEEL_PLUS_SHEET)) {
+  if (plusSheet && plusActive && registered(plusSheet)) {
     rows.push({
-      kind: 'sheet', id: DRAW_STEEL_PLUS_SHEET, label: 'CHRONICLE.HeroSheet.Picker.Plus',
+      kind: 'sheet', id: plusSheet, label: 'CHRONICLE.HeroSheet.Picker.Plus',
       note: 'CHRONICLE.HeroSheet.Picker.PlusNote', tag: 'CHRONICLE.HeroSheet.Picker.Found', checked: false, disabled: false,
     });
   }
   rows.push({
-    kind: 'sheet', id: DRAW_STEEL_SHEET, label: 'CHRONICLE.HeroSheet.Picker.DrawSteel',
+    kind: 'sheet', id: drawSteelSheet, label: 'CHRONICLE.HeroSheet.Picker.DrawSteel',
     note: 'CHRONICLE.HeroSheet.Picker.DrawSteelNote', tag: null, checked: false, disabled: false,
   });
   return rows;
