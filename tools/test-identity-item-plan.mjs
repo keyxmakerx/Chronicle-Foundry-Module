@@ -191,3 +191,15 @@ test('a failed create leaves the old item and the other steps still run', async 
   }
   assert.ok(!actor.log.some((l) => l[0] === 'delete'), 'old item kept');
 });
+
+test('a joined kit field: each missing kit replaces one Chronicle no longer names, else is added', () => {
+  const defs = [{ ...single('kit', 'kit'), foundry_item_join: true }];
+  const items = [{ id: 'k1', name: 'Shining Armor', type: 'kit' }, { id: 'k2', name: 'Spellsword', type: 'kit' }];
+  const plan = (fields, its, applied = {}) => planIdentityItems({ items: its, fieldDefs: defs, fieldsData: fields, applied: applied === 'none' ? undefined : applied });
+  assert.deepEqual(plan({ kit: 'Shining Armor, Spellsword' }, items), [], 'both already there');
+  assert.deepEqual(plan({ kit: 'Shining Armor, Panther' }, items),
+    [{ fieldKey: 'kit', itemType: 'kit', wantName: 'Panther', removeIds: ['k2'] }], 'the dropped kit is the one replaced');
+  assert.deepEqual(plan({ kit: 'Shining Armor, Spellsword' }, [items[0]]),
+    [{ fieldKey: 'kit', itemType: 'kit', wantName: 'Spellsword', removeIds: [] }], 'a second kit is added');
+  assert.deepEqual(plan({ kit: 'Panther, Spellsword' }, items, 'none'), [], 'first apply keeps the sheet\'s own kits');
+});
