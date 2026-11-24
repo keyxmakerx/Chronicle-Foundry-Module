@@ -40,6 +40,13 @@ root. There is no `package.json`.
 - [ ] Bind a key to "Open the Chronicle Sync dashboard", press it as the GM: the dashboard opens; as a player the GM-only two are not listed
 - [ ] With the world not connected, a key bound to the notebook does nothing and Foundry's own use of that key still works
 
+## Shared rolls
+
+- [ ] As a player whose hero is linked to a Foundry actor, open the hero's page in Chronicle, press Might, then Roll -> Foundry chat shows the roll under the hero's name and portrait (on the hero's token when it is on the scene), not the player's name
+- [ ] The same from the Table tab's power roll line (a characteristic showing the hero's number) -> the hero speaks; a plain d20 from the Table -> the player's name, as before
+- [ ] As the GM, roll from a player's hero sheet -> the hero speaks
+- [ ] A hero with no linked actor in Foundry -> the roll shows under the player's name, no console errors
+
 ## Dice So Nice
 
 - [ ] Without Dice So Nice installed: roll `/r 1d20` as GM and as a player; both get Foundry's normal roll card and no console errors. Chronicle Sync → Problems → Health shows Dice So Nice "Not in use"
@@ -336,6 +343,16 @@ In **Chronicle Sync → Settings → What syncs**.
 - [ ] Update character page name -> Actor name updates
 - [ ] Delete character page -> Actor unlinked (flags removed) but NOT deleted
 
+### NPCs on character pages (Draw Steel)
+A character page is a hero when a player has it, Chronicle marks it playable, or it names a class, ancestry, culture, career or kit. Every other character page is an NPC.
+- [ ] Make a character page in Chronicle with only a title and a faction -> the Foundry actor is a Draw Steel NPC in "Chronicle: NPCs" and opens on Draw Steel's NPC sheet, never a hero sheet; a GM-only page's token starts hidden
+- [ ] Rename it in Chronicle -> the actor's name follows; change its Stamina in Foundry -> nothing changes in Chronicle; rename it in Foundry -> the page's name follows
+- [ ] Make a hero page (a class or ancestry picked, or claimed by a player) -> it still arrives as a hero actor
+- [ ] Make a monster (NPC actor) yourself in Foundry -> no page appears in Chronicle
+- [ ] In a world where NPC pages came in as heroes before this change (Orsen Vey), reload -> one question "Make these Draw Steel NPCs?" lists them, and no real hero is on the list. Yes -> each opens on the NPC sheet, keeps its name, picture, token, notes, folder and gear, drops its ancestry, career and kit and the hero basic actions, and stays linked to its page
+- [ ] Answer No instead -> they stay heroes, and reloading or editing their pages does not ask again
+- [ ] Give an NPC page a kit in Chronicle, or have a player claim it -> one question "Make these Draw Steel heroes?"; Yes -> it opens as a hero with the basic actions and the page's hero details
+
 ### Identity items (Draw Steel: ancestry, culture, career, kit)
 - [ ] In Chronicle, set an actor's linked character to an ancestry that exists in the system compendium (e.g. Dwarf) -> within a few seconds the Foundry sheet shows the Dwarf ancestry item in place of the old one (data from the compendium); the Chronicle value does not change
 - [ ] Same with an ancestry that exists as an Item in the world's Items sidebar -> the world item is used
@@ -482,6 +499,51 @@ Open a hero in the Chronicle hero sheet, then palette button in the title bar ->
 - [ ] A Limited viewer sees the moon with the picture (no Stamina ring), name, class, origins, level, XP and victories, the tab row and Biography, and nothing else; when the GM damages or heals the hero, nothing flashes or falls for them
 - [ ] Picking the night sky changes nothing in Chronicle: the hero's history in Chronicle shows no new entry
 
+### Chronicle NPC and monster sheet (Draw Steel)
+Needs Draw Steel 1.1.0 or later and a Chronicle connection. Pick it on an NPC: open the NPC, title bar menu (three dots) -> Sheet -> Sheet: "Chronicle NPC and monster sheet" -> Save. Draw Steel's sheet stays the world's default. Have one NPC from a Chronicle character page with a negotiation tracker (Orsen Vey), and one creature from a Chronicle creature page with villain actions (a goblin war chief).
+
+#### Monster (a creature page's actor)
+- [ ] As the GM, open the creature -> portrait, name, "Level N · organization · role", keyword chips, Level, EV and Malice on the right with an amber edge, the ⊘ mark and "only you" under the number; below, the five characteristics, Speed, Stability, Size and Free strike, then Stamina with its bar, Damage, Conditions and Villain actions; then the tabs, Abilities open
+- [ ] Type a new Malice -> every open monster sheet shows it, and Draw Steel's own Malice shows it too
+- [ ] Click a characteristic -> Draw Steel's roll dialog; click Free strike -> Draw Steel's free strike
+- [ ] Type a new Stamina -> it saves, and the bar turns amber at or under the winded figure
+- [ ] Start a fight with the creature in it -> "In this fight" under Malice, and the villain action boxes show 1, 2, 3 with the first ringed as next. Click 1 -> it is crossed through, 2 is ringed, the line reads "2 of 3 left this fight", and in Abilities that villain action is greyed with "Used"
+- [ ] Use villain action 2 from the Abilities tab -> once its chat card posts, 2 is crossed through too. Cancel the dialog on 3 instead -> 3 stays unmarked
+- [ ] End the fight -> the marks are gone, and the line reads "Marks start when a fight does"
+- [ ] A minion in a squad of one -> the Stamina box shows the squad's Stamina, as on Draw Steel's sheet
+- [ ] Fold -> a small card: picture, name, level and role, Stamina bar and number, the five characteristics, the villain action marks, Malice with "only you", Abilities and Open. Click a mark on the card -> it marks the same as the sheet
+- [ ] As a player with Observer: no Malice anywhere, the villain action marks are plain (not clickable), Free strike is plain text, characteristics can't be rolled
+- [ ] As a player with Limited: only the header (picture, name, level, organization, role, keywords, Level and EV), the tab row and Biography; no Malice, no Fold button
+
+#### NPC (a character page's actor)
+- [ ] As the GM, open Orsen -> the page's faction and tag chips under his name (a Director-only tag is not among them), Impression on the right with the amber edge, the ⊘ mark and "only you", and a Talking button. The Talk tab is open
+- [ ] Below the header: his stat block, or, if he has none, a box saying "No stat block yet" with an Edit mode button. Beside it, Negotiation: Interest and Patience as numbers and five dots, "If they answered now:" and the answer, and a line saying whether players see Interest and Patience
+- [ ] Talk tab: each motivation and pitfall as a chip with its state in words ("not found yet", "appealed to"; a found one has no word), a legend line, "Argument log (N)" which opens the log newest first, and "From the page" with the page's open text. Text in the page's GM-only blocks is not there
+- [ ] People tab: who the page is linked to in Chronicle, with how; a Director-only link has the amber edge and "⊘ only you"
+- [ ] At the end of the tab row, an amber "⊘ Only you" button. Click it -> a drawer over the tab showing: "On the page, for you only" with the page's secret text, "Not found yet" with the motivations and pitfalls the party hasn't found, Impression, and beside it "What the players have" (whether they see the meters, and what they found or appealed to). Escape, the close button or picking a tab closes it, and focus goes back to the button
+- [ ] As a player, there is no "Only you" button, and the page's secret text appears nowhere on the sheet
+- [ ] Press Talking -> his token on the map glows, and the button stays pressed; press again -> the glow stops
+- [ ] In Chronicle, change Interest on his page -> within a few seconds the open sheet shows the new number, with no reload
+- [ ] Biography tab in play mode -> Draw Steel's negotiation box is not repeated there; in Edit mode it is, as on Draw Steel's sheet
+- [ ] Edit mode (padlock) -> "Sheet shape" with "Talk first (NPC)" and "Stat block first (monster)", Stamina max, Free strike, and Draw Steel's characteristic, combat, movement, damage editors. Pick the monster shape -> the sheet redraws as a monster (no Talk, no People); pick the NPC shape to go back
+- [ ] Fold -> a small card: picture, name, level, "Talking" while it's on, Interest and Patience, the answer, the found chips (others marked), Talking, Talk and Open. Talk on the card opens the full sheet on Talk
+- [ ] Stop Chronicle (or block the module's address) and open Orsen again as the GM -> the sheet still opens within about 4 seconds, showing what the actor holds, with "Chronicle couldn't be reached, so this shows only what the actor holds." in the Talk tab
+- [ ] As a player with Observer, before the GM shows the meters in Chronicle: no Impression, no chips, no Talking button, no People tab; Interest and Patience show dashes and the line reads "The Director hasn't shown these yet"; the Talk tab lists only the motivations and pitfalls the party has found, with no legend
+- [ ] The GM shows the meters in Chronicle -> the player's open sheet shows the real Interest and Patience within a few seconds
+- [ ] As a player with Limited: only the header (picture, name, level and role), the tab row and Biography; no Impression, chips or Talking
+- [ ] Open the browser console on the player's screen (F12) -> no request to the Chronicle server from the sheet
+- [ ] Open the NPC's data on the player's screen (Foundry's console: `game.actors.getName("Orsen Vey").toObject()`) -> no page text, no unfound motivation, no Impression in it
+
+#### Both
+- [ ] Sheet look -> the hero looks are listed, then "Draw Steel's own sheet". Pick "Draw Steel's own sheet" -> the NPC opens in Draw Steel's sheet
+- [ ] Pick each dramatic look in turn, on Orsen and on the War Chief -> the sheet draws in that look, with the same figures as the Chronicle look: The portrait hall (the picture down the left, a gold ring for Interest or Stamina, hexagon motivations or stone plaques), Steel and banner (a banner down the left, blade bars and shield plates), Arcane glass (a glowing ring, tiles and hexagons), The gilded card (a gold-framed card, a dial on the left, coins and medallions), Night sky (a moon ring, the motivations or characteristics as a constellation). Malice, Impression and the "Only you" button keep the amber edge, the ⊘ mark and "only you" in every look
+- [ ] In each dramatic look, open the "Only you" drawer -> it takes the place of the open tab, inside the look, with nothing cut off; in The portrait hall the button sits at the foot of the tab rail, turned like the others
+- [ ] In each dramatic look, fold -> the small card in that look's colours
+- [ ] In a fight, in each dramatic look: mark a villain action used -> a short move plays (a sweep, comet or coin turning, by look) and the next one is marked "Next"; take the War Chief below his winded mark -> a winded move plays; in Chronicle, raise Orsen's Interest -> a move plays as the number changes. With Chronicle's motion set to Calm these become short fades, and with it off (or the computer's reduced motion on) nothing moves
+- [ ] Resize a dramatic-look sheet narrow (about 700 pixels) -> the layout stacks, nothing overlaps or is cut off
+- [ ] Nothing on this sheet changes the page in Chronicle except what Draw Steel's own fields already send: the page's history shows no entry for opening, folding, marking a villain action, Talking or picking a shape
+- [ ] Light and dark interface themes both read cleanly
+
 ### Foundry -> Chronicle
 - [ ] Create character Actor in Foundry -> Page created in Chronicle with mapped fields
 - [ ] Update Actor ability scores -> Chronicle page fields_data updates
@@ -513,7 +575,7 @@ that reads each field's `foundry_path` from the matched Chronicle system's manif
 ### Edge Cases
 - [ ] Actor sync disabled when no system adapter available
 - [ ] Sync guard prevents infinite loops (change in A doesn't re-trigger back to A)
-- [ ] Only character-type actors processed (NPCs, vehicles ignored)
+- [ ] Only character-type actors processed (vehicles and the GM's own NPCs ignored; under Draw Steel an NPC made for a character page syncs its name and visibility)
 - [ ] As a player on the character you claimed in Chronicle, change HP and an item's quantity -> with a GM in the game, Chronicle shows both; a later change in Chronicle does not undo them
 - [ ] As a player on a character nobody claimed in Chronicle, change HP -> nothing changes in Chronicle and the GM gets one notice saying the character isn't claimed
 - [ ] With two GMs in the game, a player's change is sent once (one History row), not twice
@@ -547,6 +609,14 @@ Needs a GM and a player client on the same scene, and a creature actor whose por
 - [ ] GM: untick "Token art on hover" in the world settings: nobody gets previews
 - [ ] Motion Calm: the picture fades in; Off: it appears at once
 
+### Draw Steel NPCs and monsters
+- [ ] As the GM, rest the cursor on a monster's token -> a card: picture, name, "Level N · organization · role", Stamina number and bar with the winded mark, Stability, Free strike, Immune and Weak (when it has any), Conditions, and the five characteristics; in a fight it also says how many villain actions are left
+- [ ] As a player, the same token -> only the picture, larger, with no name or numbers. Set the token's nameplate to "Hover" or "Always" -> the card adds the name. Damage the monster to half Stamina or below -> the card says "Winded", never the number
+- [ ] As a player, a hidden or Secret monster -> nothing
+- [ ] As the GM, turn Talking on for Orsen (a Chronicle NPC) -> as a player, his card shows the motivations and pitfalls the party has found; once the GM shows the meters in Chronicle, Interest and Patience with their numbers and dots
+- [ ] A Foundry-only NPC (no Chronicle page) with motivations set on its own sheet, talking -> a player's card shows none of them
+- [ ] The token HUD switch and both settings above turn the card off too
+
 ## Creature Forms (Change Form)
 
 Needs Sync Creatures on, a GM and a player client on the same scene, a Chronicle creature page with a second form (Draw Steel: Add a form on its stat block), and its token on the scene. The GM's Chronicle must have the system-state write route (keyxmakerx/Chronicle#1504) for the page steps.
@@ -575,7 +645,7 @@ Needs a GM and a player client on the same scene, and an NPC page synced as a jo
 - [ ] Starting a second NPC talking stops the first; two minutes with no lines switches it off; a reload doesn't leave it on
 - [ ] Leave a client idle for a minute, or switch its tab away: the glow slows to still, and comes back on return
 - [ ] Reveal a hidden NPC token whose page is hidden: asked once "Show their Chronicle page?"; Yes shows the page to players in Chronicle, No leaves it hidden
-- [ ] Draw Steel world: on a linked or same-named NPC's Chronicle page, change the negotiation tracker (interest, patience, motivations, impression): the NPC actor's sheet shows the same values within a moment; a non-Draw-Steel world and hero actors stay untouched
+- [ ] Draw Steel world: on a linked or same-named NPC's Chronicle page, add a motivation and a pitfall to the negotiation tracker without marking them found: the NPC actor's sheet does not list them. Mark the motivation found: it appears within a moment. Interest and patience reach the actor only after Show to players. Give a player Limited on the actor: its Biography lists only found entries. A non-Draw-Steel world and hero actors stay untouched
 - [ ] Draw Steel world: drop a Chronicle NPC journal on a token whose page already has a tracker: the actor's negotiation fills in right after the "linked" notice (edits on the Foundry sheet don't go back to Chronicle yet)
 - [ ] On the NPC's Chronicle page press "Show in Foundry": the page says "Sent to Foundry." and both clients play the same spotlight as the star
 - [ ] "Show in Foundry" for an NPC with no token on the GM's scene, or only a hidden one: only the GM gets a notice

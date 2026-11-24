@@ -1,0 +1,53 @@
+{{!-- Steel and banner monster boxes, above the tabs. Play: Stamina as a
+notched blade, the villain actions used this fight as cut steel tags (marks
+the Director sets; they clear when the fight ends) beside the conditions, the
+characteristics as shields, then movement, combat, Free strike and the next
+villain action as plates. Edit: Draw Steel's own stat editors. --}}
+<section class="cs-hero-stats stats cs-npc-stats cs-steel-stats">
+  {{#if isPlay}}
+  <div class="cs-steel-vitals">
+    {{> "modules/chronicle-sync/templates/npc-looks/steel/blade.hbs"}}
+    <div class="cs-steel-pipsrow">
+      {{#if npc.villain.total}}
+      <div class="cs-steel-grp cs-npc-va">
+        <span class="cs-steel-k">{{localize "CHRONICLE.NpcSheet.Villain.Title"}}</span>
+        <span class="cs-va-pips cs-npc-tags" role="group" aria-label="{{localize "CHRONICLE.NpcSheet.Villain.Title"}}">
+          {{#each npc.villain.marks as |m|}}
+          {{#if @root.npc.villain.canMark}}
+          <button type="button" class="cs-va-mark {{m.state}}" data-action="csVillain" data-item-id="{{m.id}}" aria-pressed="{{#if (eq m.state "used")}}true{{else}}false{{/if}}" aria-label="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}" data-tooltip-text="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}"><b>{{m.order}}</b></button>
+          {{else}}
+          <span class="cs-va-mark {{m.state}}" role="img" aria-label="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}" data-tooltip-text="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}"><b>{{m.order}}</b></span>
+          {{/if}}
+          {{/each}}
+        </span>
+        <span class="cs-npc-left">{{#if npc.villain.inFight}}{{localize "CHRONICLE.NpcSheet.Villain.Left" left=npc.villain.left total=npc.villain.total}}{{else}}{{localize "CHRONICLE.NpcSheet.Villain.NoFight"}}{{/if}}</span>
+      </div>
+      {{/if}}
+      <div class="cs-steel-grp cs-npc-cond">
+        <span class="cs-steel-k">{{localize "CHRONICLE.HeroSheet.Conditions"}}</span>
+        {{#if npc.chronicle.conditions.length}}
+        <ul class="cs-steel-tags">
+          {{#each npc.chronicle.conditions as |c|}}
+          <li>{{#if c.img}}<img src="{{c.img}}" alt="" inert>{{/if}}{{c.name}}</li>
+          {{/each}}
+        </ul>
+        {{else}}
+        <span class="cs-npc-none">{{localize "COMMON.None"}}</span>
+        {{/if}}
+      </div>
+    </div>
+  </div>
+  {{> "modules/chronicle-sync/templates/npc-looks/steel/shields.hbs"}}
+  <div class="cs-steel-cols cs-npc-cols">
+    {{> "modules/chronicle-sync/templates/npc-looks/steel/plates.hbs"}}
+    {{#if npc.villain.left}}
+    <div class="cs-steel-plate cs-steel-wide cs-npc-nextplate">
+      <p class="cs-steel-k">{{localize "CHRONICLE.NpcSheet.Villain.NextAction"}}</p>
+      <p class="cs-npc-next">{{#each npc.villain.marks as |m|}}{{#if (eq m.state "next")}}<b>{{m.name}}</b>{{/if}}{{/each}}</p>
+    </div>
+    {{/if}}
+  </div>
+  {{else}}
+  {{> "modules/chronicle-sync/templates/npc-looks/edit-stats.hbs"}}
+  {{/if}}
+</section>

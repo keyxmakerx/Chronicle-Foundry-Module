@@ -1,0 +1,457 @@
+/* The gilded card look on the Chronicle NPC and monster sheet
+   (templates/npc-looks/gilded/, scripts/_npc-look-gilded.mjs). The window is
+   also a .chronicle-hero-sheet in the gilded look, so hero-look-gilded.css
+   already draws the frame, the arch and medal, the name plate, the dial, the
+   coin rows and the medallions; this file adds what the NPC and monster have
+   and a hero doesn't: the Interest dial, Patience, Impression, villain
+   actions and Malice as coins, the hand of motivation and pitfall coins, the
+   stat block laid under them, and the moves for them. Scoped to the NPC sheet, so the
+   hero sheet is untouched. */
+
+/* New colours sit with the look's own tokens: tarnished gold for what is
+   spent or winded, red enamel for pitfalls and Malice. */
+.chronicle-npc-sheet[data-cs-look="gilded"] {
+  --cs-gilded-tarnish-hi: #d4c59e;
+  --cs-gilded-tarnish: #8c7a55;
+  --cs-gilded-tarnish-pale: #a39576;
+  --cs-gilded-tarnish-deep: #3d3324;
+  --cs-gilded-tarnish-face: #231f17;
+  --cs-gilded-patina: #1b2014;
+  --cs-gilded-enamel-deep: #3d0610;
+  --cs-gilded-enamel-ink: #ffe4e6;
+  --cs-gilded-ember-coin: radial-gradient(circle at 35% 30%, var(--cs-gilded-ember-hi), var(--cs-gilded-ember-mid) 60%, var(--cs-gilded-ember-deep));
+  --cs-gilded-violet-coin: radial-gradient(circle at 35% 30%, var(--cs-gilded-violet-hi), var(--cs-gilded-violet-mid) 60%, var(--cs-gilded-violet-deep));
+  --cs-gilded-enamel-coin: radial-gradient(circle at 35% 30%, var(--cs-gilded-rose), var(--cs-gilded-blood) 60%, var(--cs-gilded-enamel-deep));
+  --cs-gilded-rim: conic-gradient(from 0deg, var(--cs-gilded-gold-hi), var(--cs-gilded-gold), var(--cs-gilded-gold-deep), var(--cs-gilded-gold-pale), var(--cs-gilded-gold), var(--cs-gilded-gold-hi));
+  --cs-gilded-rim-tarnish: conic-gradient(from 0deg, var(--cs-gilded-tarnish-hi), var(--cs-gilded-tarnish), var(--cs-gilded-tarnish-deep), var(--cs-gilded-tarnish-pale), var(--cs-gilded-tarnish), var(--cs-gilded-tarnish-hi));
+  --cs-gilded-back: radial-gradient(circle at 40% 32%, var(--cs-gilded-navy-hi), var(--cs-gilded-navy-lo) 72%);
+  --cs-gilded-face-gold: radial-gradient(circle at 38% 32%, var(--cs-gilded-gold-hi), var(--cs-gilded-gold) 30%, var(--cs-gilded-gold-deep) 52%, var(--cs-gilded-navy) 53.5% 57%, transparent 59%), var(--cs-gilded-rim);
+  --cs-gilded-face-enamel: radial-gradient(circle at 38% 32%, var(--cs-gilded-rose), var(--cs-gilded-blood) 32%, var(--cs-gilded-enamel-deep) 52%, var(--cs-gilded-navy) 53.5% 57%, transparent 59%), var(--cs-gilded-rim);
+}
+
+/* ---- Director-only: the amber edge, the mark and the words ---------------- */
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-left .cs-dm-only {
+  margin-left: -12px;
+  padding: 6px 0 5px 10px;
+  box-shadow: inset 2px 0 0 var(--cs-hero-dm);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--cs-hero-dm) 11%, transparent), transparent 80%);
+}
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-left .cs-dm-only > .cs-gc-k { color: var(--cs-hero-dm); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-left .cs-dm-words {
+  grid-area: c;
+  display: block;
+  margin: 0;
+  font: italic 13px/1.2 var(--cs-hero-face);
+  letter-spacing: 0;
+  text-transform: none;
+  color: color-mix(in srgb, var(--cs-hero-dm) 80%, var(--cs-gilded-soft));
+}
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-left .cs-dm-only .cs-dm-mark::before { font-size: 11px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-mal,
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-imp { grid-template-areas: "k p n" "c c c"; row-gap: 1px; }
+
+/* ---- The header: Talking sits where the hero's Take Respite does ---------- */
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-plate .cs-gc-origins + .cs-gc-origins { margin-top: 0; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-plate .cs-gc-sub { font-size: 15px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-plate .cs-gc-vic b { letter-spacing: 0.12em; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-origin .cs-gc-mini { padding: 2px 6px; font-size: 11px; }
+/* Pressed, Talking is the gold button with a filled mark; off, a gold outline
+   with a hollow mark, so the state never rests on colour. */
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-btn.cs-talk-btn { pointer-events: auto; gap: 8px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-btn.cs-talk-btn::before {
+  content: "";
+  position: static;
+  z-index: auto;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: none;
+  box-shadow: inset 0 0 0 1px currentColor;
+  transform: none;
+}
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-btn.cs-talk-btn[aria-pressed="true"] {
+  border-color: var(--cs-gilded-gold-deep);
+  background: var(--cs-gilded-button);
+  color: var(--cs-gilded-gold-ink);
+}
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-btn.cs-talk-btn[aria-pressed="true"]::before {
+  background: var(--cs-gilded-gold-ink);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cs-gilded-gold-ink) 25%, transparent);
+}
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-btn.cs-talk-btn[aria-pressed="false"] {
+  border-color: var(--cs-gilded-line-hi);
+  background: transparent;
+  box-shadow: none;
+  color: var(--cs-gilded-gold-pale);
+}
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-btn.cs-talk-btn:focus-visible { outline: 2px solid var(--cs-gilded-gold-hi); outline-offset: 3px; }
+
+/* ---- The dial: Stamina for the monster, Interest for the NPC -------------- */
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-state:empty { display: none; }
+/* The stops change colour one after another, so a new band spreads across the gold from corner to corner. */
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-dial :is(.cs-gc-s0, .cs-gc-s1, .cs-gc-s2, .cs-gc-s3) { transition: stop-color 700ms ease; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-dial .cs-gc-s1 { transition-delay: 150ms; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-dial .cs-gc-s2 { transition-delay: 300ms; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-dial .cs-gc-s3 { transition-delay: 450ms; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-stam input[type="number"],
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-big { transition: color 500ms ease; }
+/* Winded tarnishes the gold: dull, brown, still readable. Dying cracks it red. */
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-stam[data-band="winded"] .cs-gc-s0 { stop-color: var(--cs-gilded-tarnish-hi); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-stam[data-band="winded"] .cs-gc-s1 { stop-color: var(--cs-gilded-tarnish); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-stam[data-band="winded"] .cs-gc-s2 { stop-color: var(--cs-gilded-tarnish-pale); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-stam[data-band="winded"] .cs-gc-s3 { stop-color: var(--cs-gilded-tarnish-deep); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-stam:is([data-band="dying"], [data-band="dead"]) :is(.cs-gc-s0, .cs-gc-s2) { stop-color: var(--cs-gilded-rose); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-stam:is([data-band="dying"], [data-band="dead"]) :is(.cs-gc-s1, .cs-gc-s3) { stop-color: var(--cs-gilded-blood); }
+/* The winded point: a bright tick across the track with a small gem above it. */
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-wmark { stroke: var(--cs-gilded-shine); stroke-width: 2.5; stroke-linecap: round; filter: drop-shadow(0 0 3px var(--cs-gilded-gold-hi)); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-wgem { fill: var(--cs-gilded-gold-hi); stroke: var(--cs-gilded-navy); stroke-width: 1.5; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-tmask { fill: none; stroke: #fff; stroke-width: 14; stroke-linecap: round; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-tarnish { fill: none; stroke: var(--cs-gilded-patina); stroke-width: 13; stroke-dasharray: 0 100; opacity: 0; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-wat { display: inline-flex; align-items: center; gap: 6px; font: 600 8.5px/1.4 var(--cs-gilded-display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--cs-gilded-dim); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-wdot { flex: none; width: 6px; height: 6px; background: var(--cs-gilded-gold-hi); transform: rotate(45deg); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-eye { flex: none; font-style: normal; font-size: 9px; letter-spacing: 0; color: var(--cs-gilded-gold-warm); }
+
+/* Interest: the arc is cut into five steps; low Interest turns it to blood, two to embers. */
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-int .cs-gc-fill { stroke-linecap: butt; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-notch { stroke: var(--cs-gilded-navy); stroke-width: 3; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-step { font: 600 11px var(--cs-gilded-display); fill: var(--cs-gilded-gold-warm); text-anchor: middle; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-big { display: block; font: 600 clamp(34px, 20cqi, 58px)/1.12 var(--cs-gilded-display); color: var(--cs-gc-band); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-int:is([data-band="i0"], [data-band="i1"]) { --cs-gc-band: var(--cs-gilded-crack); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-int:is([data-band="i0"], [data-band="i1"]) :is(.cs-gc-s0, .cs-gc-s2) { stop-color: var(--cs-gilded-rose); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-int:is([data-band="i0"], [data-band="i1"]) :is(.cs-gc-s1, .cs-gc-s3) { stop-color: var(--cs-gilded-blood); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-int[data-band="i2"] { --cs-gc-band: var(--cs-gilded-ember-hi); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-int[data-band="i2"] :is(.cs-gc-s0, .cs-gc-s2) { stop-color: var(--cs-gilded-ember-hi); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-int[data-band="i2"] .cs-gc-s1 { stop-color: var(--cs-gilded-ember-mid); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-int[data-band="i2"] .cs-gc-s3 { stop-color: var(--cs-gilded-ember-deep); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-int:is([data-band="i4"], [data-band="i5"]) { --cs-gc-band: var(--cs-gilded-gold-hi); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-int:is([data-band="i4"], [data-band="i5"]) .cs-gc-fill { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--cs-gilded-gold-warm) 70%, transparent)); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-glint { fill: none; stroke: var(--cs-gilded-shine); stroke-width: 15; stroke-linecap: round; opacity: 0; filter: drop-shadow(0 0 6px var(--cs-gilded-gold-hi)); }
+
+/* ---- Coin rows: number fields read as bold figures, like the hero's inputs -- */
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-n b { font: 600 17px var(--cs-gilded-display); color: var(--cs-gilded-white); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-n small { margin-left: 2px; font: 600 12px var(--cs-gilded-display); color: var(--cs-hero-muted); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-mal-in input { width: 2.6ch; min-width: 30px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-note { grid-area: c; margin: 0; font: italic 13px/1.3 var(--cs-hero-face); color: var(--cs-hero-muted); }
+
+/* Villain actions: numbered ember coins in order. The spent one lies dark
+   side up and struck; the next one glows; the last waits, lit. */
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-va { grid-template-areas: "k p n" "c c c"; row-gap: 3px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-va .cs-gc-pips { gap: 9px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-va-pips .cs-va-mark,
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-va .cs-va-mark {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--cs-gilded-ember-deep);
+  border-radius: 50%;
+  background: var(--cs-gilded-ember-coin);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--cs-gilded-ember) 40%, transparent);
+  font: 600 11px/1 var(--cs-gilded-display);
+  text-decoration: none;
+  color: var(--cs-gilded-ember-deep);
+}
+.chronicle-npc-sheet[data-cs-look="gilded"] button.cs-va-mark { cursor: pointer; transition: filter 200ms ease, transform 200ms var(--cs-gilded-ease); }
+.chronicle-npc-sheet[data-cs-look="gilded"] button.cs-va-mark:hover { filter: brightness(1.15); box-shadow: 0 0 10px color-mix(in srgb, var(--cs-gilded-ember) 60%, transparent); }
+.chronicle-npc-sheet[data-cs-look="gilded"] button.cs-va-mark:active { transform: scale(0.94); }
+.chronicle-npc-sheet[data-cs-look="gilded"] button.cs-va-mark:focus-visible { outline: 2px solid var(--cs-gilded-gold-hi); outline-offset: 3px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-va-pips .cs-va-mark.next,
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-va .cs-va-mark.next {
+  box-shadow: 0 0 0 2px var(--cs-gilded-navy), 0 0 0 3px var(--cs-gilded-ember-hi), 0 0 14px var(--cs-gilded-ember);
+  color: var(--cs-gilded-ember-deep);
+  animation: cs-gilded-npc-ember 2.4s ease-in-out infinite;
+}
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-va-pips .cs-va-mark.used,
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-va .cs-va-mark.used {
+  border-color: color-mix(in srgb, var(--cs-gilded-ember) 30%, transparent);
+  background: var(--cs-gilded-back);
+  box-shadow: none;
+  color: color-mix(in srgb, var(--cs-gilded-ember) 55%, transparent);
+  text-decoration: none;
+}
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-va-mark.used::after { content: ""; position: absolute; left: 3px; right: 3px; top: calc(50% - 0.75px); height: 1.5px; background: color-mix(in srgb, var(--cs-gilded-ember) 65%, transparent); transform: rotate(-45deg); }
+
+/* Malice: red enamel coins, ten to the track, lit up to the number. */
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-mal .cs-gc-pips { flex-wrap: nowrap; gap: 4px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-mal .cs-gc-pips i { box-sizing: border-box; width: 11px; height: 11px; border-color: color-mix(in srgb, var(--cs-gilded-crack) 50%, transparent); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-mal .cs-gc-pips i.on { border-color: var(--cs-gilded-enamel-deep); background: var(--cs-gilded-enamel-coin); box-shadow: 0 0 7px color-mix(in srgb, var(--cs-gilded-crack) 55%, transparent); }
+
+/* Patience: violet coins, the look's second metal, so they never read as the gold of Interest. */
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-pat .cs-gc-pips { gap: 7px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-pat .cs-gc-pips i { width: 17px; height: 17px; border-color: color-mix(in srgb, var(--cs-gilded-violet) 55%, transparent); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-pat .cs-gc-pips i.on { border-color: var(--cs-gilded-violet-deep); background: var(--cs-gilded-violet-coin); box-shadow: 0 0 10px color-mix(in srgb, var(--cs-gilded-violet) 70%, transparent); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-pat .cs-gc-n b { font-size: 20px; }
+
+/* The answer he'd give now, and the honest line about a missing stat block. */
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-now { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin: 0; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-now b { font: 600 24px/1.1 var(--cs-gilded-display); letter-spacing: 0.06em; text-transform: uppercase; background: var(--cs-gilded-letters); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 2px 6px var(--cs-gilded-shade)); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-now small { font: italic 14px/1.3 var(--cs-hero-face); color: var(--cs-hero-muted); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-quiet { margin: 0; font: italic 14px/1.4 var(--cs-hero-face); color: var(--cs-hero-muted); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-vacant { display: grid; gap: 6px; justify-items: start; padding-top: 8px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-quiet { font: italic 14px/1.4 var(--cs-hero-face); color: var(--cs-gilded-gold-warm); text-decoration: none; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-quiet:hover { color: var(--cs-gilded-gold-hi); text-decoration: underline; text-decoration-color: var(--cs-gilded-line-hi); text-underline-offset: 3px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-quiet:focus-visible { outline: 2px solid var(--cs-gilded-gold-hi); outline-offset: 3px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-left .cs-nostat {
+  display: block;
+  margin: 0;
+  padding: 9px 0 0;
+  border: 0;
+  border-top: 1px dashed var(--cs-gilded-line-hi);
+  border-radius: 0;
+}
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-left .cs-nostat b { font: 600 9.5px/1.3 var(--cs-gilded-display); letter-spacing: 0.22em; text-transform: uppercase; color: var(--cs-gilded-gold-warm); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-left .cs-nostat p { margin: 3px 0 4px; font: italic 13.5px/1.35 var(--cs-hero-face); color: var(--cs-hero-muted); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-left .cs-nostat .cs-quiet { display: inline; }
+
+/* Speed, stability, size and free strike: the last label is the longest, so its column is wider. */
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-facts { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr) minmax(0, 0.8fr) minmax(0, 1.25fr); align-items: end; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-fact-btn {
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  text-shadow: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: color 200ms ease;
+}
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-fact-btn b { transition: color 200ms ease; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-fact-btn:hover b { color: var(--cs-gilded-gold-pale); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-fact-btn:active { transform: scale(0.97); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-fact-btn:focus-visible { outline: 2px solid var(--cs-gilded-gold-hi); outline-offset: 3px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-cond b { font-weight: 600; color: var(--cs-gilded-rose); }
+
+/* The next villain action sits where the hero's skills do. */
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-next-line { margin: 8px 0 0; font: italic 15px/1.45 var(--cs-hero-face); color: var(--cs-gilded-ember); }
+
+/* ---- Motivations and pitfalls: a hand of coins ------------------------------
+   Found is a gold coin with its face engraved; appealed to is tarnished and
+   struck through; not found yet lies dark side up with a question mark; a
+   pitfall is red enamel in a gold rim. The epithet under each name says the
+   state in words. */
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gc-right > .cs-gc-k { margin-bottom: 1px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-motives { display: flex; flex-direction: column; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-motive { display: flex; align-items: center; gap: 13px; min-width: 0; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-mcoin { position: relative; width: 46px; height: 46px; color: var(--cs-gilded-gold-ink); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-mcoin > * { grid-area: 1 / 1; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-ico { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-q { font: 600 21px/1 var(--cs-gilded-display); font-style: normal; color: color-mix(in srgb, var(--cs-gilded-gold-warm) 70%, transparent); opacity: 0; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-motive[data-state="hidden"] .cs-gn-ico { opacity: 0; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-motive[data-state="hidden"] .cs-gn-q { opacity: 1; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-motive[data-state="found"] .cs-gn-mcoin { background: var(--cs-gilded-face-gold); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-motive[data-kind="pitfall"][data-state="found"] .cs-gn-mcoin { color: var(--cs-gilded-enamel-ink); background: var(--cs-gilded-face-enamel); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-motive[data-state="used"] .cs-gn-mcoin { color: var(--cs-gilded-tarnish-pale); background: radial-gradient(circle, var(--cs-gilded-tarnish-face) 56%, transparent 58%), var(--cs-gilded-rim-tarnish); box-shadow: 0 0 0 1px color-mix(in srgb, var(--cs-gilded-tarnish) 33%, transparent), 0 4px 10px color-mix(in srgb, var(--cs-gilded-shade) 55%, transparent); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-mcoin::after { content: ""; position: absolute; left: 4px; right: 4px; top: calc(50% - 1px); height: 2px; border-radius: 1px; background: var(--cs-gilded-tarnish-hi); box-shadow: 0 0 0 1px var(--cs-gilded-tarnish-face); transform: rotate(-45deg) scaleX(0); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-motive[data-state="used"] .cs-gn-mcoin::after { transform: rotate(-45deg); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-motive[data-state="hidden"] .cs-gn-mcoin { background: var(--cs-gilded-back); box-shadow: inset 0 0 0 1px var(--cs-gilded-line-hi), inset 0 0 0 4px var(--cs-gilded-navy-lo), inset 0 0 0 5px var(--cs-gilded-line), 0 4px 10px color-mix(in srgb, var(--cs-gilded-shade) 55%, transparent); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-motive[data-kind="pitfall"][data-state="hidden"] .cs-gn-mcoin { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-gilded-crack) 55%, transparent), inset 0 0 0 4px var(--cs-gilded-navy-lo), inset 0 0 0 5px color-mix(in srgb, var(--cs-gilded-crack) 25%, transparent), 0 4px 10px color-mix(in srgb, var(--cs-gilded-shade) 55%, transparent); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-motive .cs-gc-nm { font-size: 13.5px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-motive[data-state="used"] .cs-gc-nm { color: var(--cs-gilded-tarnish-pale); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--cs-gilded-tarnish-hi) 70%, transparent); text-decoration-thickness: 1px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-motive[data-state="hidden"] .cs-gc-nm { color: var(--cs-gilded-soft); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-motive .cs-gc-rk { text-transform: lowercase; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-motive[data-state="found"] .cs-gc-rk { color: var(--cs-gilded-gold-pale); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-motive[data-kind="pitfall"][data-state="found"] .cs-gc-rk { color: var(--cs-gilded-rose); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-motive[data-kind="pitfall"] .cs-gc-rk::first-letter { text-transform: uppercase; }
+
+/* ---- The stat block, for an NPC that has one ----------------------------------
+   Stamina and the combat facts go under the answer in the left box, the five
+   characteristics under the hand of coins in the right one, so the card
+   still reads in one look. */
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-sstam { display: grid; gap: 4px; min-width: 0; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-sn { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-sval input[type="number"] { height: 38px; width: 3.4ch; font-size: 30px; text-align: center; color: var(--cs-gilded-white); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-sstam:is([data-band="dying"], [data-band="dead"]) .cs-gn-sval input[type="number"] { color: var(--cs-gilded-crack); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-sstam[data-band="winded"] .cs-gn-sval input[type="number"] { color: var(--cs-gilded-rose); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-of { font: 600 15px var(--cs-gilded-display); color: var(--cs-hero-muted); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-bar { position: relative; display: block; height: 8px; background: color-mix(in srgb, var(--cs-gilded-white) 10%, transparent); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-bar i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, var(--cs-gilded-gold), var(--cs-gilded-gold-hi)); transition: width 800ms cubic-bezier(0.3, 0.9, 0.3, 1); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-bar u { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--cs-gilded-shine); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-sstam[data-band="winded"] .cs-gn-bar i { background: linear-gradient(90deg, var(--cs-gilded-tarnish), var(--cs-gilded-tarnish-hi)); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-sstam:is([data-band="dying"], [data-band="dead"]) .cs-gn-bar i { background: linear-gradient(90deg, var(--cs-gilded-blood), var(--cs-gilded-crack)); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-sstam .cs-gn-note { grid-area: auto; font-size: 12.5px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-sstam .cs-gc-state { display: inline-block; margin: 0 0 0 6px; font-style: normal; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-schars { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-schars .cs-gc-row { gap: 9px; min-width: 0; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-schars .cs-gc-coin { width: 40px; height: 40px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-schars .cs-gc-coin b { font-size: 16px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-schars .cs-gc-nm { font-size: 11.5px; letter-spacing: 0.14em; }
+
+/* ---- Folded cards and the tabs: the hero card, with the talk or the fight added ---- */
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-card .cs-va-pips { justify-content: center; gap: 8px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-card-meters { justify-content: center; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-meter b { font-family: var(--cs-gilded-display); color: var(--cs-gilded-white); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-meter .cs-dots i { width: 11px; height: 11px; background: var(--cs-gilded-coin); box-shadow: 0 0 0 1px var(--cs-gilded-gold-deep); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-meter:nth-child(2) .cs-dots i { background: var(--cs-gilded-violet-coin); box-shadow: 0 0 0 1px var(--cs-gilded-violet-deep); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-meter .cs-dots i.off { background: var(--cs-gilded-pip); box-shadow: inset 0 0 0 1px var(--cs-gilded-line-hi); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-lab { font-family: var(--cs-gilded-display); font-size: 9px; letter-spacing: 0.18em; color: var(--cs-gilded-gold-warm); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-offer { font-family: var(--cs-hero-face); font-style: italic; font-size: 14px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-card-malice { font-family: var(--cs-gilded-display); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-card-malice input { border-color: var(--cs-gilded-line-hi); border-radius: 2px; font-family: var(--cs-gilded-display); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-card .cs-talk-btn[aria-pressed="true"] { border-color: var(--cs-gilded-gold-deep); background: var(--cs-gilded-button); color: var(--cs-gilded-gold-ink); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-card .cs-talk-btn[aria-pressed="true"]::before { background: var(--cs-gilded-gold-ink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cs-gilded-gold-ink) 25%, transparent); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-talking { font-family: var(--cs-gilded-display); }
+
+/* The Talk and People tabs: headings in the look's capitals over a gold hairline. */
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-pane-h { border-bottom: 0; background: linear-gradient(90deg, var(--cs-gilded-line-hi), transparent) 0 100% / 100% 1px no-repeat; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-pane-h small { font-style: italic; font-size: 13px; letter-spacing: 0; text-transform: none; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-pane-h .cs-quiet { font: 600 9px var(--cs-gilded-display); letter-spacing: 0.16em; text-transform: uppercase; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-prose,
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-rows li { font-family: var(--cs-hero-face); font-size: 15.5px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-rows li { border-bottom: 0; background: linear-gradient(90deg, transparent, var(--cs-gilded-line) 18%, var(--cs-gilded-line) 82%, transparent) 0 100% / 100% 1px no-repeat; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-rows li em { font-style: italic; font-size: 14px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-rows li.cs-dm-only { box-shadow: inset 2px 0 0 var(--cs-hero-dm); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-motives .cs-chip { border-color: var(--cs-gilded-line-hi); background: color-mix(in srgb, var(--cs-gilded-navy-hi) 45%, transparent); font-family: var(--cs-hero-face); font-size: 14.5px; font-weight: 600; color: var(--cs-gilded-gold-pale); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-motives .cs-chip-kind { font-family: var(--cs-gilded-display); font-size: 8.5px; letter-spacing: 0.16em; font-weight: 600; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-motives .cs-chip[data-state="hidden"] { border-color: var(--cs-gilded-line); background: none; color: var(--cs-gilded-soft); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-motives .cs-chip[data-state="used"] { border-color: color-mix(in srgb, var(--cs-gilded-tarnish) 50%, transparent); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-motives .cs-chip[data-kind="pitfall"][data-state="found"] { border-color: color-mix(in srgb, var(--cs-gilded-crack) 55%, transparent); color: var(--cs-gilded-rose); }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-chip-state { font-style: italic; font-size: 13px; }
+.chronicle-npc-sheet[data-cs-look="gilded"] .cs-legend { font-family: var(--cs-hero-face); font-style: italic; font-size: 13.5px; }
+
+/* ---- The Director's drawer: in the open tab's place ----------------------- */
+.chronicle-npc-sheet[data-cs-look="gilded"]:not(.cs-folded) .window-content > .cs-only-you { grid-column: 1 / -1; grid-row: 6; margin: 18px 0 44px; }
+
+/* ---- Narrower windows ---------------------------------------------------- */
+@container cs-gc-left (max-width: 250px) {
+  .chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-mal,
+  .chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-imp,
+  .chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-va { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "k n" "p p" "c c"; }
+  .chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* A short window: the boxes tighten so the whole card stays above the foot of the frame. */
+@container cs-gilded (max-height: 700px) {
+  .chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-motives { gap: 4px; }
+  .chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-mcoin { width: 40px; height: 40px; }
+  .chronicle-npc-sheet[data-cs-look="gilded"] .cs-gn-now b { font-size: 20px; }
+}
+
+/* ---- Moves: still a card in the hand ------------------------------------------
+   The sheet puts a cs-move-* class on the window for about a second. Open,
+   hit and heal are the hero's and already play on the shared classes (the
+   cards deal, the crack flashes, the rays swell); these are the new ones. */
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-open .cs-gn-motive { animation: cs-gilded-deal 450ms calc(var(--i, 0) * 70ms + 450ms) cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+
+/* A villain action: the card tilts, red foil runs over it, the spent coin
+   turns dark side up and the next one is dealt. */
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-va { animation: cs-gilded-tilt 700ms cubic-bezier(0.3, 0.6, 0.3, 1); }
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-va .cs-gc-foil {
+  width: 420px;
+  background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--cs-gilded-crack) 22%, transparent) 36%, color-mix(in srgb, var(--cs-gilded-rose) 46%, transparent) 50%, color-mix(in srgb, var(--cs-gilded-crack) 22%, transparent) 64%, transparent);
+  animation: cs-gilded-foil-fast 900ms cubic-bezier(0.3, 0.6, 0.3, 1);
+}
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-va .cs-gn-va .cs-va-mark.used:not(:has(~ .used)) { animation: cs-gilded-npc-spend 800ms cubic-bezier(0.3, 0.7, 0.3, 1); }
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-va .cs-va-mark.next { animation: cs-gilded-npc-ignite 600ms 300ms cubic-bezier(0.3, 0.7, 0.3, 1) both; }
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-va .cs-gn-next-line { animation: cs-gilded-deal 450ms 300ms cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-va .cs-gn-note { animation: cs-gilded-npc-thud 450ms 250ms; }
+
+/* Malice gained: the top coin drops into the row, the figure lands and the amber edge flares. */
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-malice .cs-gn-mal .cs-gc-pips i.on:not(:has(~ i.on)) { animation: cs-gilded-npc-drop 600ms cubic-bezier(0.3, 0.8, 0.4, 1); }
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-malice .cs-gn-mal .cs-gn-mal-in { animation: cs-gilded-npc-thud 450ms 300ms; }
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-malice .cs-gn-mal { animation: cs-gilded-npc-edge 800ms ease-out; }
+
+/* Winded: a dark patina creeps along the gold while the gradient dulls to tarnish. */
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-winded .cs-gn-tarnish { animation: cs-gilded-npc-tarnish 900ms ease-out; }
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-winded .cs-gc-state { animation: cs-gilded-rise 450ms 400ms var(--cs-gilded-ease) both; }
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-winded .cs-gc-dial { animation: cs-gilded-npc-dim 900ms ease-out; }
+
+/* Interest up: gold foil runs along the arc, the rays swell, the figure brightens. */
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-up .cs-gn-glint { animation: cs-gilded-npc-glint 900ms cubic-bezier(0.45, 0, 0.25, 1); }
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-up .cs-gn-int .cs-gc-rays { animation: cs-gilded-rays 900ms ease-out; }
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-up :is(.cs-gn-big, .cs-gn-now b) { animation: cs-gilded-npc-shine 850ms ease-out; }
+
+/* Interest down: the arc dims and the figure shakes. */
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-down .cs-gn-int .cs-gc-fill { animation: cs-gilded-npc-dip 700ms ease-out; }
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-down .cs-gn-big { animation: cs-gilded-npc-shake 400ms ease-out; }
+/* Patience spent: the coin that goes out turns over to its dark side. */
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-down .cs-gn-pat .cs-gc-pips :is(i.on + i:not(.on), i:first-child:not(.on)) { animation: cs-gilded-npc-turnover 600ms cubic-bezier(0.4, 0, 0.3, 1); }
+
+/* A pitfall: the tilt and red crack of a hit, the figure drops, the red coins flare. */
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-pit { animation: cs-gilded-tilt 700ms cubic-bezier(0.3, 0.6, 0.3, 1); }
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-pit .cs-gc-crack { animation: cs-gilded-crack 700ms ease-out; }
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-pit .cs-gn-big { animation: cs-gilded-npc-thud 450ms 120ms; }
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-pit .cs-gn-motive[data-kind="pitfall"][data-state="found"] .cs-gn-mcoin { animation: cs-gilded-npc-flare 700ms ease-out; }
+
+/* Found: foil crosses the card and the gold coins turn over in turn, a glint on each name. */
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-reveal .cs-gc-foil { animation: cs-gilded-foil-fast 900ms ease-out; }
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-reveal .cs-gn-motive[data-state="found"] .cs-gn-mcoin { animation: cs-gilded-npc-reveal 750ms calc(var(--i, 0) * 50ms) cubic-bezier(0.3, 0.7, 0.2, 1) both; }
+.chronicle-npc-sheet[data-cs-look="gilded"].cs-move-reveal .cs-gn-motive[data-state="found"] .cs-gc-rt { animation: cs-gilded-npc-shine 750ms calc(var(--i, 0) * 50ms + 250ms) ease-out; }
+
+@keyframes cs-gilded-npc-ember {
+  0%, 100% { box-shadow: 0 0 0 2px var(--cs-gilded-navy), 0 0 0 3px var(--cs-gilded-ember-hi), 0 0 8px color-mix(in srgb, var(--cs-gilded-ember) 60%, transparent); }
+  50% { box-shadow: 0 0 0 2px var(--cs-gilded-navy), 0 0 0 3px var(--cs-gilded-ember-hi), 0 0 18px var(--cs-gilded-ember); }
+}
+/* Two halves of one turn: the lit face turns away, the dark face turns back. */
+@keyframes cs-gilded-npc-spend {
+  0% { transform: perspective(200px) rotateY(0) scale(1.4); background: var(--cs-gilded-ember-coin); box-shadow: 0 0 22px var(--cs-gilded-ember); }
+  49.9% { transform: perspective(200px) rotateY(90deg) scale(1.25); background: var(--cs-gilded-ember-coin); }
+  50% { transform: perspective(200px) rotateY(-90deg) scale(1.25); }
+  100% { transform: perspective(200px) rotateY(0) scale(1); }
+}
+@keyframes cs-gilded-npc-ignite {
+  0% { transform: scale(0.75); filter: brightness(0.7); }
+  45% { transform: scale(1.3); filter: brightness(1.35); box-shadow: 0 0 0 2px var(--cs-gilded-navy), 0 0 0 3px var(--cs-gilded-ember-hi), 0 0 26px var(--cs-gilded-ember); }
+  100% { transform: none; }
+}
+@keyframes cs-gilded-npc-turnover {
+  0% { transform: perspective(160px) rotateY(0) scale(1.25); background: var(--cs-gilded-violet-coin); box-shadow: 0 0 14px var(--cs-gilded-violet); }
+  49.9% { transform: perspective(160px) rotateY(90deg) scale(1.15); background: var(--cs-gilded-violet-coin); }
+  50% { transform: perspective(160px) rotateY(-90deg) scale(1.15); }
+  100% { transform: perspective(160px) rotateY(0) scale(1); }
+}
+@keyframes cs-gilded-npc-reveal {
+  0% { transform: perspective(300px) rotateY(0) scale(1.05); }
+  45% { transform: perspective(300px) rotateY(180deg) scale(1.2); filter: brightness(1.7); }
+  75% { transform: perspective(300px) rotateY(360deg) scale(1.12); filter: brightness(1.3) drop-shadow(0 0 14px var(--cs-gilded-gold-warm)); }
+  100% { transform: none; }
+}
+@keyframes cs-gilded-npc-flare { 20% { transform: scale(1.15) rotate(-8deg); filter: brightness(1.5) drop-shadow(0 0 12px var(--cs-gilded-crack)); } 45% { transform: rotate(5deg); } }
+@keyframes cs-gilded-npc-drop {
+  0% { opacity: 0; transform: translateY(-44px) scale(2.4); box-shadow: 0 0 22px var(--cs-gilded-crack); }
+  55% { opacity: 1; transform: translateY(2px) scale(1.15, 0.8); }
+  78% { transform: translateY(-3px) scale(1); }
+}
+@keyframes cs-gilded-npc-thud { 0% { transform: scale(1.5); color: var(--cs-gilded-gold-hi); } 60% { transform: scale(0.94); } }
+@keyframes cs-gilded-npc-edge { 30% { box-shadow: inset 4px 0 0 var(--cs-hero-dm), inset 40px 0 30px -30px color-mix(in srgb, var(--cs-hero-dm) 40%, transparent); } }
+/* Winded is at most half the arc, so the patina only has to creep that far. */
+@keyframes cs-gilded-npc-tarnish {
+  0% { opacity: 0.6; stroke-dasharray: 0 100; }
+  55% { opacity: 0.6; stroke-dasharray: 50 100; }
+  100% { opacity: 0; stroke-dasharray: 50 100; }
+}
+@keyframes cs-gilded-npc-dim { 35% { filter: brightness(0.7) saturate(0.6); } }
+@keyframes cs-gilded-npc-dip { 30% { filter: brightness(0.55); } }
+@keyframes cs-gilded-npc-glint {
+  0% { opacity: 0; stroke-dashoffset: 8; }
+  12% { opacity: 0.95; }
+  85% { opacity: 0.85; }
+  100% { opacity: 0; stroke-dashoffset: -100; }
+}
+@keyframes cs-gilded-npc-shine { 35% { filter: brightness(1.6) drop-shadow(0 0 12px var(--cs-gilded-gold-warm)); } }
+@keyframes cs-gilded-npc-shake { 20% { transform: translateX(-4px); } 40% { transform: translateX(4px); } 60% { transform: translateX(-2px); } 80% { transform: translateX(1px); } }
+
+/* Calm keeps the state changes and drops the travel: no tilt, no flip, no
+   drop, no glow; each move is a short fade. */
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="gilded"]:is(.cs-move-va, .cs-move-pit) { animation: none; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="gilded"] :is(.cs-gn-motive, .cs-gn-mal, .cs-gn-mal .cs-gc-pips i, .cs-gn-mal-in, .cs-gn-pat .cs-gc-pips i, .cs-gn-mcoin, .cs-gn-next-line, .cs-gn-note, .cs-gn-big, .cs-gn-now b, .cs-gc-rt, .cs-gc-dial, .cs-gc-fill, .cs-va-mark.used) { animation-name: cs-gilded-fade; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="gilded"] :is(.cs-va-mark.next, .cs-gn-glint, .cs-gn-tarnish) { animation: none; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="gilded"] :is(.cs-gn-motive, .cs-gc-fill, .cs-gn-bar i) { transition: none; }
+
+/* Reduced motion stops everything: the next coin's glow holds still and nothing tilts, flips or travels. */
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-cs-motion="full"]) .chronicle-npc-sheet[data-cs-look="gilded"],
+  html:not([data-cs-motion="full"]) .chronicle-npc-sheet[data-cs-look="gilded"] :is(*, ::before, ::after) {
+    animation: none !important;
+    transition: none !important;
+  }
+}

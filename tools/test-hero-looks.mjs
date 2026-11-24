@@ -925,7 +925,8 @@ test('the settings window\'s rules for the classes this sheet shares are reset o
   for (const file of styles) {
     const css = read(file).replace(/\/\*[\s\S]*?\*\//g, '');
     for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-      for (const sel of m[1].split(',').map((x) => x.trim())) {
+      // Split on the commas between selectors, not those inside :is() or :not().
+      for (const sel of m[1].split(/,(?![^()]*\))/).map((x) => x.trim())) {
         const compounds = sel.split(/[\s>+~]+/).filter(Boolean);
         // Scoped to another window when any part names something this sheet doesn't use.
         if (!compounds.length || !compounds.every((c) => /^\.cs-[a-z0-9-]+(:[a-z-]+(\([^)]*\))?)*$/.test(c) && heroClasses.has(c.slice(1).split(':')[0]))) continue;

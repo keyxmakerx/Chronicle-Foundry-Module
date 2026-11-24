@@ -1,0 +1,21 @@
+{{!-- The Combat glass cell: size, how it moves, damage it shrugs off or fears,
+and the conditions on it. --}}
+<div class="cs-glass-cell cs-glass-body">
+  <p class="cs-glass-k">{{systemFields.combat.label}}</p>
+  <p class="cs-glass-t">
+    <span>{{systemFields.combat.fields.size.label}} <b>{{system.combat.size}}</b></span>
+    {{#if movement.list}}<span>{{movement.list}}</span>{{/if}}
+  </p>
+  <p class="cs-glass-t">{{systemFields.damage.fields.immunities.label}}: {{#if damageIW.immunities}}{{{damageIW.immunities}}}{{else}}{{localize "COMMON.None"}}{{/if}}</p>
+  <p class="cs-glass-t">{{systemFields.damage.fields.weaknesses.label}}: {{#if damageIW.weaknesses}}{{{damageIW.weaknesses}}}{{else}}{{localize "COMMON.None"}}{{/if}}</p>
+  <div class="cs-glass-t cs-dr-cond">
+    <span>{{localize "CHRONICLE.HeroSheet.Conditions"}}</span>
+    {{#if npc.chronicle.conditions.length}}
+    <ul class="cs-glass-skill-list">
+      {{#each npc.chronicle.conditions as |c|}}<li>{{c.name}}</li>{{/each}}
+    </ul>
+    {{else}}
+    <span>{{localize "COMMON.None"}}</span>
+    {{/if}}
+  </div>
+</div>

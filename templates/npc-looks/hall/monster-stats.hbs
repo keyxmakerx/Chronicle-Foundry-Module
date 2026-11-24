@@ -1,0 +1,68 @@
+{{!-- The portrait hall's monster boxes, beside the picture and above the tabs.
+Play: the Stamina ring with the villain actions left inside it, the villain
+actions as diamonds (marks the Director sets; they clear when the fight
+ends), Malice for the Director with the mark and the words, conditions and the
+combat line, then the five characteristics as plaques and the next villain
+action. Edit: Draw Steel's own stat editors. --}}
+<section class="cs-hero-stats cs-hall-stats stats cs-npc-stats">
+  {{#if isPlay}}
+  <div class="cs-hall-gauges">
+    {{> "modules/chronicle-sync/templates/npc-looks/hall/stamina-ring.hbs"}}
+
+    <div class="cs-hall-col">
+      {{#if npc.villain.total}}
+      <div class="cs-hall-res cs-hall-va">
+        <span class="cs-hall-k">{{localize "CHRONICLE.NpcSheet.Villain.Title"}}</span>
+        <span class="cs-hall-pips cs-hall-vds">
+          {{#each npc.villain.marks as |m|}}
+          {{#if @root.npc.villain.canMark}}
+          <button type="button" class="cs-hall-vd {{m.state}}" data-action="csVillain" data-item-id="{{m.id}}" aria-pressed="{{#if (eq m.state "used")}}true{{else}}false{{/if}}" aria-label="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}" data-tooltip-text="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}"><b>{{m.order}}</b></button>
+          {{else}}
+          <span class="cs-hall-vd {{m.state}}" role="img" aria-label="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}" data-tooltip-text="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}"><b>{{m.order}}</b></span>
+          {{/if}}
+          {{/each}}
+        </span>
+        <span class="cs-hall-vsub">{{#if npc.villain.inFight}}{{localize "CHRONICLE.NpcSheet.Villain.Left" left=npc.villain.left total=npc.villain.total}}{{else}}{{localize "CHRONICLE.NpcSheet.Villain.NoFight"}}{{/if}}</span>
+      </div>
+      {{/if}}
+
+      {{#if showMalice}}
+      <div class="cs-hall-res cs-hall-malice cs-dm-only" data-tooltip="CHRONICLE.NpcSheet.MaliceTip">
+        <span class="cs-hall-k"><span class="cs-dm-mark">{{malice.label}}</span><small class="cs-dm-words">{{localize "CHRONICLE.NpcSheet.OnlyYou"}}</small></span>
+        <span class="cs-hall-pips" role="presentation">{{#each npc.look.maliceDiamonds as |on|}}<i class="{{#if on}}on{{/if}}"></i>{{/each}}</span>
+        <span class="cs-hall-n">
+          <label class="cs-field">
+            <span class="cs-hidden-label">{{malice.label}}, {{localize "CHRONICLE.NpcSheet.OnlyYou"}}</span>
+            <input type="number" step="1" data-setting="malice" value="{{malice.value}}">
+          </label>
+        </span>
+      </div>
+      {{/if}}
+
+      <div class="cs-hall-res cs-hall-cond">
+        <span class="cs-hall-k">{{localize "CHRONICLE.HeroSheet.Conditions"}}</span>
+        {{#if npc.chronicle.conditions.length}}
+        <span class="cs-hall-conds">
+          {{#each npc.chronicle.conditions as |c|}}<b>{{#if c.img}}<img src="{{c.img}}" alt="" inert>{{/if}}{{c.name}}</b>{{/each}}
+        </span>
+        {{else}}
+        <span class="cs-hall-none">{{localize "COMMON.None"}}</span>
+        {{/if}}
+      </div>
+
+      {{> "modules/chronicle-sync/templates/npc-looks/hall/combat-line.hbs"}}
+    </div>
+  </div>
+
+  {{> "modules/chronicle-sync/templates/npc-looks/hall/numbers-row.hbs"}}
+
+  {{#if npc.look.villainNext}}
+  <div class="cs-hall-skills cs-hall-next">
+    <p class="cs-hall-k">{{localize "CHRONICLE.NpcSheet.Villain.NextAction"}}</p>
+    <p class="cs-hall-nextline"><b>{{npc.look.villainNext.order}}. {{npc.look.villainNext.name}}</b></p>
+  </div>
+  {{/if}}
+  {{else}}
+  {{> "modules/chronicle-sync/templates/npc-looks/edit-stats.hbs"}}
+  {{/if}}
+</section>

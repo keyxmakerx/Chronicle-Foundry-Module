@@ -296,3 +296,69 @@ export function critSfx(die) {
   const known = CRITS.some((c) => c.id === pick && c.kind === kind);
   return { id: CRIT_TRIGGER, result: known ? pick : DEFAULT_CRIT[kind] };
 }
+
+/** The id of the "Sync with Chronicle" theme and dice, which copy the campaign's pick. */
+export const SYNC_ID = `${ID_PREFIX}-sync`;
+
+/**
+ * The campaign's dice pick as stored for every client: a set and a colour id,
+ * each '' for Chronicle's default. Anything malformed reads as the default.
+ * @param {*} raw - the world setting's value (JSON text) or an object
+ * @returns {{set: string, colour: string}}
+ */
+export function readLook(raw) {
+  let v = raw;
+  if (typeof v === 'string') {
+    try {
+      v = JSON.parse(v);
+    } catch {
+      v = null;
+    }
+  }
+  const pick = (s) => (typeof s === 'string' && SET_ID.test(s) ? s : '');
+  return { set: pick(v?.set), colour: pick(v?.colour) };
+}
+
+/**
+ * The look Chronicle's rolls settings answer with (`diceSet`, `diceColour`),
+ * in the stored shape.
+ * @param {*} settings - GET /rolls/settings
+ */
+export function lookFromSettings(settings) {
+  return readLook({ set: settings?.diceSet, colour: settings?.diceColour });
+}
+
+/**
+ * The "Sync with Chronicle" theme and dice: copies of the picked set's
+ * registrations under SYNC_ID, so a player who picks it in Dice So Nice
+ * follows the campaign's choice. An empty or unknown set falls back to the
+ * first shipped set (Chronicle's default), an unknown colour to the set's
+ * first colour. Null when nothing registered.
+ * @param {{colorsets: object[], setOf: Map<string, string>, presets: object[]}} plan - from buildRegistrations
+ * @param {{set: string, colour: string}} look
+ * @param {string} name - the label players see
+ * @returns {{colorset: object, system: object|null, presets: object[], set: string}|null}
+ */
+export function syncRegistrations(plan, look, name) {
+  const themes = plan?.colorsets ?? [];
+  if (!themes.length) return null;
+  const setOfTheme = (cs) => plan.setOf?.get(cs.name);
+  const inSet = (id) => themes.filter((cs) => setOfTheme(cs) === id);
+  let set = look?.set && inSet(look.set).length ? look.set : setOfTheme(themes[0]);
+  const choices = inSet(set);
+  const theme = choices.find((cs) => cs.name === colorsetId(set, look?.colour)) ?? choices[0];
+  const presets = (plan.presets ?? [])
+      .filter((p) => p.system === systemId(set))
+      .map((p) => {
+        const copy = { ...p, system: SYNC_ID, colorset: SYNC_ID };
+        if (p.labels) copy.labels = [...p.labels];
+        return copy;
+      });
+  return {
+    set,
+    colorset: { ...theme, name: SYNC_ID, description: name, category: GROUP },
+    // A set with no faces of its own is colours only; an empty dice system would only clutter the list.
+    system: presets.length ? { id: SYNC_ID, name, group: GROUP } : null,
+    presets,
+  };
+}

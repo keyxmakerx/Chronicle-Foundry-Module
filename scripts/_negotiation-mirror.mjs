@@ -1,12 +1,28 @@
 /**
  * Pure rules for mirroring Chronicle's Draw Steel negotiation tracker onto
  * Foundry NPC actors (scripts/negotiation-mirror.mjs): which WebSocket
- * message counts, how the tracker's GM half maps onto the Draw Steel system's
- * `system.negotiation`, which actors belong to the page, and what actually
- * changed. No Foundry globals, so tools/test-negotiation-mirror.mjs pins it.
+ * message counts, which part of the tracker may be saved on the Draw Steel
+ * system's `system.negotiation`, which actors belong to the page, and what
+ * actually changed. No Foundry globals, so tools/test-negotiation-mirror.mjs
+ * pins it.
+ *
+ * Only what players may already know is saved: an actor document reaches
+ * players' browsers, and Draw Steel's Limited view prints the negotiation.
+ * So the actor gets the found motivations and pitfalls, and the meters once
+ * the Director has shown them, as Chronicle's own public half does. The rest
+ * stays in Chronicle for the Director's screen.
  */
 
+import { FLAG_SCOPE } from './constants.mjs';
 import { normalizeName } from './_npc-presence.mjs';
+
+/**
+ * Whether the Director has shown the meters to players. Not a secret: it
+ * tells a player's sheet that the actor's Interest and Patience are real,
+ * not Draw Steel's starting values.
+ */
+export const SHOWN_FLAG = 'negotiationShown';
+export const SHOWN_PATH = `flags.${FLAG_SCOPE}.${SHOWN_FLAG}`;
 
 /** Chronicle's slug for a motivation that Foundry's system spells differently. */
 const SLUG_TO_FOUNDRY = Object.freeze({ 'higher-authority': 'authority' });
@@ -46,40 +62,52 @@ function mapKeys(list) {
   return [...out].sort();
 }
 
+/** The found slugs that are still on the NPC's own list. */
+function foundOnList(found, list) {
+  const on = new Set(Array.isArray(list) ? list : []);
+  return (Array.isArray(found) ? found : []).filter((slug) => on.has(slug));
+}
+
 /**
- * Turn the tracker's GM half into an actor update. Impression is only sent
- * when the tracker has one, so a blank never wipes the sheet.
+ * Turn the tracker's GM half into the actor update players may see: found
+ * motivations and pitfalls always, so lists saved by an older mirror are
+ * replaced, interest and patience only once the Director has shown them, and
+ * whether they are shown. Impression and unfound entries never leave Chronicle.
  * @param {object|null} gm
  * @returns {object|null} Update object, or null when there is nothing to mirror.
  */
 export function toFoundryNegotiation(gm) {
   if (!gm || typeof gm !== 'object' || Array.isArray(gm) || !Object.keys(gm).length) return null;
+  const found = gm.found && typeof gm.found === 'object' ? gm.found : {};
   const update = {
-    'system.negotiation.interest': clampPoints(gm.interest) ?? 0,
-    'system.negotiation.patience': clampPoints(gm.patience) ?? 0,
-    'system.negotiation.motivations': mapKeys(gm.motivations),
-    'system.negotiation.pitfalls': mapKeys(gm.pitfalls),
+    'system.negotiation.motivations': mapKeys(foundOnList(found.motivations, gm.motivations)),
+    'system.negotiation.pitfalls': mapKeys(foundOnList(found.pitfalls, gm.pitfalls)),
+    [SHOWN_PATH]: gm.shown === true,
   };
-  if (Number.isInteger(gm.impression)) update['system.negotiation.impression'] = gm.impression;
+  if (gm.shown === true) {
+    update['system.negotiation.interest'] = clampPoints(gm.interest) ?? 0;
+    update['system.negotiation.patience'] = clampPoints(gm.patience) ?? 0;
+  }
   return update;
 }
 
 /**
- * Which NPC actors a page's negotiation belongs to. An explicit link wins
- * and takes every actor carrying it; otherwise exactly one NPC whose name
- * matches the page's. Heroes are never touched: character sync owns them.
+ * Which NPC actors a page's negotiation belongs to. An NPC actor character
+ * sync made from this page, or one linked to it by a dropped journal, wins
+ * and takes every such actor; otherwise exactly one NPC whose name matches
+ * the page's. Hero actors are never touched: character sync owns them.
  *
- * @param {{entityId: string, pageName: string, actors: Array<{id: string, name: string, type: string, isHero?: boolean, linkedEntityId?: string|null}>}} q
+ * @param {{entityId: string, pageName: string, actors: Array<{id: string, name: string, type: string, pageId?: string|null, linkedEntityId?: string|null}>}} q
  * @returns {string[]} Actor ids.
  */
 export function pickNegotiationActors({ entityId, pageName, actors }) {
-  const npcs = (actors || []).filter((a) => a?.id && a.type === 'npc' && !a.isHero);
-  const linked = npcs.filter((a) => a.linkedEntityId === entityId);
+  const npcs = (actors || []).filter((a) => a?.id && a.type === 'npc');
+  const linked = npcs.filter((a) => a.linkedEntityId === entityId || (a.pageId && a.pageId === entityId));
   if (linked.length) return linked.map((a) => a.id);
-  // Another page's explicit link must not be stolen by a name coincidence.
+  // Another page's link or synced actor must not be taken by a name coincidence.
   const want = normalizeName(pageName);
   if (!want) return [];
-  const named = npcs.filter((a) => !a.linkedEntityId && normalizeName(a.name) === want);
+  const named = npcs.filter((a) => !a.linkedEntityId && !a.pageId && normalizeName(a.name) === want);
   return named.length === 1 ? [named[0].id] : [];
 }
 
@@ -92,14 +120,14 @@ function asList(v) {
  * so an unchanged tracker causes no actor write.
  * @param {object} update - From toFoundryNegotiation.
  * @param {object|null} current - `actor.system.negotiation` (Sets allowed).
+ * @param {unknown} [shownNow] - the actor's shown flag.
  * @returns {object|null} Changed fields, or null when nothing differs.
  */
-export function negotiationChanges(update, current) {
+export function negotiationChanges(update, current, shownNow) {
   if (!update) return null;
   const out = {};
   for (const [path, next] of Object.entries(update)) {
-    const field = path.slice('system.negotiation.'.length);
-    const have = current?.[field];
+    const have = path === SHOWN_PATH ? shownNow === true : current?.[path.slice('system.negotiation.'.length)];
     const same = Array.isArray(next)
       ? JSON.stringify(asList(have)) === JSON.stringify(next)
       : have === next;

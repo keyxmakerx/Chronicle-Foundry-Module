@@ -1,0 +1,71 @@
+{{!-- The steel and banner monster header, built on the hero sheet's: a war
+camp's crimson banner down the left with the picture in a shield, the level
+medal, organization and role, then the name in capitals over the keywords, EV
+and Malice. A Limited viewer sees this part, so it shows only what Draw
+Steel's own NPC header shows, and Malice only to the Director, with the amber
+edge, the mark and the words. The frame, rivets and charge are decoration. --}}
+<header class="cs-hero-head cs-npc-head cs-steel-head" style="{{#if avatarProperties.objectFit}}--avatar-object-fit: {{avatarProperties.objectFit}};{{/if}}{{#if avatarProperties.objectPosition}} --avatar-object-position: {{avatarProperties.objectPosition}};{{/if}}">
+  <div class="cs-steel-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+
+  <div class="cs-steel-banner" data-cloth="war">
+    <div class="cs-steel-hang">
+    <div class="cs-steel-cloth">
+      <div class="cs-steel-crest">
+        {{!-- Shown where the creature has no picture of its own. --}}
+        <svg class="cs-steel-emblem" viewBox="0 0 100 124" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+          <g fill="none" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M50 22v62M36 42h28M44 84h12l-6 14z"/>
+            <path d="M24 30c14 4 20 8 26 12 6-4 12-8 26-12"/>
+          </g>
+        </svg>
+        {{!-- The whole picture is the portrait button. Its menu offers the full
+        picture, the token and, in Edit mode, Foundry's file picker, which reads
+        data-edit off the picture. --}}
+        <button type="button" class="cs-portrait-btn" data-action="csPortraitMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize "CHRONICLE.HeroSheet.Portrait.Menu"}}" data-tooltip="CHRONICLE.HeroSheet.Portrait.Menu">
+          <img class="cs-portrait" src="{{document.img}}" alt="{{document.name}}" {{#unless isPlay}}data-edit="img"{{/unless}}>
+        </button>
+      </div>
+      <p class="cs-steel-lvl" role="img" aria-label="{{localize "CHRONICLE.HeroSheet.LevelN" level=system.monster.level}}"><small aria-hidden="true">{{systemFields.monster.fields.level.label}}</small><b>{{system.monster.level}}</b></p>
+      {{#if system.monster.organizationLabel}}
+      <p class="cs-steel-cls">{{system.monster.organizationLabel}}</p>
+      <p class="cs-steel-col">{{#if system.monster.roleLabel}}<span class="cs-steel-subcls">{{system.monster.roleLabel}}</span>{{/if}}</p>
+      {{else}}
+      <p class="cs-steel-cls">{{system.monster.roleLabel}}</p>
+      {{/if}}
+      {{!-- The war camp's charge: crossed blades, decoration only. --}}
+      <svg class="cs-npc-device" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+        <g transform="rotate(-36 50 52)"><path class="b" d="M50 4 54.5 13V64h-9V13z"/><path class="g" d="M36 64h28v6H36z"/><path class="h" d="M47.5 70h5v13h-5z"/><circle class="g" cx="50" cy="88" r="5"/></g>
+        <g transform="rotate(36 50 52)"><path class="b" d="M50 4 54.5 13V64h-9V13z"/><path class="g" d="M36 64h28v6H36z"/><path class="h" d="M47.5 70h5v13h-5z"/><circle class="g" cx="50" cy="88" r="5"/></g>
+      </svg>
+    </div>
+    </div>
+  </div>
+
+  <div class="cs-steel-id">
+    {{#if isPlay}}
+    <h1 class="cs-name">{{document.name}}</h1>
+    {{else}}
+    <div class="cs-name-edit">
+      {{formInput fields.name value=source.name placeholder=(localize "DOCUMENT.FIELDS.name.label")}}
+    </div>
+    {{/if}}
+    <ul class="cs-steel-sub">
+      {{#each monsterKeywords as |keyword|}}
+      <li class="cs-steel-origin"><span class="cs-steel-kind">{{localize "CHRONICLE.NpcSheet.Keyword"}}</span><span class="cs-steel-origin-name">{{keyword}}</span></li>
+      {{/each}}
+      <li class="cs-steel-vit">{{localize "DRAW_STEEL.Actor.base.EVLabel.Label"}} <b>{{system.evLabel}}</b></li>
+      {{#unless isPlay}}
+      <li><button type="button" class="cs-mini cs-steel-mini" data-action="editMonsterMetadata" data-tooltip="CHRONICLE.NpcSheet.EditMetadata" aria-label="{{localize "CHRONICLE.NpcSheet.EditMetadata"}}"><i class="fa-solid fa-gear" inert></i></button></li>
+      {{/unless}}
+    </ul>
+    {{#if npc.villain.inFight}}<p class="cs-npc-note"><i aria-hidden="true"></i>{{localize "CHRONICLE.NpcSheet.InFight"}}</p>{{/if}}
+    {{#if showMalice}}
+    <div class="cs-steel-grp cs-npc-mal cs-dm-only" data-tooltip="CHRONICLE.NpcSheet.MaliceTip">
+      <span class="cs-steel-k"><span class="cs-dm-mark">{{malice.label}}</span></span>
+      <span class="cs-npc-malbars" role="presentation"{{#if malice.value}} style="--m: {{malice.value}}"{{/if}}></span>
+      <input type="number" step="1" data-setting="malice" value="{{malice.value}}" aria-label="{{malice.label}}, {{localize "CHRONICLE.NpcSheet.OnlyYou"}}">
+      <small class="cs-dm-words">{{localize "CHRONICLE.NpcSheet.OnlyYou"}}</small>
+    </div>
+    {{/if}}
+  </div>
+</header>

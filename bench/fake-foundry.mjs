@@ -200,9 +200,20 @@ class BenchDocument {
 
     stampOperation(options, this._parent ?? null);
     if (!this._world.collectionFor(this.documentName).get(this.id) && !this._parent) return undefined;
-    const change = diff(this._source, expandObject(data));
+    // `==key` replaces the value whole instead of merging into it, as a
+    // type change's `==system` does in Foundry.
+    const expanded = expandObject(data);
+    const replaced = {};
+    for (const key of Object.keys(expanded)) {
+      if (!key.startsWith('==')) continue;
+      replaced[key.slice(2)] = expanded[key];
+      delete expanded[key];
+    }
+    const change = diff(this._source, expanded);
+    for (const [key, value] of Object.entries(replaced)) change[key] = clone(value);
     if (!Object.keys(change).length) return this;
-    mergeInto(this._source, change);
+    mergeInto(this._source, Object.fromEntries(Object.entries(change).filter(([k]) => !(k in replaced))));
+    for (const [key, value] of Object.entries(replaced)) this._source[key] = clone(value);
     this._refresh();
     this._world.log.writes.push({ op: 'update', type: this.documentName, id: this.id, change, options });
     change._id = this.id;

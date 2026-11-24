@@ -1,0 +1,68 @@
+{{!-- The steel and banner NPC header, built on the hero sheet's: the caravan
+guild's brown banner down the left with the picture in a shield, the level
+medal and role, then the name in capitals over the page's chips. On the
+Director's screen Impression and the Talking switch (the token's talking
+glow) are added. A Limited viewer sees this part, so everything past Draw
+Steel's own header is for the Director only. The frame, rivets and charge are
+decoration. --}}
+<header class="cs-hero-head cs-npc-head cs-steel-head" style="{{#if avatarProperties.objectFit}}--avatar-object-fit: {{avatarProperties.objectFit}};{{/if}}{{#if avatarProperties.objectPosition}} --avatar-object-position: {{avatarProperties.objectPosition}};{{/if}}">
+  <div class="cs-steel-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+
+  <div class="cs-steel-banner" data-cloth="guild">
+    <div class="cs-steel-hang">
+    <div class="cs-steel-cloth">
+      <div class="cs-steel-crest">
+        {{!-- Shown where the creature has no picture of its own. --}}
+        <svg class="cs-steel-emblem" viewBox="0 0 100 124" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+          <g fill="none" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M50 22v62M36 42h28M44 84h12l-6 14z"/>
+            <path d="M24 30c14 4 20 8 26 12 6-4 12-8 26-12"/>
+          </g>
+        </svg>
+        {{!-- The whole picture is the portrait button. Its menu offers the full
+        picture, the token and, in Edit mode, Foundry's file picker, which reads
+        data-edit off the picture. --}}
+        <button type="button" class="cs-portrait-btn" data-action="csPortraitMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize "CHRONICLE.HeroSheet.Portrait.Menu"}}" data-tooltip="CHRONICLE.HeroSheet.Portrait.Menu">
+          <img class="cs-portrait" src="{{document.img}}" alt="{{document.name}}" {{#unless isPlay}}data-edit="img"{{/unless}}>
+        </button>
+      </div>
+      <p class="cs-steel-lvl" role="img" aria-label="{{localize "CHRONICLE.HeroSheet.LevelN" level=system.monster.level}}"><small aria-hidden="true">{{systemFields.monster.fields.level.label}}</small><b>{{system.monster.level}}</b></p>
+      {{#if system.monster.organizationLabel}}
+      <p class="cs-steel-cls">{{system.monster.organizationLabel}}</p>
+      <p class="cs-steel-col">{{#if system.monster.roleLabel}}<span class="cs-steel-subcls">{{system.monster.roleLabel}}</span>{{/if}}</p>
+      {{else}}
+      <p class="cs-steel-cls">{{system.monster.roleLabel}}</p>
+      {{/if}}
+      {{!-- The caravan guild's charge: a wagon wheel, decoration only. --}}
+      <svg class="cs-npc-device" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+        <circle class="b" cx="50" cy="50" r="34"/><circle class="b" cx="50" cy="50" r="8"/>
+        <path class="g" d="M50 16v68M16 50h68M26 26l48 48M74 26 26 74"/>
+      </svg>
+    </div>
+    </div>
+  </div>
+
+  <div class="cs-steel-id">
+    {{#if isPlay}}
+    <h1 class="cs-name">{{document.name}}</h1>
+    {{else}}
+    <div class="cs-name-edit">
+      {{formInput fields.name value=source.name placeholder=(localize "DOCUMENT.FIELDS.name.label")}}
+    </div>
+    {{/if}}
+    <ul class="cs-steel-sub">
+      {{#each npc.page.chips as |chip|}}
+      <li class="cs-steel-origin"><span class="cs-steel-kind">{{chip.kind}}</span><span class="cs-steel-origin-name">{{chip.name}}</span></li>
+      {{/each}}
+      {{#if npc.isGM}}
+      <li class="cs-steel-vit cs-dm-only" data-tooltip="CHRONICLE.NpcSheet.ImpressionTip"><span class="cs-dm-mark">{{localize "CHRONICLE.NpcSheet.Impression"}}</span> <b>{{npc.negotiation.impressionText}}</b> <small class="cs-dm-words">{{localize "CHRONICLE.NpcSheet.OnlyYou"}}</small></li>
+      {{/if}}
+      {{#unless isPlay}}
+      <li><button type="button" class="cs-mini cs-steel-mini" data-action="editMonsterMetadata" data-tooltip="CHRONICLE.NpcSheet.EditMetadata" aria-label="{{localize "CHRONICLE.NpcSheet.EditMetadata"}}"><i class="fa-solid fa-gear" inert></i></button></li>
+      {{/unless}}
+    </ul>
+    {{#if npc.talk.show}}
+    <button type="button" class="cs-steel-btn cs-npc-talk" data-action="csTalk" aria-pressed="{{#if npc.talk.pressed}}true{{else}}false{{/if}}" data-tooltip="CHRONICLE.NpcSheet.TalkingTip"><i aria-hidden="true"></i>{{localize "CHRONICLE.NpcSheet.Talking"}}</button>
+    {{/if}}
+  </div>
+</header>

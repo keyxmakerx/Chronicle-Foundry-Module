@@ -401,6 +401,24 @@ export function registerSettings() {
     default: {},
   });
 
+  // Internal: per actor id, the type the GM said No to switching it to
+  // (hero or NPC), so that actor is not offered again (actor-type-switch.mjs).
+  game.settings.register(MODULE_ID, 'actorTypeDeclined', {
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
+  });
+
+  // Internal: true once every linked actor was checked against its page's
+  // hero or NPC type, so a connect without a full character list does it once.
+  game.settings.register(MODULE_ID, 'actorTypesChecked', {
+    scope: 'world',
+    config: false,
+    type: Boolean,
+    default: false,
+  });
+
   // Internal: per-type and per-entity sync exclusions (not shown in settings UI).
   // Stored as JSON: { excludedTypes: [typeId, ...], excludedEntities: ["entityId", ...] }
   game.settings.register(MODULE_ID, 'syncExclusions', {

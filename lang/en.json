@@ -19,6 +19,125 @@
       "Setting": "Show synced journals as Chronicle pages",
       "SettingHint": "Synced journals open in Chronicle's page look. Turn it off to give them Foundry's journal sheet back. A journal you set to another sheet keeps it."
     },
+    "NpcSheet": {
+      "Name": "Chronicle NPC and monster sheet",
+      "Tabs": {
+        "talk": "Talk",
+        "people": "People"
+      },
+      "Shape": {
+        "Legend": "Sheet shape",
+        "npc": "Talk first (NPC)",
+        "monster": "Stat block first (monster)",
+        "Hint": "Chosen from its Chronicle page: a character page is an NPC, a creature page or a bestiary monster is a monster. Pick here to change it for this actor."
+      },
+      "Keyword": "Keyword",
+      "Faction": "Faction",
+      "Tag": "Tag",
+      "EditMetadata": "Level, organization, role and keywords",
+      "OnlyYou": "only you",
+      "OnlyYouTab": "Only you",
+      "Drawer": {
+        "Note": "Read from Chronicle, never saved in Foundry",
+        "Close": "Close",
+        "Secrets": "On the page, for you only",
+        "NoSecrets": "The page has no secret text.",
+        "NotFound": "Not found yet",
+        "AllFound": "The party has found every motivation and pitfall.",
+        "Given": "What the players have"
+      },
+      "MaliceTip": "Only you see Malice. Draw Steel's own number, shared by every monster.",
+      "InFight": "In this fight",
+      "Impression": "Impression",
+      "ImpressionTip": "Only you see Impression.",
+      "Talking": "Talking",
+      "TalkingTip": "Turns this token's talking glow on and off, as its token HUD does",
+      "FreeStrikeTip": "Make a free strike",
+      "Negotiation": "Negotiation",
+      "Interest": "Interest",
+      "Patience": "Patience",
+      "OfFive": "{n} of 5",
+      "IfAnswered": "If they answered now:",
+      "Answer": {
+        "0": "No, and…",
+        "1": "No.",
+        "2": "No, but…",
+        "3": "Yes, but…",
+        "4": "Yes.",
+        "5": "Yes, and…"
+      },
+      "Over": "the talk is over",
+      "NoNegotiation": "No negotiation on the page yet.",
+      "OpenPage": "Open the page in Chronicle ↗",
+      "Seen": {
+        "chronicleShown": "Players see Interest and Patience",
+        "chronicleHidden": "Players don't see Interest and Patience yet",
+        "playersShown": "Shown by the Director",
+        "playersHidden": "The Director hasn't shown these yet",
+        "offlineShown": "Chronicle couldn't be reached: what players see",
+        "offlineHidden": "Chronicle couldn't be reached: what players see",
+        "actorShown": "From this actor",
+        "actorHidden": "From this actor"
+      },
+      "NoStats": {
+        "Title": "No stat block yet",
+        "Body": "This sheet shows no fight numbers until it has a stat block, rather than Draw Steel's empty defaults. Set them in Edit mode, or drop a monster's abilities here.",
+        "Edit": "Edit mode",
+        "BodyView": "This sheet shows no fight numbers until it has a stat block, rather than Draw Steel's empty defaults."
+      },
+      "Villain": {
+        "Title": "Villain actions",
+        "Used": "Used",
+        "Next": "Next",
+        "Waiting": "Waiting",
+        "NextAction": "Next villain action",
+        "Left": "{left} of {total} left this fight",
+        "NoFight": "Marks start when a fight does",
+        "Failed": "The villain action mark could not be saved.",
+        "State": {
+          "used": "{order}. {name}: used this fight",
+          "next": "{order}. {name}: next",
+          "unused": "{order}. {name}"
+        }
+      },
+      "Kind": {
+        "motivation": "Motivation",
+        "pitfall": "Pitfall"
+      },
+      "State": {
+        "found": "found",
+        "used": "appealed to",
+        "hidden": "not found yet"
+      },
+      "Talk": {
+        "Motives": "Motivations and pitfalls",
+        "LogCount": "Argument log ({count})",
+        "Legend": "Dashed: the party hasn't found it. Struck through: already appealed to, so it won't move them again.",
+        "None": "Nothing found yet.",
+        "NoneGM": "No motivations or pitfalls on the page yet.",
+        "FromPage": "From the page",
+        "FromPageNote": "Read from Chronicle, never saved in Foundry"
+      },
+      "Hover": {
+        "Stamina": "Stamina",
+        "Stability": "Stability",
+        "FreeStrike": "Free strike",
+        "Immune": "Immune",
+        "Weak": "Weak",
+        "Conditions": "Conditions"
+      },
+      "Look": {
+        "OfInterest": "of 5 Interest",
+        "InnerPatience": "Inner arcs: Patience",
+        "WindedAt": "Winded at {n}",
+        "AnswerNow": "If they answered now"
+      },
+      "People": {
+        "Note": "From the page's links in Chronicle",
+        "None": "The page has no links yet."
+      },
+      "Offline": "Chronicle couldn't be reached, so this shows only what the actor holds."
+    },
     "HeroSheet": {
       "Name": "Chronicle hero sheet",
       "Looks": {
@@ -1383,6 +1502,17 @@
       },
       "NotReady": "Chronicle sync isn't ready on this client."
     },
+    "ActorType": {
+      "ToNpcTitle": "Make these Draw Steel NPCs?",
+      "ToNpcBody": "<p>These Chronicle pages are NPCs, but their Foundry actors were made as heroes, so they open as empty hero sheets ({count}):</p>{list}<p>Switch them to NPC actors? Each keeps its name, pictures, tokens, notes, folder and items. What only heroes have goes: hero choices such as ancestry, career and kit, and the basic actions every new hero gets.</p><p>Choose No to leave them as heroes. You won't be asked about these again.</p>",
+      "ToNpcDone": "Chronicle: switched to NPC actors: {count}.",
+      "ToHeroTitle": "Make these Draw Steel heroes?",
+      "ToHeroBody": "<p>These Chronicle pages are now heroes (a player has them, Chronicle marks them playable, or they name a class or hero choice), but their Foundry actors are NPCs ({count}):</p>{list}<p>Switch them to hero actors? Each keeps its name, pictures, tokens, notes, folder and items, gets the basic actions every new hero gets, and then takes its page's hero details.</p><p>Choose No to leave them as NPCs. You won't be asked about these again.</p>",
+      "ToHeroDone": "Chronicle: switched to hero actors: {count}.",
+      "Declined": "Chronicle: left as they are: {count}.",
+      "Failed": "Chronicle: could not switch {names}. See the console for details.",
+      "More": "and {count} more"
+    },
     "RemoteDelete": {
       "Title": "Delete in Chronicle too?",
       "Body": "<p>Deleted in Foundry and linked to Chronicle ({count}):</p>{list}<p>Delete them in Chronicle too? Chronicle deletes them for good.</p><p>Choose No to keep them in Chronicle. A kept page gets sync turned off, so it stays out of Foundry until you bring it in from Chronicle Sync; a kept actor is not brought back either.</p>",
@@ -1467,7 +1597,36 @@
     "Rolls": {
       "FallbackName": "Someone at the table"
     },
+    "DiceTray": {
+      "Open": "Roll dice",
+      "Title": "Roll dice",
+      "Close": "Close",
+      "Dice": "Dice",
+      "AddDie": "Add a {die}",
+      "RemoveHint": "Click a die to add one. Right-click or Shift-click to take one away.",
+      "Modifier": "Modifier",
+      "Less": "One less",
+      "More": "One more",
+      "Empty": "Pick some dice",
+      "Clear": "Clear",
+      "Roll": "Roll",
+      "Failed": "That roll didn't work. Try typing it in the chat box with /roll.",
+      "PowerRoll": "Power roll",
+      "NoHero": "Pick your hero in Player Configuration, or select your token, to roll its characteristics.",
+      "Char": {
+        "might": "Might",
+        "agility": "Agility",
+        "reason": "Reason",
+        "intuition": "Intuition",
+        "presence": "Presence"
+      },
+      "Setting": {
+        "Name": "Dice button by the chat box",
+        "Hint": "Shows a dice button beside the chat box that opens a tray for rolling dice without typing /roll. Only changes your own screen."
+      }
+    },
     "Dice": {
+      "SyncName": "Sync with Chronicle",
       "Heading": "Dice So Nice",
       "Intro": "The Chronicle rune dice play in Dice So Nice, another author's module. This checks what your own client found, so a change on their side shows up here instead of as silently missing dice.",
       "State": "State",

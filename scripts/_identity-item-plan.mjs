@@ -83,6 +83,10 @@ export function planIdentityItems({ items, fieldDefs, fieldsData, applied }) {
     if (typeof last[def.key] === 'string' && norm(last[def.key]) === norm(wantName)) continue;
     const itemType = singleType(def);
     const current = list.filter((it) => it && it.type === itemType);
+    if (def.foundry_item_join) {
+      planJoined(plan, def.key, itemType, wantName, current, firstApply);
+      continue;
+    }
     // The adapter reads the first item of the type, so that is the one compared.
     if (current.length && norm(current[0].name) === norm(wantName)) continue;
     // Sync has never applied picks to this actor, and it already has one:
@@ -96,4 +100,22 @@ export function planIdentityItems({ items, fieldDefs, fieldsData, applied }) {
     plan.push({ fieldKey: def.key, itemType, wantName, removeIds: current.length ? [current[0].id] : [] });
   }
   return plan;
+}
+
+/**
+ * A joined field (two kits) wants one item per name. Each wanted name the
+ * actor lacks replaces an item of the type that Chronicle no longer names,
+ * else is added; an item nobody replaces stays, since sync never deletes
+ * without asking. On a first apply an actor that already has items keeps them.
+ */
+function planJoined(plan, fieldKey, itemType, wantName, current, firstApply) {
+  if (firstApply && current.length) return;
+  const wanted = wantName.split(',').map((n) => n.trim()).filter(Boolean);
+  const wantedSet = new Set(wanted.map(norm));
+  const spare = current.filter((it) => !wantedSet.has(norm(it.name)));
+  for (const name of wanted) {
+    if (current.some((it) => norm(it.name) === norm(name))) continue;
+    const out = spare.shift();
+    plan.push({ fieldKey, itemType, wantName: name, removeIds: out ? [out.id] : [] });
+  }
 }

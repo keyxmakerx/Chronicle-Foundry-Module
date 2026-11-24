@@ -1,0 +1,243 @@
+/* The dice button by the chat box and the tray it opens. The button is an
+   icon control: monochrome, no frame until hover or focus. The tray is a tool
+   window on the shared tokens, so it follows Foundry's light and dark themes. */
+
+.chronicle-dice-button {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: var(--sidebar-item-height, 32px);
+  min-width: 0;
+  height: var(--sidebar-item-height, 32px);
+  margin: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font-size: 1.1em;
+  line-height: 1;
+  cursor: pointer;
+}
+.chronicle-dice-button:hover,
+.chronicle-dice-button:focus-visible,
+.chronicle-dice-button[aria-expanded="true"] {
+  border-color: currentColor;
+  background: transparent;
+  box-shadow: none;
+}
+.chronicle-dice-button:focus-visible {
+  outline: 2px solid var(--cs-accent);
+  outline-offset: 1px;
+}
+
+#chronicle-dice-tray {
+  position: fixed;
+  z-index: 1000;
+  width: min(330px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--cs-line);
+  border-radius: 12px;
+  background: var(--cs-surface);
+  box-shadow: var(--cs-page-shadow-raised);
+  color: var(--cs-text);
+  font-size: 13px;
+  animation: cdt-in 150ms ease-out;
+}
+@keyframes cdt-in {
+  from { opacity: 0; transform: translateY(4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #chronicle-dice-tray { animation: none; }
+}
+
+#chronicle-dice-tray button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+#chronicle-dice-tray button:focus-visible,
+#chronicle-dice-tray input:focus-visible {
+  outline: 2px solid var(--cs-accent);
+  outline-offset: 1px;
+}
+
+#chronicle-dice-tray .cdt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+#chronicle-dice-tray .cdt-head h2 {
+  margin: 0;
+  border: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cs-text);
+}
+#chronicle-dice-tray .cdt-close {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--cs-text-2);
+}
+#chronicle-dice-tray .cdt-close:hover { border-color: var(--cs-line); color: var(--cs-text); }
+
+#chronicle-dice-tray .cdt-group { margin-top: 10px; }
+#chronicle-dice-tray .cdt-label {
+  display: block;
+  margin: 0 0 6px;
+  border: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cs-text-muted);
+}
+#chronicle-dice-tray .cdt-who {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--cs-text-2);
+}
+#chronicle-dice-tray .cdt-note {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--cs-text-muted);
+}
+
+/* Characteristics and dice are value pickers, so they are framed buttons. */
+#chronicle-dice-tray .cdt-chars {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+#chronicle-dice-tray .cdt-char,
+#chronicle-dice-tray .cdt-die {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+  padding: 5px 2px;
+  border: 1px solid var(--cs-line);
+  border-radius: 8px;
+  background: var(--cs-surface-2);
+  box-shadow: none;
+  line-height: 1.1;
+}
+#chronicle-dice-tray .cdt-char:hover,
+#chronicle-dice-tray .cdt-die:hover { border-color: var(--cs-accent); }
+#chronicle-dice-tray .cdt-char-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--cs-text-2);
+}
+#chronicle-dice-tray .cdt-char-value { font-size: 15px; font-weight: 600; }
+
+#chronicle-dice-tray .cdt-dice {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+#chronicle-dice-tray .cdt-die svg { width: 22px; height: 22px; color: var(--cs-text-2); }
+#chronicle-dice-tray .cdt-die-name { font-size: 11px; font-variant-numeric: tabular-nums; }
+#chronicle-dice-tray .cdt-die.is-picked {
+  border-color: var(--cs-accent);
+  background: var(--cs-accent-soft);
+}
+#chronicle-dice-tray .cdt-die.is-picked svg { color: var(--cs-accent); }
+#chronicle-dice-tray .cdt-die.is-picked .cdt-die-name { font-weight: 600; }
+
+#chronicle-dice-tray .cdt-mod-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#chronicle-dice-tray .cdt-mod-row .cdt-label { margin: 0; }
+#chronicle-dice-tray .cdt-stepper { display: flex; align-items: center; gap: 4px; }
+#chronicle-dice-tray .cdt-stepper button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--cs-line);
+  border-radius: 8px;
+  background: var(--cs-surface-2);
+  box-shadow: none;
+  font-size: 11px;
+}
+#chronicle-dice-tray .cdt-stepper input {
+  width: 48px;
+  height: 26px;
+  border: 1px solid var(--cs-line);
+  border-radius: 8px;
+  background: var(--cs-surface);
+  color: var(--cs-text);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+#chronicle-dice-tray .cdt-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--cs-line);
+}
+#chronicle-dice-tray .cdt-formula {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--cs-text-2);
+}
+/* Clear is a quiet word; Roll is the one real command. */
+#chronicle-dice-tray .cdt-clear {
+  flex: 0 0 auto;
+  width: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--cs-accent);
+}
+#chronicle-dice-tray .cdt-clear:hover { text-decoration: underline; }
+#chronicle-dice-tray .cdt-clear[hidden] { display: none; }
+#chronicle-dice-tray .cdt-roll {
+  flex: 0 0 auto;
+  width: auto;
+  margin: 0;
+  padding: 5px 16px;
+  border: 1px solid var(--cs-accent-strong);
+  border-radius: 8px;
+  background: var(--cs-accent);
+  box-shadow: var(--cs-page-shadow);
+  color: var(--cs-on-accent);
+  font-weight: 600;
+}
+#chronicle-dice-tray .cdt-roll:hover { background: var(--cs-accent-strong); }
+#chronicle-dice-tray .cdt-roll:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

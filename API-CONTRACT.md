@@ -289,7 +289,9 @@ text field; the text goes in a following `PUT` as `entry`.
 **Response:** The created entity object (same shape as GET).
 
 #### GET /entities/:entityId
-Returns a single entity with full content.
+Returns a single entity with full content. The Chronicle NPC sheet reads it
+on the Director's screen for the page's text, faction and tags, in memory
+only (see "What the module does with `system_state.updated`").
 
 #### PUT /entities/:entityId
 Updates an entity. **PARTIAL update** — see the contract below.
@@ -545,7 +547,8 @@ entity (a custom Foundry item has nothing to relate to).
 #### GET /entities/:entityId/relations
 List all relations on an entity.
 
-**Used by:** `item-sync.mjs` → pull inventory relations for actors
+**Used by:** `item-sync.mjs` → pull inventory relations for actors;
+`npc-looks.mjs` → the Chronicle NPC sheet's People tab (Director only)
 
 #### DELETE /relations/:relationId
 Delete a relation (and its reverse). `relationId` is the numeric relation id.
@@ -630,7 +633,8 @@ Envelope `{type, campaignId, resourceId: <roll id>, payload}`, payload:
   "rollerName": "Mara", "label": "Brutal Slam", "formula": "2d10+2",
   "dice": [{"sides": 10, "value": 7}, {"sides": 10, "value": 9}], "modifier": 2,
   "total": 18, "outcome": "Tier 3", "why": "", "from": "",
-  "mode": "public|gm|blind|self", "hidden": true, "createdAt": "<RFC3339>" }
+  "mode": "public|gm|blind|self", "hidden": true, "characterId": "<hero page id, optional>",
+  "createdAt": "<RFC3339>" }
 ```
 
 Chronicle filters the audience: the module's socket gets public, gm and blind
@@ -640,12 +644,17 @@ are not in `/sync/changes`, so a reconnect never replays them. The allowlist
 includes the `roll.` prefix. On the **active GM's client only**, a roll with
 `origin` `chronicle`, not `hidden` and not `self` is posted to chat as a real
 Roll built from the given dice (never re-rolled, so Dice So Nice animates
-it), speaker `rollerName`, flavor `label` (and `outcome`), flag
+it), speaker `rollerName` or, when `characterId` is set and an actor's
+`entityId` flag matches it, that actor (Foundry's `ChatMessage.getSpeaker`),
+flavor `label` (and `outcome`), flag
 `flags["chronicle-sync"].roll = {id, origin: "chronicle"}`. `public` is an
 ordinary public message; `gm` is whispered to the GM users and the Foundry
 user linked to `rollerId`; `blind` is a blind whisper to the GM users. Each
 roll id posts once (a bounded in-memory set, and an existing message with the
-flag). `tools/test-roll-relay.mjs`.
+flag). `characterId` comes only on a Table roll of a hero's own numbers
+(Chronicle's hero sheet, the Table's power roll line), after Chronicle
+checked the roller has claimed that hero or is a Director, and, for a public
+roll, that every player may see the page; it is not in the roll log. `tools/test-roll-relay.mjs`.
 
 Re-verify by: 2027-01-28 (Chronicle's rolls route and `roll.made` broadcast; keyxmakerx/Chronicle-Foundry-Module#240)
 
@@ -1934,14 +1943,35 @@ worlds where `game.system.id` is `draw-steel`, and only for `systemId`
 `{ "systemId", "key", "public": {...}, "gm": {...}, "isGm": true, "updatedAt" }`
 
 (the `gm` half is present only for an owner-level key; a 404 means an older
-Chronicle or no such page and is ignored quietly) and copies interest and
-patience (clamped 0 to 5), motivations, pitfalls (`higher-authority` becomes
-the system's `authority`; unknown slugs are dropped) and impression (only
-when the tracker has one) onto `system.negotiation` of the NPC actors linked
-to that page (actor flag `npcEntityId`, else a unique NPC name match; heroes
-never). It runs once more when a GM links a page by dropping its journal on a
-token. Nothing is written back: edits on the Foundry sheet don't sync to
-Chronicle yet. `tools/test-negotiation-mirror.mjs`.
+Chronicle or no such page and is ignored quietly) and copies only what
+players may know onto `system.negotiation`, because an actor document
+reaches players' browsers: the motivations and pitfalls in `gm.found` that
+are still on the NPC's lists (`higher-authority` becomes the system's
+`authority`; unknown slugs are dropped), and interest and patience (clamped
+0 to 5) only when `gm.shown` is true. Impression and unfound entries stay in
+Chronicle. It also sets the actor flag `negotiationShown` to `gm.shown`,
+which is not a secret: it tells a player's sheet whether the meters are real
+or Draw Steel's starting values. The update goes to the NPC actors made from
+or linked to that page (actor flag `entityId` on an NPC actor character sync
+made from the page, or `npcEntityId`, else a unique NPC name match; heroes
+never), and carries `syncOptions()`, so character sync doesn't send it back.
+It runs once more when a GM links a page by dropping its journal on a token.
+Every GM client then fires the Foundry hook `chronicleSyncNegotiation` with
+the page id, so an open Chronicle NPC sheet reads the page again. Nothing is
+written back: edits on the Foundry sheet don't sync to Chronicle yet.
+`tools/test-negotiation-mirror.mjs`.
+
+`scripts/npc-looks.mjs` (the Chronicle NPC sheet, Director's screen only)
+reads the same `negotiation` state, `GET /entities/:entityId` (its
+`entry_html`, `fields_data.faction` and `tags`) and
+`GET /entities/:entityId/relations` for an NPC actor's page, all three at
+once, waiting at most 4 seconds and reusing the answer for 30 seconds; a 404
+on any of them is "nothing there", anything else shows what the actor holds
+with an "offline" note. It keeps what it read in memory only: nothing it
+reads is saved on a Foundry document. It shows the page's open text (secret
+spans, `section.secret` blocks and GM-only pictures left out), the faction
+and tags without `dmOnly` ones, and the relations, `dmOnly` ones marked.
+Players' screens never call these. `tools/test-npc-looks-contract.mjs`.
 
 `scripts/creature-sync.mjs` acts on `key` `foundry` for any system: it
 forgets its cached answer for that page, and reads

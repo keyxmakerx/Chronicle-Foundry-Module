@@ -127,6 +127,16 @@ function _mapImageSrc(map) {
 }
 
 /**
+ * Whether a Chronicle map row names a picture at all, so a missing picture
+ * can be told apart from one that failed to load.
+ * @param {object} map
+ * @returns {boolean}
+ */
+export function _mapHasImageFields(map) {
+  return !!(map?.image_id || map?.image_url || map?.image_path || map?.image);
+}
+
+/**
  * MapSync orchestrates Chronicle map data ↔ Foundry materialization.
  */
 export class MapSync {
@@ -1163,12 +1173,15 @@ export class MapSync {
 
     const meta = this._buildMapMeta(mapData, imageSrc, { shadowed });
 
-    if (!imageSrc && !shadowed) {
+    // A map with no picture in Chronicle (a pin board, a map still being
+    // drawn) is the author's choice, not a fault: warning about it on every
+    // load sent GMs hunting for a misconfiguration that wasn't there.
+    if (!imageSrc && !shadowed && !_mapHasImageFields(mapData)) {
+      console.debug(`Chronicle: map "${mapData.name || mapData.id}" has no picture in Chronicle.`);
+    } else if (!imageSrc && !shadowed) {
       const reason = mapData.image_id
         ? `media id ${mapData.image_id} did not resolve via /media/:id`
-        : (mapData.image_url || mapData.image_path || mapData.image)
-          ? 'image fields present but none parsed as a valid URL'
-          : 'no image_id, image_url, image_path, or image fields on the map row';
+        : 'image fields present but none parsed as a valid URL';
       this._logError({
         kind: 'image_url',
         mapId: mapData.id,
@@ -1177,7 +1190,7 @@ export class MapSync {
       this._toastOnce(
         `image_url:${mapData.id}`,
         'warn',
-        `Chronicle: map "${noticeText(mapData.name || mapData.id)}" has no image — check apiUrl setting and that the map has an uploaded image in Chronicle.`
+        `Chronicle: the picture for map "${noticeText(mapData.name || mapData.id)}" could not be loaded. Check the Chronicle address in Chronicle Sync's settings.`
       );
     }
 

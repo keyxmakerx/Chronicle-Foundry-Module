@@ -1,0 +1,20 @@
+{{!-- The five characteristics as cast plaques, each rolling through Draw
+Steel. The metal comes from the value (iron, bronze, gold), worked out in
+scripts/_npc-look-hall.mjs, and is named in words as well. --}}
+<div class="cs-hall-plaques">
+  {{#each characteristics as |chr key|}}
+  <button
+    type="button"
+    class="cs-hall-pl"
+    data-metal="{{lookup @root.npc.look.metals key}}"
+    style="--i: {{@index}}"
+    data-action="roll" data-roll-type="characteristic" data-characteristic="{{key}}"
+    data-tooltip-text="{{localize "DRAW_STEEL.ROLL.Prompt" prompt=chr.field.label}}"
+    {{disabled (not @root.owner)}}
+  >
+    <i>{{localize (concat "CHRONICLE.HeroSheet.Metal." (lookup @root.npc.look.metals key))}}</i>
+    <b>{{numberFormat chr.value sign=true}}</b>
+    <span>{{chr.field.label}}</span>
+  </button>
+  {{/each}}
+</div>

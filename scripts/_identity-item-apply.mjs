@@ -6,6 +6,7 @@
  */
 import { FLAG_SCOPE, syncOptions, APPLY_OPTION } from './constants.mjs';
 import { findEntry, entryItemFill } from './_campaign-entry-item.mjs';
+import { mentionLookup } from './_entry-text.mjs';
 
 const norm = (s) => String(s ?? '').trim().toLowerCase();
 
@@ -70,7 +71,7 @@ export async function applyIdentityItem(actor, step, game, entries) {
   } else {
     // A campaign's own entry has no Foundry item to copy; the flag marks it as made here.
     data = { name: step.wantName, type: step.itemType, flags: { [FLAG_SCOPE]: { chronicleMade: true } } };
-    const fill = entryItemFill(findEntry(entries, step.wantName));
+    const fill = entryItemFill(findEntry(entries, step.wantName), { mentionId: journalMentions(game) });
     if (fill) Object.assign(data, fill);
   }
   await actor.createEmbeddedDocuments('Item', [data], writeOptions());
@@ -78,6 +79,19 @@ export async function applyIdentityItem(actor, step, game, entries) {
     await actor.deleteEmbeddedDocuments('Item', step.removeIds, writeOptions());
   }
   return source ? 'found' : 'made';
+}
+
+/**
+ * Chronicle page ids by journal name, for the mentions in an entry's text.
+ * @returns {(name: string) => string|null}
+ */
+export function journalMentions(game) {
+  const journals = [];
+  for (const j of game?.journal ?? []) {
+    const entityId = j?.getFlag?.(FLAG_SCOPE, 'entityId');
+    if (entityId) journals.push({ name: j.name, entityId });
+  }
+  return mentionLookup(journals);
 }
 
 /**

@@ -1,0 +1,47 @@
+{{!-- Row one of a stat block: the five characteristics, each rolling through
+Draw Steel, then Speed, Stability, Size and Free strike. Free strike is Draw
+Steel's button for whoever can edit the sheet (the Director, or the player who
+runs a retainer) and plain text for anyone else, as on its own sheet. --}}
+<div class="cs-row cs-row-numbers">
+  <div class="cs-group cs-chars">
+    {{#each characteristics as |chr key|}}
+    <button
+      type="button"
+      class="cs-box cs-num cs-roll"
+      data-action="roll"
+      data-roll-type="characteristic"
+      data-characteristic="{{key}}"
+      data-tooltip-text="{{localize "DRAW_STEEL.ROLL.Prompt" prompt=chr.field.label}}"
+      {{disabled (not @root.owner)}}
+    >
+      <span class="cs-lab">{{chr.field.label}}</span>
+      <span class="cs-big">{{numberFormat chr.value sign=true}}</span>
+    </button>
+    {{/each}}
+  </div>
+  <div class="cs-group cs-combat">
+    <div class="cs-box cs-num"{{#if movement.list}} data-tooltip-text="{{movement.list}}"{{/if}}>
+      <span class="cs-lab">{{systemFields.movement.fields.value.label}}</span>
+      <span class="cs-big">{{system.movement.value}}</span>
+    </div>
+    <div class="cs-box cs-num"{{#if combatTooltip}} data-tooltip-html="{{combatTooltip}}"{{/if}}>
+      <span class="cs-lab">{{systemFields.combat.fields.stability.label}}</span>
+      <span class="cs-big">{{system.combat.stability}}</span>
+    </div>
+    <div class="cs-box cs-num">
+      <span class="cs-lab">{{systemFields.combat.fields.size.label}}</span>
+      <span class="cs-big">{{system.combat.size}}</span>
+    </div>
+    {{#if editable}}
+    <button type="button" class="cs-box cs-num cs-roll" data-action="freeStrike" data-tooltip="CHRONICLE.NpcSheet.FreeStrikeTip">
+      <span class="cs-lab">{{systemFields.monster.fields.freeStrike.label}}</span>
+      <span class="cs-big">{{system.monster.freeStrike}}</span>
+    </button>
+    {{else}}
+    <div class="cs-box cs-num">
+      <span class="cs-lab">{{systemFields.monster.fields.freeStrike.label}}</span>
+      <span class="cs-big">{{system.monster.freeStrike}}</span>
+    </div>
+    {{/if}}
+  </div>
+</div>

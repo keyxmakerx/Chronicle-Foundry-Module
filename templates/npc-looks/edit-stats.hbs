@@ -1,0 +1,25 @@
+{{!-- Edit mode for both shapes: Draw Steel's own NPC stat editors, with the
+same names and data-source flags its sheet uses, and the shape picked by
+hand. --}}
+<div class="cs-edit standard-form">
+  {{#if npc.canShape}}
+  <fieldset class="cs-shape-pick">
+    <legend>{{localize "CHRONICLE.NpcSheet.Shape.Legend"}}</legend>
+    <div class="cs-seg" role="group" aria-label="{{localize "CHRONICLE.NpcSheet.Shape.Legend"}}">
+      {{#each npc.shapes as |s|}}
+      <button type="button" class="cs-btn" data-action="csShape" data-shape="{{s.id}}" aria-pressed="{{#if s.checked}}true{{else}}false{{/if}}">{{localize s.label}}</button>
+      {{/each}}
+    </div>
+    <p class="hint">{{localize "CHRONICLE.NpcSheet.Shape.Hint"}}</p>
+  </fieldset>
+  {{/if}}
+  <fieldset class="resources">
+    <legend>{{localize "DRAW_STEEL.SHEET.Resources"}}</legend>
+    {{formGroup systemFields.stamina.fields.max value=systemSource.stamina.max dataset=datasets.isSource}}
+    {{formGroup systemFields.monster.fields.freeStrike value=systemSource.monster.freeStrike dataset=datasets.isSource}}
+  </fieldset>
+  {{> "systems/draw-steel/templates/sheets/actor/shared/partials/stats/characteristics.hbs" editCharacteristics=true}}
+  {{> "systems/draw-steel/templates/sheets/actor/shared/partials/stats/combat.hbs"}}
+  {{> "systems/draw-steel/templates/sheets/actor/shared/partials/stats/movement.hbs"}}
+  {{> "systems/draw-steel/templates/sheets/actor/shared/partials/stats/immunities-weaknesses.hbs"}}
+</div>

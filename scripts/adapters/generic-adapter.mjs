@@ -16,7 +16,7 @@
  * pseudo-documents) become plain arrays/objects instead of `{}`.
  */
 
-import { touchedScalarKeys } from '../_actor-field-diff.mjs';
+import { touchedScalarKeys, ITEMS_CHANGED } from '../_actor-field-diff.mjs';
 import { identityFieldDefs } from '../_identity-item-plan.mjs';
 
 /**
@@ -51,6 +51,7 @@ export async function createGenericAdapter(api, chronicleSystemId) {
   // Only scalar (foundry_path) fields go through actor.update; collection
   // fields are excluded here (identity ones are swapped as items instead).
   const writableFields = mappedFields.filter((f) => f.foundry_path && f.foundry_writable !== false);
+  const identity = identityFieldDefs(mappedFields);
 
   console.debug(
     `Chronicle: Generic adapter loaded for "${chronicleSystemId}" — ` +
@@ -65,7 +66,10 @@ export async function createGenericAdapter(api, chronicleSystemId) {
     fieldDefs: mappedFields,
 
     /** Single-item collection fields Chronicle may change on the sheet (ancestry, culture, career, kit). */
-    identityFields: identityFieldDefs(mappedFields),
+    identityFields: identity,
+
+    /** Item types a single-item field reads; a change to one is pushed (see ITEMS_CHANGED). */
+    itemFieldTypes: singleItemTypes(mappedFields),
 
     /** Character entity type slug from the manifest. */
     characterTypeSlug: fieldDefs.preset_slug || `${chronicleSystemId}-character`,
@@ -92,9 +96,15 @@ export async function createGenericAdapter(api, chronicleSystemId) {
     /**
      * Like toChronicleFields, but only the scalar fields the update `change`
      * touched, plus the Foundry-derived collection fields (items) when at
-     * least one scalar changed. Returns null when no mapped field changed, so
-     * the caller skips the push. Chronicle merges the result into the stored
-     * fields, so Chronicle-only fields are never overwritten.
+     * least one scalar or a mapped item changed. Returns null when nothing
+     * mapped changed, so the caller skips the push. Chronicle merges the
+     * result into the stored fields, so Chronicle-only fields are never
+     * overwritten.
+     *
+     * An identity item (complication, ancestry...) the user removed, with no
+     * other of its type left, is sent as "" so Chronicle drops the pick too.
+     * Only a removal does that: an item merely absent is still left out
+     * (buildChronicleFields), and class stays Foundry-led.
      *
      * @param {Actor} actor
      * @param {object} change - Foundry's nested update diff.
@@ -102,11 +112,20 @@ export async function createGenericAdapter(api, chronicleSystemId) {
      */
     toChronicleFieldsChanged(actor, change) {
       const touched = new Set(touchedScalarKeys(change || {}, mappedFields));
-      if (touched.size === 0) return null;
-      return buildChronicleFields(
+      const items = change?.[ITEMS_CHANGED];
+      const itemsTouched = !!items && typeof items === 'object' && Object.keys(items).length > 0;
+      if (touched.size === 0 && !itemsTouched) return null;
+      const out = buildChronicleFields(
         actor,
         mappedFields.filter((f) => f.foundry_collection || touched.has(f.key)),
       );
+      if (itemsTouched) {
+        for (const def of identity) {
+          const types = Array.isArray(def.foundry_item_type) ? def.foundry_item_type : [def.foundry_item_type];
+          if (!(def.key in out) && types.some((t) => items[t] === 'deleted')) out[def.key] = '';
+        }
+      }
+      return out;
     },
 
     /**
@@ -217,6 +236,21 @@ export function normalizeFoundryValue(value, depth) {
 }
 
 /**
+ * The item types the single-item collection fields read.
+ * @param {Array<object>} fields
+ * @returns {Set<string>}
+ */
+export function singleItemTypes(fields) {
+  const out = new Set();
+  for (const f of fields ?? []) {
+    if (!f?.foundry_collection || !f.foundry_item_single) continue;
+    const types = Array.isArray(f.foundry_item_type) ? f.foundry_item_type : [f.foundry_item_type];
+    for (const t of types) if (typeof t === 'string' && t) out.add(t);
+  }
+  return out;
+}
+
+/**
  * Whether an item still carries the name Foundry gives a new, empty item of
  * its type ("Complication", "New Complication"). That is no choice yet, so a
  * single-item field treats it as absent rather than sending the type's name
@@ -268,6 +302,11 @@ export function extractCollectionField(actor, field) {
     // Single-item collapse: "exactly one X item" fields (class/ancestry/kit)
     // want the item's NAME as a plain string, not a one-element JSON array.
     // Uses the first projected path when a projection is given, else item.name.
+    // A joined field (foundry_item_join) holds several picks, such as a
+    // tactician's two kits: every real item's name, joined as Chronicle stores them.
+    if (field.foundry_item_single && field.foundry_item_join && !proj) {
+      return contents.filter((it) => it && !isPlaceholderName(it) && it.name).map((it) => it.name).join(', ');
+    }
     if (field.foundry_item_single) {
       const first = contents[0];
       if (!first) return '';

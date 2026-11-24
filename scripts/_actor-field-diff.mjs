@@ -40,6 +40,15 @@ export function changeTouchesPath(change, path) {
 }
 
 /**
+ * The key an actor's pending change carries when one of its embedded items
+ * that a single-item field reads (complication, ancestry, class...) was made,
+ * edited or removed. Foundry fires no actor update for those, so without it
+ * the field would wait for the next unrelated edit. Its value maps each item
+ * type to 'changed' or 'deleted'; a later change in the burst wins.
+ */
+export const ITEMS_CHANGED = 'chronicleItems';
+
+/**
  * Keys of the scalar mapped fields whose Foundry path `change` touches.
  * @param {object} change
  * @param {Array<{key: string, foundry_path?: string}>} mappedFields

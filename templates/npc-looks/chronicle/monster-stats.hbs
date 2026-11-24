@@ -1,0 +1,54 @@
+{{!-- Chronicle monster sheet boxes, above the tabs. Play: characteristics and
+combat numbers, then Stamina, damage, conditions and the villain actions used
+this fight (marks the Director sets; they clear when the fight ends). Edit:
+Draw Steel's own stat editors. --}}
+<section class="cs-hero-stats stats cs-npc-stats">
+  {{#if isPlay}}
+  {{> "modules/chronicle-sync/templates/npc-looks/chronicle/numbers-row.hbs"}}
+  <div class="cs-row cs-row-mon">
+    {{> "modules/chronicle-sync/templates/npc-looks/chronicle/stamina-box.hbs"}}
+    <div class="cs-box cs-damage">
+      <span class="cs-lab">{{localize "CHRONICLE.HeroSheet.Damage"}}</span>
+      <dl class="cs-kv">
+        <div>
+          <dt>{{systemFields.damage.fields.immunities.label}}</dt>
+          <dd>{{#if damageIW.immunities}}{{{damageIW.immunities}}}{{else}}{{localize "COMMON.None"}}{{/if}}</dd>
+        </div>
+        <div>
+          <dt>{{systemFields.damage.fields.weaknesses.label}}</dt>
+          <dd>{{#if damageIW.weaknesses}}{{{damageIW.weaknesses}}}{{else}}{{localize "COMMON.None"}}{{/if}}</dd>
+        </div>
+      </dl>
+    </div>
+    <div class="cs-box cs-conditions">
+      <span class="cs-lab">{{localize "CHRONICLE.HeroSheet.Conditions"}}</span>
+      {{#if npc.chronicle.conditions.length}}
+      <ul class="cs-tags">
+        {{#each npc.chronicle.conditions as |c|}}
+        <li>{{#if c.img}}<img src="{{c.img}}" alt="" inert>{{/if}}{{c.name}}</li>
+        {{/each}}
+      </ul>
+      {{else}}
+      <span class="cs-val">{{localize "COMMON.None"}}</span>
+      {{/if}}
+    </div>
+    {{#if npc.villain.total}}
+    <div class="cs-box cs-va">
+      <span class="cs-lab">{{localize "CHRONICLE.NpcSheet.Villain.Title"}}</span>
+      <div class="cs-va-pips">
+        {{#each npc.villain.marks as |m|}}
+        {{#if @root.npc.villain.canMark}}
+        <button type="button" class="cs-va-mark {{m.state}}" data-action="csVillain" data-item-id="{{m.id}}" aria-pressed="{{#if (eq m.state "used")}}true{{else}}false{{/if}}" aria-label="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}" data-tooltip-text="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}">{{m.order}}</button>
+        {{else}}
+        <span class="cs-va-mark {{m.state}}" role="img" aria-label="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}" data-tooltip-text="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}">{{m.order}}</span>
+        {{/if}}
+        {{/each}}
+      </div>
+      <p class="cs-sub">{{#if npc.villain.inFight}}{{localize "CHRONICLE.NpcSheet.Villain.Left" left=npc.villain.left total=npc.villain.total}}{{else}}{{localize "CHRONICLE.NpcSheet.Villain.NoFight"}}{{/if}}</p>
+    </div>
+    {{/if}}
+  </div>
+  {{else}}
+  {{> "modules/chronicle-sync/templates/npc-looks/edit-stats.hbs"}}
+  {{/if}}
+</section>

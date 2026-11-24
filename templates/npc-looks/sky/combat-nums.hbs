@@ -1,0 +1,18 @@
+{{!-- Speed and Free strike as big thin numbers. Free strike is Draw Steel's
+button for whoever can edit the sheet (the Director, or the player who runs a
+retainer) and plain text for anyone else, as on its own sheet. --}}
+<div class="cs-sky-num cs-sky-speed"{{#if movement.list}} data-tooltip-text="{{movement.list}}"{{/if}}>
+  <b class="cs-sky-big">{{system.movement.value}}</b>
+  <span class="cs-sky-k">{{systemFields.movement.fields.value.label}}</span>
+</div>
+{{#if editable}}
+<button type="button" class="cs-sky-num cs-sn-free cs-sn-press" data-action="freeStrike" data-tooltip="CHRONICLE.NpcSheet.FreeStrikeTip">
+  <b class="cs-sky-big">{{system.monster.freeStrike}}</b>
+  <span class="cs-sky-k">{{systemFields.monster.fields.freeStrike.label}}</span>
+</button>
+{{else}}
+<div class="cs-sky-num cs-sn-free">
+  <b class="cs-sky-big">{{system.monster.freeStrike}}</b>
+  <span class="cs-sky-k">{{systemFields.monster.fields.freeStrike.label}}</span>
+</div>
+{{/if}}

@@ -13,12 +13,14 @@
  */
 
 import { log } from './logger.mjs';
-import { syncOptions } from './constants.mjs';
+import { FLAG_SCOPE, syncOptions } from './constants.mjs';
 import {
   ROLL_MESSAGE_TYPE,
   SeenRolls,
   buildChatData,
+  characterIdOf,
   hasRollMessage,
+  heroSpeaker,
   isRouteMissing,
   judgeIncoming,
   postBodies,
@@ -74,6 +76,7 @@ export const rollRelay = {
         rollerFoundryId: rollerFoundryId && game.users.get(rollerFoundryId) ? rollerFoundryId : null,
         fallbackAlias: game.i18n.localize('CHRONICLE.Rolls.FallbackName'),
         authorId: game.user.id,
+        speaker: this._heroSpeaker(payload),
       });
       // The Roll class rebuilds each term from its saved results, so nothing is rolled again.
       data.rolls = data.rolls.map((r) => Roll.fromData(r));
@@ -81,6 +84,24 @@ export const rollRelay = {
       await ChatMessage.create(data, syncOptions());
     } catch (err) {
       log.warn('Could not show a Chronicle roll in chat', err);
+    }
+  },
+
+  /**
+   * A roll Chronicle made from a hero's sheet speaks as the actor linked to
+   * that hero, through Foundry's own speaker (its token on the scene when it
+   * has one). No linked actor, or any failure, leaves the roller's name.
+   */
+  _heroSpeaker(payload) {
+    const id = characterIdOf(payload);
+    if (!id) return null;
+    try {
+      const actor = game.actors?.find((a) => a.getFlag(FLAG_SCOPE, 'entityId') === id);
+      if (!actor) return null;
+      return heroSpeaker(ChatMessage.getSpeaker({ actor }), actor);
+    } catch (err) {
+      log.warn('Could not find the hero for a Chronicle roll; it shows under the player\'s name', err);
+      return null;
     }
   },
 

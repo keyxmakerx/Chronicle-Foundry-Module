@@ -290,7 +290,7 @@ export function buildCapabilityReport(snapshot, fieldDefs) {
       source: 'actor.items',
       count: snapshot.items.count,
       types: snapshot.items.types,
-      note: 'Embedded items. Pullable via a collection mapping (foundry_collection + foundry_item_type[, foundry_item_single]); a single-item mapping for ancestry, culture, career or kit is also Chronicle → Foundry (the item is swapped); per-type schemas below show the projectable fields.',
+      note: 'Embedded items. Pullable via a collection mapping (foundry_collection + foundry_item_type[, foundry_item_single]); a single-item mapping for ancestry, culture, career, kit or complication is also Chronicle → Foundry (the item is swapped); per-type schemas below show the projectable fields.',
       sample: snapshot.items.sample,
       samples: snapshot.items.samples || [],
     });

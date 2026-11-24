@@ -9,6 +9,8 @@
 
 import { installFoundry } from './fake-foundry.mjs';
 import { CHRONICLE_URL } from './chronicle.mjs';
+import { buildChronicleFields } from '../scripts/adapters/generic-adapter.mjs';
+import { ITEMS_CHANGED } from '../scripts/_actor-field-diff.mjs';
 
 // The module narrates on console.debug/log; keep the bench output to results
 // unless asked (BENCH_VERBOSE=1). Warnings and errors still print.
@@ -92,8 +94,20 @@ export const benchAdapter = {
   toChronicleFields(actor) {
     return actor.system?.hp === undefined ? {} : { hp: actor.system.hp };
   },
+  // The item types those fields read, so adding, editing or removing one in
+  // Foundry pushes it as the generic adapter does.
+  itemFieldTypes: new Set(['ancestry', 'kit']),
   toChronicleFieldsChanged(actor, change) {
-    return change?.system?.hp === undefined ? null : { hp: change.system.hp };
+    const out = change?.system?.hp === undefined ? {} : { hp: change.system.hp };
+    const items = change?.[ITEMS_CHANGED];
+    if (items) {
+      for (const def of benchAdapter.identityFields) {
+        const got = buildChronicleFields(actor, [def]);
+        if (def.key in got) out[def.key] = got[def.key];
+        else if (items[def.key] === 'deleted') out[def.key] = '';
+      }
+    }
+    return Object.keys(out).length ? out : null;
   },
 };
 
