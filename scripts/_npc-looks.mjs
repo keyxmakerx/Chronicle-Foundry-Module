@@ -81,6 +81,7 @@ export const SHARED_TEMPLATES = Object.freeze({
   talk: `${NPC_LOOK_DIR}/talk.hbs`,
   people: `${NPC_LOOK_DIR}/people.hbs`,
   edit: `${NPC_LOOK_DIR}/edit-stats.hbs`,
+  onlyYou: `${NPC_LOOK_DIR}/only-you.hbs`,
 });
 
 /** The partials each look's templates include, by name in the look's folder. */
@@ -156,8 +157,31 @@ export function npcParts(baseParts, own) {
   for (const [id, part] of Object.entries(baseParts)) {
     if (!(id in parts)) parts[id] = part;
   }
+  // After the tabs, so it opens over whichever one is showing.
+  parts.onlyYou = { template: SHARED_TEMPLATES.onlyYou };
   parts.card = own.card;
   return parts;
+}
+
+/**
+ * What the Director's "Only you" drawer holds: the page's secret text and
+ * the motivations and pitfalls the party hasn't found on one side, and on
+ * the other what the players have been given (found and appealed-to
+ * entries, and whether they see the meters). Built only from the
+ * Director's live read; null without one, so nothing is drawn.
+ * @param {{isGM: boolean, live: boolean, secrets: string[], negotiation: object|null}} p
+ * @returns {null|{secrets: string[], hidden: object[], given: object[], shown: boolean, impressionText: string|null}}
+ */
+export function onlyYouView({ isGM, live, secrets = [], negotiation = null }) {
+  if (!isGM || !live) return null;
+  const rows = negotiation?.rows ?? [];
+  return {
+    secrets: secrets.filter((t) => typeof t === 'string' && t),
+    hidden: rows.filter((r) => r.state === 'hidden'),
+    given: rows.filter((r) => r.state !== 'hidden'),
+    shown: negotiation?.shown === true,
+    impressionText: negotiation?.has ? (negotiation.impressionText ?? null) : null,
+  };
 }
 
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);

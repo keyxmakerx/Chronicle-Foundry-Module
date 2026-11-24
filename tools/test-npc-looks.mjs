@@ -10,7 +10,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   NPC_LOOK_DIR, SHAPES, allNpcLookTemplates, answerKey, hasStatBlock, meterPips, motiveKey, motiveRows,
-  negotiationView, npcChanges, npcLook, npcLookTemplate, npcPageId, npcParts, npcTabs, openingTab, pageChips,
+  negotiationView, npcChanges, npcLook, npcLookTemplate, npcPageId, npcParts, npcTabs, onlyYouView, openingTab, pageChips,
   pageText, peopleRows, sheetShape, villainKey, villainMarks, withVillainUse,
 } from '../scripts/_npc-looks.mjs';
 
@@ -53,7 +53,7 @@ test('npcTabs: no Stats tab, Talk first, People after Features; npcParts: boxes 
   assert.equal(tabs.primary.tabs[0].label, 'CHRONICLE.NpcSheet.Tabs.talk');
   assert.equal(tabs.primary.labelPrefix, 'X');
   const parts = npcParts({ header: 1, tabs: 2, stats: 3, features: 4, abilities: 5, effects: 6, biography: 7 }, { header: 'H', stats: 'S', card: 'C' });
-  assert.deepEqual(Object.keys(parts), ['header', 'stats', 'tabs', 'talk', 'people', 'features', 'abilities', 'effects', 'biography', 'card']);
+  assert.deepEqual(Object.keys(parts), ['header', 'stats', 'tabs', 'talk', 'people', 'features', 'abilities', 'effects', 'biography', 'onlyYou', 'card']);
   assert.equal(parts.stats, 'S');
 });
 
@@ -208,4 +208,25 @@ test('npcChanges: the hero moves, then villain action, Malice, winded, Interest,
   assert.deepEqual(npcChanges({ ...before, interest: 3 }, { ...before, interest: 1 }), ['down']);
   assert.deepEqual(npcChanges(null, after), []);
   assert.deepEqual(npcChanges({ villainUsed: null, malice: null }, { villainUsed: 1, malice: 4 }), []);
+});
+
+test('onlyYouView: the Director\'s live read only, split into what only they know and what players have', () => {
+  const negotiation = {
+    has: true, shown: true, impressionText: '4',
+    rows: [
+      { key: 'greed', kind: 'motivation', state: 'found' },
+      { key: 'legacy', kind: 'motivation', state: 'hidden' },
+      { key: 'protection', kind: 'motivation', state: 'used' },
+      { key: 'justice', kind: 'pitfall', state: 'hidden' },
+    ],
+  };
+  assert.equal(onlyYouView({ isGM: false, live: true, secrets: ['x'], negotiation }), null);
+  assert.equal(onlyYouView({ isGM: true, live: false, secrets: ['x'], negotiation }), null);
+  const v = onlyYouView({ isGM: true, live: true, secrets: ['Holds his debts.', '', 3], negotiation });
+  assert.deepEqual(v.secrets, ['Holds his debts.']);
+  assert.deepEqual(v.hidden.map((r) => r.key), ['legacy', 'justice']);
+  assert.deepEqual(v.given.map((r) => r.key), ['greed', 'protection']);
+  assert.equal(v.shown, true);
+  assert.equal(v.impressionText, '4');
+  assert.equal(onlyYouView({ isGM: true, live: true, secrets: [], negotiation: { has: false, rows: [] } }).impressionText, null);
 });

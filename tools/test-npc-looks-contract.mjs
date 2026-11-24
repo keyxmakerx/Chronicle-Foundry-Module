@@ -38,7 +38,7 @@ const KNOWN_ACTIONS = new Set([
 const HERO_ACTIONS = new Set(['csPortraitMenu', 'csUnfold', 'csFold', 'csLookPicker']);
 
 /** The NPC sheet's own actions. useAbility wraps Draw Steel's, so it is not new. */
-const NPC_ACTIONS = new Set(['csTalk', 'csVillain', 'csShape', 'csOpenPage', 'csToggleLog']);
+const NPC_ACTIONS = new Set(['csTalk', 'csVillain', 'csShape', 'csOpenPage', 'csToggleLog', 'csOnlyYou']);
 
 /** Draw Steel's stat editors, as its own NPC stats template includes them. */
 const DS_STAT_PARTIALS = ['characteristics', 'combat', 'movement', 'immunities-weaknesses']
@@ -130,14 +130,26 @@ function ifBlocks(src, cond) {
   return out;
 }
 
-const TEMPLATES = allNpcLookTemplates();
+/** Every template on disk, so a look's templates are checked before it joins the catalogue. */
+const TEMPLATES = templatesOnDisk();
 
-test('every template the sheet draws is on disk, and every template on disk is drawn', () => {
-  for (const path of TEMPLATES) assert.ok(existsSync(onDisk(path)), `missing ${path}`);
-  assert.deepEqual(templatesOnDisk().sort(), [...TEMPLATES].sort());
+/** The look folders on disk. */
+const LOOKS = readdirSync(DIR, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort();
+
+/** The template a look on disk draws a part with: its own, else the Chronicle look's. */
+function lookPart(look, shape, part) {
+  const own = resolve(DIR, look, `${shape}-${part}.hbs`);
+  return existsSync(own) ? own : resolve(DIR, 'chronicle', `${shape}-${part}.hbs`);
+}
+
+test('every look in the catalogue has its templates, and every template on disk is one the sheet draws', () => {
+  assert.deepEqual(LOOKS, [...NPC_LOOKS].sort());
+  const drawn = allNpcLookTemplates();
+  for (const path of drawn) assert.ok(existsSync(onDisk(path)), `missing ${path}`);
+  assert.deepEqual([...TEMPLATES].sort(), [...drawn].sort());
   for (const look of NPC_LOOKS) {
     for (const shape of SHAPES) {
-      for (const part of NPC_LOOK_PARTS) assert.ok(TEMPLATES.includes(npcLookTemplate(look, shape, part)), `${look} ${shape}-${part}`);
+      for (const part of NPC_LOOK_PARTS) assert.ok(drawn.includes(npcLookTemplate(look, shape, part)), `${look} ${shape}-${part}`);
     }
   }
 });
@@ -204,10 +216,10 @@ test('every lang key the templates and the sheet use exists', () => {
 });
 
 for (const shape of SHAPES) {
-  for (const look of NPC_LOOKS) {
-    const header = read(onDisk(npcLookTemplate(look, shape, 'header')));
-    const stats = read(onDisk(npcLookTemplate(look, shape, 'stats')));
-    const card = read(onDisk(npcLookTemplate(look, shape, 'card')));
+  for (const look of LOOKS) {
+    const header = read(lookPart(look, shape, 'header'));
+    const stats = read(lookPart(look, shape, 'stats'));
+    const card = read(lookPart(look, shape, 'card'));
 
     test(`${look} ${shape}: the header reads only Draw Steel's header and the sheet's player-safe figures`, () => {
       const extra = dataPaths(header).filter((p) => !HEADER_MAY_READ.has(p) && !HEADER_FIGURES.has(p));
@@ -384,6 +396,8 @@ test('a player\'s screen holds nothing the Director only may know, and never ask
   assert.equal(npc.pageUrl, null);
   assert.equal(npc.talk.show, false);
   assert.equal(npc.malice.show, false);
+  assert.equal(npc.onlyYou, null);
+  assert.doesNotMatch(JSON.stringify(npc), /sold the party out|Traitor|Baron|Gallow/);
   assert.equal(npc.negotiation.source, 'players');
   assert.equal(npc.negotiation.impression, null);
   assert.equal(npc.negotiation.impressionText, '–');
@@ -400,7 +414,7 @@ test('a player sees the meters once the Director has shown them', async () => {
   assert.equal(npc.negotiation.impression, null);
 });
 
-test('the Director\'s screen reads the page live, without its secret text or Director-only tags', async () => {
+test('the Director\'s screen reads the page live, its secret text only in the "Only you" drawer', async () => {
   const { npc, calls } = await figuresAs({ isGM: true, flags: { entityId: 'page-1' } });
   assert.deepEqual(calls.sort(), ['/entities/page-1', '/entities/page-1/relations', '/entities/page-1/system-state/drawsteel/negotiation']);
   assert.equal(npc.negotiation.source, 'chronicle');
@@ -410,8 +424,12 @@ test('the Director\'s screen reads the page live, without its secret text or Dir
   assert.deepEqual(npc.page.chips.map((c) => c.name), ['River Guild', 'Ally']);
   assert.deepEqual(npc.people.map((p) => [p.name, p.dmOnly]), [['Mira', false], ['The Baron', true]]);
   assert.equal(npc.talk.show, true);
-  // The page's secret text is not drawn anywhere on this sheet.
-  assert.doesNotMatch(JSON.stringify(npc), /sold the party out/);
+  // The page's secret text is only in the drawer, never in the open text or the chips.
+  assert.deepEqual(npc.onlyYou.secrets, ['He sold the party out to the Baron.']);
+  assert.deepEqual(npc.onlyYou.hidden.map((r) => r.key), ['legacy', 'power']);
+  assert.deepEqual(npc.onlyYou.given.map((r) => r.key), ['wealth']);
+  assert.equal(npc.onlyYou.impressionText, '7');
+  assert.doesNotMatch(JSON.stringify({ ...npc, onlyYou: null }), /sold the party out/);
 });
 
 test('a monster asks Chronicle nothing, even for the Director', async () => {

@@ -36,6 +36,16 @@
       "Tag": "Tag",
       "EditMetadata": "Level, organization, role and keywords",
       "OnlyYou": "only you",
+      "OnlyYouTab": "Only you",
+      "Drawer": {
+        "Note": "Read from Chronicle, never saved in Foundry",
+        "Close": "Close",
+        "Secrets": "On the page, for you only",
+        "NoSecrets": "The page has no secret text.",
+        "NotFound": "Not found yet",
+        "AllFound": "The party has found every motivation and pitfall.",
+        "Given": "What the players have"
+      },
       "MaliceTip": "Only you see Malice. Draw Steel's own number, shared by every monster.",
       "InFight": "In this fight",
       "Impression": "Impression",
@@ -104,6 +114,14 @@
         "NoneGM": "No motivations or pitfalls on the page yet.",
         "FromPage": "From the page",
         "FromPageNote": "Read from Chronicle, never saved in Foundry"
+      },
+      "Hover": {
+        "Stamina": "Stamina",
+        "Stability": "Stability",
+        "FreeStrike": "Free strike",
+        "Immune": "Immune",
+        "Weak": "Weak",
+        "Conditions": "Conditions"
       },
       "People": {
         "Note": "From the page's links in Chronicle",

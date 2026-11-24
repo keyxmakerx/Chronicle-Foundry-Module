@@ -258,3 +258,62 @@
   font: 600 15px var(--cs-hero-face);
   text-align: center;
 }
+
+/* The Director's "Only you" tab, at the end of the tab row, and its drawer.
+   Open, the drawer takes the place of the tab showing until it is closed or
+   another tab is picked. Amber edge, mark and words, as everything that is
+   the Director's alone. */
+.chronicle-npc-sheet nav.tabs .cs-only-you-tab {
+  flex: none;
+  width: auto;
+  height: auto;
+  margin-inline-start: auto;
+  padding: 4px 12px;
+  border: 1px solid var(--cs-hero-dm);
+  border-radius: min(999px, var(--cs-hero-radius));
+  background: var(--cs-hero-dm-soft);
+  color: var(--cs-hero-dm);
+  font: 600 13px var(--cs-hero-face);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.chronicle-npc-sheet nav.tabs .cs-only-you-tab[aria-expanded="true"] {
+  background: var(--cs-hero-dm);
+  color: var(--cs-hero-bg, #111);
+}
+.chronicle-npc-sheet nav.tabs .cs-only-you-tab:focus-visible {
+  outline: 2px solid var(--cs-hero-dm);
+  outline-offset: 2px;
+}
+.chronicle-npc-sheet.cs-only-you-open .window-content > section.tab { display: none; }
+.chronicle-npc-sheet .cs-only-you {
+  margin: 12px 0 16px;
+  padding: 14px 16px 16px 18px;
+  border: 1px solid var(--cs-hero-line);
+  border-radius: min(10px, var(--cs-hero-radius));
+  background: var(--cs-hero-panel);
+  box-shadow: inset 3px 0 0 var(--cs-hero-dm);
+  color: var(--cs-hero-text);
+  container-type: inline-size;
+  animation: cs-npc-drawer-in 200ms var(--cs-hero-ease) both;
+}
+.chronicle-npc-sheet .cs-only-you[hidden] { display: none; }
+@keyframes cs-npc-drawer-in { from { opacity: 0; transform: translateY(-6px); } }
+html[data-cs-motion="calm"] .chronicle-npc-sheet .cs-only-you { animation-name: cs-fade; }
+.chronicle-npc-sheet .cs-oy-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.chronicle-npc-sheet .cs-oy-head h3 { margin: 0; border: 0; color: var(--cs-hero-dm); font: 700 15px var(--cs-hero-face); }
+.chronicle-npc-sheet .cs-oy-head small { color: var(--cs-hero-muted); font-size: 12px; }
+.chronicle-npc-sheet .cs-oy-close { width: 30px; height: 30px; margin-inline-start: auto; padding: 0; }
+.chronicle-npc-sheet .cs-oy-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.chronicle-npc-sheet .cs-oy-side { display: grid; align-content: start; gap: 8px; min-width: 0; }
+.chronicle-npc-sheet .cs-oy-side h4 {
+  margin: 4px 0 0;
+  color: var(--cs-hero-muted);
+  font: 600 11.5px var(--cs-hero-face);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.chronicle-npc-sheet .cs-oy-side .cs-prose { margin: 0; }
+@container (max-width: 560px) {
+  .chronicle-npc-sheet .cs-oy-cols { grid-template-columns: 1fr; }
+}

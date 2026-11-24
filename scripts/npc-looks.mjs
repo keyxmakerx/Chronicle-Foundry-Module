@@ -29,7 +29,7 @@ import { isTalkLive } from './_npc-presence.mjs';
 import { SHOWN_FLAG } from './_negotiation-mirror.mjs';
 import {
   NPC_ONLY, SHAPE_FLAG, SHAPES, VILLAIN_FLAG,
-  allNpcLookTemplates, hasStatBlock, negotiationView, npcChanges, npcLook, npcLookTemplate, npcPageId, npcParts,
+  allNpcLookTemplates, hasStatBlock, negotiationView, npcChanges, npcLook, npcLookTemplate, npcPageId, npcParts, onlyYouView,
   npcTabs, openingTab, pageChips, pageText, peopleRows, sheetShape, villainKey, villainMarks, withVillainUse,
 } from './_npc-looks.mjs';
 
@@ -98,6 +98,7 @@ export function makeChronicleNpcSheet(Base) {
         csShape: ChronicleNpcSheet.#onShape,
         csOpenPage: ChronicleNpcSheet.#onOpenPage,
         csToggleLog: ChronicleNpcSheet.#onToggleLog,
+        csOnlyYou: ChronicleNpcSheet.#onOnlyYou,
         useAbility: ChronicleNpcSheet.#onUseAbility,
       },
     };
@@ -125,6 +126,9 @@ export function makeChronicleNpcSheet(Base) {
 
     /** What this draw shows, built once per draw for every part. */
     #model = null;
+
+    /** Whether the Director's "Only you" drawer is open; kept across redraws. */
+    #onlyYouOpen = false;
 
     /** The shape this actor is drawn in. */
     get shape() {
@@ -203,8 +207,12 @@ export function makeChronicleNpcSheet(Base) {
     _configureRenderParts(options) {
       const parts = super._configureRenderParts(options);
       if (this.shape !== 'npc' || this.folded) for (const id of NPC_ONLY) delete parts[id];
-      // People is the page's links, which only the Director's screen reads.
-      if (!globalThis.game?.user?.isGM) delete parts.people;
+      // People is the page's links, and the drawer its secrets: only the Director's screen reads them.
+      if (!globalThis.game?.user?.isGM) {
+        delete parts.people;
+        delete parts.onlyYou;
+      }
+      if (this.shape !== 'npc' || this.folded) delete parts.onlyYou;
       return parts;
     }
 
@@ -266,6 +274,68 @@ export function makeChronicleNpcSheet(Base) {
       } catch (err) {
         console.warn('Chronicle Sync | villain action marks not shown', err);
       }
+      try {
+        this.#drawOnlyYouTab();
+      } catch (err) {
+        console.warn('Chronicle Sync | the Only you drawer is unavailable', err);
+      }
+    }
+
+    /**
+     * The amber "Only you" tab at the end of the tab row, for the Director
+     * on an NPC read from its page. It opens the drawer over the tab showing
+     * instead of switching tabs, so it is a button, not one of Draw Steel's tabs.
+     */
+    #drawOnlyYouTab() {
+      const nav = this.element.querySelector('nav.tabs[data-group="primary"]');
+      const drawer = this.element.querySelector('.cs-only-you');
+      nav?.querySelector('.cs-only-you-tab')?.remove();
+      if (!nav || !drawer || !this.#model?.onlyYou) {
+        this.#onlyYouOpen = false;
+        return;
+      }
+      const i18n = globalThis.game.i18n;
+      const btn = globalThis.document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'cs-only-you-tab cs-dm-only';
+      btn.dataset.action = 'csOnlyYou';
+      btn.setAttribute('aria-controls', drawer.id);
+      const mark = globalThis.document.createElement('span');
+      mark.className = 'cs-dm-mark';
+      mark.textContent = i18n.localize('CHRONICLE.NpcSheet.OnlyYouTab');
+      btn.append(mark);
+      nav.append(btn);
+      this.#applyOnlyYou({ focus: false });
+      // A redraw of other parts keeps this drawer, so its key handler is added once.
+      if (drawer.dataset.csKeys) return;
+      drawer.dataset.csKeys = '1';
+      drawer.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        event.stopPropagation();
+        this.#onlyYouOpen = false;
+        this.#applyOnlyYou({ focus: true });
+      });
+    }
+
+    /** Picking a tab closes the drawer, so the tab picked is what shows. */
+    changeTab(...args) {
+      super.changeTab(...args);
+      if (!this.#onlyYouOpen) return;
+      this.#onlyYouOpen = false;
+      this.#applyOnlyYou({ focus: false });
+    }
+
+    /** Show or hide the drawer to match its state; focus follows it when asked. */
+    #applyOnlyYou({ focus }) {
+      const drawer = this.element?.querySelector('.cs-only-you');
+      const btn = this.element?.querySelector('.cs-only-you-tab');
+      if (!drawer || !btn) return;
+      drawer.hidden = !this.#onlyYouOpen;
+      btn.setAttribute('aria-expanded', String(this.#onlyYouOpen));
+      this.element.classList.toggle('cs-only-you-open', this.#onlyYouOpen);
+      if (!focus) return;
+      if (this.#onlyYouOpen) drawer.querySelector('.cs-oy-close')?.focus();
+      else btn.focus();
     }
 
     /** Dim the villain actions used this fight in Draw Steel's own Abilities list. */
@@ -422,6 +492,7 @@ export function makeChronicleNpcSheet(Base) {
           }) : [],
         },
         people: live ? peopleRows(live.relations, pageId) : [],
+        onlyYou: shape === 'npc' ? onlyYouView({ isGM, live: !!live, secrets: page.secrets, negotiation }) : null,
         pageUrl: isGM && pageId ? chroniclePageUrl({ apiUrl: setting('apiUrl', ''), campaignId: setting('campaignId', ''), entityId: pageId }) : null,
         shapes: SHAPES.map((id) => ({ id, label: `CHRONICLE.NpcSheet.Shape.${id}`, checked: id === shape })),
         canShape: !!actor.isOwner,
@@ -490,6 +561,12 @@ export function makeChronicleNpcSheet(Base) {
     }
 
     /** Show or hide the argument log, without a redraw. */
+    /** Open or close the Director's "Only you" drawer. */
+    static #onOnlyYou() {
+      this.#onlyYouOpen = !this.#onlyYouOpen;
+      this.#applyOnlyYou({ focus: true });
+    }
+
     static #onToggleLog(event, target) {
       const log = this.element?.querySelector('.cs-log');
       if (!log) return;

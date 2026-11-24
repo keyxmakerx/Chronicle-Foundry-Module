@@ -2461,6 +2461,53 @@ body.ccal-rest #chronicle-calendar-bar .ccal-sky * { animation-play-state: pause
   object-fit: contain;
 }
 
+/* A Draw Steel NPC or monster's hover card: the picture beside what this
+   viewer may know (scripts/_npc-hover.mjs). Same frame, so a token frame
+   restyles it too. */
+.chronicle-hover-art.cs-hover-card {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  width: max-content;
+  max-width: min(420px, 60vw);
+  color: var(--cs-text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.chronicle-hover-art.cs-hover-card img { width: 120px; max-width: 120px; height: auto; max-height: 160px; flex: none; }
+.cs-hover-card .cs-hc-body { display: grid; gap: 6px; min-width: 180px; padding: 2px 4px 2px 0; }
+/* Room for five characteristic names in full. */
+.cs-hover-card .cs-hc-body:has(.cs-hc-chars) { min-width: 270px; }
+.cs-hover-card .cs-hc-name { font-size: 15px; font-weight: 700; }
+.cs-hover-card .cs-hc-sub { color: var(--cs-text-muted); }
+.cs-hover-card .cs-hc-state { justify-self: start; padding: 1px 8px; border-radius: 999px; background: rgba(var(--cs-warn-rgb), 0.18); color: var(--cs-text); font-weight: 600; }
+.cs-hover-card .cs-hc-lab { color: var(--cs-text-muted); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.cs-hover-card .cs-hc-stam { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }
+.cs-hover-card .cs-hc-bar { position: relative; height: 6px; border-radius: 3px; background: var(--cs-line); overflow: hidden; }
+.cs-hover-card .cs-hc-bar i { position: absolute; inset: 0 auto 0 0; background: var(--cs-ok); }
+.cs-hover-card .cs-hc-stam[data-band="winded"] .cs-hc-bar i { background: var(--cs-warn); }
+.cs-hover-card .cs-hc-stam:is([data-band="dying"], [data-band="dead"]) .cs-hc-bar i { background: var(--cs-bad); }
+.cs-hover-card .cs-hc-bar u { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--cs-text); }
+.cs-hover-card .cs-hc-num { font-weight: 700; font-variant-numeric: tabular-nums; }
+.cs-hover-card .cs-hc-facts { display: grid; gap: 2px; margin: 0; }
+.cs-hover-card .cs-hc-facts > div { display: flex; gap: 6px; }
+.cs-hover-card .cs-hc-facts dt { color: var(--cs-text-muted); }
+.cs-hover-card .cs-hc-facts dd { margin: 0; font-weight: 600; }
+.cs-hover-card .cs-hc-chars { display: flex; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.cs-hover-card .cs-hc-chars li { display: grid; flex: 1; min-width: 0; padding: 3px 2px; border: 1px solid var(--cs-line); border-radius: 4px; text-align: center; }
+.cs-hover-card .cs-hc-chars b { font-size: 14px; font-variant-numeric: tabular-nums; }
+.cs-hover-card .cs-hc-chars span { overflow: hidden; color: var(--cs-text-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.cs-hover-card .cs-hc-meters { display: grid; gap: 3px; }
+.cs-hover-card .cs-hc-meter { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.cs-hover-card .cs-hc-meter b { margin-inline-start: auto; font-variant-numeric: tabular-nums; }
+.cs-hover-card .cs-hc-pips { display: inline-flex; gap: 3px; }
+.cs-hover-card .cs-hc-pips i { width: 8px; height: 8px; border: 1px solid var(--cs-accent); border-radius: 50%; }
+.cs-hover-card .cs-hc-pips i.on { background: var(--cs-accent); }
+.cs-hover-card .cs-hc-motives { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.cs-hover-card .cs-hc-motives li { padding: 1px 7px; border: 1px solid var(--cs-line); border-radius: 999px; }
+.cs-hover-card .cs-hc-motives li[data-kind="pitfall"] { border-color: var(--cs-bad); }
+.cs-hover-card .cs-hc-kind { margin-right: 4px; color: var(--cs-text-muted); font-size: 11px; }
+
 /* Change form: the picker rows, and the reveal card that grows out of the
  * token. The card's frame uses the same knobs as the hover art. */
 .chronicle-form-picker fieldset {
