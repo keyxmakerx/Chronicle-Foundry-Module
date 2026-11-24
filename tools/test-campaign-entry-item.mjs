@@ -6,7 +6,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { entryDescriptionHTML, entryItemFill, findEntry, planEntryRefresh } from '../scripts/_campaign-entry-item.mjs';
+import { ENTRY_TEXT_FORMAT, entryDescriptionHTML, entryItemFill, findEntry, planEntryRefresh } from '../scripts/_campaign-entry-item.mjs';
 import { applyIdentityItem, applyEntryRefresh } from '../scripts/_identity-item-apply.mjs';
 import { identityFieldTypes } from '../scripts/_identity-item-plan.mjs';
 
@@ -52,7 +52,7 @@ test('GM-only text keeps the item name-only', () => {
   assert.equal(entryItemFill({ ...FAIRY, description: '<p>ok</p><span data-secret="true">twist</span>' }), null);
   assert.equal(entryItemFill(null), null);
   const fill = entryItemFill(FAIRY);
-  assert.deepEqual(fill.flags, { 'chronicle-sync': { chronicleMade: true, entrySlug: 'fairy', entryUpdatedAt: FAIRY.updatedAt } });
+  assert.deepEqual(fill.flags, { 'chronicle-sync': { chronicleMade: true, entrySlug: 'fairy', entryUpdatedAt: FAIRY.updatedAt, entryFormat: ENTRY_TEXT_FORMAT } });
 });
 
 function fakeActor() {
@@ -96,9 +96,26 @@ test('refresh: a changed entry, or one never filled, rewrites the made item', ()
   }
 });
 
+test('refresh: an item filled by the older text format is rewritten once', () => {
+  const old = made({ chronicleMade: true, entryUpdatedAt: FAIRY.updatedAt });
+  const plan = planEntryRefresh({ items: [old], fields: FIELDS, fieldsData: { ancestry: 'Fairy' }, entriesByField: { ancestry: [FAIRY] } });
+  assert.equal(plan.length, 1);
+  assert.equal(plan[0].update['flags.chronicle-sync.entryFormat'], ENTRY_TEXT_FORMAT);
+});
+
+test('a Markdown entry from the AI tools reads as text, with mentions linked', () => {
+  const drakari = {
+    description: 'Build a Drakari hero with the **Dragon Knight** ancestry. It is named for @[The Dragon Knights], '
+      + 'kin of @[Nobody Here|someone].\n---',
+  };
+  const html = entryDescriptionHTML(drakari, { mentionId: (n) => (n === 'The Dragon Knights' ? 'ent-7' : null) });
+  assert.equal(html, '<p>Build a Drakari hero with the <strong>Dragon Knight</strong> ancestry. It is named for '
+    + '<a data-mention-id="ent-7">The Dragon Knights</a>, kin of someone.</p>');
+});
+
 test('refresh: nothing to do when current, not sync-made, renamed, secret or missing', () => {
   const cases = [
-    { items: [made({ chronicleMade: true, entryUpdatedAt: FAIRY.updatedAt })] },
+    { items: [made({ chronicleMade: true, entryUpdatedAt: FAIRY.updatedAt, entryFormat: ENTRY_TEXT_FORMAT })] },
     { items: [{ id: 'i1', name: 'Fairy', type: 'ancestry', flags: {} }] },
     { items: [made({ chronicleMade: true })], fieldsData: { ancestry: 'Elf' } },
     { items: [made({ chronicleMade: true })], entries: [{ ...FAIRY, description: '<span data-secret>x</span>' }] },
