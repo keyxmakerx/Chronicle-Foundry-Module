@@ -1,0 +1,56 @@
+{{!-- The Director's "Only you" drawer, opened from the tab row over the tab
+showing: the page's secret text and what the party hasn't found, beside what
+the players have been given. Read from Chronicle on the Director's screen and
+never saved in Foundry; the sheet draws this part only for the Director. --}}
+<aside class="cs-only-you cs-dm-only" id="{{concat rootId "-cs-only-you"}}" aria-labelledby="{{concat rootId "-cs-only-you-h"}}" hidden>
+  {{#if npc.onlyYou}}
+  <div class="cs-oy-head">
+    <h3 id="{{concat rootId "-cs-only-you-h"}}"><span class="cs-dm-mark">{{localize "CHRONICLE.NpcSheet.OnlyYouTab"}}</span></h3>
+    <small>{{localize "CHRONICLE.NpcSheet.Drawer.Note"}}</small>
+    <button type="button" class="cs-quiet cs-oy-close" data-action="csOnlyYou" aria-label="{{localize "CHRONICLE.NpcSheet.Drawer.Close"}}"><i class="fa-solid fa-xmark" inert></i></button>
+  </div>
+  <div class="cs-oy-cols">
+    <section class="cs-oy-side cs-oy-mine">
+      <h4>{{localize "CHRONICLE.NpcSheet.Drawer.Secrets"}}</h4>
+      {{#each npc.onlyYou.secrets as |text|}}
+      <p class="cs-prose">{{text}}</p>
+      {{else}}
+      <p class="cs-prose cs-muted">{{localize "CHRONICLE.NpcSheet.Drawer.NoSecrets"}}</p>
+      {{/each}}
+      <h4>{{localize "CHRONICLE.NpcSheet.Drawer.NotFound"}}</h4>
+      {{#if npc.onlyYou.hidden.length}}
+      <ul class="cs-motives">
+        {{#each npc.onlyYou.hidden as |row|}}
+        <li class="cs-chip" data-state="{{row.state}}" data-kind="{{row.kind}}">
+          <span class="cs-chip-kind">{{localize (concat "CHRONICLE.NpcSheet.Kind." row.kind)}}</span>
+          <span class="cs-chip-name">{{row.label}}</span>
+        </li>
+        {{/each}}
+      </ul>
+      {{else}}
+      <p class="cs-prose cs-muted">{{localize "CHRONICLE.NpcSheet.Drawer.AllFound"}}</p>
+      {{/if}}
+      {{#if npc.onlyYou.impressionText}}
+      <p class="cs-prose">{{localize "CHRONICLE.NpcSheet.Impression"}}: <b>{{npc.onlyYou.impressionText}}</b></p>
+      {{/if}}
+    </section>
+    <section class="cs-oy-side cs-oy-given">
+      <h4>{{localize "CHRONICLE.NpcSheet.Drawer.Given"}}</h4>
+      <p class="cs-prose">{{localize (ifThen npc.onlyYou.shown "CHRONICLE.NpcSheet.Seen.chronicleShown" "CHRONICLE.NpcSheet.Seen.chronicleHidden")}}</p>
+      {{#if npc.onlyYou.given.length}}
+      <ul class="cs-motives">
+        {{#each npc.onlyYou.given as |row|}}
+        <li class="cs-chip" data-state="{{row.state}}" data-kind="{{row.kind}}">
+          <span class="cs-chip-kind">{{localize (concat "CHRONICLE.NpcSheet.Kind." row.kind)}}</span>
+          <span class="cs-chip-name">{{row.label}}</span>
+          {{#unless (eq row.state "found")}}<span class="cs-chip-state">{{localize (concat "CHRONICLE.NpcSheet.State." row.state)}}</span>{{/unless}}
+        </li>
+        {{/each}}
+      </ul>
+      {{else}}
+      <p class="cs-prose cs-muted">{{localize "CHRONICLE.NpcSheet.Talk.None"}}</p>
+      {{/if}}
+    </section>
+  </div>
+  {{/if}}
+</aside>

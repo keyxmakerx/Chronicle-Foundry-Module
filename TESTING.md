@@ -520,6 +520,8 @@ Needs Draw Steel 1.1.0 or later and a Chronicle connection. Pick it on an NPC: o
 - [ ] Below the header: his stat block, or, if he has none, a box saying "No stat block yet" with an Edit mode button. Beside it, Negotiation: Interest and Patience as numbers and five dots, "If they answered now:" and the answer, and a line saying whether players see Interest and Patience
 - [ ] Talk tab: each motivation and pitfall as a chip with its state in words ("not found yet", "appealed to"; a found one has no word), a legend line, "Argument log (N)" which opens the log newest first, and "From the page" with the page's open text. Text in the page's GM-only blocks is not there
 - [ ] People tab: who the page is linked to in Chronicle, with how; a Director-only link has the amber edge and "⊘ only you"
+- [ ] At the end of the tab row, an amber "⊘ Only you" button. Click it -> a drawer over the tab showing: "On the page, for you only" with the page's secret text, "Not found yet" with the motivations and pitfalls the party hasn't found, Impression, and beside it "What the players have" (whether they see the meters, and what they found or appealed to). Escape, the close button or picking a tab closes it, and focus goes back to the button
+- [ ] As a player, there is no "Only you" button, and the page's secret text appears nowhere on the sheet
 - [ ] Press Talking -> his token on the map glows, and the button stays pressed; press again -> the glow stops
 - [ ] In Chronicle, change Interest on his page -> within a few seconds the open sheet shows the new number, with no reload
 - [ ] Biography tab in play mode -> Draw Steel's negotiation box is not repeated there; in Edit mode it is, as on Draw Steel's sheet
@@ -601,6 +603,14 @@ Needs a GM and a player client on the same scene, and a creature actor whose por
 - [ ] Player: Game Settings, Chronicle Sync, untick "Show token art on hover": no more previews for that player only. Bind "Show or hide token art on hover" in Configure Controls: the key switches it with a notice
 - [ ] GM: untick "Token art on hover" in the world settings: nobody gets previews
 - [ ] Motion Calm: the picture fades in; Off: it appears at once
+
+### Draw Steel NPCs and monsters
+- [ ] As the GM, rest the cursor on a monster's token -> a card: picture, name, "Level N · organization · role", Stamina number and bar with the winded mark, Stability, Free strike, Immune and Weak (when it has any), Conditions, and the five characteristics; in a fight it also says how many villain actions are left
+- [ ] As a player, the same token -> only the picture, larger, with no name or numbers. Set the token's nameplate to "Hover" or "Always" -> the card adds the name. Damage the monster to half Stamina or below -> the card says "Winded", never the number
+- [ ] As a player, a hidden or Secret monster -> nothing
+- [ ] As the GM, turn Talking on for Orsen (a Chronicle NPC) -> as a player, his card shows the motivations and pitfalls the party has found; once the GM shows the meters in Chronicle, Interest and Patience with their numbers and dots
+- [ ] A Foundry-only NPC (no Chronicle page) with motivations set on its own sheet, talking -> a player's card shows none of them
+- [ ] The token HUD switch and both settings above turn the card off too
 
 ## Creature Forms (Change Form)
 
