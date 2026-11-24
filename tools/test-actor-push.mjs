@@ -212,3 +212,72 @@ test('a Chronicle update does not overwrite a field whose push is still in fligh
   await sync._updateActorFromEntity(actor, { id: 'ent-1', updated_at: 'V3', fields_data: { hp: 11 } });
   assert.deepEqual(data(writes), [{ 'system.attributes.hp.value': 11 }], 'a later Chronicle change applies');
 });
+
+const HERO_DEFS = { fields: [
+  { key: 'hp', foundry_path: 'system.attributes.hp.value', type: 'number' },
+  { key: 'class', type: 'string', foundry_collection: 'items', foundry_item_type: ['class'], foundry_item_single: true },
+  { key: 'complication', type: 'string', foundry_collection: 'items', foundry_item_type: ['complication'], foundry_item_single: true },
+] };
+
+async function heroHarness(items) {
+  const { sync, calls } = await harness();
+  sync._adapter = await createGenericAdapter({ get: async () => HERO_DEFS }, 'drawsteel');
+  const actor = actorDoc({ documentName: 'Actor', items: { contents: items } });
+  const push = async (fn) => {
+    fn(actor);
+    sync._actorPushDebouncer.flush('a1');
+    await new Promise((r) => setImmediate(r));
+    return calls.filter((c) => c[0] === 'PUT' && c[1].endsWith('/fields')).map((c) => c[2].fields_data);
+  };
+  return { sync, actor, push };
+}
+
+test('an item a single-item field reads, added or edited in Foundry, pushes that field with no actor update', async () => {
+  const items = [{ name: 'Fury', type: 'class' }];
+  const { sync, actor, push } = await heroHarness(items);
+  assert.deepEqual(sync._adapter.itemFieldTypes, new Set(['class', 'complication']));
+  const comp = { name: 'Amnesia', type: 'complication', parent: actor };
+  const sent = await push(() => { items.push(comp); sync._onCreateItem(comp, {}, 'gm'); });
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].complication, 'Amnesia');
+  assert.equal(sent[0].class, 'Fury');
+  assert.ok(!('hp' in sent[0]), 'scalars the change did not touch stay out');
+
+  comp.name = 'Advanced Studies';
+  const renamed = await push(() => sync._onUpdateItem(comp, { name: 'Advanced Studies' }, {}, 'gm'));
+  assert.equal(renamed.at(-1).complication, 'Advanced Studies');
+});
+
+test('items sync wrote itself, flag-only edits and unmapped item types push nothing', async () => {
+  const items = [];
+  const { sync, actor, push } = await heroHarness(items);
+  const comp = { name: 'Amnesia', type: 'complication', parent: actor };
+  const sword = { name: 'Sword', type: 'equipment', parent: actor };
+  const sent = await push(() => {
+    items.push(comp, sword);
+    sync._onCreateItem(comp, { chronicleSyncApply: true }, 'gm');
+    sync._onUpdateItem(comp, { flags: { 'chronicle-sync': { relationId: 'r' } } }, {}, 'gm');
+    sync._onCreateItem(sword, {}, 'gm');
+  });
+  assert.deepEqual(sent, []);
+});
+
+test('removing the complication in Foundry clears it in Chronicle; class stays Foundry-led', async () => {
+  const items = [{ name: 'Fury', type: 'class' }];
+  const { sync, actor, push } = await heroHarness(items);
+  const comp = { name: 'Amnesia', type: 'complication', parent: actor };
+  const sent = await push(() => sync._onDeleteItem(comp, {}, 'gm'));
+  assert.equal(sent.at(-1).complication, '', 'a removal is sent as cleared');
+  items.length = 0;
+  const cls = await push(() => sync._onDeleteItem({ name: 'Fury', type: 'class', parent: actor }, {}, 'gm'));
+  assert.equal(cls.length, sent.length, 'a removed class sends nothing: it is never cleared');
+
+  // Swapped in one burst: removed, then another added. The new one is sent.
+  const next = { name: 'Cursed Ring', type: 'complication', parent: actor };
+  const swapped = await push(() => {
+    sync._onDeleteItem(comp, {}, 'gm');
+    items.push(next);
+    sync._onCreateItem(next, {}, 'gm');
+  });
+  assert.equal(swapped.at(-1).complication, 'Cursed Ring');
+});
