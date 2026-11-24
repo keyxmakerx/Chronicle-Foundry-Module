@@ -11,7 +11,9 @@
  *
  * System-specific field mapping is delegated to adapter modules. The adapter's
  * actorType property (e.g., "character" for D&D 5e, "hero" for Draw Steel)
- * determines which Foundry actor type to sync.
+ * determines which Foundry actor type to sync. Under a system with its own
+ * NPC actor type (Draw Steel) an NPC's page becomes that type instead, and
+ * shares only its name, pictures and visibility (_npc-character.mjs).
  */
 
 import { noticeText } from './_escape-html.mjs';
@@ -40,6 +42,9 @@ import { PictureStore } from './picture-store.mjs';
 import { heroChoice, heroPictureIds, heroPicturePlan, HERO_PICTURES_FLAG } from './_hero-pictures.mjs';
 import { folderKindFor, needsPlacing, FOLDER_PLACED_FLAG, ACTOR_FOLDER_FLAG, HEROES } from './_actor-folder.mjs';
 import { CLASS_PICK_FLAG, classPick, pickToFinish, pickChanged } from './_finish-hero.mjs';
+import { npcActorTypeFor, actorTypeForPage, switchTarget } from './_npc-character.mjs';
+import { ActorTypeSwitch, switchActorType } from './actor-type-switch.mjs';
+import { isAnsweringGM } from './_stash-relay.mjs';
 
 /** How long a read of the campaign's pick-list entries is reused. */
 const ENTRY_CACHE_MS = 30_000;
@@ -89,6 +94,12 @@ export class ActorSync {
 
     /** @type {number|null} Cached "Player Characters" sub-type ID (child of character type). Null when addon off or sub-type not found. */
     this._pcSubtypeId = null;
+
+    /** @type {string|null} The system's NPC actor type, when it has one apart from heroes. */
+    this._npcType = null;
+
+    /** @type {ActorTypeSwitch|null} Asks the GM before switching an actor's type. */
+    this._typeSwitch = null;
 
     // Foundry -> Chronicle actor pushes are debounced per actor: a burst of
     // edits (a slider drag, an HP tick) is one request, not one per update,
@@ -148,6 +159,17 @@ export class ActorSync {
 
     // Resolve the character entity type ID from Chronicle.
     await this._resolveCharacterTypeId();
+
+    const actorTypes = game.documentTypes?.Actor ?? Object.keys(globalThis.CONFIG?.Actor?.dataModels ?? {});
+    const npcType = npcActorTypeFor(game.system?.id, actorTypes);
+    this._npcType = npcType && npcType !== this._actorType ? npcType : null;
+    this._typeSwitch = this._npcType
+      ? new ActorTypeSwitch({
+        heroType: this._actorType,
+        npcType: this._npcType,
+        run: (actor, toType, entity) => this._runTypeSwitch(actor, toType, entity),
+      })
+      : null;
 
     // Register Foundry hooks for Actor changes (character type only).
     Hooks.on('createActor', this._onCreateActor);
@@ -325,6 +347,7 @@ export class ActorSync {
     // new one after every module's onInitialSync.
     const createdAfter = getSetting('lastSyncTime') || null;
     let errors = 0;
+    let listed = null;
     if (feed?.mode === 'delta') {
       errors = await this._catchUpFromFeed(feed.changes, feed.createdAfter ?? createdAfter);
     } else {
@@ -338,6 +361,7 @@ export class ActorSync {
       for (const typeId of typeIds) {
         allEntities.push(...(await this._walkTypeEntities(typeId)));
       }
+      listed = allEntities;
 
       const excluded = this._excludedIds();
       for (const entity of allEntities) {
@@ -355,6 +379,11 @@ export class ActorSync {
     await this._reconcileClaimOwnership();
     await this._placeLooseActors();
     await this._syncAllLayers(feed?.mode === 'delta' ? feed.changes : null);
+    try {
+      await this._checkActorTypes(listed);
+    } catch (err) {
+      console.warn('Chronicle: could not check hero and NPC actor types', err);
+    }
 
     // Surface unresolved character links (broken / missing) so the GM can
     // fix them in the dashboard's Characters section rather than silently desyncing.
@@ -517,11 +546,100 @@ export class ActorSync {
   async _reconcileClaimOwnership() {
     if (!game.user?.isGM) return;
     for (const actor of game.actors?.contents ?? []) {
-      if (actor.type !== this._actorType || !actor.getFlag(FLAG_SCOPE, 'entityId')) continue;
+      if (!this._isCharacterActor(actor) || !actor.getFlag(FLAG_SCOPE, 'entityId')) continue;
       const owner = actor.getFlag(FLAG_SCOPE, 'chronicleOwnerUserId') ?? null;
       if (!owner) continue;
       await this._applyClaimOwnership(actor, owner, owner);
     }
+  }
+
+  /** The adapter's field defs, identity ones included, which tell a hero page from an NPC's. @private */
+  _heroFieldDefs() {
+    return [...(this._adapter?.fieldDefs ?? []), ...(this._adapter?.identityFields ?? [])];
+  }
+
+  /** Whether this is an NPC actor made for a character page (an unlinked one is the GM's own). @private */
+  _isLinkedNpc(actor) {
+    return !!this._npcType && actor?.type === this._npcType && !!actor.getFlag?.(FLAG_SCOPE, 'entityId');
+  }
+
+  /** Whether this module syncs the actor: the hero type, or an NPC made for a character page. @private */
+  _isCharacterActor(actor) {
+    return actor?.type === this._actorType || this._isLinkedNpc(actor);
+  }
+
+  /**
+   * Offer the GM a switch when a linked actor's type no longer fits its
+   * page (see switchTarget). Never switches anything by itself.
+   * @param {Actor} actor
+   * @param {object} entity
+   * @returns {boolean} whether the actor was offered
+   * @private
+   */
+  _checkActorType(actor, entity) {
+    if (!this._typeSwitch || !actor?.getFlag?.(FLAG_SCOPE, 'entityId')) return false;
+    const items = (actor.items?.contents ?? Array.from(actor.items ?? [])).map((i) => ({ type: i.type }));
+    const toType = switchTarget({
+      actor: { type: actor.type, hasPlayerOwner: !!actor.hasPlayerOwner, items },
+      entity,
+      pcSubtypeId: this._pcSubtypeId,
+      fieldDefs: this._heroFieldDefs(),
+      heroType: this._actorType,
+      npcType: this._npcType,
+    });
+    return !!toType && this._typeSwitch.offer(actor, toType, entity);
+  }
+
+  /**
+   * Check every linked actor's type against its page. The actors made before
+   * sync told heroes and NPCs apart are found once per world when the connect
+   * reads no full character list; after that each page is checked as it is
+   * applied.
+   * @param {object[]|null} entities - the full character list, when this connect read it
+   * @private
+   */
+  async _checkActorTypes(entities) {
+    if (!this._typeSwitch || !isAnsweringGM(game.user, game.users?.activeGM)) return;
+    let list = entities;
+    if (!list) {
+      if (getSetting('actorTypesChecked')) return;
+      list = await this._listCharacterEntities();
+      if (this._characterListFailed) return;
+    }
+    const byId = new Map(list.map((e) => [e.id, e]));
+    let offered = false;
+    for (const actor of game.actors?.contents ?? []) {
+      if (!this._isCharacterActor(actor)) continue;
+      const entity = byId.get(actor.getFlag(FLAG_SCOPE, 'entityId'));
+      if (entity && this._checkActorType(actor, entity)) offered = true;
+    }
+    if (getSetting('actorTypesChecked')) return;
+    if (!offered) {
+      await setSetting('actorTypesChecked', true);
+      return;
+    }
+    // Marked once the GM has answered (not awaited, so the connect does not
+    // wait on the GM): a question Foundry closed on unanswered is asked again.
+    this._typeSwitch.flush()
+      .then(() => setSetting('actorTypesChecked', true))
+      .catch((err) => console.warn('Chronicle: could not record the actor type check', err));
+  }
+
+  /**
+   * Switch one actor the GM said yes to. A new hero then takes its page's
+   * hero fields, choices and class pick, as a hero made from the page would.
+   * @param {Actor} actor
+   * @param {string} toType
+   * @param {object} entity
+   * @private
+   */
+  async _runTypeSwitch(actor, toType, entity) {
+    await this._inTurn(entity.id, async () => {
+      await switchActorType(actor, toType, { heroType: this._actorType });
+      if (toType !== this._actorType) return;
+      const page = await this._api.get(`/entities/${entity.id}`);
+      if (page) await this._updateActorFromEntity(actor, page);
+    });
   }
 
   /** The actor linked to a Chronicle entity, or undefined. @private */
@@ -719,9 +837,13 @@ export class ActorSync {
     }
 
     try {
+      const type = actorTypeForPage({
+        entity, pcSubtypeId: this._pcSubtypeId, fieldDefs: this._heroFieldDefs(), heroType: this._actorType, npcType: this._npcType,
+      });
+      const asNpc = type !== this._actorType;
       const actorData = {
         name: entity.name,
-        type: this._actorType,
+        type,
         flags: {
           [FLAG_SCOPE]: {
             entityId: entity.id,
@@ -731,8 +853,11 @@ export class ActorSync {
         },
       };
 
-      // Apply adapter field mapping.
-      const fieldUpdate = this._adapter.fromChronicleFields(entity);
+      // Apply adapter field mapping. An NPC takes none: the hero fields are
+      // not an NPC's, and its stat block is the GM's. A private page's NPC
+      // starts hidden, as the visibility sync would make it.
+      const fieldUpdate = asNpc ? null : this._adapter.fromChronicleFields(entity);
+      if (asNpc) _setNestedValue(actorData, 'prototypeToken.hidden', entity.is_private === true);
       if (fieldUpdate) {
         // Merge dot-notation fields into nested structure for creation.
         for (const [key, value] of Object.entries(fieldUpdate)) {
@@ -746,9 +871,11 @@ export class ActorSync {
       }
 
       const actor = await Actor.create(actorData, applyOptions());
-      await this._applyIdentityItems(actor, entity);
-      await this._recordClassPick(actor, entity);
-      await this._syncLayers(actor, entity.id);
+      if (!asNpc) {
+        await this._applyIdentityItems(actor, entity);
+        await this._recordClassPick(actor, entity);
+        await this._syncLayers(actor, entity.id);
+      }
       await this._applyClaimOwnership(actor, entity.owner_user_id ?? null, null);
       await this._placeInFolder(actor, entity);
 
@@ -966,9 +1093,10 @@ export class ActorSync {
     }
     try {
       // Only values that differ are written, marked as ours so the update
-      // hook does not push them back.
+      // hook does not push them back. An NPC takes only its name.
+      const npc = this._isLinkedNpc(actor);
       const changes = planActorApply({
-        update: this._adapter.fromChronicleFields(entity),
+        update: npc ? (entity.name ? { name: entity.name } : {}) : this._adapter.fromChronicleFields(entity),
         actor,
       });
       // A field with a local edit still waiting in the push debounce, or
@@ -984,9 +1112,11 @@ export class ActorSync {
         await actor.update(changes, syncOptions({ [APPLY_OPTION]: true }));
       }
 
-      await this._applyIdentityItems(actor, entity);
-      await this._recordClassPick(actor, entity);
-      await this._replanLayers(actor, entity);
+      if (!npc) {
+        await this._applyIdentityItems(actor, entity);
+        await this._recordClassPick(actor, entity);
+        await this._replanLayers(actor, entity);
+      }
 
       // Sync visibility: Chronicle is_private → Foundry actor hidden.
       // A private entity means the NPC is hidden from players.
@@ -1014,6 +1144,7 @@ export class ActorSync {
         await this._applyClaimOwnership(actor, nextOwner, previousOwner);
       }
       await this._placeInFolder(actor, entity);
+      this._checkActorType(actor, entity);
 
       console.debug(`Chronicle: Updated actor "${actor.name}" from entity`);
       return true;
@@ -1049,7 +1180,7 @@ export class ActorSync {
   async _placeLooseActors() {
     for (const actor of game.actors.contents) {
       const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
-      if (!entityId || actor.type !== this._actorType) continue;
+      if (!entityId || !this._isCharacterActor(actor)) continue;
       await this._placeInFolder(actor, { owner_user_id: actor.getFlag(FLAG_SCOPE, 'chronicleOwnerUserId') ?? null });
     }
   }
@@ -1238,11 +1369,15 @@ export class ActorSync {
   async _handleUpdateActor(actor, change, options, userId) {
     if (options?.[APPLY_OPTION]) return;
     if (!sendsChangeHere(userId)) return;
-    if (actor.type !== this._actorType) return;
+    if (!this._isCharacterActor(actor)) return;
     if (!this._adapter) return;
 
     const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
+
+    // An NPC sends only its name and visibility: its system data is the GM's
+    // stat block, not the page's hero fields.
+    const sent = this._isLinkedNpc(actor) ? (change.name !== undefined ? { name: change.name } : {}) : change;
 
     // Sync visibility: Foundry prototypeToken.hidden → Chronicle is_private.
     // Await this before field sync to avoid inconsistent state.
@@ -1254,10 +1389,10 @@ export class ActorSync {
     const gate = this._pushGate();
     if (gate === 'drop') return;
     if (gate === 'hold') {
-      if (!hiddenChanged && !change.system && !change.name) return;
+      if (!hiddenChanged && !sent.system && !sent.name) return;
       const byPlayer = userId !== game.user.id;
-      const diff = change.system || change.name !== undefined
-        ? { ...(change.system ? { system: change.system } : {}), ...(change.name !== undefined ? { name: change.name } : {}) }
+      const diff = sent.system || sent.name !== undefined
+        ? { ...(sent.system ? { system: sent.system } : {}), ...(sent.name !== undefined ? { name: sent.name } : {}) }
         : null;
       this._syncManager.holdChange({
         key: `actor:${actor.id}`, part: 'characters', kind: 'actor.update', label: actor.name,
@@ -1276,8 +1411,8 @@ export class ActorSync {
     // Only push field/name changes if system data or name changed. The diff
     // is kept (merged with the burst's earlier ones) so the push can send
     // just the mapped fields that changed.
-    if (!change.system && !change.name) return;
-    this._pendingChanges.set(actor.id, mergeChanges(this._pendingChanges.get(actor.id), change));
+    if (!sent.system && !sent.name) return;
+    this._pendingChanges.set(actor.id, mergeChanges(this._pendingChanges.get(actor.id), sent));
     this._pendingAuthors.set(actor.id, userId);
     if (userId !== game.user.id) {
       this._pendingPlayers.set(actor.id, (this._pendingPlayers.get(actor.id) ?? new Set()).add(userId));
@@ -1731,7 +1866,8 @@ export class ActorSync {
   /**
    * Get all synced actors with their status for dashboard display.
    * Filters by the adapter's actor type so Draw Steel shows heroes,
-   * D&D 5e shows characters, etc.
+   * D&D 5e shows characters, etc., plus the NPCs made for character pages.
+   * An unlinked NPC actor is the GM's own and never listed.
    * @returns {Array<{id: string, name: string, entityId: string|null, synced: boolean, lastSync: string|null}>}
    */
   getSyncedActors() {
@@ -1739,7 +1875,7 @@ export class ActorSync {
 
     const targetType = this._actorType;
     return game.actors.contents
-      .filter((a) => a.type === targetType)
+      .filter((a) => a.type === targetType || this._isLinkedNpc(a))
       .map((a) => {
         const entityId = a.getFlag(FLAG_SCOPE, 'entityId') || null;
         const lastSync = a.getFlag(FLAG_SCOPE, 'lastSync') || null;
@@ -1924,6 +2060,14 @@ export class ActorSync {
     const actor = game.actors.get(actorId);
     const entityId = actor?.getFlag(FLAG_SCOPE, 'entityId');
     if (!actor || !entityId || !this._adapter) return false;
+    // An NPC's system data is not the page's hero fields (see
+    // _handleUpdateActor), so only its name is sent. Its visibility is not:
+    // a token left visible must never make a GM-only page public.
+    if (this._isLinkedNpc(actor)) {
+      if (!(await this._pushActorName(actor, entityId))) return false;
+      await this._setActorFlag(actor, 'lastSync', new Date().toISOString());
+      return true;
+    }
     await this._putFieldsMerged(entityId, this._withoutLayered(actor, this._adapter.toChronicleFields(actor)));
     await this._setActorFlag(actor, 'lastSync', new Date().toISOString());
     console.debug(`Chronicle: Re-pushed actor "${actor.name}" → entity ${entityId}`);

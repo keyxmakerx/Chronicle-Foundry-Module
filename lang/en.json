@@ -1383,6 +1383,17 @@
       },
       "NotReady": "Chronicle sync isn't ready on this client."
     },
+    "ActorType": {
+      "ToNpcTitle": "Make these Draw Steel NPCs?",
+      "ToNpcBody": "<p>These Chronicle pages are NPCs, but their Foundry actors were made as heroes, so they open as empty hero sheets ({count}):</p>{list}<p>Switch them to NPC actors? Each keeps its name, pictures, tokens, notes, folder and items. What only heroes have goes: hero choices such as ancestry, career and kit, and the basic actions every new hero gets.</p><p>Choose No to leave them as heroes. You won't be asked about these again.</p>",
+      "ToNpcDone": "Chronicle: switched to NPC actors: {count}.",
+      "ToHeroTitle": "Make these Draw Steel heroes?",
+      "ToHeroBody": "<p>These Chronicle pages are now heroes (a player has them, Chronicle marks them playable, or they name a class or hero choice), but their Foundry actors are NPCs ({count}):</p>{list}<p>Switch them to hero actors? Each keeps its name, pictures, tokens, notes, folder and items, gets the basic actions every new hero gets, and then takes its page's hero details.</p><p>Choose No to leave them as NPCs. You won't be asked about these again.</p>",
+      "ToHeroDone": "Chronicle: switched to hero actors: {count}.",
+      "Declined": "Chronicle: left as they are: {count}.",
+      "Failed": "Chronicle: could not switch {names}. See the console for details.",
+      "More": "and {count} more"
+    },
     "RemoteDelete": {
       "Title": "Delete in Chronicle too?",
       "Body": "<p>Deleted in Foundry and linked to Chronicle ({count}):</p>{list}<p>Delete them in Chronicle too? Chronicle deletes them for good.</p><p>Choose No to keep them in Chronicle. A kept page gets sync turned off, so it stays out of Foundry until you bring it in from Chronicle Sync; a kept actor is not brought back either.</p>",

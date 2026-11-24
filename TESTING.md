@@ -343,6 +343,16 @@ In **Chronicle Sync → Settings → What syncs**.
 - [ ] Update character page name -> Actor name updates
 - [ ] Delete character page -> Actor unlinked (flags removed) but NOT deleted
 
+### NPCs on character pages (Draw Steel)
+A character page is a hero when a player has it, Chronicle marks it playable, or it names a class, ancestry, culture, career or kit. Every other character page is an NPC.
+- [ ] Make a character page in Chronicle with only a title and a faction -> the Foundry actor is a Draw Steel NPC in "Chronicle: NPCs" and opens on Draw Steel's NPC sheet, never a hero sheet; a GM-only page's token starts hidden
+- [ ] Rename it in Chronicle -> the actor's name follows; change its Stamina in Foundry -> nothing changes in Chronicle; rename it in Foundry -> the page's name follows
+- [ ] Make a hero page (a class or ancestry picked, or claimed by a player) -> it still arrives as a hero actor
+- [ ] Make a monster (NPC actor) yourself in Foundry -> no page appears in Chronicle
+- [ ] In a world where NPC pages came in as heroes before this change (Orsen Vey), reload -> one question "Make these Draw Steel NPCs?" lists them, and no real hero is on the list. Yes -> each opens on the NPC sheet, keeps its name, picture, token, notes, folder and gear, drops its ancestry, career and kit and the hero basic actions, and stays linked to its page
+- [ ] Answer No instead -> they stay heroes, and reloading or editing their pages does not ask again
+- [ ] Give an NPC page a kit in Chronicle, or have a player claim it -> one question "Make these Draw Steel heroes?"; Yes -> it opens as a hero with the basic actions and the page's hero details
+
 ### Identity items (Draw Steel: ancestry, culture, career, kit)
 - [ ] In Chronicle, set an actor's linked character to an ancestry that exists in the system compendium (e.g. Dwarf) -> within a few seconds the Foundry sheet shows the Dwarf ancestry item in place of the old one (data from the compendium); the Chronicle value does not change
 - [ ] Same with an ancestry that exists as an Item in the world's Items sidebar -> the world item is used
@@ -520,7 +530,7 @@ that reads each field's `foundry_path` from the matched Chronicle system's manif
 ### Edge Cases
 - [ ] Actor sync disabled when no system adapter available
 - [ ] Sync guard prevents infinite loops (change in A doesn't re-trigger back to A)
-- [ ] Only character-type actors processed (NPCs, vehicles ignored)
+- [ ] Only character-type actors processed (vehicles and the GM's own NPCs ignored; under Draw Steel an NPC made for a character page syncs its name and visibility)
 - [ ] As a player on the character you claimed in Chronicle, change HP and an item's quantity -> with a GM in the game, Chronicle shows both; a later change in Chronicle does not undo them
 - [ ] As a player on a character nobody claimed in Chronicle, change HP -> nothing changes in Chronicle and the GM gets one notice saying the character isn't claimed
 - [ ] With two GMs in the game, a player's change is sent once (one History row), not twice
