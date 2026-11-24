@@ -83,7 +83,12 @@ export const benchAdapter = {
     key, type: 'string', foundry_collection: 'items', foundry_item_type: [key], foundry_item_single: true,
   })),
   // `hp` is the one mapped scalar, so it is what a layer's effect can change.
-  fieldDefs: [{ key: 'hp', type: 'number', foundry_path: 'system.hp' }],
+  // `subclass` is mapped to its item as Draw Steel maps it, so a subclass
+  // picked in Chronicle can be noted for the player to add.
+  fieldDefs: [
+    { key: 'hp', type: 'number', foundry_path: 'system.hp' },
+    { key: 'subclass', type: 'string', foundry_collection: 'items', foundry_item_type: ['subclass'], foundry_item_single: true, foundry_item_join: true },
+  ],
   fromChronicleFields(entity) {
     const out = {};
     if (entity?.name) out.name = entity.name;

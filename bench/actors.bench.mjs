@@ -312,6 +312,18 @@ test('a class picked in Chronicle is noted on the actor for its player and never
   await waitFor(() => actor.system.hp === 6, 10000, 'hp applied');
   await settle();
   assert.ok(!actor.getFlag(FLAG, 'classPick'), 'nothing left to finish');
+
+  // A second domain picked in Chronicle is noted the same way, never embedded.
+  await actor.createEmbeddedDocuments('Item', [{ name: 'Life', type: 'subclass' }], { chronicleSyncApply: true });
+  await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: { subclass: 'Life, War' } });
+  await waitFor(() => actor.getFlag(FLAG, 'subclassPick'), 10000, 'subclass pick noted');
+  assert.deepEqual(actor.getFlag(FLAG, 'subclassPick'), ['War']);
+  assert.equal(actor.items.filter((i) => i.type === 'subclass').length, 1, 'sync never embeds the subclass');
+  await actor.createEmbeddedDocuments('Item', [{ name: 'War', type: 'subclass' }], { chronicleSyncApply: true });
+  await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: { hp: 7 } });
+  await waitFor(() => actor.system.hp === 7, 10000, 'hp applied');
+  await settle();
+  assert.ok(!actor.getFlag(FLAG, 'subclassPick'), 'both domains on the sheet');
   await closeWorld(world);
 }, { settings: ON }));
 
