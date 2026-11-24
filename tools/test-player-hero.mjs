@@ -98,7 +98,7 @@ function setup({ actors = [], users, mappings = {}, members = [], entities = {},
   settings.syncExclusions = JSON.stringify({ excludedTypes: [], excludedEntities: excluded });
   globalThis.game.user = { id: 'gm', isGM: true };
   const userList = users ?? [{ id: 'gm', isGM: true, name: 'GM' }, { id: 'uNew', isGM: false, name: 'New' }, { id: 'uOld', isGM: false, name: 'Old' }];
-  globalThis.game.users = { contents: userList, get: (id) => userList.find((u) => u.id === id) };
+  globalThis.game.users = { contents: userList, get: (id) => userList.find((u) => u.id === id), activeGM: globalThis.game.user };
   globalThis.game.actors = { contents: actors, find: (fn) => actors.find(fn), get: (id) => actors.find((a) => a.id === id) };
   const as = new ActorSync();
   const made = [];
@@ -134,6 +134,14 @@ test('live claim: an old hero claimed by a linked player with no hero here gets 
   await as._onCharacterUpdated(hero('eNew', 'cNew'));
   assert.deepEqual(made, ['eNew']);
   assert.equal(log[0][0], 'create');
+});
+
+test('live claim: only the active GM makes the hero, so two GMs never make two', async () => {
+  const { as, made } = setup({ mappings: { cNew: 'uNew' } });
+  globalThis.game.users.activeGM = { id: 'gm2', isGM: true };
+  await as._onCharacterUpdated(hero('eNew', 'cNew'));
+  assert.equal(await as._bringInPlayerHeroes([{ entityId: 'eNew', ownerKey: 'cNew' }]), 0);
+  assert.deepEqual(made, []);
 });
 
 test('live claim: nothing for a player who already owns a hero, an unclaimed page, or a page sync is off for', async () => {

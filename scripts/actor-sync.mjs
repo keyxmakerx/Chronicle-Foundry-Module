@@ -38,6 +38,7 @@ import { planLayerEffects, layeredFieldKeys, storedLayers, LAYER_FLAG } from './
 import { bringsInActor } from './_actor-catch-up.mjs';
 import { usersWithHero, planPlayerHeroes, memberClaims, assignsCharacter } from './_player-hero.mjs';
 import { memberKey } from './_member-mapping.mjs';
+import { isAnsweringGM } from './_stash-relay.mjs';
 import { PictureStore } from './picture-store.mjs';
 import { heroChoice, heroPictureIds, heroPicturePlan, HERO_PICTURES_FLAG } from './_hero-pictures.mjs';
 import { folderKindFor, needsPlacing, FOLDER_PLACED_FLAG, ACTOR_FOLDER_FLAG, HEROES } from './_actor-folder.mjs';
@@ -48,6 +49,14 @@ const ENTRY_CACHE_MS = 30_000;
 
 /** Actor flag: the identity picks (ancestry, kit, …) Chronicle last had when applied. */
 const IDENTITY_APPLIED_FLAG = 'identityApplied';
+
+/**
+ * Making a hero for a player is left to the active GM's client: each GM's
+ * client queues its own creates, so two GMs would each make one.
+ */
+function isActiveGM() {
+  return isAnsweringGM(game.user, game.users?.activeGM);
+}
 
 /**
  * ActorSync handles character entity ↔ Actor synchronization.
@@ -551,7 +560,7 @@ export class ActorSync {
    * @private
    */
   async _bringInPlayerHeroes(extra = []) {
-    if (!game.user?.isGM || !this._adapter || !this._characterTypeId) return 0;
+    if (!isActiveGM() || !this._adapter || !this._characterTypeId) return 0;
     const waiting = [...this._claimsWaiting].map(([ownerKey, entityId]) => ({ entityId, ownerKey }));
     const claims = [...extra, ...waiting, ...memberClaims(this._syncManager?.getMembers?.() ?? [], memberKey)];
     if (!claims.length) return 0;
@@ -607,7 +616,7 @@ export class ActorSync {
    */
   async _bringInClaimed(entity) {
     const ownerKey = entity?.owner_user_id ? String(entity.owner_user_id) : '';
-    if (!game.user?.isGM || !entity?.id || !ownerKey) return;
+    if (!isActiveGM() || !entity?.id || !ownerKey) return;
     if (this._excludedIds().includes(entity.id)) return;
     const mappings = getUserMappings();
     if (!game.users?.get?.(mappings[ownerKey])) {
@@ -1776,6 +1785,10 @@ export class ActorSync {
    */
   async _resolveCharacterTypeId() {
     if (!this._adapter?.characterTypeSlug) return;
+    // A refreshed adapter may name another type; ids kept from the old one
+    // would keep routing pushes and events to it.
+    this._characterTypeId = null;
+    this._pcSubtypeId = null;
 
     try {
       const result = await this._api.get('/entity-types');
