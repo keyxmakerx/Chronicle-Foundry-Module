@@ -476,7 +476,14 @@
       "SheetLine": "Chronicle picked {cls}, level {level}. The class is not on this sheet yet.",
       "NoClass": "No {cls} class was found in this world or its compendiums. Add one, then drag it onto the sheet.",
       "DragIt": "Drag the {cls} class from the Items or Compendium tab onto the sheet.",
-      "Failed": "Could not add {cls} to {actor}. Drag the class onto the sheet instead."
+      "Failed": "Could not add {cls} to {actor}. Drag the class onto the sheet instead.",
+      "SubTitle": "Add to {actor}",
+      "SubBody": "Chronicle picked <strong>{sub}</strong> for {actor}, and it is not on this sheet yet. Add it now? Foundry adds it the way it adds one you drag on.",
+      "SubAdd": "Add {sub}",
+      "SubSheetLine": "Chronicle picked {sub}, which is not on this sheet yet.",
+      "NoSub": "No {sub} was found in this world or its compendiums. Add one, then drag it onto the sheet.",
+      "SubDragIt": "Drag {sub} from the Items or Compendium tab onto the sheet.",
+      "SubFailed": "Could not add {sub} to {actor}. Drag it onto the sheet instead."
     },
     "ActorSync": {
       "PlayerChangeNotSent": "Chronicle: a player's change to \"{actor}\" wasn't sent, because the character isn't claimed in Chronicle by the member that player is matched to. Have them claim it there, or make the change yourself.",

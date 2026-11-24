@@ -17,7 +17,7 @@ import { FLAG_SCOPE } from './constants.mjs';
 import { escapeHtml } from './_escape-html.mjs';
 import { choiceDialog } from './_dialogs.mjs';
 import { findIdentityItem } from './_identity-item-apply.mjs';
-import { CLASS_PICK_FLAG, pickToFinish, offersCard } from './_finish-hero.mjs';
+import { CLASS_PICK_FLAG, pickToFinish, offersCard, SUBCLASS_PICK_FLAG, subclassesToFinish } from './_finish-hero.mjs';
 
 const LINE_CLASS = 'chronicle-finish-hero';
 
@@ -37,13 +37,23 @@ function pendingPick(actor) {
   return pickToFinish(items, actor.getFlag(FLAG_SCOPE, CLASS_PICK_FLAG) ?? null);
 }
 
+/** The subclasses Chronicle picked that the sheet still lacks, or null. */
+function pendingSubclasses(actor) {
+  if (!actor?.getFlag?.(FLAG_SCOPE, 'entityId')) return null;
+  const flag = actor.getFlag(FLAG_SCOPE, SUBCLASS_PICK_FLAG);
+  if (!Array.isArray(flag)) return null;
+  const items = actor.items?.contents ?? Array.from(actor.items ?? []);
+  return subclassesToFinish(items, flag);
+}
+
 /** Register the hooks. Called once at ready, on every client. */
 export function registerFinishHero() {
   Hooks.on('renderActorSheet', onRenderSheet);
   Hooks.on('renderActorSheetV2', onRenderSheet);
   // A new pick from the GM's sync, or a hero handed to this player later.
   Hooks.on('updateActor', (actor, change) => {
-    const picked = foundry.utils.hasProperty(change ?? {}, `flags.${FLAG_SCOPE}.${CLASS_PICK_FLAG}`);
+    const picked = foundry.utils.hasProperty(change ?? {}, `flags.${FLAG_SCOPE}.${CLASS_PICK_FLAG}`)
+      || foundry.utils.hasProperty(change ?? {}, `flags.${FLAG_SCOPE}.${SUBCLASS_PICK_FLAG}`);
     if (picked || change?.ownership) maybeOffer(actor);
   });
   for (const actor of game.actors ?? []) maybeOffer(actor);
@@ -52,9 +62,57 @@ export function registerFinishHero() {
 function maybeOffer(actor) {
   const pick = pendingPick(actor);
   const key = actor?.id;
-  if (!offersCard({ isGM: !!game.user?.isGM, isOwner: !!actor?.isOwner, pick, shown: shown.has(key) })) return;
-  shown.add(key);
-  queue = queue.then(() => offer(actor)).catch((err) => console.warn('Chronicle: finish-hero card failed', err));
+  if (offersCard({ isGM: !!game.user?.isGM, isOwner: !!actor?.isOwner, pick, shown: shown.has(key) })) {
+    shown.add(key);
+    queue = queue.then(() => offer(actor)).catch((err) => console.warn('Chronicle: finish-hero card failed', err));
+    return;
+  }
+  const subs = pendingSubclasses(actor);
+  const subKey = `${key}:sub:${(subs ?? []).join('|')}`;
+  if (!offersCard({ isGM: !!game.user?.isGM, isOwner: !!actor?.isOwner, pick: subs ? { name: subs[0] } : null, shown: shown.has(subKey) })) return;
+  shown.add(subKey);
+  queue = queue.then(() => offerSubclass(actor)).catch((err) => console.warn('Chronicle: finish-hero card failed', err));
+}
+
+async function offerSubclass(actor) {
+  const subs = pendingSubclasses(actor);
+  if (!subs) return;
+  const data = { actor: escapeHtml(actor.name), sub: escapeHtml(subs[0]) };
+  const res = await choiceDialog({
+    title: t('SubTitle', { actor: actor.name }),
+    content: `<p>${t('SubBody', data)}</p>`,
+    buttons: [
+      { action: 'finish', label: t('SubAdd', { sub: subs[0] }), default: true },
+      { action: 'later', label: t('Later') },
+    ],
+  });
+  if (res?.action === 'finish') await addSubclass(actor);
+}
+
+/**
+ * Hand the first subclass Chronicle picked to the sheet as a drop, so the
+ * system adds it the way a dragged one is added, its own steps included.
+ * @param {Actor} actor
+ */
+export async function addSubclass(actor) {
+  const subs = pendingSubclasses(actor);
+  if (!subs) return;
+  const sub = subs[0];
+  try {
+    const item = await findIdentityItem(game, 'subclass', sub);
+    if (!item) {
+      ui.notifications?.warn(t('NoSub', { sub: escapeHtml(sub) }));
+      await actor.sheet?.render({ force: true });
+      return;
+    }
+    const sheet = actor.sheet;
+    await sheet?.render({ force: true });
+    const root = await sheetElement(sheet);
+    if (!root || !dropOnSheet(root, item.uuid)) ui.notifications?.info(t('SubDragIt', { sub: escapeHtml(sub) }));
+  } catch (err) {
+    console.error(`Chronicle: could not add "${sub}" to "${actor.name}"`, err);
+    ui.notifications?.warn(t('SubFailed', { actor: escapeHtml(actor.name), sub: escapeHtml(sub) }));
+  }
 }
 
 async function offer(actor) {
@@ -149,7 +207,11 @@ function onRenderSheet(app, html) {
   if (!actor || !root) return;
   root.querySelector(`.${LINE_CLASS}`)?.remove();
   const pick = pendingPick(actor);
-  if (!pick || !actor.isOwner) return;
+  if (!pick) {
+    subclassLine(actor, root);
+    return;
+  }
+  if (!actor.isOwner) return;
 
   const line = document.createElement('div');
   line.className = LINE_CLASS;
@@ -171,4 +233,29 @@ function onRenderSheet(app, html) {
   }
   const host = root.querySelector('.window-content') ?? root;
   host.prepend(line);
+}
+
+/**
+ * The line for a subclass Chronicle picked that the sheet lacks. The GM gets
+ * the button too: dropping a subclass runs no level-up the player must own.
+ */
+function subclassLine(actor, root) {
+  const subs = pendingSubclasses(actor);
+  if (!subs || !actor.isOwner) return;
+  const line = document.createElement('div');
+  line.className = LINE_CLASS;
+  const icon = document.createElement('i');
+  icon.className = 'fa-solid fa-scroll';
+  icon.setAttribute('aria-hidden', 'true');
+  const text = document.createElement('span');
+  text.textContent = t('SubSheetLine', { sub: subs.join(', ') });
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = t('SubAdd', { sub: subs[0] });
+  button.addEventListener('click', (event) => {
+    event.preventDefault();
+    addSubclass(actor);
+  });
+  line.append(icon, text, button);
+  (root.querySelector('.window-content') ?? root).prepend(line);
 }

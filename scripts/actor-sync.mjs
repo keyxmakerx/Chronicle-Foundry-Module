@@ -44,7 +44,7 @@ import { isAnsweringGM } from './_stash-relay.mjs';
 import { PictureStore } from './picture-store.mjs';
 import { heroChoice, heroPictureIds, heroPicturePlan, HERO_PICTURES_FLAG } from './_hero-pictures.mjs';
 import { folderKindFor, needsPlacing, FOLDER_PLACED_FLAG, ACTOR_FOLDER_FLAG, HEROES } from './_actor-folder.mjs';
-import { CLASS_PICK_FLAG, classPick, pickToFinish, pickChanged } from './_finish-hero.mjs';
+import { CLASS_PICK_FLAG, classPick, pickToFinish, pickChanged, SUBCLASS_PICK_FLAG, subclassPicks, subclassesToFinish, subclassPickChanged } from './_finish-hero.mjs';
 import { npcActorTypeFor, actorTypeForPage, switchTarget } from './_npc-character.mjs';
 import { ActorTypeSwitch, switchActorType } from './actor-type-switch.mjs';
 
@@ -1104,6 +1104,11 @@ export class ActorSync {
       const next = pickToFinish(items, classPick(this._adapter?.fieldDefs, entity?.fields_data));
       const current = actor.getFlag?.(FLAG_SCOPE, CLASS_PICK_FLAG) ?? null;
       if (pickChanged(current, next)) await this._setActorFlag(actor, CLASS_PICK_FLAG, next);
+      // A subclass picked in Chronicle (a conduit's second domain) is noted
+      // the same way and added through the system's own drop, never embedded.
+      const subNext = subclassesToFinish(items, subclassPicks(this._adapter?.fieldDefs, entity?.fields_data));
+      const subCurrent = actor.getFlag?.(FLAG_SCOPE, SUBCLASS_PICK_FLAG) ?? null;
+      if (subclassPickChanged(subCurrent, subNext)) await this._setActorFlag(actor, SUBCLASS_PICK_FLAG, subNext);
     } catch (err) {
       console.warn(`Chronicle: could not note the class pick on "${actor.name}"`, err);
     }
@@ -1499,7 +1504,7 @@ export class ActorSync {
    */
   async _unlinkCopy(actor) {
     await actor.update(
-      flagRemoval(FLAG_SCOPE, 'entityId', 'lastSync', 'chronicleUpdatedAt', 'chronicleOwnerUserId', IDENTITY_APPLIED_FLAG, CLASS_PICK_FLAG),
+      flagRemoval(FLAG_SCOPE, 'entityId', 'lastSync', 'chronicleUpdatedAt', 'chronicleOwnerUserId', IDENTITY_APPLIED_FLAG, CLASS_PICK_FLAG, SUBCLASS_PICK_FLAG),
       applyOptions(),
     );
     const items = (actor.items?.contents ?? [])
