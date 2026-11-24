@@ -2414,6 +2414,17 @@ body.ccal-rest #chronicle-calendar-bar .ccal-sky * { animation-play-state: pause
 .cs-satchel-pane > .application,
 .cs-satchel-pane .application { position: static; inset: auto; width: 100%; min-width: 0; max-width: none; height: auto; min-height: 0; max-height: none; transform: none; box-shadow: none; overflow: visible; }
 .cs-satchel-back { width: auto; margin: 0 0 8px; }
+/* Cut scenes tab: the scenes a player may still watch again, one row each,
+   with the window's end beside the name. */
+.cs-cutscenes { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
+.cs-cutscene-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--cs-line); border-radius: 6px; background: var(--cs-surface); color: var(--cs-text); }
+.cs-cutscene-text { display: flex; flex: 1 1 auto; flex-direction: column; gap: 2px; min-width: 0; }
+.cs-cutscene-text > b { overflow-wrap: anywhere; }
+.cs-cutscene-until { font-size: 12px; color: var(--cs-text-muted); }
+.cs-cutscene-watch { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; width: auto; min-height: 32px; padding: 0 12px; border-color: var(--cs-accent-strong); background: var(--cs-accent); color: var(--cs-on-accent); font-weight: 600; }
+.cs-cutscene-watch:hover,
+.cs-cutscene-watch:focus-visible { background: var(--cs-accent-strong); }
+.cs-cutscenes-note { margin: 8px 0 0; font-size: 12.5px; color: var(--cs-text-2); }
 
 /* Calendar window: Chronicle's calendar page edge to edge, under a slim
    title bar, so the frame reads as the page rather than a box in a box. */

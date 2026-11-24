@@ -681,6 +681,23 @@ Needs a drop list on two creature pages in Chronicle (Crafting → Spoils tab �
 - [ ] A campaign with no drop lists, or with the crafting addon off, gets no window when a combat ends
 - [ ] With two GMs connected, only one gets the window
 
+## Cut scenes
+
+Needs Chronicle's Cut scenes add-on on with one saved scene (Chronicle → the campaign → Cut scenes → New scene), a GM client and two player clients each linked to a Chronicle member (Chronicle Sync → Settings → Players), and a third linked player who is not logged in to Foundry.
+
+- [ ] Before anything is shown, a player's Satchel has a **Cut scenes** tab once the GM has connected; with the add-on off it has no such tab
+- [ ] In Chronicle, open the scene → **Show to…**, tick the first player only, **Show** -> that player's Foundry goes dark full screen and plays the scene over the canvas; the second player's Foundry and the GM's do not change
+- [ ] On the player's screen, Esc or the small close control ends it after about 2 seconds; with **Ending: tap**, a quiet **Close** appears once the last layer has finished
+- [ ] Show it again to both players, then press **Stop** on the "Showing to …" row in Chronicle -> both takeovers end at once
+- [ ] Chronicle Sync → Overview's activity shows a line "Cut scene "…": 2 in Foundry now, 0 away, …"
+- [ ] Show a scene to the player who is not logged in, then log them in within two minutes -> it plays when their Foundry finishes loading. Past two minutes it does not play, but it is in their Satchel → **Cut scenes**
+- [ ] A player's Satchel → **Cut scenes** lists each scene shown to them with "Until <time>" and **Watch again**; **Watch again** plays it full screen; a scene shown to the other player only is not listed
+- [ ] Show a scene with rewatch **1 hour**; after the hour the row disappears from an open Satchel without reopening it
+- [ ] Log the GM out: a player's Cut scenes tab says the GM isn't connected and still lists the scenes shown to them this session, and **Watch again** still plays them; log the GM back in -> the full list fills in by itself
+- [ ] A player not linked to a Chronicle member sees "Not linked to Chronicle yet" on the tab
+- [ ] Set Configure Settings → Chronicle Sync → Motion to **Calm** on a player and show a scene -> no drifting particles; the layers fade in place
+- [ ] In the player's browser console, `game.journal.contents.some(j => JSON.stringify(j.flags).includes("Something"))` is `false` (use a word from the scene's text): nothing of a scene is saved in the world
+
 ## Satchel and notebook
 
 - [ ] Every user (GM and players) has an **Open my Satchel** button (briefcase) in the Chronicle scene controls and a **Jot notes** tab in the bottom-right corner while the world is connected to Chronicle

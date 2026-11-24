@@ -1715,6 +1715,28 @@ whispered line for each take, harvest, study and finished project.
 
 Re-verify by: 2026-11-14 (Chronicle `internal/plugins/syncapi/crafting_api_handler.go`, `internal/app/crafting_sync_adapter.go`, `internal/plugins/crafting/spoils.go`, `projects.go`, `docs/api/openapi.yaml` Crafting tag; Chronicle issue #1915)
 
+### Cut scenes
+
+The Director shows a saved scene from Chronicle's Cut scenes page; players who
+are in Foundry get it there too (see `cutscene.foundry` below) and can watch it
+again from the Satchel while its rewatch window is open. Needs the `cutscenes`
+add-on; with it off the route answers **403** `{"error":"addon_disabled"}`, and
+an older Chronicle answers **404**. The module learns whether the add-on is on
+from `GET /addons` (slug `cutscenes`) once per connect and shares it in world
+setting `cutscenesAvailable`, which decides whether players' Satchels show the
+Cut scenes tab; a failed read leaves the stored answer alone.
+
+**Used by:** `scripts/cutscenes.mjs` (GM client), reached by players through
+the module socket.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/cutscenes/showings?user=<chronicleUserId>` | That member's showings still inside their rewatch window, newest first: `{"data":[{showingId, name, shownAt, rewatchUntil, scene}],"total":N}` (a bare array is read too). `shownAt` and `rewatchUntil` are RFC 3339 times; `scene` is the scene as shown (below). The module asks only for the member the asking Foundry user is matched to (`userMappings`, looked up by the socket's sender id), never one named in the request. |
+
+A scene (camelCase JSON): `{id, name, background:{kind, seconds, params}, overlays:[{kind, at, seconds, params}], text:[{say, at, seconds, style}], ending:{kind, after?}}`. The module passes it unchanged (keeping only these keys) to Chronicle's engine, vendored at `vendor/chronicle/cutscene_engine.js`, which draws nothing for a kind it does not know and sets `say` as text, never markup.
+
+Re-verify by: 2027-01-23 (Chronicle `internal/plugins/cutscenes/`, the syncapi route for showings, `static/js/cutscene_engine.js`)
+
 ### Player notebook pages
 
 Not part of the REST API: the notebook (`scripts/player-notebook.mjs`,
@@ -1812,6 +1834,8 @@ allowlist (`api-client.mjs`) is ignored.
 | `creature_add.requested` | no payload; `resourceId` is the creature page's entity id; DM-equivalent sockets only; recorded in the change feed as `creature_add` (op `created`) | "Add to Foundry" pressed on a creature page |
 | `quest.updated` | `{ version }`; `resourceId` is the quest page's id. Sent only to DM sockets when the change is DM-only | A quest sheet was saved; open quest windows refetch |
 | `notice_boards.updated` | `{ home }` (`page` or `category`); `resourceId` is the page id or the type id | A home's boards changed; open board windows refetch |
+| `cutscene.foundry` | `{ showingId, viewers:[chronicleUserId…], scene, rewatchUntil }`; sent only to the campaign's Foundry-module socket; not in the change feed | The Director showed a cut scene to those members |
+| `cutscene.foundry_stop` | `{ showingId }`; the same audience | The Director stopped a showing; watching it again still works |
 | `roll.made` | A roll (see "Shared rolls" below); `resourceId` is the roll id. Public, gm and blind rolls in full; a self roll only to its owner's key | A roll was made at Chronicle's table or crafting, or recorded from Foundry |
 | `sync.status` | `{ connected: bool }` | Connection state change |
 | `sync.error` | `{ message }` | Synchronization error |
@@ -1874,6 +1898,29 @@ the same spotlight as the token HUD star. No such token, or a hidden one,
 only tells the GM. `tools/test-npc-presence.mjs`.
 
 Re-verify by: 2026-12-01 (Chronicle `internal/plugins/foundry_vtt/npc_spotlight.go`, `internal/app/npc_spotlight_adapters.go`; keyxmakerx/Chronicle#1039)
+
+### What the module does with `cutscene.foundry` and `cutscene.foundry_stop`
+
+Sent only to the Foundry module's socket, and not recorded in the change feed:
+a showing missed while the GM's Foundry was closed is not replayed, and
+players find it in the Satchel's watch-again list instead. The module's
+allowlist includes the `cutscene.` prefix; `scripts/cutscenes.mjs`
+`CutsceneRelay` acts on the **active GM client only**. For `cutscene.foundry`
+it matches each viewer to a Foundry user (`userMappings`) and, for each one
+logged in now, sends that client a knock carrying the showing id alone. The
+client answers with a one-off public key and gets the scene encrypted to it
+(`_stash-crypto.mjs`), so no other client can read it even if Foundry sends
+the socket message everywhere; the GM's client hands a scene only to a user
+matched to one of the showing's viewers, while the showing is live and inside
+its window. A viewer matched to the GM's own Foundry user plays it on the GM's
+screen. A viewer who logs in to Foundry within two minutes of the showing still
+gets it live. `cutscene.foundry_stop` sends the clients it reached a bare stop
+with the showing id. Nothing of a scene is written to a Foundry document; each
+client keeps what it received in memory for the session. The module does not
+mark a showing watched in Chronicle (the sync API has no route for it).
+`tools/test-cutscene-relay.mjs`.
+
+Re-verify by: 2027-01-23 (Chronicle `internal/websocket/message.go` `cutscene.foundry`, `Sources`; `internal/plugins/cutscenes/`)
 
 ### What the module does with `system_state.updated`
 

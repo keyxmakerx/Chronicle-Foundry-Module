@@ -78,6 +78,7 @@ const ALLOWED_WS_TYPE_PREFIXES = Object.freeze([
   'hero_layers.',
   'creature_add.',
   'roll.',
+  'cutscene.',
 ]);
 
 /**

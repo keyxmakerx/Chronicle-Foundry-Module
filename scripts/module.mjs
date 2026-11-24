@@ -52,6 +52,7 @@ import { registerShortcuts } from './_keybindings.mjs';
 import { registerMotion } from './motion.mjs';
 import { registerDiceSoNice } from './dice-so-nice.mjs';
 import { questLive, registerQuestBoard } from './quest-board.mjs';
+import { CutsceneRelay, registerCutscenes } from './cutscenes.mjs';
 import { retireNotesFolder } from './_notes-folder.mjs';
 import { FLAG_SCOPE, MODULE_ID, syncOptions } from './constants.mjs';
 import { removedFolder } from './_set-aside.mjs';
@@ -195,6 +196,7 @@ Hooks.once('ready', async () => {
   syncManager.registerModule(negotiationMirror);
   syncManager.registerModule(rollRelay);
   syncManager.registerModule(questLive);
+  syncManager.registerModule(new CutsceneRelay());
 
   // Create UI first so it's always available, even if start() fails.
   dashboard = new SyncDashboard();
@@ -255,6 +257,13 @@ Hooks.once('ready', async () => {
     registerQuestBoard(() => syncManager?.api ?? null);
   } catch (err) {
     console.warn('Chronicle Sync | Quest board unavailable', err);
+  }
+  try {
+    // Cut scenes the Director shows from Chronicle play on players' screens;
+    // the active GM's client hands them out and answers watch-again asks.
+    registerCutscenes();
+  } catch (err) {
+    console.warn('Chronicle Sync | Cut scenes unavailable', err);
   }
   try {
     // The Journal tab opens on "At this table", for every user.
