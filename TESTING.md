@@ -592,7 +592,7 @@ Needs a GM and a player client on the same scene, and an NPC page synced as a jo
 - [ ] Starting a second NPC talking stops the first; two minutes with no lines switches it off; a reload doesn't leave it on
 - [ ] Leave a client idle for a minute, or switch its tab away: the glow slows to still, and comes back on return
 - [ ] Reveal a hidden NPC token whose page is hidden: asked once "Show their Chronicle page?"; Yes shows the page to players in Chronicle, No leaves it hidden
-- [ ] Draw Steel world: on a linked or same-named NPC's Chronicle page, change the negotiation tracker (interest, patience, motivations, impression): the NPC actor's sheet shows the same values within a moment; a non-Draw-Steel world and hero actors stay untouched
+- [ ] Draw Steel world: on a linked or same-named NPC's Chronicle page, add a motivation and a pitfall to the negotiation tracker without marking them found: the NPC actor's sheet does not list them. Mark the motivation found: it appears within a moment. Interest and patience reach the actor only after Show to players. Give a player Limited on the actor: its Biography lists only found entries. A non-Draw-Steel world and hero actors stay untouched
 - [ ] Draw Steel world: drop a Chronicle NPC journal on a token whose page already has a tracker: the actor's negotiation fills in right after the "linked" notice (edits on the Foundry sheet don't go back to Chronicle yet)
 - [ ] On the NPC's Chronicle page press "Show in Foundry": the page says "Sent to Foundry." and both clients play the same spotlight as the star
 - [ ] "Show in Foundry" for an NPC with no token on the GM's scene, or only a hidden one: only the GM gets a notice

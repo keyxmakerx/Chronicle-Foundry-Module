@@ -2,9 +2,9 @@
  * Chronicle Sync - Draw Steel negotiation mirror (Chronicle to Foundry).
  *
  * When the Draw Steel negotiation tracker changes on a Chronicle NPC page,
- * the active GM's client copies interest, patience, motivations, pitfalls
- * and impression onto that NPC's actor, on Draw Steel worlds only. Edits on
- * the Foundry sheet are not sent back. A failure is logged for the GM, never
+ * the active GM's client copies the part players may know onto that NPC's
+ * actor, on Draw Steel worlds only: found motivations and pitfalls, and the
+ * meters once shown. Edits on the Foundry sheet are not sent back. A failure is logged for the GM, never
  * shown to players. Pure rules live in _negotiation-mirror.mjs.
  */
 
@@ -51,7 +51,8 @@ async function mirrorEntity(api, entityId) {
       id: a.id,
       name: a.name,
       type: a.type,
-      isHero: !!a.getFlag(FLAG_SCOPE, 'entityId'),
+      // Set by character sync, which makes Draw Steel NPC pages NPC actors.
+      pageId: a.getFlag(FLAG_SCOPE, 'entityId') ?? null,
       linkedEntityId: a.getFlag(FLAG_SCOPE, LINK_FLAG) ?? null,
     }));
     for (const id of pickNegotiationActors({ entityId, pageName: page?.name, actors })) {
