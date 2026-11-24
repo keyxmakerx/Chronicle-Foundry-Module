@@ -28,7 +28,7 @@ import { mergeChanges, changeTouchesPath } from './_actor-field-diff.mjs';
 import { collapseChanges } from './_change-feed.mjs';
 import { planActorApply } from './_actor-apply-plan.mjs';
 import { planIdentityItems, identityFieldTypes, identityPicks } from './_identity-item-plan.mjs';
-import { applyIdentityPlan, applyEntryRefresh } from './_identity-item-apply.mjs';
+import { applyIdentityPlan, applyEntryRefresh, journalMentions } from './_identity-item-apply.mjs';
 import { planEntryRefresh } from './_campaign-entry-item.mjs';
 import { sendsChangeHere, memberOf, ownsCharacter } from './_change-author.mjs';
 import { ASK, askModel, sameName } from './_player-asks.mjs';
@@ -876,7 +876,9 @@ export class ActorSync {
         failed.push(...(await applyIdentityPlan(actor, plan, game, entriesByField)).failed);
       }
       await recordPicks(failed);
-      const refresh = planEntryRefresh({ items, fields: madeFields, fieldsData: entity?.fields_data, entriesByField });
+      const refresh = planEntryRefresh({
+        items, fields: madeFields, fieldsData: entity?.fields_data, entriesByField, mentionId: journalMentions(game),
+      });
       try {
         await applyEntryRefresh(actor, refresh);
       } catch (err) {

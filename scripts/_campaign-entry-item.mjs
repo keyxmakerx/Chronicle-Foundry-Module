@@ -10,6 +10,13 @@
 import { FLAG_SCOPE } from './constants.mjs';
 import { hasClearSecrets } from './_gm-secrets.mjs';
 import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
+import { entryTextHTML } from './_entry-text.mjs';
+
+/**
+ * How the description text is turned into HTML. Raised when that changes, so
+ * items filled the old way are rewritten even though their entry hasn't.
+ */
+export const ENTRY_TEXT_FORMAT = 2;
 
 const norm = (s) => String(s ?? '').trim().toLowerCase();
 
@@ -37,14 +44,16 @@ function listHTML(key, items) {
 
 /**
  * The item description for an entry: its own text (or summary), then its
- * details. The description is HTML, cleaned again here as at every other
- * Chronicle ingress; the scalars and list items are plain text and escaped.
+ * details. The description is Markdown or HTML (`_entry-text.mjs`), cleaned
+ * again here as at every other Chronicle ingress; the scalars and list items
+ * are plain text and escaped.
  * @param {object} entry - one `GET /system-entries` row
+ * @param {{mentionId?: (name: string) => string|null}} [opts] - see `mentionLookup`
  * @returns {string} HTML
  */
-export function entryDescriptionHTML(entry) {
+export function entryDescriptionHTML(entry, opts = {}) {
   const parts = [];
-  const desc = typeof entry?.description === 'string' ? entry.description.trim() : '';
+  const desc = typeof entry?.description === 'string' ? entryTextHTML(entry.description, opts) : '';
   if (desc) parts.push(_sanitizeIncomingHTML(desc));
   else if (entry?.summary) parts.push(`<p>${escapeHTML(entry.summary)}</p>`);
 
@@ -74,19 +83,26 @@ export function findEntry(entries, name) {
  * save, so the caller keeps the item name-only.
  * @returns {{system: object, flags: object}|null}
  */
-export function entryItemFill(entry) {
+export function entryItemFill(entry, opts = {}) {
   if (!entry) return null;
-  const html = entryDescriptionHTML(entry);
+  const html = entryDescriptionHTML(entry, opts);
   if (hasClearSecrets(html)) return null;
   return {
     system: { description: { value: html } },
-    flags: { [FLAG_SCOPE]: { chronicleMade: true, entrySlug: entry.slug ?? '', entryUpdatedAt: entry.updatedAt ?? '' } },
+    flags: {
+      [FLAG_SCOPE]: {
+        chronicleMade: true,
+        entrySlug: entry.slug ?? '',
+        entryUpdatedAt: entry.updatedAt ?? '',
+        entryFormat: ENTRY_TEXT_FORMAT,
+      },
+    },
   };
 }
 
 /**
  * Items sync made earlier whose entry has changed since (or that were made
- * before entries could fill them). Only the first item of the type is looked
+ * before entries could fill them, or filled by an older `ENTRY_TEXT_FORMAT`). Only the first item of the type is looked
  * at, the one the adapter reads, and only while its name still matches the
  * entry: a renamed pick is the swap planner's job.
  * @param {object} args
@@ -94,9 +110,10 @@ export function entryItemFill(entry) {
  * @param {Array<{fieldKey: string, itemType: string}>} args.fields - identity fields
  * @param {object} args.fieldsData - Chronicle `fields_data`
  * @param {Record<string, Array<object>>} args.entriesByField
+ * @param {(name: string) => string|null} [args.mentionId] - see `mentionLookup`
  * @returns {Array<{itemId: string, fieldKey: string, update: object}>}
  */
-export function planEntryRefresh({ items, fields, fieldsData, entriesByField }) {
+export function planEntryRefresh({ items, fields, fieldsData, entriesByField, mentionId }) {
   const list = Array.isArray(items) ? items : [];
   const data = fieldsData && typeof fieldsData === 'object' ? fieldsData : {};
   const out = [];
@@ -106,8 +123,10 @@ export function planEntryRefresh({ items, fields, fieldsData, entriesByField }) 
     if (!flags?.chronicleMade) continue;
     if (typeof data[fieldKey] !== 'string' || norm(data[fieldKey]) !== norm(first.name)) continue;
     const entry = findEntry(entriesByField?.[fieldKey], first.name);
-    if (!entry || (flags.entryUpdatedAt && flags.entryUpdatedAt === entry.updatedAt)) continue;
-    const fill = entryItemFill(entry);
+    if (!entry) continue;
+    const current = flags.entryFormat === ENTRY_TEXT_FORMAT;
+    if (current && flags.entryUpdatedAt && flags.entryUpdatedAt === entry.updatedAt) continue;
+    const fill = entryItemFill(entry, { mentionId });
     if (!fill) continue;
     out.push({
       itemId: first.id,
@@ -117,6 +136,7 @@ export function planEntryRefresh({ items, fields, fieldsData, entriesByField }) 
         'system.description.value': fill.system.description.value,
         [`flags.${FLAG_SCOPE}.entrySlug`]: fill.flags[FLAG_SCOPE].entrySlug,
         [`flags.${FLAG_SCOPE}.entryUpdatedAt`]: fill.flags[FLAG_SCOPE].entryUpdatedAt,
+        [`flags.${FLAG_SCOPE}.entryFormat`]: ENTRY_TEXT_FORMAT,
       },
     });
   }

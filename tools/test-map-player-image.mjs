@@ -447,3 +447,25 @@ test('shadow gone in a later session: the blanked copy is written again', async 
     listed = [];
   }
 });
+
+// --- A map with no picture in Chronicle is not a fault ---
+
+test('a map with no picture fields warns no one; one whose picture fails to load does', async () => {
+  const run = async (row) => {
+    const ms = makeSync(makePage({ src: '' }));
+    const toasts = [];
+    const errors = [];
+    ms._toastOnce = (key, level, text) => toasts.push({ key, level, text });
+    ms._logError = (e) => errors.push(e);
+    ms._resolveMediaUrl = async () => '';
+    await ms._materializeMap(row);
+    return { toasts, errors };
+  };
+  const bare = await run({ id: 'map-1', name: 'The road to Lastwell' });
+  assert.deepEqual(bare, { toasts: [], errors: [] });
+
+  const broken = await run({ id: 'map-1', name: 'Test Map', image_id: 'med-9' });
+  assert.equal(broken.toasts.length, 1);
+  assert.match(broken.toasts[0].text, /could not be loaded/);
+  assert.match(broken.errors[0].message, /med-9/);
+});
