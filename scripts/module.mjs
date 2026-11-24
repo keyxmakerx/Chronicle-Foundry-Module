@@ -51,6 +51,7 @@ import { addChronicleControls } from './_scene-controls.mjs';
 import { registerShortcuts } from './_keybindings.mjs';
 import { registerMotion } from './motion.mjs';
 import { registerDiceSoNice } from './dice-so-nice.mjs';
+import { registerDiceTray, registerDiceTraySetting } from './dice-tray.mjs';
 import { questLive, registerQuestBoard } from './quest-board.mjs';
 import { CutsceneRelay, registerCutscenes } from './cutscenes.mjs';
 import { retireNotesFolder } from './_notes-folder.mjs';
@@ -105,6 +106,7 @@ Hooks.once('init', () => {
   console.debug('Chronicle Sync | Initializing');
   registerSettings();
   registerHoverArtSettings();
+  registerDiceTraySetting();
   registerMotion();
   try {
     // Every client, not only the GM: each one registers the rune dice with
@@ -264,6 +266,12 @@ Hooks.once('ready', async () => {
     registerCutscenes();
   } catch (err) {
     console.warn('Chronicle Sync | Cut scenes unavailable', err);
+  }
+  try {
+    // The dice button by the chat box, for every user; needs no connection.
+    registerDiceTray();
+  } catch (err) {
+    console.warn('Chronicle Sync | Dice tray unavailable', err);
   }
   try {
     // The Journal tab opens on "At this table", for every user.

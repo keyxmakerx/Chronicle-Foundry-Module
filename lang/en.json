@@ -1467,6 +1467,34 @@
     "Rolls": {
       "FallbackName": "Someone at the table"
     },
+    "DiceTray": {
+      "Open": "Roll dice",
+      "Title": "Roll dice",
+      "Close": "Close",
+      "Dice": "Dice",
+      "AddDie": "Add a {die}",
+      "RemoveHint": "Click a die to add one. Right-click or Shift-click to take one away.",
+      "Modifier": "Modifier",
+      "Less": "One less",
+      "More": "One more",
+      "Empty": "Pick some dice",
+      "Clear": "Clear",
+      "Roll": "Roll",
+      "Failed": "That roll didn't work. Try typing it in the chat box with /roll.",
+      "PowerRoll": "Power roll",
+      "NoHero": "Pick your hero in Player Configuration, or select your token, to roll its characteristics.",
+      "Char": {
+        "might": "Might",
+        "agility": "Agility",
+        "reason": "Reason",
+        "intuition": "Intuition",
+        "presence": "Presence"
+      },
+      "Setting": {
+        "Name": "Dice button by the chat box",
+        "Hint": "Shows a dice button beside the chat box that opens a tray for rolling dice without typing /roll. Only changes your own screen."
+      }
+    },
     "Dice": {
       "Heading": "Dice So Nice",
       "Intro": "The Chronicle rune dice play in Dice So Nice, another author's module. This checks what your own client found, so a change on their side shows up here instead of as silently missing dice.",
