@@ -36,6 +36,8 @@ import { actingMemberOf, heldKeysOf, describeHeld, HeldNotices } from './_player
 import { getPlayerAsks, playerName } from './player-asks.mjs';
 import { planLayerEffects, layeredFieldKeys, storedLayers, LAYER_FLAG } from './_layer-effects.mjs';
 import { bringsInActor } from './_actor-catch-up.mjs';
+import { usersWithHero, planPlayerHeroes, memberClaims, assignsCharacter } from './_player-hero.mjs';
+import { memberKey } from './_member-mapping.mjs';
 import { PictureStore } from './picture-store.mjs';
 import { heroChoice, heroPictureIds, heroPicturePlan, HERO_PICTURES_FLAG } from './_hero-pictures.mjs';
 import { folderKindFor, needsPlacing, FOLDER_PLACED_FLAG, ACTOR_FOLDER_FLAG, HEROES } from './_actor-folder.mjs';
@@ -63,6 +65,13 @@ export class ActorSync {
 
     /** Chronicle claimants already reported as having no Foundry user, so the GM hears once a session. */
     this._unmappedNoticed = new Set();
+
+    /**
+     * Heroes claimed live by a member with no Foundry user yet (member key ->
+     * page id). The members list read at connect predates the claim, so a
+     * link made later in this session finds the hero here.
+     */
+    this._claimsWaiting = new Map();
 
     /**
      * Tracks Foundry-originated creates whose POST is in flight.
@@ -352,6 +361,7 @@ export class ActorSync {
       }
     }
 
+    errors += await this._bringInPlayerHeroes();
     await this._reconcileClaimOwnership();
     await this._placeLooseActors();
     await this._syncAllLayers(feed?.mode === 'delta' ? feed.changes : null);
@@ -479,6 +489,7 @@ export class ActorSync {
           syncOptions({ [APPLY_OPTION]: true })
         );
       }
+      if (!plan.unmapped) await this._assignCharacter(actor, getUserMappings()[ownerId]);
       for (const staleId of plan.staleOwnerUserIds) {
         ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.PreviousOwnerKept', {
           actor: noticeText(actor.name),
@@ -500,12 +511,129 @@ export class ActorSync {
   }
 
   /**
+   * Make the claimed actor the player's assigned character when they have
+   * none, so Foundry's character tools find it. Never replaces one the GM
+   * assigned, and never throws.
+   * @param {Actor} actor
+   * @param {string|null} userId - the claimant's Foundry user.
+   * @private
+   */
+  async _assignCharacter(actor, userId) {
+    try {
+      const user = userId ? game.users?.get?.(userId) : null;
+      if (typeof user?.update !== 'function') return;
+      const actorIds = (game.actors?.contents ?? []).map((a) => a.id);
+      if (!assignsCharacter({ user, actorId: actor?.id ?? null, actorIds })) return;
+      await user.update({ character: actor.id });
+    } catch (err) {
+      console.warn(`Chronicle: could not make "${actor?.name}" the assigned character`, err);
+    }
+  }
+
+  /**
    * Apply cached claims again after a member was linked to a Foundry user
    * (SyncManager calls this), so the player owns their actor at once.
    */
   async reconcileOwnership() {
     if (!this._adapter || !getSetting('syncCharacters')) return;
+    // A newly linked player may have a claimed hero with no actor yet; making
+    // one is a pull, so it waits while characters take nothing from Chronicle.
+    if ((this._syncManager?.pullGate?.('characters') ?? 'apply') === 'apply') await this._bringInPlayerHeroes();
     await this._reconcileClaimOwnership();
+  }
+
+  /**
+   * Make the actors `planPlayerHeroes` picks: a claimed hero whose player is
+   * linked here and plays no hero in this world. Claims come from the members
+   * list (each member's character) and from live claims that waited for a link.
+   * @param {Array<{entityId: string, ownerKey: string}>} [extra] - claims to try first.
+   * @returns {Promise<number>} how many failed
+   * @private
+   */
+  async _bringInPlayerHeroes(extra = []) {
+    if (!game.user?.isGM || !this._adapter || !this._characterTypeId) return 0;
+    const waiting = [...this._claimsWaiting].map(([ownerKey, entityId]) => ({ entityId, ownerKey }));
+    const claims = [...extra, ...waiting, ...memberClaims(this._syncManager?.getMembers?.() ?? [], memberKey)];
+    if (!claims.length) return 0;
+    const actors = game.actors?.contents ?? [];
+    const users = game.users?.contents ?? Array.from(game.users ?? []);
+    const plan = planPlayerHeroes({
+      claims,
+      mappings: getUserMappings(),
+      users: users.map((u) => ({ id: u.id, isGM: !!u.isGM })),
+      linkedEntityIds: actors.map((a) => a.getFlag?.(FLAG_SCOPE, 'entityId')).filter(Boolean),
+      excludedIds: this._excludedIds(),
+      heroUserIds: usersWithHero({ actors, users, actorType: this._actorType, ownerLevel: CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3 }),
+    });
+    let errors = 0;
+    for (const { entityId, ownerKey } of plan) {
+      if (this._claimsWaiting.get(ownerKey) === entityId) this._claimsWaiting.delete(ownerKey);
+      const made = await this._inTurn(entityId, () => this._bringInHero(entityId, ownerKey));
+      if (made === false) errors++;
+    }
+    return errors;
+  }
+
+  /**
+   * Read a claimed hero and make its actor, if it is still a character, still
+   * that member's, and still has no actor.
+   * @returns {Promise<boolean|null>} true when made, null when not needed, false on failure
+   * @private
+   */
+  async _bringInHero(entityId, ownerKey) {
+    if (this._findLinkedActor(entityId)) return null;
+    let entity;
+    try {
+      entity = await this._api.get(`/entities/${entityId}`);
+    } catch (err) {
+      if ((err?.status ?? err?.statusCode) === 404) {
+        this._api.dropLastErrorLogEntry?.({ path: `/entities/${entityId}`, status: 404 });
+        return null;
+      }
+      console.warn(`Chronicle: could not read the claimed hero ${entityId}`, err);
+      return false;
+    }
+    if (!entity || !this._isCharacterEntity(entity) || String(entity.owner_user_id ?? '') !== ownerKey) return null;
+    return this._makeClaimedActor(entity);
+  }
+
+  /**
+   * A hero was claimed (or changed) in Chronicle and has no actor here. Its
+   * player gets it when they play no hero in this world; one whose claimant
+   * has no Foundry user yet waits for the link.
+   * Runs inside the page's turn already, so it must not queue another.
+   * @param {object} entity
+   * @private
+   */
+  async _bringInClaimed(entity) {
+    const ownerKey = entity?.owner_user_id ? String(entity.owner_user_id) : '';
+    if (!game.user?.isGM || !entity?.id || !ownerKey) return;
+    if (this._excludedIds().includes(entity.id)) return;
+    const mappings = getUserMappings();
+    if (!game.users?.get?.(mappings[ownerKey])) {
+      this._claimsWaiting.set(ownerKey, entity.id);
+      // They may have joined the campaign since connect.
+      this._syncManager?.refreshMembersForClaim?.()?.catch?.((err) => console.warn('Chronicle: could not read members again', err));
+      return;
+    }
+    const actors = game.actors?.contents ?? [];
+    const users = game.users?.contents ?? Array.from(game.users ?? []);
+    const plan = planPlayerHeroes({
+      claims: [{ entityId: entity.id, ownerKey }],
+      mappings,
+      users: users.map((u) => ({ id: u.id, isGM: !!u.isGM })),
+      linkedEntityIds: actors.map((a) => a.getFlag?.(FLAG_SCOPE, 'entityId')).filter(Boolean),
+      excludedIds: this._excludedIds(),
+      heroUserIds: usersWithHero({ actors, users, actorType: this._actorType, ownerLevel: CONST.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3 }),
+    });
+    if (plan.length) await this._makeClaimedActor(entity);
+  }
+
+  /** Make a claimed hero's actor and say so in History. @private */
+  async _makeClaimedActor(entity) {
+    const made = await this._onCharacterCreated(entity);
+    if (made) this._syncManager?.logActivity?.('create', `"${entity.name}" is claimed in Chronicle by a player with no hero here; its actor was created`);
+    return made;
   }
 
   /**
@@ -806,7 +934,10 @@ export class ActorSync {
     const actor = game.actors.find(
       (a) => a.getFlag(FLAG_SCOPE, 'entityId') === entity.id
     );
-    if (!actor) return;
+    if (!actor) {
+      await this._bringInClaimed(entity);
+      return;
+    }
     await this._updateActorFromEntity(actor, entity);
   }
 

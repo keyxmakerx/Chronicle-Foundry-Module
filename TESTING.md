@@ -628,6 +628,8 @@ Needs the Player Character Claiming addon on in Chronicle, a character linked to
 - [ ] Unassign it in Chronicle -> Foundry ownership is unchanged
 - [ ] Assign it to a member with no Foundry user mapped -> no ownership change, one GM notice that the player has no Foundry user, and Chronicle Sync → Settings → Players shows that member as "Owns a character, not linked"; linking them, pressing **Save**, then reconnecting, gives them Owner
 - [ ] Reconnect (or Bring in all) with a claim that is already applied -> no notice and no ownership change
+- [ ] A new player with no hero in Foundry: link them (Settings → Players), then in Chronicle claim for them a hero that has no actor, even one made long before the last sync -> within a few seconds an actor of that name appears in the Heroes folder, the player is **Owner**, and in Foundry's **User Configuration** it is their character. Claim one for a player who already owns a hero here -> no actor is made
+- [ ] Claim a hero with no actor for a member who is not linked yet -> nothing appears; link them -> the actor appears, owned by them and set as their character. A player whose character the GM already chose keeps it
 
 ## Stashes
 
