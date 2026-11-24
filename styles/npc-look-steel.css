@@ -1,0 +1,562 @@
+/* The steel and banner look on the Chronicle NPC and monster sheet
+   (scripts/npc-looks.mjs, templates/npc-looks/steel/). The window is also a
+   hero sheet, so styles/hero-look-steel.css already draws the plate, rivets,
+   banner, shield crest, level medal, blade, pips, shields and cut plates from
+   the classes these templates reuse. This file adds only what a creature
+   needs: a banner cloth for each shape, villain actions as cut steel tags,
+   Malice as red bars, Interest as a blade cut into five steps, and
+   motivations and pitfalls as shields that change metal with their state.
+   Square corners, heavy and quick moves: things snap rather than ease.
+   Every rule is scoped to the NPC sheet, so the hero sheet is untouched. */
+
+/* Every colour this file adds is in this block; the rest come from steel's
+   own tokens. */
+.chronicle-npc-sheet[data-cs-look="steel"] {
+  --cs-hero-dm: #f59e0b;
+  --cs-hero-dm-soft: color-mix(in srgb, #f59e0b 14%, #0e1013);
+  --cs-npc-dm-hi: #fbbf4a;
+  --cs-npc-war-hi: #a8141e;
+  --cs-npc-war-mid: #5a0910;
+  --cs-npc-war-lo: #2a0407;
+  --cs-npc-war-black: #0b0b0d;
+  --cs-npc-guild-hi: #7a4a1f;
+  --cs-npc-guild-mid: #45280f;
+  --cs-npc-guild-lo: #241407;
+  --cs-npc-guild-amber: #d9952e;
+  --cs-npc-warm-hi: #c9932f;
+  --cs-npc-yes-hi: #3f9a4e;
+  --cs-npc-yes-lo: #17501f;
+  --cs-npc-iron-hi: #6a7078;
+  --cs-npc-iron-face: #181b20;
+  --cs-npc-pit-hi: #ffb0a0;
+  --cs-npc-pit-lo: #4a0a07;
+  --cs-npc-pit-face-hi: #2c1416;
+  --cs-npc-pit-face-lo: #120809;
+  --cs-npc-pit-ink: #ff9a8a;
+  --cs-npc-pit-word: #ffb8a8;
+  --cs-npc-pit-mark: #ff8a7a;
+  --cs-npc-malice-hi: #ff9180;
+  --cs-npc-cond-ink: #ffe1da;
+}
+
+/* ---- Each creature's banner ------------------------------------------- */
+/* The war camp: crimson between black side panels, gold trim kept. */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-banner[data-cloth="war"] { --cs-steel-cloth-hi: var(--cs-npc-war-hi); --cs-steel-cloth-mid: var(--cs-npc-war-mid); --cs-steel-cloth-lo: var(--cs-npc-war-lo); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-banner[data-cloth="war"] .cs-steel-cloth {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 34px, color-mix(in srgb, var(--cs-steel-black) 10%, transparent) 34px 36px, color-mix(in srgb, var(--cs-steel-white) 4%, transparent) 36px 70px),
+    linear-gradient(90deg, var(--cs-npc-war-black) 0 21%, color-mix(in srgb, var(--cs-steel-gold) 45%, transparent) 21% calc(21% + 1px), transparent calc(21% + 1px) calc(79% - 1px), color-mix(in srgb, var(--cs-steel-gold) 45%, transparent) calc(79% - 1px) 79%, var(--cs-npc-war-black) 79%),
+    linear-gradient(180deg, var(--cs-steel-cloth-hi), var(--cs-steel-cloth-mid) 70%, var(--cs-steel-cloth-lo));
+}
+/* The caravan guild: road-dust brown with two amber stripes. */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-banner[data-cloth="guild"] { --cs-steel-cloth-hi: var(--cs-npc-guild-hi); --cs-steel-cloth-mid: var(--cs-npc-guild-mid); --cs-steel-cloth-lo: var(--cs-npc-guild-lo); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-banner[data-cloth="guild"] .cs-steel-cloth {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 34px, color-mix(in srgb, var(--cs-steel-black) 10%, transparent) 34px 36px, color-mix(in srgb, var(--cs-steel-white) 4%, transparent) 36px 70px),
+    linear-gradient(90deg, transparent 0 12%, var(--cs-npc-guild-amber) 12% 17%, transparent 17% 83%, var(--cs-npc-guild-amber) 83% 88%, transparent 88%),
+    linear-gradient(180deg, var(--cs-steel-cloth-hi), var(--cs-steel-cloth-mid) 70%, var(--cs-steel-cloth-lo));
+}
+/* The charge sits low on the cloth, above the cut. A short window hides it
+   with the lowest lines, as the hero banner does. */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-device { flex: none; width: 92px; height: 92px; margin: auto 0 96px; overflow: visible; filter: drop-shadow(0 2px 0 color-mix(in srgb, var(--cs-steel-black) 60%, transparent)); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-banner[data-cloth="war"] .cs-npc-device .b { fill: var(--cs-npc-war-black); stroke: color-mix(in srgb, var(--cs-steel-gold) 55%, transparent); stroke-width: 1; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-banner[data-cloth="war"] .cs-npc-device .g { fill: var(--cs-steel-gold-deep); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-banner[data-cloth="war"] .cs-npc-device .h { fill: var(--cs-npc-war-black); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-banner[data-cloth="guild"] .cs-npc-device .b { stroke: var(--cs-npc-guild-amber); stroke-width: 6; fill: none; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-banner[data-cloth="guild"] .cs-npc-device .g { stroke: var(--cs-npc-guild-amber); stroke-width: 4.5; fill: none; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-banner[data-cloth="guild"] .cs-steel-cls { font-size: clamp(15px, 10.5cqi, 24px); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-cls:empty,
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-col:empty { display: none; }
+
+/* The medal says "Level" over the number, so a Director new to the sheet
+   reads it without guessing. */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-lvl { grid-template-rows: auto auto; align-content: center; gap: 0; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-lvl small { font: 600 7.5px/1 var(--cs-steel-display); letter-spacing: 0.18em; text-transform: uppercase; color: var(--cs-steel-cloth-lo); margin: 2px 0 -1px; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-lvl b { font-size: 26px; line-height: 1; }
+
+/* ---- The name and the lines under it ---------------------------------- */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-vit b { color: var(--cs-steel-white); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-origin-name { color: var(--cs-steel-white); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-sub .cs-steel-mini { margin: 0; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-note {
+  grid-row: 2;
+  grid-column: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font: 500 11px/1.3 var(--cs-steel-display);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cs-hero-muted);
+}
+/* A token: a gold ring round a dark disc. */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-note i { width: 12px; height: 12px; border-radius: 50%; background: var(--cs-steel-ink); box-shadow: 0 0 0 2px var(--cs-steel-gold-deep), inset 0 0 0 2px var(--cs-steel-raise-hi); }
+
+/* Director-only: the amber edge, the mark and the words together, on steel's
+   dark plate. The mark itself comes from npc-looks.css. */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-sub .cs-dm-only {
+  padding: 2px 10px 2px 12px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--cs-hero-dm) 13%, transparent), transparent 90%);
+  box-shadow: inset 3px 0 0 var(--cs-hero-dm);
+}
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-sub .cs-dm-only + li::before { display: none; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-sub li + .cs-dm-only::before { display: none; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-dm-only .cs-dm-mark { color: var(--cs-hero-dm); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-dm-only .cs-dm-words {
+  display: inline;
+  margin: 0 0 0 4px;
+  font: 500 10px/1 var(--cs-steel-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--cs-hero-dm) 80%, var(--cs-steel-white));
+}
+
+/* Malice: red bars drawn from the number itself (--m, lit up to ten), with
+   the Director's number box beside them. Only the Director sees it. */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-id .cs-npc-mal {
+  grid-row: 3;
+  grid-column: 1 / -1;
+  justify-self: start;
+  margin-left: -2px;
+  padding: 4px 12px;
+  gap: 10px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--cs-hero-dm) 13%, transparent), transparent 85%);
+  box-shadow: inset 3px 0 0 var(--cs-hero-dm);
+}
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-mal .cs-steel-k { color: var(--cs-hero-dm); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-malbars {
+  position: relative;
+  flex: none;
+  width: 127px;
+  height: 15px;
+  margin: 0 4px;
+  transform: skewX(-20deg);
+}
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-malbars::before,
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-malbars::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  -webkit-mask: repeating-linear-gradient(90deg, #000 0 10px, transparent 10px 13px);
+  mask: repeating-linear-gradient(90deg, #000 0 10px, transparent 10px 13px);
+}
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-malbars::before { width: 100%; background: color-mix(in srgb, var(--cs-steel-red) 24%, var(--cs-steel-ink)); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-malbars::after {
+  width: calc(min(var(--m, 0), 10) * 13px);
+  background: linear-gradient(180deg, var(--cs-npc-malice-hi), var(--cs-steel-red) 55%, var(--cs-steel-blade-lo));
+}
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-mal input[type="number"] {
+  width: 4ch;
+  min-width: 52px;
+  height: 26px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 0;
+  background: var(--cs-steel-well);
+  box-shadow: inset 0 2px 4px var(--cs-steel-black), inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 9%, transparent);
+  color: var(--cs-steel-white);
+  font: 500 16px var(--cs-steel-display);
+  text-align: center;
+}
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-mal input[type="number"]:focus { outline: none; box-shadow: inset 0 2px 4px var(--cs-steel-black), inset 0 0 0 1px color-mix(in srgb, var(--cs-hero-dm) 60%, transparent), inset 0 -2px 0 var(--cs-hero-dm); }
+
+/* Talking: steel's amber button, lit with a live green light while pressed,
+   dark steel with an empty light when not. */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-id .cs-npc-talk { grid-row: 2; grid-column: 2; align-self: center; min-width: 118px; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-talk i { width: 8px; height: 8px; border-radius: 50%; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-talk[aria-pressed="true"] i { background: var(--cs-hero-ok); box-shadow: 0 0 0 2px color-mix(in srgb, var(--cs-steel-ink) 70%, transparent), 0 0 8px var(--cs-hero-ok); animation: cs-steel-npc-live 1.6s steps(2, jump-none) infinite; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-talk[aria-pressed="false"] { background: var(--cs-steel-raise); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 15%, transparent); color: var(--cs-hero-muted); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-talk[aria-pressed="false"] i { box-shadow: inset 0 0 0 1.5px currentColor; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-talk[aria-pressed="false"]:hover { background: var(--cs-steel-raise-hi); color: var(--cs-steel-white); }
+
+/* ---- The blade --------------------------------------------------------- */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-read .cs-steel-k { background: none; }
+/* The thresholds line below says where winded is, so the blade needn't. */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-wind { display: none; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-thr { margin: -4px 0 0; font: 500 12px/1.3 var(--cs-steel-display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--cs-hero-muted); }
+/* A crack across the blade at the winded notch, there from winded on. */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-crack { position: absolute; top: 0; bottom: 0; left: calc(var(--winded, 50) * 1% - 9px); width: 18px; opacity: 0; filter: drop-shadow(1.5px 0 0 color-mix(in srgb, var(--cs-steel-white) 60%, transparent)); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-crack::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--cs-steel-ink);
+  transform-origin: 50% 0;
+  clip-path: polygon(44% 0, 68% 0, 44% 34%, 76% 54%, 50% 100%, 30% 100%, 52% 58%, 18% 38%);
+}
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-blade:not([data-band="healthy"]) .cs-npc-crack { opacity: 1; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-notchsparks { right: auto; left: calc(var(--winded, 50) * 1%); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-notchsparks i:nth-child(1) { --a: -120deg; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-notchsparks i:nth-child(2) { --a: -75deg; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-notchsparks i:nth-child(3) { --a: -100deg; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-notchsparks i:nth-child(4) { --a: 70deg; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-notchsparks i:nth-child(5) { --a: 115deg; }
+
+/* Interest: a blade cut into five steps, read from the sheet's five pips. Its
+   red turns amber, gold and green as the NPC warms to the party; the answer
+   they'd give rides on it. */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-segs {
+  position: absolute;
+  inset: 3px;
+  display: flex;
+  clip-path: polygon(0 0, 96% 0, 100% 50%, 96% 100%, 0 100%);
+}
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-segs i { position: relative; flex: 1; transform-origin: 0 50%; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-segs i.on {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--cs-steel-white) 30%, transparent), transparent 2px),
+    linear-gradient(180deg, var(--cs-steel-blade-hi), var(--cs-steel-blade-lo));
+}
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-segs:has(i:nth-child(2).on) i.on { background: linear-gradient(180deg, color-mix(in srgb, var(--cs-steel-white) 30%, transparent), transparent 2px), linear-gradient(180deg, var(--cs-steel-wind-hi), var(--cs-steel-wind-lo)); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-segs:has(i:nth-child(3).on) i.on { background: linear-gradient(180deg, color-mix(in srgb, var(--cs-steel-white) 35%, transparent), transparent 2px), linear-gradient(180deg, var(--cs-npc-warm-hi), var(--cs-steel-gold-lo)); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-segs:has(i:nth-child(4).on) i.on { background: linear-gradient(180deg, color-mix(in srgb, var(--cs-steel-white) 30%, transparent), transparent 2px), linear-gradient(180deg, var(--cs-npc-yes-hi), var(--cs-npc-yes-lo)); }
+/* The notch between steps: a dark line with a triangle cut top and bottom. */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-segs i:not(:last-child) { box-shadow: inset -2px 0 0 color-mix(in srgb, var(--cs-steel-ink) 80%, transparent); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-segs i:not(:last-child)::before,
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-segs i:not(:last-child)::after { content: ""; position: absolute; right: -5px; z-index: 1; width: 12px; height: 7px; background: var(--cs-steel-ink); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-segs i:not(:last-child)::before { top: 0; clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-segs i:not(:last-child)::after { bottom: 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-shine { position: absolute; inset: 3px; opacity: 0; background: linear-gradient(100deg, transparent 40%, color-mix(in srgb, var(--cs-steel-white) 67%, transparent) 50%, transparent 60%); transform: translateX(-100%); clip-path: polygon(0 0, 96% 0, 100% 50%, 96% 100%, 0 100%); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-num { min-width: 0.6em; font: 500 26px/1 var(--cs-steel-display); letter-spacing: 0; text-align: center; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-int .cs-steel-of { margin-left: -2px; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-ans { margin-left: 6px; padding: 5px 12px; font-size: 13px; letter-spacing: 0.12em; color: var(--cs-steel-gold-hi); }
+
+/* ---- The pips row ------------------------------------------------------ */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-pipsrow { gap: 10px 20px; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-n b { font: 500 16px/1 var(--cs-steel-display); color: var(--cs-steel-white); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-n small { margin-left: 3px; letter-spacing: 0.1em; text-transform: uppercase; font-size: 11px; }
+
+/* Villain actions: cut steel tags in order. Spent is dark and slashed, the
+   next one glows ember, the rest wait in plain steel. A button for whoever
+   can mark them, a plain tag otherwise; each says its state in words. */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-tags { flex: none; gap: 4px; margin: 0; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-va-mark {
+  position: relative;
+  isolation: isolate;
+  flex: none;
+  width: 32px;
+  min-width: 0;
+  height: 22px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--cs-steel-tag);
+  font: 700 13px/1 var(--cs-steel-display);
+  text-decoration: none;
+}
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-va-mark b { position: relative; font: inherit; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-va-mark::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(180deg, var(--cs-steel-raise-hi), var(--cs-steel-raise));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-surge-edge) 45%, transparent);
+  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+}
+.chronicle-npc-sheet[data-cs-look="steel"] button.cs-va-mark:hover { box-shadow: none; color: var(--cs-steel-white); }
+.chronicle-npc-sheet[data-cs-look="steel"] button.cs-va-mark:hover::before { box-shadow: inset 0 0 0 1px var(--cs-steel-gold); }
+.chronicle-npc-sheet[data-cs-look="steel"] button.cs-va-mark:active { translate: 0 2px; }
+.chronicle-npc-sheet[data-cs-look="steel"] button.cs-va-mark:focus-visible { outline: 2px solid var(--cs-steel-gold); outline-offset: 3px; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-va-mark.next { background: none; box-shadow: none; color: var(--cs-steel-ink); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-va-mark.next::before { background: linear-gradient(180deg, var(--cs-steel-surge-hi), var(--cs-steel-surge-lo)); box-shadow: inset 0 -2px 0 var(--cs-steel-wind-lo); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-va-mark.used { background: none; box-shadow: none; color: var(--cs-steel-dim); text-decoration: none; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-va-mark.used::before { background: var(--cs-steel-ink); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 10%, transparent); }
+/* The slash a spent tag keeps, scored where the spark ran. */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-va-mark::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  top: calc(50% - 1px);
+  height: 2px;
+  background: color-mix(in srgb, var(--cs-steel-surge-edge) 80%, transparent);
+  transform: rotate(-28deg);
+  clip-path: inset(0 100% 0 0);
+}
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-va-mark.used::after { clip-path: inset(0); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-left { font: 500 12px/1.3 var(--cs-steel-display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--cs-hero-muted); }
+
+/* Conditions: red-steel tags, cut like steel's skill tags. */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-cond .cs-steel-tags { margin: 0; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-cond .cs-steel-tags li { display: inline-flex; align-items: center; gap: 6px; background: color-mix(in srgb, var(--cs-steel-red) 40%, var(--cs-steel-raise)); color: var(--cs-npc-cond-ink); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-cond .cs-steel-tags img { width: 14px; height: 14px; border: 0; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-none { font: 500 12px/1.4 var(--cs-steel-display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--cs-hero-muted); }
+
+/* Patience: wide silver bars, big enough to count at a glance. */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-pat .cs-steel-pips { gap: 5px; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-pat .cs-steel-pips i { position: relative; width: 34px; height: 16px; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-pat .cs-steel-pips i.on { background: linear-gradient(180deg, var(--cs-steel-silver-hi), var(--cs-steel-silver-lo)); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-pat .cs-steel-n b { font-size: 22px; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-pat .cs-steel-n small { text-transform: none; font-size: 13px; letter-spacing: 0; margin-left: 1px; }
+
+/* ---- Motivations and pitfalls as shields ------------------------------- */
+/* Found is gold-edged; appealed to is dull iron with the name struck; not
+   found is a dashed outline with a question mark; a pitfall is red steel.
+   The state is also a word on every shield. */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motives { margin: 0; padding: 0; list-style: none; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive { height: 132px; cursor: default; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive:active { translate: none; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive > .cs-npc-dash { position: absolute; inset: 0; z-index: 1; display: none; width: 100%; height: 100%; fill: none; stroke: var(--cs-steel-rim-mid); stroke-width: 2; stroke-dasharray: 7 5; }
+/* The question mark sits in the shield's point, under the words. */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive > .cs-npc-q { position: absolute; z-index: 1; bottom: 9px; left: 0; right: 0; display: none; font: 700 21px/1 var(--cs-steel-display); text-align: center; text-decoration: none; color: var(--cs-steel-rim-mid); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-kindw { margin-top: -16px; font: 500 9.5px/1.3 var(--cs-steel-display); font-style: normal; letter-spacing: 0.22em; text-transform: uppercase; color: var(--cs-steel-gold); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive b {
+  max-width: calc(100% - 14px);
+  margin: 2px 0 3px;
+  font: 700 clamp(16px, 3.2cqi, 23px)/1.05 var(--cs-steel-display);
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-transform: uppercase;
+  overflow-wrap: normal;
+}
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive .cs-npc-word { max-width: calc(100% - 14px); font: 500 10px/1.2 var(--cs-steel-display); letter-spacing: 0.16em; text-align: center; white-space: normal; color: var(--cs-hero-muted); }
+
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive[data-kind="motivation"][data-state="found"]::before { background: linear-gradient(160deg, var(--cs-steel-gold-hi), var(--cs-steel-gold) 45%, var(--cs-steel-gold-lo)); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive[data-kind="motivation"][data-state="found"] .cs-npc-word { color: var(--cs-steel-gold-hi); }
+
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive[data-state="used"]::before { background: linear-gradient(160deg, var(--cs-npc-iron-hi), var(--cs-steel-raise-hi) 45%, var(--cs-steel-plate-mid)); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive[data-state="used"]::after { background: linear-gradient(180deg, var(--cs-npc-iron-face), var(--cs-steel-ink)); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive[data-state="used"] b { color: var(--cs-steel-dim); background: linear-gradient(color-mix(in srgb, var(--cs-steel-white) 55%, transparent), color-mix(in srgb, var(--cs-steel-white) 55%, transparent)) 0 56% / 100% 2px no-repeat; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive[data-state="used"] .cs-npc-kindw { color: var(--cs-steel-dim); }
+
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive[data-kind="pitfall"]::before { background: linear-gradient(160deg, var(--cs-npc-pit-hi), var(--cs-steel-red) 45%, var(--cs-npc-pit-lo)); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive[data-kind="pitfall"]::after { background: linear-gradient(180deg, var(--cs-npc-pit-face-hi), var(--cs-npc-pit-face-lo)); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive[data-kind="pitfall"] .cs-npc-kindw { color: var(--cs-npc-pit-ink); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive[data-kind="pitfall"][data-state="found"] .cs-npc-word { color: var(--cs-npc-pit-word); }
+
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive[data-state="hidden"]::before { background: none; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive[data-state="hidden"]::after { inset: 0; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--cs-steel-white) 3%, transparent) 0 6px, transparent 6px 12px), linear-gradient(180deg, color-mix(in srgb, var(--cs-steel-ink) 70%, transparent), color-mix(in srgb, var(--cs-steel-ink) 40%, transparent)); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive[data-state="hidden"] > :is(.cs-npc-dash, .cs-npc-q) { display: block; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive[data-state="hidden"] b { color: var(--cs-hero-muted); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive[data-kind="pitfall"][data-state="hidden"] > .cs-npc-dash { stroke: var(--cs-steel-red); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive[data-kind="pitfall"][data-state="hidden"] > .cs-npc-q { color: var(--cs-npc-pit-mark); }
+
+/* ---- The plates -------------------------------------------------------- */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-cols.cs-npc-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-cols .cs-steel-wide { grid-column: 1 / -1; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-next { margin: 4px 0 0; font: 400 14px/1.45 var(--cs-hero-face); color: var(--cs-hero-body); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-next b { font: 600 15px var(--cs-steel-display); letter-spacing: 0.08em; text-transform: uppercase; color: var(--cs-steel-surge-edge); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-talkplate { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 24px; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-talkplate .cs-npc-next { margin: 2px 0 0; color: var(--cs-steel-white); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-answer { text-transform: uppercase; letter-spacing: 0.04em; color: var(--cs-steel-gold-hi); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-answer small { font-size: 12px; color: var(--cs-hero-muted); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-facts { flex-direction: column; align-items: flex-end; gap: 3px; margin: 0 0 3px; text-align: right; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-eye::before { content: "◉"; margin-right: 6px; color: var(--cs-steel-gold); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-quiet { font: 500 11px var(--cs-steel-display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--cs-steel-gold); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-quiet:hover { color: var(--cs-steel-gold-hi); }
+/* No stat block yet: a plate that says so, a place for something, not a thing. */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-nostat { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; align-items: center; margin: 0; padding: 10px 14px; border: 0; border-radius: 0; background: color-mix(in srgb, var(--cs-steel-ink) 60%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 11%, transparent); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-nostat b { font: 600 15px var(--cs-steel-display); letter-spacing: 0.08em; text-transform: uppercase; color: var(--cs-steel-white); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-nostat p { grid-column: 1; margin: 0; font-size: 13px; color: var(--cs-hero-body); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-nostat .cs-quiet { grid-column: 2; grid-row: 1 / span 2; }
+/* Free strike is a plate that rolls, a button for whoever can edit the sheet. */
+.chronicle-npc-sheet[data-cs-look="steel"] button.cs-npc-strike { display: block; width: auto; height: auto; margin: 0; border: 0; border-radius: 0; text-align: left; font: inherit; cursor: pointer; background: color-mix(in srgb, var(--cs-steel-ink) 60%, transparent); }
+.chronicle-npc-sheet[data-cs-look="steel"] button.cs-npc-strike:hover { background: var(--cs-steel-raise); box-shadow: inset 0 0 0 1px var(--cs-steel-gold); }
+.chronicle-npc-sheet[data-cs-look="steel"] button.cs-npc-strike:active { translate: 0 2px; }
+.chronicle-npc-sheet[data-cs-look="steel"] button.cs-npc-strike:focus-visible { outline: 2px solid var(--cs-steel-gold); outline-offset: -3px; clip-path: none; }
+.chronicle-npc-sheet[data-cs-look="steel"] button.cs-npc-strike > span { display: block; }
+
+/* ---- Panes: steel's group headings, cut plates and tags ---------------- */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-pane { padding: 0 0 8px; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-pane-h { margin-top: 0; padding: 0; border-bottom: 2px solid var(--cs-steel-raise); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-pane-h h3 { padding: 4px 18px 3px 11px; background: linear-gradient(180deg, var(--cs-steel-raise-hi), var(--cs-steel-raise)); box-shadow: inset 3px 0 0 var(--cs-steel-gold), inset 0 1px 0 color-mix(in srgb, var(--cs-steel-white) 8%, transparent); clip-path: polygon(0 0, 100% 0, calc(100% - 9px) 100%, 0 100%); font-size: 11.5px; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-pane-h small { padding-bottom: 4px; font: 500 10.5px var(--cs-steel-display); letter-spacing: 0.12em; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-pane-body { padding: 12px 0 18px; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-prose { color: var(--cs-hero-body); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-motives .cs-chip {
+  gap: 7px;
+  padding: 4px 14px;
+  border: 0;
+  border-radius: 0;
+  background: var(--cs-steel-raise);
+  box-shadow: none;
+  font: 500 12px/1.4 var(--cs-steel-display);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cs-steel-tag);
+  clip-path: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
+}
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-motives .cs-chip .cs-chip-kind { font: 500 10px var(--cs-steel-display); letter-spacing: 0.2em; color: var(--cs-steel-gold); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-motives .cs-chip[data-kind="pitfall"] { background: color-mix(in srgb, var(--cs-steel-red) 30%, var(--cs-steel-raise)); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-motives .cs-chip[data-kind="pitfall"] .cs-chip-kind { color: var(--cs-npc-pit-ink); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-motives .cs-chip[data-state="hidden"] { background: color-mix(in srgb, var(--cs-steel-ink) 60%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 14%, transparent); color: var(--cs-hero-body); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-chip-state { font: 500 10.5px var(--cs-steel-display); letter-spacing: 0.12em; text-transform: uppercase; color: var(--cs-hero-muted); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-rows li { border-bottom-color: color-mix(in srgb, var(--cs-steel-white) 8%, transparent); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-rows li em { font: 500 12.5px var(--cs-steel-display); letter-spacing: 0.08em; text-transform: uppercase; color: var(--cs-steel-gold-soft); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-rows li.cs-dm-only { padding-left: 14px; background: linear-gradient(90deg, color-mix(in srgb, var(--cs-hero-dm) 10%, transparent), transparent 70%); box-shadow: inset 3px 0 0 var(--cs-hero-dm); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-rows li small.cs-dm-mark { font: 500 11px var(--cs-steel-display); letter-spacing: 0.14em; text-transform: uppercase; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-legend { color: var(--cs-hero-muted); }
+
+/* Edit mode: the shape picker as steel's cut buttons. */
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-shape-pick .cs-btn { min-height: 0; padding: 6px 16px; border: 0; border-radius: 0; background: var(--cs-steel-raise); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 15%, transparent); color: var(--cs-steel-tag); font: 500 11.5px var(--cs-steel-display); letter-spacing: 0.14em; text-transform: uppercase; clip-path: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-shape-pick .cs-btn:hover { background: var(--cs-steel-raise-hi); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-shape-pick .cs-btn[aria-pressed="true"] { background: var(--cs-steel-gold); box-shadow: inset 0 -2px 0 var(--cs-steel-gold-deep); color: var(--cs-steel-ink); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-shape-pick .cs-btn:active { translate: 0 2px; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-shape-pick .cs-btn:focus-visible { outline: none; box-shadow: inset 0 3px 0 var(--cs-steel-ink), inset 0 -3px 0 var(--cs-steel-ink); }
+
+/* ---- The Director's drawer: in the open tab's place --------------------- */
+.chronicle-npc-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content > .cs-only-you { grid-column: 2; grid-row: 4; margin: 14px 46px 30px 0; }
+@container cs-hero (max-width: 940px) {
+  .chronicle-npc-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content > .cs-only-you { margin-right: 28px; }
+}
+@container cs-hero (max-width: 760px) {
+  .chronicle-npc-sheet[data-cs-look="steel"]:not(.cs-folded) .window-content > .cs-only-you { grid-column: 1; grid-row: 5; margin: 14px 28px 30px; }
+}
+
+/* ---- Folded: the card on steel, its cloth the shape's own --------------- */
+.chronicle-npc-sheet[data-cs-look="steel"].cs-shape-monster .cs-card-art { background: linear-gradient(180deg, var(--cs-npc-war-hi), var(--cs-npc-war-mid)); }
+.chronicle-npc-sheet[data-cs-look="steel"].cs-shape-npc .cs-card-art { background: linear-gradient(180deg, var(--cs-npc-guild-hi), var(--cs-npc-guild-mid)); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-card-meters { gap: 18px; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-card .cs-meter b { font: 700 18px/1.1 var(--cs-steel-display); color: var(--cs-steel-white); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-meter .cs-dots { gap: 4px; padding: 0 2px; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-meter .cs-dots i { width: 16px; height: 9px; border-radius: 0; background: linear-gradient(180deg, var(--cs-steel-silver-hi), var(--cs-steel-silver-lo)); box-shadow: none; transform: skewX(-20deg); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-meter .cs-dots i.off { background: var(--cs-steel-ink); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 15%, transparent); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-card .cs-meter .cs-lab { font: 500 10px var(--cs-steel-display); letter-spacing: 0.18em; text-transform: uppercase; color: var(--cs-steel-gold); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-card .cs-offer { color: var(--cs-hero-body); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-card .cs-offer b { color: var(--cs-steel-gold-hi); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-card .cs-motives { gap: 5px; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-card .cs-motives .cs-chip { padding: 2px 12px; font-size: 11px; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-card .cs-va-pips { gap: 4px; margin: 0; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-card-stam .cs-bar { position: relative; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-talking { font: 600 11px var(--cs-steel-display); letter-spacing: 0.16em; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-card-actions .cs-talk-btn[aria-pressed="true"] { border: 0; background: color-mix(in srgb, var(--cs-hero-ok) 18%, var(--cs-steel-raise)); box-shadow: inset 0 0 0 1px var(--cs-hero-ok); color: var(--cs-steel-white); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-card-malice { padding: 4px 8px 4px 12px; background: linear-gradient(90deg, color-mix(in srgb, var(--cs-hero-dm) 13%, transparent), transparent 90%); box-shadow: inset 3px 0 0 var(--cs-hero-dm); font: 500 11px var(--cs-steel-display); letter-spacing: 0.12em; text-transform: uppercase; }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-card-malice input { height: 26px; border: 0; border-radius: 0; background: var(--cs-steel-well); box-shadow: inset 0 2px 4px var(--cs-steel-black), inset 0 0 0 1px color-mix(in srgb, var(--cs-steel-white) 9%, transparent); color: var(--cs-steel-white); font: 500 16px var(--cs-steel-display); }
+.chronicle-npc-sheet[data-cs-look="steel"] .cs-card-malice input:focus { outline: none; box-shadow: inset 0 2px 4px var(--cs-steel-black), inset 0 0 0 1px color-mix(in srgb, var(--cs-hero-dm) 60%, transparent), inset 0 -2px 0 var(--cs-hero-dm); }
+
+/* ---- Narrower windows -------------------------------------------------- */
+/* Too narrow for the banner beside the boxes, it is a pennant across the top,
+   which has no room for the charge. */
+@container cs-hero (max-width: 760px) {
+  .chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-device { display: none; }
+}
+@container cs-steel-stats (max-width: 620px) {
+  .chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-cols.cs-npc-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container cs-steel-stats (max-width: 520px) {
+  .chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motives { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-pat .cs-steel-pips i { width: 26px; }
+}
+@container cs-steel-stats (max-width: 400px) {
+  .chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-cols.cs-npc-cols { grid-template-columns: minmax(0, 1fr); }
+  .chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-ans { display: none; }
+}
+@container cs-steel-id (max-width: 520px) {
+  .chronicle-npc-sheet[data-cs-look="steel"] .cs-steel-id .cs-npc-talk { grid-row: auto; grid-column: 1 / -1; justify-self: start; margin-top: 4px; }
+  .chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-note { grid-row: auto; grid-column: 1 / -1; }
+}
+@container cs-hero (max-width: 940px) {
+  .chronicle-npc-sheet[data-cs-look="steel"] .cs-npc-motive { height: 120px; }
+}
+
+/* ---- Moves: heavy and quick ------------------------------------------- */
+/* The sheet puts a cs-move-* class on the window for a moment (never while
+   folded). Open, hit and heal are steel's own, playing on the blade and
+   shields these templates reuse; the Interest blade sits those out, since a
+   hit is to Stamina. */
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-hit .cs-npc-int .cs-steel-edge::before { animation: none; }
+
+/* A villain action: the plate thumps down, a spark scores the spent tag, the
+   next tag clacks into place and its name slides in. */
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-va:not(.cs-folded) .window-content { animation: cs-steel-npc-thump 300ms steps(1); }
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-va:not(.cs-folded) .cs-va-mark.used { animation: cs-steel-npc-spend 520ms ease-out; }
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-va:not(.cs-folded) .cs-va-mark.used::after { animation: cs-steel-npc-score 380ms 60ms cubic-bezier(0.3, 0.6, 0.4, 1) both; }
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-va:not(.cs-folded) .cs-va-mark.next { animation: cs-steel-npc-clack 220ms 280ms steps(2) both; }
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-va:not(.cs-folded) :is(.cs-npc-next, .cs-npc-left) { animation: cs-steel-slide 300ms 220ms cubic-bezier(0.2, 0.9, 0.2, 1) both; }
+
+/* Malice gained: the newest red bar slams into the row and the count thuds. */
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-malice:not(.cs-folded) .cs-npc-malbars::after { animation: cs-steel-npc-slam 360ms cubic-bezier(0.55, 0, 0.9, 0.4) both; }
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-malice:not(.cs-folded) .cs-npc-mal input { animation: cs-steel-npc-stamp 280ms 200ms cubic-bezier(0.3, 1.5, 0.6, 1) both; }
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-malice:not(.cs-folded) .cs-npc-mal { animation: cs-steel-npc-thud 240ms 300ms steps(1); }
+
+/* Winded: after the hit lands, the blade cracks at the notch, sparks burst
+   from the crack and the state is stamped on the blade. */
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-winded:not(.cs-folded) .cs-npc-crack { animation: cs-steel-npc-glow 900ms 280ms both; }
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-winded:not(.cs-folded) .cs-npc-crack::before { animation: cs-steel-npc-crack 900ms 280ms both; }
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-winded:not(.cs-folded) .cs-npc-notchsparks i { animation: cs-steel-spark 560ms 300ms ease-out; }
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-winded:not(.cs-folded) .cs-steel-blade:not(.cs-npc-int) { animation: cs-steel-npc-shiver 260ms 280ms steps(1); }
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-winded:not(.cs-folded) .cs-steel-blade:not(.cs-npc-int) .cs-steel-state { animation: cs-steel-npc-stamp 320ms 380ms cubic-bezier(0.3, 1.5, 0.6, 1) both; }
+
+/* Interest up: the blade lunges, its newest step is struck out to length, a
+   shine runs along it and the answer is stamped. Whatever was appealed to is
+   hammered and struck through. */
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-up:not(.cs-folded) .cs-npc-int { animation: cs-steel-npc-lunge 420ms cubic-bezier(0.2, 0.9, 0.3, 1); }
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-up:not(.cs-folded) .cs-npc-segs i.on:not(:has(~ .on)) { animation: cs-steel-npc-surge 620ms cubic-bezier(0.2, 0.9, 0.3, 1); }
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-up:not(.cs-folded) .cs-npc-shine { animation: cs-steel-shine 600ms 140ms ease-out; }
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-up:not(.cs-folded) :is(.cs-npc-ans, .cs-npc-answer) { animation: cs-steel-npc-stamp 320ms 220ms cubic-bezier(0.3, 1.5, 0.6, 1) both; }
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-up:not(.cs-folded) .cs-npc-motive[data-state="used"] { animation: cs-steel-npc-hammer 420ms ease-out; }
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-up:not(.cs-folded) .cs-npc-motive[data-state="used"] b { animation: cs-steel-npc-strike 300ms 120ms ease-out both; }
+
+/* Interest down: both gauges shiver. */
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-down:not(.cs-folded) :is(.cs-npc-int, .cs-npc-pat) { animation: cs-steel-npc-shiver 260ms steps(1); }
+
+/* A pitfall: steel's hit. The plate jolts, the Interest blade flashes white
+   and its end step flickers, and the red shields recoil. */
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-pit:not(.cs-folded) .window-content { animation: cs-steel-jolt 320ms steps(1); }
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-pit:not(.cs-folded) .cs-npc-int .cs-steel-edge::before { animation: cs-steel-white 250ms ease-out; }
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-pit:not(.cs-folded) .cs-npc-segs i.on:not(:has(~ .on)) { animation: cs-steel-npc-flick 450ms steps(1); }
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-pit:not(.cs-folded) .cs-npc-motive[data-kind="pitfall"]:not([data-state="hidden"]) { animation: cs-steel-npc-recoil 360ms steps(1); }
+
+/* Found: the shields drop in one after another and turn to face the Director. */
+.chronicle-npc-sheet[data-cs-look="steel"].cs-move-reveal:not(.cs-folded) .cs-npc-motive[data-state="found"] { animation: cs-steel-npc-reveal 820ms calc(var(--i, 0) * 60ms) ease-out both; }
+
+@keyframes cs-steel-npc-live { 50% { opacity: 0.35; } }
+@keyframes cs-steel-npc-lunge { 30% { translate: 10px 0; } }
+@keyframes cs-steel-npc-surge {
+  from { transform: scaleX(0); }
+  65% { transform: scaleX(1.12); }
+  to { transform: scaleX(1); }
+}
+@keyframes cs-steel-npc-flick { 0%, 40% { filter: brightness(2.2); opacity: 0.4; } 20%, 60% { filter: none; opacity: 1; } }
+@keyframes cs-steel-npc-thump {
+  0% { transform: translateY(6px); }
+  30% { transform: translateY(-3px); }
+  60% { transform: translateY(1px); }
+  100% { transform: none; }
+}
+@keyframes cs-steel-npc-thud { 0% { translate: 0 2px; } 50% { translate: 0 -1px; } 100% { translate: 0 0; } }
+@keyframes cs-steel-npc-shiver { 0% { translate: -4px 0; } 25% { translate: 4px 0; } 50% { translate: -2px 0; } 75% { translate: 1px 0; } 100% { translate: 0 0; } }
+@keyframes cs-steel-npc-recoil { 0% { translate: 0 -5px; filter: brightness(1.8); } 33% { translate: 0 3px; } 66% { translate: 0 -1px; filter: none; } 100% { translate: 0 0; } }
+@keyframes cs-steel-npc-spend { 0% { translate: 0 -4px; filter: brightness(2.4); } 35% { translate: 0 1px; filter: brightness(1.4); } 100% { translate: 0 0; filter: none; } }
+@keyframes cs-steel-npc-score { from { clip-path: inset(0 100% 0 0); background: var(--cs-steel-white); } }
+@keyframes cs-steel-npc-clack { from { translate: 0 -4px; } }
+@keyframes cs-steel-npc-slam {
+  from { width: calc(max(min(var(--m, 0), 10) - 1, 0) * 13px); filter: brightness(2.6); }
+  60% { filter: brightness(2); }
+  to { filter: none; }
+}
+@keyframes cs-steel-npc-stamp { from { opacity: 0; scale: 1.7; } }
+@keyframes cs-steel-npc-crack {
+  0% { background: var(--cs-steel-white); transform: scaleY(0); }
+  18% { transform: scaleY(1); background: var(--cs-steel-white); }
+  45% { background: var(--cs-steel-spark); }
+  100% { background: var(--cs-steel-ink); transform: scaleY(1); }
+}
+@keyframes cs-steel-npc-glow {
+  0%, 40% { opacity: 1; filter: drop-shadow(0 0 5px var(--cs-steel-spark)) drop-shadow(0 0 2px var(--cs-steel-white)); }
+  100% { opacity: 1; filter: drop-shadow(1.5px 0 0 color-mix(in srgb, var(--cs-steel-white) 60%, transparent)); }
+}
+@keyframes cs-steel-npc-reveal {
+  0% { opacity: 0; transform: perspective(600px) translateY(-40px) rotateY(-88deg); }
+  28% { opacity: 1; transform: perspective(600px) translateY(4px) rotateY(-72deg); }
+  38% { transform: perspective(600px) translateY(0) rotateY(-72deg); }
+  78% { transform: perspective(600px) rotateY(12deg); filter: brightness(1.7); }
+  100% { transform: none; filter: none; }
+}
+@keyframes cs-steel-npc-hammer { 0% { translate: 0 -6px; filter: brightness(2.2); } 25% { translate: 0 3px; filter: brightness(1.3); } 50% { translate: 0 -1px; } 100% { translate: 0 0; filter: none; } }
+@keyframes cs-steel-npc-strike { from { background-size: 0 2px; } }
+
+/* Calm: the new moves become fades too, as steel's own do. Nothing travels,
+   turns or shakes. */
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="steel"] :is(.cs-va-mark, .cs-va-mark::after, .cs-npc-motive, .cs-npc-motive b, .cs-npc-int, .cs-npc-segs i, .cs-npc-mal, .cs-npc-malbars::after, .cs-npc-mal input, .cs-npc-pat, .cs-npc-crack, .cs-npc-crack::before, .cs-steel-blade, .cs-steel-state, .cs-npc-ans, .cs-npc-answer, .cs-npc-next, .cs-npc-left) { animation-name: cs-steel-fade; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="steel"]:is(.cs-move-va, .cs-move-pit) .window-content { animation: none; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="steel"] :is(.cs-npc-notchsparks i, .cs-npc-talk[aria-pressed] i, .cs-npc-shine) { animation: none; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="steel"].cs-move-hit .cs-npc-int .cs-steel-edge::before { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .chronicle-npc-sheet[data-cs-look="steel"] :is(*, *::before, *::after) { animation: none !important; }
+}

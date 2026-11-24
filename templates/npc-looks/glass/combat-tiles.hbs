@@ -1,0 +1,22 @@
+{{!-- Speed, Stability and Free strike as tiles. Free strike is Draw Steel's
+button for whoever can edit the sheet (the Director, or the player who runs a
+retainer) and plain text for anyone else, as on its own sheet. --}}
+<div class="cs-glass-box cs-glass-plain"{{#if movement.list}} data-tooltip-text="{{movement.list}}"{{/if}}>
+  <span class="cs-glass-lb">{{systemFields.movement.fields.value.label}}</span>
+  <b class="cs-glass-n">{{system.movement.value}}</b>
+</div>
+<div class="cs-glass-box cs-glass-plain"{{#if combatTooltip}} data-tooltip-html="{{combatTooltip}}"{{/if}}>
+  <span class="cs-glass-lb">{{systemFields.combat.fields.stability.label}}</span>
+  <b class="cs-glass-n">{{system.combat.stability}}</b>
+</div>
+{{#if editable}}
+<button type="button" class="cs-glass-box cs-glass-plain cs-dr-act" data-action="freeStrike" data-tooltip="CHRONICLE.NpcSheet.FreeStrikeTip">
+  <span class="cs-glass-lb">{{systemFields.monster.fields.freeStrike.label}}</span>
+  <b class="cs-glass-n">{{system.monster.freeStrike}}</b>
+</button>
+{{else}}
+<div class="cs-glass-box cs-glass-plain">
+  <span class="cs-glass-lb">{{systemFields.monster.fields.freeStrike.label}}</span>
+  <b class="cs-glass-n">{{system.monster.freeStrike}}</b>
+</div>
+{{/if}}

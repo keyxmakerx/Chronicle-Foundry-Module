@@ -1,0 +1,92 @@
+{{!-- Arcane glass monster boxes, above the tabs. Play: the Stamina ring that
+wraps the picture (with the winded point ticked on it and the villain actions
+as the arcs inside it), a row of tiles (Stamina, EV, Speed, Stability, Free
+strike, and Malice for the Director only, with the amber edge, the mark and
+the words), the five characteristics as hexes, then the villain actions used
+this fight and the combat figures in two glass cells. Inputs and buttons keep
+Draw Steel's names, data-source="false" and actions. Edit: Draw Steel's own
+stat editors. The section takes no box of its own: the look's CSS lays its
+parts out beside the header's in one grid. --}}
+<section class="cs-hero-stats stats cs-npc-stats cs-glass-stats">
+  {{#if isPlay}}
+  <div class="cs-glass-ring cs-dr-ring" data-band="{{npc.chronicle.stamina.band}}">
+    <svg class="cs-glass-ring-art" viewBox="0 0 240 240" aria-hidden="true" focusable="false">
+      <circle class="cs-glass-fill" cx="120" cy="120" r="106" pathLength="100" stroke-dasharray="{{npc.chronicle.stamina.fill}} 100" transform="rotate(90 120 120)"/>
+      {{#if npc.chronicle.stamina.windedAt}}<circle class="cs-dr-wmark" cx="120" cy="120" r="106" pathLength="100" stroke-dasharray="0.8 99.2" stroke-dashoffset="{{npc.look.windedOffset}}" transform="rotate(90 120 120)"/>{{/if}}
+      {{#each npc.look.vaArcs as |seg|}}
+      <circle class="cs-glass-seg{{#if seg.on}} on{{/if}}" cx="120" cy="120" r="95" pathLength="100" stroke-dasharray="{{seg.dash}}" stroke-dashoffset="{{seg.offset}}" transform="rotate(90 120 120)"/>
+      {{/each}}
+    </svg>
+    {{#if npc.chronicle.stamina.windedAt}}<span class="cs-dr-wat">{{localize "CHRONICLE.NpcSheet.Look.WindedAt" n=system.stamina.winded}}</span>{{/if}}
+    <p class="cs-glass-chip">
+      <b>{{#if isSingleSquadMinion}}{{combatGroup.system.staminaValue}}{{else}}{{system.stamina.value}}{{/if}}</b>/<span>{{#if isSingleSquadMinion}}{{combatGroup.system.staminaMax}}{{else}}{{system.stamina.max}}{{/if}}</span>
+      {{#if (eq npc.chronicle.stamina.band "winded")}}<strong class="cs-glass-state">{{localize "CHRONICLE.HeroSheet.Winded"}}</strong>{{/if}}
+      {{#if (eq npc.chronicle.stamina.band "dying")}}<strong class="cs-glass-state">{{localize "CHRONICLE.HeroSheet.Dying"}}</strong>{{/if}}
+      {{#if (eq npc.chronicle.stamina.band "dead")}}<strong class="cs-glass-state">{{localize "CHRONICLE.HeroSheet.Dead"}}</strong>{{/if}}
+    </p>
+  </div>
+
+  <div class="cs-glass-trk">
+    {{> "modules/chronicle-sync/templates/npc-looks/glass/stamina-tile.hbs"}}
+    <div class="cs-glass-box cs-glass-plain">
+      <span class="cs-glass-lb">{{localize "DRAW_STEEL.Actor.base.EVLabel.Label"}}</span>
+      <b class="cs-glass-n">{{system.evLabel}}</b>
+    </div>
+    {{> "modules/chronicle-sync/templates/npc-looks/glass/combat-tiles.hbs"}}
+    {{#if showMalice}}
+    <div class="cs-glass-box cs-glass-plain cs-dr-dm cs-dm-only" data-tooltip="CHRONICLE.NpcSheet.MaliceTip">
+      <span class="cs-dr-only cs-dm-mark">{{localize "CHRONICLE.NpcSheet.OnlyYou"}}</span>
+      <span class="cs-glass-lb">{{malice.label}}</span>
+      <label class="cs-field cs-glass-n">
+        <span class="cs-hidden-label">{{malice.label}}, {{localize "CHRONICLE.NpcSheet.OnlyYou"}}</span>
+        <input type="number" step="1" data-setting="malice" value="{{malice.value}}">
+      </label>
+    </div>
+    {{/if}}
+  </div>
+
+  <div class="cs-glass-const">
+    <span class="cs-glass-line" aria-hidden="true"></span>
+    {{#each characteristics as |chr key|}}
+    <button type="button" class="cs-glass-hx cs-dr-lit" style="--i: {{@index}}; --lit: {{lookup @root.npc.look.lit key}}" data-action="roll" data-roll-type="characteristic" data-characteristic="{{key}}" data-tooltip-text="{{localize "DRAW_STEEL.ROLL.Prompt" prompt=chr.field.label}}" {{disabled (not @root.owner)}}>
+      <span class="cs-glass-glow" aria-hidden="true"></span>
+      <b>{{numberFormat chr.value sign=true}}</b>
+      <span class="cs-glass-hx-name">{{chr.field.label}}</span>
+    </button>
+    {{/each}}
+  </div>
+
+  <div class="cs-glass-grid{{#unless npc.villain.total}} cs-dr-solo{{/unless}}">
+    {{#if npc.villain.total}}
+    <div class="cs-glass-cell cs-dr-va">
+      <p class="cs-glass-k">{{localize "CHRONICLE.NpcSheet.Villain.Title"}}<span class="cs-dr-left">{{#if npc.villain.inFight}}{{localize "CHRONICLE.NpcSheet.Villain.Left" left=npc.villain.left total=npc.villain.total}}{{else}}{{localize "CHRONICLE.NpcSheet.Villain.NoFight"}}{{/if}}</span></p>
+      <ol class="cs-dr-vas">
+        {{#each npc.villain.marks as |m|}}
+        <li>
+          {{#if @root.npc.villain.canMark}}
+          <button type="button" class="cs-dr-vmark {{m.state}}" data-action="csVillain" data-item-id="{{m.id}}" aria-pressed="{{#if (eq m.state "used")}}true{{else}}false{{/if}}" aria-label="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}" data-tooltip-text="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}">
+            <i>{{m.order}}</i><span class="cs-dr-vname">{{m.name}}</span>
+            {{#if (eq m.state "used")}}<em class="cs-dr-tag">{{localize "CHRONICLE.NpcSheet.Villain.Used"}}</em>{{/if}}
+            {{#if (eq m.state "next")}}<em class="cs-dr-tag">{{localize "CHRONICLE.NpcSheet.Villain.Next"}}</em>{{/if}}
+          </button>
+          {{else}}
+          <span class="cs-dr-vmark {{m.state}}" role="img" aria-label="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}" data-tooltip-text="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}">
+            <i>{{m.order}}</i><span class="cs-dr-vname">{{m.name}}</span>
+            {{#if (eq m.state "used")}}<em class="cs-dr-tag">{{localize "CHRONICLE.NpcSheet.Villain.Used"}}</em>{{/if}}
+            {{#if (eq m.state "next")}}<em class="cs-dr-tag">{{localize "CHRONICLE.NpcSheet.Villain.Next"}}</em>{{/if}}
+          </span>
+          {{/if}}
+        </li>
+        {{/each}}
+      </ol>
+      {{#if npc.villain.inFight}}{{#if npc.look.nextVillain}}
+      <p class="cs-dr-next"><span class="cs-dr-next-k">{{localize "CHRONICLE.NpcSheet.Villain.Next"}}</span><b>{{npc.look.nextVillain}}</b></p>
+      {{/if}}{{/if}}
+    </div>
+    {{/if}}
+    {{> "modules/chronicle-sync/templates/npc-looks/glass/combat-cell.hbs"}}
+  </div>
+  {{else}}
+  {{> "modules/chronicle-sync/templates/npc-looks/edit-stats.hbs"}}
+  {{/if}}
+</section>

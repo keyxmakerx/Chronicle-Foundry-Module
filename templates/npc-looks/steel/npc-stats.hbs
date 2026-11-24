@@ -1,0 +1,82 @@
+{{!-- Steel and banner NPC boxes, above the tabs. Play: Interest as a blade cut
+into five steps (its answer stamped on it) over Patience as silver bars, the
+motivations and pitfalls as shields that change metal with their state, and
+what the NPC would answer now. Then the stat block, or an honest empty place
+for one (no made-up numbers). Every state is words as well as a look. Edit:
+Draw Steel's own stat editors. --}}
+<section class="cs-hero-stats stats cs-npc-stats cs-steel-stats">
+  {{#if isPlay}}
+  {{#if npc.negotiation.has}}
+  <div class="cs-steel-vitals cs-npc-neg">
+    <div class="cs-steel-blade cs-npc-int">
+      <div class="cs-steel-edge" aria-hidden="true">
+        <span class="cs-npc-segs">{{#each npc.negotiation.interestPips as |on|}}<i class="{{#if on}}on{{/if}}"></i>{{/each}}</span>
+        <span class="cs-npc-shine"></span>
+      </div>
+      <div class="cs-steel-read" role="img" aria-label="{{localize "CHRONICLE.NpcSheet.Interest"}}: {{localize "CHRONICLE.NpcSheet.OfFive" n=npc.negotiation.interestText}}">
+        <span class="cs-npc-num">{{npc.negotiation.interestText}}</span>
+        <span class="cs-steel-of">/ 5</span>
+        <span class="cs-steel-k">{{localize "CHRONICLE.NpcSheet.Interest"}}</span>
+        {{#if npc.negotiation.answer}}<strong class="cs-steel-state cs-npc-ans">{{localize npc.negotiation.answer}}</strong>{{/if}}
+      </div>
+    </div>
+    <div class="cs-steel-pipsrow">
+      <div class="cs-steel-grp cs-npc-pat">
+        <span class="cs-steel-k">{{localize "CHRONICLE.NpcSheet.Patience"}}</span>
+        <span class="cs-steel-pips" role="img" aria-label="{{localize "CHRONICLE.NpcSheet.OfFive" n=npc.negotiation.patienceText}}">{{#each npc.negotiation.patiencePips as |on|}}<i class="{{#if on}}on{{/if}}"></i>{{/each}}</span>
+        <span class="cs-steel-n"><b>{{npc.negotiation.patienceText}}</b><small>/5</small></span>
+      </div>
+    </div>
+  </div>
+  {{#if npc.negotiation.rows.length}}
+  <ul class="cs-steel-shields cs-npc-motives">
+    {{#each npc.negotiation.rows as |row|}}
+    <li class="cs-steel-sh cs-npc-motive" style="--i: {{@index}}" data-state="{{row.state}}" data-kind="{{row.kind}}" data-motive="{{row.key}}">
+      <svg class="cs-npc-dash" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false"><polygon points="1.5,1.5 98.5,1.5 98.5,57.5 50,98.5 1.5,57.5" vector-effect="non-scaling-stroke"/></svg>
+      <u class="cs-npc-q" aria-hidden="true">?</u>
+      <i class="cs-npc-kindw">{{localize (concat "CHRONICLE.NpcSheet.Kind." row.kind)}}</i>
+      <b>{{row.label}}</b>
+      <span class="cs-npc-word">{{localize (concat "CHRONICLE.NpcSheet.State." row.state)}}</span>
+    </li>
+    {{/each}}
+  </ul>
+  {{/if}}
+  <div class="cs-steel-cols cs-npc-cols">
+    <div class="cs-steel-plate cs-steel-wide cs-npc-talkplate">
+      <div>
+        {{#if npc.negotiation.answer}}
+        <p class="cs-steel-k">{{localize "CHRONICLE.NpcSheet.IfAnswered"}}</p>
+        <p class="cs-steel-big cs-npc-answer">{{localize npc.negotiation.answer}}{{#if npc.negotiation.over}} <small>· {{localize "CHRONICLE.NpcSheet.Over"}}</small>{{/if}}</p>
+        {{/if}}
+      </div>
+      <p class="cs-steel-text cs-npc-facts">
+        <span class="cs-npc-eye">{{localize (concat "CHRONICLE.NpcSheet.Seen." npc.negotiation.source (ifThen npc.negotiation.shown "Shown" "Hidden"))}}</span>
+      </p>
+    </div>
+    {{> "modules/chronicle-sync/templates/npc-looks/steel/nostat.hbs"}}
+  </div>
+  {{else}}
+  <div class="cs-steel-cols cs-npc-cols">
+    <div class="cs-steel-plate cs-steel-wide cs-npc-talkplate">
+      <div>
+        <p class="cs-steel-k">{{localize "CHRONICLE.NpcSheet.Negotiation"}}</p>
+        <p class="cs-npc-next">{{localize "CHRONICLE.NpcSheet.NoNegotiation"}}</p>
+      </div>
+      {{#if npc.pageUrl}}<button type="button" class="cs-quiet" data-action="csOpenPage">{{localize "CHRONICLE.NpcSheet.OpenPage"}}</button>{{/if}}
+    </div>
+    {{> "modules/chronicle-sync/templates/npc-looks/steel/nostat.hbs"}}
+  </div>
+  {{/if}}
+  {{#if npc.statBlock}}
+  <div class="cs-steel-vitals">
+    {{> "modules/chronicle-sync/templates/npc-looks/steel/blade.hbs"}}
+  </div>
+  {{> "modules/chronicle-sync/templates/npc-looks/steel/shields.hbs"}}
+  <div class="cs-steel-cols cs-npc-cols">
+    {{> "modules/chronicle-sync/templates/npc-looks/steel/plates.hbs"}}
+  </div>
+  {{/if}}
+  {{else}}
+  {{> "modules/chronicle-sync/templates/npc-looks/edit-stats.hbs"}}
+  {{/if}}
+</section>

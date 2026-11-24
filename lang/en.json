@@ -88,6 +88,9 @@
       "Villain": {
         "Title": "Villain actions",
         "Used": "Used",
+        "Next": "Next",
+        "Waiting": "Waiting",
+        "NextAction": "Next villain action",
         "Left": "{left} of {total} left this fight",
         "NoFight": "Marks start when a fight does",
         "Failed": "The villain action mark could not be saved.",
@@ -122,6 +125,12 @@
         "Immune": "Immune",
         "Weak": "Weak",
         "Conditions": "Conditions"
+      },
+      "Look": {
+        "OfInterest": "of 5 Interest",
+        "InnerPatience": "Inner arcs: Patience",
+        "WindedAt": "Winded at {n}",
+        "AnswerNow": "If they answered now"
       },
       "People": {
         "Note": "From the page's links in Chronicle",

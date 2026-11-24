@@ -1,0 +1,35 @@
+{{!-- Stamina as a notched blade: Draw Steel's current and temporary Stamina
+inputs (data-source="false", so effect locks work) sit on the steel, with the
+winded notch, a crack once winded, and the thresholds under it. A minion in a
+single squad shows the squad's Stamina, as Draw Steel's own sheet does. The
+edge, sparks and crack are decoration. --}}
+<div class="cs-steel-blade" data-band="{{npc.chronicle.stamina.band}}" style="--fill: {{npc.chronicle.stamina.fill}};{{#if npc.chronicle.stamina.windedAt}} --winded: {{npc.chronicle.stamina.windedAt}};{{/if}}">
+  <div class="cs-steel-edge" aria-hidden="true">
+    <span class="cs-steel-fillwrap"><i class="cs-steel-fill"></i><i class="cs-steel-shine"></i></span>
+    {{#if npc.chronicle.stamina.windedAt}}<i class="cs-steel-mark"></i><i class="cs-npc-crack"></i>{{/if}}
+    <span class="cs-steel-sparks"><i></i><i></i><i></i><i></i><i></i></span>
+    {{#if npc.chronicle.stamina.windedAt}}<span class="cs-steel-sparks cs-npc-notchsparks"><i></i><i></i><i></i><i></i><i></i></span>{{/if}}
+  </div>
+  <div class="cs-steel-read">
+    <label class="cs-field cs-steel-stam">
+      {{#if isSingleSquadMinion}}
+      <span class="cs-hidden-label">{{localize "TYPES.CombatantGroup.squad"}}</span>
+      <input type="number" name="squadStaminaValue" value="{{combatGroup.system.staminaValue}}">
+      {{else}}
+      <span class="cs-hidden-label">{{systemFields.stamina.fields.value.label}}</span>
+      {{formInput systemFields.stamina.fields.value value=system.stamina.value dataset=datasets.notSource}}
+      {{/if}}
+    </label>
+    <span class="cs-steel-of">/ {{#if isSingleSquadMinion}}{{combatGroup.system.staminaMax}}{{else}}{{system.stamina.max}}{{/if}}</span>
+    <span class="cs-steel-k">{{systemFields.stamina.label}}</span>
+    {{#if system.stamina.winded}}<em class="cs-steel-wind">{{localize "CHRONICLE.HeroSheet.Winded"}} {{system.stamina.winded}}</em>{{/if}}
+    {{#if (eq npc.chronicle.stamina.band "winded")}}<strong class="cs-steel-state">{{localize "CHRONICLE.HeroSheet.Winded"}}</strong>{{/if}}
+    {{#if (eq npc.chronicle.stamina.band "dying")}}<strong class="cs-steel-state">{{localize "CHRONICLE.HeroSheet.Dying"}}</strong>{{/if}}
+    {{#if (eq npc.chronicle.stamina.band "dead")}}<strong class="cs-steel-state">{{localize "CHRONICLE.HeroSheet.Dead"}}</strong>{{/if}}
+    <label class="cs-field cs-steel-temp">
+      <span>{{systemFields.stamina.fields.temporary.label}}</span>
+      {{formInput systemFields.stamina.fields.temporary value=system.stamina.temporary dataset=datasets.notSource}}
+    </label>
+  </div>
+</div>
+<p class="cs-sub cs-npc-thr">{{localize "CHRONICLE.HeroSheet.Thresholds" winded=system.stamina.winded dead=system.stamina.min}}</p>

@@ -155,7 +155,7 @@ test('every look in the catalogue has its templates, and every template on disk 
 });
 
 test('a look without NPC templates draws the Chronicle look, and parts it doesn\'t draw are Draw Steel\'s', () => {
-  assert.equal(npcLookTemplate('hall', 'npc', 'header'), 'modules/chronicle-sync/templates/npc-looks/chronicle/npc-header.hbs');
+  assert.equal(npcLookTemplate('someday', 'npc', 'header'), 'modules/chronicle-sync/templates/npc-looks/chronicle/npc-header.hbs');
   assert.equal(npcLookTemplate('chronicle', 'monster', 'tabs'), null);
 });
 

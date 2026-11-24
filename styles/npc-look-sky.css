@@ -1,0 +1,402 @@
+/* The night sky look on the Chronicle NPC and monster sheet
+   (scripts/npc-looks.mjs, templates/npc-looks/sky/). It is the hero's night
+   sky (hero-look-sky.css) with new parts, so the sky, the hills, the moon,
+   the big thin numbers, the italic facts, the constellation, the tab row and
+   the hit, heal and opening moves are the hero's own. This file adds only
+   what the hero has no part for.
+
+   A monster: the moon's ring is Stamina with the winded point marked, and
+   the villain actions are the arcs inside it and three stars on an arc under
+   the moon. An NPC: the ring is Interest with Patience as the arcs inside it;
+   the motivations and pitfalls are the constellation, each star drawn by its
+   state. Malice and Impression are Director-only: the amber edge, the mark
+   and the words, never colour alone.
+
+   Always dark, like the hero's. Every rule is scoped to
+   .chronicle-npc-sheet[data-cs-look="sky"], so the hero sheet is untouched,
+   and it reads the hero look's --cs-sky-* tokens; the block below holds the
+   only value of its own. Ambient motion is opacity and transform only. */
+
+.chronicle-npc-sheet[data-cs-look="sky"] {
+  /* The default tone of the Interest ring, number and answer, until Interest sets one. */
+  --cs-sn-tone: var(--cs-sky-gold);
+}
+
+/* ---- The name and the lines above and below it ------------------------- */
+/* A creature's name is often longer than a hero's: it shrinks to stay on one line where it can. --len is its length, when the sheet sets it. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-id .cs-name { font-size: clamp(30px, min(9.8cqi, calc(118cqi / var(--len, 15))), 66px); text-wrap: balance; }
+/* An NPC's lines sit together at the foot of the moon's height, so the answer reads as the name's subtitle, not a line apart. */
+.chronicle-npc-sheet[data-cs-look="sky"].cs-shape-npc .cs-sky-id { align-self: end; }
+/* The keyword keeps its small kind word, because a monster's line needs it. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-sub .cs-sky-kind { margin-right: 0.6em; font: 400 8.5px/1 var(--cs-sky-display); letter-spacing: 0.2em; text-transform: uppercase; color: var(--cs-hero-muted); vertical-align: 0.3em; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-kinds a { cursor: default; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-kinds a:hover { color: inherit; text-shadow: none; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-eye .cs-sky-kind { color: color-mix(in srgb, var(--cs-sky-gold) 55%, var(--cs-hero-muted)); }
+/* The page's chips start a second line under the level and role. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-id .cs-sky-eye > .cs-sn-br { flex: 0 0 100%; height: 0; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-id .cs-sky-eye > li:has(+ .cs-sn-br)::after,
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-id .cs-sky-eye > .cs-sn-br::after { content: none; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-id .cs-sky-eye > li > .cs-sky-mini { margin-left: 0.2em; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-token span::before { content: ""; display: inline-block; width: 9px; height: 9px; margin-right: 8px; vertical-align: -1px; background-color: var(--cs-sky-dim); -webkit-mask: var(--cs-sky-star-mask) center / contain no-repeat; mask: var(--cs-sky-star-mask) center / contain no-repeat; }
+
+/* Interest sets one tone for the ring, the number and the answer: rose at the bottom of the offers, gold in the middle, aurora green at the top. */
+.chronicle-npc-sheet[data-cs-look="sky"] [data-int]:is([data-int="i0"], [data-int="i1"]) { --cs-sn-tone: var(--cs-sky-rose); }
+.chronicle-npc-sheet[data-cs-look="sky"] [data-int="i2"] { --cs-sn-tone: var(--cs-sky-ember); }
+.chronicle-npc-sheet[data-cs-look="sky"] [data-int="i3"] { --cs-sn-tone: var(--cs-sky-gold); }
+.chronicle-npc-sheet[data-cs-look="sky"] [data-int]:is([data-int="i4"], [data-int="i5"]) { --cs-sn-tone: var(--cs-sky-aurora-b); }
+/* The answer the NPC would give now: the line the table asks first, right under the name. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-ans { flex: 1 0 100%; margin: 0; font: 400 18px/1.25 var(--cs-sky-display); color: var(--cs-sky-soft); text-shadow: var(--cs-sky-text-halo); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-ans b { margin-left: 0.15em; font: italic 400 27px/1 var(--cs-sky-serif); color: color-mix(in srgb, var(--cs-sn-tone) 55%, var(--cs-sky-ink)); text-shadow: 0 0 18px color-mix(in srgb, var(--cs-sn-tone) 45%, transparent); transition: color 0.6s ease, text-shadow 0.6s ease; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-over { margin-left: 14px; font: 400 9px/1.4 var(--cs-sky-display); letter-spacing: 0.2em; text-transform: uppercase; color: var(--cs-hero-bad); }
+
+/* ---- The rings round the moon ------------------------------------------ */
+/* The monster: villain actions are the inner arcs, in ember; the winded mark crosses the Stamina track. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-ring:not(.cs-sn-intring) .cs-sky-seg { stroke: color-mix(in srgb, var(--cs-sky-ember) 16%, transparent); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-ring:not(.cs-sn-intring) .cs-sky-seg.on { stroke: var(--cs-sky-ember); filter: drop-shadow(0 0 3px color-mix(in srgb, var(--cs-sky-ember) 70%, transparent)); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-wmark-under { stroke: var(--cs-sky-top); stroke-width: 6; stroke-linecap: round; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-wmark { stroke: var(--cs-sky-gold-pale); stroke-width: 2; stroke-linecap: round; transition: stroke 0.6s ease; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-ring:is([data-band="winded"], [data-band="dying"], [data-band="dead"]) .cs-sn-wmark { stroke: var(--cs-sky-rose); }
+/* The NPC: Interest fills the ring in its tone, notched at each of the five steps; Patience is the inner arcs. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-intring .cs-sky-fill { stroke: var(--cs-sn-tone); filter: drop-shadow(0 0 6px var(--cs-sn-tone)); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-notch { fill: none; stroke: var(--cs-sky-top); stroke-width: 6; }
+
+/* ---- The numbers -------------------------------------------------------- */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-num > .cs-sky-big:not(label) { display: block; height: 50px; line-height: 48px; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-big b { font-weight: 300; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-state:empty { display: none; }
+/* The sky's dark halo round the small labels too, so a star just beside a word does not read as a mark. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-nums .cs-sky-k { text-shadow: var(--cs-sky-text-halo); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-wat { font: 400 8.5px/1.5 var(--cs-sky-display); letter-spacing: 0.2em; text-transform: uppercase; color: var(--cs-sky-dim); }
+/* EV sits a few pixels left, so the template's fixed star there hides under the word instead of reading as a mark before it. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-ev { margin-left: -6px; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-int .cs-sky-big b { color: color-mix(in srgb, var(--cs-sn-tone) 55%, var(--cs-sky-ink)); transition: color 0.6s ease; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-pat .cs-sky-big b { color: var(--cs-sky-seg); }
+/* Free strike is Draw Steel's button for whoever edits the sheet; it reads as the number until pointed at. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-press { width: auto; height: auto; margin: 0; padding: 0; border: 0; border-radius: 10px; background: none; box-shadow: none; text-shadow: none; font: inherit; color: inherit; text-align: left; cursor: pointer; transition: transform 0.1s ease; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-press .cs-sky-big { transition: text-shadow 0.3s ease; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-press:hover:not(:disabled) .cs-sky-big { text-shadow: 0 0 18px var(--cs-sky-glow); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-press:hover:not(:disabled) .cs-sky-k { color: var(--cs-sky-gold); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-press:active:not(:disabled) { transform: scale(0.97); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-press:focus-visible { outline: 1px solid var(--cs-sky-gold); outline-offset: 4px; }
+/* Director-only figures: the amber edge, the mark and the words. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-dm-mark::before { content: "\2298"; margin-right: 0.4em; letter-spacing: 0; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-dm-words { margin-left: 0.5em; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-dm-words::before { content: "\00b7"; margin-right: 0.5em; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-imp { margin-left: -14px; padding: 0 12px 6px 14px; border-radius: 0 12px 12px 0; box-shadow: inset 2px 0 0 var(--cs-hero-dm); background: linear-gradient(90deg, color-mix(in srgb, var(--cs-hero-dm) 8%, transparent), transparent 70%); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-imp .cs-sky-k { color: var(--cs-hero-dm); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-cond b { font-weight: 400; color: var(--cs-hero-bad); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-facts .cs-quiet { font: italic 400 15px/1.4 var(--cs-sky-serif); letter-spacing: 0; text-transform: none; color: var(--cs-sky-gold); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-facts .cs-quiet:hover { color: var(--cs-sky-ink); text-decoration: none; text-shadow: 0 0 10px var(--cs-sky-glow); }
+
+/* Malice, in the header under the name: a big thin number in rose, its label with the mark and the words, ten stars counting it. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-mal { display: flex; align-items: center; gap: 12px; width: fit-content; max-width: 100%; margin: 14px 0 0 -14px; padding: 3px 16px 5px 14px; border-radius: 0 12px 12px 0; box-shadow: inset 2px 0 0 var(--cs-hero-dm); background: linear-gradient(90deg, color-mix(in srgb, var(--cs-hero-dm) 8%, transparent), transparent 70%); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-mal-n { font: 400 34px/1 var(--cs-sky-display); color: var(--cs-sky-rose); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-mal-n input[type="number"] { width: auto; min-width: 1.4ch; height: 40px; padding: 0 2px 2px; font: inherit; color: inherit; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-mal-k { display: grid; gap: 4px; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-mal .cs-sky-k { color: var(--cs-hero-dm); text-shadow: var(--cs-sky-text-halo); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-malstars { display: flex; gap: 3px; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-malstars i { --lit: clamp(0, calc(var(--m, 0) - var(--k) + 1), 1); --hit: clamp(0, calc(1 - max(calc(var(--m, 0) - var(--k)), calc(var(--k) - var(--m, 0)))), 1); position: relative; width: 10px; height: 10px; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-malstars i::before { content: ""; position: absolute; inset: 0; background: var(--cs-sky-rose); -webkit-mask: var(--cs-sky-star-mask) center / contain no-repeat; mask: var(--cs-sky-star-mask) center / contain no-repeat; opacity: calc(0.28 + 0.72 * var(--lit)); transform: scale(calc(0.7 + 0.3 * var(--lit))); transition: opacity 0.6s ease, transform 0.6s ease; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-malstars i::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--cs-sky-rose) 45%, transparent), transparent 65%); opacity: calc(0.45 * var(--lit)); pointer-events: none; }
+
+/* ---- Under the moon ------------------------------------------------------ */
+/* An NPC without a stat block: an honest empty place, never made-up numbers. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-nostat { display: block; margin: 0; padding: 0; border: 0; border-radius: 0; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-nostat-t { margin: 6px 0 4px; font: italic 400 16px/1.4 var(--cs-sky-serif); color: var(--cs-hero-body); text-shadow: var(--cs-sky-text-halo); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-nostat .cs-quiet { font: italic 400 16px/1.4 var(--cs-sky-serif); letter-spacing: 0; text-transform: none; color: var(--cs-sky-gold); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-nostat .cs-quiet:hover { color: var(--cs-sky-ink); text-decoration: none; text-shadow: 0 0 10px var(--cs-sky-glow); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-more { margin-top: 12px; }
+/* The Talking switch: a star that pulses while the token's talking glow is on. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-talk-btn::before { content: none; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-talkdot { width: 11px; height: 11px; background-color: var(--cs-sky-gold); -webkit-mask: var(--cs-sky-star-mask) center / contain no-repeat; mask: var(--cs-sky-star-mask) center / contain no-repeat; transition: transform 0.3s ease, background-color 0.3s ease; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-rest .cs-talk-btn[aria-pressed="true"] { border-color: var(--cs-sky-gold); background: var(--cs-sky-gold-wash); color: var(--cs-sky-gold); box-shadow: 0 0 18px color-mix(in srgb, var(--cs-sky-gold) 22%, transparent); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-rest .cs-talk-btn[aria-pressed="true"] .cs-sn-talkdot { animation: cs-sky-pulse 2.4s ease-in-out infinite; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-rest .cs-talk-btn[aria-pressed="false"] { border-color: var(--cs-sky-line-strong); background: none; color: var(--cs-sky-dim); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-rest .cs-talk-btn[aria-pressed="false"] .cs-sn-talkdot { background-color: var(--cs-sky-dim); transform: scale(0.6); }
+
+/* The characteristics of an NPC who has a stat block: a row of small rolls under the numbers. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-chars { flex: 1 0 100%; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; max-width: 440px; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-chr { display: flex; flex-direction: column; align-items: center; gap: 2px; width: auto; height: auto; margin: 0; padding: 6px 2px 5px; border: 0; border-radius: 12px; background: none; box-shadow: none; text-shadow: none; color: var(--cs-sky-ink); cursor: pointer; transition: background-color 0.3s ease, box-shadow 0.3s ease; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-chr b { font: 300 22px/1.1 var(--cs-sky-display); font-variant-numeric: tabular-nums; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-chr span { font: 400 8.5px/1.3 var(--cs-sky-display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--cs-sky-dim); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-chr:hover:not(:disabled) { background: var(--cs-sky-wash); box-shadow: 0 0 14px color-mix(in srgb, var(--cs-sky-gold) 28%, transparent); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-chr:hover:not(:disabled) span { color: var(--cs-sky-ink); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-chr:active:not(:disabled) { transform: scale(0.97); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-chr:focus-visible { outline: 1px solid var(--cs-sky-gold); outline-offset: 1px; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-chr:disabled { cursor: default; }
+
+/* ---- Villain actions: three stars on an arc under the moon -------------- */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-vab .cs-sky-k { justify-content: space-between; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-left { letter-spacing: 0.16em; color: var(--cs-sky-dim); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-va { position: relative; height: 84px; margin: 2px 0 0; padding: 0; list-style: none; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-va-arc { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-va-arc path { fill: none; stroke: var(--cs-sky-line-strong); stroke-width: 1; stroke-dasharray: 1 6; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-vam { position: absolute; left: calc(var(--x) * 1%); top: calc(var(--y) * 1px - 15px); width: var(--w, 96px); margin-left: calc(var(--w, 96px) / -2); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-vabtn { display: flex; flex-direction: column; align-items: center; width: 100%; height: auto; margin: 0; padding: 0; border: 0; border-radius: 12px; background: none; box-shadow: none; text-shadow: none; font: inherit; color: inherit; }
+.chronicle-npc-sheet[data-cs-look="sky"] button.cs-sn-vabtn { cursor: pointer; }
+.chronicle-npc-sheet[data-cs-look="sky"] button.cs-sn-vabtn:focus-visible { outline: 1px solid var(--cs-sky-gold); outline-offset: 2px; }
+.chronicle-npc-sheet[data-cs-look="sky"] button.cs-sn-vabtn:active .cs-sn-vastar { transform: scale(0.9); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-vastar { position: relative; width: 30px; height: 30px; transition: transform 0.2s ease; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-vastar::before { content: ""; position: absolute; inset: 0; background: color-mix(in srgb, var(--cs-sky-peri) 65%, transparent); -webkit-mask: var(--cs-sky-star-mask) center / contain no-repeat; mask: var(--cs-sky-star-mask) center / contain no-repeat; transform: scale(0.5); transition: transform 0.8s var(--cs-sky-ease), background-color 0.8s ease; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-vastar::after { content: ""; position: absolute; inset: -14px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--cs-sky-ember) 50%, transparent), transparent 62%); opacity: 0; transition: opacity 0.8s ease; pointer-events: none; }
+/* Next: the one bright star, breathing. Used: burnt to ash and tipped over. Waiting: small and pale. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-vam.next .cs-sn-vastar::before { background: linear-gradient(180deg, var(--cs-sky-gold-pale), var(--cs-sky-ember)); transform: none; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-vam.next .cs-sn-vastar::after { opacity: 0.9; animation: cs-sky-npc-breathe 3.2s ease-in-out infinite; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-vam.used .cs-sn-vastar::before { background: color-mix(in srgb, var(--cs-sky-ember) 28%, transparent); transform: scale(0.6) rotate(45deg); }
+.chronicle-npc-sheet[data-cs-look="sky"] button.cs-sn-vabtn:hover .cs-sn-vastar::after { opacity: 0.6; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-vam em { display: flex; gap: 0.6em; margin-top: 3px; font: 400 8.5px/1.4 var(--cs-sky-display); font-style: normal; letter-spacing: 0.2em; text-transform: uppercase; color: var(--cs-sky-dim); white-space: nowrap; text-shadow: var(--cs-sky-text-halo); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-vam em b { font-weight: 400; color: inherit; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-vam.next em { color: var(--cs-sky-ember); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-vam.used em { color: color-mix(in srgb, var(--cs-sky-dim) 65%, transparent); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-nk { margin-top: 8px; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-next { margin: 4px 0 0; font: italic 400 16.5px/1.35 var(--cs-sky-serif); color: var(--cs-hero-body); text-shadow: var(--cs-sky-text-halo); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-next b { font: 400 11px/1.5 var(--cs-sky-display); font-style: normal; letter-spacing: 0.14em; text-transform: uppercase; color: var(--cs-sky-ember); }
+
+/* ---- The motivations and pitfalls as a constellation ---------------------
+   Each star is drawn by its state, so a redraw that changes the state
+   redraws the star: found is a bright star, appealed to is dimmed and
+   eclipsed, not found is a faint dot named in italics, and a found pitfall
+   is a red star. The words under each name say the same. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-const-k { position: absolute; left: 0; top: -6px; margin: 0; letter-spacing: 0.3em; color: var(--cs-sky-gold); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-empty { aspect-ratio: auto; min-height: 60px; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-empty .cs-sn-const-k { position: static; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-ghost { fill: none; stroke: var(--cs-sky-peri); stroke-opacity: 0.4; stroke-width: 1.4; stroke-linecap: round; stroke-dasharray: 0 0.03; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-veil { opacity: 0; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-stars { display: contents; margin: 0; padding: 0; list-style: none; }
+/* A star is not a button, so it takes no pointer and shows no hover; it is wider than a number's star, so a long name wraps instead of running into its neighbour. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive { --tone: var(--cs-sky-gold); left: calc(var(--u) * (var(--x) - 65)); width: calc(var(--u) * 130); text-align: center; pointer-events: none; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive[data-kind="pitfall"] { --tone: var(--cs-sky-rose); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-st { position: absolute; left: 50%; top: calc(var(--u) * var(--halo)); width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--tone) 42%, transparent), transparent 64%); transition: background 0.8s ease; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-st::before { content: ""; position: absolute; inset: 3px; background: var(--cs-sky-gold-pale); -webkit-mask: var(--cs-sky-star-mask) center / contain no-repeat; mask: var(--cs-sky-star-mask) center / contain no-repeat; animation: cs-sky-star 5s ease-in-out calc(var(--i) * -1.1s) infinite; transition: inset 0.8s var(--cs-sky-ease), background-color 0.8s ease; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-st::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--tone), 0 0 12px var(--tone); opacity: 0; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-ecl { position: absolute; left: 50%; top: 50%; width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px; border-radius: 50%; background: var(--cs-sky-eclipse); box-shadow: 0 0 0 1px color-mix(in srgb, var(--cs-sky-gold) 60%, transparent), 0 0 7px 1px color-mix(in srgb, var(--cs-sky-gold) 45%, transparent); opacity: 0; transform: translateX(16px); transition: opacity 0.9s ease, transform 1s var(--cs-sky-ease); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive[data-kind="pitfall"][data-state="found"] .cs-sn-st::before { background: linear-gradient(180deg, color-mix(in srgb, var(--cs-sky-rose) 45%, var(--cs-sky-star)), var(--cs-sky-rose) 55%, var(--cs-sky-blood)); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive[data-state="used"] .cs-sn-st { background: radial-gradient(circle, color-mix(in srgb, var(--tone) 14%, transparent), transparent 64%); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive[data-state="used"] .cs-sn-st::before { inset: 4px; background: color-mix(in srgb, var(--cs-sky-gold) 45%, transparent); animation: none; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive[data-state="used"] .cs-sn-ecl { opacity: 1; transform: none; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive[data-state="hidden"] .cs-sn-st { background: none; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive[data-state="hidden"] .cs-sn-st::before { inset: 14.5px; border-radius: 50%; -webkit-mask: none; mask: none; background: color-mix(in srgb, var(--cs-sky-peri) 70%, transparent); box-shadow: 0 0 6px var(--cs-sky-peri); animation: none; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive b { font: 400 12.5px/1.3 var(--cs-sky-display); letter-spacing: 0.18em; text-transform: uppercase; color: var(--cs-sky-ink); text-shadow: var(--cs-sky-text-halo); overflow-wrap: anywhere; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive[data-state="used"] b { color: var(--cs-sky-dim); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive[data-state="hidden"] b { font: italic 400 18px/1.1 var(--cs-sky-serif); letter-spacing: 0.01em; text-transform: none; color: var(--cs-sky-soft); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive .cs-sn-sw, .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive .cs-sn-sw span { flex: none; font-size: 8.5px; line-height: 1.4; letter-spacing: 0.18em; text-transform: uppercase; color: var(--cs-sky-dim); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive .cs-sn-sw { margin-top: 2px; text-shadow: var(--cs-sky-text-halo); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive .cs-sn-sw em { font-style: normal; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive[data-kind="pitfall"] .cs-sn-sw em { color: color-mix(in srgb, var(--cs-hero-bad) 80%, var(--cs-sky-dim)); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive[data-state="found"] .cs-sn-word { color: var(--cs-sky-gold); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive[data-kind="pitfall"][data-state="found"] .cs-sn-word { color: var(--cs-hero-bad); }
+
+/* ---- The Talk and People tabs and their lists, in the sky --------------- */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-pane-h { position: relative; border-bottom: 0; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-pane-h::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: radial-gradient(circle, var(--cs-sky-line-strong) 0.8px, transparent 1.2px) 0 0 / 6px 2px repeat-x; -webkit-mask-image: linear-gradient(90deg, var(--cs-sky-mask) 40%, transparent); mask-image: linear-gradient(90deg, var(--cs-sky-mask) 40%, transparent); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-pane-h small { font: italic 400 14.5px var(--cs-sky-serif); letter-spacing: 0; text-transform: none; color: var(--cs-sky-dim); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-prose { font: italic 400 17px/1.45 var(--cs-sky-serif); color: var(--cs-hero-body); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-muted { color: var(--cs-hero-muted); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-pane .cs-quiet { font: 400 9.5px/1.5 var(--cs-sky-display); letter-spacing: 0.2em; text-transform: uppercase; color: var(--cs-sky-gold); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-pane .cs-quiet:hover { color: var(--cs-sky-ink); text-decoration: none; text-shadow: 0 0 10px var(--cs-sky-glow); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-legend { font: italic 400 14.5px/1.4 var(--cs-sky-serif); color: var(--cs-sky-dim); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-rows li { position: relative; border-bottom: 0; border-radius: 12px; background: linear-gradient(90deg, transparent, var(--cs-sky-line) 10%, var(--cs-sky-line) 90%, transparent) left bottom / 100% 1px no-repeat; font: 400 14px var(--cs-sky-display); letter-spacing: 0.03em; color: var(--cs-sky-ink); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-rows li em { font: italic 400 16px var(--cs-sky-serif); color: var(--cs-sky-soft); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-rows li small { font: 400 8.5px var(--cs-sky-display); letter-spacing: 0.2em; text-transform: uppercase; color: var(--cs-sky-dim); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-rows li.cs-dm-only small.cs-dm-mark { color: var(--cs-hero-dm); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-rows li.cs-dm-only small.cs-dm-mark::before { margin-right: 0.4em; }
+/* The motivations and pitfalls as small pills: the state is always a word as well as a look. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-motives .cs-chip { gap: 8px; padding: 4px 12px 3px; border-color: var(--cs-sky-gold-soft); border-radius: 99px; background: var(--cs-sky-gold-wash); font: 400 12px/1.3 var(--cs-sky-display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--cs-sky-ink); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-motives .cs-chip:hover { border-color: var(--cs-sky-gold-soft); box-shadow: none; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-motives .cs-chip-kind { font: 400 8.5px/1.3 var(--cs-sky-display); letter-spacing: 0.2em; color: var(--cs-sky-dim); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-motives .cs-chip[data-kind="pitfall"] { border-color: color-mix(in srgb, var(--cs-sky-rose) 45%, transparent); background: color-mix(in srgb, var(--cs-sky-rose) 9%, transparent); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-motives .cs-chip[data-kind="pitfall"] .cs-chip-kind { color: var(--cs-hero-bad); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-motives .cs-chip[data-state="hidden"] { border-color: var(--cs-sky-line-strong); border-style: dashed; background: none; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-motives .cs-chip[data-state="hidden"] .cs-chip-name { font: italic 400 16px/1.2 var(--cs-sky-serif); letter-spacing: 0.01em; text-transform: none; color: var(--cs-sky-soft); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-motives .cs-chip[data-state="used"] { border-color: var(--cs-sky-line); background: none; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-chip-state { font: 400 8.5px/1.3 var(--cs-sky-display); letter-spacing: 0.18em; text-transform: uppercase; color: var(--cs-sky-dim); }
+/* Edit mode: the shape is picked with the sky's thin pills. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-shape-pick .cs-btn { min-height: 30px; padding: 7px 14px 6px; border: 1px solid var(--cs-sky-line-strong); border-radius: 99px; background: none; font: 400 9.5px/1 var(--cs-sky-display); letter-spacing: 0.2em; text-transform: uppercase; color: var(--cs-sky-soft); transition: color 0.3s ease, border-color 0.3s ease, background-color 0.3s ease; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-shape-pick .cs-btn:hover { border-color: var(--cs-sky-gold); color: var(--cs-sky-gold); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-shape-pick .cs-btn[aria-pressed="true"] { border-color: var(--cs-sky-gold); background: var(--cs-sky-gold-wash); color: var(--cs-sky-gold); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-shape-pick .hint { font: italic 400 14.5px/1.4 var(--cs-sky-serif); color: var(--cs-sky-dim); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-shape-pick legend { padding: 0 0 6px; }
+/* Draw Steel's Abilities list: a villain action used this fight is dimmed and says "Used". */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-used-word { font: 400 9px var(--cs-sky-display); letter-spacing: 0.2em; color: var(--cs-sky-dim); }
+
+/* ---- The Director's drawer: in the open tab's place --------------------- */
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded) .window-content > .cs-only-you { grid-column: 2 / 5; grid-row: 6; margin: 26px 0 36px 18px; }
+@container cs-hero (max-width: 760px) {
+  .chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded) .window-content > .cs-only-you { grid-column: 1 / -1; grid-row: 8; margin: 22px var(--cs-sky-gutter) 30px calc(var(--cs-sky-gutter) + 14px); }
+}
+
+/* ---- Folded: the small card, with the talk or the fight added ---------- */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-card-meters { justify-content: center; gap: 22px; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-card-meters .cs-meter { justify-items: center; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-card-meters .cs-meter .cs-lab { font: 400 8px/1.4 var(--cs-sky-display); letter-spacing: 0.2em; text-transform: uppercase; color: var(--cs-sky-dim); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-meter b { font: 300 22px/1.1 var(--cs-sky-display); color: var(--cs-sky-ink); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-card-meters .cs-meter b { font-size: 20px; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-meter .cs-dots i { width: 5px; height: 5px; background: var(--cs-sky-peri); box-shadow: 0 0 6px var(--cs-sky-peri); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-meter .cs-dots i.off { background: none; box-shadow: inset 0 0 0 1px var(--cs-sky-dim); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-card .cs-offer { font: italic 400 15px/1.3 var(--cs-sky-serif); color: var(--cs-hero-body); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-card .cs-offer b { font-weight: 400; color: var(--cs-sky-gold); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-card .cs-motives { justify-content: center; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-card .cs-motives .cs-chip { padding: 2px 9px 1px; font-size: 9.5px; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-card .cs-motives .cs-chip-state { font-size: 7.5px; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-card-sub .cs-talking { color: var(--cs-sky-gold); font-weight: 400; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-card .cs-talk-btn::before { background: var(--cs-sky-gold); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cs-sky-gold) 25%, transparent); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-card .cs-va-pips { justify-content: center; gap: 10px; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-va-mark { flex: none; width: 26px; min-width: 26px; height: 26px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--cs-sky-line-strong); font: 400 11px var(--cs-sky-display); color: var(--cs-sky-soft); transition: box-shadow 0.3s ease, background-color 0.3s ease; }
+.chronicle-npc-sheet[data-cs-look="sky"] button.cs-va-mark:hover { box-shadow: inset 0 0 0 1px var(--cs-sky-gold), 0 0 12px color-mix(in srgb, var(--cs-sky-gold) 28%, transparent); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-va-mark.used { background: color-mix(in srgb, var(--cs-sky-ember) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cs-sky-ember) 40%, transparent); color: var(--cs-sky-dim); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-va-mark.next { background: var(--cs-sky-gold-wash); box-shadow: inset 0 0 0 1.5px var(--cs-sky-ember), 0 0 12px color-mix(in srgb, var(--cs-sky-ember) 30%, transparent); color: var(--cs-sky-ember); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-card-malice { padding: 3px 0 3px 10px; border-radius: 0 12px 12px 0; box-shadow: inset 2px 0 0 var(--cs-hero-dm); background: linear-gradient(90deg, color-mix(in srgb, var(--cs-hero-dm) 8%, transparent), transparent 70%); font: 400 9px/1.4 var(--cs-sky-display); letter-spacing: 0.2em; text-transform: uppercase; color: var(--cs-hero-dm); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-card-malice input { height: 28px; border: 0; border-bottom: 1px dotted var(--cs-sky-line-strong); border-radius: 0; background: none; font: 300 20px var(--cs-sky-display); color: var(--cs-sky-rose); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-card-malice input:focus { border-bottom: 1px solid var(--cs-sky-gold); outline: none; }
+
+/* ---- Moves: slow and weightless, like the hero's ------------------------ */
+/* Opening, a hit and a heal are the hero's own rules. These are the new ones; none plays on the folded card. */
+
+/* A villain action: a red comet crosses the sky; the action just used burns out, the next one kindles, and the line under them changes. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-comet { position: absolute; left: 97%; top: 5%; width: 300px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--cs-sky-rose) 70%, transparent) 72%, color-mix(in srgb, var(--cs-sky-rose) 30%, var(--cs-sky-star))); transform-origin: 0 50%; transform: rotate(162deg); opacity: 0; }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-comet::before { content: ""; position: absolute; inset: -4px 0; border-radius: 6px; background: linear-gradient(90deg, transparent 25%, color-mix(in srgb, var(--cs-sky-blood) 45%, transparent)); }
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-comet::after { content: ""; position: absolute; right: -3px; top: 50%; width: 7px; height: 7px; margin-top: -3.5px; border-radius: 50%; background: var(--cs-sky-star); box-shadow: 0 0 8px 2px var(--cs-sky-rose), 0 0 24px 7px color-mix(in srgb, var(--cs-sky-blood) 70%, transparent); }
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-va .cs-sn-comet { animation: cs-sky-npc-comet 1.25s cubic-bezier(0.35, 0.1, 0.55, 1); }
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-va .cs-sn-vam.used:is(:has(+ li:not(.used)), :last-child) .cs-sn-vastar::before { animation: cs-sky-npc-burnout 1.1s ease-out; }
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-va .cs-sn-vam.used:is(:has(+ li:not(.used)), :last-child) .cs-sn-vastar::after { animation: cs-sky-npc-flare 1.1s ease-out; }
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-va .cs-sn-vam.next .cs-sn-vastar::before { animation: cs-sky-npc-kindle 0.85s 0.4s var(--cs-sky-ease) both; }
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-va .cs-sn-ring:not(.cs-sn-intring) .cs-sky-seg:not(.on):is(:has(+ .cs-sky-seg.on), :last-child) { animation: cs-sky-npc-burn-arc 1s ease-out; }
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-va :is(.cs-sn-next, .cs-sn-left) { animation: cs-sky-npc-rise 0.7s 0.25s ease-out both; }
+
+/* Malice gained: a red star blinks in at the end of the row, and the number glows. */
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-malice .cs-sn-malstars i::before { animation: cs-sky-npc-blink 0.75s ease-out; }
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-malice .cs-sn-malstars i::after { animation: cs-sky-npc-malflare 0.75s ease-out; }
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-malice .cs-sn-mal-n input { animation: cs-sky-npc-glow 0.8s ease-out; }
+
+/* Winded: a shadow slides half across the moon, holds, and settles into the winded dimming. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-disc::before { content: ""; position: absolute; inset: -6%; z-index: 1; border-radius: 50%; background: radial-gradient(circle, var(--cs-sky-eclipse) 62%, transparent 71%); opacity: 0; transform: translateX(110%); pointer-events: none; }
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-winded .cs-sky-disc::before { animation: cs-sky-npc-wane 1.7s var(--cs-sky-ease); }
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-winded .cs-sky-state { animation: cs-sky-npc-rise 0.8s 0.5s ease-out both; }
+
+/* Interest up: an aurora drifts across, as on a heal; the ring, the number and the answer brighten. */
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-up .cs-sky-aurora { animation: cs-sky-aurora 1s ease-in-out; }
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-up .cs-sn-intring .cs-sky-fill { animation: cs-sky-npc-bloom 1s ease-out; }
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-up :is(.cs-sn-int .cs-sky-big, .cs-sn-ans b) { animation: cs-sky-npc-shine 1s ease-out; }
+
+/* Interest down: the number sinks a little, and the arc of Patience that went out flares pale, then dims. */
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-down .cs-sn-int .cs-sky-big,
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-down .cs-sn-pat .cs-sky-big { animation: cs-sky-npc-sink 0.8s ease-out; }
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded):is(.cs-move-down, .cs-move-up, .cs-move-pit) .cs-sn-intring :is(:not(.cs-sky-seg) + .cs-sky-seg:not(.on), .cs-sky-seg.on + .cs-sky-seg:not(.on)) { animation: cs-sky-npc-dim 0.65s ease-out; }
+
+/* A pitfall: the moon is eclipsed and the horizon flushes red, as on a hit, and the pitfall's red star flares. */
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-pit .cs-sky-red { animation: cs-sky-red 0.95s ease-out; }
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-pit .cs-sky-ecl { animation: cs-sky-eclipse 0.9s ease-out; }
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-pit .cs-sn-motive[data-kind="pitfall"][data-state="found"] .cs-sn-st::after { animation: cs-sky-npc-ring 0.9s ease-out; }
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-pit .cs-sn-int .cs-sky-big { animation: cs-sky-npc-sink 0.9s ease-out; }
+
+/* A motivation found: a shooting star lands where the faint dot was, the star ignites, and the lines to the stars draw themselves. */
+.chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive::after { content: ""; position: absolute; left: 50%; top: calc(var(--u) * var(--halo)); width: 150px; height: 2px; margin-top: -1px; border-radius: 2px; background: linear-gradient(90deg, var(--cs-sky-star), color-mix(in srgb, var(--cs-sky-gold) 55%, transparent) 25%, transparent); transform-origin: 0 50%; opacity: 0; pointer-events: none; }
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-reveal .cs-sn-motive[data-kind="motivation"][data-state="found"]::after { animation: cs-sky-npc-land 0.9s calc(var(--i) * 0.12s) cubic-bezier(0.5, 0, 0.9, 0.55) both; }
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-reveal .cs-sn-motive[data-kind="motivation"][data-state="found"] .cs-sn-st { animation: cs-sky-npc-ignite 0.9s calc(var(--i) * 0.12s) ease-out both; }
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-reveal .cs-sn-motive[data-kind="motivation"][data-state="found"] :is(b, .cs-sn-sw) { animation: cs-sky-fade 0.45s calc(var(--i) * 0.12s + 0.42s) ease-out both; }
+.chronicle-npc-sheet[data-cs-look="sky"]:not(.cs-folded).cs-move-reveal .cs-sn-motives .cs-sky-link:not(.cs-sn-veil) { animation: cs-sky-draw 0.45s 0.42s ease-out both; }
+
+@keyframes cs-sky-npc-breathe { 0%, 100% { opacity: 0.55; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1.1); } }
+@keyframes cs-sky-npc-comet {
+  0% { opacity: 0; transform: rotate(162deg) translateX(-320px); }
+  12% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(162deg) translateX(1150px); }
+}
+@keyframes cs-sky-npc-burnout { 0% { transform: scale(1.5); background: var(--cs-sky-star); } 35% { transform: scale(1.3) rotate(15deg); background: var(--cs-sky-rose); } }
+@keyframes cs-sky-npc-flare { 0% { opacity: 1; transform: scale(1.9); } 40% { opacity: 1; } }
+@keyframes cs-sky-npc-kindle { 0% { transform: scale(0.5); opacity: 0.4; } 55% { transform: scale(1.35); opacity: 1; } 100% { transform: none; } }
+@keyframes cs-sky-npc-rise { from { opacity: 0; transform: translateY(5px); } }
+/* Only the star at the end of the lit row (--hit) moves; the others hold still. */
+@keyframes cs-sky-npc-blink {
+  0% { opacity: calc((0.28 + 0.72 * var(--lit)) * (1 - var(--hit))); transform: scale(calc((0.7 + 0.3 * var(--lit)) * (1 - var(--hit)))); }
+  35% { opacity: calc(0.28 + 0.72 * var(--lit)); transform: scale(calc(0.7 + 0.3 * var(--lit) + 1.2 * var(--hit))) rotate(calc(45deg * var(--hit))); }
+  70% { transform: scale(calc(0.7 + 0.3 * var(--lit) - 0.1 * var(--hit))); }
+}
+@keyframes cs-sky-npc-malflare { 0%, 40% { opacity: calc(0.45 * var(--lit) + 0.55 * var(--hit)); transform: scale(calc(1 + 0.9 * var(--hit))); } }
+@keyframes cs-sky-npc-glow { 30% { text-shadow: 0 0 18px var(--cs-sky-rose), 0 0 36px color-mix(in srgb, var(--cs-sky-rose) 50%, transparent); } }
+@keyframes cs-sky-npc-wane { 0% { opacity: 1; transform: translateX(110%); } 45%, 70% { opacity: 0.94; transform: translateX(52%); } 100% { opacity: 0; transform: translateX(52%); } }
+@keyframes cs-sky-npc-bloom { 30% { filter: drop-shadow(0 0 14px var(--cs-sn-tone)) brightness(1.3); } }
+@keyframes cs-sky-npc-shine { 30% { text-shadow: 0 0 20px var(--cs-sn-tone), 0 0 40px color-mix(in srgb, var(--cs-sn-tone) 50%, transparent); } }
+@keyframes cs-sky-npc-ring { 0% { opacity: 1; transform: scale(0.4); } 100% { opacity: 0; transform: scale(2.4); } }
+@keyframes cs-sky-npc-sink { 40% { opacity: 0.35; transform: translateY(3px); } }
+/* Both ends are written out: an open end would blend with the arc's own colour transition and flash the wrong colour. */
+@keyframes cs-sky-npc-dim { 0% { stroke: var(--cs-sky-star); stroke-width: 6; filter: drop-shadow(0 0 6px var(--cs-sky-peri)); } 100% { stroke: color-mix(in srgb, var(--cs-sky-seg) 22%, transparent); stroke-width: 3; filter: none; } }
+@keyframes cs-sky-npc-burn-arc { 0% { stroke: var(--cs-sky-gold-pale); stroke-width: 6; filter: drop-shadow(0 0 7px var(--cs-sky-rose)); } 40% { stroke: var(--cs-sky-rose); stroke-width: 4; } 100% { stroke: color-mix(in srgb, var(--cs-sky-ember) 16%, transparent); stroke-width: 3; filter: none; } }
+@keyframes cs-sky-npc-land {
+  0% { opacity: 0; transform: rotate(-38deg) translateX(240px); }
+  12% { opacity: 1; }
+  46% { opacity: 1; transform: rotate(-38deg) translateX(0) scaleX(1); }
+  58%, 100% { opacity: 0; transform: rotate(-38deg) translateX(0) scaleX(0); }
+}
+@keyframes cs-sky-npc-ignite { 0%, 44% { transform: scale(0.15); opacity: 0.4; } 56% { transform: scale(1.9); opacity: 1; } 100% { transform: none; } }
+
+/* ---- Narrower windows ---------------------------------------------------- */
+/* Under the moon the hero's one centred column takes over; the new parts follow it. */
+@container cs-hero (max-width: 760px) {
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-id .cs-sky-prog { justify-content: center; }
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-mal { margin-left: auto; margin-right: auto; }
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-chars { margin-inline: auto; }
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-id .cs-sky-eye > .cs-sn-br { flex-basis: 100%; }
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-aside { text-align: center; }
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-more { justify-content: center; }
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-vab .cs-sky-k { justify-content: center; gap: 14px; }
+}
+@container cs-hero (max-width: 500px) {
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-ans { font-size: 16px; }
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-ans b { font-size: 23px; }
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-malstars { display: none; }
+}
+
+/* ---- Calm: every move becomes a short fade ------------------------------
+   The new loops stop; the comet and the sliding shadow become brief fades of
+   the same light, and a star found simply appears. */
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-vam.next .cs-sn-vastar::after,
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-rest .cs-talk-btn .cs-sn-talkdot,
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-st::before,
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive::after { animation: none; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-va .cs-sn-comet { animation: none; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-va .cs-sn-vam.used .cs-sn-vastar::before { animation: cs-sky-fade 0.35s ease-out; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-va .cs-sn-vam.next .cs-sn-vastar::before { animation: cs-sky-fade 0.35s ease-out; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-va .cs-sn-vam.used .cs-sn-vastar::after,
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-va .cs-sn-ring .cs-sky-seg { animation: none; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-va :is(.cs-sn-next, .cs-sn-left),
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-winded .cs-sky-state { animation: cs-sky-fade 0.35s ease-out both; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-malice .cs-sn-malstars i::before { animation: cs-sky-fade 0.35s ease-out; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-malice .cs-sn-malstars i::after,
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-malice .cs-sn-mal-n input { animation: none; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-winded .cs-sky-disc::before { animation: cs-sky-aurora-fade 0.8s ease-in-out; transform: translateX(52%); }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-up .cs-sky-aurora { animation: cs-sky-aurora-fade 1.2s ease-in-out; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-up :is(.cs-sn-intring .cs-sky-fill, .cs-sn-int .cs-sky-big, .cs-sn-ans b),
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"]:is(.cs-move-down, .cs-move-up, .cs-move-pit) .cs-sn-intring .cs-sky-seg,
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-down :is(.cs-sn-int, .cs-sn-pat) .cs-sky-big,
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-pit .cs-sn-int .cs-sky-big,
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-pit .cs-sn-motive .cs-sn-st::after { animation: none; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-pit .cs-sky-red { animation-duration: 0.6s; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-pit .cs-sky-ecl { animation-duration: 0.5s; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-reveal .cs-sn-motive[data-state="found"] .cs-sn-st { animation: cs-sky-fade 0.35s ease-out both; }
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-reveal .cs-sn-motive[data-state="found"] :is(b, .cs-sn-sw),
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-reveal .cs-sn-motive[data-state="found"]::after,
+html[data-cs-motion="calm"] .chronicle-npc-sheet[data-cs-look="sky"].cs-move-reveal .cs-sn-motives .cs-sky-link { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-vam.next .cs-sn-vastar::after,
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-rest .cs-talk-btn .cs-sn-talkdot,
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-st::before,
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-st,
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-comet,
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive::after,
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-vastar::before,
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-malstars i::before,
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-malstars i::after,
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-mal-n input,
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-ans b,
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-intring .cs-sky-fill,
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-intring .cs-sky-seg,
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-ring .cs-sky-seg,
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-int .cs-sky-big,
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-pat .cs-sky-big,
+  .chronicle-npc-sheet[data-cs-look="sky"] :is(.cs-sn-next, .cs-sn-left, .cs-sky-state),
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motive :is(b, .cs-sn-sw),
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sn-motives .cs-sky-link,
+  .chronicle-npc-sheet[data-cs-look="sky"] .cs-sky-disc::before { animation: none !important; transition: none !important; }
+}

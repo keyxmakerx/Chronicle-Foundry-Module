@@ -535,7 +535,12 @@ Needs Draw Steel 1.1.0 or later and a Chronicle connection. Pick it on an NPC: o
 - [ ] Open the NPC's data on the player's screen (Foundry's console: `game.actors.getName("Orsen Vey").toObject()`) -> no page text, no unfound motivation, no Impression in it
 
 #### Both
-- [ ] Sheet look -> the hero looks are listed, then "Draw Steel's own sheet". Pick a dramatic look -> the sheet draws in the Chronicle look until that look's NPC version arrives. Pick "Draw Steel's own sheet" -> the NPC opens in Draw Steel's sheet
+- [ ] Sheet look -> the hero looks are listed, then "Draw Steel's own sheet". Pick "Draw Steel's own sheet" -> the NPC opens in Draw Steel's sheet
+- [ ] Pick each dramatic look in turn, on Orsen and on the War Chief -> the sheet draws in that look, with the same figures as the Chronicle look: The portrait hall (the picture down the left, a gold ring for Interest or Stamina, hexagon motivations or stone plaques), Steel and banner (a banner down the left, blade bars and shield plates), Arcane glass (a glowing ring, tiles and hexagons), The gilded card (a gold-framed card, a dial on the left, coins and medallions), Night sky (a moon ring, the motivations or characteristics as a constellation). Malice, Impression and the "Only you" button keep the amber edge, the ⊘ mark and "only you" in every look
+- [ ] In each dramatic look, open the "Only you" drawer -> it takes the place of the open tab, inside the look, with nothing cut off; in The portrait hall the button sits at the foot of the tab rail, turned like the others
+- [ ] In each dramatic look, fold -> the small card in that look's colours
+- [ ] In a fight, in each dramatic look: mark a villain action used -> a short move plays (a sweep, comet or coin turning, by look) and the next one is marked "Next"; take the War Chief below his winded mark -> a winded move plays; in Chronicle, raise Orsen's Interest -> a move plays as the number changes. With Chronicle's motion set to Calm these become short fades, and with it off (or the computer's reduced motion on) nothing moves
+- [ ] Resize a dramatic-look sheet narrow (about 700 pixels) -> the layout stacks, nothing overlaps or is cut off
 - [ ] Nothing on this sheet changes the page in Chronicle except what Draw Steel's own fields already send: the page's history shows no entry for opening, folding, marking a villain action, Talking or picking a shape
 - [ ] Light and dark interface themes both read cleanly
 

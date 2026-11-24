@@ -46,12 +46,25 @@ export const NPC_LOOK_DIR = 'modules/chronicle-sync/templates/npc-looks';
 /** The parts every look draws for each shape. */
 export const NPC_LOOK_PARTS = Object.freeze(['header', 'stats', 'card']);
 
+/** The parts the dramatic looks draw themselves: the folded card is the Chronicle look's, restyled, as on the hero sheet. */
+const DRAMATIC_PARTS = Object.freeze(['header', 'stats']);
+
+/** Each look with its own NPC and monster templates, and the parts it draws with them. */
+const OWN_PARTS = Object.freeze({
+  chronicle: NPC_LOOK_PARTS,
+  hall: DRAMATIC_PARTS,
+  steel: DRAMATIC_PARTS,
+  glass: DRAMATIC_PARTS,
+  gilded: DRAMATIC_PARTS,
+  sky: DRAMATIC_PARTS,
+});
+
 /**
  * The looks that have their own NPC and monster templates. A look without
  * them draws these sheets in the Chronicle look, rather than in a look that
  * would only half fit.
  */
-export const NPC_LOOKS = Object.freeze(['chronicle']);
+export const NPC_LOOKS = Object.freeze(Object.keys(OWN_PARTS));
 
 /**
  * The look an NPC sheet is drawn in: the hero look when it has NPC
@@ -73,7 +86,9 @@ export function npcLook(heroLook) {
  */
 export function npcLookTemplate(look, shape, part) {
   if (!NPC_LOOK_PARTS.includes(part) || !SHAPES.includes(shape)) return null;
-  return `${NPC_LOOK_DIR}/${npcLook(look)}/${shape}-${part}.hbs`;
+  const drawn = npcLook(look);
+  const from = OWN_PARTS[drawn].includes(part) ? drawn : NPC_LOOKS[0];
+  return `${NPC_LOOK_DIR}/${from}/${shape}-${part}.hbs`;
 }
 
 /** The panes and the Edit mode editors both shapes share, whatever the look. */
@@ -87,6 +102,21 @@ export const SHARED_TEMPLATES = Object.freeze({
 /** The partials each look's templates include, by name in the look's folder. */
 export const NPC_LOOK_PARTIALS = Object.freeze({
   chronicle: Object.freeze(['numbers-row', 'stamina-box']),
+  hall: Object.freeze(['numbers-row', 'combat-line', 'stamina-ring', 'stamina-row']),
+  steel: Object.freeze(['blade', 'shields', 'plates', 'nostat']),
+  glass: Object.freeze(['stamina-tile', 'combat-tiles', 'combat-cell']),
+  sky: Object.freeze(['sky-layer', 'stamina-num', 'combat-nums']),
+});
+
+/**
+ * Each look's NPC moves that run past the sheet's default second (ms), so
+ * the move's class stays on the window until its animation ends.
+ */
+export const NPC_MOVE_MS = Object.freeze({
+  hall: Object.freeze({ va: 1300, winded: 1600 }),
+  steel: Object.freeze({ winded: 1200 }),
+  glass: Object.freeze({ va: 1200, winded: 1700 }),
+  sky: Object.freeze({ va: 1300, winded: 1800, up: 1200, reveal: 1500 }),
 });
 
 /** Every NPC look template and partial, for loading them before the first draw. */

@@ -1,0 +1,60 @@
+{{!-- Night sky NPC header: the sky, the picture in a round moon, then the
+level and role on one line and the page's chips on the next, the name, and
+on the Director's screen the Talking switch under the moon (the token's
+talking glow). The Interest ring round the moon and what the NPC would answer
+now are drawn by the stats part. A Limited viewer sees this part, so
+everything past Draw Steel's own header is for the Director only. --}}
+<header class="cs-hero-head cs-npc-head cs-sky-head" style="{{#if avatarProperties.objectFit}}--avatar-object-fit: {{avatarProperties.objectFit}};{{/if}}{{#if avatarProperties.objectPosition}} --avatar-object-position: {{avatarProperties.objectPosition}};{{/if}}">
+  {{> "modules/chronicle-sync/templates/npc-looks/sky/sky-layer.hbs"}}
+
+  <div class="cs-sky-moon">
+    <svg class="cs-sky-rings" viewBox="0 0 340 340" aria-hidden="true" focusable="false">
+      <circle class="cs-sky-orbit" cx="170" cy="170" r="164"/>
+      <circle class="cs-sky-track" cx="170" cy="170" r="146"/>
+    </svg>
+    <div class="cs-sky-disc">
+      {{!-- Shown where there is no picture of their own. --}}
+      <svg class="cs-sky-face" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+        <circle class="m1" cx="34" cy="36" r="11"/>
+        <circle class="m2" cx="62" cy="30" r="6"/>
+        <circle class="m3" cx="58" cy="62" r="15"/>
+        <circle class="m4" cx="30" cy="68" r="7"/>
+        <circle class="m5" cx="76" cy="50" r="4"/>
+      </svg>
+      <button type="button" class="cs-portrait-btn" data-action="csPortraitMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize "CHRONICLE.HeroSheet.Portrait.Menu"}}" data-tooltip="CHRONICLE.HeroSheet.Portrait.Menu">
+        <img class="cs-portrait" src="{{document.img}}" alt="{{document.name}}" {{#unless isPlay}}data-edit="img"{{/unless}}>
+      </button>
+      <div class="cs-sky-ecl" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <div class="cs-sky-id">
+    <ul class="cs-sky-eye">
+      <li class="cs-sky-lvl"><span>{{localize "CHRONICLE.HeroSheet.LevelN" level=system.monster.level}}</span></li>
+      {{#if system.monster.organizationLabel}}<li class="cs-sky-origin"><span class="cs-sky-origin-name">{{system.monster.organizationLabel}}</span></li>{{/if}}
+      {{#if system.monster.roleLabel}}<li class="cs-sky-origin"><span class="cs-sky-origin-name">{{system.monster.roleLabel}}</span></li>{{/if}}
+      {{#unless isPlay}}
+      <li class="cs-sky-origin"><button type="button" class="cs-sky-mini" data-action="editMonsterMetadata" data-tooltip="CHRONICLE.NpcSheet.EditMetadata" aria-label="{{localize "CHRONICLE.NpcSheet.EditMetadata"}}"><i class="fa-solid fa-gear" inert></i></button></li>
+      {{/unless}}
+      {{#if npc.page.chips.length}}
+      <li class="cs-sn-br" aria-hidden="true"></li>
+      {{#each npc.page.chips as |chip|}}
+      <li class="cs-sky-origin"><span class="cs-sky-kind">{{chip.kind}}</span><span class="cs-sky-origin-name">{{chip.name}}</span></li>
+      {{/each}}
+      {{/if}}
+    </ul>
+    {{#if isPlay}}
+    <h1 class="cs-name">{{document.name}}</h1>
+    {{else}}
+    <div class="cs-name-edit">
+      {{formInput fields.name value=source.name placeholder=(localize "DOCUMENT.FIELDS.name.label")}}
+    </div>
+    {{/if}}
+  </div>
+
+  {{#if npc.talk.show}}
+  <div class="cs-sky-rest">
+    <button type="button" class="cs-sky-btn cs-talk-btn" data-action="csTalk" aria-pressed="{{#if npc.talk.pressed}}true{{else}}false{{/if}}" data-tooltip="CHRONICLE.NpcSheet.TalkingTip"><i class="cs-sn-talkdot" aria-hidden="true"></i>{{localize "CHRONICLE.NpcSheet.Talking"}}</button>
+  </div>
+  {{/if}}
+</header>

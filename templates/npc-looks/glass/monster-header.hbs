@@ -1,0 +1,58 @@
+{{!-- Arcane glass monster header: the picture in its glowing ring on the left,
+level, organization and role above the name, the keywords beside it. The violet
+field and the glass panel are drawn here so the glass has something to blur;
+the Stamina ring that wraps the picture comes from the stats part, which a
+Limited viewer does not get. A Limited viewer sees this part, so it shows only
+what Draw Steel's own NPC header shows. The numbers, including Malice for the
+Director, are in the stats part. --}}
+<header class="cs-hero-head cs-glass-head cs-npc-head" style="{{#if avatarProperties.objectFit}}--avatar-object-fit: {{avatarProperties.objectFit}};{{/if}}{{#if avatarProperties.objectPosition}} --avatar-object-position: {{avatarProperties.objectPosition}};{{/if}}">
+  <div class="cs-glass-field" aria-hidden="true"><div class="cs-glass-sky"><i></i><i></i></div></div>
+  <div class="cs-glass-pane" aria-hidden="true"><span class="cs-glass-ripple"></span><span class="cs-glass-ripple cs-dr-ripple"></span></div>
+
+  <div class="cs-glass-orb">
+    <svg class="cs-glass-orb-art" viewBox="0 0 240 240" aria-hidden="true" focusable="false">
+      <circle class="cs-glass-dash" cx="120" cy="120" r="116"/>
+      <circle class="cs-glass-groove" cx="120" cy="120" r="106"/>
+    </svg>
+    <div class="cs-glass-pt">
+      <svg class="cs-glass-sigil" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+        <g fill="none" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">
+          <path d="M50 14 80 31v38L50 86 20 69V31z"/>
+          <path d="M50 30 66 39v22L50 70 34 61V39z"/>
+          <path d="M50 14v16M80 31 66 39M80 69 66 61M50 86V70M20 69l14-8M20 31l14 8"/>
+        </g>
+      </svg>
+      <button type="button" class="cs-portrait-btn" data-action="csPortraitMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize "CHRONICLE.HeroSheet.Portrait.Menu"}}" data-tooltip="CHRONICLE.HeroSheet.Portrait.Menu">
+        <img class="cs-portrait" src="{{document.img}}" alt="{{document.name}}" {{#unless isPlay}}data-edit="img"{{/unless}}>
+      </button>
+    </div>
+  </div>
+
+  <div class="cs-glass-id">
+    <div class="cs-glass-top">
+      <p class="cs-glass-eye">
+        <span class="cs-glass-lvl">{{localize "CHRONICLE.HeroSheet.LevelN" level=system.monster.level}}</span>
+        {{#if system.monster.organizationLabel}}<span class="cs-glass-cls">{{system.monster.organizationLabel}}</span>{{/if}}
+        {{#if system.monster.roleLabel}}<span class="cs-glass-cls cs-glass-subcls">{{system.monster.roleLabel}}</span>{{/if}}
+        {{#unless isPlay}}
+        <button type="button" class="cs-mini" data-action="editMonsterMetadata" data-tooltip="CHRONICLE.NpcSheet.EditMetadata" aria-label="{{localize "CHRONICLE.NpcSheet.EditMetadata"}}"><i class="fa-solid fa-gear" inert></i></button>
+        {{/unless}}
+      </p>
+    </div>
+    {{#if isPlay}}
+    <h1 class="cs-name">{{document.name}}</h1>
+    {{else}}
+    <div class="cs-name-edit">
+      {{formInput fields.name value=source.name placeholder=(localize "DOCUMENT.FIELDS.name.label")}}
+    </div>
+    {{/if}}
+    {{#if monsterKeywords.length}}
+    <ul class="cs-glass-origins">
+      {{#each monsterKeywords as |keyword|}}
+      <li class="cs-glass-origin"><span class="cs-glass-kind">{{localize "CHRONICLE.NpcSheet.Keyword"}}</span><span class="cs-glass-origin-name">{{keyword}}</span></li>
+      {{/each}}
+    </ul>
+    {{/if}}
+    {{#if npc.villain.inFight}}<p class="cs-glass-vic"><span class="cs-dr-token">{{localize "CHRONICLE.NpcSheet.InFight"}}</span></p>{{/if}}
+  </div>
+</header>

@@ -1,0 +1,129 @@
+{{!-- Night sky NPC boxes, above the tabs. Play: the Interest ring round the
+moon (Patience as the arcs inside it), what the NPC would answer now, big thin
+numbers for Interest, Patience and (Director only) Impression, and the
+motivations and pitfalls as a constellation, each star drawn by its state. A
+stat block, when the NPC has one, adds Stamina, Speed, Free strike and the
+characteristics as rolls; without one an honest empty place stands under the
+moon, never made-up numbers. Edit: Draw Steel's own stat editors. --}}
+<section class="cs-hero-stats stats cs-npc-stats cs-sky-stats">
+  {{#if isPlay}}
+  {{!-- Over the moon the header draws: same box, so the arcs sit on its rings. --}}
+  <svg class="cs-sky-ring cs-sn-ring cs-sn-intring" data-int="{{npc.look.band}}" viewBox="0 0 340 340" aria-hidden="true" focusable="false">
+    <circle class="cs-sky-fill" cx="170" cy="170" r="146" pathLength="100" stroke-dasharray="{{npc.look.ring.fill}} 100" transform="rotate(-90 170 170)"/>
+    <circle class="cs-sn-notch" cx="170" cy="170" r="146" pathLength="100" stroke-dasharray="0.7 19.3" stroke-dashoffset="0.35" transform="rotate(-90 170 170)"/>
+    {{#each npc.look.ring.segs as |seg|}}
+    <circle class="cs-sky-seg{{#if seg.on}} on{{/if}}" cx="170" cy="170" r="132" pathLength="100" stroke-dasharray="{{seg.dash}}" stroke-dashoffset="{{seg.offset}}" transform="rotate(-90 170 170)"/>
+    {{/each}}
+  </svg>
+
+  <div class="cs-sky-nums cs-sn-talknums" data-int="{{npc.look.band}}"{{#if npc.statBlock}} data-band="{{npc.chronicle.stamina.band}}"{{/if}}>
+    {{#if npc.negotiation.has}}
+    {{#if npc.negotiation.answer}}
+    <p class="cs-sn-ans">{{localize "CHRONICLE.NpcSheet.IfAnswered"}} <b>{{localize npc.negotiation.answer}}</b>{{#if npc.negotiation.over}}<small class="cs-sn-over">{{localize "CHRONICLE.NpcSheet.Over"}}</small>{{/if}}</p>
+    {{/if}}
+    <div class="cs-sky-num cs-sn-int">
+      <span class="cs-sky-big"{{#if npc.look.known}} role="img" aria-label="{{localize "CHRONICLE.NpcSheet.OfFive" n=npc.negotiation.interestText}}"{{/if}}><b>{{npc.negotiation.interestText}}</b>{{#if npc.look.known}}<small>/5</small>{{/if}}</span>
+      <span class="cs-sky-k">{{localize "CHRONICLE.NpcSheet.Interest"}}</span>
+    </div>
+    <div class="cs-sky-num cs-sn-pat">
+      <span class="cs-sky-big"{{#if npc.look.known}} role="img" aria-label="{{localize "CHRONICLE.NpcSheet.OfFive" n=npc.negotiation.patienceText}}"{{/if}}><b>{{npc.negotiation.patienceText}}</b>{{#if npc.look.known}}<small>/5</small>{{/if}}</span>
+      <span class="cs-sky-k">{{localize "CHRONICLE.NpcSheet.Patience"}}</span>
+    </div>
+    {{#if npc.isGM}}
+    <div class="cs-sky-num cs-sn-imp cs-dm-only" data-tooltip="CHRONICLE.NpcSheet.ImpressionTip">
+      <span class="cs-sky-big"><b>{{npc.negotiation.impressionText}}</b></span>
+      <span class="cs-sky-k"><span class="cs-dm-mark">{{localize "CHRONICLE.NpcSheet.Impression"}}</span><span class="cs-dm-words">{{localize "CHRONICLE.NpcSheet.OnlyYou"}}</span></span>
+    </div>
+    {{/if}}
+    {{/if}}
+    {{#if npc.statBlock}}
+    {{> "modules/chronicle-sync/templates/npc-looks/sky/stamina-num.hbs"}}
+    {{> "modules/chronicle-sync/templates/npc-looks/sky/combat-nums.hbs"}}
+    <div class="cs-sn-chars">
+      {{#each characteristics as |chr key|}}
+      <button type="button" class="cs-sn-chr" data-action="roll" data-roll-type="characteristic" data-characteristic="{{key}}" data-tooltip-text="{{localize "DRAW_STEEL.ROLL.Prompt" prompt=chr.field.label}}" {{disabled (not @root.owner)}}>
+        <b>{{numberFormat chr.value sign=true}}</b>
+        <span>{{chr.field.label}}</span>
+      </button>
+      {{/each}}
+    </div>
+    {{/if}}
+
+    <p class="cs-sky-facts">
+      {{#if npc.negotiation.has}}
+      <span>{{localize (concat "CHRONICLE.NpcSheet.Seen." npc.negotiation.source (ifThen npc.negotiation.shown "Shown" "Hidden"))}}</span>
+      {{else}}
+      <span>{{localize "CHRONICLE.NpcSheet.NoNegotiation"}}</span>
+      {{#if npc.pageUrl}}<button type="button" class="cs-quiet" data-action="csOpenPage">{{localize "CHRONICLE.NpcSheet.OpenPage"}}</button>{{/if}}
+      {{/if}}
+      {{#if npc.statBlock}}
+      <span>{{systemFields.combat.fields.size.label}} {{system.combat.size}}</span>
+      <span{{#if combatTooltip}} data-tooltip-html="{{combatTooltip}}"{{/if}}>{{systemFields.combat.fields.stability.label}} {{system.combat.stability}}</span>
+      {{#if movement.list}}<span>{{movement.list}}</span>{{/if}}
+      {{/if}}
+    </p>
+  </div>
+
+  {{!-- The motivations and pitfalls take the characteristics' places in the
+  sky. A line joins two stars once both are found; until then a faint dotted
+  ghost shows where it will run. A star is not a button: nothing here rolls. --}}
+  {{#if npc.look.motives.stars.length}}
+  <div class="cs-sky-const cs-sn-motives">
+    <p class="cs-sky-k cs-sn-const-k">{{localize "CHRONICLE.NpcSheet.Talk.Motives"}}</p>
+    <svg class="cs-sky-lines" viewBox="0 0 590 240" aria-hidden="true" focusable="false">
+      <g class="cs-sn-ghosts">
+        {{#each npc.look.motives.ghosts as |g|}}<path class="cs-sn-ghost" pathLength="1" d="{{g.d}}"/>{{/each}}
+      </g>
+      <g class="cs-sky-links">
+        {{#each npc.look.motives.links as |link|}}
+        <path class="cs-sky-link{{#if link.veiled}} cs-sn-veil{{/if}}" style="--i: {{link.i}}" pathLength="1" d="{{link.d}}"/>
+        {{/each}}
+      </g>
+    </svg>
+    <ul class="cs-sn-stars">
+      {{#each npc.look.motives.stars as |s|}}
+      <li class="cs-sky-pl cs-sn-motive" data-motive="{{s.key}}" data-kind="{{s.kind}}" data-state="{{s.state}}" style="--x: {{s.x}}; --y: {{s.y}}; --halo: {{s.halo}}; --i: {{s.i}}">
+        <i class="cs-sn-st" aria-hidden="true"><i class="cs-sn-ecl"></i></i>
+        <b>{{s.label}}</b>
+        <span class="cs-sn-sw"><em>{{localize (concat "CHRONICLE.NpcSheet.Kind." s.kind)}}</em> · <span class="cs-sn-word">{{localize (concat "CHRONICLE.NpcSheet.State." s.state)}}</span></span>
+      </li>
+      {{/each}}
+    </ul>
+  </div>
+  {{else}}
+  {{#if npc.negotiation.has}}
+  <div class="cs-sky-const cs-sn-motives cs-sn-empty">
+    <p class="cs-sky-k cs-sn-const-k">{{localize "CHRONICLE.NpcSheet.Talk.Motives"}}</p>
+    <p class="cs-sky-none">{{localize (ifThen npc.isGM "CHRONICLE.NpcSheet.Talk.NoneGM" "CHRONICLE.NpcSheet.Talk.None")}}</p>
+  </div>
+  {{/if}}
+  {{/if}}
+
+  {{!-- Under the moon: the honest empty place for a stat block, and any
+  motivations or pitfalls past the seven the sky has room for. --}}
+  {{#if (or npc.look.motives.more.length (not npc.statBlock))}}
+  <div class="cs-sky-skills cs-sn-aside">
+    {{#unless npc.statBlock}}
+    <div class="cs-nostat">
+      <p class="cs-sky-k">{{localize "CHRONICLE.NpcSheet.NoStats.Title"}}</p>
+      <p class="cs-sn-nostat-t">{{localize (ifThen editable "CHRONICLE.NpcSheet.NoStats.Body" "CHRONICLE.NpcSheet.NoStats.BodyView")}}</p>
+      {{#if editable}}<button type="button" class="cs-quiet" data-action="toggleMode">{{localize "CHRONICLE.NpcSheet.NoStats.Edit"}}</button>{{/if}}
+    </div>
+    {{/unless}}
+    {{#if npc.look.motives.more.length}}
+    <ul class="cs-motives cs-sn-more">
+      {{#each npc.look.motives.more as |row|}}
+      <li class="cs-chip" data-state="{{row.state}}" data-kind="{{row.kind}}">
+        <span class="cs-chip-kind">{{localize (concat "CHRONICLE.NpcSheet.Kind." row.kind)}}</span>
+        <span class="cs-chip-name">{{row.label}}</span>
+        <span class="cs-chip-state">{{localize (concat "CHRONICLE.NpcSheet.State." row.state)}}</span>
+      </li>
+      {{/each}}
+    </ul>
+    {{/if}}
+  </div>
+  {{/if}}
+  {{else}}
+  {{> "modules/chronicle-sync/templates/npc-looks/edit-stats.hbs"}}
+  {{/if}}
+</section>

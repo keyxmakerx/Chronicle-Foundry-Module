@@ -1,0 +1,117 @@
+{{!-- Night sky monster boxes, above the tabs. Play: the Stamina ring round the
+moon (the winded point marked, the villain actions as the arcs inside it),
+the big thin numbers for Stamina, EV, Speed and Free strike, the small facts
+and conditions, the five characteristics as a constellation (each star
+rolls its characteristic), and the villain actions as three stars on an arc
+under the moon with the next one named. Malice is in the header. Inputs and
+buttons keep Draw Steel's names, data-source="false" and actions, so its
+handlers and active-effect locks work. Edit: Draw Steel's own stat editors. --}}
+<section class="cs-hero-stats stats cs-npc-stats cs-sky-stats">
+  {{#if isPlay}}
+  {{!-- Over the moon the header draws: same box, so the arcs sit on its rings. --}}
+  <svg class="cs-sky-ring cs-sn-ring" data-band="{{npc.chronicle.stamina.band}}" viewBox="0 0 340 340" aria-hidden="true" focusable="false">
+    <circle class="cs-sky-fill" cx="170" cy="170" r="146" pathLength="100" stroke-dasharray="{{npc.look.ring.fill}} 100" transform="rotate(-90 170 170)"/>
+    {{#if npc.look.ring.winded}}
+    <line class="cs-sn-wmark-under" x1="{{npc.look.ring.winded.x1}}" y1="{{npc.look.ring.winded.y1}}" x2="{{npc.look.ring.winded.x2}}" y2="{{npc.look.ring.winded.y2}}"/>
+    <line class="cs-sn-wmark" x1="{{npc.look.ring.winded.x1}}" y1="{{npc.look.ring.winded.y1}}" x2="{{npc.look.ring.winded.x2}}" y2="{{npc.look.ring.winded.y2}}"/>
+    {{/if}}
+    {{#each npc.look.ring.segs as |seg|}}
+    <circle class="cs-sky-seg{{#if seg.on}} on{{/if}}" cx="170" cy="170" r="132" pathLength="100" stroke-dasharray="{{seg.dash}}" stroke-dashoffset="{{seg.offset}}" transform="rotate(-90 170 170)"/>
+    {{/each}}
+  </svg>
+
+  <div class="cs-sky-nums" data-band="{{npc.chronicle.stamina.band}}">
+    {{> "modules/chronicle-sync/templates/npc-looks/sky/stamina-num.hbs"}}
+    <div class="cs-sky-num cs-sn-ev">
+      <b class="cs-sky-big">{{system.evLabel}}</b>
+      <span class="cs-sky-k">{{localize "DRAW_STEEL.Actor.base.EVLabel.Label"}}</span>
+    </div>
+    {{> "modules/chronicle-sync/templates/npc-looks/sky/combat-nums.hbs"}}
+
+    <p class="cs-sky-facts">
+      <span>{{systemFields.combat.fields.size.label}} {{system.combat.size}}</span>
+      <span{{#if combatTooltip}} data-tooltip-html="{{combatTooltip}}"{{/if}}>{{systemFields.combat.fields.stability.label}} {{system.combat.stability}}</span>
+      {{#if movement.list}}<span>{{movement.list}}</span>{{/if}}
+      <span>{{systemFields.damage.fields.immunities.label}}: {{#if damageIW.immunities}}{{{damageIW.immunities}}}{{else}}{{localize "COMMON.None"}}{{/if}}</span>
+      <span>{{systemFields.damage.fields.weaknesses.label}}: {{#if damageIW.weaknesses}}{{{damageIW.weaknesses}}}{{else}}{{localize "COMMON.None"}}{{/if}}</span>
+      {{#if npc.chronicle.conditions.length}}
+      <span class="cs-sn-cond">{{localize "CHRONICLE.HeroSheet.Conditions"}}: {{#each npc.chronicle.conditions as |c|}}{{#unless @first}}, {{/unless}}<b>{{c.name}}</b>{{/each}}</span>
+      {{/if}}
+    </p>
+  </div>
+
+  {{!-- The characteristics: the sky is drawn in SVG (lines and star shapes,
+  scaled from one 590 by 240 space); each star's name and number is a real
+  button on top of it, so it takes focus and rolls like Draw Steel's. --}}
+  <div class="cs-sky-const">
+    <svg class="cs-sky-lines" viewBox="0 0 590 240" aria-hidden="true" focusable="false">
+      <g class="cs-sky-links">
+        {{#each npc.look.constellation.links as |link|}}
+        <path class="cs-sky-link" style="--i: {{link.i}}" pathLength="1" d="{{link.d}}"/>
+        {{/each}}
+      </g>
+      {{#each characteristics as |chr key|}}
+      {{#with (lookup @root.npc.look.constellation.stars key) as |st|}}
+      <g class="cs-sky-star t{{st.tier}}" style="--i: {{@index}}" transform="translate({{st.x}} {{st.y}})">
+        <circle class="cs-sky-halo" r="{{st.halo}}"/>
+        <path class="cs-sky-core" d="{{st.path}}"/>
+      </g>
+      {{/with}}
+      {{/each}}
+    </svg>
+    {{#each characteristics as |chr key|}}
+    {{#with (lookup @root.npc.look.constellation.stars key) as |st|}}
+    <button
+      type="button"
+      class="cs-sky-pl t{{st.tier}}"
+      style="--x: {{st.x}}; --y: {{st.y}}; --halo: {{st.halo}}; --i: {{@index}}"
+      data-action="roll" data-roll-type="characteristic" data-characteristic="{{key}}"
+      data-tooltip-text="{{localize "DRAW_STEEL.ROLL.Prompt" prompt=chr.field.label}}"
+      {{disabled (not @root.owner)}}
+    >
+      <b>{{numberFormat chr.value sign=true}}</b>
+      <span>{{chr.field.label}}</span>
+    </button>
+    {{/with}}
+    {{/each}}
+  </div>
+
+  {{!-- The villain actions the Director has used this fight (they clear when
+  it ends): a star on an arc each, in order. A used one is burnt to ash, the
+  next one is bright, the rest are pale; each says which in words. --}}
+  {{#if npc.villain.total}}
+  <div class="cs-sky-skills cs-sn-vab">
+    <p class="cs-sky-k">
+      <span>{{localize "CHRONICLE.NpcSheet.Villain.Title"}}</span>
+      <span class="cs-sn-left">{{#if npc.villain.inFight}}{{localize "CHRONICLE.NpcSheet.Villain.Left" left=npc.villain.left total=npc.villain.total}}{{else}}{{localize "CHRONICLE.NpcSheet.Villain.NoFight"}}{{/if}}</span>
+    </p>
+    <ul class="cs-sn-va" style="--w: {{npc.look.villain.labelWidth}}px">
+      <svg class="cs-sn-va-arc" viewBox="0 0 340 84" aria-hidden="true" focusable="false"><path d="{{npc.look.villain.arc}}"/></svg>
+      {{#each npc.villain.marks as |m|}}
+      {{#with (lookup @root.npc.look.villain.places @index) as |pl|}}
+      <li class="cs-sn-vam {{m.state}}" style="--x: {{pl.x}}; --y: {{pl.y}}">
+        {{#if @root.npc.villain.canMark}}
+        <button type="button" class="cs-sn-vabtn" data-action="csVillain" data-item-id="{{m.id}}" aria-pressed="{{#if (eq m.state "used")}}true{{else}}false{{/if}}" aria-label="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}" data-tooltip-text="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}">
+          <i class="cs-sn-vastar" aria-hidden="true"></i>
+          <em><b>{{m.order}}</b>{{#if (eq m.state "used")}}{{localize "CHRONICLE.NpcSheet.Villain.Used"}}{{/if}}{{#if (eq m.state "next")}}{{localize "CHRONICLE.NpcSheet.Villain.Next"}}{{/if}}{{#if (eq m.state "unused")}}{{localize "CHRONICLE.NpcSheet.Villain.Waiting"}}{{/if}}</em>
+        </button>
+        {{else}}
+        <span class="cs-sn-vabtn" role="img" aria-label="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}" data-tooltip-text="{{localize (concat "CHRONICLE.NpcSheet.Villain.State." m.state) name=m.name order=m.order}}">
+          <i class="cs-sn-vastar" aria-hidden="true"></i>
+          <em><b>{{m.order}}</b>{{#if (eq m.state "used")}}{{localize "CHRONICLE.NpcSheet.Villain.Used"}}{{/if}}{{#if (eq m.state "next")}}{{localize "CHRONICLE.NpcSheet.Villain.Next"}}{{/if}}{{#if (eq m.state "unused")}}{{localize "CHRONICLE.NpcSheet.Villain.Waiting"}}{{/if}}</em>
+        </span>
+        {{/if}}
+      </li>
+      {{/with}}
+      {{/each}}
+    </ul>
+    {{#if npc.look.villain.next}}
+    <p class="cs-sky-k cs-sn-nk">{{localize "CHRONICLE.NpcSheet.Villain.NextAction"}}</p>
+    <p class="cs-sn-next"><b>{{npc.look.villain.next.name}}</b></p>
+    {{/if}}
+  </div>
+  {{/if}}
+  {{else}}
+  {{> "modules/chronicle-sync/templates/npc-looks/edit-stats.hbs"}}
+  {{/if}}
+</section>

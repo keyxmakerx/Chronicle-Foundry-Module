@@ -1,0 +1,29 @@
+{{!-- Movement, combat and Free strike as dark plates with a cut corner.
+Free strike is Draw Steel's button for whoever can edit the sheet (the
+Director, or the player who runs a retainer) and plain text for anyone else,
+as on its own sheet. Immunities and weaknesses are Draw Steel's own HTML. --}}
+<div class="cs-steel-plate"{{#if movement.list}} data-tooltip-text="{{movement.list}}"{{/if}}>
+  <p class="cs-steel-k">{{systemFields.movement.label}}</p>
+  <p class="cs-steel-big">{{system.movement.value}} <small>{{systemFields.movement.fields.value.label}}</small></p>
+  <p class="cs-steel-text">{{#if movement.list}}<span>{{movement.list}}</span>{{/if}}</p>
+</div>
+<div class="cs-steel-plate">
+  <p class="cs-steel-k">{{systemFields.combat.label}}</p>
+  <p class="cs-steel-big">{{system.combat.size}} <small>{{systemFields.combat.fields.size.label}}</small></p>
+  <p class="cs-steel-text">
+    <span{{#if combatTooltip}} data-tooltip-html="{{combatTooltip}}"{{/if}}>{{systemFields.combat.fields.stability.label}} {{system.combat.stability}}</span>
+    <span>{{systemFields.damage.fields.immunities.label}}: {{#if damageIW.immunities}}{{{damageIW.immunities}}}{{else}}{{localize "COMMON.None"}}{{/if}}</span>
+    <span>{{systemFields.damage.fields.weaknesses.label}}: {{#if damageIW.weaknesses}}{{{damageIW.weaknesses}}}{{else}}{{localize "COMMON.None"}}{{/if}}</span>
+  </p>
+</div>
+{{#if editable}}
+<button type="button" class="cs-steel-plate cs-npc-strike" data-action="freeStrike" data-tooltip="CHRONICLE.NpcSheet.FreeStrikeTip">
+  <span class="cs-steel-k">{{systemFields.monster.fields.freeStrike.label}}</span>
+  <span class="cs-steel-big">{{system.monster.freeStrike}}</span>
+</button>
+{{else}}
+<div class="cs-steel-plate cs-npc-strike">
+  <p class="cs-steel-k">{{systemFields.monster.fields.freeStrike.label}}</p>
+  <p class="cs-steel-big">{{system.monster.freeStrike}}</p>
+</div>
+{{/if}}

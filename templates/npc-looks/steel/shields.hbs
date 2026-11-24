@@ -1,0 +1,18 @@
+{{!-- The five characteristics as steel-rimmed shields. Each rolls through
+Draw Steel, so it is Draw Steel's own roll button, disabled for anyone who
+doesn't own the actor. --}}
+<div class="cs-steel-shields">
+  {{#each characteristics as |chr key|}}
+  <button
+    type="button"
+    class="cs-steel-sh"
+    style="--i: {{@index}}"
+    data-action="roll" data-roll-type="characteristic" data-characteristic="{{key}}"
+    data-tooltip-text="{{localize "DRAW_STEEL.ROLL.Prompt" prompt=chr.field.label}}"
+    {{disabled (not @root.owner)}}
+  >
+    <b>{{numberFormat chr.value sign=true}}</b>
+    <span>{{chr.field.label}}</span>
+  </button>
+  {{/each}}
+</div>

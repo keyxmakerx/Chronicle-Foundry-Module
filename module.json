@@ -41,6 +41,11 @@
     "styles/hero-look-gilded.css",
     "styles/hero-look-sky.css",
     "styles/npc-looks.css",
+    "styles/npc-look-hall.css",
+    "styles/npc-look-steel.css",
+    "styles/npc-look-glass.css",
+    "styles/npc-look-gilded.css",
+    "styles/npc-look-sky.css",
     "styles/table-view.css"
   ],
   "languages": [

@@ -1,0 +1,82 @@
+{{!-- The portrait hall's NPC boxes, beside the picture and above the tabs.
+Play: the negotiation as the Interest ring with Patience as the inner arcs,
+Patience and Interest as rows of diamonds, what the NPC would answer now, and
+the motivations and pitfalls as plaques; then the stat block (Stamina, the
+characteristics, the combat line), or an honest empty place for one, never
+made-up numbers. Edit: Draw Steel's own stat editors. --}}
+<section class="cs-hero-stats cs-hall-stats stats cs-npc-stats">
+  {{#if isPlay}}
+  <div class="cs-hall-gauges">
+    {{#if npc.negotiation.has}}
+    <div class="cs-hall-ring cs-hall-interest" data-band="{{npc.look.interest.band}}">
+      <svg class="cs-hall-ring-art" viewBox="0 0 200 200" aria-hidden="true" focusable="false">
+        <circle class="cs-hall-ticks" cx="100" cy="100" r="95" pathLength="42"/>
+        <circle class="cs-hall-track" cx="100" cy="100" r="82"/>
+        <circle class="cs-hall-fill" cx="100" cy="100" r="82" pathLength="100" stroke-dasharray="{{npc.look.interest.fill}} 100" transform="rotate(-90 100 100)"/>
+        {{#each npc.look.patienceArcs as |seg|}}
+        <circle class="cs-hall-seg{{#if seg.on}} on{{/if}}" cx="100" cy="100" r="65" pathLength="100" stroke-dasharray="{{seg.dash}}" stroke-dashoffset="{{seg.offset}}" transform="rotate(-90 100 100)"/>
+        {{/each}}
+      </svg>
+      <div class="cs-hall-rv">
+        <span class="cs-hall-big">{{npc.negotiation.interestText}}</span>
+        <span class="cs-hall-of">{{localize "CHRONICLE.NpcSheet.Look.OfInterest"}}</span>
+        {{#if npc.negotiation.answer}}<strong class="cs-hall-state">{{localize npc.negotiation.answer}}</strong>{{/if}}
+      </div>
+      <div class="cs-hall-ring-foot">
+        <span class="cs-hall-wat">{{localize "CHRONICLE.NpcSheet.Look.InnerPatience"}}</span>
+      </div>
+    </div>
+
+    <div class="cs-hall-col">
+      <div class="cs-hall-res cs-hall-pat">
+        <span class="cs-hall-k">{{localize "CHRONICLE.NpcSheet.Patience"}}</span>
+        <span class="cs-hall-pips" role="img" aria-label="{{localize "CHRONICLE.NpcSheet.OfFive" n=npc.negotiation.patienceText}}">{{#each npc.negotiation.patiencePips as |on|}}<i class="{{#if on}}on{{/if}}"></i>{{/each}}</span>
+        <span class="cs-hall-n"><b>{{npc.negotiation.patienceText}}</b><small>/5</small></span>
+      </div>
+      <div class="cs-hall-res cs-hall-intr">
+        <span class="cs-hall-k">{{localize "CHRONICLE.NpcSheet.Interest"}}</span>
+        <span class="cs-hall-pips" role="img" aria-label="{{localize "CHRONICLE.NpcSheet.OfFive" n=npc.negotiation.interestText}}">{{#each npc.negotiation.interestPips as |on|}}<i class="{{#if on}}on{{/if}}"></i>{{/each}}</span>
+        <span class="cs-hall-n"><b>{{npc.negotiation.interestText}}</b><small>/5</small></span>
+      </div>
+      {{#if npc.negotiation.answer}}
+      <p class="cs-hall-line cs-hall-answer">{{localize "CHRONICLE.NpcSheet.IfAnswered"}} <b>{{localize npc.negotiation.answer}}</b></p>
+      {{/if}}
+      {{#if npc.negotiation.over}}<p class="cs-hall-line cs-hall-over">{{localize "CHRONICLE.NpcSheet.Over"}}</p>{{/if}}
+      <p class="cs-hall-line cs-hall-dim"><span>{{localize (concat "CHRONICLE.NpcSheet.Seen." npc.negotiation.source (ifThen npc.negotiation.shown "Shown" "Hidden"))}}</span></p>
+    </div>
+    {{else}}
+    <div class="cs-hall-col cs-hall-noneg">
+      <p class="cs-hall-k">{{localize "CHRONICLE.NpcSheet.Negotiation"}}</p>
+      <p class="cs-hall-answer">{{localize "CHRONICLE.NpcSheet.NoNegotiation"}}</p>
+      {{#if npc.pageUrl}}<button type="button" class="cs-quiet cs-hall-link" data-action="csOpenPage">{{localize "CHRONICLE.NpcSheet.OpenPage"}}</button>{{/if}}
+    </div>
+    {{/if}}
+  </div>
+
+  {{#if npc.negotiation.rows.length}}
+  <ul class="cs-hall-plaques cs-hall-motives">
+    {{#each npc.negotiation.rows as |row|}}
+    <li class="cs-hall-pl cs-hall-motive" data-kind="{{row.kind}}" data-state="{{row.state}}" data-motive="{{row.key}}" style="--i: {{@index}}; --len: {{row.label.length}}">
+      <i>{{localize (concat "CHRONICLE.NpcSheet.Kind." row.kind)}}</i>
+      <b>{{row.label}}</b>
+      <span class="cs-hall-word">{{localize (concat "CHRONICLE.NpcSheet.State." row.state)}}</span>
+    </li>
+    {{/each}}
+  </ul>
+  {{/if}}
+
+  {{#if npc.statBlock}}
+  {{> "modules/chronicle-sync/templates/npc-looks/hall/stamina-row.hbs"}}
+  {{> "modules/chronicle-sync/templates/npc-looks/hall/numbers-row.hbs"}}
+  <div class="cs-hall-statline">{{> "modules/chronicle-sync/templates/npc-looks/hall/combat-line.hbs"}}</div>
+  {{else}}
+  <div class="cs-nostat">
+    <b>{{localize "CHRONICLE.NpcSheet.NoStats.Title"}}</b>
+    <p>{{localize (ifThen editable "CHRONICLE.NpcSheet.NoStats.Body" "CHRONICLE.NpcSheet.NoStats.BodyView")}}</p>
+    {{#if editable}}<button type="button" class="cs-quiet" data-action="toggleMode">{{localize "CHRONICLE.NpcSheet.NoStats.Edit"}}</button>{{/if}}
+  </div>
+  {{/if}}
+  {{else}}
+  {{> "modules/chronicle-sync/templates/npc-looks/edit-stats.hbs"}}
+  {{/if}}
+</section>

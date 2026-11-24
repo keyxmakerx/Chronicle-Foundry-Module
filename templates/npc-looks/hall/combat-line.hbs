@@ -1,0 +1,19 @@
+{{!-- The combat line under the gauges: Speed, Stability, Size and Free strike,
+then how it moves and what it resists. Free strike is Draw Steel's button for
+whoever can edit the sheet (the Director, or the player who runs a retainer)
+and plain text for anyone else. --}}
+<p class="cs-hall-line">
+  <span{{#if movement.list}} data-tooltip-text="{{movement.list}}"{{/if}}>{{systemFields.movement.fields.value.label}} <b>{{system.movement.value}}</b></span>
+  <span{{#if combatTooltip}} data-tooltip-html="{{combatTooltip}}"{{/if}}>{{systemFields.combat.fields.stability.label}} <b>{{system.combat.stability}}</b></span>
+  <span>{{systemFields.combat.fields.size.label}} <b>{{system.combat.size}}</b></span>
+  {{#if editable}}
+  <button type="button" class="cs-hall-fs" data-action="freeStrike" data-tooltip="CHRONICLE.NpcSheet.FreeStrikeTip">{{systemFields.monster.fields.freeStrike.label}} <b>{{system.monster.freeStrike}}</b></button>
+  {{else}}
+  <span>{{systemFields.monster.fields.freeStrike.label}} <b>{{system.monster.freeStrike}}</b></span>
+  {{/if}}
+</p>
+<p class="cs-hall-line cs-hall-dim">
+  {{#if movement.list}}<span>{{movement.list}}</span>{{/if}}
+  <span>{{systemFields.damage.fields.immunities.label}}: {{#if damageIW.immunities}}{{{damageIW.immunities}}}{{else}}{{localize "COMMON.None"}}{{/if}}</span>
+  <span>{{systemFields.damage.fields.weaknesses.label}}: {{#if damageIW.weaknesses}}{{{damageIW.weaknesses}}}{{else}}{{localize "COMMON.None"}}{{/if}}</span>
+</p>
