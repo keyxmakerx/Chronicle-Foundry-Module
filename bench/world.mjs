@@ -24,6 +24,13 @@ const traffic = { inflight: 0, last: Date.now(), requests: [] };
 
 const realFetch = globalThis.fetch;
 globalThis.fetch = async (url, init = {}) => {
+  // A site-root path is Foundry serving one of the open world's files.
+  if (typeof url === 'string' && url.startsWith('/')) {
+    const file = traffic.files?.get(url.slice(1));
+    return file?.blob
+      ? new Response(file.blob, { status: 200, headers: { 'content-type': file.type } })
+      : new Response('', { status: 404 });
+  }
   const isModule = String(init?.headers?.Authorization || init?.headers?.authorization || '').includes(traffic.moduleKey || '\u0000');
   if (!isModule) return realFetch(url, init);
   // "Chronicle can't be reached": the request never leaves, as on a dropped network.
@@ -101,7 +108,7 @@ export const benchAdapter = {
   },
   // The item types those fields read, so adding, editing or removing one in
   // Foundry pushes it as the generic adapter does.
-  itemFieldTypes: new Set(['ancestry', 'kit']),
+  itemFieldTypes: new Set(['ancestry', 'kit', 'subclass']),
   toChronicleFieldsChanged(actor, change) {
     const out = change?.system?.hp === undefined ? {} : { hp: change.system.hp };
     const items = change?.[ITEMS_CHANGED];
@@ -111,6 +118,9 @@ export const benchAdapter = {
         if (def.key in got) out[def.key] = got[def.key];
         else if (items[def.key] === 'deleted') out[def.key] = '';
       }
+      // The subclass is Foundry-led, so it is pushed but never swapped.
+      const sub = benchAdapter.fieldDefs.find((d) => d.key === 'subclass');
+      Object.assign(out, buildChronicleFields(actor, [sub]));
     }
     return Object.keys(out).length ? out : null;
   },
@@ -186,6 +196,7 @@ export async function openWorld(world, { modules = ['journals'], itemFields = nu
     foundry: globalThis.foundry, ChatMessage: globalThis.ChatMessage, fromUuid: globalThis.fromUuid, TextEditor: globalThis.TextEditor,
   });
   traffic.moduleKey = world.seed.moduleKey;
+  traffic.files = world.files;
   if (!world.settingsRegistered) {
     m.registerSettings();
     world.settingsRegistered = true;
