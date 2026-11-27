@@ -11,11 +11,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ENTRY_ABILITY_FLAG, ENTRY_ABILITY_HASH, entryAbilities, rollCharacteristics, heroTierText,
-  heroAbilityItem, planEntryAbilities,
+  heroAbilityItem, planEntryAbilities, entryListItems,
 } from '../scripts/_entry-abilities.mjs';
 import { fingerprint } from '../scripts/_creature-abilities.mjs';
 
 const SCOPE = 'chronicle-sync';
+
+// Foundry's cleaner, standing in: drops <script>, keeps the rest.
+globalThis.foundry = { applications: { ux: { TextEditor: { cleanHTML: (h) => h.replace(/<script[\s\S]*?<\/script>/gi, '') } } } };
 
 // The kit example from Chronicle's AI guide for campaign entries.
 const BURNING_SHOT = {
@@ -140,4 +143,66 @@ test('the GM\'s own ability under the same name wins; a creature ability never c
   const plan = planEntryAbilities({ items: [kitItem('Ember Archer'), creature], fields: FIELDS, entriesByField: { kit: [KIT] }, known: KNOWN });
   assert.equal(plan.create.length, 1);
   assert.deepEqual(plan.remove, []);
+});
+
+// A campaign's own ancestry: its signature traits become feature items.
+const ANCESTRY = {
+  name: 'Dryad',
+  properties: {
+    size: '1S',
+    signature_traits: [
+      { name: 'Barkskin', description: 'Your **skin** is bark.<script>x()</script>' },
+      { name: 'Rooted', description: 'You can\'t be {@movement pushed|pushed} while standing on soil.' },
+      { description: 'nameless' },
+    ],
+  },
+};
+const ANC_FIELDS = [{ fieldKey: 'ancestry', itemType: 'ancestry' }];
+const ITEMS_MAP = { ancestry: { signature_traits: { type: 'feature' } } };
+const WITH_TYPES = { ...KNOWN, itemTypes: ['ability', 'ancestry', 'feature', 'kit'] };
+const ancestryItem = (made = true) => ({ id: 'anc', name: 'Dryad', type: 'ancestry', flags: made ? { [SCOPE]: { chronicleMade: true } } : {} });
+const traitPlan = (items, extra = {}) => planEntryAbilities({
+  items, fields: ANC_FIELDS, entriesByField: { ancestry: [ANCESTRY] }, known: WITH_TYPES, entryItemsByField: ITEMS_MAP, ...extra,
+});
+
+test('a list property the system maps gives one item per named object', () => {
+  const found = entryListItems(ANCESTRY, ITEMS_MAP.ancestry, WITH_TYPES.itemTypes);
+  assert.deepEqual(found.map((f) => [f.prop, f.type, f.item.name]), [['signature_traits', 'feature', 'Barkskin'], ['signature_traits', 'feature', 'Rooted']]);
+  assert.deepEqual(entryListItems(ANCESTRY, { signature_traits: { type: 'spell' } }, WITH_TYPES.itemTypes), [], 'a type the system lacks makes nothing');
+  assert.deepEqual(entryListItems(ANCESTRY, ITEMS_MAP.ancestry, null), [], 'unknown types make nothing');
+  assert.deepEqual(entryListItems(ANCESTRY, { size: { type: 'feature' } }, WITH_TYPES.itemTypes), [], 'only a list');
+});
+
+test('a made ancestry gives its signature traits as features, cleaned and flagged', () => {
+  const plan = traitPlan([ancestryItem()]);
+  assert.deepEqual(plan.remove, []);
+  assert.deepEqual(plan.create.map((c) => [c.type, c.name]), [['feature', 'Barkskin'], ['feature', 'Rooted']]);
+  const [bark, rooted] = plan.create;
+  assert.equal(bark.system.description.value, '<p>Your <strong>skin</strong> is bark.&lt;script&gt;x()&lt;/script&gt;</p>', 'Markdown, with raw markup shown as text');
+  assert.match(rooted.system.description.value, /be pushed while/, 'rule markers read as words');
+  assert.deepEqual(bark.flags[SCOPE], { chronicleMade: true, [ENTRY_ABILITY_FLAG]: 'ancestry:dryad:signature_traits:barkskin', [ENTRY_ABILITY_HASH]: fingerprint(ANCESTRY.properties.signature_traits[0]) });
+});
+
+test('traits follow the entry: unchanged left alone, edited rebuilt, dropped or swapped away removed', () => {
+  const made = (name, hash) => ({ id: `t-${name}`, name, type: 'feature', flags: { [SCOPE]: { chronicleMade: true, [ENTRY_ABILITY_FLAG]: `ancestry:dryad:signature_traits:${name.toLowerCase()}`, [ENTRY_ABILITY_HASH]: hash } } });
+  const bark = made('Barkskin', fingerprint(ANCESTRY.properties.signature_traits[0]));
+  const rooted = made('Rooted', 'old');
+  const plan = traitPlan([ancestryItem(), bark, rooted]);
+  assert.deepEqual(plan.remove, ['t-Rooted']);
+  assert.deepEqual(plan.create.map((c) => c.name), ['Rooted']);
+  const dropped = traitPlan([ancestryItem(), bark], { entriesByField: { ancestry: [{ ...ANCESTRY, properties: { signature_traits: [] } }] } });
+  assert.deepEqual(dropped, { create: [], remove: ['t-Barkskin'] });
+  assert.deepEqual(traitPlan([ancestryItem(false), bark]), { create: [], remove: ['t-Barkskin'] }, 'a swapped-in printed ancestry takes them away');
+});
+
+test('the GM\'s own feature of that name wins; their ability of that name does not count', () => {
+  const gmFeature = { id: 'gm', name: 'barkskin', type: 'feature', flags: {} };
+  assert.deepEqual(traitPlan([ancestryItem(), gmFeature]).create.map((c) => c.name), ['Rooted']);
+  const gmAbility = { id: 'gm', name: 'Barkskin', type: 'ability', flags: {} };
+  assert.deepEqual(traitPlan([ancestryItem(), gmAbility]).create.map((c) => c.name), ['Barkskin', 'Rooted']);
+});
+
+test('a trait whose text still holds GM-only content is not made', () => {
+  const secret = { ...ANCESTRY, properties: { signature_traits: [{ name: 'Hidden', description: '<span data-secret>x</span>' }] } };
+  assert.deepEqual(traitPlan([ancestryItem()], { entriesByField: { ancestry: [secret] } }).create, []);
 });
