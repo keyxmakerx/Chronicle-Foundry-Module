@@ -1094,7 +1094,7 @@ export class JournalSync {
     const current = journal.folder ?? null;
     if (current && !this._isSyncFolder(current)) return;
     const target = await this._getOrCreateEntityFolder(entity);
-    if (target && current?.id !== target.id) await journal.update({ folder: target.id }, syncOptions());
+    if (target && current?.id !== target.id && this._holdsLink(journal, entity.id)) await journal.update({ folder: target.id }, syncOptions());
   }
 
   /**
@@ -1695,6 +1695,9 @@ export class JournalSync {
         body.expected_updated_at = chronicleUpdatedAt;
       }
 
+      // The text was gathered across awaits; a player's link change in that
+      // time would aim it at the page they chose.
+      if (!this._holdsLink(journal, entityId)) return;
       let result;
       try {
         result = await this._api.put(`/entities/${entityId}`, body);
@@ -1710,7 +1713,7 @@ export class JournalSync {
       this._api.clearRetry?.('PUT', `/entities/${entityId}`);
 
       // Push ownership changes as Chronicle permission updates.
-      if (changed?.ownership) {
+      if (changed?.ownership && this._holdsLink(journal, entityId)) {
         await this._pushPermissions(entityId, journal.ownership, isPrivate, journal.name, journal);
       }
 

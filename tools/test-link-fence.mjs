@@ -97,3 +97,32 @@ test('lookups by link that sync writes through, or that decide what a player may
   assert.match(read('actor-sync.mjs'), /this\._fence = linkFence;/);
   assert.match(read('link-record.mjs'), /if \(after\) linkFence\.linkedByGM\(d\.id\);/);
 });
+
+test('actor pushes and the inventory reconcile ask the fence right before each send or write', async () => {
+  const { readFileSync } = await import('node:fs');
+  const read = (f) => readFileSync(new URL(`../scripts/${f}`, import.meta.url), 'utf8');
+  const actor = read('actor-sync.mjs');
+  // Each send to Chronicle from an actor is directly preceded by the check.
+  for (const send of [
+    "await this._api.post(`/entities/${entityId}/reveal`",
+    "const result = await this._api.put(`/entities/${entityId}`, nameBody)",
+    "const forced = await this._api.put(`/entities/${entityId}`, nameBody)",
+    "if (role === 'img') await this._api.put(`/entities/${entityId}/image`",
+  ]) {
+    const at = actor.indexOf(send);
+    assert.ok(at > 0, send);
+    const before = actor.slice(actor.lastIndexOf('\n', actor.lastIndexOf('\n', at) - 1), at);
+    assert.match(before, /if \(!this\._aimsAt\(actor, entityId\)\) return/, send);
+  }
+  const merged = actor.slice(actor.indexOf('async _putFieldsMerged'), actor.indexOf('return this._api.put(`/entities/${entityId}/fields`'));
+  assert.match(merged, /if \(actor && !this\._aimsAt\(actor, entityId\)\) return null;/);
+  assert.equal((actor.match(/this\._putFieldsMerged\([^)]*\bactor\)/g) || []).length, 3, 'every caller names the actor');
+  const items = read('item-sync.mjs');
+  const rec = items.slice(items.indexOf('async _reconcileNow'), items.indexOf('\n  }\n', items.indexOf('async _reconcileNow')));
+  for (const w of ['.update({ [`flags.', '.update(change', "createEmbeddedDocuments('Item'", 'const item = actor.items.get(id);', "deleteEmbeddedDocuments('Item'"]) {
+    const at = rec.indexOf(w);
+    assert.ok(at > 0, w);
+    const check = Math.max(rec.lastIndexOf('if (!holds()) return;', at), rec.lastIndexOf('&& holds()', at));
+    assert.ok(check > 0 && !/await /.test(rec.slice(check, rec.lastIndexOf('\n', at)).replace(/^[^\n]*\n/, '')), `${w} is checked with no await before it`);
+  }
+});

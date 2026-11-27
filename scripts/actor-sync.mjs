@@ -1869,6 +1869,7 @@ export class ActorSync {
    */
   async _pushHidden(actor, entityId, isHidden) {
     try {
+      if (!this._aimsAt(actor, entityId)) return;
       await this._api.post(`/entities/${entityId}/reveal`, { is_private: isHidden });
       console.debug(`Chronicle: ${isHidden ? 'Hid' : 'Revealed'} page for actor "${actor.name}" (Foundry → Chronicle)`);
     } catch (err) {
@@ -1921,7 +1922,7 @@ export class ActorSync {
       const acting = actingMemberOf(players, (id) => memberOf(getUserMappings(), id));
       let wrote = false;
       if (fields && Object.keys(fields).length > 0) {
-        const answer = await this._putFieldsMerged(entityId, fields, acting);
+        const answer = await this._putFieldsMerged(entityId, fields, acting, actor);
         this._tellHeld(actor, heldKeysOf(answer));
         wrote = true;
       }
@@ -1972,9 +1973,10 @@ export class ActorSync {
             continue;
           }
           const acting = actingUserId ? { actingUserId } : {};
+          if (!this._aimsAt(actor, entityId)) return wrote;
           if (role === 'img') await this._api.put(`/entities/${entityId}/image`, { image_path: id, ...acting });
           else {
-            const answer = await this._putFieldsMerged(entityId, { [TOKEN_FIELD]: id }, actingUserId);
+            const answer = await this._putFieldsMerged(entityId, { [TOKEN_FIELD]: id }, actingUserId, actor);
             // A token Chronicle held back is not sent; the next change tries again.
             if (heldKeysOf(answer).some((h) => h.key === TOKEN_FIELD)) continue;
           }
@@ -2033,6 +2035,17 @@ export class ActorSync {
   }
 
   /**
+   * Whether a push from this actor may go to page `entityId` now: it is still
+   * linked there and its link is not being undone. Asked right before each
+   * send, since a player's link change can land during any await before it
+   * (_link-fence.mjs).
+   * @private
+   */
+  _aimsAt(actor, entityId) {
+    return this._fence.holds(actor.id, actor.getFlag(FLAG_SCOPE, 'entityId'), entityId);
+  }
+
+  /**
    * Write some fields without losing the rest. Older Chronicle servers
    * replace the whole field set on this PUT, so the current set is read and
    * the changes laid over it; newer ones merge, and sending the merged set
@@ -2041,11 +2054,14 @@ export class ActorSync {
    * @param {string} entityId
    * @param {object} fields
    * @param {string|null} [actingUserId] - Chronicle member a player's change is for.
+   * @param {Actor|null} [actor] - the actor the fields come from; nothing is
+   *   sent unless it is still linked to `entityId` and not fenced.
    * @returns {Promise<any>} Chronicle's answer, which names any `held` keys.
    * @private
    */
-  async _putFieldsMerged(entityId, fields, actingUserId = null) {
+  async _putFieldsMerged(entityId, fields, actingUserId = null, actor = null) {
     const current = (await this._api.get(`/entities/${entityId}`))?.fields_data;
+    if (actor && !this._aimsAt(actor, entityId)) return null;
     const merged = current && typeof current === 'object' && !Array.isArray(current)
       ? { ...current, ...fields }
       : fields;
@@ -2089,6 +2105,7 @@ export class ActorSync {
     }
 
     try {
+      if (!this._aimsAt(actor, entityId)) return false;
       const result = await this._api.put(`/entities/${entityId}`, nameBody);
       if (result?.updated_at) {
         await this._setActorFlag(actor, 'chronicleUpdatedAt', result.updated_at);
@@ -2113,6 +2130,7 @@ export class ActorSync {
       }
       // Force push.
       delete nameBody.expected_updated_at;
+      if (!this._aimsAt(actor, entityId)) return false;
       const forced = await this._api.put(`/entities/${entityId}`, nameBody);
       if (forced?.updated_at) {
         await this._setActorFlag(actor, 'chronicleUpdatedAt', forced.updated_at);
@@ -2609,7 +2627,7 @@ export class ActorSync {
       await this._setActorFlag(actor, 'lastSync', new Date().toISOString());
       return true;
     }
-    await this._putFieldsMerged(entityId, this._withoutLayered(actor, this._adapter.toChronicleFields(actor)));
+    await this._putFieldsMerged(entityId, this._withoutLayered(actor, this._adapter.toChronicleFields(actor)), null, actor);
     if (await this._pushPictures(actor, entityId)) await this._refreshChronicleVersion(actor, entityId);
     await this._setActorFlag(actor, 'lastSync', new Date().toISOString());
     console.debug(`Chronicle: Re-pushed actor "${actor.name}" → entity ${entityId}`);
