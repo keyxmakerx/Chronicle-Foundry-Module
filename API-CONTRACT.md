@@ -488,7 +488,7 @@ warn row in the Health pane, never a reason to load code from Chronicle. A
 Chronicle without the route answers 404: no list, no notice, and the entry
 is dropped from the error log.
 
-Re-verify by: 2027-01-27 (Chronicle `internal/plugins/foundry_vtt/vendored_assets.go` and its syncapi route; the route had not landed when this was written)
+Re-verify by: 2027-01-27 (Chronicle `internal/plugins/foundry_vtt/vendored_assets.go` and its syncapi route; not on Chronicle main when this was written)
 
 ---
 

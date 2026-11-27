@@ -7,7 +7,7 @@
 export const VENDOR_MANIFEST = Object.freeze({
   "cutscene_engine.js": { engine: "cutscenes", source: "static/js/cutscene_engine.js", digest: "69533c967f80" },
   "gl_shared.js": { engine: "sky", source: "static/js/widgets/gl_shared.js", digest: "58a97f609643" },
-  "shop_room.js": { engine: "shop", source: "static/js/widgets/shop_room.js", digest: "d0bcb3b739f2" },
+  "shop_room.js": { engine: "shop", source: "static/js/widgets/shop_room.js", digest: "3d40b9a9065f" },
   "shop_room_counter.js": { engine: "shop", source: "static/js/widgets/shop_room_counter.js", digest: "e958e022d71a" },
   "shop_room_icons.js": { engine: "shop", source: "static/js/widgets/shop_room_icons.js", digest: "c20c1dbc2311" },
   "shop_room_keeper.js": { engine: "shop", source: "static/js/widgets/shop_room_keeper.js", digest: "88519f50100b" },
@@ -25,7 +25,7 @@ export const VENDOR_MANIFEST = Object.freeze({
   "sky_world.js": { engine: "sky", source: "static/js/widgets/sky_world.js", digest: "ebf8cd9d5570" },
   "crafting_lib.js": { engine: "crafting", source: "internal/plugins/crafting/static/js/crafting_lib.js", digest: "7c89a0bb6e26" },
   "crafting_tray.js": { engine: "crafting", source: "internal/plugins/crafting/static/js/crafting_tray.js", digest: "f54f053a1260" },
-  "crafting_block.js": { engine: "crafting", source: "internal/plugins/crafting/static/js/crafting_block.js", digest: "7bcf8b6f6057" },
+  "crafting_block.js": { engine: "crafting", source: "internal/plugins/crafting/static/js/crafting_block.js", digest: "a8cbf348587f" },
   "crafting.css": { engine: "crafting", source: "internal/plugins/crafting/static/css/crafting.css", digest: "5923751e2ffd" },
   "spoils.css": { engine: "crafting", source: "internal/plugins/crafting/static/css/spoils.css", digest: "eed01b5e6662" },
 });
