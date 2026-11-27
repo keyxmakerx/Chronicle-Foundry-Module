@@ -234,6 +234,7 @@ export function buildPlayerSnapshot({
   const filtered = dateInfo.audience === 'players';
   const w = dateInfo.current_weather;
   const keep = eventsConfirmed && typeof isPublic === 'function' ? events.filter((e) => isPublic(e)) : [];
+  const seenMoons = filtered ? skyMoons(calendar.moons) : [];
   return {
     v: SNAPSHOT_VERSION,
     hidden: false,
@@ -264,8 +265,8 @@ export function buildPlayerSnapshot({
         name: str(m.moon_name, 80), phase_name: str(m.phase_name, 80), phase_icon: str(m.phase_icon, 40),
       }))
       : [],
-    skyMoons: filtered ? skyMoons(calendar.moons) : [],
-    events: keep.slice(0, SNAPSHOT_EVENT_LIMIT).map(snapshotEvent),
+    skyMoons: seenMoons,
+    events: keep.slice(0, SNAPSHOT_EVENT_LIMIT).map(snapshotEvent).map((e) => onlySeenMoons(e, seenMoons)),
     dayWeather: dayWeatherConfirmed ? pastDayWeather(dayWeather, dateInfo) : [],
   };
 }
@@ -333,6 +334,19 @@ export function snapshotEvent(e) {
     color: safeColor(e.color),
     sky: skyNight(e.payload),
   };
+}
+
+/**
+ * A public event can name a moon hidden from players; its id alone would
+ * tell them the moon exists. Keep only the moons this snapshot carries, and
+ * drop a sky that named moons and kept none (an eclipse would otherwise fall
+ * back to the first moon players can see).
+ */
+export function onlySeenMoons(e, seen) {
+  if (!e.sky || !e.sky.moons.length) return e;
+  const ids = new Set(seen.map((m) => m.id));
+  const moons = e.sky.moons.filter((id) => ids.has(id));
+  return { ...e, sky: moons.length ? { ...e.sky, moons } : null };
 }
 
 /** The sky event kinds Chronicle's sky draws: the moon nights, then the rest. */

@@ -229,6 +229,26 @@ test('an event keeps only its moon night for the sky', () => {
   assert.equal('payload' in e, false);
 });
 
+test('a public sky event never carries the id of a moon hidden from players', () => {
+  const moons = [{ id: 1, name: 'Selûne', cycle_days: 30 }, { id: 2, name: 'Hidden', cycle_days: 9, hidden_from_players: true }];
+  const mk = (id, payload) => ({ id, name: 'E' + id, year: 1, month: 1, day: 1, payload: JSON.stringify(payload) });
+  const s = VM.buildPlayerSnapshot({
+    calendar: { ...cal, moons },
+    dateInfo: { year: 1, month: 1, day: 1, audience: 'players' },
+    events: [
+      mk(1, { type: 'eclipse-solar', moons: [2] }),
+      mk(2, { type: 'conjunction', moons: [1, 2] }),
+      mk(3, { type: 'comet' }),
+    ],
+    eventsConfirmed: true,
+    isPublic,
+  });
+  assert.equal(s.events[0].sky, null, 'an eclipse of only the hidden moon is dropped, not moved to a seen one');
+  assert.deepEqual(s.events[1].sky.moons, [1]);
+  assert.deepEqual(s.events[2].sky, { type: 'comet', moons: [] });
+  assert.ok(!JSON.stringify(s).includes('"moons":[2') && !JSON.stringify(s.events).includes(',2]'), 'the hidden id is nowhere in the events');
+});
+
 test('an event keeps the sky event fields the sky reads, by name, and its end date', () => {
   const sky = VM.skyNight(JSON.stringify({
     type: 'comet', direction: { compass: 'SW', altitude: 'mid', secret: 1 }, color: '#aabbcc', colors: ['#112233', 'red', '#445566', '#778899'],
