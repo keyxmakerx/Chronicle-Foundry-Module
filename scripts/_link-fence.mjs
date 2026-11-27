@@ -9,12 +9,15 @@
 export default class LinkFence {
   constructor() {
     this._undoing = new Map();
+    this._failed = new Set();
   }
 
   /**
-   * Run an unlink with the document fenced until it settles. The fence goes
+   * Run an unlink with the document fenced until it lands. The fence goes
    * up and the write starts synchronously, so a hook that calls this has
-   * fenced the document before it returns.
+   * fenced the document before it returns. An unlink that fails leaves the
+   * document fenced until a later unlink of it lands, since it still names
+   * the player's page; the next start's link check undoes that link.
    * @param {string} id
    * @param {() => Promise<unknown>} write
    * @returns {Promise<unknown>}
@@ -26,24 +29,32 @@ export default class LinkFence {
       if (n > 0) this._undoing.set(id, n);
       else this._undoing.delete(id);
     };
+    const fail = (err) => {
+      this._failed.add(id);
+      throw err;
+    };
     let pending;
     try {
       pending = Promise.resolve(write());
     } catch (err) {
       pending = Promise.reject(err);
     }
-    return pending.finally(release);
+    const landed = (value) => {
+      this._failed.delete(id);
+      return value;
+    };
+    return pending.then(landed, fail).finally(release);
   }
 
   /**
    * Whether a write for `entityId` may go to the document now: it is still
-   * linked to that page and no unlink of it is in flight.
+   * linked to that page, no unlink of it is in flight and none has failed.
    * @param {string} id - the document's id
    * @param {string|null|undefined} linkedTo - the document's link as of now
    * @param {string} entityId - the page the write carries
    * @returns {boolean}
    */
   holds(id, linkedTo, entityId) {
-    return !!entityId && linkedTo === entityId && !this._undoing.has(id);
+    return !!entityId && linkedTo === entityId && !this._undoing.has(id) && !this._failed.has(id);
   }
 }

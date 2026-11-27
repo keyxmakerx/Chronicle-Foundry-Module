@@ -22,18 +22,28 @@ test('holds only for the linked page and while no unlink is in flight', async ()
   assert.equal(f.holds('d', 'e1', 'e1'), true, 'released once the unlink settles');
 });
 
-test('overlapping unlinks keep the fence until the last settles, and a failure releases it', async () => {
+test('overlapping unlinks keep the fence until the last lands', async () => {
   const f = new LinkFence();
-  let first;
+  let first, second;
   const a = f.undo('d', () => new Promise((r) => { first = r; }));
-  const b = f.undo('d', () => Promise.reject(new Error('refused')));
-  await assert.rejects(b);
+  const b = f.undo('d', () => new Promise((r) => { second = r; }));
+  second();
+  await b;
   assert.equal(f.holds('d', 'e1', 'e1'), false, 'still fenced by the first');
   first();
   await a;
   assert.equal(f.holds('d', 'e1', 'e1'), true);
-  await assert.rejects(f.undo('d', () => { throw new Error('sync throw'); }));
-  assert.equal(f.holds('d', 'e1', 'e1'), true);
+});
+
+test('a failed unlink, thrown or rejected, leaves the document fenced', async () => {
+  const f = new LinkFence();
+  await assert.rejects(f.undo('d', () => Promise.reject(new Error('refused'))));
+  assert.equal(f.holds('d', 'e1', 'e1'), false);
+  await assert.rejects(f.undo('t', () => { throw new Error('sync throw'); }));
+  assert.equal(f.holds('t', 'e1', 'e1'), false);
+  assert.equal(f.holds('other', 'e1', 'e1'), true);
+  await f.undo('d', async () => {});
+  assert.equal(f.holds('d', 'e1', 'e1'), true, 'a later unlink that lands lifts it');
 });
 
 test('the actor apply asks the fence before its first write and between its steps', async () => {
