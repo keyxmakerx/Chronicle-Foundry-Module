@@ -118,11 +118,12 @@ function stopCurrent(showingId = null) {
 /**
  * Play a showing full screen over everything, replacing one already playing.
  * @param {{showingId: string, scene: object}} showing
- * @param {{label?: string, failed?: string}} [opts] - the screen reader's
- *   name for it, and the warning when it cannot play
+ * @param {{label?: string, failed?: string, canContinue?: boolean}} [opts] -
+ *   the screen reader's name for it, the warning when it cannot play, and
+ *   whether a moment offers its own Continue (the Director's preview only)
  * @returns {Promise<boolean>} whether it started
  */
-export async function playShowing(showing, { label, failed } = {}) {
+export async function playShowing(showing, { label, failed, canContinue = false } = {}) {
   let engine = null;
   try {
     await loadStandalone([ENGINE_FILE]);
@@ -141,7 +142,10 @@ export async function playShowing(showing, { label, failed } = {}) {
       // The module's Motion setting outranks the computer's: Calm and Off
       // both get the engine's still version.
       reducedMotion: currentMotion() !== 'full',
+      motion: currentMotion(),
       label: label || t('Label'),
+      canContinue,
+      words: momentWords(),
       onClose: () => { if (current === mine) current = null; },
     });
     return true;
@@ -151,6 +155,18 @@ export async function playShowing(showing, { label, failed } = {}) {
     ui.notifications?.warn(failed || t('PlayFailed'));
     return false;
   }
+}
+
+/** The words a moment's question is drawn with, in this client's language. */
+function momentWords() {
+  return {
+    turn: t('MomentTurn'),
+    go: t('MomentContinue'),
+    write: t('MomentWrite'),
+    writeHint: t('MomentWriteHint'),
+    director: t('MomentDirector'),
+    directorHint: t('MomentDirectorHint'),
+  };
 }
 
 // --- Player side: asking the GM's client ------------------------------------
@@ -343,6 +359,8 @@ export class CutsceneRelay {
     return playShowing({ showingId: `preview-${preview.previewId}`, scene: preview.scene }, {
       label: t('PreviewLabel', { name }),
       failed: t('PreviewFailed'),
+      // The GM watching their own preview lets each moment go on.
+      canContinue: true,
     });
   }
 

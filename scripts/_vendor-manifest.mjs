@@ -5,7 +5,7 @@
  * checks it against the files.
  */
 export const VENDOR_MANIFEST = Object.freeze({
-  "cutscene_engine.js": { engine: "cutscenes", source: "static/js/cutscene_engine.js", digest: "f1e0330a2d7e" },
+  "cutscene_engine.js": { engine: "cutscenes", source: "static/js/cutscene_engine.js", digest: "71e8f067b2e1" },
   "gl_shared.js": { engine: "sky", source: "static/js/widgets/gl_shared.js", digest: "58a97f609643" },
   "shop_room.js": { engine: "shop", source: "static/js/widgets/shop_room.js", digest: "3d40b9a9065f" },
   "shop_room_counter.js": { engine: "shop", source: "static/js/widgets/shop_room_counter.js", digest: "e958e022d71a" },
