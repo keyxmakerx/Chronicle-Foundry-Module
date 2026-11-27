@@ -288,6 +288,72 @@ test('an origin item added, swapped or removed on the sheet in Foundry reaches C
   await closeWorld(world);
 }, { settings: ON }));
 
+test('a conduit\'s two domains added on the sheet in Foundry both reach Chronicle, over a lone domain Chronicle held', () => scenario('fdy-two-domains-push', async ({ seed, world }) => {
+  await openWorld(world, { modules: ['journals', 'actors', 'items'] });
+  const e = await chronicleCharacter(seed, 'Tyne', 18);
+  await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: { subclass: 'Love' } });
+  await waitFor(() => actorFor(world, e.id), 10000, 'actor created');
+  await settle();
+  const actor = actorFor(world, e.id);
+  const subclass = async () => (await seed.chronicle.get(`/entities/${e.id}`)).fields_data?.subclass;
+
+  await actor.createEmbeddedDocuments('Item', [{ name: 'Life', type: 'subclass' }]);
+  await actor.createEmbeddedDocuments('Item', [{ name: 'Love', type: 'subclass' }]);
+  await settle();
+  assert.equal(await subclass(), 'Life, Love', 'both domains pushed');
+  await closeWorld(world);
+}, { settings: ON }));
+
+// Two tiny, different real PNGs: Chronicle checks the bytes and gives
+// identical bytes one media id.
+const PNGS = [
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGM4IScHRAwQCgAfJgQRoo8irwAAAABJRU5ErkJggg==',
+].map((b) => Buffer.from(b, 'base64'));
+
+test('a portrait and token chosen for a hero in Foundry become the Chronicle page\'s picture and token, and do not come back as copies', () => scenario('fdy-hero-pictures-push', async ({ seed, world }) => {
+  await openWorld(world, MODULES);
+  const e = await chronicleCharacter(seed, 'Tyne', 18);
+  // A hero category's token picture field, as the Draw Steel package declares it.
+  await seed.declareFields(e.entity_type_id, [{ key: 'token_image', label: 'Token picture', type: 'string' }]);
+  await waitFor(() => actorFor(world, e.id), 10000, 'actor created');
+  await settle();
+  const actor = actorFor(world, e.id);
+  const portrait = 'worlds/bench-world/heroes/tyne.png';
+  const token = 'worlds/bench-world/heroes/tyne-token.png';
+  for (const [i, path] of [portrait, token].entries()) {
+    const blob = new Blob([PNGS[i]], { type: 'image/png' });
+    world.files.set(path, { size: blob.size, type: blob.type, blob });
+  }
+  // Another site's picture is never fetched.
+  await actor.update({ img: 'https://example.com/tyne.png' });
+  await settle();
+  assert.equal((await seed.chronicle.get(`/entities/${e.id}`)).image_path ?? '', '', 'an outside picture is not sent');
+
+  await actor.update({ img: portrait, prototypeToken: { texture: { src: token } } });
+  await settle();
+  const page = await seed.chronicle.get(`/entities/${e.id}`);
+  assert.match(page.image_path ?? '', /\S/, 'the portrait became the page picture');
+  assert.match(page.fields_data?.token_image ?? '', /\S/, 'the token became the page token');
+  assert.notEqual(page.image_path, page.fields_data.token_image, 'two different pictures');
+  assert.equal(actor.img, portrait, 'the portrait file stays');
+  assert.equal(actor.prototypeToken.texture.src, token, 'the token file stays');
+  assert.ok(![...world.files.keys()].some((p) => p.includes(page.image_path)), 'Chronicle\'s copy is not brought back');
+
+  // Sent once: a later edit sends no picture again.
+  const sent = await recordRequests(async () => {
+    await actor.update({ system: { hp: 12 } });
+    await settle();
+  });
+  assert.ok(!sent.some((r) => r.url.endsWith('/media') || r.url.endsWith('/image')), 'no picture resent');
+
+  // Both ways: a picture chosen in Chronicle afterwards replaces the one sent.
+  await seed.chronicle.put(`/entities/${e.id}/image`, { image_path: page.fields_data.token_image });
+  await waitFor(() => actor.img !== portrait, 10000, 'Chronicle\'s new portrait applied');
+  assert.match(actor.img, new RegExp(page.fields_data.token_image), 'the portrait is Chronicle\'s copy');
+  await closeWorld(world);
+}, { settings: ON }));
+
 test('a class picked in Chronicle is noted on the actor for its player and never embedded, and the note goes once a class is on the sheet', () => scenario('chr-class-pick', async ({ seed, world }) => {
   await openWorld(world, { modules: ['journals', 'actors', 'items'] });
   const e = await chronicleCharacter(seed, 'Tyne', 10);

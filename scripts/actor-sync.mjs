@@ -42,8 +42,10 @@ import { planGmFieldClear, holdsGmFieldText } from './_gm-field-clear.mjs';
 import { usersWithHero, planPlayerHeroes, memberClaims, assignsCharacter } from './_player-hero.mjs';
 import { memberKey } from './_member-mapping.mjs';
 import { isAnsweringGM } from './_stash-relay.mjs';
-import { PictureStore } from './picture-store.mjs';
+import { PictureStore, MAX_PICTURE_BYTES } from './picture-store.mjs';
 import { heroChoice, heroPictureIds, heroPicturePlan, HERO_PICTURES_FLAG } from './_hero-pictures.mjs';
+import { TOKEN_FIELD } from './_creature-pictures.mjs';
+import { PICTURES_CHANGED, changesPictures, picturesToPush, sendablePicture, pictureName, sentFlag, isWorldFile, sameOriginUrl } from './_hero-picture-push.mjs';
 import { folderKindFor, needsPlacing, FOLDER_PLACED_FLAG, ACTOR_FOLDER_FLAG, HEROES } from './_actor-folder.mjs';
 import { CLASS_PICK_FLAG, classPick, pickToFinish, pickChanged, SUBCLASS_PICK_FLAG, subclassPicks, subclassesToFinish, subclassPickChanged } from './_finish-hero.mjs';
 import { npcActorTypeFor, actorTypeForPage, switchTarget } from './_npc-character.mjs';
@@ -135,6 +137,8 @@ export class ActorSync {
     this._heldNotices = new HeldNotices();
     /** @type {Map<string, object>} Diffs whose push is in flight, by actor id. */
     this._pushingChanges = new Map();
+    // Actors whose Foundry pictures are being sent: a pull meanwhile leaves their pictures alone.
+    this._sendingPictures = new Set();
     this._actorPushDebouncer = new JournalPushDebouncer(
       (actor, entityId) => { this._pushActorUpdate(actor, entityId); }
     );
@@ -1308,7 +1312,11 @@ export class ActorSync {
         }
       }
       if (!npc) Object.assign(changes, planGmFieldClear({ actor, entity, fields: this._adapter.gmClearFields }).update);
-      Object.assign(changes, await this._picturePlan(entity, actor));
+      // Likewise a picture chosen in Foundry and not yet sent, or being sent,
+      // stays: Chronicle's pictures here predate it.
+      const sendingPictures = this._sendingPictures.has(actor.id)
+        || [this._pendingChanges, this._pushingChanges].some((m) => m.get(actor.id)?.[PICTURES_CHANGED]);
+      if (!sendingPictures) Object.assign(changes, await this._picturePlan(entity, actor));
       if (Object.keys(changes).length > 0) {
         await actor.update(changes, syncOptions({ [APPLY_OPTION]: true }));
       }
@@ -1528,6 +1536,7 @@ export class ActorSync {
           sync_direction: 'both',
         });
 
+        if (await this._pushPictures(actor, entity.id)) await this._refreshChronicleVersion(actor, entity.id);
         console.debug(`Chronicle: Pushed new actor "${actor.name}" to Chronicle`);
         this._syncManager?.recordUserOutcome?.(userId);
       }
@@ -1578,8 +1587,13 @@ export class ActorSync {
 
     // An NPC sends only its name and visibility: its system data is the GM's
     // stat block, not the page's hero fields.
-    const sent = this._isLinkedNpc(actor) ? (change.name !== undefined ? { name: change.name } : {}) : change;
+    // A hero's new portrait or token goes to Chronicle as its own kind of
+    // change; an NPC's pictures are the GM's stat block art and stay.
+    const npc = this._isLinkedNpc(actor);
+    const sent = npc ? (change.name !== undefined ? { name: change.name } : {})
+      : (changesPictures(change) ? { ...change, [PICTURES_CHANGED]: true } : change);
     const items = sent[ITEMS_CHANGED];
+    const pictures = sent[PICTURES_CHANGED];
 
     // Sync visibility: Foundry prototypeToken.hidden → Chronicle is_private.
     // Await this before field sync to avoid inconsistent state.
@@ -1591,13 +1605,14 @@ export class ActorSync {
     const gate = this._pushGate();
     if (gate === 'drop') return;
     if (gate === 'hold') {
-      if (!hiddenChanged && !sent.system && !sent.name && !items) return;
+      if (!hiddenChanged && !sent.system && !sent.name && !items && !pictures) return;
       const byPlayer = userId !== game.user.id;
-      const diff = sent.system || sent.name !== undefined || items
+      const diff = sent.system || sent.name !== undefined || items || pictures
         ? {
           ...(sent.system ? { system: sent.system } : {}),
           ...(sent.name !== undefined ? { name: sent.name } : {}),
           ...(items ? { [ITEMS_CHANGED]: items } : {}),
+          ...(pictures ? { [PICTURES_CHANGED]: true } : {}),
         }
         : null;
       this._syncManager.holdChange({
@@ -1617,7 +1632,7 @@ export class ActorSync {
     // Only push field/name changes if system data or name changed. The diff
     // is kept (merged with the burst's earlier ones) so the push can send
     // just the mapped fields that changed.
-    if (!sent.system && !sent.name && !items) return;
+    if (!sent.system && !sent.name && !items && !pictures) return;
     this._pendingChanges.set(actor.id, mergeChanges(this._pendingChanges.get(actor.id), sent));
     this._pendingAuthors.set(actor.id, userId);
     if (userId !== game.user.id) {
@@ -1701,15 +1716,18 @@ export class ActorSync {
         ? this._adapter.toChronicleFieldsChanged(actor, change)
         : (change.system || change[ITEMS_CHANGED] ? this._adapter.toChronicleFields(actor) : null));
 
+      // A player's change is judged by Chronicle as that player: the keys
+      // it will not take come back as `held` and stay as the player made
+      // them in Foundry.
+      const acting = actingMemberOf(players, (id) => memberOf(getUserMappings(), id));
+      let wrote = false;
       if (fields && Object.keys(fields).length > 0) {
-        // A player's change is judged by Chronicle as that player: the keys
-        // it will not take come back as `held` and stay as the player made
-        // them in Foundry.
-        const acting = actingMemberOf(players, (id) => memberOf(getUserMappings(), id));
         const answer = await this._putFieldsMerged(entityId, fields, acting);
         this._tellHeld(actor, heldKeysOf(answer));
-        await this._refreshChronicleVersion(actor, entityId);
+        wrote = true;
       }
+      if (change[PICTURES_CHANGED] && (await this._pushPictures(actor, entityId, acting))) wrote = true;
+      if (wrote) await this._refreshChronicleVersion(actor, entityId);
 
       await this._setActorFlag(actor, 'lastSync', new Date().toISOString());
 
@@ -1722,6 +1740,75 @@ export class ActorSync {
     } finally {
       this._pushingChanges.delete(actor.id);
     }
+  }
+
+  /**
+   * Send a hero's own portrait and token to Chronicle: each world file is
+   * uploaded as campaign media and becomes the page picture or `token_image`.
+   * What was sent is recorded in the hero-pictures flag, so the pull that
+   * follows sees Chronicle's new media as already applied and never copies it
+   * back over the file. A picture that cannot be read or sent is skipped and
+   * logged; it never fails the field push.
+   * @param {Actor} actor
+   * @param {string} entityId
+   * @param {string|null} [actingUserId] - Chronicle member a player's change is for.
+   * @returns {Promise<boolean>} whether anything was written to the page.
+   * @private
+   */
+  async _pushPictures(actor, entityId, actingUserId = null) {
+    if (this._isLinkedNpc(actor)) return false;
+    let applied = actor.getFlag(FLAG_SCOPE, HERO_PICTURES_FLAG) ?? null;
+    const wanted = picturesToPush({ img: actor.img, token: actor.prototypeToken?.texture?.src, applied });
+    if (wanted.length === 0) return false;
+    let wrote = false;
+    const uploaded = new Map();
+    this._sendingPictures.add(actor.id);
+    try {
+      for (const { role, path } of wanted) {
+        try {
+          if (!uploaded.has(path)) uploaded.set(path, await this._uploadWorldPicture(path));
+          const id = uploaded.get(path);
+          if (!id) {
+            console.warn(`Chronicle: Not sending picture "${path}" for "${actor.name}": it is not a PNG, JPEG, WebP or GIF file within the size limit`);
+            continue;
+          }
+          const acting = actingUserId ? { actingUserId } : {};
+          if (role === 'img') await this._api.put(`/entities/${entityId}/image`, { image_path: id, ...acting });
+          else {
+            const answer = await this._putFieldsMerged(entityId, { [TOKEN_FIELD]: id }, actingUserId);
+            // A token Chronicle held back is not sent; the next change tries again.
+            if (heldKeysOf(answer).some((h) => h.key === TOKEN_FIELD)) continue;
+          }
+          wrote = true;
+          const update = sentFlag(applied, role, id, path);
+          applied = Object.values(update)[0];
+          await actor.update(update, applyOptions());
+        } catch (err) {
+          // A page whose category has no token picture keeps only the portrait.
+          if (role === 'token' && err?.status === 400) console.warn(`Chronicle: "${actor.name}"'s Chronicle page has no token picture field; only the portrait was sent`);
+          else console.error(`Chronicle: Failed to send picture "${path}" for "${actor.name}"`, err);
+        }
+      }
+    } finally {
+      this._sendingPictures.delete(actor.id);
+    }
+    return wrote;
+  }
+
+  /**
+   * Read a world file and upload it as campaign media.
+   * @param {string} path
+   * @returns {Promise<string>} the media id, or '' when the file is not a picture that may be sent.
+   * @private
+   */
+  async _uploadWorldPicture(path) {
+    if (!isWorldFile(path)) return '';
+    const url = sameOriginUrl(globalThis.foundry?.utils?.getRoute?.(path) ?? path, globalThis.location?.origin ?? '');
+    if (!url) return '';
+    const response = await fetch(url);
+    const blob = response.ok ? await response.blob() : null;
+    if (!sendablePicture(blob, MAX_PICTURE_BYTES)) return '';
+    return (await this._api.uploadMedia(blob, pictureName(path)))?.id || '';
   }
 
   /**
@@ -2316,6 +2403,7 @@ export class ActorSync {
       return true;
     }
     await this._putFieldsMerged(entityId, this._withoutLayered(actor, this._adapter.toChronicleFields(actor)));
+    if (await this._pushPictures(actor, entityId)) await this._refreshChronicleVersion(actor, entityId);
     await this._setActorFlag(actor, 'lastSync', new Date().toISOString());
     console.debug(`Chronicle: Re-pushed actor "${actor.name}" → entity ${entityId}`);
     return true;
