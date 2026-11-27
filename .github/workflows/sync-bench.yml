@@ -61,6 +61,13 @@ jobs:
         with:
           node-version: '22'
 
+      # The vendored copies must be Chronicle's files unchanged; a Chronicle
+      # change to one fails here until the copy is refreshed.
+      - name: Vendored Chronicle files match Chronicle ${{ steps.ref.outputs.ref }}
+        env:
+          CHRONICLE_DIR: chronicle
+        run: node --test tools/test-cutscene-relay.mjs tools/test-shop-room.mjs tools/test-sky-clock.mjs tools/test-craft-relay.mjs
+
       - name: Generate Chronicle templates
         working-directory: chronicle
         run: go run github.com/a-h/templ/cmd/templ@$(go list -m -f '{{.Version}}' github.com/a-h/templ) generate

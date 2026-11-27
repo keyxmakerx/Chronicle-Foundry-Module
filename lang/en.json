@@ -1125,6 +1125,8 @@
     },
     "Cutscenes": {
       "Label": "Cut scene",
+      "PreviewLabel": "Preview: {name}",
+      "PreviewFailed": "Your cut scene preview couldn't play here. Reload Foundry, then press Preview in Foundry again.",
       "PlayFailed": "A cut scene couldn't play here. Reload Foundry, then watch it again from the Satchel's Cut scenes tab.",
       "ListLabel": "Cut scenes you can watch again",
       "Untitled": "Untitled scene",

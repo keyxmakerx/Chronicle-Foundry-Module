@@ -67,7 +67,8 @@ async function loadModule() {
     import('../scripts/map-sync.mjs'),
     import('../scripts/creature-sync.mjs'),
     import('../scripts/player-asks.mjs'),
-  ]).then(([settings, sm, js, as, is, ms, cs, pa]) => ({
+    import('../scripts/cutscenes.mjs'),
+  ]).then(([settings, sm, js, as, is, ms, cs, pa, cut]) => ({
     registerSettings: settings.registerSettings,
     SyncManager: sm.SyncManager,
     JournalSync: js.JournalSync,
@@ -76,6 +77,7 @@ async function loadModule() {
     MapSync: ms.MapSync,
     CreatureSync: cs.CreatureSync,
     PlayerAsks: pa.PlayerAsks,
+    CutsceneRelay: cut.CutsceneRelay,
   }));
   return modulesLoaded;
 }
@@ -251,6 +253,7 @@ export async function openWorld(world, { modules = ['journals'], itemFields = nu
   }
   if (modules.includes('playerAsks')) sm.registerModule(world.playerAsks = new m.PlayerAsks());
   if (modules.includes('maps')) sm.registerModule(new m.MapSync());
+  if (modules.includes('cutscenes')) sm.registerModule(world.cutscenes = new m.CutsceneRelay());
   world.syncManager = sm;
   await sm.start();
   await waitFor(() => sm._initialSyncDone, 20000, 'initial sync');

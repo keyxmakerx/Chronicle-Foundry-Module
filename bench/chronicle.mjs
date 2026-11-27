@@ -228,6 +228,21 @@ export async function seedCampaign(label = 'bench') {
     });
     if (r.status >= 300) throw new Error(`layer take off failed: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
   };
+  // Any add-on by slug, through the owner's toggle; before the world opens,
+  // since the module reads add-on state when it connects.
+  const enableAddon = async (slug) => {
+    const list = await (await web.get(`/campaigns/${campaignId}/addons`)).json();
+    const row = list.find((a) => a.addon_slug === slug);
+    if (!row) throw new Error(`no ${slug} add-on`);
+    if (!row.enabled) {
+      const r = await fetch(`${CHRONICLE_URL}/campaigns/${campaignId}/addons/${row.addon_id}/toggle`, {
+        method: 'PUT', redirect: 'manual',
+        headers: { cookie: web.cookie(), 'content-type': 'application/x-www-form-urlencoded', 'x-csrf-token': web.csrf() },
+        body: 'action=enable',
+      });
+      if (r.status >= 400) throw new Error(`${slug} add-on not enabled: HTTP ${r.status}`);
+    }
+  };
   // A creature page's "Add to Foundry" button (a web route, DM team).
   const addToFoundry = async (entityId) => {
     const r = await fetch(`${CHRONICLE_URL}/campaigns/${campaignId}/foundry-vtt/creature-add/${entityId}`, {
@@ -270,7 +285,7 @@ export async function seedCampaign(label = 'bench') {
     if (r.status >= 300) throw new Error(`notifications failed: HTTP ${r.status}`);
     return r.json();
   };
-  return { campaignId, moduleKey, displayName, addPlayer, ownerNotifications, addToFoundry, createMap, enableClaiming, assignOwner, createFolder, fileInFolder, declareFields, enableTransformations, putOnLayer, takeOffLayer, chronicle: apiClient(campaignId, otherKey), module: apiClient(campaignId, moduleKey) };
+  return { campaignId, moduleKey, displayName, web, enableAddon, addPlayer, ownerNotifications, addToFoundry, createMap, enableClaiming, assignOwner, createFolder, fileInFolder, declareFields, enableTransformations, putOnLayer, takeOffLayer, chronicle: apiClient(campaignId, otherKey), module: apiClient(campaignId, moduleKey) };
 }
 
 /** A REST client scoped to one campaign, for scenario setup and assertions. */

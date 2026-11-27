@@ -1885,6 +1885,7 @@ allowlist (`api-client.mjs`) is ignored.
 | `notice_boards.updated` | `{ home }` (`page` or `category`); `resourceId` is the page id or the type id | A home's boards changed; open board windows refetch |
 | `cutscene.foundry` | `{ showingId, viewers:[chronicleUserId…], scene, rewatchUntil }`; sent only to the campaign's Foundry-module socket; not in the change feed | The Director showed a cut scene to those members |
 | `cutscene.foundry_stop` | `{ showingId }`; the same audience | The Director stopped a showing; watching it again still works |
+| `cutscene.foundry_preview` | `{ previewId, director: chronicleUserId, scene }`; the same audience; nothing is stored on either side | The Director pressed Preview in Foundry on an unsaved or saved scene. One GM client plays it on its own screen (the GM `director` is matched to when that GM is playing, else the active GM) and never relays it to other clients |
 | `roll.made` | A roll (see "Shared rolls" below); `resourceId` is the roll id. Public, gm and blind rolls in full; a self roll only to its owner's key | A roll was made at Chronicle's table or crafting, or recorded from Foundry |
 | `sync.status` | `{ connected: bool }` | Connection state change |
 | `sync.error` | `{ message }` | Synchronization error |
