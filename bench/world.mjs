@@ -80,9 +80,23 @@ async function loadModule() {
   return modulesLoaded;
 }
 
+/** The adapter's mapped numbers: Chronicle key and Foundry path. */
+const BENCH_NUMBERS = [['hp', 'system.hp'], ['victories', 'system.hero.victories'], ['xp', 'system.hero.xp']];
+
+/** The mapped numbers a system object (or a change to one) holds. */
+function benchNumbers(system) {
+  const out = {};
+  for (const [key, path] of BENCH_NUMBERS) {
+    const v = path.split('.').slice(1).reduce((o, k) => o?.[k], system);
+    if (v !== undefined) out[key] = v;
+  }
+  return out;
+}
+
 /**
  * A minimal game-system adapter: Chronicle `fields_data.hp` is Foundry
- * `system.hp`, and the name follows the entity.
+ * `system.hp` (Victories and XP sit under `system.hero` as Draw Steel keeps
+ * them), and the name follows the entity.
  */
 export const benchAdapter = {
   systemId: 'bench',
@@ -92,28 +106,33 @@ export const benchAdapter = {
   identityFields: ['ancestry', 'kit'].map((key) => ({
     key, type: 'string', foundry_collection: 'items', foundry_item_type: [key], foundry_item_single: true,
   })),
-  // `hp` is the one mapped scalar, so it is what a layer's effect can change.
+  // `hp` is the scalar the layer scenarios change; Victories and XP are the
+  // progression numbers a hero's player changes in play.
   // `subclass` is mapped to its item as Draw Steel maps it, so a subclass
   // picked in Chronicle can be noted for the player to add.
   fieldDefs: [
     { key: 'hp', type: 'number', foundry_path: 'system.hp' },
+    { key: 'victories', type: 'number', foundry_path: 'system.hero.victories' },
+    { key: 'xp', type: 'number', foundry_path: 'system.hero.xp' },
     { key: 'subclass', type: 'string', foundry_collection: 'items', foundry_item_type: ['subclass'], foundry_item_single: true, foundry_item_join: true },
   ],
   fromChronicleFields(entity) {
     const out = {};
     if (entity?.name) out.name = entity.name;
-    const hp = entity?.fields_data?.hp;
-    if (hp !== undefined && hp !== null) out['system.hp'] = hp;
+    for (const [key, path] of BENCH_NUMBERS) {
+      const v = entity?.fields_data?.[key];
+      if (v !== undefined && v !== null) out[path] = v;
+    }
     return out;
   },
   toChronicleFields(actor) {
-    return actor.system?.hp === undefined ? {} : { hp: actor.system.hp };
+    return benchNumbers(actor.system);
   },
   // The item types those fields read, so adding, editing or removing one in
   // Foundry pushes it as the generic adapter does.
   itemFieldTypes: new Set(['ancestry', 'kit', 'subclass']),
   toChronicleFieldsChanged(actor, change) {
-    const out = change?.system?.hp === undefined ? {} : { hp: change.system.hp };
+    const out = benchNumbers(change?.system);
     const items = change?.[ITEMS_CHANGED];
     if (items) {
       for (const def of benchAdapter.identityFields) {

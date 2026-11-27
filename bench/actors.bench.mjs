@@ -213,6 +213,55 @@ test('a player\'s HP edit on the character they claimed reaches Chronicle and su
   assert.equal((await seed.chronicle.get(`/entities/${other.id}`)).fields_data?.hp, 20);
 }, { settings: ON }));
 
+test('a player\'s Victories added in Foundry reach Chronicle and ring the Director\'s bell; a respite banked in Chronicle comes back to the actor; the GM\'s own fix rings nothing', () => scenario('fvtt-player-progression', async ({ seed, world }) => {
+  await seed.enableClaiming();
+  const player = await seed.addPlayer();
+  await openWorld(world, MODULES);
+  await world.game.settings.set('chronicle-sync', 'userMappings', JSON.stringify({ [player.userId]: 'benchPlayer00001' }));
+
+  // Victories and XP as a system declares them for play: the hero's player
+  // changes them, and a change rings the Directors' bell.
+  const types = await seed.chronicle.entityTypes();
+  const type = types.find((t) => t.slug === 'character' || /character/i.test(t.name));
+  const play = { edit: 'owner', kind: 'counter', min: 0, step: 1, bell: true };
+  await seed.declareFields(type.id, [
+    { key: 'victories', label: 'Victories', type: 'number', play },
+    { key: 'xp', label: 'XP', type: 'number', play },
+  ]);
+  const hero = await chronicleCharacter(seed, 'Sela', 20);
+  await seed.chronicle.put(`/entities/${hero.id}/fields`, { fields_data: { victories: 2, xp: 4 } });
+  await waitFor(() => actorFor(world, hero.id)?.system?.hero?.xp === 4, 10000, 'actor created with its progression');
+  await seed.assignOwner(hero.id, player.userId);
+  await settle();
+  const actor = actorFor(world, hero.id);
+  const bells = async () => (await seed.ownerNotifications()).filter((n) => n.link?.endsWith(`/entities/${hero.id}`));
+
+  await world.asPlayer(() => actor.update({ 'system.hero.victories': 3 }));
+  await settle();
+  assert.equal((await seed.chronicle.get(`/entities/${hero.id}`)).fields_data?.victories, 3, 'the player\'s victory is in Chronicle');
+  const rung = await bells();
+  assert.equal(rung.length, 1, 'one bell for the hero');
+  assert.match(rung[0].message, new RegExp(`${player.displayName} changed Sela`), 'the bell names the player and the hero');
+  assert.match(rung[0].detail || '', /Victories: 2 → 3/, 'the bell says what changed');
+
+  // A respite banked on the sheet: Victories become XP in one save.
+  const reqs = await recordRequests(async () => {
+    await seed.chronicle.put(`/entities/${hero.id}/fields`, { fields_data: { victories: 0, xp: 7 } });
+    await settle();
+  });
+  assert.equal(actor.system.hero.victories, 0, 'the bank reaches the actor');
+  assert.equal(actor.system.hero.xp, 7);
+  assert.deepEqual(writes(reqs).filter((r) => r.url.startsWith(`/entities/${hero.id}`)).map((r) => `${r.method} ${r.url}`), [], 'nothing is pushed back');
+
+  // The GM correcting a number in Foundry stores it and rings nothing new.
+  await actor.update({ 'system.hero.xp': 8 });
+  await settle();
+  assert.equal((await seed.chronicle.get(`/entities/${hero.id}`)).fields_data?.xp, 8, 'the GM\'s fix is in Chronicle');
+  const after = await bells();
+  assert.equal(after.length, 1, 'still one bell');
+  assert.doesNotMatch(after[0].detail || '', /XP/, 'the GM\'s own fix is not in the bell');
+}, { settings: ON }));
+
 test('a Chronicle ancestry pick swaps the actor\'s ancestry item from a compendium, and a custom kit becomes a plain item, with nothing pushed back', () => scenario('chr-identity-items', async ({ seed, world }) => {
   const modules = { modules: ['journals', 'actors', 'items'] };
   // An installed system compendium holding Dwarf; "Homebrew Kit" is nowhere.
