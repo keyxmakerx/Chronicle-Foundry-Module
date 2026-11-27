@@ -302,8 +302,12 @@ test('every starter room the packs add keeps its own parts', () => {
 
 const chronicleDir = process.env.CHRONICLE_DIR;
 const chronicleWidgets = chronicleDir && join(resolve(chronicleDir), 'static', 'js', 'widgets');
-test('vendored files match Chronicle (needs CHRONICLE_DIR)', { skip: !(chronicleWidgets && existsSync(chronicleWidgets)) && 'CHRONICLE_DIR not set' }, () => {
+// Only an unset CHRONICLE_DIR skips: a source Chronicle moved or renamed
+// must fail, or the copy would stop being checked without anyone noticing.
+test('vendored files match Chronicle (needs CHRONICLE_DIR)', { skip: !chronicleWidgets && 'CHRONICLE_DIR not set' }, () => {
   for (const f of SHOP_ROOM_FILES) {
+    assert.ok(existsSync(join(chronicleWidgets, f)),
+      `Chronicle has no static/js/widgets/${f}; it moved or was renamed, so update tools/refresh-vendor.mjs`);
     assert.equal(readFileSync(join(VENDOR, f), 'utf8'), readFileSync(join(chronicleWidgets, f), 'utf8'),
       `vendor/chronicle/${f} differs from Chronicle's; copy it again from static/js/widgets/`);
   }

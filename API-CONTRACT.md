@@ -481,6 +481,32 @@ Lists addons with their enabled/disabled state for the campaign.
 
 ---
 
+### Vendored assets
+
+#### GET /vendored-assets
+The digest of each Chronicle file the module keeps an unchanged copy of in
+`vendor/chronicle/`, keyed by the copy's file name: the first 12 hex
+characters of the sha256 of the bytes Chronicle serves.
+
+**Used by:** `sync-manager.mjs` once per connect, through `_vendor-check.mjs`
+
+**Response:**
+```json
+{ "assets": { "shop_room.js": "d0bcb3b739f2", "sky_gl.js": "1f2e3d4c5b6a" } }
+```
+
+The module keeps at most 100 entries, each a file name of at most 64
+characters with a 12-hex value, and compares them with
+`scripts/_vendor-manifest.mjs`; a copy Chronicle doesn't list is ignored.
+A differing engine (cut scene player, shop room, Sky Clock, crafting) is a
+warn row in the Health pane, never a reason to load code from Chronicle. A
+Chronicle without the route answers 404: no list, no notice, and the entry
+is dropped from the error log.
+
+Re-verify by: 2027-01-27 (Chronicle `internal/plugins/foundry_vtt/vendored_assets.go` and its syncapi route; not on Chronicle main when this was written)
+
+---
+
 ### Tags
 
 #### GET /tags
