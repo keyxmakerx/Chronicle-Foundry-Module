@@ -173,6 +173,20 @@ test('a list property the system maps gives one item per named object', () => {
   assert.deepEqual(entryListItems(ANCESTRY, { size: { type: 'feature' } }, WITH_TYPES.itemTypes), [], 'only a list');
 });
 
+test('a list item never takes a type an identity field syncs', () => {
+  assert.deepEqual(entryListItems(ANCESTRY, { signature_traits: { type: 'kit' } }, WITH_TYPES.itemTypes, ['kit']), []);
+  const own = traitPlan([ancestryItem()], { entryItemsByField: { ancestry: { signature_traits: { type: 'ancestry' } } } });
+  assert.deepEqual(own.create, [], 'the field being planned is an identity field');
+  const other = traitPlan([ancestryItem()], { entryItemsByField: { ancestry: { signature_traits: { type: 'kit' } } }, identityTypes: ['ancestry', 'kit'] });
+  assert.deepEqual(other.create, [], 'nor one another identity field syncs, though it is not planned now');
+});
+
+test('two list objects whose names match give one item, the first', () => {
+  const twins = { name: 'Dryad', properties: { signature_traits: [{ name: 'Barkskin', description: 'one' }, { name: ' barkskin ', description: 'two' }] } };
+  const found = entryListItems(twins, ITEMS_MAP.ancestry, WITH_TYPES.itemTypes);
+  assert.deepEqual(found.map((f) => f.item.description), ['one']);
+});
+
 test('a made ancestry gives its signature traits as features, cleaned and flagged', () => {
   const plan = traitPlan([ancestryItem()]);
   assert.deepEqual(plan.remove, []);

@@ -90,21 +90,29 @@ export function heroAbilityItem(ability, { known = {}, key, hash }) {
 /**
  * The items one list property of an entry gives under `foundry_entry_items`:
  * each named object in the list. A type the system doesn't define gives
- * none, so a mapping can't make a document Foundry would refuse.
+ * none, so a mapping can't make a document Foundry would refuse; nor does a
+ * type an identity field syncs, since sync would read a second ancestry or
+ * kit as the hero's. Two objects whose names match give one item, the first.
  * @param {object} entry
  * @param {Record<string, {type: string}>} [entryItems]
  * @param {string[]|null} [itemTypes] - the system's item types
+ * @param {string[]} [identityTypes] - the item types identity fields sync
  * @returns {Array<{prop: string, type: string, item: {name: string, description?: string}}>}
  */
-export function entryListItems(entry, entryItems, itemTypes) {
+export function entryListItems(entry, entryItems, itemTypes, identityTypes = []) {
   const props = entry?.properties && typeof entry.properties === 'object' ? entry.properties : {};
   if (!Array.isArray(itemTypes)) return [];
   const out = [];
   for (const [prop, def] of Object.entries(entryItems ?? {}).sort(([a], [b]) => a.localeCompare(b))) {
     const list = Object.hasOwn(props, prop) ? props[prop] : null;
     if (!Array.isArray(list) || typeof def?.type !== 'string' || !itemTypes.includes(def.type)) continue;
+    if (identityTypes.includes(def.type)) continue;
+    const seen = new Set();
     for (const item of list) {
-      if (item && typeof item === 'object' && typeof item.name === 'string' && item.name.trim()) out.push({ prop, type: def.type, item });
+      if (!item || typeof item !== 'object' || typeof item.name !== 'string' || !item.name.trim()) continue;
+      if (seen.has(norm(item.name))) continue;
+      seen.add(norm(item.name));
+      out.push({ prop, type: def.type, item });
     }
   }
   return out;
@@ -139,9 +147,11 @@ export function entryListItemData({ type, item }, { key, hash }) {
  * @param {Record<string, Array<object>>} args.entriesByField - only the fields read
  * @param {object} [args.known] - also `itemTypes`, the system's item types
  * @param {Record<string, object>} [args.entryItemsByField] - each field's `foundry_entry_items`
+ * @param {string[]} [args.identityTypes] - every identity field's item type, not only `fields`'
  * @returns {{create: object[], remove: string[]}}
  */
-export function planEntryAbilities({ items, fields, entriesByField, known = {}, entryItemsByField }) {
+export function planEntryAbilities({ items, fields, entriesByField, known = {}, entryItemsByField, identityTypes = [] }) {
+  const notListable = [...identityTypes, ...(fields ?? []).map((f) => f.itemType)];
   const list = Array.isArray(items) ? items : [];
   const read = (fields ?? []).filter((f) => Array.isArray(entriesByField?.[f.fieldKey]));
   const desired = [];
@@ -153,7 +163,7 @@ export function planEntryAbilities({ items, fields, entriesByField, known = {}, 
         const hash = fingerprint(ability);
         desired.push({ key, hash, data: heroAbilityItem(ability, { known, key, hash }) });
       }
-      for (const listed of entryListItems(entry, entryItemsByField?.[fieldKey], known.itemTypes)) {
+      for (const listed of entryListItems(entry, entryItemsByField?.[fieldKey], known.itemTypes, notListable)) {
         const key = `${fieldKey}:${norm(it.name)}:${listed.prop}:${norm(listed.item.name)}`;
         const hash = fingerprint(listed.item);
         const data = entryListItemData(listed, { key, hash });

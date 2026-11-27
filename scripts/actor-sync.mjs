@@ -1311,7 +1311,8 @@ export class ActorSync {
       };
       const items = actor.items?.contents ?? Array.from(actor.items ?? []);
       const entryItemsByField = Object.fromEntries((this._adapter?.identityFields ?? []).map((d) => [d.key, d.foundry_entry_items]));
-      const { create, remove } = planEntryAbilities({ items, fields, entriesByField, known, entryItemsByField });
+      const identityTypes = identityFieldTypes(this._adapter?.identityFields ?? []).map((f) => f.itemType);
+      const { create, remove } = planEntryAbilities({ items, fields, entriesByField, known, entryItemsByField, identityTypes });
       const options = syncOptions({ [APPLY_OPTION]: true });
       if (remove.length) await actor.deleteEmbeddedDocuments('Item', remove, options);
       if (create.length) await actor.createEmbeddedDocuments('Item', create, options);
