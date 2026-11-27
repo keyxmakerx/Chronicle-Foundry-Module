@@ -185,7 +185,8 @@ function loadLooks() {
 }
 
 // Weather that stays in the sky and never touches the ground.
-const DRY_SKIES = ['clear', 'partly-cloudy', 'cloudy', 'overcast', 'sunbeams', 'red-sky', 'night-clouds', 'butterfly-days', 'dry-lightning'];
+const DRY_SKIES = ['clear', 'partly-cloudy', 'cloudy', 'overcast', 'sunbeams', 'red-sky', 'night-clouds', 'butterfly-days', 'dry-lightning',
+  'mammatus-sky', 'lenticular', 'leviathans'];
 
 test('every weather Chronicle\'s sky draws marks the stone in range, and none is left when it clears', () => {
   const L = loadLooks();
@@ -228,6 +229,8 @@ test('each kind of weather leaves its own mark', () => {
   assert.ok(of('firestorm').soot > 0.7 && of('smog').soot > 0.4);
   assert.equal(of('firestorm').dew, 0, 'fire leaves the stone dry');
   assert.equal(of('dry-lightning').wet, 0, 'a storm with no rain leaves it dry');
+  assert.ok(of('st-elmos-fire').glow, 'St Elmo\'s fire plays over the stone');
+  assert.ok(of('eruption').dust && of('eruption').soot > 0.3, 'an eruption leaves ash and soot');
   assert.ok(of('sea-spray').wet > 0.3 && !of('sea-spray').dust, 'spray wets the stone and is not grit');
   assert.ok(of('pollen-haze').dust.c[0] > of('pollen-haze').dust.c[2], 'pollen dusts it yellow');
   for (const id of ['firefly-dusk', 'fey-lights', 'wisp-lights', 'dreamfog', 'sky-rift', 'star-rain', 'glimmersnow', 'witchfire', 'brimstone']) {
