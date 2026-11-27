@@ -34,6 +34,7 @@ import { planActorApply } from './_actor-apply-plan.mjs';
 import { planIdentityItems, identityFieldTypes, identityPicks } from './_identity-item-plan.mjs';
 import { applyIdentityPlan, applyEntryRefresh, journalMentions } from './_identity-item-apply.mjs';
 import { planEntryRefresh } from './_campaign-entry-item.mjs';
+import { planEntryAbilities } from './_entry-abilities.mjs';
 import { sendsChangeHere, memberOf, ownsCharacter } from './_change-author.mjs';
 import { ASK, askModel, sameName } from './_player-asks.mjs';
 import { actingMemberOf, heldKeysOf, describeHeld, HeldNotices } from './_player-picks-held.mjs';
@@ -1262,6 +1263,7 @@ export class ActorSync {
         console.error(`Chronicle: could not refresh campaign entries on "${actor.name}"`, err);
         failed.push(...refresh.map((r) => r.fieldKey));
       }
+      if (!(await this._applyEntryAbilities(actor, identityFieldTypes(fieldDefs), entriesByField))) failed.push('abilities');
       if (failed.length) {
         ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.IdentityItemFailed', {
           actor: noticeText(actor.name),
@@ -1274,6 +1276,39 @@ export class ActorSync {
         actor: noticeText(actor.name),
         fields: '',
       }));
+    }
+  }
+
+  /**
+   * Give the hero the abilities its campaign entries hold (a homemade kit's
+   * signature ability) as rollable ability items, and take away the ones
+   * whose entry no longer holds them. Reads the actor's items afresh, since
+   * the identity writes just before may have swapped the kit.
+   * @param {Actor} actor
+   * @param {Array<{fieldKey: string, itemType: string}>} fields
+   * @param {Record<string, Array<object>>} entriesByField
+   * @returns {Promise<boolean>} false when a write failed
+   * @private
+   */
+  async _applyEntryAbilities(actor, fields, entriesByField) {
+    try {
+      const dsConfig = globalThis.ds?.CONFIG ?? globalThis.CONFIG?.DRAW_STEEL ?? {};
+      const keys = (obj) => (obj && typeof obj === 'object' ? Object.keys(obj) : null);
+      const known = {
+        keywords: keys(dsConfig.abilities?.keywords),
+        damageTypes: keys(dsConfig.damageTypes),
+        conditions: Array.isArray(globalThis.CONFIG?.statusEffects) ? CONFIG.statusEffects.map((e) => e.id) : null,
+        types: keys(dsConfig.abilities?.types),
+      };
+      const items = actor.items?.contents ?? Array.from(actor.items ?? []);
+      const { create, remove } = planEntryAbilities({ items, fields, entriesByField, known });
+      const options = syncOptions({ [APPLY_OPTION]: true });
+      if (remove.length) await actor.deleteEmbeddedDocuments('Item', remove, options);
+      if (create.length) await actor.createEmbeddedDocuments('Item', create, options);
+      return true;
+    } catch (err) {
+      console.error(`Chronicle: could not bring in the entry abilities on "${actor.name}"`, err);
+      return false;
     }
   }
 
@@ -1311,6 +1346,7 @@ export class ActorSync {
             entriesByField, mentionId: journalMentions(game), entryFieldsByField,
           });
           if (refresh.length) await applyEntryRefresh(actor, refresh);
+          await this._applyEntryAbilities(actor, made, entriesByField);
         } catch (err) {
           console.error(`Chronicle: could not refresh campaign entries on "${actor.name}"`, err);
         }
