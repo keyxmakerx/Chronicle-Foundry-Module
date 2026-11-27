@@ -366,6 +366,19 @@ Chronicle then judges the write as that member with the web door's hero-choice c
 
 Re-verify by: 2027-01-15 (Chronicle `internal/plugins/syncapi/acting_player.go` `judgeActingPlayer`, `internal/plugins/entities/owner_picks_check.go` `PlayerPicksHeld`)
 
+#### PUT /entities/:entityId/image
+Sets the page picture (`image_path`) to a media id of this campaign, the `id` that `POST /media` answers. A media id from another campaign, one that does not exist, or a path is a 400 ("invalid image path") and nothing changes.
+
+**Used by:** `actor-sync.mjs` → a hero's portrait chosen in Foundry (`_pushPictures`)
+
+**Request:**
+```json
+{ "image_path": "<media id>", "actingUserId": "<member id>" }
+```
+`actingUserId` is sent for a player's change, as on `PUT /entities/:entityId/fields`: a member who does not own the page, or is not in the campaign, is a 403. Answers `{"status":"ok"}` and broadcasts `entity.updated`; the new `updated_at` is not returned, so the module reads the page back. A Chronicle without this route answers 404 or 405, which the module logs; the portrait stays in Foundry.
+
+Re-verify by: 2027-01-15 (Chronicle `internal/plugins/syncapi/api_handler.go` `UpdateEntityImage`, `internal/plugins/entities/service.go` `CheckImagePath`)
+
 #### GET /entities/:entityId/permissions
 Returns entity permission/visibility settings.
 

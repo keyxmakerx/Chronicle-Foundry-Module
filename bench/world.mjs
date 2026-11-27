@@ -23,7 +23,17 @@ if (!process.env.BENCH_VERBOSE) {
 const traffic = { inflight: 0, last: Date.now(), requests: [] };
 
 const realFetch = globalThis.fetch;
+// The page's own address, as a Foundry tab has one; world files are served there.
+const FOUNDRY_ORIGIN = 'http://foundry.bench';
+globalThis.location = { origin: FOUNDRY_ORIGIN };
 globalThis.fetch = async (url, init = {}) => {
+  // Foundry serving one of the open world's files.
+  if (typeof url === 'string' && url.startsWith(`${FOUNDRY_ORIGIN}/`)) {
+    const file = traffic.files?.get(url.slice(FOUNDRY_ORIGIN.length + 1));
+    return file?.blob
+      ? new Response(file.blob, { status: 200, headers: { 'content-type': file.type } })
+      : new Response('', { status: 404 });
+  }
   const isModule = String(init?.headers?.Authorization || init?.headers?.authorization || '').includes(traffic.moduleKey || '\u0000');
   if (!isModule) return realFetch(url, init);
   // "Chronicle can't be reached": the request never leaves, as on a dropped network.
@@ -70,9 +80,23 @@ async function loadModule() {
   return modulesLoaded;
 }
 
+/** The adapter's mapped numbers: Chronicle key and Foundry path. */
+const BENCH_NUMBERS = [['hp', 'system.hp'], ['victories', 'system.hero.victories'], ['xp', 'system.hero.xp']];
+
+/** The mapped numbers a system object (or a change to one) holds. */
+function benchNumbers(system) {
+  const out = {};
+  for (const [key, path] of BENCH_NUMBERS) {
+    const v = path.split('.').slice(1).reduce((o, k) => o?.[k], system);
+    if (v !== undefined) out[key] = v;
+  }
+  return out;
+}
+
 /**
  * A minimal game-system adapter: Chronicle `fields_data.hp` is Foundry
- * `system.hp`, and the name follows the entity.
+ * `system.hp` (Victories and XP sit under `system.hero` as Draw Steel keeps
+ * them), and the name follows the entity.
  */
 export const benchAdapter = {
   systemId: 'bench',
@@ -82,28 +106,33 @@ export const benchAdapter = {
   identityFields: ['ancestry', 'kit'].map((key) => ({
     key, type: 'string', foundry_collection: 'items', foundry_item_type: [key], foundry_item_single: true,
   })),
-  // `hp` is the one mapped scalar, so it is what a layer's effect can change.
+  // `hp` is the scalar the layer scenarios change; Victories and XP are the
+  // progression numbers a hero's player changes in play.
   // `subclass` is mapped to its item as Draw Steel maps it, so a subclass
   // picked in Chronicle can be noted for the player to add.
   fieldDefs: [
     { key: 'hp', type: 'number', foundry_path: 'system.hp' },
+    { key: 'victories', type: 'number', foundry_path: 'system.hero.victories' },
+    { key: 'xp', type: 'number', foundry_path: 'system.hero.xp' },
     { key: 'subclass', type: 'string', foundry_collection: 'items', foundry_item_type: ['subclass'], foundry_item_single: true, foundry_item_join: true },
   ],
   fromChronicleFields(entity) {
     const out = {};
     if (entity?.name) out.name = entity.name;
-    const hp = entity?.fields_data?.hp;
-    if (hp !== undefined && hp !== null) out['system.hp'] = hp;
+    for (const [key, path] of BENCH_NUMBERS) {
+      const v = entity?.fields_data?.[key];
+      if (v !== undefined && v !== null) out[path] = v;
+    }
     return out;
   },
   toChronicleFields(actor) {
-    return actor.system?.hp === undefined ? {} : { hp: actor.system.hp };
+    return benchNumbers(actor.system);
   },
   // The item types those fields read, so adding, editing or removing one in
   // Foundry pushes it as the generic adapter does.
-  itemFieldTypes: new Set(['ancestry', 'kit']),
+  itemFieldTypes: new Set(['ancestry', 'kit', 'subclass']),
   toChronicleFieldsChanged(actor, change) {
-    const out = change?.system?.hp === undefined ? {} : { hp: change.system.hp };
+    const out = benchNumbers(change?.system);
     const items = change?.[ITEMS_CHANGED];
     if (items) {
       for (const def of benchAdapter.identityFields) {
@@ -111,6 +140,9 @@ export const benchAdapter = {
         if (def.key in got) out[def.key] = got[def.key];
         else if (items[def.key] === 'deleted') out[def.key] = '';
       }
+      // The subclass is Foundry-led, so it is pushed but never swapped.
+      const sub = benchAdapter.fieldDefs.find((d) => d.key === 'subclass');
+      Object.assign(out, buildChronicleFields(actor, [sub]));
     }
     return Object.keys(out).length ? out : null;
   },
@@ -186,6 +218,7 @@ export async function openWorld(world, { modules = ['journals'], itemFields = nu
     foundry: globalThis.foundry, ChatMessage: globalThis.ChatMessage, fromUuid: globalThis.fromUuid, TextEditor: globalThis.TextEditor,
   });
   traffic.moduleKey = world.seed.moduleKey;
+  traffic.files = world.files;
   if (!world.settingsRegistered) {
     m.registerSettings();
     world.settingsRegistered = true;

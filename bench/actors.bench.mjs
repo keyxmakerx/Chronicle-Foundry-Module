@@ -213,6 +213,55 @@ test('a player\'s HP edit on the character they claimed reaches Chronicle and su
   assert.equal((await seed.chronicle.get(`/entities/${other.id}`)).fields_data?.hp, 20);
 }, { settings: ON }));
 
+test('a player\'s Victories added in Foundry reach Chronicle and ring the Director\'s bell; a respite banked in Chronicle comes back to the actor; the GM\'s own fix rings nothing', () => scenario('fvtt-player-progression', async ({ seed, world }) => {
+  await seed.enableClaiming();
+  const player = await seed.addPlayer();
+  await openWorld(world, MODULES);
+  await world.game.settings.set('chronicle-sync', 'userMappings', JSON.stringify({ [player.userId]: 'benchPlayer00001' }));
+
+  // Victories and XP as a system declares them for play: the hero's player
+  // changes them, and a change rings the Directors' bell.
+  const types = await seed.chronicle.entityTypes();
+  const type = types.find((t) => t.slug === 'character' || /character/i.test(t.name));
+  const play = { edit: 'owner', kind: 'counter', min: 0, step: 1, bell: true };
+  await seed.declareFields(type.id, [
+    { key: 'victories', label: 'Victories', type: 'number', play },
+    { key: 'xp', label: 'XP', type: 'number', play },
+  ]);
+  const hero = await chronicleCharacter(seed, 'Sela', 20);
+  await seed.chronicle.put(`/entities/${hero.id}/fields`, { fields_data: { victories: 2, xp: 4 } });
+  await waitFor(() => actorFor(world, hero.id)?.system?.hero?.xp === 4, 10000, 'actor created with its progression');
+  await seed.assignOwner(hero.id, player.userId);
+  await settle();
+  const actor = actorFor(world, hero.id);
+  const bells = async () => (await seed.ownerNotifications()).filter((n) => n.link?.endsWith(`/entities/${hero.id}`));
+
+  await world.asPlayer(() => actor.update({ 'system.hero.victories': 3 }));
+  await settle();
+  assert.equal((await seed.chronicle.get(`/entities/${hero.id}`)).fields_data?.victories, 3, 'the player\'s victory is in Chronicle');
+  const rung = await bells();
+  assert.equal(rung.length, 1, 'one bell for the hero');
+  assert.match(rung[0].message, new RegExp(`${player.displayName} changed Sela`), 'the bell names the player and the hero');
+  assert.match(rung[0].detail || '', /Victories: 2 → 3/, 'the bell says what changed');
+
+  // A respite banked on the sheet: Victories become XP in one save.
+  const reqs = await recordRequests(async () => {
+    await seed.chronicle.put(`/entities/${hero.id}/fields`, { fields_data: { victories: 0, xp: 7 } });
+    await settle();
+  });
+  assert.equal(actor.system.hero.victories, 0, 'the bank reaches the actor');
+  assert.equal(actor.system.hero.xp, 7);
+  assert.deepEqual(writes(reqs).filter((r) => r.url.startsWith(`/entities/${hero.id}`)).map((r) => `${r.method} ${r.url}`), [], 'nothing is pushed back');
+
+  // The GM correcting a number in Foundry stores it and rings nothing new.
+  await actor.update({ 'system.hero.xp': 8 });
+  await settle();
+  assert.equal((await seed.chronicle.get(`/entities/${hero.id}`)).fields_data?.xp, 8, 'the GM\'s fix is in Chronicle');
+  const after = await bells();
+  assert.equal(after.length, 1, 'still one bell');
+  assert.doesNotMatch(after[0].detail || '', /XP/, 'the GM\'s own fix is not in the bell');
+}, { settings: ON }));
+
 test('a Chronicle ancestry pick swaps the actor\'s ancestry item from a compendium, and a custom kit becomes a plain item, with nothing pushed back', () => scenario('chr-identity-items', async ({ seed, world }) => {
   const modules = { modules: ['journals', 'actors', 'items'] };
   // An installed system compendium holding Dwarf; "Homebrew Kit" is nowhere.
@@ -285,6 +334,72 @@ test('an origin item added, swapped or removed on the sheet in Foundry reaches C
   await settle();
   assert.equal((await ancestry()) ?? '', '', 'removal pushed');
   assert.equal(actor.items.filter((i) => i.type === 'ancestry').length, 0, 'the clear does not come back as an item');
+  await closeWorld(world);
+}, { settings: ON }));
+
+test('a conduit\'s two domains added on the sheet in Foundry both reach Chronicle, over a lone domain Chronicle held', () => scenario('fdy-two-domains-push', async ({ seed, world }) => {
+  await openWorld(world, { modules: ['journals', 'actors', 'items'] });
+  const e = await chronicleCharacter(seed, 'Tyne', 18);
+  await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: { subclass: 'Love' } });
+  await waitFor(() => actorFor(world, e.id), 10000, 'actor created');
+  await settle();
+  const actor = actorFor(world, e.id);
+  const subclass = async () => (await seed.chronicle.get(`/entities/${e.id}`)).fields_data?.subclass;
+
+  await actor.createEmbeddedDocuments('Item', [{ name: 'Life', type: 'subclass' }]);
+  await actor.createEmbeddedDocuments('Item', [{ name: 'Love', type: 'subclass' }]);
+  await settle();
+  assert.equal(await subclass(), 'Life, Love', 'both domains pushed');
+  await closeWorld(world);
+}, { settings: ON }));
+
+// Two tiny, different real PNGs: Chronicle checks the bytes and gives
+// identical bytes one media id.
+const PNGS = [
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGM4IScHRAwQCgAfJgQRoo8irwAAAABJRU5ErkJggg==',
+].map((b) => Buffer.from(b, 'base64'));
+
+test('a portrait and token chosen for a hero in Foundry become the Chronicle page\'s picture and token, and do not come back as copies', () => scenario('fdy-hero-pictures-push', async ({ seed, world }) => {
+  await openWorld(world, MODULES);
+  const e = await chronicleCharacter(seed, 'Tyne', 18);
+  // A hero category's token picture field, as the Draw Steel package declares it.
+  await seed.declareFields(e.entity_type_id, [{ key: 'token_image', label: 'Token picture', type: 'string' }]);
+  await waitFor(() => actorFor(world, e.id), 10000, 'actor created');
+  await settle();
+  const actor = actorFor(world, e.id);
+  const portrait = 'worlds/bench-world/heroes/tyne.png';
+  const token = 'worlds/bench-world/heroes/tyne-token.png';
+  for (const [i, path] of [portrait, token].entries()) {
+    const blob = new Blob([PNGS[i]], { type: 'image/png' });
+    world.files.set(path, { size: blob.size, type: blob.type, blob });
+  }
+  // Another site's picture is never fetched.
+  await actor.update({ img: 'https://example.com/tyne.png' });
+  await settle();
+  assert.equal((await seed.chronicle.get(`/entities/${e.id}`)).image_path ?? '', '', 'an outside picture is not sent');
+
+  await actor.update({ img: portrait, prototypeToken: { texture: { src: token } } });
+  await settle();
+  const page = await seed.chronicle.get(`/entities/${e.id}`);
+  assert.match(page.image_path ?? '', /\S/, 'the portrait became the page picture');
+  assert.match(page.fields_data?.token_image ?? '', /\S/, 'the token became the page token');
+  assert.notEqual(page.image_path, page.fields_data.token_image, 'two different pictures');
+  assert.equal(actor.img, portrait, 'the portrait file stays');
+  assert.equal(actor.prototypeToken.texture.src, token, 'the token file stays');
+  assert.ok(![...world.files.keys()].some((p) => p.includes(page.image_path)), 'Chronicle\'s copy is not brought back');
+
+  // Sent once: a later edit sends no picture again.
+  const sent = await recordRequests(async () => {
+    await actor.update({ system: { hp: 12 } });
+    await settle();
+  });
+  assert.ok(!sent.some((r) => r.url.endsWith('/media') || r.url.endsWith('/image')), 'no picture resent');
+
+  // Both ways: a picture chosen in Chronicle afterwards replaces the one sent.
+  await seed.chronicle.put(`/entities/${e.id}/image`, { image_path: page.fields_data.token_image });
+  await waitFor(() => actor.img !== portrait, 10000, 'Chronicle\'s new portrait applied');
+  assert.match(actor.img, new RegExp(page.fields_data.token_image), 'the portrait is Chronicle\'s copy');
   await closeWorld(world);
 }, { settings: ON }));
 

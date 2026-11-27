@@ -498,7 +498,7 @@ export function installFoundry({ settings = {}, systemId = 'dnd5e' } = {}) {
   };
   world.settingsValues = values;
 
-  // The world's user-data files, in memory: path → { size, type }.
+  // The world's user-data files, in memory: path → { size, type, blob }.
   const files = new Map();
   world.files = files;
   const FilePicker = {
@@ -514,7 +514,7 @@ export function installFoundry({ settings = {}, systemId = 'dnd5e' } = {}) {
     },
     async upload(source, dir, file) {
       const path = `${dir}/${file.name}`;
-      files.set(path, { size: file.size, type: file.type });
+      files.set(path, { size: file.size, type: file.type, blob: file });
       log.writes.push({ op: 'upload', type: 'File', id: path });
       return { status: 'success', path };
     },
@@ -590,6 +590,8 @@ export function installFoundry({ settings = {}, systemId = 'dnd5e' } = {}) {
     foundry: {
       utils: {
         randomID,
+        // Foundry serves a world file at its path under the site root.
+        getRoute: (path) => `/${String(path).replace(/^\/+/, '')}`,
         expandObject,
         getProperty,
         setProperty,
