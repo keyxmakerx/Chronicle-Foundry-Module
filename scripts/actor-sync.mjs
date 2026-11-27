@@ -1245,16 +1245,18 @@ export class ActorSync {
         return;
       }
       const entriesByField = await this._campaignEntries([...planned, ...madeFields.map((f) => f.fieldKey)]);
-      // Where the system says an entry's properties go on the item it makes.
+      // Where the system says an entry's properties go on the item it makes,
+      // and which of them change the hero.
       const entryFieldsByField = Object.fromEntries(fieldDefs.map((d) => [d.key, d.foundry_entry_fields]));
+      const entryEffectsByField = Object.fromEntries(fieldDefs.map((d) => [d.key, d.foundry_entry_effects]));
 
       const failed = [];
       if (plan.length) {
-        failed.push(...(await applyIdentityPlan(actor, plan, game, entriesByField, entryFieldsByField)).failed);
+        failed.push(...(await applyIdentityPlan(actor, plan, game, entriesByField, entryFieldsByField, entryEffectsByField)).failed);
       }
       await recordPicks(failed);
       const refresh = planEntryRefresh({
-        items, fields: madeFields, fieldsData: entity?.fields_data, entriesByField, mentionId: journalMentions(game), entryFieldsByField,
+        items, fields: madeFields, fieldsData: entity?.fields_data, entriesByField, mentionId: journalMentions(game), entryFieldsByField, entryEffectsByField,
       });
       try {
         await applyEntryRefresh(actor, refresh);
@@ -1296,6 +1298,7 @@ export class ActorSync {
     // A cached list would hold the entry as it was before the edit.
     for (const { fieldKey: key } of fields) this._entryCache?.delete(key);
     const entryFieldsByField = Object.fromEntries(fieldDefs.map((d) => [d.key, d.foundry_entry_fields]));
+    const entryEffectsByField = Object.fromEntries(fieldDefs.map((d) => [d.key, d.foundry_entry_effects]));
     const actors = game.actors?.contents ?? Array.from(game.actors ?? []);
     for (const actor of actors) {
       const entityId = actor.getFlag?.(FLAG_SCOPE, 'entityId');
@@ -1308,7 +1311,7 @@ export class ActorSync {
           const entriesByField = await this._campaignEntries(made.map((f) => f.fieldKey));
           const refresh = planEntryRefresh({
             items, fields: made, fieldsData: actor.getFlag(FLAG_SCOPE, IDENTITY_APPLIED_FLAG) ?? {},
-            entriesByField, mentionId: journalMentions(game), entryFieldsByField,
+            entriesByField, mentionId: journalMentions(game), entryFieldsByField, entryEffectsByField,
           });
           if (refresh.length) await applyEntryRefresh(actor, refresh);
         } catch (err) {
