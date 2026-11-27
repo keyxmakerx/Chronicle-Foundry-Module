@@ -119,7 +119,8 @@ export function parseTier(text, known = {}) {
   for (const part of parts) {
     const clause = plainText(part);
     if (!clause) continue;
-    let m = clause.match(/^(\d+)(?: (\w+))? damage$/i);
+    // "3 + @chr" is a hero's damage: the system adds the characteristic rolled.
+    let m = clause.match(/^(\d+(?: \+ @chr)?)(?: (\w+))? damage$/i);
     if (m && (!m[2] || damageTypes.includes(m[2].toLowerCase()))) {
       clauses.push({ kind: 'damage', value: m[1], types: m[2] ? [m[2].toLowerCase()] : [] });
       continue;
