@@ -498,8 +498,9 @@ export class SyncManager {
     for (const actor of game.actors?.contents ?? []) {
       const entityId = actor.getFlag?.(FLAG_SCOPE, 'entityId');
       if (!entityId) continue;
-      const cached = actor.getFlag?.(FLAG_SCOPE, 'chronicleOwnerUserId');
-      const key = cached ? String(cached) : byCharacter.get(entityId);
+      // Chronicle's member list says whose character this is; the actor's
+      // owner flag is a player-writable cache and proves nothing.
+      const key = byCharacter.get(entityId);
       if (!key) continue;
       const ids = out.get(key) ?? new Set();
       const ownership = actor.ownership ?? {};
@@ -1137,8 +1138,11 @@ export class SyncManager {
    * Add an entry to the activity log.
    * @param {string} type - Log type: 'pull', 'push', 'update', 'link', 'unlink', 'connect', 'error'.
    * @param {string} message - Human-readable description.
+   * @param {object} [historyEvent] - The row Chronicle's sync history gets
+   *   instead of the one the type implies, for entries it reads differently
+   *   (a settled conflict).
    */
-  logActivity(type, message) {
+  logActivity(type, message, historyEvent) {
     const time = Date.now();
     this._activityLog.unshift({
       time,
@@ -1146,7 +1150,7 @@ export class SyncManager {
       message,
       timeFormatted: new Date(time).toLocaleTimeString(),
     });
-    this._history?.add(activityToEvent(type, message, time));
+    this._history?.add(historyEvent ?? activityToEvent(type, message, time));
     if (this._activityLog.length > this._maxLogEntries) {
       this._activityLog.length = this._maxLogEntries;
     }

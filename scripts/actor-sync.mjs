@@ -19,9 +19,11 @@
 import { noticeText } from './_escape-html.mjs';
 import { getSetting, setSetting, getUserMappings, getSyncExclusions } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
+import { conflictEvent } from './_history-report.mjs';
 import { createGenericAdapter, buildChronicleFields } from './adapters/generic-adapter.mjs';
 import { FLAG_SCOPE, syncOptions, APPLY_OPTION } from './constants.mjs';
 import { flagRemoval } from './_flag-removal.mjs';
+import { touchesLinkFlags } from './_set-aside.mjs';
 import { planClaimOwnership } from './_claim-ownership-plan.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { walkEntityPages, unwrapEntityList } from './_entity-page-walk.mjs';
@@ -81,6 +83,13 @@ export class ActorSync {
 
     /** Chronicle claimants already reported as having no Foundry user, so the GM hears once a session. */
     this._unmappedNoticed = new Set();
+    /**
+     * Who Chronicle says claimed each linked page (entity id -> member id),
+     * as last read from Chronicle. The actor's own owner flag is only a
+     * cache for the sheet: a player who owns the actor can rewrite it.
+     * @type {Map<string, string|null>}
+     */
+    this._chronicleOwners = new Map();
 
     /**
      * Heroes claimed live by a member with no Foundry user yet (member key ->
@@ -222,6 +231,11 @@ export class ActorSync {
 
     if (msg.type === 'hero_layers.changed') {
       await this._onLayersChanged(msg.resourceId);
+      return;
+    }
+    if (msg.type === 'system_entry.changed') {
+      const fieldKey = msg.payload?.fieldKey;
+      if (typeof fieldKey === 'string' && fieldKey) await this._refreshMadeItems(fieldKey);
       return;
     }
 
@@ -397,6 +411,7 @@ export class ActorSync {
 
       const excluded = this._excludedIds();
       for (const entity of allEntities) {
+        this._noteOwner(entity);
         const existingActor = this._findLinkedActor(entity.id);
         if (!existingActor) {
           if (bringsInActor({ entity, createdAfter, excludedIds: excluded })
@@ -417,6 +432,14 @@ export class ActorSync {
       await this._checkActorTypes(listed);
     } catch (err) {
       console.warn('Chronicle: could not check hero and NPC actor types', err);
+    }
+
+    // A campaign entry edited while this world was closed reaches no hero's
+    // page, so the items made from entries are checked against them here.
+    try {
+      await this._refreshMadeItems();
+    } catch (err) {
+      console.warn('Chronicle: could not refresh items made from campaign entries', err);
     }
 
     // Surface unresolved character links (broken / missing) so the GM can
@@ -699,10 +722,31 @@ export class ActorSync {
     if (!game.user?.isGM) return;
     for (const actor of game.actors?.contents ?? []) {
       if (!this._isCharacterActor(actor) || !actor.getFlag(FLAG_SCOPE, 'entityId')) continue;
-      const owner = actor.getFlag(FLAG_SCOPE, 'chronicleOwnerUserId') ?? null;
+      const owner = this._ownerFromChronicle(actor.getFlag(FLAG_SCOPE, 'entityId'));
       if (!owner) continue;
       await this._applyClaimOwnership(actor, owner, owner);
     }
+  }
+
+  /** Remember who Chronicle says claimed a page, when the copy says. @private */
+  _noteOwner(entity) {
+    if (entity?.id && Object.prototype.hasOwnProperty.call(entity, 'owner_user_id')) {
+      this._chronicleOwners.set(entity.id, entity.owner_user_id == null ? null : String(entity.owner_user_id));
+    }
+  }
+
+  /**
+   * Who claimed a page, from what Chronicle sent: the page itself, else the
+   * member list's characters. Null when Chronicle hasn't said.
+   * @param {string} entityId
+   * @returns {string|null}
+   * @private
+   */
+  _ownerFromChronicle(entityId) {
+    if (!entityId) return null;
+    if (this._chronicleOwners.has(entityId)) return this._chronicleOwners.get(entityId);
+    const member = (this._syncManager?.getMembers?.() ?? []).find((m) => m?.character_entity_id === entityId);
+    return member ? memberKey(member) : null;
   }
 
   /** The adapter's field defs, identity ones included, which tell a hero page from an NPC's. @private */
@@ -1201,14 +1245,16 @@ export class ActorSync {
         return;
       }
       const entriesByField = await this._campaignEntries([...planned, ...madeFields.map((f) => f.fieldKey)]);
+      // Where the system says an entry's properties go on the item it makes.
+      const entryFieldsByField = Object.fromEntries(fieldDefs.map((d) => [d.key, d.foundry_entry_fields]));
 
       const failed = [];
       if (plan.length) {
-        failed.push(...(await applyIdentityPlan(actor, plan, game, entriesByField)).failed);
+        failed.push(...(await applyIdentityPlan(actor, plan, game, entriesByField, entryFieldsByField)).failed);
       }
       await recordPicks(failed);
       const refresh = planEntryRefresh({
-        items, fields: madeFields, fieldsData: entity?.fields_data, entriesByField, mentionId: journalMentions(game),
+        items, fields: madeFields, fieldsData: entity?.fields_data, entriesByField, mentionId: journalMentions(game), entryFieldsByField,
       });
       try {
         await applyEntryRefresh(actor, refresh);
@@ -1228,6 +1274,47 @@ export class ActorSync {
         actor: noticeText(actor.name),
         fields: '',
       }));
+    }
+  }
+
+  /**
+   * Bring the items sync made from campaign entries up to date with those
+   * entries, for one field or all. An entry edit changes no hero's page, so
+   * Chronicle announces it (`system_entry.changed`) and connect calls this
+   * too. The hero's picks are the ones last applied from Chronicle, and an
+   * item is rewritten only when its entry's `updatedAt` moved
+   * (`planEntryRefresh`), so running it again changes nothing.
+   * @param {string} [fieldKey] - one field, or every identity field
+   * @private
+   */
+  async _refreshMadeItems(fieldKey) {
+    // One GM's client writes, so two GMs online don't both refresh the same items.
+    if (!isActiveGM() || !this._adapter || !this._api) return;
+    const fieldDefs = this._adapter.identityFields ?? [];
+    const fields = identityFieldTypes(fieldDefs).filter((f) => !fieldKey || f.fieldKey === fieldKey);
+    if (!fields.length) return;
+    // A cached list would hold the entry as it was before the edit.
+    for (const { fieldKey: key } of fields) this._entryCache?.delete(key);
+    const entryFieldsByField = Object.fromEntries(fieldDefs.map((d) => [d.key, d.foundry_entry_fields]));
+    const actors = game.actors?.contents ?? Array.from(game.actors ?? []);
+    for (const actor of actors) {
+      const entityId = actor.getFlag?.(FLAG_SCOPE, 'entityId');
+      if (!entityId || this._isLinkedNpc(actor)) continue;
+      await this._inTurn(entityId, async () => {
+        const items = actor.items?.contents ?? Array.from(actor.items ?? []);
+        const made = fields.filter(({ itemType }) => items.find((it) => it?.type === itemType)?.flags?.[FLAG_SCOPE]?.chronicleMade);
+        if (!made.length) return;
+        try {
+          const entriesByField = await this._campaignEntries(made.map((f) => f.fieldKey));
+          const refresh = planEntryRefresh({
+            items, fields: made, fieldsData: actor.getFlag(FLAG_SCOPE, IDENTITY_APPLIED_FLAG) ?? {},
+            entriesByField, mentionId: journalMentions(game), entryFieldsByField,
+          });
+          if (refresh.length) await applyEntryRefresh(actor, refresh);
+        } catch (err) {
+          console.error(`Chronicle: could not refresh campaign entries on "${actor.name}"`, err);
+        }
+      });
     }
   }
 
@@ -1347,6 +1434,7 @@ export class ActorSync {
       // `null` when unclaimed so the indicator shows "Unclaimed" rather
       // than stale data.
       if (Object.prototype.hasOwnProperty.call(entity, 'owner_user_id')) {
+        this._noteOwner(entity);
         const previousOwner = actor.getFlag(FLAG_SCOPE, 'chronicleOwnerUserId') ?? null;
         const nextOwner = entity.owner_user_id ?? null;
         await this._setActorFlag(actor, 'chronicleOwnerUserId', nextOwner);
@@ -1577,6 +1665,16 @@ export class ActorSync {
    * @private
    */
   async _handleUpdateActor(actor, change, options, userId) {
+    // A player who owns an actor can rewrite its page link, which would have
+    // this client pull another page's fields onto it. Only sync writes the
+    // link, so a player's change to it unlinks the actor (as a copy is).
+    // Checked before the sync-write option, which a player's client can send.
+    if (userId !== game.user.id && sendsChangeHere(userId) && touchesLinkFlags(change, FLAG_SCOPE, ['entityId'])) {
+      await this._unlinkCopy(actor);
+      const notice = game.i18n.format('CHRONICLE.Notifications.PlayerLinkUndone', { name: noticeText(actor.name) });
+      ui.notifications?.warn?.(notice, { permanent: true });
+      return;
+    }
     if (options?.[APPLY_OPTION]) return;
     if (!sendsChangeHere(userId)) return;
     if (!this._isCharacterActor(actor)) return;
@@ -1596,10 +1694,15 @@ export class ActorSync {
     const pictures = sent[PICTURES_CHANGED];
 
     // Sync visibility: Foundry prototypeToken.hidden → Chronicle is_private.
-    // Await this before field sync to avoid inconsistent state.
-    const hiddenChanged =
+    // Await this before field sync to avoid inconsistent state. Who sees a
+    // page is the GM's to say: a player's change is sent by this client
+    // under the GM's key, and the page id comes from a flag the player can
+    // write, so only this GM's own visibility change is sent (another GM's
+    // change is sent by that GM's client).
+    const byGM = userId === game.user.id;
+    const hiddenChanged = byGM && (
       change.prototypeToken?.hidden !== undefined ||
-      change.token?.hidden !== undefined;
+      change.token?.hidden !== undefined);
     const isHidden = hiddenChanged ? (change.prototypeToken?.hidden ?? change.token?.hidden ?? false) : undefined;
 
     const gate = this._pushGate();
@@ -1898,7 +2001,10 @@ export class ActorSync {
     } catch (err) {
       if (!(err instanceof ConflictError)) throw err;
       // A part set to "From Foundry" takes nothing from Chronicle, a conflict included.
-      const strategy = this._syncManager?.pullGate?.('characters') === 'drop' ? 'foundry' : getSetting('conflictResolution');
+      const forcedPart = this._syncManager?.pullGate?.('characters') === 'drop';
+      const strategy = forcedPart ? 'foundry' : getSetting('conflictResolution');
+      // Only the name carries a version check, so it is the field the edit sent.
+      const settled = (kept, reason) => conflictEvent({ kind: 'character', resourceId: entityId, name: actor.name, kept, reason, fields: ['name'] });
       if (strategy === 'chronicle') {
         // Re-pull from Chronicle; this burst is dropped, so its paths no
         // longer hold Chronicle's values back.
@@ -1906,6 +2012,7 @@ export class ActorSync {
         const entity = await this._api.get(`/entities/${entityId}`);
         if (entity) await this._updateActorFromEntity(actor, entity);
         ui.notifications.warn(game.i18n.format('CHRONICLE.Notifications.ConflictKeptChronicle', { name: noticeText(actor.name) }));
+        this._syncManager?.logActivity?.('update', `Conflict on "${actor.name}": kept the Chronicle version`, settled('chronicle', 'setting'));
         return false;
       }
       // Force push.
@@ -1915,6 +2022,10 @@ export class ActorSync {
         await this._setActorFlag(actor, 'chronicleUpdatedAt', forced.updated_at);
       }
       ui.notifications.warn(game.i18n.format('CHRONICLE.Notifications.ConflictKeptFoundry', { name: noticeText(actor.name) }));
+      // "Newest" keeps Foundry here: the rename being pushed was just made,
+      // after the Chronicle change that caused the conflict.
+      const reason = forcedPart ? 'part' : (strategy === 'newest' ? 'newer' : 'setting');
+      this._syncManager?.logActivity?.('update', `Conflict on "${actor.name}": kept the Foundry version`, settled('foundry', reason));
       return true;
     }
   }

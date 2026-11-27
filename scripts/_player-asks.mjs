@@ -87,13 +87,14 @@ export function askModel({ kind, docId, who, name, where = '', link = {} }) {
 /**
  * Whether a page's visibility lets players read it, the bar for a player's
  * new item to point at it: not hidden, and either the campaign default or a
- * custom set with a view (or edit) grant for every player or everyone.
- * @param {{is_private?: boolean}|null} entity
+ * custom set with a view (or edit) grant for every player or everyone. A
+ * page in a DM-only category never is, whatever its own visibility says.
+ * @param {{is_private?: boolean, type_dm_only?: boolean}|null} entity
  * @param {{visibility?: string, permissions?: Array<{subject_type: string, subject_id?: string|number, permission: string}>}|null} perms
  * @returns {boolean}
  */
 export function playersCanView(entity, perms) {
-  if (!entity || entity.is_private === true) return false;
+  if (!entity || entity.is_private === true || entity.type_dm_only === true) return false;
   const visibility = perms?.visibility ?? 'default';
   if (visibility === 'default' || visibility === 'everyone') return true;
   if (visibility !== 'custom' || !Array.isArray(perms?.permissions)) return false;

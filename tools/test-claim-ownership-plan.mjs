@@ -104,13 +104,37 @@ test('apply: a non-GM client does nothing, and unclaim does nothing', async () =
   assert.deepEqual(notes.warn, []);
 });
 
-test('reconcile: honours cached claims once and is idempotent', async () => {
+test('reconcile: honours Chronicle\'s claims once and is idempotent', async () => {
   const s = setup();
   s._adapter = { actorType: 'hero' };
   const fresh = fakeActor({ default: 0 }, { entityId: 'e', chronicleOwnerUserId: 'cA' });
   const done = fakeActor({ default: 0, uB: 3 }, { entityId: 'e2', chronicleOwnerUserId: 'cB' });
   globalThis.game.actors = { contents: [fresh, done] };
+  s._noteOwner({ id: 'e', owner_user_id: 'cA' });
+  s._syncManager = { getMembers: () => [{ user_id: 'cB', character_entity_id: 'e2' }] };
   await s._reconcileClaimOwnership();
   assert.equal(fresh.calls.length, 1);
   assert.equal(done.calls.length, 0);
+});
+
+test('reconcile: an owner flag a player wrote on their actor hands the hero to no one', async () => {
+  const s = setup();
+  s._adapter = { actorType: 'hero' };
+  // Chronicle never said; the flag alone names member cA.
+  const forged = fakeActor({ default: 0 }, { entityId: 'e', chronicleOwnerUserId: 'cA' });
+  // Chronicle says cB; the flag says cA.
+  const rewritten = fakeActor({ default: 0 }, { entityId: 'e2', chronicleOwnerUserId: 'cA' });
+  globalThis.game.actors = { contents: [forged, rewritten] };
+  s._noteOwner({ id: 'e2', owner_user_id: 'cB' });
+  await s._reconcileClaimOwnership();
+  assert.equal(forged.calls.length, 0);
+  assert.deepEqual(rewritten.calls.map((c) => Object.keys(c[0]?.ownership ?? {})), [['uB']]);
+});
+
+test('member matching takes whose character it is from Chronicle, never the actor\'s owner flag', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../scripts/sync-manager.mjs', import.meta.url), 'utf8');
+  const body = src.match(/_memberEvidence\(\) \{[\s\S]*?\n  \}/)?.[0] ?? '';
+  assert.ok(body.includes('byCharacter.get(entityId)'));
+  assert.ok(!body.includes('chronicleOwnerUserId'), 'a player can write that flag on their own actor');
 });

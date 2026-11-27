@@ -152,6 +152,8 @@ Returns character preset field definitions with Foundry annotations.
 - `foundry_actor_type` — Actor type to create/filter (e.g., "character", "hero")
 - `foundry_path` — Dot-notation path on `actor.system` (e.g., "system.abilities.str.value")
 - `foundry_writable` — Whether this field can be written back to Foundry (false = read-only from Foundry)
+- `foundry_entry_fields` — on a single-item field (a kit), where a campaign's own entry's properties go on the item sync makes for it: `{"stamina_bonus": {"path": "system.bonuses.stamina", "format": "number"}, "melee_damage_bonus": {"path": "system.bonuses.melee.damage", "format": "tiers"}}`. Formats are `number`, `text` and `tiers` (`"+0/+2/+4"` to `path.tier1`–`tier3`); a value that doesn't read is left out. Chronicle drops a mapping whose path is not under `system` (at most eight parts, each starting with a letter, never `constructor` or `prototype`), and the module checks the same again (`_campaign-entry-item.mjs` `usableEntryPath`). Re-verify by: 2026-12-27 (Chronicle `internal/systems/entry_fields.go`)
+- `system_entry.changed` (WebSocket, GM sockets only): `{ "fieldKey": "kit" }` when one of the campaign's own entries for that field is made, saved or deleted. The field only, never the entry. The module re-reads `GET /system-entries?fieldKey=` and refreshes the items it made (`ActorSync._refreshMadeItems`); not in the change feed, so connect re-checks every field. Re-verify by: 2026-12-27 (Chronicle `internal/systems/entry_announce.go`, `internal/app/system_state_adapters.go`)
 - `gm_only` — the value is the GM's alone. Such a field comes with no `foundry_path` or `foundry_collection`, so it is never written to or read from Foundry; the adapter also skips a `gm_only` field that does carry a path. `foundry_clear_path` is where the manifest put it: the connect pass and each hero apply empty that path while it still holds Chronicle's text, and tell the GM once about other text left there (`_gm-field-clear.mjs`, `tools/test-gm-field-clear.mjs`). The same holds on the creature and item field endpoints, and for a field the campaign's own category marks GM-only. A field one page marks GM-only (`field_overrides.added` on the page) is skipped for that page's actor (`pageGmOnlyKeys`)
 - `owner_only` — only the GM and the page's player see it; the mapping is kept
 
@@ -274,6 +276,15 @@ uses `/sync/pull` and `/sync/changes`.
   "total": 120, "page": 1, "per_page": 50
 }
 ```
+
+`type_dm_only: true` (absent otherwise) marks a page in a category only the DM
+team may see (Adventures). Chronicle hides such a page from players whatever
+its own `is_private` and `visibility` say, so the module treats it as private:
+the journal is hidden, it sits in its category folder only, and an item linked
+to it is not added to a character players can see (`scripts/_dm-only-category.mjs`;
+the category's `preset_category: "adventures"` is read too, for a copy sent
+without the mark).
+Re-verify by: 2027-02-27 (Chronicle `internal/plugins/entities/model.go` `TypeDMOnly`)
 
 #### POST /entities
 Creates a new entity.
@@ -839,7 +850,8 @@ Chronicle (404).
 
 #### POST /sync/history
 The module reports what only it sees: changes it applied in Foundry
-(`to_foundry`), its connects and problems (`link`). Same access as the read.
+(`to_foundry`), its connects and problems (`link`), and how each sync
+conflict was settled. Same access as the read.
 
 **Used by:** `sync-manager.mjs` → `_history` (`scripts/_history-report.mjs`), every 15 s and on connect
 
@@ -850,8 +862,16 @@ The module reports what only it sees: changes it applied in Foundry
   page row names who last changed it in Chronicle.
 - 403 or 404 stops reporting for the session; other failures retry on the
   next flush.
+- A settled conflict (a page or a hero's rename that Chronicle answered with
+  409) is one event: `status: "conflict"`, `ok: true`, `call: "foundry
+  conflict"`, `action` `"Chronicle kept"` or `"Foundry kept"`, `direction`
+  toward the side that lost (`to_foundry` when Chronicle is kept,
+  `to_chronicle` when Foundry is), `kind` `"page"` or `"character"`,
+  `resourceId` the Chronicle page. `message` says why that side won (the
+  conflict setting, the newest edit, or the part set to From Foundry) and
+  names the fields the Foundry edit sent, never their values (`conflictEvent`).
 
-Re-verify by: 2026-12-01 (Chronicle `internal/plugins/syncapi/sync_history_handler.go`, `sync_history_recorder.go`)
+Re-verify by: 2026-12-27 (Chronicle `internal/plugins/syncapi/sync_history_handler.go`, `sync_history_recorder.go`)
 
 #### POST /sync/players
 The GM's client reports the world's Foundry users. Chronicle sees only the
@@ -1319,6 +1339,9 @@ Deletes a media file.
 
 #### GET /entities/:entityId/relations
 Lists an entity's relations, minus those naming a page the key cannot view.
+The Owner key sees them all, so on an actor any player can see the module adds
+no item for a `dmOnly` Has Item link or one whose page players cannot view; an
+item already linked to a `dmOnly` one is unlinked (kept) and named to the GM.
 
 **Response:** a bare array of camelCase rows (the module also accepts `{data}`):
 ```json

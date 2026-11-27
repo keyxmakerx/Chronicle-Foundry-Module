@@ -340,6 +340,39 @@ test('§1A _buildOwnership: dmOnlyHidden OFF does NOT count (entity is visible)'
 });
 
 // ---------------------------------------------------------------------
+// A DM-only category (Adventures) is private whatever the page says
+// ---------------------------------------------------------------------
+
+test('_buildOwnership: a page in a DM-only category is hidden, its own visibility ignored', async () => {
+  resetSettings();
+  let asked = 0;
+  let counted = 0;
+  const js = makeJournalSync({
+    apiGet: async () => { asked++; return { permissions: [{ subject_type: 'role', subject_id: '1', permission: 'edit' }] }; },
+  });
+  js._syncManager.noteDmOnlyHidden = () => { counted++; };
+  assert.deepEqual(await js._buildOwnership({ id: 'a1', is_private: false, visibility: 'default', type_dm_only: true }), { default: L.NONE });
+  assert.deepEqual(await js._buildOwnership({ id: 'a1', visibility: 'custom', type_dm_only: true }), { default: L.NONE });
+  assert.equal(asked, 0, 'a player grant never widens it, so it is not even read');
+  assert.equal(counted, 2);
+});
+
+test('_buildOwnership: the category alone hides a page sent without the mark', async () => {
+  resetSettings();
+  const js = makeJournalSync();
+  js._tree.types = new Map([[5, { id: 5, name: 'Adventures', preset_category: 'adventures' }]]);
+  assert.deepEqual(await js._buildOwnership({ id: 'a2', is_private: false, entity_type_id: 5 }), { default: L.NONE });
+  assert.deepEqual(await js._buildOwnership({ id: 'a3', is_private: false, entity_type_id: 6 }), { default: L.OBSERVER });
+});
+
+test('_buildOwnership: dmOnlyHidden OFF treats a DM-only category like any private page', async () => {
+  resetSettings();
+  settings.dmOnlyHidden = false;
+  const js = makeJournalSync();
+  assert.deepEqual(await js._buildOwnership({ id: 'a4', type_dm_only: true }), { default: L.OBSERVER });
+});
+
+// ---------------------------------------------------------------------
 // Static-source regression pins
 // ---------------------------------------------------------------------
 

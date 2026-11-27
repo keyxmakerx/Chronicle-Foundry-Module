@@ -24,7 +24,8 @@ import { getSetting, getUserMappings } from './settings.mjs';
 import { FLAG_SCOPE, APPLY_OPTION } from './constants.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { collapseChanges } from './_change-feed.mjs';
-import { HAS_ITEM, EQUIPPED_FLAG, planInventory, itemDataFor, hasItemBody } from './_inventory-plan.mjs';
+import { HAS_ITEM, EQUIPPED_FLAG, planInventory, itemDataFor, hasItemBody, seenByPlayers, dmOnlyHeld } from './_inventory-plan.mjs';
+import { noticeText } from './_escape-html.mjs';
 import { treasureUpdate, treasureSignature, expandPaths } from './_treasure-item.mjs';
 import { itemsToRemove } from './_stash-reconcile.mjs';
 import { sendsChangeHere, memberOf, ownsCharacter } from './_change-author.mjs';
@@ -268,7 +269,12 @@ export class ItemSync {
       quantity: i.system?.quantity,
       ...equippedOf(i),
     }));
-    const plan = planInventory(list, items);
+    // An item on an actor a player can see shows them its name, so a
+    // Director-only link, or one to a page players cannot open, adds none.
+    const L = globalThis.CONST?.DOCUMENT_OWNERSHIP_LEVELS;
+    const playerEyes = seenByPlayers(actor.ownership, (id) => !!game.users?.get(id)?.isGM, L?.LIMITED ?? 1);
+    const plan = planInventory(list, items, { playerEyes });
+    if (playerEyes) this._tellHiddenHeld(actor, dmOnlyHeld(list, items));
     // The only delete: an item a stash move the GM just applied took off
     // this character. Every other gone relation is only unlinked. The move's
     // own relation event may have unlinked the item already, so its last
@@ -297,8 +303,16 @@ export class ItemSync {
     }
     if (plan.create.length) {
       const data = [];
-      for (const r of plan.create) data.push(itemDataFor(r, await this._treasureFor(r.targetEntityId)));
-      await actor.createEmbeddedDocuments('Item', data, opts());
+      for (const r of plan.create) {
+        const page = playerEyes || this._itemType ? await this._readItemPage(r.targetEntityId) : null;
+        // Fails closed: an unread page adds nothing now; the next reconcile tries again.
+        if (playerEyes && !(page && playersCanView(page.entity, page.perms))) {
+          console.debug(`Chronicle: a Has Item link on "${actor.name}" points at a page players cannot view; no item added.`);
+          continue;
+        }
+        data.push(itemDataFor(r, this._treasureFrom(page)));
+      }
+      if (data.length) await actor.createEmbeddedDocuments('Item', data, opts());
     }
     // Never deleted: the item stays in Foundry, only its link is dropped.
     for (const id of unlink) {
@@ -604,16 +618,60 @@ export class ItemSync {
   }
 
   /**
-   * The treasure data for a new item of the preset's Foundry type, or null
-   * for a plain item. A page players cannot open in Chronicle gives its name
-   * only, since the item sits on a hero players see; a failed read does too.
-   * @param {string} entityId - the Chronicle item page.
-   * @returns {Promise<{type: string, system: object, flags: object}|null>}
+   * Tell the GM, once a session per item, of items on a hero players see
+   * that are still linked to a Director-only link: they were added before
+   * such links were kept off, and sync never deletes without asking.
+   * @param {Actor} actor
+   * @param {string[]} itemIds
    * @private
    */
-  async _treasureFor(entityId) {
+  _tellHiddenHeld(actor, itemIds) {
+    this._hiddenTold ??= new Set();
+    const names = itemIds.filter((id) => !this._hiddenTold.has(id)).map((id) => {
+      this._hiddenTold.add(id);
+      return actor.items.get(id)?.name;
+    }).filter(Boolean);
+    if (!names.length) return;
+    const notice = game.i18n.format('CHRONICLE.Notifications.DmOnlyItemHeld', {
+      actor: noticeText(actor.name), items: noticeText(names.join(', ')),
+    });
+    ui.notifications?.warn?.(notice, { permanent: true });
+  }
+
+  /**
+   * An item page and its permissions, or null when the page could not be
+   * read. The permissions read may fail alone; players then cannot view a
+   * custom page.
+   * @param {string} entityId
+   * @returns {Promise<{entity: object, perms: object|null}|null>}
+   * @private
+   */
+  async _readItemPage(entityId) {
+    if (!entityId) return null;
+    try {
+      const [entity, perms] = await Promise.all([
+        this._api.get(`/entities/${entityId}`),
+        this._api.get(`/entities/${entityId}/permissions`).catch(() => null),
+      ]);
+      return entity ? { entity, perms } : null;
+    } catch (err) {
+      console.warn(`Chronicle: Failed to read item page ${entityId}`, err);
+      return null;
+    }
+  }
+
+  /**
+   * The treasure data for a new item of the preset's Foundry type, or null
+   * for a plain item. A page players cannot open in Chronicle gives its name
+   * only (that is only reached on an actor no player sees); an unread page
+   * does too.
+   * @param {{entity: object, perms: object|null}|null} page - from _readItemPage
+   * @returns {{type: string, system: object, flags: object}|null}
+   * @private
+   */
+  _treasureFrom(page) {
     if (!this._itemType) return null;
-    const built = await this._treasureUpdate(entityId);
+    const built = page ? this._treasureBuild(page) : null;
     if (!built) return { type: this._itemType, system: {}, flags: {} };
     return {
       type: this._itemType,
@@ -629,11 +687,13 @@ export class ItemSync {
    */
   async _treasureUpdate(entityId) {
     if (!entityId || !this._itemType) return null;
+    const page = await this._readItemPage(entityId);
+    return page ? this._treasureBuild(page) : null;
+  }
+
+  /** @private */
+  _treasureBuild({ entity, perms }) {
     try {
-      const [entity, perms] = await Promise.all([
-        this._api.get(`/entities/${entityId}`),
-        this._api.get(`/entities/${entityId}/permissions`).catch(() => null),
-      ]);
       const choicesFor = (path) => foundry.utils.getProperty(globalThis.CONFIG, path) ?? null;
       const { update, unknown } = treasureUpdate({
         entity, fields: this._itemFields, choicesFor, showWords: playersCanView(entity, perms), clear: true,
@@ -641,7 +701,7 @@ export class ItemSync {
       if (unknown.length) console.debug(`Chronicle: "${entity?.name}" values with no Draw Steel equivalent were left out: ${unknown.join('; ')}`);
       return { update, sig: treasureSignature(update) };
     } catch (err) {
-      console.warn(`Chronicle: Failed to read item page ${entityId} for its treasure data`, err);
+      console.warn(`Chronicle: Failed to build the treasure data of item page ${entity?.id}`, err);
       return null;
     }
   }

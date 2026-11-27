@@ -13,18 +13,20 @@ import { flagRemoval } from './_flag-removal.mjs';
 import { noticeText, escapeHtml } from './_escape-html.mjs';
 import { getSetting, setSetting, getSyncExclusions, getUserMappings } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
+import { conflictEvent } from './_history-report.mjs';
 import { FLAG_SCOPE, KEEP_LOCAL_FLAG, syncOptions } from './constants.mjs';
 import { TYPE_SLUG_FLAG } from './_shop-journal.mjs';
 import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
 import {
   toFoundrySecrets, toChronicleSecrets, secretBlockRanges, PART_ATTR,
   hideSecrets, restoreSecrets, secretKeyer, hasClearSecrets, DEFAULT_PLACEHOLDER_TEXT,
-  applyReveals, carryReveals, revealableSecrets, hasSecretBlock,
+  applyReveals, carryReveals, revealableSecrets, hasSecretBlock, piecesOwnedBy,
 } from './_gm-secrets.mjs';
 import { watchGMSecrets } from './gm-secret-view.mjs';
 import { newJournalSheetFlags } from './chronicle-sheet.mjs';
 import { playerSafeFacts } from './_chronicle-sheet-model.mjs';
 import { defaultLevelForVisibility } from './_ownership.mjs';
+import { inDmOnlyCategory } from './_dm-only-category.mjs';
 import { isCalendarNoteJournal } from './calendar-sync.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
 import { walkEntityPages, unwrapEntityList } from './_entity-page-walk.mjs';
@@ -34,7 +36,7 @@ import { isMapJournal } from './_journal-ownership.mjs';
 import { pickJournalCreateType, buildEntityCreateBody } from './_journal-create.mjs';
 import { JournalPushDebouncer } from './_journal-push-debounce.mjs';
 import { mergeJournalChange, changedJournalFields } from './_journal-push-fields.mjs';
-import { setAside, LINK_FLAGS } from './_set-aside.mjs';
+import { setAside, LINK_FLAGS, LINK_ID_FLAGS, touchesLinkFlags } from './_set-aside.mjs';
 import { isOldNotesJournal } from './_notes-folder.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { collapseChanges } from './_change-feed.mjs';
@@ -174,6 +176,14 @@ export class JournalSync {
      * @type {Map<string, string>}
      */
     this._secretPieces = new Map();
+    /**
+     * The Chronicle page each placeholder id came from. A page is only ever
+     * filled or restored from its own pieces: a player who owns one journal
+     * could otherwise paste another journal's placeholder id into it and
+     * have the GM's client fill that GM-only text in.
+     * @type {Map<string, string>}
+     */
+    this._secretOwners = new Map();
     /** @type {Map<string, Promise<void>>} entity id -> read in flight */
     this._secretLoads = new Map();
     /** Journals already warned about this session, by id. */
@@ -1486,6 +1496,18 @@ export class JournalSync {
    * @private
    */
   async _handleUpdateJournal(journal, change, options, userId) {
+    // A player who owns a journal can rewrite its link to Chronicle, which
+    // would have this client pull another page's text into it or aim their
+    // pushes there. Only this client's sync writes links, so a player's
+    // change to one unlinks the journal; the old link is gone, and the GM can
+    // link it again from the dashboard. Checked before the sync-write option,
+    // which a player's client can send too.
+    if (userId !== game.user.id && sendsChangeHere(userId) && touchesLinkFlags(change, FLAG_SCOPE, LINK_ID_FLAGS)) {
+      await journal.update(flagRemoval(FLAG_SCOPE, ...LINK_FLAGS, 'pushedPermissions'), syncOptions());
+      const notice = game.i18n.format('CHRONICLE.Notifications.PlayerLinkUndone', { name: noticeText(journal.name) });
+      ui.notifications?.warn?.(notice, { permanent: true });
+      return;
+    }
     if (options?.chronicleSync) return;
     if (!sendsChangeHere(userId)) return;
 
@@ -1554,7 +1576,7 @@ export class JournalSync {
   _fillReveals(page, change) {
     const content = change?.text?.content;
     if (typeof content !== 'string' || !page?.parent?.getFlag(FLAG_SCOPE, 'entityId')) return;
-    const next = applyReveals(content, this._secretPieces, secretPlaceholderText(), _sanitizeIncomingHTML);
+    const next = applyReveals(content, this._piecesOf(page.parent.getFlag(FLAG_SCOPE, 'entityId')), secretPlaceholderText(), _sanitizeIncomingHTML);
     if (next !== null) change.text.content = next;
   }
 
@@ -1900,6 +1922,14 @@ export class JournalSync {
    */
   async _buildOwnership(entity) {
     const L = CONST.DOCUMENT_OWNERSHIP_LEVELS;
+
+    // A page in a DM-only category is private whatever its own visibility
+    // says, a player grant included: Chronicle never shows it to players.
+    if (inDmOnlyCategory(entity, this._tree?.types)) {
+      const level = defaultLevelForVisibility(true);
+      if (level <= L.NONE) this._syncManager?.noteDmOnlyHidden?.();
+      return { default: level };
+    }
 
     // Simple / legacy visibility — honor the operator's dmOnlyHidden +
     // defaultOwnership dashboard controls.
@@ -2308,10 +2338,10 @@ export class JournalSync {
   /** @private */
   async _forPush(journal, html, entityId, { fetch = true } = {}) {
     const label = secretPlaceholderText();
-    let r = restoreSecrets(html, this._secretPieces, label, _sanitizeIncomingHTML);
+    let r = restoreSecrets(html, this._piecesOf(entityId), label, _sanitizeIncomingHTML);
     if (r.missing.length && fetch && entityId) {
       await this._loadSecretPieces(entityId);
-      r = restoreSecrets(html, this._secretPieces, label, _sanitizeIncomingHTML);
+      r = restoreSecrets(html, this._piecesOf(entityId), label, _sanitizeIncomingHTML);
     }
     if (r.missing.length) {
       if (!this._warnedUnrestored.has(journal.id)) {
@@ -2358,8 +2388,25 @@ export class JournalSync {
     const { html: hidden, pieces } = await hideSecrets(
       await this._withPictures(toFoundrySecrets(html)), secretPlaceholderText(), secretKeyer(getSetting('apiKey'), entityId),
     );
-    for (const [id, content] of pieces) this._secretPieces.set(id, content);
+    this._keepPieces(entityId, pieces);
     return _sanitizeIncomingHTML(hidden);
+  }
+
+  /** Remember a page's GM-only pieces, each under the page it came from. */
+  _keepPieces(entityId, pieces) {
+    for (const [id, content] of pieces) {
+      this._secretPieces.set(id, content);
+      this._secretOwners.set(id, entityId);
+    }
+  }
+
+  /**
+   * The GM-only pieces of one Chronicle page only.
+   * @param {string|undefined} entityId
+   * @returns {Map<string, string>}
+   */
+  _piecesOf(entityId) {
+    return piecesOwnedBy(this._secretPieces, this._secretOwners, entityId);
   }
 
   /**
@@ -2381,7 +2428,7 @@ export class JournalSync {
         const { pieces } = await hideSecrets(
           toFoundryPictures(toFoundrySecrets(html), () => undefined), secretPlaceholderText(), secretKeyer(getSetting('apiKey'), entityId),
         );
-        for (const [id, content] of pieces) this._secretPieces.set(id, content);
+        this._keepPieces(entityId, pieces);
       }
     })().finally(() => this._secretLoads.delete(entityId));
     this._secretLoads.set(entityId, load);
@@ -2519,8 +2566,12 @@ export class JournalSync {
    */
   async _handleConflict(journal, entityId, body, editedAt) {
     // A part set to "From Foundry" takes nothing from Chronicle, a conflict included.
-    const strategy = this._syncManager?.pullGate?.('journals') === 'drop' ? 'foundry' : getSetting('conflictResolution');
+    const forced = this._syncManager?.pullGate?.('journals') === 'drop';
+    const strategy = forced ? 'foundry' : getSetting('conflictResolution');
     console.warn(`Chronicle: Conflict on entity ${entityId}, strategy="${strategy}"`);
+    // Field names only: the history never carries the values themselves.
+    const fields = Object.keys(body ?? {});
+    const settled = (kept, reason) => conflictEvent({ kind: 'page', resourceId: entityId, name: journal.name, kept, reason, fields });
 
     switch (strategy) {
       case 'chronicle': {
@@ -2530,7 +2581,7 @@ export class JournalSync {
           await this._onEntityUpdated(entity);
         }
         ui.notifications.warn(game.i18n.format('CHRONICLE.Notifications.ConflictKeptChronicle', { name: noticeText(journal.name) }));
-        this._syncManager?.logActivity?.('update', `Conflict on "${journal.name}": kept the Chronicle version`);
+        this._syncManager?.logActivity?.('update', `Conflict on "${journal.name}": kept the Chronicle version`, settled('chronicle', 'setting'));
         break;
       }
       case 'foundry': {
@@ -2540,7 +2591,7 @@ export class JournalSync {
         await this._recordPush(journal, result);
         await this._hidePushedSecrets(journal, result);
         ui.notifications.warn(game.i18n.format('CHRONICLE.Notifications.ConflictKeptFoundry', { name: noticeText(journal.name) }));
-        this._syncManager?.logActivity?.('update', `Conflict on "${journal.name}": kept the Foundry version`);
+        this._syncManager?.logActivity?.('update', `Conflict on "${journal.name}": kept the Foundry version`, settled('foundry', forced ? 'part' : 'setting'));
         break;
       }
       case 'newest':
@@ -2558,11 +2609,11 @@ export class JournalSync {
           const result = await this._api.put(`/entities/${entityId}`, body);
           await this._recordPush(journal, result);
           await this._hidePushedSecrets(journal, result);
-          this._syncManager?.logActivity?.('update', `Conflict on "${journal.name}": the Foundry version was newer and was kept`);
+          this._syncManager?.logActivity?.('update', `Conflict on "${journal.name}": the Foundry version was newer and was kept`, settled('foundry', 'newer'));
         } else if (remote) {
           // Remote is newer — re-pull.
           await this._onEntityUpdated(remote);
-          this._syncManager?.logActivity?.('update', `Conflict on "${journal.name}": the Chronicle version was newer and was kept`);
+          this._syncManager?.logActivity?.('update', `Conflict on "${journal.name}": the Chronicle version was newer and was kept`, settled('chronicle', 'newer'));
         }
         break;
       }
@@ -2606,8 +2657,9 @@ export class JournalSync {
         // Update existing page.
         const page = existingTextPages[i];
         // A pull keeps what the GM revealed at the table.
-        const kept = carryReveals(page.text?.content, section.content);
-        const updates = { 'text.content': applyReveals(kept, this._secretPieces, secretPlaceholderText(), _sanitizeIncomingHTML) ?? kept };
+        const own = this._piecesOf(journal.getFlag(FLAG_SCOPE, 'entityId'));
+        const kept = carryReveals(page.text?.content, section.content, own, _sanitizeIncomingHTML);
+        const updates = { 'text.content': applyReveals(kept, own, secretPlaceholderText(), _sanitizeIncomingHTML) ?? kept };
         if (page.name !== section.title) {
           updates.name = section.title;
         }

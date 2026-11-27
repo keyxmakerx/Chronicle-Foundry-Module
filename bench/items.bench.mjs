@@ -57,6 +57,25 @@ test('inventory changes in Chronicle reach the open world: add, quantity, and a 
   assertNoDuplicateItems(world);
 }, { settings: ON }));
 
+test('on a hero its player can see, a Director-only link and a private item page add no item', () => scenario('chr-items-hidden', async ({ seed, world }) => {
+  await openWorld(world, MODULES);
+  const { hero, item, actor } = await heroAndItem(seed, world, 'Plain Rope');
+  // A player can see this actor, so its items' names reach them.
+  actor.ownership = { ...(actor.ownership || {}), default: 2 };
+  const locket = await entityOfType(seed, 'Cursed Locket', /item/i);
+  const ring = await entityOfType(seed, 'Secret Ring', /item/i);
+  await seed.chronicle.put(`/entities/${ring.id}`, { is_private: true });
+  await seed.chronicle.post(`/entities/${hero.id}/relations`, {
+    target_entity_id: locket.id, relation_type: 'Has Item', reverse_relation_type: 'In Inventory Of', metadata: { quantity: 1 }, dm_only: true,
+  });
+  await give(seed, hero, ring, 1);
+  await give(seed, hero, item, 1);
+  await waitFor(() => itemFor(actor, item.id), 10000, 'the visible item added');
+  await settle();
+  assert.deepEqual(itemsOf(actor).map((i) => i.name), ['Plain Rope'], 'only the item players may know of');
+  assertNoDuplicateItems(world);
+}, { settings: ON }));
+
 test('inventory changed while Foundry was closed arrives on open, and a second open writes nothing', () => scenario('chr-items-offline', async ({ seed, world }) => {
   await openWorld(world, MODULES);
   const { hero, item, actor } = await heroAndItem(seed, world, 'Rope');
