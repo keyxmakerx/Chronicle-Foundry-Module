@@ -5,7 +5,7 @@
  * pass a fake world.
  */
 import { FLAG_SCOPE, syncOptions, APPLY_OPTION } from './constants.mjs';
-import { findEntry, entryItemFill } from './_campaign-entry-item.mjs';
+import { findEntry, entryItemFill, entryTextHeld } from './_campaign-entry-item.mjs';
 import { mentionLookup } from './_entry-text.mjs';
 
 const norm = (s) => String(s ?? '').trim().toLowerCase();
@@ -58,9 +58,10 @@ export async function findIdentityItem(game, itemType, name) {
  * over the campaign's entry, since it may carry the system's own advancements.
  * @param {Array<object>} [entries] - the campaign's entries for this field
  * @param {object} [entryFields] - the field's `foundry_entry_fields`
+ * @param {object} [entryEffects] - the field's `foundry_entry_effects`
  * @returns {Promise<'found'|'made'>}
  */
-export async function applyIdentityItem(actor, step, game, entries, entryFields) {
+export async function applyIdentityItem(actor, step, game, entries, entryFields, entryEffects) {
   const source = await findIdentityItem(game, step.itemType, step.wantName);
   let data;
   if (source) {
@@ -72,7 +73,7 @@ export async function applyIdentityItem(actor, step, game, entries, entryFields)
   } else {
     // A campaign's own entry has no Foundry item to copy; the flag marks it as made here.
     data = { name: step.wantName, type: step.itemType, flags: { [FLAG_SCOPE]: { chronicleMade: true } } };
-    const fill = entryItemFill(findEntry(entries, step.wantName), { mentionId: journalMentions(game), entryFields });
+    const fill = entryItemFill(findEntry(entries, step.wantName), { mentionId: journalMentions(game), entryFields, entryEffects });
     if (fill) Object.assign(data, fill);
   }
   await actor.createEmbeddedDocuments('Item', [data], writeOptions());
@@ -99,30 +100,43 @@ export function journalMentions(game) {
  * Apply a whole plan; one failed step does not stop the rest.
  * @param {Record<string, Array<object>>} [entriesByField]
  * @param {Record<string, object>} [entryFieldsByField] - each field's `foundry_entry_fields`
- * @returns {Promise<{done: string[], failed: string[]}>} field keys
+ * @param {Record<string, object>} [entryEffectsByField] - each field's `foundry_entry_effects`
+ * @returns {Promise<{done: string[], failed: string[], held: string[]}>} field keys done and
+ *   failed, and the names of made items whose entry text was left out for holding GM-only content
  */
-export async function applyIdentityPlan(actor, plan, game, entriesByField, entryFieldsByField) {
+export async function applyIdentityPlan(actor, plan, game, entriesByField, entryFieldsByField, entryEffectsByField) {
   const done = [];
   const failed = [];
+  const held = [];
   for (const step of plan) {
     try {
-      await applyIdentityItem(actor, step, game, entriesByField?.[step.fieldKey], entryFieldsByField?.[step.fieldKey]);
+      const entries = entriesByField?.[step.fieldKey];
+      const how = await applyIdentityItem(actor, step, game, entries, entryFieldsByField?.[step.fieldKey], entryEffectsByField?.[step.fieldKey]);
       done.push(step.fieldKey);
+      if (how === 'made' && entryTextHeld(findEntry(entries, step.wantName))) held.push(step.wantName);
     } catch (err) {
       console.error(`Chronicle: could not set ${step.fieldKey} "${step.wantName}" on "${actor.name}"`, err);
       failed.push(step.fieldKey);
     }
   }
-  return { done, failed };
+  return { done, failed, held };
 }
 
 /**
  * Rewrite the text of items sync made whose campaign entry changed
- * (`planEntryRefresh`). One write for all of them.
+ * (`planEntryRefresh`), one write for all of them, then each item's own
+ * effect. Only the effect sync put there is rewritten or taken off.
  * @returns {Promise<string[]>} the field keys refreshed
  */
 export async function applyEntryRefresh(actor, refresh) {
   if (!refresh.length) return [];
   await actor.updateEmbeddedDocuments('Item', refresh.map((r) => r.update), writeOptions());
+  for (const { itemId, effect } of refresh) {
+    const item = effect && actor.items?.get?.(itemId);
+    if (!item) continue;
+    if (effect.create) await item.createEmbeddedDocuments('ActiveEffect', [effect.create], writeOptions());
+    if (effect.update) await item.updateEmbeddedDocuments('ActiveEffect', [effect.update], writeOptions());
+    if (effect.remove) await item.deleteEmbeddedDocuments('ActiveEffect', [effect.remove], writeOptions());
+  }
   return refresh.map((r) => r.fieldKey);
 }
