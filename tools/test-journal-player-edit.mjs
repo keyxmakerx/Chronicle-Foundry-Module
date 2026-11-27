@@ -201,3 +201,53 @@ test('with journals not synced, the link guard still undoes a player\'s link cha
     globalThis.Hooks = realHooks;
   }
 });
+
+// A Chronicle change applied while a player's link change is still being
+// undone, or while it lands during the apply's own awaits, writes nothing.
+function applyRig(js, { onPull } = {}) {
+  js._isExcluded = () => false;
+  js._followsVisibility = () => false;
+  js._placeJournal = async () => {};
+  js._pullHtml = async (_id, html) => { await onPull?.(); return html; };
+  js._journalPushDebouncer.has = () => false;
+  js._olderThanRecorded = () => false;
+}
+const SECRET_PAGE = { id: 'B', name: 'Secret', entry_html: '<p>secret text</p>', updated_at: '2026-10-03T05:00:00Z' };
+
+test('a Chronicle change does not reach a journal whose player-set link is still being undone', async () => {
+  const j = makeJournal({ flags: { entityId: 'B' }, pages: [page('<p>mine</p>')] });
+  installJournals([j]);
+  const { js } = make();
+  applyRig(js);
+  const realUpdate = j.update;
+  let land;
+  j.update = (data, options) => new Promise((resolve) => { land = () => resolve(realUpdate(data, options)); });
+  const unlink = js._guardUpdate(j, { flags: { 'chronicle-sync': { entityId: 'B' } } }, 'player');
+  assert.ok(unlink, 'the guard undoes the change');
+  await js._applyEntityUpdated(SECRET_PAGE);
+  assert.equal(j.name, 'Journal');
+  assert.equal(j.pages[0].text.content, '<p>mine</p>');
+  j.update = realUpdate;
+  land();
+  await unlink;
+  assert.equal(j.flags.entityId, undefined);
+  assert.equal(js._holdsLink(j, 'B'), false);
+});
+
+test('a player\'s link change landing during an apply\'s awaits stops the apply\'s later writes', async () => {
+  const j = makeJournal({ flags: { entityId: 'A' }, pages: [page('<p>A text</p>')] });
+  installJournals([j]);
+  const { js } = make();
+  let unlink;
+  applyRig(js, {
+    onPull: () => {
+      // The player re-points the journal while this client fetches the text.
+      j.flags.entityId = 'B';
+      unlink = js._guardUpdate(j, { flags: { 'chronicle-sync': { entityId: 'B' } } }, 'player');
+    },
+  });
+  await js._applyEntityUpdated({ id: 'A', name: 'Journal', entry_html: '<p>A text, edited</p>', updated_at: '2026-10-03T05:00:00Z' });
+  await unlink;
+  assert.equal(j.pages[0].text.content, '<p>A text</p>', 'no page written after the link changed');
+  assert.equal(j.flags.entityId, undefined);
+});

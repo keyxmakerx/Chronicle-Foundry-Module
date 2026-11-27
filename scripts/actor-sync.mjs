@@ -53,6 +53,7 @@ import { folderKindFor, needsPlacing, FOLDER_PLACED_FLAG, ACTOR_FOLDER_FLAG, HER
 import { CLASS_PICK_FLAG, classPick, pickToFinish, pickChanged, SUBCLASS_PICK_FLAG, subclassPicks, subclassesToFinish, subclassPickChanged } from './_finish-hero.mjs';
 import { npcActorTypeFor, actorTypeForPage, switchTarget } from './_npc-character.mjs';
 import { ActorTypeSwitch, switchActorType } from './actor-type-switch.mjs';
+import LinkFence from './_link-fence.mjs';
 
 /** How long a read of the campaign's pick-list entries is reused. */
 const ENTRY_CACHE_MS = 30_000;
@@ -75,6 +76,9 @@ export class ActorSync {
   constructor() {
     /** @type {import('./api-client.mjs').ChronicleAPI|null} */
     this._api = null;
+
+    /** Actors whose player-set link is being undone (_link-fence.mjs). */
+    this._fence = new LinkFence();
 
     /** @type {import('./sync-manager.mjs').SyncManager|null} */
     this._syncManager = null;
@@ -1440,15 +1444,23 @@ export class ActorSync {
       const sendingPictures = this._sendingPictures.has(actor.id)
         || [this._pendingChanges, this._pushingChanges].some((m) => m.get(actor.id)?.[PICTURES_CHANGED]);
       if (!sendingPictures) Object.assign(changes, await this._picturePlan(entity, actor));
+      // Asked again before each step below: a player's link change can land
+      // during any await (_link-fence.mjs).
+      const holds = () => this._fence.holds(actor.id, actor.getFlag(FLAG_SCOPE, 'entityId'), entity.id);
+      if (!holds()) return true;
       if (Object.keys(changes).length > 0) {
         await actor.update(changes, syncOptions({ [APPLY_OPTION]: true }));
       }
 
       if (!npc) {
+        if (!holds()) return true;
         await this._applyIdentityItems(actor, entity);
+        if (!holds()) return true;
         await this._recordClassPick(actor, entity);
+        if (!holds()) return true;
         await this._replanLayers(actor, entity);
       }
+      if (!holds()) return true;
 
       // Sync visibility: Chronicle is_private → Foundry actor hidden.
       // A private entity means the NPC is hidden from players.
@@ -1572,7 +1584,7 @@ export class ActorSync {
     // An actor a player makes never arrives linked: the link is theirs to
     // write and would aim their later pushes at someone else's character.
     // Checked before the apply skip, since their client can send that option.
-    if (undoesLinkChangeHere(userId) && actor.getFlag(FLAG_SCOPE, 'entityId')) await this._unlinkCopy(actor);
+    if (undoesLinkChangeHere(userId) && actor.getFlag(FLAG_SCOPE, 'entityId')) await this._fence.undo(actor.id, () => this._unlinkCopy(actor));
     if (options?.[APPLY_OPTION]) return;
 
     // A copy (Duplicate, an import of an export) carries the original's link,
@@ -1706,7 +1718,7 @@ export class ActorSync {
     // link, so a player's change to it unlinks the actor (as a copy is).
     // Checked before the sync-write option, which a player's client can send.
     if (undoesLinkChangeHere(userId) && touchesLinkFlags(change, FLAG_SCOPE, ['entityId'])) {
-      await this._unlinkCopy(actor);
+      await this._fence.undo(actor.id, () => this._unlinkCopy(actor));
       const notice = game.i18n.format('CHRONICLE.Notifications.PlayerLinkUndone', { name: noticeText(actor.name) });
       ui.notifications?.warn?.(notice, { permanent: true });
       return;

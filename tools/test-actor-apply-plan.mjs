@@ -59,6 +59,6 @@ test('ActorSync applies through the plan, with the apply option', () => {
   // Echoes are recognised by the write's own option, never a shared flag.
   // Only the player link guard, which a forged option must not skip, runs first.
   assert.match(src, /async _handleUpdateActor[^{]*\{\n(    \/\/[^\n]*\n)+    if \(undoesLinkChangeHere\(userId\) && touchesLinkFlags\([^\n]*\n[\s\S]*?\n    \}\n    if \(options\?\.\[APPLY_OPTION\]\) return;/);
-  assert.match(src, /async _handleCreateActor[^{]*\{\n(    \/\/[^\n]*\n)+    if \(undoesLinkChangeHere\(userId\) && [^\n]*_unlinkCopy\(actor\);\n    if \(options\?\.\[APPLY_OPTION\]\) return;/);
+  assert.match(src, /async _handleCreateActor[^{]*\{\n(    \/\/[^\n]*\n)+    if \(undoesLinkChangeHere\(userId\) && [^\n]*_unlinkCopy\(actor\)\)?;\n    if \(options\?\.\[APPLY_OPTION\]\) return;/);
   assert.doesNotMatch(src, /_syncing/);
 });
