@@ -224,6 +224,11 @@ export class ActorSync {
       await this._onLayersChanged(msg.resourceId);
       return;
     }
+    if (msg.type === 'system_entry.changed') {
+      const fieldKey = msg.payload?.fieldKey;
+      if (typeof fieldKey === 'string' && fieldKey) await this._refreshMadeItems(fieldKey);
+      return;
+    }
 
     // Only handle entity events.
     if (!msg.type?.startsWith('entity.')) return;
@@ -417,6 +422,14 @@ export class ActorSync {
       await this._checkActorTypes(listed);
     } catch (err) {
       console.warn('Chronicle: could not check hero and NPC actor types', err);
+    }
+
+    // A campaign entry edited while this world was closed reaches no hero's
+    // page, so the items made from entries are checked against them here.
+    try {
+      await this._refreshMadeItems();
+    } catch (err) {
+      console.warn('Chronicle: could not refresh items made from campaign entries', err);
     }
 
     // Surface unresolved character links (broken / missing) so the GM can
@@ -1230,6 +1243,46 @@ export class ActorSync {
         actor: noticeText(actor.name),
         fields: '',
       }));
+    }
+  }
+
+  /**
+   * Bring the items sync made from campaign entries up to date with those
+   * entries, for one field or all. An entry edit changes no hero's page, so
+   * Chronicle announces it (`system_entry.changed`) and connect calls this
+   * too. The hero's picks are the ones last applied from Chronicle, and an
+   * item is rewritten only when its entry's `updatedAt` moved
+   * (`planEntryRefresh`), so running it again changes nothing.
+   * @param {string} [fieldKey] - one field, or every identity field
+   * @private
+   */
+  async _refreshMadeItems(fieldKey) {
+    if (!game.user?.isGM || !this._adapter || !this._api) return;
+    const fieldDefs = this._adapter.identityFields ?? [];
+    const fields = identityFieldTypes(fieldDefs).filter((f) => !fieldKey || f.fieldKey === fieldKey);
+    if (!fields.length) return;
+    // A cached list would hold the entry as it was before the edit.
+    for (const { fieldKey: key } of fields) this._entryCache?.delete(key);
+    const entryFieldsByField = Object.fromEntries(fieldDefs.map((d) => [d.key, d.foundry_entry_fields]));
+    const actors = game.actors?.contents ?? Array.from(game.actors ?? []);
+    for (const actor of actors) {
+      const entityId = actor.getFlag?.(FLAG_SCOPE, 'entityId');
+      if (!entityId || this._isLinkedNpc(actor)) continue;
+      await this._inTurn(entityId, async () => {
+        const items = actor.items?.contents ?? Array.from(actor.items ?? []);
+        const made = fields.filter(({ itemType }) => items.find((it) => it?.type === itemType)?.flags?.[FLAG_SCOPE]?.chronicleMade);
+        if (!made.length) return;
+        try {
+          const entriesByField = await this._campaignEntries(made.map((f) => f.fieldKey));
+          const refresh = planEntryRefresh({
+            items, fields: made, fieldsData: actor.getFlag(FLAG_SCOPE, IDENTITY_APPLIED_FLAG) ?? {},
+            entriesByField, mentionId: journalMentions(game), entryFieldsByField,
+          });
+          if (refresh.length) await applyEntryRefresh(actor, refresh);
+        } catch (err) {
+          console.error(`Chronicle: could not refresh campaign entries on "${actor.name}"`, err);
+        }
+      });
     }
   }
 
