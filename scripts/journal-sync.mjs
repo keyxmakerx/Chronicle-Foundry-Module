@@ -2615,7 +2615,7 @@ export class JournalSync {
         // Update existing page.
         const page = existingTextPages[i];
         // A pull keeps what the GM revealed at the table.
-        const kept = carryReveals(page.text?.content, section.content);
+        const kept = carryReveals(page.text?.content, section.content, this._secretPieces, _sanitizeIncomingHTML);
         const updates = { 'text.content': applyReveals(kept, this._secretPieces, secretPlaceholderText(), _sanitizeIncomingHTML) ?? kept };
         if (page.name !== section.title) {
           updates.name = section.title;
