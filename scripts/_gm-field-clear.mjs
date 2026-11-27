@@ -88,3 +88,16 @@ function fingerprint(text) {
 export function holdsGmFieldText(actor, fields) {
   return clearableGmFields(fields).some((f) => comparable(readPath(actor, f.foundry_clear_path)) !== '');
 }
+
+/**
+ * Keys this one page marks GM-only on a field added to it (Chronicle's
+ * `field_overrides.added`). Chronicle withholds such a value from players on
+ * that page, so sync never writes it onto the Foundry document either.
+ * @param {object} entity
+ * @returns {Set<string>}
+ */
+export function pageGmOnlyKeys(entity) {
+  const added = entity?.field_overrides?.added;
+  if (!Array.isArray(added)) return new Set();
+  return new Set(added.filter((d) => d?.gm_only && typeof d.key === 'string').map((d) => d.key));
+}

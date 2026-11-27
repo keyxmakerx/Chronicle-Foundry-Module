@@ -13,6 +13,7 @@
  */
 
 import { readPath, sameValue } from './_actor-apply-plan.mjs';
+import { pageGmOnlyKeys } from './_gm-field-clear.mjs';
 
 /** Formats this module converts; a field with any other format is skipped. */
 export const CREATURE_FORMATS = new Set(['set', 'integer', 'size', 'fraction', 'ac_flat', 'type_subtype']);
@@ -156,8 +157,9 @@ export function creatureUpdate({ entity, fields, pullKeys = [], choicesFor }) {
   const data = entity?.fields_data || {};
   const update = {};
   const unknown = [];
+  const hiddenHere = pageGmOnlyKeys(entity);
   for (const field of fields || []) {
-    if (!field.foundry_path || field.foundry_collection || field.gm_only) continue;
+    if (!field.foundry_path || field.foundry_collection || field.gm_only || hiddenHere.has(field.key)) continue;
     if (field.foundry_writable === false || pullKeys.includes(field.key)) continue;
     const out = toFoundryValue(field, data[field.key], choicesFor);
     if (out.unknown) unknown.push(...out.unknown.map((u) => `${field.label || field.key}: ${u}`));

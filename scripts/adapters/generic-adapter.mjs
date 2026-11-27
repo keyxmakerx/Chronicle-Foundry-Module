@@ -18,7 +18,7 @@
 
 import { touchedScalarKeys, ITEMS_CHANGED } from '../_actor-field-diff.mjs';
 import { identityFieldDefs } from '../_identity-item-plan.mjs';
-import { clearableGmFields } from '../_gm-field-clear.mjs';
+import { clearableGmFields, pageGmOnlyKeys } from '../_gm-field-clear.mjs';
 
 /**
  * Create a generic adapter instance by fetching field definitions from the API.
@@ -168,19 +168,6 @@ export async function createGenericAdapter(api, chronicleSystemId) {
       return update;
     },
   };
-}
-
-/**
- * Keys this one page marks GM-only on a field added to it (Chronicle's
- * `field_overrides.added`). Chronicle withholds such a value from players on
- * that page, so sync never writes it onto the actor either.
- * @param {object} entity
- * @returns {Set<string>}
- */
-export function pageGmOnlyKeys(entity) {
-  const added = entity?.field_overrides?.added;
-  if (!Array.isArray(added)) return new Set();
-  return new Set(added.filter((d) => d?.gm_only && typeof d.key === 'string').map((d) => d.key));
 }
 
 /**

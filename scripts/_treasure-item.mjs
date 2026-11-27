@@ -15,6 +15,7 @@
  */
 
 import { resolveChoice } from './_creature-fields.mjs';
+import { pageGmOnlyKeys } from './_gm-field-clear.mjs';
 
 /** Formats this module converts for treasures; any other is skipped. */
 export const TREASURE_FORMATS = new Set(['set', 'integer', 'treasure_keywords', 'html_section']);
@@ -116,7 +117,8 @@ export function textHtml(raw) {
 export function treasureUpdate({ entity, fields, choicesFor, showWords, clear = false }) {
   const update = {};
   const unknown = [];
-  const mapped = (fields || []).filter((f) => f?.foundry_path && f.key && !f.gm_only);
+  const hiddenHere = pageGmOnlyKeys(entity);
+  const mapped = (fields || []).filter((f) => f?.foundry_path && f.key && !f.gm_only && !hiddenHere.has(f.key));
   if (!showWords) return { update: clear ? emptied(mapped, update) : update, unknown };
   const data = entity?.fields_data && typeof entity.fields_data === 'object' ? entity.fields_data : {};
   const sections = [];

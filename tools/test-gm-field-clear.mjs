@@ -115,3 +115,13 @@ test('a field one page marks GM-only is not written for that page', async () => 
   assert.equal(update['system.characteristics.might.value'], 2);
   assert.equal(adapter.fromChronicleFields(ENTITY)['system.biography.value'], 'Born under ash');
 });
+
+test('creature and item updates skip a field one page marks GM-only', () => {
+  const lore = { key: 'lore', label: 'Lore', foundry_path: 'system.description.value' };
+  const page = { name: 'Goblin', fields_data: { lore: SECRET }, field_overrides: { added: [{ key: 'lore', gm_only: true }] } };
+  assert.ok(!JSON.stringify(creatureUpdate({ entity: page, fields: [lore], choicesFor: () => null }).update).includes(SECRET));
+  const item = treasureUpdate({ entity: page, fields: [lore], choicesFor: () => null, showWords: true });
+  assert.ok(!JSON.stringify(item.update).includes(SECRET), JSON.stringify(item.update));
+  const open = { ...page, field_overrides: undefined };
+  assert.ok(JSON.stringify(creatureUpdate({ entity: open, fields: [lore], choicesFor: () => null }).update).includes(SECRET));
+});
