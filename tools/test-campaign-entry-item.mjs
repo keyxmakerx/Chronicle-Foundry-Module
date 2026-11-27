@@ -6,7 +6,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ENTRY_TEXT_FORMAT, entryDescriptionHTML, entryItemFill, entryItemValues, findEntry, planEntryRefresh } from '../scripts/_campaign-entry-item.mjs';
+import { ENTRY_TEXT_FORMAT, entryDescriptionHTML, entryItemFill, entryItemValues, findEntry, planEntryRefresh, usableEntryPath } from '../scripts/_campaign-entry-item.mjs';
 import { applyIdentityItem, applyEntryRefresh } from '../scripts/_identity-item-apply.mjs';
 import { identityFieldTypes } from '../scripts/_identity-item-plan.mjs';
 
@@ -189,4 +189,21 @@ test('refresh: a changed kit entry rewrites its bonuses too', () => {
   assert.equal(plan[0].update['system.bonuses.stamina'], 6);
   assert.equal(plan[0].update['system.bonuses.melee.damage.tier3'], 4);
   assert.equal(plan[0].update['system.description.value'], entryDescriptionHTML(BOG));
+});
+
+test('a mapped path that could reach a shared object, or runs too deep, writes nothing', () => {
+  const bad = [
+    'system.__proto__.x', 'system.a.__proto__', 'system._x', 'system.1a',
+    'system.constructor.prototype.x', 'system.a.prototype', 'system.constructor',
+    'system.a.b.c.d.e.f.g.h.i', 'system', 'system.', 'system..a',
+  ];
+  for (const path of bad) {
+    assert.equal(usableEntryPath(path), false, path);
+    assert.deepEqual(entryItemValues({ properties: { stamina_bonus: '6' } }, { stamina_bonus: { path, format: 'number' } }), {}, path);
+    entryItemFill({ name: 'Bog', properties: { stamina_bonus: '6' } }, { entryFields: { stamina_bonus: { path, format: 'number' } } });
+  }
+  assert.equal(usableEntryPath('system.a.b.c.d.e.f.g.h'), true, 'eight segments under system');
+  assert.equal(({}).x, undefined, 'nothing reached the shared prototype');
+  const made = entryItemFill({ name: 'Bog', properties: { stamina_bonus: '6' } }, { entryFields: { stamina_bonus: { path: 'system.bonuses.stamina', format: 'number' } } });
+  assert.equal(Object.getPrototypeOf(made.system.bonuses), Object.prototype, 'Foundry gets plain objects');
 });

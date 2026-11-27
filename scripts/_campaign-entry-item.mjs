@@ -22,6 +22,21 @@ export const ENTRY_TEXT_FORMAT = 3;
 /** Longest text a `text` mapping writes; an entry property is a short value. */
 const MAX_ENTRY_TEXT = 1000;
 
+/**
+ * A mapped path: under the item's system data, at most eight segments, each
+ * starting with a letter. Chronicle checks the same; this is the module's
+ * own check on what it writes into a Foundry document.
+ */
+const ENTRY_FIELD_PATH = /^system(\.[A-Za-z][A-Za-z0-9_]*){1,8}$/;
+// Names an object path could use to reach a shared prototype.
+const RESERVED_SEGMENTS = new Set(['constructor', 'prototype']);
+
+/** True when a manifest path may be written onto an item. */
+export function usableEntryPath(path) {
+  return typeof path === 'string' && ENTRY_FIELD_PATH.test(path)
+    && !path.split('.').some((seg) => RESERVED_SEGMENTS.has(seg));
+}
+
 const norm = (s) => String(s ?? '').trim().toLowerCase();
 
 const escapeHTML = (s) => String(s ?? '')
@@ -104,7 +119,7 @@ export function entryItemValues(entry, entryFields) {
   const out = {};
   for (const [key, def] of Object.entries(entryFields ?? {})) {
     const path = def?.path;
-    if (typeof path !== 'string' || !/^system(\.[A-Za-z0-9_]+)+$/.test(path) || !(key in props)) continue;
+    if (!usableEntryPath(path) || !Object.hasOwn(props, key)) continue;
     const value = props[key];
     if (def.format === 'number') {
       const n = entryNumber(value);
@@ -121,14 +136,20 @@ export function entryItemValues(entry, entryFields) {
 
 /** Dotted values as nested objects, for an item that doesn't exist yet. */
 function nestValues(values) {
-  const out = {};
+  // Built on prototype-less objects and own keys only, so no path can reach
+  // an inherited property; cloned at the end because Foundry expects plain
+  // objects.
+  const out = Object.create(null);
   for (const [path, value] of Object.entries(values)) {
     const keys = path.split('.');
     let node = out;
-    for (const k of keys.slice(0, -1)) node = (node[k] && typeof node[k] === 'object') ? node[k] : (node[k] = {});
+    for (const k of keys.slice(0, -1)) {
+      if (!Object.hasOwn(node, k) || typeof node[k] !== 'object') node[k] = Object.create(null);
+      node = node[k];
+    }
     node[keys[keys.length - 1]] = value;
   }
-  return out;
+  return structuredClone(out);
 }
 
 /** The entry for this field and name, or null. */
