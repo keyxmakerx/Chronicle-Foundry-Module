@@ -107,6 +107,14 @@ test('only today\'s moon nights reach the sky, as the payload its code parses', 
   assert.deepEqual(JSON.parse(ev[0].payload), { type: 'blood', moons: [1] });
 });
 
+test('the sky code\'s own rule for today\'s events wins when given (a comet whose days run over today)', () => {
+  const comet = { id: 'c', year: 1247, month: 1, day: 2, end_year: 1247, end_month: 1, end_day: 20, payload: '{"type":"comet"}' };
+  const seen = [];
+  const ev = SC.skyEvents({ ...view, events: [...view.events, comet] }, (all) => { seen.push(all.length); return all.filter((e) => e.id === 'c'); });
+  assert.deepEqual(ev.map((e) => e.id), ['c']);
+  assert.equal(seen[0], view.events.length + 1, 'the rule sees every event');
+});
+
 test('what falls in front of the figure follows the weather', () => {
   assert.equal(SC.frontWeather({ icon: 'snow' }), 'snow');
   assert.equal(SC.frontWeather({ icon: 'cloud', precipitation: { type: 'snow' } }), 'snow');
