@@ -79,6 +79,8 @@ const ALLOWED_WS_TYPE_PREFIXES = Object.freeze([
   'creature_add.',
   'roll.',
   'cutscene.',
+  // A campaign entry was made, saved or deleted: the field only, Directors and keys only.
+  'system_entry.',
 ]);
 
 /**

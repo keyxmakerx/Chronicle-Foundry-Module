@@ -152,6 +152,8 @@ Returns character preset field definitions with Foundry annotations.
 - `foundry_actor_type` — Actor type to create/filter (e.g., "character", "hero")
 - `foundry_path` — Dot-notation path on `actor.system` (e.g., "system.abilities.str.value")
 - `foundry_writable` — Whether this field can be written back to Foundry (false = read-only from Foundry)
+- `foundry_entry_fields` — on a single-item field (a kit), where a campaign's own entry's properties go on the item sync makes for it: `{"stamina_bonus": {"path": "system.bonuses.stamina", "format": "number"}, "melee_damage_bonus": {"path": "system.bonuses.melee.damage", "format": "tiers"}}`. Formats are `number`, `text` and `tiers` (`"+0/+2/+4"` to `path.tier1`–`tier3`); a value that doesn't read is left out. Chronicle drops a mapping whose path is not under `system` (at most eight parts, each starting with a letter, never `constructor` or `prototype`), and the module checks the same again (`_campaign-entry-item.mjs` `usableEntryPath`). Re-verify by: 2026-12-27 (Chronicle `internal/systems/entry_fields.go`)
+- `system_entry.changed` (WebSocket, GM sockets only): `{ "fieldKey": "kit" }` when one of the campaign's own entries for that field is made, saved or deleted. The field only, never the entry. The module re-reads `GET /system-entries?fieldKey=` and refreshes the items it made (`ActorSync._refreshMadeItems`); not in the change feed, so connect re-checks every field. Re-verify by: 2026-12-27 (Chronicle `internal/systems/entry_announce.go`, `internal/app/system_state_adapters.go`)
 - `gm_only` — the value is the GM's alone. Such a field comes with no `foundry_path` or `foundry_collection`, so it is never written to or read from Foundry; the adapter also skips a `gm_only` field that does carry a path. `foundry_clear_path` is where the manifest put it: the connect pass and each hero apply empty that path while it still holds Chronicle's text, and tell the GM once about other text left there (`_gm-field-clear.mjs`, `tools/test-gm-field-clear.mjs`). The same holds on the creature and item field endpoints, and for a field the campaign's own category marks GM-only. A field one page marks GM-only (`field_overrides.added` on the page) is skipped for that page's actor (`pageGmOnlyKeys`)
 - `owner_only` — only the GM and the page's player see it; the mapping is kept
 
@@ -236,13 +238,16 @@ The campaign's own pick-list entries (a homebrew ancestry, kit, culture...),
 as `{"data":[{fieldKey, slug, name, summary, description, properties, updatedAt}],"total":N}`.
 Always the player view, whoever holds the key: Directors-only entries are left
 out and secret spans are stripped, because the module writes this into items
-players can open. `properties` holds scalars and lists of `{name, cost?, description?}`.
+players can open. `properties` holds scalars, lists of `{name, cost?, description?}`,
+and abilities: objects of text parts (`name`, `flavor`, `type`, `action_type`, `cost`,
+`keywords`, `distance`, `target`, `trigger`, `power_roll`, `tier1`–`tier3`, `effect`,
+`special`), at most four an entry, which `_entry-abilities.mjs` makes into ability items.
 404 on a Chronicle without the route; the module then stops asking for the
 session and leaves made items name-only.
 
-**Used by:** `actor-sync.mjs` `_campaignEntries`, `_campaign-entry-item.mjs`
+**Used by:** `actor-sync.mjs` `_campaignEntries`, `_campaign-entry-item.mjs`, `_entry-abilities.mjs`
 
-Re-verify by: 2026-11-18 (Chronicle `internal/plugins/syncapi/system_entries_api.go`)
+Re-verify by: 2026-12-27 (Chronicle `internal/plugins/syncapi/system_entries_api.go`, `internal/systems/entry_ability.go`)
 
 ---
 
@@ -1883,6 +1888,7 @@ allowlist (`api-client.mjs`) is ignored.
 | `notice_boards.updated` | `{ home }` (`page` or `category`); `resourceId` is the page id or the type id | A home's boards changed; open board windows refetch |
 | `cutscene.foundry` | `{ showingId, viewers:[chronicleUserId…], scene, rewatchUntil }`; sent only to the campaign's Foundry-module socket; not in the change feed | The Director showed a cut scene to those members |
 | `cutscene.foundry_stop` | `{ showingId }`; the same audience | The Director stopped a showing; watching it again still works |
+| `cutscene.foundry_preview` | `{ previewId, director: chronicleUserId, scene }`; the same audience; nothing is stored on either side | The Director pressed Preview in Foundry on an unsaved or saved scene. One GM client plays it on its own screen (the GM `director` is matched to when that GM is playing, else the active GM) and never relays it to other clients |
 | `roll.made` | A roll (see "Shared rolls" below); `resourceId` is the roll id. Public, gm and blind rolls in full; a self roll only to its owner's key | A roll was made at Chronicle's table or crafting, or recorded from Foundry |
 | `sync.status` | `{ connected: bool }` | Connection state change |
 | `sync.error` | `{ message }` | Synchronization error |

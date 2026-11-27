@@ -30,7 +30,7 @@ delete that comes back, an edit that never leaves Foundry).
   character turned into a journal, both sides agree on names, no failed
   writes, no hook errors, no error pop-ups).
 - `*.bench.mjs` are the scenarios, one file per area (`journals`, `actors`, `player-asks`,
-  `creatures`, `items`, `maps`, `notes`); the area name is the argument to `run.sh`.
+  `creatures`, `items`, `maps`, `notes`, `cutscenes`); the area name is the argument to `run.sh`.
 
 ## Running it
 

@@ -345,7 +345,7 @@ test('WS dispatch: every prefix in ALLOWED_WS_TYPE_PREFIXES is accepted', () => 
     const allowedPrefixes = [
       'entity.', 'entity_type.', 'map.', 'marker.', 'drawing.',
       'token.', 'layer.', 'fog.', 'note.', 'calendar.', 'relation.', 'sync.',
-      'stash.', 'downtime.', 'npc.', 'system_state.', 'hero_layers.', 'creature_add.', 'roll.', 'cutscene.',
+      'stash.', 'downtime.', 'npc.', 'system_state.', 'hero_layers.', 'creature_add.', 'roll.', 'cutscene.', 'system_entry.',
     ];
     for (const prefix of allowedPrefixes) {
       let fired = false;
@@ -431,4 +431,16 @@ test('api-client.mjs: REST fetch builds /api/v1/campaigns/{id} URL, never /synca
     !/\/syncapi\//.test(source),
     'no `/syncapi/` substring anywhere in api-client.mjs — that was the chronicle#323 drift shape',
   );
+});
+
+test('WS dispatch: a campaign entry change reaches its handler', () => {
+  installWebSocketStub();
+  try {
+    const api = makeApi();
+    api.connect();
+    let got = null;
+    api.on('system_entry.changed', (msg) => { got = msg; });
+    dispatch(api, { type: 'system_entry.changed', payload: { fieldKey: 'kit' } });
+    assert.equal(got?.payload?.fieldKey, 'kit');
+  } finally { uninstallWebSocketStub(); }
 });
