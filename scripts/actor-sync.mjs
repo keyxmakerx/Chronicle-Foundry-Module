@@ -1257,7 +1257,8 @@ export class ActorSync {
    * @private
    */
   async _refreshMadeItems(fieldKey) {
-    if (!game.user?.isGM || !this._adapter || !this._api) return;
+    // One GM's client writes, so two GMs online don't both refresh the same items.
+    if (!isActiveGM() || !this._adapter || !this._api) return;
     const fieldDefs = this._adapter.identityFields ?? [];
     const fields = identityFieldTypes(fieldDefs).filter((f) => !fieldKey || f.fieldKey === fieldKey);
     if (!fields.length) return;
