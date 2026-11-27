@@ -273,8 +273,12 @@ test('rain lands on the glass round its rim, more as it rains harder, none when 
 });
 
 const chronicle = process.env.CHRONICLE_DIR && join(process.env.CHRONICLE_DIR, 'static', 'js', 'widgets');
-test('vendored sky files match Chronicle (needs CHRONICLE_DIR)', { skip: !(chronicle && existsSync(chronicle)) && 'CHRONICLE_DIR not set' }, () => {
+// Only an unset CHRONICLE_DIR skips: a source Chronicle moved or renamed
+// must fail, or the copy would stop being checked without anyone noticing.
+test('vendored sky files match Chronicle (needs CHRONICLE_DIR)', { skip: !chronicle && 'CHRONICLE_DIR not set' }, () => {
   for (const f of SKY_FILES) {
+    assert.ok(existsSync(join(chronicle, f)),
+      `Chronicle has no static/js/widgets/${f}; it moved or was renamed, so update tools/refresh-vendor.mjs`);
     assert.ok(readFileSync(join(chronicle, f)).equals(readFileSync(join(VENDOR, f))),
       `vendor/chronicle/${f} differs from Chronicle's; copy it again from static/js/widgets/`);
   }

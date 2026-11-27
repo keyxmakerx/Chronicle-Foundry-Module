@@ -230,8 +230,12 @@ test('the narrow-window rules are Chronicle\'s phone rules for the block', () =>
 
 const chronicleDir = process.env.CHRONICLE_DIR;
 const crafting = chronicleDir && join(resolve(chronicleDir), 'internal', 'plugins', 'crafting', 'static');
-test('vendored files match Chronicle (needs CHRONICLE_DIR)', { skip: !(crafting && existsSync(crafting)) && 'CHRONICLE_DIR not set' }, () => {
+// Only an unset CHRONICLE_DIR skips: a source Chronicle moved or renamed
+// must fail, or the copy would stop being checked without anyone noticing.
+test('vendored files match Chronicle (needs CHRONICLE_DIR)', { skip: !crafting && 'CHRONICLE_DIR not set' }, () => {
   for (const [f, from] of [['crafting_lib.js', 'js'], ['crafting_tray.js', 'js'], ['crafting_block.js', 'js'], ['crafting.css', 'css'], ['spoils.css', 'css']]) {
+    assert.ok(existsSync(join(crafting, from, f)),
+      `Chronicle has no internal/plugins/crafting/static/${from}/${f}; it moved or was renamed, so update tools/refresh-vendor.mjs`);
     assert.equal(readFileSync(join(VENDOR, f), 'utf8'), readFileSync(join(crafting, from, f), 'utf8'),
       `vendor/chronicle/${f} differs from Chronicle's; copy it again from internal/plugins/crafting/static/${from}/`);
   }

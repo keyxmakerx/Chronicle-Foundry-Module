@@ -4,15 +4,18 @@
  * from Chronicle; the version check compares it with Chronicle's own list.
  * It must describe the bytes actually in vendor/chronicle/, cover every
  * file there, and name the same files the freshness tests compare with
- * Chronicle, so a copy can't be added without a byte-for-byte check.
- * Needs no Chronicle checkout.
+ * Chronicle, so a copy can't be added without a byte-for-byte check. With
+ * CHRONICLE_DIR set, a source Chronicle moved or renamed fails those tests
+ * rather than skipping them. Needs no Chronicle checkout.
  *
  * Run: node --test tools/test-vendor-manifest.mjs
  */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { VENDOR_MANIFEST } from '../scripts/_vendor-manifest.mjs';
@@ -70,4 +73,55 @@ test('the freshness tests compare exactly the manifest\'s files, from the same s
 test('engines are the four the version check names', () => {
   const engines = new Set(Object.values(VENDOR_MANIFEST).map((e) => e.engine));
   assert.deepEqual([...engines].sort(), ['crafting', 'cutscenes', 'shop', 'sky']);
+});
+
+const FRESHNESS_TESTS = {
+  cutscenes: 'tools/test-cutscene-relay.mjs',
+  shop: 'tools/test-shop-room.mjs',
+  sky: 'tools/test-sky-clock.mjs',
+  crafting: 'tools/test-craft-relay.mjs',
+};
+
+// Runs only the Chronicle comparison of one freshness test. The parent
+// runner's context is dropped so the child reports on its own.
+function runFreshness(file, chronicleDir) {
+  const env = { ...process.env, CHRONICLE_DIR: chronicleDir };
+  delete env.NODE_TEST_CONTEXT;
+  const r = spawnSync(process.execPath, ['--test', '--test-name-pattern=needs CHRONICLE_DIR', file], { cwd: ROOT, env, encoding: 'utf8' });
+  return { code: r.status, out: `${r.stdout}${r.stderr}` };
+}
+
+test('with CHRONICLE_DIR set, a source Chronicle moved fails its freshness test and names it', () => {
+  const fake = mkdtempSync(join(tmpdir(), 'fake-chronicle-'));
+  try {
+    for (const [file, { source }] of Object.entries(VENDOR_MANIFEST)) {
+      mkdirSync(join(fake, dirname(source)), { recursive: true });
+      copyFileSync(join(VENDOR, file), join(fake, source));
+    }
+    for (const [engine, testFile] of Object.entries(FRESHNESS_TESTS)) {
+      const all = runFreshness(testFile, fake);
+      assert.equal(all.code, 0, `${testFile} passes against a Chronicle with every source:\n${all.out}`);
+      assert.match(all.out, /# pass [1-9]/, `${testFile} ran its comparison`);
+      const [, { source }] = Object.entries(VENDOR_MANIFEST).filter(([, e]) => e.engine === engine).at(-1);
+      rmSync(join(fake, source));
+      const moved = runFreshness(testFile, fake);
+      assert.notEqual(moved.code, 0, `${testFile} fails when Chronicle has no ${source}`);
+      assert.ok(moved.out.includes(source), `${testFile} names ${source}:\n${moved.out}`);
+      assert.match(moved.out, /# skipped 0/, `${testFile} does not skip`);
+    }
+    // A whole folder gone (Chronicle moved the widgets) used to skip.
+    const empty = mkdtempSync(join(tmpdir(), 'empty-chronicle-'));
+    try {
+      for (const testFile of Object.values(FRESHNESS_TESTS)) {
+        const gone = runFreshness(testFile, empty);
+        assert.notEqual(gone.code, 0, `${testFile} fails against a Chronicle without the folder`);
+        assert.match(gone.out, /Chronicle has no [\w/]+\.(?:js|css)/, `${testFile} names the missing path:\n${gone.out}`);
+        assert.match(gone.out, /# skipped 0/, `${testFile} does not skip`);
+      }
+    } finally {
+      rmSync(empty, { recursive: true, force: true });
+    }
+  } finally {
+    rmSync(fake, { recursive: true, force: true });
+  }
 });

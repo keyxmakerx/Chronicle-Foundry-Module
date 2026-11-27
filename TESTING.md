@@ -9,7 +9,8 @@ root. There is no `package.json`.
 Vendored Chronicle files: `CHRONICLE_DIR=../Chronicle node --test
 tools/test-cutscene-relay.mjs tools/test-shop-room.mjs tools/test-sky-clock.mjs
 tools/test-craft-relay.mjs` compares each copy with Chronicle's byte for byte
-(the sync bench CI job runs it). When one differs,
+and fails, naming the path, when Chronicle no longer has a copy's source (the
+sync bench CI job runs it; only an unset `CHRONICLE_DIR` skips). When one differs,
 `CHRONICLE_DIR=../Chronicle node tools/refresh-vendor.mjs` copies them again
 and rewrites `scripts/_vendor-manifest.mjs`.
 
