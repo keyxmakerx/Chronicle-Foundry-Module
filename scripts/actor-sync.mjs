@@ -1201,14 +1201,16 @@ export class ActorSync {
         return;
       }
       const entriesByField = await this._campaignEntries([...planned, ...madeFields.map((f) => f.fieldKey)]);
+      // Where the system says an entry's properties go on the item it makes.
+      const entryFieldsByField = Object.fromEntries(fieldDefs.map((d) => [d.key, d.foundry_entry_fields]));
 
       const failed = [];
       if (plan.length) {
-        failed.push(...(await applyIdentityPlan(actor, plan, game, entriesByField)).failed);
+        failed.push(...(await applyIdentityPlan(actor, plan, game, entriesByField, entryFieldsByField)).failed);
       }
       await recordPicks(failed);
       const refresh = planEntryRefresh({
-        items, fields: madeFields, fieldsData: entity?.fields_data, entriesByField, mentionId: journalMentions(game),
+        items, fields: madeFields, fieldsData: entity?.fields_data, entriesByField, mentionId: journalMentions(game), entryFieldsByField,
       });
       try {
         await applyEntryRefresh(actor, refresh);

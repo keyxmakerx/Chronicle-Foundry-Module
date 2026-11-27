@@ -13,10 +13,14 @@ import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
 import { entryTextHTML } from './_entry-text.mjs';
 
 /**
- * How the description text is turned into HTML. Raised when that changes, so
- * items filled the old way are rewritten even though their entry hasn't.
+ * How an item is filled from its entry: the description's HTML, and since 3
+ * the system's mapped values. Raised when that changes, so items filled the
+ * old way are rewritten even though their entry hasn't.
  */
-export const ENTRY_TEXT_FORMAT = 2;
+export const ENTRY_TEXT_FORMAT = 3;
+
+/** Longest text a `text` mapping writes; an entry property is a short value. */
+const MAX_ENTRY_TEXT = 1000;
 
 const norm = (s) => String(s ?? '').trim().toLowerCase();
 
@@ -70,6 +74,63 @@ export function entryDescriptionHTML(entry, opts = {}) {
   return parts.concat(lists.filter(Boolean)).join('');
 }
 
+/** A number, or a numeric text such as "+2"; null for anything else. */
+function entryNumber(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value !== 'string' || !/^\s*[+-]?\d+(\.\d+)?\s*$/.test(value)) return null;
+  return Number(value);
+}
+
+/** "+2/+2/+4" as [2, 2, 4], one number as three; null for anything else. */
+function entryTiers(value) {
+  const one = entryNumber(value);
+  if (one !== null) return [one, one, one];
+  if (typeof value !== 'string') return null;
+  const parts = value.split('/').map(entryNumber);
+  return parts.length === 3 && parts.every((n) => n !== null) ? parts : null;
+}
+
+/**
+ * The item values an entry's properties give, as dotted paths, from the
+ * field's `foundry_entry_fields` (Chronicle checked each path is under
+ * `system`; checked again here). A property that is absent or doesn't read in
+ * its format is left out, so the item keeps the system's default for it.
+ * @param {object} entry - one `GET /system-entries` row
+ * @param {Record<string, {path: string, format: string}>} [entryFields]
+ * @returns {Record<string, number|string>}
+ */
+export function entryItemValues(entry, entryFields) {
+  const props = entry?.properties && typeof entry.properties === 'object' ? entry.properties : {};
+  const out = {};
+  for (const [key, def] of Object.entries(entryFields ?? {})) {
+    const path = def?.path;
+    if (typeof path !== 'string' || !/^system(\.[A-Za-z0-9_]+)+$/.test(path) || !(key in props)) continue;
+    const value = props[key];
+    if (def.format === 'number') {
+      const n = entryNumber(value);
+      if (n !== null) out[path] = n;
+    } else if (def.format === 'tiers') {
+      const tiers = entryTiers(value);
+      if (tiers) tiers.forEach((n, i) => { out[`${path}.tier${i + 1}`] = n; });
+    } else if (def.format === 'text' && ['string', 'number'].includes(typeof value)) {
+      out[path] = String(value).trim().slice(0, MAX_ENTRY_TEXT);
+    }
+  }
+  return out;
+}
+
+/** Dotted values as nested objects, for an item that doesn't exist yet. */
+function nestValues(values) {
+  const out = {};
+  for (const [path, value] of Object.entries(values)) {
+    const keys = path.split('.');
+    let node = out;
+    for (const k of keys.slice(0, -1)) node = (node[k] && typeof node[k] === 'object') ? node[k] : (node[k] = {});
+    node[keys[keys.length - 1]] = value;
+  }
+  return out;
+}
+
 /** The entry for this field and name, or null. */
 export function findEntry(entries, name) {
   const want = norm(name);
@@ -78,17 +139,21 @@ export function findEntry(entries, name) {
 }
 
 /**
- * The fields to write for an entry: the description, and flags that record
- * which entry version filled it. Null when the description is not safe to
- * save, so the caller keeps the item name-only.
+ * The fields to write for an entry: the description, the values its
+ * properties give (`entryItemValues`), and flags that record which entry
+ * version filled it. Null when the description is not safe to save, so the
+ * caller keeps the item name-only.
+ * @param {object} entry
+ * @param {{mentionId?: (name: string) => string|null, entryFields?: object}} [opts]
  * @returns {{system: object, flags: object}|null}
  */
 export function entryItemFill(entry, opts = {}) {
   if (!entry) return null;
   const html = entryDescriptionHTML(entry, opts);
   if (hasClearSecrets(html)) return null;
+  const { system: mapped = {} } = nestValues(entryItemValues(entry, opts.entryFields));
   return {
-    system: { description: { value: html } },
+    system: { ...mapped, description: { value: html } },
     flags: {
       [FLAG_SCOPE]: {
         chronicleMade: true,
@@ -111,9 +176,10 @@ export function entryItemFill(entry, opts = {}) {
  * @param {object} args.fieldsData - Chronicle `fields_data`
  * @param {Record<string, Array<object>>} args.entriesByField
  * @param {(name: string) => string|null} [args.mentionId] - see `mentionLookup`
+ * @param {Record<string, object>} [args.entryFieldsByField] - each field's `foundry_entry_fields`
  * @returns {Array<{itemId: string, fieldKey: string, update: object}>}
  */
-export function planEntryRefresh({ items, fields, fieldsData, entriesByField, mentionId }) {
+export function planEntryRefresh({ items, fields, fieldsData, entriesByField, mentionId, entryFieldsByField }) {
   const list = Array.isArray(items) ? items : [];
   const data = fieldsData && typeof fieldsData === 'object' ? fieldsData : {};
   const out = [];
@@ -126,13 +192,15 @@ export function planEntryRefresh({ items, fields, fieldsData, entriesByField, me
     if (!entry) continue;
     const current = flags.entryFormat === ENTRY_TEXT_FORMAT;
     if (current && flags.entryUpdatedAt && flags.entryUpdatedAt === entry.updatedAt) continue;
-    const fill = entryItemFill(entry, { mentionId });
+    const entryFields = entryFieldsByField?.[fieldKey];
+    const fill = entryItemFill(entry, { mentionId, entryFields });
     if (!fill) continue;
     out.push({
       itemId: first.id,
       fieldKey,
       update: {
         _id: first.id,
+        ...entryItemValues(entry, entryFields),
         'system.description.value': fill.system.description.value,
         [`flags.${FLAG_SCOPE}.entrySlug`]: fill.flags[FLAG_SCOPE].entrySlug,
         [`flags.${FLAG_SCOPE}.entryUpdatedAt`]: fill.flags[FLAG_SCOPE].entryUpdatedAt,

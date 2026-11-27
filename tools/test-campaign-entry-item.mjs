@@ -6,7 +6,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ENTRY_TEXT_FORMAT, entryDescriptionHTML, entryItemFill, findEntry, planEntryRefresh } from '../scripts/_campaign-entry-item.mjs';
+import { ENTRY_TEXT_FORMAT, entryDescriptionHTML, entryItemFill, entryItemValues, findEntry, planEntryRefresh } from '../scripts/_campaign-entry-item.mjs';
 import { applyIdentityItem, applyEntryRefresh } from '../scripts/_identity-item-apply.mjs';
 import { identityFieldTypes } from '../scripts/_identity-item-plan.mjs';
 
@@ -137,4 +137,56 @@ test('refresh writes are marked as sync-applied', async () => {
   assert.equal(actor.log[0][0], 'update');
   assert.equal(actor.log[0][2].chronicleSyncApply, true);
   assert.deepEqual(await applyEntryRefresh(fakeActor(), []), []);
+});
+
+// A campaign's own kit, with the system's map of where its bonuses go.
+const KIT_FIELDS = {
+  stamina_bonus: { path: 'system.bonuses.stamina', format: 'number' },
+  speed_bonus: { path: 'system.bonuses.speed', format: 'number' },
+  melee_damage_bonus: { path: 'system.bonuses.melee.damage', format: 'tiers' },
+  ranged_damage_bonus: { path: 'system.bonuses.ranged.damage', format: 'tiers' },
+  armor: { path: 'system.equipment.armor', format: 'text' },
+};
+const BOG = {
+  fieldKey: 'kit', slug: 'bog-warden', name: 'Bog Warden', description: '<p>Mud and spears.</p>',
+  properties: { stamina_bonus: 6, speed_bonus: '+1', melee_damage_bonus: '+0/+2/+4', ranged_damage_bonus: 'none', armor: ' Medium ' },
+  updatedAt: '2026-11-27T12:00:00Z',
+};
+
+test('an entry\'s properties give the item values the system maps them to', () => {
+  assert.deepEqual(entryItemValues(BOG, KIT_FIELDS), {
+    'system.bonuses.stamina': 6,
+    'system.bonuses.speed': 1,
+    'system.bonuses.melee.damage.tier1': 0,
+    'system.bonuses.melee.damage.tier2': 2,
+    'system.bonuses.melee.damage.tier3': 4,
+    'system.equipment.armor': 'Medium',
+  }, 'a value that does not read in its format is left out');
+  assert.deepEqual(entryItemValues({ properties: { melee_damage_bonus: 2 } }, KIT_FIELDS),
+    { 'system.bonuses.melee.damage.tier1': 2, 'system.bonuses.melee.damage.tier2': 2, 'system.bonuses.melee.damage.tier3': 2 }, 'one number fills every tier');
+  assert.deepEqual(entryItemValues(BOG, undefined), {}, 'no map, no values');
+  assert.deepEqual(entryItemValues(BOG, { stamina_bonus: { path: 'flags.x', format: 'number' } }), {}, 'only the item\'s system data');
+  assert.deepEqual(entryItemValues(BOG, { stamina_bonus: { path: 'system.a', format: 'html' } }), {}, 'an unknown format writes nothing');
+});
+
+test('a made kit carries its bonuses beside its description', async () => {
+  const actor = fakeActor();
+  const step = { fieldKey: 'kit', itemType: 'kit', wantName: 'Bog Warden', removeIds: [] };
+  assert.equal(await applyIdentityItem(actor, step, { items: [], packs: [] }, [BOG], KIT_FIELDS), 'made');
+  const item = actor.log[0][1][0];
+  assert.deepEqual(item.system.bonuses, { stamina: 6, speed: 1, melee: { damage: { tier1: 0, tier2: 2, tier3: 4 } } });
+  assert.equal(item.system.equipment.armor, 'Medium');
+  assert.equal(item.system.description.value, entryDescriptionHTML(BOG));
+});
+
+test('refresh: a changed kit entry rewrites its bonuses too', () => {
+  const kitFields = identityFieldTypes([{ key: 'kit', foundry_collection: 'items', foundry_item_type: ['kit'], foundry_item_single: true }]);
+  const item = { id: 'k1', name: 'Bog Warden', type: 'kit', flags: { 'chronicle-sync': { chronicleMade: true, entryUpdatedAt: '2026-01-01T00:00:00Z', entryFormat: ENTRY_TEXT_FORMAT } } };
+  const plan = planEntryRefresh({
+    items: [item], fields: kitFields, fieldsData: { kit: 'Bog Warden' }, entriesByField: { kit: [BOG] }, entryFieldsByField: { kit: KIT_FIELDS },
+  });
+  assert.equal(plan.length, 1);
+  assert.equal(plan[0].update['system.bonuses.stamina'], 6);
+  assert.equal(plan[0].update['system.bonuses.melee.damage.tier3'], 4);
+  assert.equal(plan[0].update['system.description.value'], entryDescriptionHTML(BOG));
 });
