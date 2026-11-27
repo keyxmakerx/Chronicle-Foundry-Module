@@ -38,6 +38,7 @@ import { actingMemberOf, heldKeysOf, describeHeld, HeldNotices } from './_player
 import { getPlayerAsks, playerName } from './player-asks.mjs';
 import { planLayerEffects, layeredFieldKeys, storedLayers, LAYER_FLAG } from './_layer-effects.mjs';
 import { bringsInActor } from './_actor-catch-up.mjs';
+import { planGmFieldClear, holdsGmFieldText } from './_gm-field-clear.mjs';
 import { usersWithHero, planPlayerHeroes, memberClaims, assignsCharacter } from './_player-hero.mjs';
 import { memberKey } from './_member-mapping.mjs';
 import { isAnsweringGM } from './_stash-relay.mjs';
@@ -404,6 +405,7 @@ export class ActorSync {
     }
 
     errors += await this._bringInPlayerHeroes();
+    await this._clearGmFieldCopies();
     await this._reconcileClaimOwnership();
     await this._placeLooseActors();
     await this._syncAllLayers(feed?.mode === 'delta' ? feed.changes : null);
@@ -786,6 +788,47 @@ export class ActorSync {
       const page = await this._api.get(`/entities/${entity.id}`);
       if (page) await this._updateActorFromEntity(actor, page);
     });
+  }
+
+  /**
+   * Empties GM-only text an earlier sync wrote onto linked characters, where
+   * their players could read it (_gm-field-clear.mjs). Only a character still
+   * holding text at such a path costs a fetch. Text that is not Chronicle's
+   * stays, and the GM is told once which characters to check. A failed check
+   * is retried on the next connect; it does not hold back the change feed.
+   * @private
+   */
+  async _clearGmFieldCopies() {
+    const fields = this._adapter?.gmClearFields;
+    if (!fields?.length) return;
+    const toCheck = game.actors.filter((a) => this._isCharacterActor(a)
+      && !!a.getFlag(FLAG_SCOPE, 'entityId') && holdsGmFieldText(a, fields));
+    const kept = [];
+    const told = { ...(getSetting('gmTextTold') || {}) };
+    for (const actor of toCheck) {
+      const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
+      try {
+        await this._inTurn(entityId, async () => {
+          const entity = await this._api.get(`/entities/${entityId}`);
+          if (!entity) return;
+          const plan = planGmFieldClear({ actor, entity, fields });
+          if (Object.keys(plan.update).length > 0) {
+            await actor.update(plan.update, syncOptions({ [APPLY_OPTION]: true }));
+          }
+          if (plan.keptMark && told[actor.id] !== plan.keptMark) {
+            kept.push(actor.name);
+            told[actor.id] = plan.keptMark;
+          }
+        });
+      } catch (err) {
+        console.warn(`Chronicle: could not check "${actor.name}" for GM-only text`, err);
+      }
+    }
+    if (kept.length > 0) {
+      await setSetting('gmTextTold', told);
+      const notice = game.i18n.format('CHRONICLE.Notifications.GmFieldTextLeft', { names: noticeText(kept.join(', ')) });
+      ui.notifications.warn(notice, { permanent: true });
+    }
   }
 
   /** The actor linked to a Chronicle entity, or undefined. @private */
@@ -1264,6 +1307,7 @@ export class ActorSync {
           if (changeTouchesPath(local, path)) delete changes[path];
         }
       }
+      if (!npc) Object.assign(changes, planGmFieldClear({ actor, entity, fields: this._adapter.gmClearFields }).update);
       Object.assign(changes, await this._picturePlan(entity, actor));
       if (Object.keys(changes).length > 0) {
         await actor.update(changes, syncOptions({ [APPLY_OPTION]: true }));

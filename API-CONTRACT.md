@@ -152,6 +152,10 @@ Returns character preset field definitions with Foundry annotations.
 - `foundry_actor_type` — Actor type to create/filter (e.g., "character", "hero")
 - `foundry_path` — Dot-notation path on `actor.system` (e.g., "system.abilities.str.value")
 - `foundry_writable` — Whether this field can be written back to Foundry (false = read-only from Foundry)
+- `gm_only` — the value is the GM's alone. Such a field comes with no `foundry_path` or `foundry_collection`, so it is never written to or read from Foundry; the adapter also skips a `gm_only` field that does carry a path. `foundry_clear_path` is where the manifest put it: the connect pass and each hero apply empty that path while it still holds Chronicle's text, and tell the GM once about other text left there (`_gm-field-clear.mjs`, `tools/test-gm-field-clear.mjs`). The same holds on the creature and item field endpoints, and for a field the campaign's own category marks GM-only. A field one page marks GM-only (`field_overrides.added` on the page) is skipped for that page's actor (`pageGmOnlyKeys`)
+- `owner_only` — only the GM and the page's player see it; the mapping is kept
+
+Re-verify by: 2027-01-27 (Chronicle `internal/systems/manifest.go` `presetFieldsForAPI`, test `TestSystemManifest_FieldsForAPI_GMOnlyNeverMapped`)
 
 #### GET /systems/:systemId/creature-fields
 Returns the system's creature preset (the first preset with category
