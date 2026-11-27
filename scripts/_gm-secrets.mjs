@@ -550,17 +550,30 @@ export function applyReveals(html, pieces, placeholderText, clean = (h) => h) {
 }
 
 /**
- * Keep the GM's reveals when a page is pulled again: every placeholder that
- * was revealed in the page as it was stays revealed in the page as pulled.
+ * Keep the GM's reveals when a page is pulled again: a placeholder revealed
+ * in the page as it was stays revealed in the page as pulled.
+ *
+ * Only a reveal the GM's client filled in counts, one whose block already
+ * shows the GM-only content. A player who owns the journal can save the
+ * revealed mark on a block still showing the label; carrying that would have
+ * the GM's client fill the content in for them on the next pull.
  * @param {string} before - the saved page
  * @param {string} after - the pulled page, placeholders in
+ * @param {Map<string, string>} pieces - id → content, from hideSecrets
+ * @param {(html: string) => string} [clean] - the sanitizer applyReveals used
  * @returns {string}
  */
-export function carryReveals(before, after) {
+export function carryReveals(before, after, pieces, clean = (h) => h) {
   const prev = String(before || '');
-  if (!prev.includes('revealed')) return after;
+  if (!prev.includes('revealed') || !pieces?.size) return after;
+  const filledByGM = (sec) => {
+    const content = pieces.get(getAttr(sec.open, 'id'));
+    if (content === undefined) return false;
+    const shown = stripParts(inner(sec)).trim();
+    return shown !== '' && (shown === content.trim() || shown === clean(content).trim());
+  };
   const shown = new Set(placeholderBlocks(parse(prev))
-    .filter((sec) => classList(sec.open).includes('revealed'))
+    .filter((sec) => classList(sec.open).includes('revealed') && filledByGM(sec))
     .map((sec) => getAttr(sec.open, 'id')));
   if (!shown.size) return after;
   const tree = parse(after);

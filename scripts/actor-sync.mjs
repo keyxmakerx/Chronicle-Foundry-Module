@@ -19,6 +19,7 @@
 import { noticeText } from './_escape-html.mjs';
 import { getSetting, setSetting, getUserMappings, getSyncExclusions } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
+import { conflictEvent } from './_history-report.mjs';
 import { createGenericAdapter, buildChronicleFields } from './adapters/generic-adapter.mjs';
 import { FLAG_SCOPE, syncOptions, APPLY_OPTION } from './constants.mjs';
 import { flagRemoval } from './_flag-removal.mjs';
@@ -1954,7 +1955,10 @@ export class ActorSync {
     } catch (err) {
       if (!(err instanceof ConflictError)) throw err;
       // A part set to "From Foundry" takes nothing from Chronicle, a conflict included.
-      const strategy = this._syncManager?.pullGate?.('characters') === 'drop' ? 'foundry' : getSetting('conflictResolution');
+      const forcedPart = this._syncManager?.pullGate?.('characters') === 'drop';
+      const strategy = forcedPart ? 'foundry' : getSetting('conflictResolution');
+      // Only the name carries a version check, so it is the field the edit sent.
+      const settled = (kept, reason) => conflictEvent({ kind: 'character', resourceId: entityId, name: actor.name, kept, reason, fields: ['name'] });
       if (strategy === 'chronicle') {
         // Re-pull from Chronicle; this burst is dropped, so its paths no
         // longer hold Chronicle's values back.
@@ -1962,6 +1966,7 @@ export class ActorSync {
         const entity = await this._api.get(`/entities/${entityId}`);
         if (entity) await this._updateActorFromEntity(actor, entity);
         ui.notifications.warn(game.i18n.format('CHRONICLE.Notifications.ConflictKeptChronicle', { name: noticeText(actor.name) }));
+        this._syncManager?.logActivity?.('update', `Conflict on "${actor.name}": kept the Chronicle version`, settled('chronicle', 'setting'));
         return false;
       }
       // Force push.
@@ -1971,6 +1976,10 @@ export class ActorSync {
         await this._setActorFlag(actor, 'chronicleUpdatedAt', forced.updated_at);
       }
       ui.notifications.warn(game.i18n.format('CHRONICLE.Notifications.ConflictKeptFoundry', { name: noticeText(actor.name) }));
+      // "Newest" keeps Foundry here: the rename being pushed was just made,
+      // after the Chronicle change that caused the conflict.
+      const reason = forcedPart ? 'part' : (strategy === 'newest' ? 'newer' : 'setting');
+      this._syncManager?.logActivity?.('update', `Conflict on "${actor.name}": kept the Foundry version`, settled('foundry', reason));
       return true;
     }
   }

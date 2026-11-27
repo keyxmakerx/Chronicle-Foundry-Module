@@ -13,6 +13,7 @@ import { flagRemoval } from './_flag-removal.mjs';
 import { noticeText, escapeHtml } from './_escape-html.mjs';
 import { getSetting, setSetting, getSyncExclusions, getUserMappings } from './settings.mjs';
 import { ConflictError } from './api-client.mjs';
+import { conflictEvent } from './_history-report.mjs';
 import { FLAG_SCOPE, KEEP_LOCAL_FLAG, syncOptions } from './constants.mjs';
 import { TYPE_SLUG_FLAG } from './_shop-journal.mjs';
 import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
@@ -25,6 +26,7 @@ import { watchGMSecrets } from './gm-secret-view.mjs';
 import { newJournalSheetFlags } from './chronicle-sheet.mjs';
 import { playerSafeFacts } from './_chronicle-sheet-model.mjs';
 import { defaultLevelForVisibility } from './_ownership.mjs';
+import { inDmOnlyCategory } from './_dm-only-category.mjs';
 import { isCalendarNoteJournal } from './calendar-sync.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
 import { walkEntityPages, unwrapEntityList } from './_entity-page-walk.mjs';
@@ -1901,6 +1903,14 @@ export class JournalSync {
   async _buildOwnership(entity) {
     const L = CONST.DOCUMENT_OWNERSHIP_LEVELS;
 
+    // A page in a DM-only category is private whatever its own visibility
+    // says, a player grant included: Chronicle never shows it to players.
+    if (inDmOnlyCategory(entity, this._tree?.types)) {
+      const level = defaultLevelForVisibility(true);
+      if (level <= L.NONE) this._syncManager?.noteDmOnlyHidden?.();
+      return { default: level };
+    }
+
     // Simple / legacy visibility — honor the operator's dmOnlyHidden +
     // defaultOwnership dashboard controls.
     if (!entity.visibility || entity.visibility === 'default') {
@@ -2519,8 +2529,12 @@ export class JournalSync {
    */
   async _handleConflict(journal, entityId, body, editedAt) {
     // A part set to "From Foundry" takes nothing from Chronicle, a conflict included.
-    const strategy = this._syncManager?.pullGate?.('journals') === 'drop' ? 'foundry' : getSetting('conflictResolution');
+    const forced = this._syncManager?.pullGate?.('journals') === 'drop';
+    const strategy = forced ? 'foundry' : getSetting('conflictResolution');
     console.warn(`Chronicle: Conflict on entity ${entityId}, strategy="${strategy}"`);
+    // Field names only: the history never carries the values themselves.
+    const fields = Object.keys(body ?? {});
+    const settled = (kept, reason) => conflictEvent({ kind: 'page', resourceId: entityId, name: journal.name, kept, reason, fields });
 
     switch (strategy) {
       case 'chronicle': {
@@ -2530,7 +2544,7 @@ export class JournalSync {
           await this._onEntityUpdated(entity);
         }
         ui.notifications.warn(game.i18n.format('CHRONICLE.Notifications.ConflictKeptChronicle', { name: noticeText(journal.name) }));
-        this._syncManager?.logActivity?.('update', `Conflict on "${journal.name}": kept the Chronicle version`);
+        this._syncManager?.logActivity?.('update', `Conflict on "${journal.name}": kept the Chronicle version`, settled('chronicle', 'setting'));
         break;
       }
       case 'foundry': {
@@ -2540,7 +2554,7 @@ export class JournalSync {
         await this._recordPush(journal, result);
         await this._hidePushedSecrets(journal, result);
         ui.notifications.warn(game.i18n.format('CHRONICLE.Notifications.ConflictKeptFoundry', { name: noticeText(journal.name) }));
-        this._syncManager?.logActivity?.('update', `Conflict on "${journal.name}": kept the Foundry version`);
+        this._syncManager?.logActivity?.('update', `Conflict on "${journal.name}": kept the Foundry version`, settled('foundry', forced ? 'part' : 'setting'));
         break;
       }
       case 'newest':
@@ -2558,11 +2572,11 @@ export class JournalSync {
           const result = await this._api.put(`/entities/${entityId}`, body);
           await this._recordPush(journal, result);
           await this._hidePushedSecrets(journal, result);
-          this._syncManager?.logActivity?.('update', `Conflict on "${journal.name}": the Foundry version was newer and was kept`);
+          this._syncManager?.logActivity?.('update', `Conflict on "${journal.name}": the Foundry version was newer and was kept`, settled('foundry', 'newer'));
         } else if (remote) {
           // Remote is newer — re-pull.
           await this._onEntityUpdated(remote);
-          this._syncManager?.logActivity?.('update', `Conflict on "${journal.name}": the Chronicle version was newer and was kept`);
+          this._syncManager?.logActivity?.('update', `Conflict on "${journal.name}": the Chronicle version was newer and was kept`, settled('chronicle', 'newer'));
         }
         break;
       }
@@ -2606,7 +2620,7 @@ export class JournalSync {
         // Update existing page.
         const page = existingTextPages[i];
         // A pull keeps what the GM revealed at the table.
-        const kept = carryReveals(page.text?.content, section.content);
+        const kept = carryReveals(page.text?.content, section.content, this._secretPieces, _sanitizeIncomingHTML);
         const updates = { 'text.content': applyReveals(kept, this._secretPieces, secretPlaceholderText(), _sanitizeIncomingHTML) ?? kept };
         if (page.name !== section.title) {
           updates.name = section.title;

@@ -4,8 +4,12 @@
  * then the page's sidebar folders, outermost first. A page under another
  * page sits beside it, in the parent's folder (a journal can't hold one).
  * Deeper than Foundry allows, the chain stops at the deepest level it can.
- * Pure: `tools/test-folder-tree.mjs`.
+ * Every client receives every folder's name, so a page in a DM-only
+ * category goes in its category folder only, never under its sidebar
+ * folders. Pure: `tools/test-folder-tree.mjs`.
  */
+
+import { inDmOnlyCategory } from './_dm-only-category.mjs';
 
 /**
  * @typedef {{key: string, kind: 'type'|'node', id: number|string, name: string, color?: string}} FolderLevel
@@ -33,6 +37,8 @@ export function folderChain(entity, { types, folders, parents }, maxDepth = 4) {
     if (!entity.type_name) return [];
     chain.push({ key: `type:${typeId}`, kind: 'type', id: typeId, name: entity.type_name, color: entity.type_color || undefined });
   }
+
+  if (inDmOnlyCategory(entity, types)) return chain.slice(0, Math.max(1, maxDepth));
 
   const seen = new Set();
   const fromNode = (nodeId) => {
@@ -68,6 +74,6 @@ export function layoutFingerprint({ types, folders }) {
     ...[...folders.values()].map((f) => `f${f.id}:${f.entity_type_id}:${f.parent_id ?? ''}:${f.name}`),
   ].sort();
   let h = 0x811c9dc5;
-  for (const ch of `v2|${rows.join('|')}`) h = Math.imul(h ^ ch.codePointAt(0), 0x01000193) >>> 0;
+  for (const ch of `v3|${rows.join('|')}`) h = Math.imul(h ^ ch.codePointAt(0), 0x01000193) >>> 0;
   return h.toString(16);
 }
