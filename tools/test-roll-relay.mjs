@@ -51,6 +51,20 @@ test('mixed dice make separate terms; a negative modifier subtracts', () => {
   assert.equal(r.terms.filter((t) => t.class === 'Die').length, 2);
 });
 
+test('every die carries the campaign dice look, and none without one', () => {
+  const look = { colorset: 'chronicle-sync', system: 'chronicle-sync' };
+  const data = buildChatData(payload({
+    dice: [{ sides: 20, value: 14 }, { sides: 6, value: 3 }], modifier: 0, total: 17,
+  }), { gmIds: GMS, appearance: look });
+  const dice = data.rolls[0].terms.filter((t) => t.class === 'Die');
+  assert.equal(dice.length, 2);
+  for (const d of dice) assert.deepEqual(d.options.appearance, look);
+  // Each die gets its own copy, so Dice So Nice changing one never changes the rest.
+  assert.notEqual(dice[0].options.appearance, dice[1].options.appearance);
+  for (const t of data.rolls[0].terms.filter((x) => x.class !== 'Die')) assert.deepEqual(t.options, {});
+  for (const t of buildRollData(payload()).terms) assert.deepEqual(t.options, {});
+});
+
 test('modes: gm whispers to GMs and the linked roller, blind to GMs only', () => {
   const gm = buildChatData(payload({ mode: 'gm' }), { gmIds: GMS, rollerFoundryId: 'p1' });
   assert.deepEqual(gm.whisper.sort(), ['gm1', 'gm2', 'p1']);
@@ -191,6 +205,9 @@ test('wiring: roll. is allowed, the relay is registered, and gated to the active
   assert.match(src, /getFlag\(FLAG_SCOPE, 'entityId'\) === id/);
   assert.match(src, /ChatMessage\.getSpeaker\(\{ actor \}\)/);
   assert.match(src, /speaker: this\._heroSpeaker\(payload\)/);
+  // The look is the shared "Sync with Chronicle" registration, read on the GM's client.
+  assert.match(src, /appearance: chronicleRollAppearance\(\)/);
+  assert.match(read('scripts/dice-so-nice.mjs'), /export function chronicleRollAppearance\(\)[\s\S]*?state\.syncReady[\s\S]*?syncAppearance\(state\.syncSystem\)/);
   assert.match(src, /options\?\.chronicleSync\) return/);
   assert.match(src, /_routeMissing/);
   assert.ok(JSON.parse(read('lang/en.json')).CHRONICLE.Rolls.FallbackName);

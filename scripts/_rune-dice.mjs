@@ -301,6 +301,15 @@ export function critSfx(die) {
 export const SYNC_ID = `${ID_PREFIX}-sync`;
 
 /**
+ * The per-die Dice So Nice look that points at "Sync with Chronicle": its
+ * colours always, its dice faces only when the picked set has faces.
+ * @param {boolean} withSystem
+ */
+export function syncAppearance(withSystem) {
+  return withSystem ? { colorset: SYNC_ID, system: SYNC_ID } : { colorset: SYNC_ID };
+}
+
+/**
  * The campaign's dice pick as stored for every client: a set and a colour id,
  * each '' for Chronicle's default. Anything malformed reads as the default.
  * @param {*} raw - the world setting's value (JSON text) or an object
