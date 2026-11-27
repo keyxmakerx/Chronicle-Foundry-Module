@@ -327,24 +327,58 @@ export function snapshotEvent(e) {
     year: num(e.year), month: num(e.month), day: num(e.day),
     start_hour: num(e.start_hour), start_minute: num(e.start_minute),
     all_day: !!e.all_day,
+    // A comet or shower runs over several days; the sky counts it on each.
+    end_year: num(e.end_year), end_month: num(e.end_month), end_day: num(e.end_day),
+    is_recurring: !!e.is_recurring,
     color: safeColor(e.color),
     sky: skyNight(e.payload),
   };
 }
 
-/** The moon-night kinds Chronicle's sky draws for an event. */
-const SKY_NIGHTS = new Set(['blood', 'magic', 'conjunction', 'eclipse', 'harvest']);
+/** The sky event kinds Chronicle's sky draws: the moon nights, then the rest. */
+const SKY_NIGHTS = new Set([
+  'blood', 'magic', 'conjunction', 'eclipse', 'harvest',
+  'comet', 'meteor-shower', 'meteor-storm', 'shooting-star', 'star-fall', 'aurora', 'arcane-aurora',
+  'eclipse-solar', 'blue-moon', 'hunters-moon', 'dark-night', 'custom',
+]);
+const COMPASS = new Set(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']);
+const ALTITUDE = new Set(['low', 'mid', 'high']);
+const SKY_WORDS = Object.freeze({
+  subtype: new Set(['total', 'annular', 'partial']),
+  shape: new Set(['streak', 'glow', 'ring', 'star', 'doorway', 'comet', 'curtain', 'veil']),
+  size: new Set(['small', 'medium', 'large']),
+});
+const SKY_NUMBERS = ['intensity', 'rate_per_hour', 'tail_degrees', 'magnitude', 'duration_minutes', 'duration_hours'];
+const HEX6 = /^#[0-9a-f]{6}$/i;
 
 /**
- * An event's moon night (a blood moon, an eclipse) for the Sky Clock, from
- * its JSON `payload`: just the kind and the moon ids, or null.
+ * An event's sky event (a blood moon, a comet, an eclipse) for the Sky Clock,
+ * from its JSON `payload`, or null. Each field the sky reads is copied by
+ * name and shape, so nothing else in a payload reaches players; the sky code
+ * checks ranges again when it draws.
  */
 export function skyNight(payload) {
   let p = payload;
   if (typeof p === 'string') { try { p = JSON.parse(p); } catch { return null; } }
   if (!p || typeof p !== 'object' || !SKY_NIGHTS.has(p.type)) return null;
   const moons = (Array.isArray(p.moons) ? p.moons : []).map(given).filter((n) => n !== null).slice(0, 8);
-  return { type: p.type, moons };
+  const out = { type: p.type, moons };
+  const d = p.direction;
+  if (d && typeof d === 'object') {
+    const dir = {};
+    if (COMPASS.has(d.compass)) dir.compass = d.compass;
+    if (ALTITUDE.has(d.altitude)) dir.altitude = d.altitude;
+    if (Object.keys(dir).length) out.direction = dir;
+  }
+  if (typeof p.color === 'string' && HEX6.test(p.color)) out.color = p.color;
+  if (Array.isArray(p.colors)) {
+    const colors = p.colors.filter((c) => typeof c === 'string' && HEX6.test(c)).slice(0, 2);
+    if (colors.length) out.colors = colors;
+  }
+  for (const k of SKY_NUMBERS) { const n = given(p[k]); if (n !== null) out[k] = n; }
+  if (p.moonlit === true) out.moonlit = true;
+  for (const [k, set] of Object.entries(SKY_WORDS)) if (set.has(p[k])) out[k] = p[k];
+  return out;
 }
 
 /**

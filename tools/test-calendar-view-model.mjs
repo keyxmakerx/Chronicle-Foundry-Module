@@ -109,7 +109,7 @@ test('player snapshot copies only named fields and only public events', () => {
   assert.ok(VM.isUsableSnapshot(s));
   assert.deepEqual(Object.keys(s.calendar).sort(), ['hemisphere', 'hours_per_day', 'leap_year_every', 'leap_year_offset', 'minutes_per_hour', 'mode', 'month_starts_new_week', 'months', 'tracks_real_time', 'weekdays']);
   assert.deepEqual(s.events.map((e) => e.id), ['a']);
-  assert.deepEqual(Object.keys(s.events[0]).sort(), ['all_day', 'color', 'day', 'id', 'month', 'name', 'sky', 'start_hour', 'start_minute', 'year']);
+  assert.deepEqual(Object.keys(s.events[0]).sort(), ['all_day', 'color', 'day', 'end_day', 'end_month', 'end_year', 'id', 'is_recurring', 'month', 'name', 'sky', 'start_hour', 'start_minute', 'year']);
   assert.equal(s.weather.color, null, 'unsafe colours are dropped');
   assert.equal('zone_name' in s.weather, false);
   assert.deepEqual(s.moons, [{ name: 'Selûne', phase_name: 'Full', phase_icon: 'moon' }]);
@@ -227,6 +227,21 @@ test('an event keeps only its moon night for the sky', () => {
   const e = VM.snapshotEvent({ id: 1, name: 'Red night', year: 1, month: 1, day: 1, payload: '{"type":"blood","moons":[1]}' });
   assert.deepEqual(e.sky, { type: 'blood', moons: [1] });
   assert.equal('payload' in e, false);
+});
+
+test('an event keeps the sky event fields the sky reads, by name, and its end date', () => {
+  const sky = VM.skyNight(JSON.stringify({
+    type: 'comet', direction: { compass: 'SW', altitude: 'mid', secret: 1 }, color: '#aabbcc', colors: ['#112233', 'red', '#445566', '#778899'],
+    tail_degrees: 30, intensity: '0.8', moonlit: true, subtype: 'total', shape: 'nope', size: 'large', note: 'GM only',
+  }));
+  assert.deepEqual(sky, {
+    type: 'comet', moons: [], direction: { compass: 'SW', altitude: 'mid' }, color: '#aabbcc', colors: ['#112233', '#445566'],
+    intensity: 0.8, tail_degrees: 30, moonlit: true, subtype: 'total', size: 'large',
+  });
+  assert.deepEqual(VM.skyNight({ type: 'eclipse-solar', moons: [7], color: 'red; x' }), { type: 'eclipse-solar', moons: [7] });
+  const e = VM.snapshotEvent({ id: 2, name: 'Comet', year: 1, month: 3, day: 8, end_year: 1, end_month: 3, end_day: 20, is_recurring: false, payload: '{"type":"meteor-shower"}' });
+  assert.deepEqual([e.end_year, e.end_month, e.end_day, e.is_recurring], [1, 3, 20, false]);
+  assert.deepEqual(e.sky, { type: 'meteor-shower', moons: [] });
 });
 
 test('the players\' weather carries what the sky reads, and no more', () => {
