@@ -5,7 +5,7 @@
  * pass a fake world.
  */
 import { FLAG_SCOPE, syncOptions, APPLY_OPTION } from './constants.mjs';
-import { findEntry, entryItemFill } from './_campaign-entry-item.mjs';
+import { findEntry, entryItemFill, entryTextHeld } from './_campaign-entry-item.mjs';
 import { mentionLookup } from './_entry-text.mjs';
 
 const norm = (s) => String(s ?? '').trim().toLowerCase();
@@ -101,21 +101,25 @@ export function journalMentions(game) {
  * @param {Record<string, Array<object>>} [entriesByField]
  * @param {Record<string, object>} [entryFieldsByField] - each field's `foundry_entry_fields`
  * @param {Record<string, object>} [entryEffectsByField] - each field's `foundry_entry_effects`
- * @returns {Promise<{done: string[], failed: string[]}>} field keys
+ * @returns {Promise<{done: string[], failed: string[], held: string[]}>} field keys done and
+ *   failed, and the names of made items whose entry text was left out for holding GM-only content
  */
 export async function applyIdentityPlan(actor, plan, game, entriesByField, entryFieldsByField, entryEffectsByField) {
   const done = [];
   const failed = [];
+  const held = [];
   for (const step of plan) {
     try {
-      await applyIdentityItem(actor, step, game, entriesByField?.[step.fieldKey], entryFieldsByField?.[step.fieldKey], entryEffectsByField?.[step.fieldKey]);
+      const entries = entriesByField?.[step.fieldKey];
+      const how = await applyIdentityItem(actor, step, game, entries, entryFieldsByField?.[step.fieldKey], entryEffectsByField?.[step.fieldKey]);
       done.push(step.fieldKey);
+      if (how === 'made' && entryTextHeld(findEntry(entries, step.wantName))) held.push(step.wantName);
     } catch (err) {
       console.error(`Chronicle: could not set ${step.fieldKey} "${step.wantName}" on "${actor.name}"`, err);
       failed.push(step.fieldKey);
     }
   }
-  return { done, failed };
+  return { done, failed, held };
 }
 
 /**

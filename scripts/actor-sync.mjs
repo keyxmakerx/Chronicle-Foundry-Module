@@ -1259,6 +1259,7 @@ export class ActorSync {
         const applied = await applyIdentityPlan(actor, plan, game, entriesByField, entryFieldsByField, entryEffectsByField);
         failed.push(...applied.failed);
         swapped.push(...applied.done);
+        this._noticeHeldText(actor, applied.held);
       }
       await recordPicks(failed);
       const refresh = planEntryRefresh({
@@ -1270,6 +1271,7 @@ export class ActorSync {
         console.error(`Chronicle: could not refresh campaign entries on "${actor.name}"`, err);
         failed.push(...refresh.map((r) => r.fieldKey));
       }
+      this._noticeHeldText(actor, refresh.filter((r) => r.textHeld).map((r) => r.name));
       this._pushEffectPaths(actor, [...swapped, ...refresh.filter((r) => r.effect).map((r) => r.fieldKey)], entryEffectsByField);
       if (!(await this._applyEntryAbilities(actor, identityFieldTypes(fieldDefs), entriesByField))) failed.push('abilities');
       if (failed.length) {
@@ -1358,6 +1360,7 @@ export class ActorSync {
             entriesByField, mentionId: journalMentions(game), entryFieldsByField, entryEffectsByField,
           });
           if (refresh.length) await applyEntryRefresh(actor, refresh);
+          this._noticeHeldText(actor, refresh.filter((r) => r.textHeld).map((r) => r.name));
           this._pushEffectPaths(actor, refresh.filter((r) => r.effect).map((r) => r.fieldKey), entryEffectsByField);
           await this._applyEntryAbilities(actor, made, entriesByField);
         } catch (err) {
@@ -1791,6 +1794,25 @@ export class ActorSync {
       this._pendingPlayers.set(actor.id, (this._pendingPlayers.get(actor.id) ?? new Set()).add(userId));
     }
     this._actorPushDebouncer.schedule(actor.id, actor, entityId);
+  }
+
+  /**
+   * Tell the GM, once per entry each session, that a campaign entry's text
+   * was left off its Foundry item for holding GM-only content, so a sheet
+   * with numbers but no text isn't a mystery.
+   * @param {Actor} actor
+   * @param {string[]} names - the entries whose text was held back
+   * @private
+   */
+  _noticeHeldText(actor, names) {
+    this._heldNoticed ??= new Set();
+    const fresh = [...new Set(names ?? [])].filter((n) => n && !this._heldNoticed.has(n.toLowerCase()));
+    if (!fresh.length) return;
+    for (const n of fresh) this._heldNoticed.add(n.toLowerCase());
+    ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.EntryTextHeld', {
+      entries: noticeText(fresh.join(', ')),
+      actor: noticeText(actor.name),
+    }));
   }
 
   /**
