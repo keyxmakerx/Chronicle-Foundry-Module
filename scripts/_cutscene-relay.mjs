@@ -15,7 +15,9 @@
  *  - a scene goes only to a user matched to one of the showing's viewers,
  *    and only while its rewatch window is open;
  *  - the watch-again list is asked for the asker's own member, never one
- *    named in the request.
+ *    named in the request;
+ *  - a Director's preview plays on one GM's own screen and never goes on
+ *    the module socket at all.
  *
  * tools/test-cutscene-relay.mjs pins these.
  */
@@ -36,6 +38,7 @@ export const CUTSCENE_MSG = Object.freeze({
 export const CUTSCENE_WS = Object.freeze({
   SHOW: 'cutscene.foundry',
   STOP: 'cutscene.foundry_stop',
+  PREVIEW: 'cutscene.foundry_preview',
 });
 
 /** A player who opens Foundry this soon after a showing started still gets it live. */
@@ -146,6 +149,42 @@ export function parseFoundryShowing(payload, now = Date.now()) {
     ? [...new Set(payload.viewers.filter((v) => (typeof v === 'string' && v) || typeof v === 'number').map(String))]
     : [];
   return { ...showing, viewers };
+}
+
+/**
+ * A `cutscene.foundry_preview` payload, checked: the Director's unsaved
+ * scene, who pressed Preview in Foundry (their Chronicle member id) and the
+ * preview's id. Nothing is stored for a preview on either side.
+ * @param {any} payload
+ * @returns {{previewId: string, director: string, scene: object}|null}
+ */
+export function parseFoundryPreview(payload) {
+  if (!plainObject(payload)) return null;
+  const previewId = showingIdOf(payload.previewId);
+  const scene = cleanScene(payload.scene);
+  const director = typeof payload.director === 'string' || typeof payload.director === 'number' ? String(payload.director) : '';
+  if (!previewId || !scene) return null;
+  return { previewId, director, scene };
+}
+
+/**
+ * Which Foundry client plays a Director's preview: the GM their Chronicle
+ * member is matched to, when that GM is playing now; otherwise the active
+ * GM, the one whose screen runs the table. Never a player's client, even
+ * when the Director is matched to a player user.
+ * @param {string} director - Chronicle member id
+ * @param {Object<string,string>} mappings - `userMappings` (member → Foundry user)
+ * @param {Array<{id: string, active: boolean, isGM: boolean}>} users
+ * @param {string|null|undefined} activeGMId
+ * @returns {string|null} the Foundry user id, or null when no GM is here
+ */
+export function previewPlayer(director, mappings, users, activeGMId) {
+  const map = plainObject(mappings) ? mappings : {};
+  const list = Array.isArray(users) ? users : [];
+  const own = director ? list.find((u) => u?.id === map[director]) : null;
+  if (own?.isGM && own.active) return own.id;
+  const gm = activeGMId ? list.find((u) => u?.id === activeGMId) : null;
+  return gm?.isGM ? gm.id : null;
 }
 
 /**

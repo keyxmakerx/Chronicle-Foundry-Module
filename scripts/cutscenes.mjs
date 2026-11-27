@@ -14,7 +14,12 @@
  * the GM's client reads Chronicle for that player's own member and answers
  * that client alone. Scenes live in memory only, never in a Foundry
  * document, and what a client received this session stays watchable while
- * the GM is away. Pure rules: _cutscene-relay.mjs.
+ * the GM is away.
+ *
+ * Preview in Foundry, from the Director's cut scene workshop, comes the same
+ * way but plays only on one GM's own screen: it is never put on the module
+ * socket, so no player's client can hear of it, and it is not remembered.
+ * Pure rules: _cutscene-relay.mjs.
  */
 
 import { MODULE_ID } from './constants.mjs';
@@ -36,7 +41,9 @@ import {
   lateJoinShowings,
   listErrorFrom,
   mayFetch,
+  parseFoundryPreview,
   parseFoundryShowing,
+  previewPlayer,
   showingIdOf,
   showingsPath,
   showingsWithin,
@@ -111,9 +118,11 @@ function stopCurrent(showingId = null) {
 /**
  * Play a showing full screen over everything, replacing one already playing.
  * @param {{showingId: string, scene: object}} showing
+ * @param {{label?: string, failed?: string}} [opts] - the screen reader's
+ *   name for it, and the warning when it cannot play
  * @returns {Promise<boolean>} whether it started
  */
-export async function playShowing(showing) {
+export async function playShowing(showing, { label, failed } = {}) {
   let engine = null;
   try {
     await loadStandalone([ENGINE_FILE]);
@@ -121,7 +130,7 @@ export async function playShowing(showing) {
     if (typeof engine?.play !== 'function') throw new Error('the cut scene engine did not load');
   } catch (err) {
     console.warn('Chronicle: could not load the cut scene engine', err);
-    ui.notifications?.warn(t('PlayFailed'));
+    ui.notifications?.warn(failed || t('PlayFailed'));
     return false;
   }
   stopCurrent();
@@ -132,14 +141,14 @@ export async function playShowing(showing) {
       // The module's Motion setting outranks the computer's: Calm and Off
       // both get the engine's still version.
       reducedMotion: currentMotion() !== 'full',
-      label: t('Label'),
+      label: label || t('Label'),
       onClose: () => { if (current === mine) current = null; },
     });
     return true;
   } catch (err) {
     if (current === mine) current = null;
     console.warn('Chronicle: a cut scene could not play', err);
-    ui.notifications?.warn(t('PlayFailed'));
+    ui.notifications?.warn(failed || t('PlayFailed'));
     return false;
   }
 }
@@ -276,6 +285,8 @@ export class CutsceneRelay {
 
   /** @param {object} msg - a Chronicle WebSocket message */
   onMessage(msg) {
+    // A preview picks its own GM, who need not be the active one.
+    if (msg?.type === CUTSCENE_WS.PREVIEW) return this._preview(msg.payload);
     if (msg?.type !== CUTSCENE_WS.SHOW && msg?.type !== CUTSCENE_WS.STOP) return;
     if (!isActiveGM()) return;
     if (msg.type === CUTSCENE_WS.SHOW) return this._show(msg.payload);
@@ -310,6 +321,29 @@ export class CutsceneRelay {
     const players = deliver.filter((id) => id !== game.user.id).length;
     this._syncManager?.logActivity?.('update',
       `Cut scene "${entry.name}": ${players} in Foundry now, ${away.length} away, ${unmapped.length} not matched to a Foundry user`);
+  }
+
+  /**
+   * The Director's Preview in Foundry: play the scene on this screen when
+   * this is the GM it is for. Only GM clients hold a Chronicle socket, and
+   * nothing is emitted, remembered or saved, so players never see it.
+   * @returns {Promise<boolean>|undefined} whether it started, when it plays here
+   */
+  _preview(payload) {
+    if (!game.user?.isGM) return;
+    const preview = parseFoundryPreview(payload);
+    if (!preview) {
+      console.warn('Chronicle: ignored a cut scene preview Chronicle sent in a shape this module does not read');
+      return;
+    }
+    const users = (game.users?.contents ?? []).map((u) => ({ id: u.id, active: !!u.active, isGM: !!u.isGM }));
+    if (previewPlayer(preview.director, getUserMappings(), users, game.users?.activeGM?.id) !== game.user.id) return;
+    const name = preview.scene.name || '';
+    this._syncManager?.logActivity?.('update', `Cut scene preview "${name}" played on this screen only`);
+    return playShowing({ showingId: `preview-${preview.previewId}`, scene: preview.scene }, {
+      label: t('PreviewLabel', { name }),
+      failed: t('PreviewFailed'),
+    });
   }
 
   _stop(payload) {

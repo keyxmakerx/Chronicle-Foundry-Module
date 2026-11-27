@@ -6,7 +6,8 @@
  * matched viewer's client, sealed to its key, and the list is read for the
  * asker's own member whatever the request says. With the engine vendored,
  * also checks it is Chronicle's file unchanged (CHRONICLE_DIR) and that it
- * offers the API the module calls.
+ * offers the API the module calls. A Director's preview plays on one GM's
+ * screen and never touches the module socket.
  */
 
 import test from 'node:test';
@@ -25,7 +26,9 @@ import {
   mayFetch,
   mergeShowings,
   nextExpiryDelay,
+  parseFoundryPreview,
   parseFoundryShowing,
+  previewPlayer,
   showingIdOf,
   showingsPath,
   showingsWithin,
@@ -268,6 +271,91 @@ test('a client that is not the active GM hands nothing out', async () => {
   }
 });
 
+// --- Preview in Foundry -----------------------------------------------------
+
+test('a preview payload is read with its Director; a malformed one is refused', () => {
+  assert.deepEqual(parseFoundryPreview({ previewId: 'pv-1', director: 'm9', scene }),
+    { previewId: 'pv-1', director: 'm9', scene: cleanScene(scene) });
+  assert.equal(parseFoundryPreview({ previewId: 'pv-1', director: 7, scene }).director, '7');
+  assert.equal(parseFoundryPreview({ previewId: 'pv-1', scene }).director, '', 'no Director still plays on the active GM');
+  assert.equal(parseFoundryPreview({ previewId: 'bad id!', scene }), null);
+  assert.equal(parseFoundryPreview({ previewId: 'pv-1', scene: 'nope' }), null);
+  assert.equal(parseFoundryPreview(null), null);
+});
+
+test('a preview plays on the Director\'s own GM screen, else the active GM\'s, never a player\'s', () => {
+  const people = [
+    { id: 'gm1', isGM: true, active: true },
+    { id: 'gm2', isGM: true, active: true },
+    { id: 'gm3', isGM: true, active: false },
+    { id: 'p1', isGM: false, active: true },
+  ];
+  const map = { dirA: 'gm2', dirB: 'gm3', dirC: 'p1' };
+  assert.equal(previewPlayer('dirA', map, people, 'gm1'), 'gm2', 'their own GM user, playing now');
+  assert.equal(previewPlayer('dirB', map, people, 'gm1'), 'gm1', 'their GM user is away: the active GM');
+  assert.equal(previewPlayer('dirC', map, people, 'gm1'), 'gm1', 'matched to a player user: still a GM screen');
+  assert.equal(previewPlayer('nobody', map, people, 'gm1'), 'gm1', 'not matched: the active GM');
+  assert.equal(previewPlayer('', map, people, 'gm1'), 'gm1');
+  assert.equal(previewPlayer('dirC', map, people, 'p1'), null, 'a player is never the screen, whatever says active');
+  assert.equal(previewPlayer('nobody', map, people, null), null, 'no GM here: nowhere');
+});
+
+test('the relay plays a preview on the chosen GM\'s screen alone and says nothing on the socket', async () => {
+  const plays = [];
+  const savedDoc = globalThis.document;
+  globalThis.document = {
+    body: { tag: 'body' },
+    createElement: () => ({}),
+    head: { appendChild: (el) => { queueMicrotask(() => el.onload?.()); } },
+  };
+  globalThis.ChronicleCutscene = {
+    play: (host, sc, opts) => { plays.push({ host, sc, opts }); return { stop() {} }; },
+  };
+  const savedMap = settings.userMappings;
+  try {
+    emits.length = 0;
+    const relay = new CutsceneRelay();
+    const payload = { previewId: 'pv-2', director: 'dir', scene };
+    // Not matched: the active GM (this client) plays it.
+    assert.equal(await relay.onMessage({ type: 'cutscene.foundry_preview', payload }), true);
+    assert.equal(plays.length, 1);
+    assert.equal(plays[0].sc.text[0].say, 'Something has noticed you.');
+    assert.equal(plays[0].opts.label, 'CHRONICLE.Cutscenes.PreviewLabel');
+
+    // Matched to another GM who is here: this screen stays quiet.
+    users.push({ id: 'gm-b', isGM: true, active: true });
+    settings.userMappings = JSON.stringify({ m1: 'u1', m2: 'u2', dir: 'gm-b' });
+    assert.equal(relay.onMessage({ type: 'cutscene.foundry_preview', payload }), undefined);
+    assert.equal(plays.length, 1);
+
+    // Even a client that is not the active GM plays a preview that is its own.
+    settings.userMappings = JSON.stringify({ m1: 'u1', m2: 'u2', dir: 'gm' });
+    game.users.activeGM = users.find((u) => u.id === 'gm-b');
+    assert.equal(await relay.onMessage({ type: 'cutscene.foundry_preview', payload }), true);
+    assert.equal(plays.length, 2);
+
+    assert.equal(emits.length, 0, 'a preview never goes on the module socket');
+    assert.equal(relay._showings.size, 0, 'nor into the showings players can fetch');
+  } finally {
+    game.users.activeGM = users[0];
+    users.splice(users.findIndex((u) => u.id === 'gm-b'), 1);
+    settings.userMappings = savedMap;
+    globalThis.document = savedDoc;
+    delete globalThis.ChronicleCutscene;
+  }
+});
+
+test('a player\'s client never plays a preview, even one naming it', () => {
+  const relay = new CutsceneRelay();
+  const me = game.user;
+  game.user = users[1];
+  try {
+    assert.equal(relay.onMessage({ type: 'cutscene.foundry_preview', payload: { previewId: 'pv-3', director: 'm1', scene } }), undefined);
+  } finally {
+    game.user = me;
+  }
+});
+
 test('wiring: socket rules, the allowlist, the Satchel tab, and nothing saved in a document', () => {
   const src = read('scripts/cutscenes.mjs');
   // Answers count only from a GM and only for this user.
@@ -279,6 +367,9 @@ test('wiring: socket rules, the allowlist, the Satchel tab, and nothing saved in
     const body = src.slice(src.indexOf(fn), src.indexOf('\n  }\n', src.indexOf(fn)));
     assert.match(body, /if \(!isActiveGM\(\) \|\| !askLimit\(senderId\)\) return;/, fn);
   }
+  // A preview is played here, never emitted to other clients.
+  const preview = src.slice(src.indexOf('  _preview(payload) {'), src.indexOf('\n  }\n', src.indexOf('  _preview(payload) {')));
+  assert.doesNotMatch(preview, /socket|knock\(|remember\(|_showings/);
   // Scenes stay in memory: no document, flag or chat message is written.
   for (const f of ['scripts/cutscenes.mjs', 'scripts/cutscene-tab.mjs']) {
     assert.doesNotMatch(read(f), /\.setFlag\(|\.createDocuments\(|\.updateDocuments\(|\b(?:Actor|Item|JournalEntry|Scene|Folder|ChatMessage|Macro)\.create\(|\.update\(\{|game\.settings\.set\(/, f);
