@@ -252,7 +252,40 @@ export async function seedCampaign(label = 'bench') {
     });
     if (r.status >= 300) throw new Error(`add to Foundry failed: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
   };
-  return { campaignId, moduleKey, displayName, web, enableAddon, addToFoundry, createMap, enableClaiming, assignOwner, createFolder, fileInFolder, declareFields, enableTransformations, putOnLayer, takeOffLayer, chronicle: apiClient(campaignId, otherKey), module: apiClient(campaignId, moduleKey) };
+  // A second person, signed up and joined as a player through the owner's
+  // invite, so a change they make can ring the owner's bell. Email isn't set
+  // up on the bench, so the invite's link comes back on the members page.
+  const addPlayer = async (name = 'Bench Player') => {
+    const tag = `${Date.now().toString(36)}-${process.pid}-${seq}`;
+    const player = webSession();
+    await player.get('/register');
+    const email = `player-${tag}@bench.test`;
+    const password = 'bench-password-1';
+    const displayName = `${name} ${tag}`;
+    let res;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      res = await player.post('/register', { email, display_name: displayName, password, confirm: password });
+      if (res.status !== 429) break;
+      await new Promise((r) => setTimeout(r, (Number(res.headers.get('retry-after')) || 10) * 1000));
+    }
+    if (res.status !== 303) throw new Error(`player register failed: HTTP ${res.status}`);
+    const invite = await web.post(`/campaigns/${campaignId}/members`, { email, role: 'player' });
+    const token = (await invite.text()).match(/invites\/accept\?token=([A-Za-z0-9_-]+)/)?.[1];
+    if (!token) throw new Error(`player invite failed: HTTP ${invite.status}`);
+    const accept = await player.get(`/invites/accept?token=${token}`);
+    if (accept.status >= 300) throw new Error(`invite accept failed: HTTP ${accept.status}`);
+    const members = await apiClient(campaignId, otherKey).get('/members');
+    const member = (Array.isArray(members) ? members : members.data).find((m) => m.display_name === displayName);
+    if (!member) throw new Error('the invited player is not a member');
+    return { userId: String(member.user_id ?? member.id), displayName };
+  };
+  // The owner's bell, newest first, as the topbar reads it.
+  const ownerNotifications = async () => {
+    const r = await web.get('/notifications');
+    if (r.status >= 300) throw new Error(`notifications failed: HTTP ${r.status}`);
+    return r.json();
+  };
+  return { campaignId, moduleKey, displayName, web, enableAddon, addPlayer, ownerNotifications, addToFoundry, createMap, enableClaiming, assignOwner, createFolder, fileInFolder, declareFields, enableTransformations, putOnLayer, takeOffLayer, chronicle: apiClient(campaignId, otherKey), module: apiClient(campaignId, moduleKey) };
 }
 
 /** A REST client scoped to one campaign, for scenario setup and assertions. */
