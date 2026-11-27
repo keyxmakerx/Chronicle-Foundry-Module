@@ -57,9 +57,10 @@ export async function findIdentityItem(game, itemType, name) {
  * a failed create leaves the sheet as it was. A Foundry item of that name wins
  * over the campaign's entry, since it may carry the system's own advancements.
  * @param {Array<object>} [entries] - the campaign's entries for this field
+ * @param {object} [entryFields] - the field's `foundry_entry_fields`
  * @returns {Promise<'found'|'made'>}
  */
-export async function applyIdentityItem(actor, step, game, entries) {
+export async function applyIdentityItem(actor, step, game, entries, entryFields) {
   const source = await findIdentityItem(game, step.itemType, step.wantName);
   let data;
   if (source) {
@@ -71,7 +72,7 @@ export async function applyIdentityItem(actor, step, game, entries) {
   } else {
     // A campaign's own entry has no Foundry item to copy; the flag marks it as made here.
     data = { name: step.wantName, type: step.itemType, flags: { [FLAG_SCOPE]: { chronicleMade: true } } };
-    const fill = entryItemFill(findEntry(entries, step.wantName), { mentionId: journalMentions(game) });
+    const fill = entryItemFill(findEntry(entries, step.wantName), { mentionId: journalMentions(game), entryFields });
     if (fill) Object.assign(data, fill);
   }
   await actor.createEmbeddedDocuments('Item', [data], writeOptions());
@@ -97,14 +98,15 @@ export function journalMentions(game) {
 /**
  * Apply a whole plan; one failed step does not stop the rest.
  * @param {Record<string, Array<object>>} [entriesByField]
+ * @param {Record<string, object>} [entryFieldsByField] - each field's `foundry_entry_fields`
  * @returns {Promise<{done: string[], failed: string[]}>} field keys
  */
-export async function applyIdentityPlan(actor, plan, game, entriesByField) {
+export async function applyIdentityPlan(actor, plan, game, entriesByField, entryFieldsByField) {
   const done = [];
   const failed = [];
   for (const step of plan) {
     try {
-      await applyIdentityItem(actor, step, game, entriesByField?.[step.fieldKey]);
+      await applyIdentityItem(actor, step, game, entriesByField?.[step.fieldKey], entryFieldsByField?.[step.fieldKey]);
       done.push(step.fieldKey);
     } catch (err) {
       console.error(`Chronicle: could not set ${step.fieldKey} "${step.wantName}" on "${actor.name}"`, err);

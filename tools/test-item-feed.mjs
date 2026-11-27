@@ -188,3 +188,65 @@ test('nothing happens with character sync off', async () => {
   assert.deepEqual(gets, []);
   settings.syncCharacters = true;
 });
+
+test('on a hero a player sees, Director-only links and pages players cannot open add no item', async () => {
+  settings.syncCharacters = true;
+  const hero = makeActor('hero-actor', 'hero');
+  hero.ownership = { default: 0, player1: 3 };
+  const pages = {
+    sword: { id: 'sword', is_private: false },
+    ring: { id: 'ring', is_private: true },
+    gem: { id: 'gem', is_private: false, type_dm_only: true },
+    cloak: { id: 'cloak', is_private: false, visibility: 'custom' },
+  };
+  const perms = { cloak: { visibility: 'custom', permissions: [{ subject_type: 'user', subject_id: 'm9', permission: 'view' }] } };
+  const relations = [
+    { ...hasItem(1, 'locket'), dmOnly: true },
+    hasItem(2, 'ring'), hasItem(3, 'gem'), hasItem(4, 'cloak'), hasItem(5, 'sword'), hasItem(6, 'gone'),
+  ];
+  const is = new ItemSync();
+  const gets = [];
+  is._api = {
+    get: async (p) => {
+      gets.push(p);
+      const [, , id, sub] = p.split('/');
+      if (id === 'hero' && sub === 'relations') return relations;
+      if (id === 'gone') throw Object.assign(new Error('boom'), { status: 500 });
+      if (sub === 'permissions') return perms[id] ?? { visibility: pages[id]?.visibility ?? 'default' };
+      return pages[id];
+    },
+  };
+  globalThis.game.actors = { contents: [hero], find: (fn) => [hero].find(fn), filter: (fn) => [hero].filter(fn) };
+  await is.onInitialSync();
+  assert.deepEqual(hero.writes, ['create sword'], 'only the page players can open lands on the hero');
+  assert.ok(!gets.includes('/entities/locket'), 'a Director-only link is not even read');
+});
+
+test('an actor no player sees still gets its Director-only items', async () => {
+  const npc = makeActor('npc-actor', 'npc');
+  npc.ownership = { default: 0 };
+  const { is } = make([npc], { npc: [{ ...hasItem(1, 'locket'), sourceEntityId: 'npc', dmOnly: true }] });
+  await is.onInitialSync();
+  assert.deepEqual(npc.writes, ['create locket']);
+});
+
+test('the GM is told once of an item still linked to a Director-only link', async () => {
+  const hero = makeActor('hero-actor', 'hero');
+  hero.ownership = { default: 2 };
+  await hero.createEmbeddedDocuments('Item', [{ name: 'Cursed Locket', system: { quantity: 1 }, flags: { 'chronicle-sync': { relationId: 1, entityId: 'locket' } } }], { chronicleSyncApply: true });
+  hero.writes.length = 0;
+  const { is } = make([hero], { hero: [{ ...hasItem(1, 'locket'), dmOnly: true }] });
+  const warned = [];
+  const before = globalThis.ui.notifications.warn;
+  globalThis.ui.notifications.warn = (m, o) => warned.push([m, o]);
+  try {
+    await is.onInitialSync();
+    await is._tellHiddenHeld(hero, ['i1']);
+  } finally {
+    globalThis.ui.notifications.warn = before;
+  }
+  assert.equal(warned.length, 1);
+  assert.match(warned[0][0], /DmOnlyItemHeld.*Cursed Locket/);
+  assert.equal(warned[0][1]?.permanent, true);
+  assert.deepEqual(hero.writes, ['update i1 {"flags.chronicle-sync.-=relationId":null,"flags.chronicle-sync.unlinkedRelationId":1}'], 'unlinked, never deleted');
+});

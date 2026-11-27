@@ -12,6 +12,9 @@ import { flagRemoval } from './_flag-removal.mjs';
 /** Marks the folder, so it is found again whatever it has been renamed to. */
 export const REMOVED_FOLDER_FLAG = 'removedFolder';
 
+/** The flags that say which Chronicle page or note a journal is. */
+export const LINK_ID_FLAGS = ['entityId', 'noteId', 'isNote'];
+
 /** The flags that tie a journal to a Chronicle page or note, and the page's facts, which every client with the journal can read. */
 export const LINK_FLAGS = ['entityId', 'noteId', 'isNote', 'entityType', 'entityTypeSlug', 'fields', 'tags', 'lastSync', 'chronicleUpdatedAt', 'facts'];
 
@@ -56,4 +59,26 @@ export async function removedFolder(scope) {
 export async function setAside(journal, scope, options) {
   const folder = await removedFolder(scope);
   await journal.update(setAsideUpdate(scope, folder?.id ?? null), { ...options });
+}
+
+/**
+ * Whether a document change sets or removes any of the module's link flags,
+ * in Foundry's nested form or its dotted form.
+ * @param {object} change - the update's diff
+ * @param {string} scope - the module's flag scope
+ * @param {string[]} keys - the link flag keys
+ * @returns {boolean}
+ */
+export function touchesLinkFlags(change, scope, keys) {
+  if (!change || typeof change !== 'object') return false;
+  const named = (k) => keys.includes(String(k).replace(/^-=/, ''));
+  const flags = change.flags;
+  if (flags && typeof flags === 'object') {
+    if (Object.keys(flags).some((k) => k === `-=${scope}`)) return true;
+    const ours = flags[scope];
+    if (ours === null) return true;
+    if (ours && typeof ours === 'object' && Object.keys(ours).some(named)) return true;
+  }
+  const prefix = `flags.${scope}.`;
+  return Object.keys(change).some((k) => k === `flags.-=${scope}` || (k.startsWith(prefix) && named(k.slice(prefix.length))));
 }

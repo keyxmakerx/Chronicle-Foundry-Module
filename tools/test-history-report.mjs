@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import {
   describeMessage, resourceIdOf, resourceNameOf, idsInPath, activityToEvent,
   HistoryReporter, HISTORY_BATCH, HISTORY_QUEUE_MAX, ECHO_WINDOW_MS, idsInResponse,
+  conflictEvent, conflictFieldNames,
 } from '../scripts/_history-report.mjs';
 
 test('messages that are changes read as history; bursts are left out', () => {
@@ -151,4 +152,31 @@ test('flushes never overlap', async () => {
   assert.equal(await r.flush(), 0);
   release();
   assert.equal(await first, 1);
+});
+
+test('a settled conflict says which side won and why, in the direction of the winner', () => {
+  const at = Date.UTC(2026, 10, 27, 12);
+  const ev = conflictEvent({
+    kind: 'page', resourceId: 'e-1', name: 'Harbor', kept: 'chronicle', reason: 'setting',
+    fields: { name: 'Harbour', entry: '<p>secret plans</p>', expected_updated_at: '2026-11-27T11:00:00Z' }, at,
+  });
+  assert.deepEqual(ev, {
+    at: new Date(at).toISOString(), direction: 'to_foundry', kind: 'page', resourceId: 'e-1', name: 'Harbor',
+    action: 'Chronicle kept', call: 'foundry conflict', status: 'conflict', ok: true, durationMs: 0,
+    message: 'The conflict setting keeps the Chronicle version. Fields the Foundry edit sent: name, entry.',
+  });
+  const won = conflictEvent({ kind: 'character', resourceId: 'e-2', name: 'Ash', kept: 'foundry', reason: 'newer', fields: ['name'] });
+  assert.equal(won.direction, 'to_chronicle');
+  assert.equal(won.action, 'Foundry kept');
+  assert.match(won.message, /newest version, and the Foundry change was newer\. Fields the Foundry edit sent: name\.$/);
+  assert.match(conflictEvent({ kind: 'page', resourceId: 'x', name: 'X', kept: 'foundry', reason: 'part' }).message, /^This part is set to From Foundry/);
+});
+
+test('a conflict carries field names, never their values, and stays within the server limits', () => {
+  const ev = conflictEvent({ kind: 'page', resourceId: 'e', name: 'n'.repeat(300), kept: 'chronicle', reason: 'setting', fields: { entry: 'GM-only words', 'bad key<script>': 1 } });
+  assert.doesNotMatch(ev.message, /GM-only words|script/);
+  assert.equal(ev.name.length, 200);
+  assert.deepEqual(conflictFieldNames({ expected_updated_at: 'x', fields_data: {}, 'a b': 1 }), ['fields_data']);
+  const many = Object.fromEntries(Array.from({ length: 80 }, (_, i) => [`field_${i}`, i]));
+  assert.ok(conflictEvent({ kind: 'page', resourceId: 'e', name: 'n', kept: 'foundry', reason: 'setting', fields: many }).message.length <= 500);
 });

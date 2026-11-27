@@ -13,6 +13,7 @@
  */
 
 import { FLAG_SCOPE } from './constants.mjs';
+import { escapeHtml } from './_escape-html.mjs';
 
 export const ROLL_MESSAGE_TYPE = 'roll.made';
 /** Flag key under the module scope: `{id, origin}`. */
@@ -96,10 +97,14 @@ export function buildRollData(payload, { appearance = null } = {}) {
   return { class: 'Roll', options: {}, formula, terms, total: payload.total, evaluated: true };
 }
 
-/** The chat line's flavour: label, then the outcome in brackets. */
+/**
+ * The chat line's flavour: label, then the outcome in brackets. Foundry
+ * renders a message's flavour as HTML on every client, and a label is text
+ * any Chronicle player typed, so both parts are escaped to stay literal.
+ */
 export function flavorFor(payload) {
-  const label = String(payload.label ?? '').trim().slice(0, MAX_LABEL);
-  const outcome = String(payload.outcome ?? '').trim().slice(0, MAX_LABEL);
+  const label = escapeHtml(String(payload.label ?? '').trim().slice(0, MAX_LABEL));
+  const outcome = escapeHtml(String(payload.outcome ?? '').trim().slice(0, MAX_LABEL));
   if (label && outcome) return `${label} (${outcome})`;
   return label || outcome;
 }

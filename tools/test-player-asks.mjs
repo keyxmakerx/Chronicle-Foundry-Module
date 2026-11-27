@@ -86,6 +86,8 @@ test('players can view a default page, or a custom one with a public or all-play
   assert.ok(!playersCanView({}, { visibility: 'custom', permissions: [{ subject_type: 'user', subject_id: 'm1', permission: 'view' }] }));
   assert.ok(!playersCanView({}, { visibility: 'custom', permissions: [] }));
   assert.ok(!playersCanView({}, { visibility: 'dm_only' }));
+  assert.ok(!playersCanView({ type_dm_only: true }, { visibility: 'default' }), 'a DM-only category hides the page whatever it says');
+  assert.ok(!playersCanView({ type_dm_only: true }, { visibility: 'custom', permissions: [{ subject_type: 'role', subject_id: '1', permission: 'view' }] }));
 });
 
 const flagOf = (m) => m?.flags?.card;

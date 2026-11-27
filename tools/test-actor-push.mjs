@@ -281,3 +281,34 @@ test('removing the complication in Foundry clears it in Chronicle; class stays F
   });
   assert.equal(swapped.at(-1).complication, 'Cursed Ring');
 });
+
+test('a token visibility change is sent only when a GM made it, never a player\'s under the GM\'s key', async () => {
+  const { sync } = await harness();
+  const posts = [];
+  sync._api.post = async (p, body) => { posts.push([p, body]); return {}; };
+  const users = globalThis.game.users;
+  globalThis.game.users = { get: (id) => (id === 'player-1' ? { id, isGM: false } : null), contents: [], activeGM: { id: 'gm' } };
+  try {
+    // A player who owns the hero (and can write its page-id flag) hides its token.
+    await sync._handleUpdateActor(actorDoc({ flags: { entityId: 'someone-elses-page' } }), { prototypeToken: { hidden: true } }, {}, 'player-1');
+  } finally {
+    globalThis.game.users = users;
+  }
+  assert.deepEqual(posts, [], 'a player\'s change hides or reveals no Chronicle page');
+  await sync._handleUpdateActor(actorDoc(), { prototypeToken: { hidden: true } }, {}, 'gm');
+  assert.deepEqual(posts, [['/entities/ent-1/reveal', { is_private: true }]]);
+});
+
+test('a player who rewrites their actor\'s page link gets it unlinked, and nothing is pulled or pushed through it', async () => {
+  const { sync, calls } = await harness();
+  const users = globalThis.game.users;
+  globalThis.game.users = { get: (id) => (id === 'player-1' ? { id, isGM: false } : null), contents: [], activeGM: { id: 'gm' } };
+  try {
+    const actor = actorDoc({ flags: { entityId: 'someone-elses-page' } });
+    await sync._handleUpdateActor(actor, { flags: { 'chronicle-sync': { entityId: 'someone-elses-page' } }, system: { attributes: { hp: { value: 9 } } } }, { chronicleSyncApply: true }, 'player-1');
+    assert.equal(actor.getFlag('chronicle-sync', 'entityId'), undefined);
+    assert.deepEqual(calls, []);
+  } finally {
+    globalThis.game.users = users;
+  }
+});

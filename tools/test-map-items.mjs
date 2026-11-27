@@ -12,7 +12,10 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
-const { pickMapItemType, journalAccessForActorOwners, journalAccessForCarriedMaps, mapPageUuidOf } =
+const {
+  pickMapItemType, journalAccessForActorOwners, journalAccessForCarriedMaps, mapPageUuidOf,
+  carriedMapShareable, withMapGivenTo,
+} =
   await import('../scripts/_map-item-rules.mjs');
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const LV = { NONE: 0, LIMITED: 1, OBSERVER: 2, OWNER: 3 };
@@ -76,4 +79,29 @@ test('the module reapplies the grant when an actor\'s ownership changes (GM clie
   const src = readFileSync(resolve(ROOT, 'scripts/map-sheet-items.mjs'), 'utf8');
   assert.match(src, /Hooks\.on\('updateActor', _onUpdateActor\)/);
   assert.match(src, /async function _onUpdateActor[\s\S]*?!game\.user\.isGM[\s\S]*?'ownership' in changes/);
+});
+
+test('a carried map is shared only when the GM gave that map to that actor', () => {
+  const map = { mapId: 'm1' };
+  assert.equal(carriedMapShareable(map, { mapGivenTo: ['a1'] }, 'a1'), true);
+  // A player can write any flags on their own character's item: an item
+  // pointing at a journal the GM never gave this actor shares nothing.
+  assert.equal(carriedMapShareable(map, { mapGivenTo: ['a2'] }, 'a1'), false, 'given to someone else');
+  assert.equal(carriedMapShareable(map, {}, 'a1'), false, 'never given');
+  assert.equal(carriedMapShareable({}, { mapGivenTo: ['a1'] }, 'a1'), false, 'not a Chronicle map page');
+  assert.equal(carriedMapShareable(map, { mapGivenTo: 'a1' }, 'a1'), false, 'malformed list');
+  assert.equal(carriedMapShareable(map, { mapGivenTo: ['a1'] }, ''), false);
+});
+
+test('giving a map records the actor on the journal once', () => {
+  assert.deepEqual(withMapGivenTo(undefined, 'a1'), ['a1']);
+  assert.deepEqual(withMapGivenTo({ mapGivenTo: ['a1'] }, 'a1'), ['a1']);
+  assert.deepEqual(withMapGivenTo({ mapGivenTo: ['a1', 7] }, 'a2'), ['a1', 'a2']);
+});
+
+test('the ownership-change grant checks the journal\'s gift list, and giving writes it', () => {
+  const src = readFileSync(resolve(ROOT, 'scripts/map-sheet-items.mjs'), 'utf8');
+  assert.match(src, /async function _onUpdateActor[\s\S]*?carriedMapShareable\(page\.flags\?\.\[FLAG_SCOPE\], entry\.flags\?\.\[FLAG_SCOPE\], actor\.id\)[\s\S]*?journals\.set/);
+  assert.match(src, /async function _recordGift[\s\S]*?withMapGivenTo\(/);
+  assert.match(src, /export async function giveMapToActor[\s\S]*?if \(already\) \{[\s\S]*?_recordGift\(entry, actor\)/);
 });

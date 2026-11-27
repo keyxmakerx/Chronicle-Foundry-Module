@@ -116,3 +116,27 @@ test('an edit grant for all players lets a matched player\'s edit through; an un
   await edit(b.js, j, {}, 'player');
   assert.equal(b.puts.length, 0);
 });
+
+test('a player who rewrites a journal\'s Chronicle link gets it unlinked, and nothing is sent', async () => {
+  const { touchesLinkFlags, LINK_ID_FLAGS } = await import('../scripts/_set-aside.mjs');
+  // The player who owns the journal points it at another page.
+  const j = makeJournal({ flags: { entityId: 'someone-elses-page' }, pages: [page('<p>new</p>')] });
+  installJournals([j]);
+  const { js, puts } = make();
+  // Sending the sync-write option from the player's client changes nothing.
+  await js._handleUpdateJournal(j, { flags: { 'chronicle-sync': { entityId: 'someone-elses-page' } } }, { chronicleSync: true }, 'player');
+  assert.equal(j.flags.entityId, undefined, 'unlinked');
+  assert.equal(j.updates.at(-1).options.chronicleSync, true);
+  assert.deepEqual(puts, []);
+  assert.equal(notes.warn.length, 1);
+  // Every form Foundry may hand the hook counts; other flags and the GM's own change do not.
+  assert.equal(touchesLinkFlags({ 'flags.chronicle-sync.entityId': 'x' }, 'chronicle-sync', LINK_ID_FLAGS), true);
+  assert.equal(touchesLinkFlags({ flags: { 'chronicle-sync': { '-=entityId': null } } }, 'chronicle-sync', LINK_ID_FLAGS), true);
+  assert.equal(touchesLinkFlags({ flags: { '-=chronicle-sync': null } }, 'chronicle-sync', LINK_ID_FLAGS), true);
+  assert.equal(touchesLinkFlags({ flags: { 'chronicle-sync': { lastSync: 'x' } } }, 'chronicle-sync', LINK_ID_FLAGS), false);
+  assert.equal(touchesLinkFlags({ name: 'x' }, 'chronicle-sync', LINK_ID_FLAGS), false);
+  const g = makeJournal({ flags: { entityId: 'e1' }, pages: [page('<p>new</p>')] });
+  installJournals([g]);
+  await make().js._handleUpdateJournal(g, { flags: { 'chronicle-sync': { entityId: 'e1' } } }, {}, 'gm');
+  assert.equal(g.flags.entityId, 'e1', 'the GM\'s own link change stands');
+});
