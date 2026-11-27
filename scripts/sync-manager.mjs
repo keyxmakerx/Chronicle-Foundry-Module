@@ -248,6 +248,10 @@ export class SyncManager {
       return;
     }
 
+    // Every GM client records its own link writes, sync running or not: a
+    // link a GM removes by hand must leave the record too.
+    this._linkRecord.start();
+
     if (!isConfigured()) {
       console.warn('Chronicle: Module not configured. Set URL, API key, and campaign ID in settings.');
       ui.notifications.warn('Chronicle Sync is not set up yet. Open Chronicle settings to connect.');
@@ -259,10 +263,8 @@ export class SyncManager {
       return;
     }
 
-    // Record links from the first write on, so none this session goes unseen,
-    // and undo any no GM made before a module's hooks, a pull or a socket
-    // message can use them.
-    this._linkRecord.start();
+    // Undo any link no GM made before a module's hooks, a pull or a socket
+    // message can use it.
     await this._checkLinks();
 
     // Detect game system and match against Chronicle systems.

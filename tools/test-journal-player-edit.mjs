@@ -169,3 +169,35 @@ test('a journal a player creates with a page or note link arrives unlinked, even
   await make().js._handleCreateJournal(g, { chronicleSync: true }, 'gm');
   assert.equal(g.flags.entityId, 'e1');
 });
+
+test('with journals not synced, the link guard still undoes a player\'s link change, and stops once the full hooks are on', async () => {
+  const hooks = new Map();
+  const realHooks = globalThis.Hooks;
+  globalThis.Hooks = {
+    on: (n, fn) => hooks.set(n, [...(hooks.get(n) || []), fn]),
+    off: (n, fn) => hooks.set(n, (hooks.get(n) || []).filter((f) => f !== fn)),
+    once: () => {},
+  };
+  const was = settings.syncJournals;
+  settings.syncJournals = false;
+  try {
+    const { js } = make();
+    await js.init(js._api);
+    // Switching journals on mid-session would start pulls through this link.
+    const j = makeJournal({ flags: { entityId: 'someone-elses-page' }, pages: [page('<p>x</p>')] });
+    installJournals([j]);
+    const change = { flags: { 'chronicle-sync': { entityId: 'someone-elses-page' } } };
+    for (const fn of hooks.get('updateJournalEntry') || []) await fn(j, change, {}, 'player');
+    assert.equal(j.flags.entityId, undefined, 'unlinked with journals off');
+    assert.equal(notes.warn.length, 1);
+    const k = makeJournal({ flags: { entityId: 'another-page' }, pages: [page('<p>x</p>')] });
+    installJournals([k]);
+    for (const fn of hooks.get('createJournalEntry') || []) await fn(k, {}, 'player');
+    assert.equal(k.flags.entityId, undefined, 'a linked create unlinked with journals off');
+    js.destroy();
+    assert.equal((hooks.get('updateJournalEntry') || []).length, 0, 'destroy removes the guard');
+  } finally {
+    settings.syncJournals = was;
+    globalThis.Hooks = realHooks;
+  }
+});

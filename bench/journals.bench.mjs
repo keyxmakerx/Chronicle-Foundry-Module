@@ -254,6 +254,28 @@ test('a GM that is not the active GM, but runs sync, undoes a player\'s link cha
   }
 }));
 
+test('a link a player changes while journals are not synced is undone, so switching them on pulls nothing through it', () => scenario('relink-journals-off', async ({ seed, world }) => {
+  const mine = await chroniclePage(seed, 'Quiet Journal');
+  const other = await chroniclePage(seed, 'Quiet Someone Else');
+  await openWorld(world);
+  await JournalSync_resync(world);
+  const j = byEntity(world, mine.id);
+  assert.ok(j, 'linked');
+  await closeWorld(world);
+
+  world.settingsValues.syncJournals = false;
+  await openWorld(world);
+  await world.asPlayer(() => j.update({ [`flags.${FLAG}.entityId`]: other.id }));
+  await settle();
+  assert.equal(j.getFlag(FLAG, 'entityId'), undefined, 'undone with journals off');
+
+  // Journals switched on without a restart: an edit of the other page lands nowhere here.
+  world.settingsValues.syncJournals = true;
+  await seed.chronicle.put(`/entities/${other.id}`, { entry: '<p>Not for this journal.</p>' });
+  await settle();
+  assert.doesNotMatch(pageText(j) || '', /Not for this journal/);
+}));
+
 test('a reopen reads only what changed (change feed), and its own pushes do not come back', () => scenario('feed-catchup', async ({ seed, world }) => {
   const pages = [];
   for (const n of ['North', 'South', 'East', 'West']) pages.push(await chroniclePage(seed, `${n} Gate`));

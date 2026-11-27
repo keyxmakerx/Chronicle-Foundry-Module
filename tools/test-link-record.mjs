@@ -180,6 +180,29 @@ test('a GM\'s own link writes are recorded; a player\'s never are', async () => 
   assert.equal([...w.hooks.values()].flat().length, 0, 'stop removes every hook');
 });
 
+test('a link noted just before sync stops or the tab closes is saved, not left for the debounce', async () => {
+  const w = world({ record: recordValue([]) });
+  const lr = new LinkRecord();
+  lr.start();
+  Hooks.call('createJournalEntry', doc('j1', { entityId: 'e1' }), {}, 'gm');
+  lr.stop();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.ok(readRecord(w.record()).has(await linkHash('journals', 'j1', { entityId: 'e1' })), 'flushed on stop');
+  const unload = [];
+  globalThis.window = { addEventListener: (n, fn) => unload.push([n, fn]), removeEventListener() {} };
+  try {
+    const lr2 = new LinkRecord();
+    lr2.start();
+    Hooks.call('createJournalEntry', doc('j2', { entityId: 'e2' }), {}, 'gm');
+    for (const [n, fn] of unload) if (n === 'beforeunload') fn();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.ok(readRecord(w.record()).has(await linkHash('journals', 'j2', { entityId: 'e2' })), 'flushed on unload');
+    lr2.stop();
+  } finally {
+    delete globalThis.window;
+  }
+});
+
 test('links noted before the first connect wait for it rather than start a partial record', async () => {
   const j = doc('j1', { entityId: 'e1' });
   const old = doc('j0', { entityId: 'e0' });
@@ -207,12 +230,14 @@ test('every GM client running sync checks, the active GM or not; a player\'s cli
   }
 });
 
-test('the check runs when sync starts, before any module hook, pull or socket message, and the setting is world-scoped and hidden', async () => {
+test('every GM client records; the check runs when sync starts, before any module hook, pull or socket message; the setting is world-scoped and hidden', async () => {
   const { readFileSync } = await import('node:fs');
   const sm = readFileSync(new URL('../scripts/sync-manager.mjs', import.meta.url), 'utf8');
   const start = sm.slice(sm.indexOf('async _startOnce() {'), sm.indexOf('\n  }\n', sm.indexOf('async _startOnce() {')));
-  const check = start.indexOf('this._linkRecord.start();\n    await this._checkLinks();');
-  assert.ok(check > 0, 'checked at start');
+  const record = start.indexOf('this._linkRecord.start();');
+  assert.ok(record > 0 && record < start.indexOf('isConfigured()'), 'every GM client records, configured or not');
+  const check = start.indexOf('await this._checkLinks();');
+  assert.ok(check > record, 'checked at start');
   for (const later of ['mod.init(this.api)', "this.api.on('*'", 'this.api.connect()']) {
     assert.ok(start.indexOf(later) > check, `${later} comes after the check`);
   }

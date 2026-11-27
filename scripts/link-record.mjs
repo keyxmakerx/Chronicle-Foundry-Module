@@ -28,11 +28,15 @@ export default class LinkRecord {
     this._noted = Promise.resolve();
     this._timer = null;
     this._hooks = [];
+    // A link noted just before the tab closes would otherwise miss the
+    // record and be undone at the next start.
+    this._onUnload = () => { this.flush(); };
   }
 
   /** Watch this GM's own writes, which are the only links the record takes. */
   start() {
     if (this._hooks.length) return;
+    globalThis.window?.addEventListener?.('beforeunload', this._onUnload);
     for (const [doc, kind] of DOCS) {
       const keys = LINK_KINDS[kind];
       this._on(`preUpdate${doc}`, (d, change, _o, userId) => {
@@ -58,7 +62,17 @@ export default class LinkRecord {
   stop() {
     for (const [name, fn] of this._hooks) Hooks.off(name, fn);
     this._hooks = [];
+    globalThis.window?.removeEventListener?.('beforeunload', this._onUnload);
+    this.flush();
+  }
+
+  /** Save what was noted now, not after the debounce. */
+  flush() {
+    const pending = this._timer !== null;
     if (this._timer) { clearTimeout(this._timer); this._timer = null; }
+    if (pending || this._add.size || this._drop.size) {
+      this.save().catch((err) => console.warn('Chronicle: could not save the link record', err));
+    }
   }
 
   _on(name, fn) {
