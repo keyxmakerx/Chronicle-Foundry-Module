@@ -215,6 +215,8 @@ test('copies that differ from Chronicle\'s are one warn row naming each engine i
   assert.equal(one.action, undefined);
   const many = byId(build({ vendorMismatch: ['cutscenes', 'sky', 'crafting'] }), 'vendor');
   assert.equal(many.title, 'This module’s cut scene player, Sky Clock, and crafting don’t match your Chronicle');
+  assert.match(one.detail, /release of it, so it may/);
+  assert.match(many.detail, /release of them, so they may not behave as they do/);
   const rows = build({ vendorMismatch: ['shop'] });
   assert.equal(rows[0].id, 'vendor', 'a problem sorts above the ok rows');
 });
