@@ -25,6 +25,7 @@ import {
   judgeIncoming,
   postBodies,
 } from './_roll-relay.mjs';
+import { chronicleRollAppearance } from './dice-so-nice.mjs';
 
 /** True on the one client that should relay: the active GM. */
 function _isActiveGM() {
@@ -77,6 +78,7 @@ export const rollRelay = {
         fallbackAlias: game.i18n.localize('CHRONICLE.Rolls.FallbackName'),
         authorId: game.user.id,
         speaker: this._heroSpeaker(payload),
+        appearance: chronicleRollAppearance(),
       });
       // The Roll class rebuilds each term from its saved results, so nothing is rolled again.
       data.rolls = data.rolls.map((r) => Roll.fromData(r));

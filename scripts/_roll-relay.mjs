@@ -59,9 +59,14 @@ export function cleanDice(dice) {
  * Foundry `Roll` data (the shape `Roll.fromData` reads) carrying Chronicle's
  * results as already-evaluated terms. Runs of the same die size share one Die
  * term; the modifier follows as an operator and a number.
+ * @param {object} payload
+ * @param {{appearance?: object|null}} [opts] - The Dice So Nice look every
+ *   die carries. It travels in the message, so each viewer's Dice So Nice
+ *   draws the campaign's dice instead of that viewer's own theme.
  * @returns {object} `{class:'Roll', formula, terms, total, evaluated, options}`
  */
-export function buildRollData(payload) {
+export function buildRollData(payload, { appearance = null } = {}) {
+  const dieOptions = () => (appearance ? { appearance: { ...appearance } } : {});
   const terms = [];
   const plus = () => terms.push({ class: 'OperatorTerm', operator: '+', evaluated: true, options: {} });
   let run = null;
@@ -73,7 +78,7 @@ export function buildRollData(payload) {
     }
     if (run) plus();
     run = {
-      class: 'Die', number: 1, faces: d.sides, modifiers: [], evaluated: true, options: {},
+      class: 'Die', number: 1, faces: d.sides, modifiers: [], evaluated: true, options: dieOptions(),
       results: [{ result: d.value, active: true }],
     };
     terms.push(run);
@@ -136,9 +141,10 @@ export function heroSpeaker(speaker, actor) {
  * @param {string|null} [ctx.authorId] - Foundry user the message is from.
  * @param {object|null} [ctx.speaker] - The hero's actor as speaker (heroSpeaker);
  *   without it the roller's name speaks.
+ * @param {object|null} [ctx.appearance] - The dice look (see buildRollData).
  */
-export function buildChatData(payload, { gmIds = [], rollerFoundryId = null, fallbackAlias = '', authorId = null, speaker = null } = {}) {
-  const rolls = [buildRollData(payload)];
+export function buildChatData(payload, { gmIds = [], rollerFoundryId = null, fallbackAlias = '', authorId = null, speaker = null, appearance = null } = {}) {
+  const rolls = [buildRollData(payload, { appearance })];
   const data = {
     content: String(payload.total),
     speaker: speaker ?? { alias: String(payload.rollerName || fallbackAlias).slice(0, MAX_NAME) },

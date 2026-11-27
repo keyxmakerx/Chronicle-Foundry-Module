@@ -17,7 +17,7 @@ import { MODULE_ID } from './constants.mjs';
 import { log } from './logger.mjs';
 import { DSN_ID, OPTIONAL_API, REQUIRED_API, judgeDiceSoNice } from './_dice-so-nice-check.mjs';
 import {
-  MANIFEST_PATH, appearanceFor, buildRegistrations, critRegistrations, critSfx, readLook,
+  MANIFEST_PATH, appearanceFor, syncAppearance, buildRegistrations, critRegistrations, critSfx, readLook,
   readManifest, syncRegistrations,
 } from './_rune-dice.mjs';
 
@@ -40,6 +40,9 @@ const state = {
   dice3d: null,
   plan: null,
   syncedSet: null,
+  // Whether "Sync with Chronicle" is registered here, and with faces of its own.
+  syncReady: false,
+  syncSystem: false,
   registered: { colorsets: new Set(), systems: new Set(), defaults: new Map() },
 };
 
@@ -171,9 +174,22 @@ async function applySync() {
       if (sync.set !== state.syncedSet && typeof dice3d.preloadPresets === 'function') await dice3d.preloadPresets(sync.system.id);
     }
     state.syncedSet = sync.set;
+    state.syncReady = true;
+    state.syncSystem = !!sync.system;
   } catch (err) {
     log.warn('Dice So Nice: "Sync with Chronicle" not registered', err);
   }
+}
+
+/**
+ * The Dice So Nice look a relayed Chronicle roll carries: "Sync with
+ * Chronicle", which every client with Dice So Nice registers from the same
+ * world setting, so all viewers see the campaign's set and colour. Null when
+ * it isn't registered here; the dice then keep each viewer's own look.
+ */
+export function chronicleRollAppearance() {
+  if (!game.dice3d || !state.syncReady) return null;
+  return syncAppearance(state.syncSystem);
 }
 
 /**

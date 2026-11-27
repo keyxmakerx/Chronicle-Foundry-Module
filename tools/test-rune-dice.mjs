@@ -15,7 +15,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
-  ASSET_ROOT, CRITS, CRIT_TRIGGER, GROUP, MANIFEST_PATH, RUNE_SET_IDS, appearanceFor, critRegistrations, critSfx, buildRegistrations, colorsetId, readManifest, safeAssetPath, systemId,
+  ASSET_ROOT, CRITS, CRIT_TRIGGER, GROUP, MANIFEST_PATH, RUNE_SET_IDS, appearanceFor, critRegistrations, critSfx, buildRegistrations, colorsetId, readManifest, safeAssetPath, syncAppearance, systemId, SYNC_ID,
 } from '../scripts/_rune-dice.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -116,6 +116,8 @@ test("a die wears its roller's set and colour only when they registered here", (
     systems: new Set([systemId('cage')]),
     defaults: new Map([['cage', colorsetId('cage', 'bronze')], ['plain', colorsetId('plain', 'default')]]),
   };
+  assert.deepEqual(syncAppearance(true), { colorset: SYNC_ID, system: SYNC_ID });
+  assert.deepEqual(syncAppearance(false), { colorset: SYNC_ID });
   assert.deepEqual(appearanceFor({ set: 'cage', colour: 'iron' }, registered), { colorset: colorsetId('cage', 'iron'), system: systemId('cage') });
   assert.deepEqual(appearanceFor({ set: 'cage', colour: 'gold' }, registered), { colorset: colorsetId('cage', 'bronze'), system: systemId('cage') });
   assert.deepEqual(appearanceFor({ set: 'cage' }, registered), { colorset: colorsetId('cage', 'bronze'), system: systemId('cage') });
