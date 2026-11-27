@@ -440,6 +440,7 @@
     "Notifications": {
       "ConflictKeptChronicle": "Conflict on \"{name}\" — kept Chronicle version.",
       "ConflictKeptFoundry": "Conflict on \"{name}\" — kept Foundry version.",
+      "GmFieldTextLeft": "Chronicle: {names} still show notes on their sheet that their players can read. Chronicle keeps those notes GM-only, but this text is not the same as Chronicle's, so it was left alone. Open each one and clear anything secret.",
       "InitialSyncFailed": "Chronicle: The first sync failed ({message}). The dashboard's History tab lists what happened.",
       "MatchFailed": "Chronicle: Match failed: {message}",
       "CreateFailed": "Chronicle: Create failed: {message}",

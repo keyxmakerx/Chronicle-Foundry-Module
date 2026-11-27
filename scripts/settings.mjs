@@ -172,6 +172,16 @@ export function registerSettings() {
       default: '[]',
     });
   }
+  // Fingerprints of leftover text at a GM-only field's Foundry path that this
+  // GM was already warned about, by actor id (_gm-field-clear.mjs). Client
+  // scope: an actor flag or world setting would reach players, who could
+  // test guesses against a fingerprint of short notes.
+  game.settings.register(MODULE_ID, 'gmTextTold', {
+    scope: 'client',
+    config: false,
+    type: Object,
+    default: {},
+  });
   game.settings.register(MODULE_ID, 'journalTabView', {
     scope: 'client',
     config: false,

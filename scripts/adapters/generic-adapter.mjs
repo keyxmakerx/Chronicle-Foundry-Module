@@ -18,6 +18,7 @@
 
 import { touchedScalarKeys, ITEMS_CHANGED } from '../_actor-field-diff.mjs';
 import { identityFieldDefs } from '../_identity-item-plan.mjs';
+import { clearableGmFields, pageGmOnlyKeys } from '../_gm-field-clear.mjs';
 
 /**
  * Create a generic adapter instance by fetching field definitions from the API.
@@ -41,8 +42,10 @@ export async function createGenericAdapter(api, chronicleSystemId) {
   }
 
   // A field is pullable if it maps a scalar (foundry_path) OR a collection
-  // (foundry_collection). Both are read on toChronicleFields.
-  const mappedFields = fieldDefs.fields.filter((f) => f.foundry_path || f.foundry_collection);
+  // (foundry_collection). Both are read on toChronicleFields. A GM-only field
+  // is never mapped, even if a Chronicle sends a path for it: anything written
+  // onto a hero reaches every player who can open its sheet.
+  const mappedFields = fieldDefs.fields.filter((f) => !f.gm_only && (f.foundry_path || f.foundry_collection));
   if (mappedFields.length === 0) {
     console.warn(`Chronicle: Generic adapter — no fields with foundry_path/foundry_collection for "${chronicleSystemId}"`);
     return null;
@@ -64,6 +67,9 @@ export async function createGenericAdapter(api, chronicleSystemId) {
 
     /** Every mapped field def; transformation layers read the scalar ones as effect keys. */
     fieldDefs: mappedFields,
+
+    /** GM-only fields with a path an earlier sync may have written them to (_gm-field-clear.mjs). */
+    gmClearFields: clearableGmFields(fieldDefs.fields),
 
     /** Single-item collection fields Chronicle may change on the sheet (ancestry, culture, career, kit). */
     identityFields: identity,
@@ -139,8 +145,10 @@ export async function createGenericAdapter(api, chronicleSystemId) {
     fromChronicleFields(entity) {
       const f = entity.fields_data || {};
       const update = {};
+      const hiddenHere = pageGmOnlyKeys(entity);
 
       for (const field of writableFields) {
+        if (hiddenHere.has(field.key)) continue;
         const value = f[field.key];
         if (value == null) continue;
 

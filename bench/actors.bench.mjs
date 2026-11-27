@@ -6,7 +6,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openWorld, closeWorld, settle, recordRequests, waitFor, traffic } from './world.mjs';
+import { openWorld, closeWorld, settle, recordRequests, waitFor, traffic, benchAdapter } from './world.mjs';
 import { FLAG, writes, scenario } from './scenario.mjs';
 
 const ON = { syncCharacters: true };
@@ -537,6 +537,55 @@ test('a Chronicle edit to one field updates the actor once, marked as applied, w
   await settle();
   assert.deepEqual(world.log.writes.slice(again).filter((w) => w.id === actor.id && w.change?.system), [], 'same value writes nothing');
   await closeWorld(world);
+}, { settings: ON }));
+
+test('a GM-only value an older sync left on a hero is cleared on open and on the next Chronicle change; other text there stays and the GM is told once', () => scenario('chr-gm-field-clear', async ({ seed, world }) => {
+  const SECRET = 'The mayor runs the cult';
+  const OWN = 'Typed by the GM in Foundry';
+  const OLD = { chronicleSync: true, chronicleSyncApply: true };
+  // What Chronicle now sends for a GM-only field: no mapping, only the path
+  // an older sync wrote it to (tools/test-gm-field-clear.mjs pins the adapter).
+  benchAdapter.gmClearFields = [{ key: 'gm_notes', label: 'GM Notes', gm_only: true, foundry_clear_path: 'system.director' }];
+  try {
+    await openWorld(world, MODULES);
+    const a = await chronicleCharacter(seed, 'Kell', 10);
+    const b = await chronicleCharacter(seed, 'Rhea', 10);
+    const types = await seed.chronicle.entityTypes();
+    const type = types.find((t) => t.slug === 'character' || /character/i.test(t.name));
+    await seed.declareFields(type.id, [{ key: 'gm_notes', type: 'text', gm_only: true }]);
+    for (const e of [a, b]) await seed.chronicle.put(`/entities/${e.id}/fields`, { fields_data: { hp: 10, gm_notes: SECRET } });
+    await waitFor(() => actorFor(world, a.id) && actorFor(world, b.id), 10000, 'actors created');
+    await settle();
+    const kell = actorFor(world, a.id);
+    const rhea = actorFor(world, b.id);
+    assert.equal(kell.system.director, undefined, 'the GM-only value is never written');
+    await closeWorld(world);
+
+    await kell.update({ 'system.director': SECRET }, OLD);
+    await rhea.update({ 'system.director': OWN }, OLD);
+    const warned = () => world.log.notifications.warn.filter((m) => m.includes('GmFieldTextLeft'));
+    const reqs = await recordRequests(async () => { await openWorld(world, MODULES); });
+    assert.equal(kell.system.director, '', 'the copy of Chronicle\'s text is cleared');
+    assert.equal(rhea.system.director, OWN, 'the GM\'s own text stays');
+    assert.equal(warned().length, 1);
+    assert.ok(warned()[0].includes('Rhea') && !warned()[0].includes('Kell'), warned()[0]);
+    assert.ok(!warned()[0].includes(OWN), 'the notice never repeats the text');
+    assert.deepEqual(writes(reqs).map((r) => `${r.method} ${r.url}`), [], 'nothing is sent to Chronicle');
+    await closeWorld(world);
+
+    await openWorld(world, MODULES);
+    assert.equal(warned().length, 1, 'the GM is told about the same text once');
+    assert.equal(rhea.system.director, OWN);
+
+    await kell.update({ 'system.director': SECRET }, OLD);
+    await seed.chronicle.put(`/entities/${a.id}/fields`, { fields_data: { hp: 7, gm_notes: SECRET } });
+    await waitFor(() => kell.system.hp === 7, 10000, 'hp applied');
+    await settle();
+    assert.equal(kell.system.director, '', 'a live apply clears it too');
+    await closeWorld(world);
+  } finally {
+    delete benchAdapter.gmClearFields;
+  }
 }, { settings: ON }));
 
 /** The running ActorSync, for scenarios that drive it at an exact moment. */

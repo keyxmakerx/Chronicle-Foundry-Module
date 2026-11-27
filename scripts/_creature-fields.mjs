@@ -13,6 +13,7 @@
  */
 
 import { readPath, sameValue } from './_actor-apply-plan.mjs';
+import { pageGmOnlyKeys } from './_gm-field-clear.mjs';
 
 /** Formats this module converts; a field with any other format is skipped. */
 export const CREATURE_FORMATS = new Set(['set', 'integer', 'size', 'fraction', 'ac_flat', 'type_subtype']);
@@ -156,8 +157,9 @@ export function creatureUpdate({ entity, fields, pullKeys = [], choicesFor }) {
   const data = entity?.fields_data || {};
   const update = {};
   const unknown = [];
+  const hiddenHere = pageGmOnlyKeys(entity);
   for (const field of fields || []) {
-    if (!field.foundry_path || field.foundry_collection) continue;
+    if (!field.foundry_path || field.foundry_collection || field.gm_only || hiddenHere.has(field.key)) continue;
     if (field.foundry_writable === false || pullKeys.includes(field.key)) continue;
     const out = toFoundryValue(field, data[field.key], choicesFor);
     if (out.unknown) unknown.push(...out.unknown.map((u) => `${field.label || field.key}: ${u}`));
@@ -199,7 +201,7 @@ export function planCreatureApply({ update, actor }) {
 export function creaturePull(actor, fields, pullKeys) {
   const out = {};
   for (const field of fields || []) {
-    if (!pullKeys?.includes(field.key) || !field.foundry_path) continue;
+    if (!pullKeys?.includes(field.key) || !field.foundry_path || field.gm_only) continue;
     let value = readPath(actor, field.foundry_path);
     if (value instanceof Set) value = Array.from(value).sort();
     // An absent path is not a cleared value; sending null would clear it.
@@ -245,7 +247,7 @@ export function seedPull({ entity, fields, pullKeys = [], choicesFor, onlyKeys =
   const data = entity?.fields_data || {};
   const seed = {};
   for (const field of fields || []) {
-    if (!pullKeys.includes(field.key) || !field.foundry_path?.startsWith('system.')) continue;
+    if (!pullKeys.includes(field.key) || !field.foundry_path?.startsWith('system.') || field.gm_only) continue;
     if (onlyKeys && !onlyKeys.includes(field.key)) continue;
     const out = toFoundryValue(field, data[field.key], choicesFor);
     if ('value' in out) seed[field.foundry_path] = out.value;
