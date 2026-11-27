@@ -155,6 +155,60 @@ export function activityToEvent(type, message, at) {
   };
 }
 
+// Why a conflict went the way it did, in the words the history shows.
+const CONFLICT_REASONS = {
+  setting: (side) => `The conflict setting keeps the ${side} version`,
+  part: () => 'This part is set to From Foundry, so Foundry is kept',
+  newer: (side) => `The conflict setting keeps the newest version, and the ${side} change was newer`,
+};
+
+/**
+ * The names of the fields a rejected write carried, never their values: the
+ * history is read by everyone with owner or DM access in Chronicle, and a
+ * value may be GM-only text. The version check is not a field.
+ * @param {object|string[]} fields - the rejected body, or names already picked
+ * @returns {string[]}
+ */
+export function conflictFieldNames(fields) {
+  const names = Array.isArray(fields) ? fields : Object.keys(fields ?? {});
+  return names
+    .map(String)
+    .filter((n) => n !== 'expected_updated_at' && /^[A-Za-z0-9_.-]{1,60}$/.test(n));
+}
+
+/**
+ * The history row for a settled sync conflict, so Chronicle's activity can
+ * show which side won and why. A conflict is not a failure: the sync did
+ * what the GM's setting asks.
+ * @param {object} c
+ * @param {'page'|'character'} c.kind
+ * @param {string} c.resourceId - the Chronicle page id
+ * @param {string} c.name
+ * @param {'chronicle'|'foundry'} c.kept
+ * @param {'setting'|'part'|'newer'} c.reason
+ * @param {object|string[]} [c.fields] - the rejected body, or field names
+ * @param {number} [c.at] - epoch ms
+ */
+export function conflictEvent({ kind, resourceId, name, kept, reason, fields, at = Date.now() }) {
+  const side = kept === 'foundry' ? 'Foundry' : 'Chronicle';
+  const why = (CONFLICT_REASONS[reason] ?? CONFLICT_REASONS.setting)(side);
+  const names = conflictFieldNames(fields);
+  const message = names.length ? `${why}. Fields the Foundry edit sent: ${names.join(', ')}.` : `${why}.`;
+  return {
+    at: new Date(at).toISOString(),
+    direction: kept === 'foundry' ? 'to_chronicle' : 'to_foundry',
+    kind,
+    resourceId: String(resourceId ?? ''),
+    name: String(name ?? '').slice(0, 200),
+    action: `${side} kept`,
+    call: 'foundry conflict',
+    status: 'conflict',
+    ok: true,
+    durationMs: 0,
+    message: message.slice(0, 500),
+  };
+}
+
 /**
  * Queues history events and sends them in batches.
  *

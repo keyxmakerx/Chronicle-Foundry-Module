@@ -813,7 +813,8 @@ Chronicle (404).
 
 #### POST /sync/history
 The module reports what only it sees: changes it applied in Foundry
-(`to_foundry`), its connects and problems (`link`). Same access as the read.
+(`to_foundry`), its connects and problems (`link`), and how each sync
+conflict was settled. Same access as the read.
 
 **Used by:** `sync-manager.mjs` → `_history` (`scripts/_history-report.mjs`), every 15 s and on connect
 
@@ -824,8 +825,16 @@ The module reports what only it sees: changes it applied in Foundry
   page row names who last changed it in Chronicle.
 - 403 or 404 stops reporting for the session; other failures retry on the
   next flush.
+- A settled conflict (a page or a hero's rename that Chronicle answered with
+  409) is one event: `status: "conflict"`, `ok: true`, `call: "foundry
+  conflict"`, `action` `"Chronicle kept"` or `"Foundry kept"`, `direction`
+  toward the side that lost (`to_foundry` when Chronicle is kept,
+  `to_chronicle` when Foundry is), `kind` `"page"` or `"character"`,
+  `resourceId` the Chronicle page. `message` says why that side won (the
+  conflict setting, the newest edit, or the part set to From Foundry) and
+  names the fields the Foundry edit sent, never their values (`conflictEvent`).
 
-Re-verify by: 2026-12-01 (Chronicle `internal/plugins/syncapi/sync_history_handler.go`, `sync_history_recorder.go`)
+Re-verify by: 2026-12-27 (Chronicle `internal/plugins/syncapi/sync_history_handler.go`, `sync_history_recorder.go`)
 
 #### POST /sync/players
 The GM's client reports the world's Foundry users. Chronicle sees only the
