@@ -494,6 +494,7 @@
       "PlayerPicksHeld": "Chronicle: not saved to Chronicle for {actor}: {reasons}. Their change stays in Foundry. Ask the player to choose from the list, or change it in Chronicle yourself.",
       "PreviousOwnerKept": "Chronicle: {player} is no longer the owner of {actor} in Chronicle, but still owns the actor in Foundry. Change this in the actor's Ownership settings if you want.",
       "ClaimantUnmapped": "Chronicle: a player owns {actor} in Chronicle but has no Foundry user mapped, so Foundry ownership was not changed. Link them in Chronicle Sync, under Settings, Players.",
+      "EntryTextHeld": "Chronicle: The text of {entries} still has GM-only parts, so {actor}'s item has its numbers but no text. It fills in once those parts are gone from the entry in Chronicle.",
       "IdentityItemFailed": "Chronicle: Could not update {actor}'s ancestry, culture, career or kit item ({fields}). The sheet was left as it was; see the console for details."
     },
     "Dashboard": {
