@@ -116,7 +116,7 @@ export function textHtml(raw) {
 export function treasureUpdate({ entity, fields, choicesFor, showWords, clear = false }) {
   const update = {};
   const unknown = [];
-  const mapped = (fields || []).filter((f) => f?.foundry_path && f.key);
+  const mapped = (fields || []).filter((f) => f?.foundry_path && f.key && !f.gm_only);
   if (!showWords) return { update: clear ? emptied(mapped, update) : update, unknown };
   const data = entity?.fields_data && typeof entity.fields_data === 'object' ? entity.fields_data : {};
   const sections = [];
