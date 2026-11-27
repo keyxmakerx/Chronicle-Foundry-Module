@@ -75,3 +75,11 @@ test('the fingerprint changes when the layout does', () => {
   moved.set('f2', { ...folders.get('f2'), parent_id: null });
   assert.notEqual(a, layoutFingerprint({ types, folders: moved }));
 });
+
+test('a page in a DM-only category stays out of its sidebar folders, whose names every client receives', () => {
+  const dmTypes = new Map([[7, { id: 7, name: 'Adventures', preset_category: 'adventures' }]]);
+  const dmFolders = new Map([['s', { id: 's', name: 'The betrayal', entity_type_id: 7 }]]);
+  const dmTree = { types: dmTypes, folders: dmFolders, parents: new Map() };
+  assert.deepEqual(keys(folderChain({ entity_type_id: 7, parent_node_id: 's' }, dmTree)), ['type:7']);
+  assert.deepEqual(keys(folderChain({ entity_type_id: 2, parent_node_id: 'f2', type_dm_only: true }, tree)), ['type:1', 'type:2']);
+});

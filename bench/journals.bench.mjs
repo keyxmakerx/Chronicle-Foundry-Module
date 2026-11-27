@@ -521,6 +521,23 @@ test('a page in nested Chronicle folders lands in the same Foundry folders, and 
   assert.deepEqual(writes(reqs).filter((r) => r.url.startsWith('/entities')).map((r) => `${r.method} ${r.url}`), [], 'module wrote nothing back');
 }));
 
+test('a page in the DM-only Adventures category becomes a journal players cannot open, outside its sidebar folders', () => scenario('chr-adventures-hidden', async ({ seed, world }) => {
+  const type = (await seed.chronicle.entityTypes()).find((t) => t.preset_category === 'adventures');
+  assert.ok(type, 'the campaign has its Adventures category');
+  const folder = await seed.createFolder('The Betrayal', type.id);
+  const e = await seed.chronicle.post('/entities', { name: 'The Duke Turns', entity_type_id: type.id, is_private: false });
+  await seed.fileInFolder(e.id, folder.id);
+  const listed = (await seed.chronicle.allEntities()).find((x) => x.id === e.id);
+  assert.equal(listed?.type_dm_only, true, 'Chronicle marks the page');
+  await openWorld(world);
+  await JournalSync_resync(world);
+  const j = byEntity(world, e.id);
+  assert.ok(j, 'journal exists for the GM');
+  assert.equal(j.ownership?.default, 0, 'players get no access');
+  assert.equal(j.folder?.name, type.name, 'filed in its category folder only');
+  assert.equal(world.game.folders.filter((f) => f.name === 'The Betrayal').length, 0, 'no folder carries the sidebar folder\'s name');
+}));
+
 test('categories that share a name share one folder; an older world\'s twin folders merge, its empty ones go, and nothing else is touched', () => scenario('folders-twins', async ({ seed, world }) => {
   const types = (await seed.chronicle.entityTypes()).filter((t) => !/character/i.test(`${t.slug} ${t.name}`));
   const first = types[0];

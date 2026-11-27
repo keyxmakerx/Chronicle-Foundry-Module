@@ -25,6 +25,7 @@ import { watchGMSecrets } from './gm-secret-view.mjs';
 import { newJournalSheetFlags } from './chronicle-sheet.mjs';
 import { playerSafeFacts } from './_chronicle-sheet-model.mjs';
 import { defaultLevelForVisibility } from './_ownership.mjs';
+import { inDmOnlyCategory } from './_dm-only-category.mjs';
 import { isCalendarNoteJournal } from './calendar-sync.mjs';
 import { _isAllowedImageHost, _describeRejection } from './_url-validation.mjs';
 import { walkEntityPages, unwrapEntityList } from './_entity-page-walk.mjs';
@@ -1900,6 +1901,14 @@ export class JournalSync {
    */
   async _buildOwnership(entity) {
     const L = CONST.DOCUMENT_OWNERSHIP_LEVELS;
+
+    // A page in a DM-only category is private whatever its own visibility
+    // says, a player grant included: Chronicle never shows it to players.
+    if (inDmOnlyCategory(entity, this._tree?.types)) {
+      const level = defaultLevelForVisibility(true);
+      if (level <= L.NONE) this._syncManager?.noteDmOnlyHidden?.();
+      return { default: level };
+    }
 
     // Simple / legacy visibility — honor the operator's dmOnlyHidden +
     // defaultOwnership dashboard controls.

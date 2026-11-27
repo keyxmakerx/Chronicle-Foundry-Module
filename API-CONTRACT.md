@@ -275,6 +275,15 @@ uses `/sync/pull` and `/sync/changes`.
 }
 ```
 
+`type_dm_only: true` (absent otherwise) marks a page in a category only the DM
+team may see (Adventures). Chronicle hides such a page from players whatever
+its own `is_private` and `visibility` say, so the module treats it as private:
+the journal is hidden, it sits in its category folder only, and an item linked
+to it is not added to a character players can see (`scripts/_dm-only-category.mjs`;
+the category's `preset_category: "adventures"` is read too, for a copy sent
+without the mark).
+Re-verify by: 2027-02-27 (Chronicle `internal/plugins/entities/model.go` `TypeDMOnly`)
+
 #### POST /entities
 Creates a new entity.
 
@@ -1280,6 +1289,9 @@ Deletes a media file.
 
 #### GET /entities/:entityId/relations
 Lists an entity's relations, minus those naming a page the key cannot view.
+The Owner key sees them all, so on an actor any player can see the module adds
+no item for a `dmOnly` Has Item link or one whose page players cannot view; an
+item already linked to a `dmOnly` one is unlinked (kept) and named to the GM.
 
 **Response:** a bare array of camelCase rows (the module also accepts `{data}`):
 ```json

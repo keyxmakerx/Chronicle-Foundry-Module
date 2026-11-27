@@ -7,7 +7,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { planInventory, itemDataFor, relationMeta, HAS_ITEM, EQUIPPED_FLAG } from '../scripts/_inventory-plan.mjs';
+import { planInventory, itemDataFor, relationMeta, HAS_ITEM, EQUIPPED_FLAG, seenByPlayers, dmOnlyHeld } from '../scripts/_inventory-plan.mjs';
 
 const rel = (id, target, meta, over = {}) => ({ id, relationType: HAS_ITEM, sourceEntityId: 'hero', targetEntityId: target, targetEntityName: target, metadata: meta, ...over });
 const item = (id, relationId, entityId, quantity = 1, equipped = false) => ({ id, relationId, entityId, quantity, equipped });
@@ -68,4 +68,29 @@ test('relationMeta tolerates bad metadata', () => {
   assert.deepEqual(relationMeta({ metadata: 'not json' }), {});
   assert.deepEqual(relationMeta({ metadata: 'null' }), {});
   assert.deepEqual(relationMeta({}), {});
+});
+
+test('a Director-only link adds nothing to an actor a player can see', () => {
+  const rels = [rel(1, 'locket', {}, { dmOnly: true }), rel(2, 'rope', {})];
+  assert.deepEqual(planInventory(rels, []).create.map((r) => r.id), [2]);
+  assert.deepEqual(planInventory(rels, [], { playerEyes: true }).create.map((r) => r.id), [2]);
+  // An item already linked to it is unlinked, never deleted, and named for the GM.
+  const held = [item('a', 1, 'locket')];
+  assert.deepEqual(planInventory(rels, held).unlink, ['a']);
+  assert.deepEqual(dmOnlyHeld(rels, held), ['a']);
+  assert.deepEqual(dmOnlyHeld(rels, [item('b', 2, 'rope'), item('c', null, 'locket')]), []);
+});
+
+test('an actor no player sees keeps its Director-only items', () => {
+  const rels = [rel(1, 'locket', {}, { dmOnly: true })];
+  assert.deepEqual(planInventory(rels, [], { playerEyes: false }).create.map((r) => r.id), [1]);
+});
+
+test('seenByPlayers: Limited or more for the default or a non-GM user', () => {
+  const isGM = (id) => id === 'gm';
+  assert.equal(seenByPlayers({ default: 0, gm: 3 }, isGM), false);
+  assert.equal(seenByPlayers({ default: 1 }, isGM), true);
+  assert.equal(seenByPlayers({ default: 0, p1: 3 }, isGM), true);
+  assert.equal(seenByPlayers({ default: 0, p1: 0 }, isGM), false);
+  assert.equal(seenByPlayers(null, isGM), false);
 });
