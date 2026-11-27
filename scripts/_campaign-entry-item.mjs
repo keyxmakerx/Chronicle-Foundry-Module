@@ -197,6 +197,33 @@ export function entryEffectData(entry, changes) {
   };
 }
 
+/**
+ * The hero's paths that the fields' effect mappings change, as a pending
+ * actor change touching each one, or null when there are none. Foundry fires
+ * no actor update when an item's effect changes, so sync pushes these itself
+ * for Chronicle to show the hero's new numbers.
+ * @param {Array<object|undefined>} mappings - `foundry_entry_effects` of the fields whose item changed
+ * @returns {object|null}
+ */
+export function effectPathsChange(mappings) {
+  const out = Object.create(null);
+  let any = false;
+  for (const map of mappings) {
+    for (const def of Object.values(map ?? {})) {
+      if (!usableEntryPath(def?.path)) continue;
+      let node = out;
+      const keys = def.path.split('.');
+      for (const k of keys.slice(0, -1)) {
+        if (!Object.hasOwn(node, k) || typeof node[k] !== 'object') node[k] = Object.create(null);
+        node = node[k];
+      }
+      node[keys[keys.length - 1]] = true;
+      any = true;
+    }
+  }
+  return any ? structuredClone(out) : null;
+}
+
 /** The effect sync put on this item, or null. */
 function madeEffect(item) {
   const effects = item?.effects?.contents ?? (Array.isArray(item?.effects) ? item.effects : []);

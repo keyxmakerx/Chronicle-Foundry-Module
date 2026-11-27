@@ -33,7 +33,7 @@ import { collapseChanges } from './_change-feed.mjs';
 import { planActorApply } from './_actor-apply-plan.mjs';
 import { planIdentityItems, identityFieldTypes, identityPicks } from './_identity-item-plan.mjs';
 import { applyIdentityPlan, applyEntryRefresh, journalMentions } from './_identity-item-apply.mjs';
-import { planEntryRefresh } from './_campaign-entry-item.mjs';
+import { planEntryRefresh, effectPathsChange } from './_campaign-entry-item.mjs';
 import { planEntryAbilities } from './_entry-abilities.mjs';
 import { sendsChangeHere, memberOf, ownsCharacter } from './_change-author.mjs';
 import { ASK, askModel, sameName } from './_player-asks.mjs';
@@ -1252,8 +1252,13 @@ export class ActorSync {
       const entryEffectsByField = Object.fromEntries(fieldDefs.map((d) => [d.key, d.foundry_entry_effects]));
 
       const failed = [];
+      // Fields whose item was swapped or whose effect changed: the hero's
+      // numbers those items set are pushed once they are on the sheet.
+      const swapped = [];
       if (plan.length) {
-        failed.push(...(await applyIdentityPlan(actor, plan, game, entriesByField, entryFieldsByField, entryEffectsByField)).failed);
+        const applied = await applyIdentityPlan(actor, plan, game, entriesByField, entryFieldsByField, entryEffectsByField);
+        failed.push(...applied.failed);
+        swapped.push(...applied.done);
       }
       await recordPicks(failed);
       const refresh = planEntryRefresh({
@@ -1265,6 +1270,7 @@ export class ActorSync {
         console.error(`Chronicle: could not refresh campaign entries on "${actor.name}"`, err);
         failed.push(...refresh.map((r) => r.fieldKey));
       }
+      this._pushEffectPaths(actor, [...swapped, ...refresh.filter((r) => r.effect).map((r) => r.fieldKey)], entryEffectsByField);
       if (!(await this._applyEntryAbilities(actor, identityFieldTypes(fieldDefs), entriesByField))) failed.push('abilities');
       if (failed.length) {
         ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.IdentityItemFailed', {
@@ -1349,6 +1355,7 @@ export class ActorSync {
             entriesByField, mentionId: journalMentions(game), entryFieldsByField, entryEffectsByField,
           });
           if (refresh.length) await applyEntryRefresh(actor, refresh);
+          this._pushEffectPaths(actor, refresh.filter((r) => r.effect).map((r) => r.fieldKey), entryEffectsByField);
           await this._applyEntryAbilities(actor, made, entriesByField);
         } catch (err) {
           console.error(`Chronicle: could not refresh campaign entries on "${actor.name}"`, err);
@@ -1781,6 +1788,22 @@ export class ActorSync {
       this._pendingPlayers.set(actor.id, (this._pendingPlayers.get(actor.id) ?? new Set()).add(userId));
     }
     this._actorPushDebouncer.schedule(actor.id, actor, entityId);
+  }
+
+  /**
+   * Push the hero's numbers that these fields' items set through their
+   * effects (an ancestry's speed). Foundry fires no actor update when an
+   * item or its effect changes, so without this Chronicle would show the old
+   * numbers until an unrelated edit. Joins the actor's debounced push like a
+   * sheet edit; those fields are Foundry-led, so nothing comes back.
+   * @param {Actor} actor
+   * @param {string[]} fieldKeys
+   * @param {Record<string, object>} entryEffectsByField
+   * @private
+   */
+  _pushEffectPaths(actor, fieldKeys, entryEffectsByField) {
+    const change = effectPathsChange([...new Set(fieldKeys)].map((k) => entryEffectsByField?.[k]));
+    if (change) this._handleUpdateActor(actor, change, {}, game.user?.id);
   }
 
   /**

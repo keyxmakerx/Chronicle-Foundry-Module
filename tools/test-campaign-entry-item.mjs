@@ -7,7 +7,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ENTRY_TEXT_FORMAT, ENTRY_EFFECT_FLAG, entryDescriptionHTML, entryEffectChanges, entryItemFill, entryItemValues, findEntry, planEntryRefresh, usableEntryPath,
+  ENTRY_TEXT_FORMAT, ENTRY_EFFECT_FLAG, effectPathsChange, entryDescriptionHTML, entryEffectChanges, entryItemFill, entryItemValues, findEntry, planEntryRefresh, usableEntryPath,
 } from '../scripts/_campaign-entry-item.mjs';
 import { applyIdentityItem, applyEntryRefresh } from '../scripts/_identity-item-apply.mjs';
 import { identityFieldTypes } from '../scripts/_identity-item-plan.mjs';
@@ -314,4 +314,13 @@ test('refresh: an item made before effects gains one; numbers taken out take it 
   assert.deepEqual(item.log.map(([op, t, list]) => [op, t, list]), [['delete', 'ActiveEffect', ['e1']]], 'the GM\'s own effect stays');
 
   assert.equal(refreshDryad(madeAncestry([{ id: 'gm1', flags: {} }]), { ...DRYAD, properties: {} })[0].effect, undefined, 'nothing to make or take off');
+});
+
+test('the hero\'s paths an effect changes are pushed as one pending change', () => {
+  assert.deepEqual(effectPathsChange([ANCESTRY_EFFECTS, undefined]), {
+    system: { movement: { value: true }, combat: { size: true, stability: true } },
+  });
+  assert.equal(effectPathsChange([undefined, {}]), null, 'nothing mapped, nothing pushed');
+  assert.equal(effectPathsChange([{ x: { path: 'system.__proto__.x', type: 'add', format: 'number' } }]), null, 'a refused path is not touched');
+  assert.equal(({}).x, undefined);
 });
