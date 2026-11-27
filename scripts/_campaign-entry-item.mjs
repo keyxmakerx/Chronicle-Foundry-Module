@@ -134,7 +134,7 @@ export function entryItemValues(entry, entryFields) {
     } else if (def.format === 'tiers') {
       const tiers = entryTiers(value);
       if (tiers) tiers.forEach((n, i) => { out[`${path}.tier${i + 1}`] = n; });
-    } else if (def.format === 'text' && ['string', 'number'].includes(typeof value)) {
+    } else if (def.format === 'text' && ['string', 'number'].includes(typeof value) && !hasClearSecrets(String(value))) {
       out[path] = String(value).trim().slice(0, MAX_ENTRY_TEXT);
     }
   }
@@ -256,19 +256,27 @@ export function findEntry(entries, name) {
 }
 
 /**
+ * Whether an entry's text still holds GM-only content, so it can't be saved
+ * on a Foundry item.
+ */
+export function entryTextHeld(entry, opts = {}) {
+  return !!entry && hasClearSecrets(entryDescriptionHTML(entry, opts));
+}
+
+/**
  * The fields to write for an entry: the description, the values its
  * properties give (`entryItemValues`), the effect they give the hero
  * (`entryEffectChanges`), and flags that record which entry version filled
- * it. Null when the description is not safe to save, so the caller keeps the
- * item name-only.
+ * it. Text still holding GM-only content is left out (an empty description)
+ * while the numbers, which never come from it, are still written, so one
+ * secret in a trait's text doesn't cost the hero their Speed.
  * @param {object} entry
  * @param {{mentionId?: (name: string) => string|null, entryFields?: object, entryEffects?: object}} [opts]
- * @returns {{system: object, flags: object, effects?: object[]}|null}
+ * @returns {{system: object, flags: object, effects?: object[]}|null} null with no entry
  */
 export function entryItemFill(entry, opts = {}) {
   if (!entry) return null;
-  const html = entryDescriptionHTML(entry, opts);
-  if (hasClearSecrets(html)) return null;
+  const html = entryTextHeld(entry, opts) ? '' : entryDescriptionHTML(entry, opts);
   const { system: mapped = {} } = nestValues(entryItemValues(entry, opts.entryFields));
   const changes = entryEffectChanges(entry, opts.entryEffects);
   return {
@@ -298,8 +306,9 @@ export function entryItemFill(entry, opts = {}) {
  * @param {(name: string) => string|null} [args.mentionId] - see `mentionLookup`
  * @param {Record<string, object>} [args.entryFieldsByField] - each field's `foundry_entry_fields`
  * @param {Record<string, object>} [args.entryEffectsByField] - each field's `foundry_entry_effects`
- * @returns {Array<{itemId: string, fieldKey: string, update: object, effect?: object}>} `effect`
- *   is `{create}`, `{update}` or `{remove}` for the item's own effect, when it changes
+ * @returns {Array<{itemId: string, fieldKey: string, name: string, update: object, effect?: object, textHeld?: true}>}
+ *   `effect` is `{create}`, `{update}` or `{remove}` for the item's own effect, when it changes;
+ *   `textHeld` when the entry's text was left out for holding GM-only content
  */
 export function planEntryRefresh({ items, fields, fieldsData, entriesByField, mentionId, entryFieldsByField, entryEffectsByField }) {
   const list = Array.isArray(items) ? items : [];
@@ -321,6 +330,8 @@ export function planEntryRefresh({ items, fields, fieldsData, entriesByField, me
     out.push({
       itemId: first.id,
       fieldKey,
+      name: first.name,
+      ...(entryTextHeld(entry, { mentionId }) ? { textHeld: true } : {}),
       ...refreshEffect(first, entry, entryEffectChanges(entry, entryEffects)),
       update: {
         _id: first.id,
