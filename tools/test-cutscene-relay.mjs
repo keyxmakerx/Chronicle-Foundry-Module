@@ -401,7 +401,10 @@ test('the vendored engine offers play(host, scene, options) returning stop()', {
 });
 
 const chronicle = process.env.CHRONICLE_DIR && join(process.env.CHRONICLE_DIR, 'static', 'js', 'cutscene_engine.js');
-test('the vendored engine matches Chronicle\'s (needs CHRONICLE_DIR)', { skip: !(chronicle && existsSync(chronicle) && vendored) && 'CHRONICLE_DIR not set, or engine not vendored' }, () => {
+// Only an unset CHRONICLE_DIR skips: a source Chronicle moved or renamed
+// must fail, or the copy would stop being checked without anyone noticing.
+test('the vendored engine matches Chronicle\'s (needs CHRONICLE_DIR)', { skip: !chronicle && 'CHRONICLE_DIR not set' }, () => {
+  assert.ok(existsSync(chronicle), 'Chronicle has no static/js/cutscene_engine.js; it moved or was renamed, so update tools/refresh-vendor.mjs');
   assert.ok(readFileSync(chronicle).equals(readFileSync(VENDORED)),
     'vendor/chronicle/cutscene_engine.js differs from Chronicle\'s; copy it again from static/js/');
 });
