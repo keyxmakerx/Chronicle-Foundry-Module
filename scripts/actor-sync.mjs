@@ -22,6 +22,7 @@ import { ConflictError } from './api-client.mjs';
 import { createGenericAdapter, buildChronicleFields } from './adapters/generic-adapter.mjs';
 import { FLAG_SCOPE, syncOptions, APPLY_OPTION } from './constants.mjs';
 import { flagRemoval } from './_flag-removal.mjs';
+import { touchesLinkFlags } from './_set-aside.mjs';
 import { planClaimOwnership } from './_claim-ownership-plan.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { walkEntityPages, unwrapEntityList } from './_entity-page-walk.mjs';
@@ -81,6 +82,13 @@ export class ActorSync {
 
     /** Chronicle claimants already reported as having no Foundry user, so the GM hears once a session. */
     this._unmappedNoticed = new Set();
+    /**
+     * Who Chronicle says claimed each linked page (entity id -> member id),
+     * as last read from Chronicle. The actor's own owner flag is only a
+     * cache for the sheet: a player who owns the actor can rewrite it.
+     * @type {Map<string, string|null>}
+     */
+    this._chronicleOwners = new Map();
 
     /**
      * Heroes claimed live by a member with no Foundry user yet (member key ->
@@ -397,6 +405,7 @@ export class ActorSync {
 
       const excluded = this._excludedIds();
       for (const entity of allEntities) {
+        this._noteOwner(entity);
         const existingActor = this._findLinkedActor(entity.id);
         if (!existingActor) {
           if (bringsInActor({ entity, createdAfter, excludedIds: excluded })
@@ -699,10 +708,31 @@ export class ActorSync {
     if (!game.user?.isGM) return;
     for (const actor of game.actors?.contents ?? []) {
       if (!this._isCharacterActor(actor) || !actor.getFlag(FLAG_SCOPE, 'entityId')) continue;
-      const owner = actor.getFlag(FLAG_SCOPE, 'chronicleOwnerUserId') ?? null;
+      const owner = this._ownerFromChronicle(actor.getFlag(FLAG_SCOPE, 'entityId'));
       if (!owner) continue;
       await this._applyClaimOwnership(actor, owner, owner);
     }
+  }
+
+  /** Remember who Chronicle says claimed a page, when the copy says. @private */
+  _noteOwner(entity) {
+    if (entity?.id && Object.prototype.hasOwnProperty.call(entity, 'owner_user_id')) {
+      this._chronicleOwners.set(entity.id, entity.owner_user_id == null ? null : String(entity.owner_user_id));
+    }
+  }
+
+  /**
+   * Who claimed a page, from what Chronicle sent: the page itself, else the
+   * member list's characters. Null when Chronicle hasn't said.
+   * @param {string} entityId
+   * @returns {string|null}
+   * @private
+   */
+  _ownerFromChronicle(entityId) {
+    if (!entityId) return null;
+    if (this._chronicleOwners.has(entityId)) return this._chronicleOwners.get(entityId);
+    const member = (this._syncManager?.getMembers?.() ?? []).find((m) => m?.character_entity_id === entityId);
+    return member ? memberKey(member) : null;
   }
 
   /** The adapter's field defs, identity ones included, which tell a hero page from an NPC's. @private */
@@ -1347,6 +1377,7 @@ export class ActorSync {
       // `null` when unclaimed so the indicator shows "Unclaimed" rather
       // than stale data.
       if (Object.prototype.hasOwnProperty.call(entity, 'owner_user_id')) {
+        this._noteOwner(entity);
         const previousOwner = actor.getFlag(FLAG_SCOPE, 'chronicleOwnerUserId') ?? null;
         const nextOwner = entity.owner_user_id ?? null;
         await this._setActorFlag(actor, 'chronicleOwnerUserId', nextOwner);
@@ -1577,6 +1608,16 @@ export class ActorSync {
    * @private
    */
   async _handleUpdateActor(actor, change, options, userId) {
+    // A player who owns an actor can rewrite its page link, which would have
+    // this client pull another page's fields onto it. Only sync writes the
+    // link, so a player's change to it unlinks the actor (as a copy is).
+    // Checked before the sync-write option, which a player's client can send.
+    if (userId !== game.user.id && sendsChangeHere(userId) && touchesLinkFlags(change, FLAG_SCOPE, ['entityId'])) {
+      await this._unlinkCopy(actor);
+      const notice = game.i18n.format('CHRONICLE.Notifications.PlayerLinkUndone', { name: noticeText(actor.name) });
+      ui.notifications?.warn?.(notice, { permanent: true });
+      return;
+    }
     if (options?.[APPLY_OPTION]) return;
     if (!sendsChangeHere(userId)) return;
     if (!this._isCharacterActor(actor)) return;
@@ -1596,10 +1637,15 @@ export class ActorSync {
     const pictures = sent[PICTURES_CHANGED];
 
     // Sync visibility: Foundry prototypeToken.hidden → Chronicle is_private.
-    // Await this before field sync to avoid inconsistent state.
-    const hiddenChanged =
+    // Await this before field sync to avoid inconsistent state. Who sees a
+    // page is the GM's to say: a player's change is sent by this client
+    // under the GM's key, and the page id comes from a flag the player can
+    // write, so only this GM's own visibility change is sent (another GM's
+    // change is sent by that GM's client).
+    const byGM = userId === game.user.id;
+    const hiddenChanged = byGM && (
       change.prototypeToken?.hidden !== undefined ||
-      change.token?.hidden !== undefined;
+      change.token?.hidden !== undefined);
     const isHidden = hiddenChanged ? (change.prototypeToken?.hidden ?? change.token?.hidden ?? false) : undefined;
 
     const gate = this._pushGate();

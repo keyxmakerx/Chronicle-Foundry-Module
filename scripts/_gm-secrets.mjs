@@ -516,6 +516,23 @@ export function revealableSecrets(html) {
 }
 
 /**
+ * The pieces that came from one Chronicle page. Nothing for a page with no
+ * id, so an unlinked page is never filled.
+ * @param {Map<string, string>} pieces - id → content
+ * @param {Map<string, string>} owners - id → the page id it came from
+ * @param {string|undefined} entityId
+ * @returns {Map<string, string>}
+ */
+export function piecesOwnedBy(pieces, owners, entityId) {
+  const out = new Map();
+  if (!entityId) return out;
+  for (const [id, content] of pieces ?? []) {
+    if (owners?.get(id) === entityId) out.set(id, content);
+  }
+  return out;
+}
+
+/**
  * A revealed placeholder holds its content, so players see what the GM
  * revealed; hidden again, it goes back to the label. Blocks whose content
  * isn't known are left alone.

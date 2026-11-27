@@ -18,6 +18,7 @@ import { currentMotion } from './motion.mjs';
 import { FLAG_SCOPE } from './constants.mjs';
 import {
   pickMapItemType, journalAccessForActorOwners, journalAccessForCarriedMaps, mapPageUuidOf,
+  carriedMapShareable, withMapGivenTo,
 } from './_map-item-rules.mjs';
 
 const OPEN_CLASS = 'cs-open-map';
@@ -68,8 +69,11 @@ async function _onUpdateActor(actor, changes) {
     const journals = new Map();
     for (const item of actor.items ?? []) {
       const uuid = mapPageUuidOf(item.flags?.[FLAG_SCOPE]);
-      const entry = uuid ? fromUuidSync(uuid)?.parent : null;
-      if (entry) journals.set(entry.id, entry);
+      const page = uuid ? fromUuidSync(uuid) : null;
+      const entry = page?.parent;
+      if (entry && carriedMapShareable(page.flags?.[FLAG_SCOPE], entry.flags?.[FLAG_SCOPE], actor.id)) {
+        journals.set(entry.id, entry);
+      }
     }
     if (!journals.size) return;
     const gmIds = new Set(game.users.filter((u) => u.isGM).map((u) => u.id));
@@ -154,8 +158,12 @@ async function _promptGive(entry) {
  */
 export async function giveMapToActor(page, actor) {
   if (!game.user.isGM) return;
+  const entry = page.parent;
   const already = actor.items.find((i) => i.getFlag(FLAG_SCOPE, 'mapPageUuid') === page.uuid);
   if (already) {
+    // Giving again records the gift on the journal, for maps given before
+    // the journal kept that list.
+    await _recordGift(entry, actor);
     ui.notifications.info(game.i18n.format('CHRONICLE.MapItems.AlreadyHas', { actor: noticeText(actor.name) }));
     return;
   }
@@ -165,14 +173,7 @@ export async function giveMapToActor(page, actor) {
     return;
   }
 
-  const entry = page.parent;
-  const gmIds = new Set(game.users.filter((u) => u.isGM).map((u) => u.id));
-  const access = journalAccessForActorOwners(
-    actor.ownership, entry.ownership, gmIds, CONST.DOCUMENT_OWNERSHIP_LEVELS,
-  );
-  if (Object.keys(access).length) {
-    await entry.update({ ownership: { ...entry.ownership, ...access } });
-  }
+  await _recordGift(entry, actor);
 
   await actor.createEmbeddedDocuments('Item', [{
     name: game.i18n.format('CHRONICLE.MapItems.ItemName', { name: entry.name }),
@@ -186,6 +187,21 @@ export async function giveMapToActor(page, actor) {
     },
   }]);
   ui.notifications.info(game.i18n.format('CHRONICLE.MapItems.Given', { name: noticeText(entry.name), actor: noticeText(actor.name) }));
+}
+
+/**
+ * Let the actor's owners open the map's journal, and note on the journal
+ * that the GM gave it to this actor, so a later owner is shared it too.
+ */
+async function _recordGift(entry, actor) {
+  const gmIds = new Set(game.users.filter((u) => u.isGM).map((u) => u.id));
+  const access = journalAccessForActorOwners(
+    actor.ownership, entry.ownership, gmIds, CONST.DOCUMENT_OWNERSHIP_LEVELS,
+  );
+  const given = withMapGivenTo(entry.flags?.[FLAG_SCOPE], actor.id);
+  const update = { [`flags.${FLAG_SCOPE}.mapGivenTo`]: given };
+  if (Object.keys(access).length) update.ownership = { ...entry.ownership, ...access };
+  await entry.update(update);
 }
 
 /**

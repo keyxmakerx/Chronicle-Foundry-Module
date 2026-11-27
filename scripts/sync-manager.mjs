@@ -485,8 +485,9 @@ export class SyncManager {
     for (const actor of game.actors?.contents ?? []) {
       const entityId = actor.getFlag?.(FLAG_SCOPE, 'entityId');
       if (!entityId) continue;
-      const cached = actor.getFlag?.(FLAG_SCOPE, 'chronicleOwnerUserId');
-      const key = cached ? String(cached) : byCharacter.get(entityId);
+      // Chronicle's member list says whose character this is; the actor's
+      // owner flag is a player-writable cache and proves nothing.
+      const key = byCharacter.get(entityId);
       if (!key) continue;
       const ids = out.get(key) ?? new Set();
       const ownership = actor.ownership ?? {};

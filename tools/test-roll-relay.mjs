@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
-  SeenRolls, buildChatData, buildRollData, characterIdOf, hasRollMessage, heroSpeaker,
+  SeenRolls, buildChatData, buildRollData, characterIdOf, flavorFor, hasRollMessage, heroSpeaker,
   isRouteMissing, judgeIncoming, modeOf, postBodies,
 } from '../scripts/_roll-relay.mjs';
 
@@ -26,6 +26,13 @@ const payload = (over = {}) => ({
   modifier: 2, total: 20, outcome: 'Tier 3', mode: 'public', ...over,
 });
 const GMS = ['gm1', 'gm2'];
+
+test('a label or outcome a player typed shows as text in Foundry chat, never as markup', () => {
+  const data = buildChatData(payload({ label: '<img src=x onerror="alert(1)">', outcome: '<script>x</script>' }), { gmIds: GMS });
+  assert.ok(!/[<>"]/.test(data.flavor), data.flavor);
+  assert.equal(data.flavor, '&lt;img src=x onerror=&quot;alert(1)&quot;&gt; (&lt;script&gt;x&lt;/script&gt;)');
+  assert.equal(flavorFor({ label: 'Fire & Ice' }), 'Fire &amp; Ice');
+});
 
 test('chat data keeps the dice, modifier, total, speaker, flavor and flag', () => {
   const data = buildChatData(payload(), { gmIds: GMS });
