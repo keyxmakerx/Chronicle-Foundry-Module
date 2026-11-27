@@ -1124,8 +1124,11 @@ export class SyncManager {
    * Add an entry to the activity log.
    * @param {string} type - Log type: 'pull', 'push', 'update', 'link', 'unlink', 'connect', 'error'.
    * @param {string} message - Human-readable description.
+   * @param {object} [historyEvent] - The row Chronicle's sync history gets
+   *   instead of the one the type implies, for entries it reads differently
+   *   (a settled conflict).
    */
-  logActivity(type, message) {
+  logActivity(type, message, historyEvent) {
     const time = Date.now();
     this._activityLog.unshift({
       time,
@@ -1133,7 +1136,7 @@ export class SyncManager {
       message,
       timeFormatted: new Date(time).toLocaleTimeString(),
     });
-    this._history?.add(activityToEvent(type, message, time));
+    this._history?.add(historyEvent ?? activityToEvent(type, message, time));
     if (this._activityLog.length > this._maxLogEntries) {
       this._activityLog.length = this._maxLogEntries;
     }

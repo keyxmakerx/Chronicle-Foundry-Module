@@ -399,7 +399,56 @@ test('an edit queued while Chronicle was unreachable meets a Chronicle edit made
   assert.equal(api.getRetryQueueSize(), 0, 'nothing left queued');
   assert.match((await seed.chronicle.get(`/entities/${e.id}`)).entry_html || '', /Rebuilt by the Foundry GM/);
   assert.match(pageText(byEntity(world, e.id)), /Rebuilt by the Foundry GM/);
+  // Chronicle's history hears how the conflict was settled, by field name only.
+  const row = await conflictRow(world, seed, e.id);
+  assert.equal(row.action, 'Foundry kept');
+  assert.equal(row.direction, 'to_chronicle');
+  assert.equal(row.reportedBy, 'client');
+  assert.match(row.message, /^The conflict setting keeps the Foundry version\. Fields the Foundry edit sent: .*entry/);
+  assert.doesNotMatch(row.message, /Rebuilt|Burned/, 'no values in the history');
 }, { settings: { conflictResolution: 'foundry' } }));
+
+/** The settled-conflict row Chronicle's sync history holds for a page. */
+async function conflictRow(world, seed, entityId) {
+  await world.syncManager._history.flush();
+  let row;
+  await waitFor(async () => {
+    const rows = (await seed.chronicle.get('/sync/history?limit=200')).data;
+    row = rows.find((r) => r.status === 'conflict' && r.resourceId === entityId);
+    return Boolean(row);
+  }, 10000, 'the conflict in the sync history');
+  assert.equal(row.ok, true, 'a settled conflict is not a failure');
+  return row;
+}
+
+test('a Foundry edit Chronicle beat to the page keeps Chronicle\'s version and says so in the sync history', () => scenario('conflict-chronicle-kept', async ({ seed, world }) => {
+  const e = await chroniclePage(seed, 'Salt Market', '<p>Stalls by the quay.</p>');
+  await openWorld(world);
+  await JournalSync_resync(world);
+  const j = byEntity(world, e.id);
+  const api = world.syncManager.api;
+  const connect = api._doConnect.bind(api);
+  let hold = true;
+  api._doConnect = () => (hold ? setTimeout(() => api._doConnect(), 100) : connect());
+  api._ws.close();
+  await waitFor(() => api._ws === null || api._ws.readyState !== 1, 5000, 'socket to drop');
+
+  traffic.offline = true;
+  await j.update({ name: 'Salt Market (Foundry)' });
+  await waitFor(() => api.getRetryQueueSize() === 1, 10000, 'the failed push to be queued');
+  traffic.offline = false;
+  await seed.chronicle.put(`/entities/${e.id}`, { name: 'Salt Market (Chronicle)' });
+
+  hold = false;
+  await waitFor(() => api._ws?.readyState === 1, 30000, 'reconnect');
+  await settle();
+  assert.equal((await seed.chronicle.get(`/entities/${e.id}`)).name, 'Salt Market (Chronicle)');
+  const row = await conflictRow(world, seed, e.id);
+  assert.equal(row.action, 'Chronicle kept');
+  assert.equal(row.direction, 'to_foundry');
+  assert.equal(row.name, 'Salt Market (Chronicle)');
+  assert.match(row.message, /^The conflict setting keeps the Chronicle version\. Fields the Foundry edit sent: name(, entry)?\.$/);
+}, { settings: { conflictResolution: 'chronicle' } }));
 
 // Two tiny, different PNGs: Chronicle gives identical bytes one media id.
 const PNGS = [
