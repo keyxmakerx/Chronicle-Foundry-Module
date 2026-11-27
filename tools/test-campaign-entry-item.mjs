@@ -7,7 +7,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ENTRY_TEXT_FORMAT, ENTRY_EFFECT_FLAG, effectPathsChange, entryDescriptionHTML, entryEffectChanges, entryItemFill, entryItemValues, findEntry, planEntryRefresh, usableEntryPath,
+  ENTRY_TEXT_FORMAT, ENTRY_EFFECT_FLAG, effectPathsChange, entryDescriptionHTML, entryEffectChanges, entryItemFill, entryItemValues, entryTextHeld, findEntry, planEntryRefresh, usableEntryPath,
 } from '../scripts/_campaign-entry-item.mjs';
 import { applyIdentityItem, applyEntryRefresh } from '../scripts/_identity-item-apply.mjs';
 import { identityFieldTypes } from '../scripts/_identity-item-plan.mjs';
@@ -50,8 +50,16 @@ test('names match case-insensitively', () => {
   assert.equal(findEntry(undefined, 'Fairy'), null);
 });
 
-test('GM-only text keeps the item name-only', () => {
-  assert.equal(entryItemFill({ ...FAIRY, description: '<p>ok</p><span data-secret="true">twist</span>' }), null);
+test('GM-only text is left off the item, and its numbers still go on', () => {
+  const secret = { ...FAIRY, description: '<p>ok</p><span data-secret="true">twist</span>', properties: { stamina_bonus: '6' } };
+  const held = entryItemFill(secret, { entryFields: { stamina_bonus: { path: 'system.bonuses.stamina', format: 'number' } } });
+  assert.equal(held.system.description.value, '', 'no text at all, not even the part before the secret');
+  assert.equal(held.system.bonuses.stamina, 6);
+  assert.ok(!JSON.stringify(held).includes('twist'));
+  assert.equal(entryTextHeld(secret), true);
+  assert.equal(entryTextHeld(FAIRY), false);
+  const text = entryItemValues({ properties: { motto: '<span data-secret="true">twist</span>' } }, { motto: { path: 'system.motto', format: 'text' } });
+  assert.deepEqual(text, {}, 'a text value holding GM-only content is left out');
   assert.equal(entryItemFill(null), null);
   const fill = entryItemFill(FAIRY);
   assert.deepEqual(fill.flags, { 'chronicle-sync': { chronicleMade: true, entrySlug: 'fairy', entryUpdatedAt: FAIRY.updatedAt, entryFormat: ENTRY_TEXT_FORMAT } });
@@ -115,12 +123,11 @@ test('a Markdown entry from the AI tools reads as text, with mentions linked', (
     + '<a data-mention-id="ent-7">The Dragon Knights</a>, kin of someone.</p>');
 });
 
-test('refresh: nothing to do when current, not sync-made, renamed, secret or missing', () => {
+test('refresh: nothing to do when current, not sync-made, renamed or missing', () => {
   const cases = [
     { items: [made({ chronicleMade: true, entryUpdatedAt: FAIRY.updatedAt, entryFormat: ENTRY_TEXT_FORMAT })] },
     { items: [{ id: 'i1', name: 'Fairy', type: 'ancestry', flags: {} }] },
     { items: [made({ chronicleMade: true })], fieldsData: { ancestry: 'Elf' } },
-    { items: [made({ chronicleMade: true })], entries: [{ ...FAIRY, description: '<span data-secret>x</span>' }] },
     { items: [made({ chronicleMade: true })], entries: [] },
   ];
   for (const c of cases) {
@@ -130,6 +137,18 @@ test('refresh: nothing to do when current, not sync-made, renamed, secret or mis
     });
     assert.deepEqual(plan, []);
   }
+});
+
+test('refresh: an entry whose text gains GM-only content clears the text and says so', () => {
+  const plan = planEntryRefresh({
+    items: [made({ chronicleMade: true })], fields: FIELDS, fieldsData: { ancestry: 'Fairy' },
+    entriesByField: { ancestry: [{ ...FAIRY, description: '<p>ok</p><span data-secret>twist</span>' }] },
+  });
+  assert.equal(plan.length, 1);
+  assert.equal(plan[0].update['system.description.value'], '');
+  assert.equal(plan[0].textHeld, true);
+  assert.equal(plan[0].name, 'Fairy');
+  assert.ok(!JSON.stringify(plan).includes('twist'));
 });
 
 test('refresh writes are marked as sync-applied', async () => {
