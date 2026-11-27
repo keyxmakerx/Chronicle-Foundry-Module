@@ -25,11 +25,30 @@ export function changesPictures(change) {
 /** Picture types Chronicle keeps as media; an SVG can carry script. */
 const RASTER = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 
-/** Whether a picture path is a file in this Foundry install. */
+/**
+ * Whether a picture path is a file in this Foundry install. A browser reads a
+ * backslash as a slash, so one could make a path another site's address;
+ * those and control characters are refused outright.
+ */
 export function isWorldFile(path) {
   const p = String(path ?? '').trim();
-  if (!p || p.startsWith('//') || p.includes('..')) return false;
+  if (!p || /[\\\u0000-\u001f\u007f]/.test(p) || p.startsWith('//') || p.includes('..')) return false;
   return !/^[a-z][a-z0-9+.-]*:/i.test(p);
+}
+
+/**
+ * The address to read a world file from, or '' when it would leave this
+ * Foundry: the resolved address must be on the page's own origin.
+ * @param {string} route - the file's route (`foundry.utils.getRoute`).
+ * @param {string} origin - the page's origin.
+ */
+export function sameOriginUrl(route, origin) {
+  try {
+    const url = new URL(route, `${origin}/`);
+    return url.origin === origin ? url.href : '';
+  } catch {
+    return '';
+  }
 }
 
 /**

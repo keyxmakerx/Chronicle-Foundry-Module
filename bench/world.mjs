@@ -23,10 +23,13 @@ if (!process.env.BENCH_VERBOSE) {
 const traffic = { inflight: 0, last: Date.now(), requests: [] };
 
 const realFetch = globalThis.fetch;
+// The page's own address, as a Foundry tab has one; world files are served there.
+const FOUNDRY_ORIGIN = 'http://foundry.bench';
+globalThis.location = { origin: FOUNDRY_ORIGIN };
 globalThis.fetch = async (url, init = {}) => {
-  // A site-root path is Foundry serving one of the open world's files.
-  if (typeof url === 'string' && url.startsWith('/')) {
-    const file = traffic.files?.get(url.slice(1));
+  // Foundry serving one of the open world's files.
+  if (typeof url === 'string' && url.startsWith(`${FOUNDRY_ORIGIN}/`)) {
+    const file = traffic.files?.get(url.slice(FOUNDRY_ORIGIN.length + 1));
     return file?.blob
       ? new Response(file.blob, { status: 200, headers: { 'content-type': file.type } })
       : new Response('', { status: 404 });

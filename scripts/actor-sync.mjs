@@ -44,7 +44,7 @@ import { isAnsweringGM } from './_stash-relay.mjs';
 import { PictureStore, MAX_PICTURE_BYTES } from './picture-store.mjs';
 import { heroChoice, heroPictureIds, heroPicturePlan, HERO_PICTURES_FLAG } from './_hero-pictures.mjs';
 import { TOKEN_FIELD } from './_creature-pictures.mjs';
-import { PICTURES_CHANGED, changesPictures, picturesToPush, sendablePicture, pictureName, sentFlag } from './_hero-picture-push.mjs';
+import { PICTURES_CHANGED, changesPictures, picturesToPush, sendablePicture, pictureName, sentFlag, isWorldFile, sameOriginUrl } from './_hero-picture-push.mjs';
 import { folderKindFor, needsPlacing, FOLDER_PLACED_FLAG, ACTOR_FOLDER_FLAG, HEROES } from './_actor-folder.mjs';
 import { CLASS_PICK_FLAG, classPick, pickToFinish, pickChanged, SUBCLASS_PICK_FLAG, subclassPicks, subclassesToFinish, subclassPickChanged } from './_finish-hero.mjs';
 import { npcActorTypeFor, actorTypeForPage, switchTarget } from './_npc-character.mjs';
@@ -1730,7 +1730,11 @@ export class ActorSync {
           }
           const acting = actingUserId ? { actingUserId } : {};
           if (role === 'img') await this._api.put(`/entities/${entityId}/image`, { image_path: id, ...acting });
-          else await this._putFieldsMerged(entityId, { [TOKEN_FIELD]: id }, actingUserId);
+          else {
+            const answer = await this._putFieldsMerged(entityId, { [TOKEN_FIELD]: id }, actingUserId);
+            // A token Chronicle held back is not sent; the next change tries again.
+            if (heldKeysOf(answer).some((h) => h.key === TOKEN_FIELD)) continue;
+          }
           wrote = true;
           const update = sentFlag(applied, role, id, path);
           applied = Object.values(update)[0];
@@ -1754,7 +1758,10 @@ export class ActorSync {
    * @private
    */
   async _uploadWorldPicture(path) {
-    const response = await fetch(globalThis.foundry?.utils?.getRoute?.(path) ?? path);
+    if (!isWorldFile(path)) return '';
+    const url = sameOriginUrl(globalThis.foundry?.utils?.getRoute?.(path) ?? path, globalThis.location?.origin ?? '');
+    if (!url) return '';
+    const response = await fetch(url);
     const blob = response.ok ? await response.blob() : null;
     if (!sendablePicture(blob, MAX_PICTURE_BYTES)) return '';
     return (await this._api.uploadMedia(blob, pictureName(path)))?.id || '';

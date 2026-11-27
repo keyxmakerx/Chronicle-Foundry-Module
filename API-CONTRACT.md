@@ -354,7 +354,7 @@ Chronicle then judges the write as that member with the web door's hero-choice c
 Re-verify by: 2027-01-15 (Chronicle `internal/plugins/syncapi/acting_player.go` `judgeActingPlayer`, `internal/plugins/entities/owner_picks_check.go` `PlayerPicksHeld`)
 
 #### PUT /entities/:entityId/image
-Sets the page picture (`image_path`) to a media id of this campaign, the `id` that `POST /media` answers. A media id from another campaign, or one that does not exist, is a 400 or 404 and nothing changes.
+Sets the page picture (`image_path`) to a media id of this campaign, the `id` that `POST /media` answers. A media id from another campaign, one that does not exist, or a path is a 400 ("invalid image path") and nothing changes.
 
 **Used by:** `actor-sync.mjs` → a hero's portrait chosen in Foundry (`_pushPictures`)
 

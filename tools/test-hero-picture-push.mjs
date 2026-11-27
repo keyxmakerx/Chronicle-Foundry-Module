@@ -5,11 +5,20 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isWorldFile, picturesToPush, sendablePicture, pictureName, sentFlag, changesPictures } from '../scripts/_hero-picture-push.mjs';
+import { isWorldFile, picturesToPush, sendablePicture, pictureName, sentFlag, changesPictures, sameOriginUrl } from '../scripts/_hero-picture-push.mjs';
 
 test('only files in this Foundry install are read', () => {
   for (const p of ['worlds/w/heroes/tyne.webp', 'images/Generic%20NPCs/Misc%20Humanoid.png', 'modules/x/a.png']) assert.ok(isWorldFile(p), p);
-  for (const p of ['', 'https://example.com/a.png', '//example.com/a.png', 'data:image/png;base64,AA', 'worlds/../../etc/a.png', 'javascript:alert(1)']) assert.ok(!isWorldFile(p), p);
+  for (const p of ['', 'https://example.com/a.png', '//example.com/a.png', 'data:image/png;base64,AA', 'worlds/../../etc/a.png', 'javascript:alert(1)',
+    '\\\\example.com\\a.png', '/\\example.com/a.png', '\\/example.com/a.png', 'worlds/w/a\\b.png', 'worlds/w/\u0000a.png', 'worlds/w/\na.png', '\t//example.com/a.png']) assert.ok(!isWorldFile(p), JSON.stringify(p));
+});
+
+test('a world file is read only from this Foundry\'s own origin', () => {
+  const origin = 'https://foundry.example';
+  assert.equal(sameOriginUrl('/worlds/w/a.png', origin), 'https://foundry.example/worlds/w/a.png');
+  assert.equal(sameOriginUrl('/vtt/worlds/w/a.png', origin), 'https://foundry.example/vtt/worlds/w/a.png');
+  for (const r of ['//other.example/a.png', '/\\other.example/a.png', 'https://other.example/a.png', '\\\\other.example\\a.png']) assert.equal(sameOriginUrl(r, origin), '', r);
+  assert.equal(sameOriginUrl('/a.png', ''), '', 'no origin, nothing read');
 });
 
 test('which pictures are sent', () => {
