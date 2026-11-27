@@ -6,6 +6,13 @@ Live checklist for the sync module. Needs a running Chronicle and Foundry VTT
 Automated checks (no Foundry): `node --test tools/test-*.mjs` from the repo
 root. There is no `package.json`.
 
+Vendored Chronicle files: `CHRONICLE_DIR=../Chronicle node --test
+tools/test-cutscene-relay.mjs tools/test-shop-room.mjs tools/test-sky-clock.mjs
+tools/test-craft-relay.mjs` compares each copy with Chronicle's byte for byte
+(the sync bench CI job runs it). When one differs,
+`CHRONICLE_DIR=../Chronicle node tools/refresh-vendor.mjs` copies them again
+and rewrites `scripts/_vendor-manifest.mjs`.
+
 ## Prerequisites
 
 - [ ] Chronicle running with API key created for target campaign
