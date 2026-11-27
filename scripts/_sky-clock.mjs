@@ -124,14 +124,17 @@ export function skyWeather(view) {
 }
 
 /**
- * The day's moon-night events (a blood moon, an eclipse) as the sky code's
+ * The day's sky events (a blood moon, a comet, an eclipse) as the sky code's
  * `parseDayEvents` reads them: each event's `payload` is a JSON string.
+ * `onToday`, when given, is the sky code's own rule for which events are
+ * today's (one whose days run over today counts); without it, only events
+ * dated today.
  */
-export function skyEvents(view) {
+export function skyEvents(view, onToday) {
   const d = view?.date;
   if (!d) return [];
-  return (view.events || [])
-    .filter((e) => e.year === d.year && e.month === d.month && e.day === d.day)
+  const all = view.events || [];
+  return (onToday ? onToday(all) : all.filter((e) => e.year === d.year && e.month === d.month && e.day === d.day))
     .map((e) => (e.sky ? { ...e, payload: JSON.stringify(e.sky) } : e))
     .filter((e) => typeof e.payload === 'string');
 }

@@ -418,7 +418,7 @@ export class SkyClock {
     const same = prev && prev.calendar.months === cal.months && JSON.stringify(prev.calendar.moons) === JSON.stringify(cal.moons);
     this.model = {
       calendar: cal,
-      todayEvents: skyEvents(this.view),
+      todayEvents: skyEvents(this.view, this.S.eventsToday ? (all) => this.S.eventsToday(cal, all) : null),
       dayWeather: cal.weather,
       skym: same ? prev.skym : window.SkyWorld.makeSkym(cal),
       landSeed: seed, width: 0, height: 0, reduced: this.rm,
