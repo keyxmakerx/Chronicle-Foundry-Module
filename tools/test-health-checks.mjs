@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { buildHealthChecks, describeWaiting } from '../scripts/_health-checks.mjs';
+import { ENGINES } from '../scripts/_vendor-check.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => readFileSync(resolve(ROOT, p), 'utf8');
@@ -203,6 +204,32 @@ test('rows read t() so a translation reaches every string', () => {
   assert.equal(rows[0].action.label, '<<Reconnect>>');
 });
 
+test('copies that differ from Chronicle\'s are one warn row naming each engine in words', () => {
+  assert.equal(byId(build({ vendorMismatch: [] }), 'vendor'), undefined);
+  assert.equal(byId(build(), 'vendor'), undefined, 'not known yet, or an older Chronicle: no row');
+  const one = byId(build({ vendorMismatch: ['shop'] }), 'vendor');
+  assert.equal(one.level, 'warn');
+  assert.equal(one.title, 'This module’s shop room doesn’t match your Chronicle');
+  assert.match(one.detail, /Update the Chronicle Sync module/);
+  assert.match(one.detail, /update Chronicle instead/);
+  assert.equal(one.action, undefined);
+  const many = byId(build({ vendorMismatch: ['cutscenes', 'sky', 'crafting'] }), 'vendor');
+  assert.equal(many.title, 'This module’s cut scene player, Sky Clock, and crafting don’t match your Chronicle');
+  const rows = build({ vendorMismatch: ['shop'] });
+  assert.equal(rows[0].id, 'vendor', 'a problem sorts above the ok rows');
+});
+
+test('the vendor row says "doesn\'t match", never that a side is behind', () => {
+  const all = byId(build({ vendorMismatch: ENGINES }), 'vendor');
+  assert.doesNotMatch(`${all.title} ${all.detail}`, /behind|out of date|outdated|older|newer/i);
+  assert.equal(byId(build({ vendorMismatch: ['nonsense', 7] }), 'vendor'), undefined, 'unknown engines are not named');
+});
+
+test('every engine has its name in lang/en.json', () => {
+  const block = JSON.parse(read('lang/en.json')).CHRONICLE.Dashboard.HealthChecks;
+  for (const e of ENGINES) assert.ok(`VendorEngine_${e}` in block, e);
+});
+
 test('the pure module has no DOM, game or foundry reference', () => {
   const src = read('scripts/_health-checks.mjs').replace(/\/\*[\s\S]*?\*\//g, '');
   assert.ok(!/\b(game|foundry|document|window|ui)\./.test(src));
@@ -213,7 +240,7 @@ test('every key the module reads exists in lang/en.json', () => {
   const block = lang.CHRONICLE.Dashboard.HealthChecks;
   const src = read('scripts/_health-checks.mjs');
   const keys = [...src.matchAll(/tr\('(\w+)'/g)].map((m) => m[1])
-    .concat([...src.matchAll(/'(\w+)'/g)].map((m) => m[1]).filter((k) => /^(Reconnects|Wait|Tried)/.test(k)));
+    .concat([...src.matchAll(/'(\w+)'/g)].map((m) => m[1]).filter((k) => /^(Reconnects|Wait|Tried|Vendor)/.test(k)));
   for (const k of keys) assert.ok(k in block, `HealthChecks.${k}`);
 });
 
