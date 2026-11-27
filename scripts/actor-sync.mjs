@@ -33,7 +33,7 @@ import { collapseChanges } from './_change-feed.mjs';
 import { planActorApply } from './_actor-apply-plan.mjs';
 import { planIdentityItems, identityFieldTypes, identityPicks } from './_identity-item-plan.mjs';
 import { applyIdentityPlan, applyEntryRefresh, journalMentions } from './_identity-item-apply.mjs';
-import { planEntryRefresh } from './_campaign-entry-item.mjs';
+import { planEntryRefresh, effectPathsChange } from './_campaign-entry-item.mjs';
 import { planEntryAbilities } from './_entry-abilities.mjs';
 import { sendsChangeHere, undoesLinkChangeHere, memberOf, ownsCharacter } from './_change-author.mjs';
 import { ASK, askModel, sameName } from './_player-asks.mjs';
@@ -1246,16 +1246,24 @@ export class ActorSync {
         return;
       }
       const entriesByField = await this._campaignEntries([...planned, ...madeFields.map((f) => f.fieldKey)]);
-      // Where the system says an entry's properties go on the item it makes.
+      // Where the system says an entry's properties go on the item it makes,
+      // and which of them change the hero.
       const entryFieldsByField = Object.fromEntries(fieldDefs.map((d) => [d.key, d.foundry_entry_fields]));
+      const entryEffectsByField = Object.fromEntries(fieldDefs.map((d) => [d.key, d.foundry_entry_effects]));
 
       const failed = [];
+      // Fields whose item was swapped or whose effect changed: the hero's
+      // numbers those items set are pushed once they are on the sheet.
+      const swapped = [];
       if (plan.length) {
-        failed.push(...(await applyIdentityPlan(actor, plan, game, entriesByField, entryFieldsByField)).failed);
+        const applied = await applyIdentityPlan(actor, plan, game, entriesByField, entryFieldsByField, entryEffectsByField);
+        failed.push(...applied.failed);
+        swapped.push(...applied.done);
+        this._noticeHeldText(actor, applied.held);
       }
       await recordPicks(failed);
       const refresh = planEntryRefresh({
-        items, fields: madeFields, fieldsData: entity?.fields_data, entriesByField, mentionId: journalMentions(game), entryFieldsByField,
+        items, fields: madeFields, fieldsData: entity?.fields_data, entriesByField, mentionId: journalMentions(game), entryFieldsByField, entryEffectsByField,
       });
       try {
         await applyEntryRefresh(actor, refresh);
@@ -1263,6 +1271,8 @@ export class ActorSync {
         console.error(`Chronicle: could not refresh campaign entries on "${actor.name}"`, err);
         failed.push(...refresh.map((r) => r.fieldKey));
       }
+      this._noticeHeldText(actor, refresh.filter((r) => r.textHeld).map((r) => r.name));
+      this._pushEffectPaths(actor, [...swapped, ...refresh.filter((r) => r.effect).map((r) => r.fieldKey)], entryEffectsByField);
       if (!(await this._applyEntryAbilities(actor, identityFieldTypes(fieldDefs), entriesByField))) failed.push('abilities');
       if (failed.length) {
         ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.IdentityItemFailed', {
@@ -1331,6 +1341,7 @@ export class ActorSync {
     // A cached list would hold the entry as it was before the edit.
     for (const { fieldKey: key } of fields) this._entryCache?.delete(key);
     const entryFieldsByField = Object.fromEntries(fieldDefs.map((d) => [d.key, d.foundry_entry_fields]));
+    const entryEffectsByField = Object.fromEntries(fieldDefs.map((d) => [d.key, d.foundry_entry_effects]));
     const actors = game.actors?.contents ?? Array.from(game.actors ?? []);
     for (const actor of actors) {
       const entityId = actor.getFlag?.(FLAG_SCOPE, 'entityId');
@@ -1343,9 +1354,11 @@ export class ActorSync {
           const entriesByField = await this._campaignEntries(made.map((f) => f.fieldKey));
           const refresh = planEntryRefresh({
             items, fields: made, fieldsData: actor.getFlag(FLAG_SCOPE, IDENTITY_APPLIED_FLAG) ?? {},
-            entriesByField, mentionId: journalMentions(game), entryFieldsByField,
+            entriesByField, mentionId: journalMentions(game), entryFieldsByField, entryEffectsByField,
           });
           if (refresh.length) await applyEntryRefresh(actor, refresh);
+          this._noticeHeldText(actor, refresh.filter((r) => r.textHeld).map((r) => r.name));
+          this._pushEffectPaths(actor, refresh.filter((r) => r.effect).map((r) => r.fieldKey), entryEffectsByField);
           await this._applyEntryAbilities(actor, made, entriesByField);
         } catch (err) {
           console.error(`Chronicle: could not refresh campaign entries on "${actor.name}"`, err);
@@ -1778,6 +1791,41 @@ export class ActorSync {
       this._pendingPlayers.set(actor.id, (this._pendingPlayers.get(actor.id) ?? new Set()).add(userId));
     }
     this._actorPushDebouncer.schedule(actor.id, actor, entityId);
+  }
+
+  /**
+   * Tell the GM, once per entry each session, that a campaign entry's text
+   * was left off its Foundry item for holding GM-only content, so a sheet
+   * with numbers but no text isn't a mystery.
+   * @param {Actor} actor
+   * @param {string[]} names - the entries whose text was held back
+   * @private
+   */
+  _noticeHeldText(actor, names) {
+    this._heldNoticed ??= new Set();
+    const fresh = [...new Set(names ?? [])].filter((n) => n && !this._heldNoticed.has(n.toLowerCase()));
+    if (!fresh.length) return;
+    for (const n of fresh) this._heldNoticed.add(n.toLowerCase());
+    ui.notifications?.warn(game.i18n.format('CHRONICLE.ActorSync.EntryTextHeld', {
+      entries: noticeText(fresh.join(', ')),
+      actor: noticeText(actor.name),
+    }));
+  }
+
+  /**
+   * Push the hero's numbers that these fields' items set through their
+   * effects (an ancestry's speed). Foundry fires no actor update when an
+   * item or its effect changes, so without this Chronicle would show the old
+   * numbers until an unrelated edit. Joins the actor's debounced push like a
+   * sheet edit; those fields are Foundry-led, so nothing comes back.
+   * @param {Actor} actor
+   * @param {string[]} fieldKeys
+   * @param {Record<string, object>} entryEffectsByField
+   * @private
+   */
+  _pushEffectPaths(actor, fieldKeys, entryEffectsByField) {
+    const change = effectPathsChange([...new Set(fieldKeys)].map((k) => entryEffectsByField?.[k]));
+    if (change) this._handleUpdateActor(actor, change, {}, game.user?.id);
   }
 
   /**
