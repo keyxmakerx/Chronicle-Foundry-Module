@@ -1,14 +1,13 @@
 /**
  * Keeps the GM-only record of the Chronicle links sync made, and checks every
- * journal's and actor's link against it when a GM connects (rules in
- * _link-record.mjs). The live hooks check link changes while a GM is online;
- * this checks the links as they stand when one connects.
+ * journal's and actor's link against it when a GM's sync starts (rules in
+ * _link-record.mjs). The live hooks check link changes while a GM's sync
+ * runs; this checks the links as they stand when it starts.
  */
 
 import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
 import { touchesLinkFlags } from './_set-aside.mjs';
 import { noticeText } from './_escape-html.mjs';
-import { unwrapEntityList } from './_entity-page-walk.mjs';
 import { LINK_KINDS, linkOf, linkHash, readRecord, recordValue, unconfirmedLinks } from './_link-record.mjs';
 
 /** The world setting that holds the record. */
@@ -16,7 +15,6 @@ export const LINK_RECORD_SETTING = 'linkRecord';
 
 const DOCS = [['JournalEntry', 'journals'], ['Actor', 'actors']];
 const FLUSH_MS = 200;
-const MAPPING_PAGE = 1000;
 const NAMES_SHOWN = 10;
 
 export default class LinkRecord {
@@ -86,8 +84,8 @@ export default class LinkRecord {
 
   /**
    * Save what was noted. Read the setting again first: another GM's client
-   * saves its own GM's links to the same setting. Before the first connect
-   * check there is no record, and the noted links wait for it.
+   * saves its own GM's links to the same setting. Before the first check
+   * there is no record, and the noted links wait for it.
    */
   async save() {
     await this._noted;
@@ -101,18 +99,17 @@ export default class LinkRecord {
   }
 
   /**
-   * On connect, undo every link neither the record nor a Chronicle mapping
-   * confirms, warn the GM which, and save the record as the links that stand.
-   * The first time, with no record yet, the links as they are become it.
-   * Only the active GM checks, so two GMs never undo the same link twice.
-   * @param {{get: Function}} api
+   * When sync starts, undo every link the record doesn't hold, warn the GM
+   * which, and save the record as the links that stand. The first time, with
+   * no record yet, the links as they are become it. Every GM client running
+   * sync checks, since each pulls through the links it finds and the active
+   * GM's client may not be running sync; a second check finds nothing to undo.
+   * Local only, so it finishes before sync reads or sends anything.
    * @param {(kind: string, doc: object) => Promise<void>} unlink
    * @returns {Promise<object[]>} the documents whose link was undone
    */
-  async checkOnConnect(api, unlink) {
+  async checkLinks(unlink) {
     if (game.user?.isGM !== true) return [];
-    const active = game.users?.activeGM;
-    if (active && active.id !== game.user.id) return [];
     await this._noted;
 
     const docs = [];
@@ -124,10 +121,10 @@ export default class LinkRecord {
     }
 
     const recorded = readRecord(game.settings.get(MODULE_ID, LINK_RECORD_SETTING));
-    const undone = recorded ? unconfirmedLinks(docs, recorded, await this._mappings(api)) : [];
+    const undone = recorded ? unconfirmedLinks(docs, recorded) : [];
     for (const d of undone) await unlink(d.kind, d.doc);
 
-    // Saved only when it changes, so a connect with nothing new writes nothing.
+    // Saved only when it changes, so a start with nothing new writes nothing.
     const standing = recordValue(docs.filter((d) => !undone.includes(d)).map((d) => d.hash));
     if (!recorded || JSON.stringify(recordValue(recorded)) !== JSON.stringify(standing)) {
       await game.settings.set(MODULE_ID, LINK_RECORD_SETTING, standing);
@@ -142,34 +139,5 @@ export default class LinkRecord {
       ui.notifications?.warn?.(notice, { permanent: true });
     }
     return undone;
-  }
-
-  /**
-   * Every Chronicle mapping of a Foundry document to a page, as
-   * `${foundryId}:${entityId}`; null when they can't be read, so only the
-   * record confirms links this time.
-   */
-  async _mappings(api) {
-    const out = new Set();
-    try {
-      // Walk to the end: by `total` when the server gives one, since it may
-      // send fewer rows a page than asked; else until a short page.
-      for (let offset = 0; ;) {
-        const raw = await api.get(`/sync/mappings?limit=${MAPPING_PAGE}&offset=${offset}`);
-        const rows = unwrapEntityList(raw);
-        for (const m of rows) {
-          if (m?.external_system === 'foundry' && m?.chronicle_type === 'entity' && m.external_id && m.chronicle_id) {
-            out.add(`${m.external_id}:${m.chronicle_id}`);
-          }
-        }
-        offset += rows.length;
-        const total = Number.isFinite(raw?.total) ? raw.total : null;
-        if (!rows.length || (total !== null ? offset >= total : rows.length < MAPPING_PAGE)) break;
-      }
-      return out;
-    } catch (err) {
-      console.warn('Chronicle: could not read sync mappings for the link check', err?.status ?? err);
-      return null;
-    }
   }
 }

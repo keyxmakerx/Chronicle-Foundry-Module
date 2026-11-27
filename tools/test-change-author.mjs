@@ -2,7 +2,7 @@
 /** Which client sends a Foundry change to Chronicle (scripts/_change-author.mjs). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sendsChange, memberOf, ownsCharacter, mayEditPage } from '../scripts/_change-author.mjs';
+import { sendsChange, undoesLinkChange, memberOf, ownsCharacter, mayEditPage } from '../scripts/_change-author.mjs';
 
 const gm = { id: 'gm1', isGM: true };
 const gm2 = { id: 'gm2', isGM: true };
@@ -48,4 +48,15 @@ test('a page is the player\'s to edit only with an edit grant that covers them',
   assert.equal(mayEditPage({ visibility: 'custom', permissions: [{ subject_type: 'public', permission: 'edit' }] }, null), false);
   assert.equal(mayEditPage({ visibility: 'default', permissions: [{ subject_type: 'public', permission: 'edit' }] }, 'm1'), false);
   assert.equal(mayEditPage(undefined, 'm1'), false);
+});
+
+test('every GM client undoes a player\'s link change, the active GM or not; a GM\'s own and another GM\'s stand', () => {
+  assert.equal(undoesLinkChange('p1', { user: gm, users: users(gm) }), true);
+  assert.equal(undoesLinkChange('p1', { user: gm2, users: users(gm) }), true, 'a GM running sync that is not the active GM');
+  assert.equal(undoesLinkChange('p1', { user: gm2, users: users(null) }), true);
+  assert.equal(undoesLinkChange('ghost', { user: gm, users: users(gm) }), true, 'an unknown author is not a GM');
+  assert.equal(undoesLinkChange('gm1', { user: gm, users: users(gm) }), false);
+  assert.equal(undoesLinkChange('gm2', { user: gm, users: users(gm) }), false);
+  assert.equal(undoesLinkChange('p1', { user: player, users: users(gm) }), false);
+  assert.equal(undoesLinkChange('', { user: gm, users: users(gm) }), false);
 });

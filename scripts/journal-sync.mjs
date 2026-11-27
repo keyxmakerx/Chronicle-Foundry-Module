@@ -42,7 +42,7 @@ import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { collapseChanges } from './_change-feed.mjs';
 import { sharedPictureIds, toFoundryPictures, toChroniclePictures } from './_inline-pictures.mjs';
 import { PictureStore, watchGMPictures } from './picture-store.mjs';
-import { sendsChangeHere, memberOf, mayEditPage } from './_change-author.mjs';
+import { sendsChangeHere, undoesLinkChangeHere, memberOf, mayEditPage } from './_change-author.mjs';
 import { ASK, askModel, sameName } from './_player-asks.mjs';
 import { getPlayerAsks, playerName } from './player-asks.mjs';
 
@@ -1279,8 +1279,7 @@ export class JournalSync {
     // A journal a player makes never arrives linked: the link is theirs to
     // write and would aim their later pushes at someone else's page. Checked
     // before the sync-write skip, since their client can send that option too.
-    const byOther = userId !== game.user.id;
-    if (byOther && sendsChangeHere(userId) && LINK_ID_FLAGS.some((k) => journal.getFlag(FLAG_SCOPE, k) != null)) {
+    if (undoesLinkChangeHere(userId) && LINK_ID_FLAGS.some((k) => journal.getFlag(FLAG_SCOPE, k) != null)) {
       await journal.update(flagRemoval(FLAG_SCOPE, ...LINK_FLAGS, 'pushedPermissions'), syncOptions());
     }
     if (options?.chronicleSync) return;
@@ -1289,7 +1288,7 @@ export class JournalSync {
     // Two journals on one page would overwrite each other's pushes while only
     // one received Chronicle's changes, so the copy starts unlinked.
     const linkedTo = journal.getFlag(FLAG_SCOPE, 'entityId');
-    if (linkedTo && !byOther) {
+    if (linkedTo && userId === game.user.id) {
       if (!game.journal.find((j) => j.id !== journal.id && j.getFlag(FLAG_SCOPE, 'entityId') === linkedTo)) return;
       await journal.update(flagRemoval(FLAG_SCOPE, ...LINK_FLAGS, 'pushedPermissions'), syncOptions());
     }
@@ -1505,7 +1504,7 @@ export class JournalSync {
     // change to one unlinks the journal; the old link is gone, and the GM can
     // link it again from the dashboard. Checked before the sync-write option,
     // which a player's client can send too.
-    if (userId !== game.user.id && sendsChangeHere(userId) && touchesLinkFlags(change, FLAG_SCOPE, LINK_ID_FLAGS)) {
+    if (undoesLinkChangeHere(userId) && touchesLinkFlags(change, FLAG_SCOPE, LINK_ID_FLAGS)) {
       await journal.update(flagRemoval(FLAG_SCOPE, ...LINK_FLAGS, 'pushedPermissions'), syncOptions());
       const notice = game.i18n.format('CHRONICLE.Notifications.PlayerLinkUndone', { name: noticeText(journal.name) });
       ui.notifications?.warn?.(notice, { permanent: true });

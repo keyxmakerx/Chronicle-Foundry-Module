@@ -227,6 +227,33 @@ test('a journal link a player changes while no GM is online is undone on the nex
   assert.deepEqual(world.log.writes.slice(before).filter((w) => JSON.stringify(w.change || {}).includes('entityId')).map((w) => `${w.op} ${w.type}`), [], 'no link changed on the second open');
 }));
 
+test('a GM that is not the active GM, but runs sync, undoes a player\'s link change live and on open', () => scenario('relink-other-gm', async ({ seed, world }) => {
+  const one = await chroniclePage(seed, 'Player Journal One');
+  const two = await chroniclePage(seed, 'Player Journal Two');
+  const other = await chroniclePage(seed, 'Someone Else Again');
+  await openWorld(world);
+  await JournalSync_resync(world);
+  const j1 = byEntity(world, one.id);
+  const j2 = byEntity(world, two.id);
+  assert.ok(j1 && j2, 'linked');
+  // The active GM is another GM whose client is not running sync.
+  const users = world.game.users;
+  const self = users.activeGM;
+  users.activeGM = { id: 'benchOtherGM0001', name: 'Other GM', isGM: true };
+  try {
+    await world.asPlayer(() => j1.update({ [`flags.${FLAG}.entityId`]: other.id }));
+    await settle();
+    assert.equal(j1.getFlag(FLAG, 'entityId'), undefined, 'live change undone here');
+    await closeWorld(world);
+    await world.asPlayer(() => j2.update({ [`flags.${FLAG}.entityId`]: other.id }));
+    const reqs = await recordRequests(async () => { await openWorld(world); });
+    assert.equal(j2.getFlag(FLAG, 'entityId'), undefined, 'offline change undone on open');
+    assert.deepEqual(writes(reqs).filter((r) => r.url.startsWith(`/entities/${other.id}`)).map((r) => `${r.method} ${r.url}`), [], 'nothing sent to the other page');
+  } finally {
+    users.activeGM = self;
+  }
+}));
+
 test('a reopen reads only what changed (change feed), and its own pushes do not come back', () => scenario('feed-catchup', async ({ seed, world }) => {
   const pages = [];
   for (const n of ['North', 'South', 'East', 'West']) pages.push(await chroniclePage(seed, `${n} Gate`));

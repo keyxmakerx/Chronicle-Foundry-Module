@@ -2,10 +2,9 @@
 /**
  * The GM-only link record (scripts/_link-record.mjs, scripts/link-record.mjs):
  * only a GM's own writes are recorded, the record holds hashes and nothing a
- * player could read a journal or page from, and on the GM's connect a link
- * neither the record nor a Chronicle mapping confirms is undone, with a
- * warning. The first connect with the record in place takes the links as
- * they are.
+ * player could read a journal or page from, and when a GM's sync starts a
+ * link the record lacks is undone, with a warning, on every GM client running
+ * sync. The first start with the record in place takes the links as they are.
  *
  * Run: node --test tools/test-link-record.mjs
  */
@@ -48,20 +47,17 @@ test('the record reads only well-formed hashes; no record is null', () => {
   assert.deepEqual(recordValue(['b'.repeat(64), good, good]), { v: 1, links: [good, 'b'.repeat(64)] });
 });
 
-test('a link is confirmed by the record, or a page link by a Chronicle mapping; else it is not', async () => {
+test('only the record confirms a link; a page link, a note link or an actor link it lacks is not', async () => {
   const mk = async (kind, id, link) => ({ kind, id, link, hash: await linkHash(kind, id, link) });
   const recordedOne = await mk('journals', 'j1', { entityId: 'e1' });
-  const mappedOne = await mk('journals', 'j2', { entityId: 'e2' });
+  const page = await mk('journals', 'j2', { entityId: 'e2' });
   const note = await mk('journals', 'j3', { entityId: 'e3', noteId: 'n3' });
   const forged = await mk('actors', 'a1', { entityId: 'someone-else' });
   const out = unconfirmedLinks(
-    [recordedOne, mappedOne, note, forged, { kind: 'journals', id: 'j4', link: null }],
+    [recordedOne, page, note, forged, { kind: 'journals', id: 'j4', link: null }],
     new Set([recordedOne.hash]),
-    new Set(['j2:e2', 'j3:e3', 'a1:the-real-one']),
   );
-  assert.deepEqual(out.map((d) => d.id), ['j3', 'a1']);
-  // With no mappings readable, only the record confirms.
-  assert.deepEqual(unconfirmedLinks([recordedOne, mappedOne], new Set([recordedOne.hash]), null).map((d) => d.id), ['j2']);
+  assert.deepEqual(out.map((d) => d.id), ['j2', 'j3', 'a1']);
 });
 
 // --- The Foundry side -------------------------------------------------------
@@ -101,15 +97,13 @@ function unlinker() {
   return { undone, fn };
 }
 
-const noMappings = { get: async () => ({ data: [], total: 0 }) };
-
 test('the first connect takes the links as they are, and undoes nothing', async () => {
   const j = doc('journal-one', { entityId: 'page-one' });
   const a = doc('actor-zed', { entityId: 'page-nine' });
   const w = world({ journals: [j], actors: [a] });
   const { undone, fn } = unlinker();
   const lr = new LinkRecord();
-  assert.deepEqual(await lr.checkOnConnect(noMappings, fn), []);
+  assert.deepEqual(await lr.checkLinks(fn), []);
   assert.deepEqual(undone, []);
   const saved = readRecord(w.record());
   assert.equal(saved.size, 2);
@@ -122,11 +116,11 @@ test('a link a player made while no GM was online is undone on connect; the GM\'
   const gmMade = doc('j1', { entityId: 'e1' });
   const mine = doc('a1', { entityId: 'my-character' }, 'Hero <b>x</b>');
   const w = world({ journals: [gmMade], actors: [mine] });
-  await new LinkRecord().checkOnConnect(noMappings, async () => {});
+  await new LinkRecord().checkLinks(async () => {});
   // The GM leaves; the player who owns the actor points it at another page.
   mine.flags.entityId = 'someone-elses-character';
   const { undone, fn } = unlinker();
-  const out = await new LinkRecord().checkOnConnect(noMappings, fn);
+  const out = await new LinkRecord().checkLinks(fn);
   assert.deepEqual(out.map((d) => d.id), ['a1']);
   assert.deepEqual(undone, ['actors:a1']);
   assert.equal(gmMade.flags.entityId, 'e1');
@@ -135,25 +129,23 @@ test('a link a player made while no GM was online is undone on connect; the GM\'
   assert.match(w.warns[0], /&lt;b&gt;/, 'the name is escaped');
   // The record now holds only the links that stand, so a second connect undoes nothing.
   const again = unlinker();
-  assert.deepEqual(await new LinkRecord().checkOnConnect(noMappings, again.fn), []);
+  assert.deepEqual(await new LinkRecord().checkLinks(again.fn), []);
   assert.equal(readRecord(w.record()).size, 1);
 });
 
-test('a link only a Chronicle mapping confirms stands, and joins the record', async () => {
-  const j = doc('j1', { entityId: 'e1' });
+test('a link the GM took away is undone if a player puts it back, though Chronicle still maps it', async () => {
+  // The GM linked j1 to e1 (Chronicle keeps that mapping), then unlinked it.
+  const j = doc('j1', {});
   const w = world({ journals: [j], record: recordValue([]) });
-  const pages = [
-    { data: [{ external_system: 'foundry', chronicle_type: 'entity', external_id: 'jx', chronicle_id: 'ex' }], total: 2 },
-    { data: [{ external_system: 'foundry', chronicle_type: 'entity', external_id: 'j1', chronicle_id: 'e1' }], total: 2 },
-  ];
-  const asked = [];
-  const api = { get: async (path) => { asked.push(path); return pages[asked.length - 1]; } };
+  const lr = new LinkRecord();
+  lr.start();
+  // A player who owns j1 puts the old link back with no GM online.
+  j.flags.entityId = 'e1';
   const { undone, fn } = unlinker();
-  assert.deepEqual(await new LinkRecord().checkOnConnect(api, fn), []);
-  assert.deepEqual(undone, []);
-  // Walked by total, though each page held fewer rows than asked.
-  assert.deepEqual(asked, ['/sync/mappings?limit=1000&offset=0', '/sync/mappings?limit=1000&offset=1']);
-  assert.ok(readRecord(w.record()).has(await linkHash('journals', 'j1', { entityId: 'e1' })));
+  assert.deepEqual((await lr.checkLinks(fn)).map((d) => d.id), ['j1']);
+  assert.deepEqual(undone, ['journals:j1']);
+  assert.deepEqual(w.record(), recordValue([]));
+  lr.stop();
 });
 
 test('a GM\'s own link writes are recorded; a player\'s never are', async () => {
@@ -198,27 +190,33 @@ test('links noted before the first connect wait for it rather than start a parti
   await lr.save();
   assert.equal(w.record(), null, 'no partial record that would leave older links unconfirmed');
   const { undone, fn } = unlinker();
-  await lr.checkOnConnect(noMappings, fn);
+  await lr.checkLinks(fn);
   assert.deepEqual(undone, []);
   assert.equal(readRecord(w.record()).size, 2);
   lr.stop();
 });
 
-test('only the active GM checks, and a player\'s client never does', async () => {
-  const forged = doc('a1', { entityId: 'x' });
-  for (const opts of [{ me: 'gm2', activeGM: 'gm' }, { me: 'p', isGM: false }]) {
+test('every GM client running sync checks, the active GM or not; a player\'s client never does', async () => {
+  for (const [opts, want] of [[{ me: 'gm2', activeGM: 'gm' }, ['actors:a1']], [{ me: 'p', isGM: false }, []]]) {
+    const forged = doc('a1', { entityId: 'x' });
     const w = world({ actors: [forged], record: recordValue([]), ...opts });
     const { undone, fn } = unlinker();
-    assert.deepEqual(await new LinkRecord().checkOnConnect(noMappings, fn), []);
-    assert.deepEqual(undone, []);
+    await new LinkRecord().checkLinks(fn);
+    assert.deepEqual(undone, want);
     assert.deepEqual(w.record(), recordValue([]));
   }
 });
 
-test('the check runs before each connect\'s catch-up, and the setting is world-scoped and hidden', async () => {
+test('the check runs when sync starts, before any module hook, pull or socket message, and the setting is world-scoped and hidden', async () => {
   const { readFileSync } = await import('node:fs');
   const sm = readFileSync(new URL('../scripts/sync-manager.mjs', import.meta.url), 'utf8');
-  assert.match(sm, /async _runInitialSync\(\) \{\n    await this\._checkLinks\(\);/);
+  const start = sm.slice(sm.indexOf('async _startOnce() {'), sm.indexOf('\n  }\n', sm.indexOf('async _startOnce() {')));
+  const check = start.indexOf('this._linkRecord.start();\n    await this._checkLinks();');
+  assert.ok(check > 0, 'checked at start');
+  for (const later of ['mod.init(this.api)', "this.api.on('*'", 'this.api.connect()']) {
+    assert.ok(start.indexOf(later) > check, `${later} comes after the check`);
+  }
+  assert.equal((sm.match(/await this\._checkLinks\(\)/g) || []).length, 1, 'checked once per start');
   const settings = readFileSync(new URL('../scripts/settings.mjs', import.meta.url), 'utf8');
   assert.match(settings, /register\(MODULE_ID, 'linkRecord', \{\n    scope: 'world',\n    config: false,/);
 });

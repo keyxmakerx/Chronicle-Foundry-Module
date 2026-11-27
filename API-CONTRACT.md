@@ -691,7 +691,7 @@ Re-verify by: 2027-01-28 (Chronicle's rolls route and `roll.made` broadcast; key
 #### GET /sync/mappings
 Lists all sync mappings for the campaign.
 
-**Used by:** `link-record.mjs` → the connect-time link check, walked to `total` (a mapping of a Foundry document to a page confirms that link)
+**Used by:** `sync-manager.mjs` → initial sync setup
 
 **Query:** `?limit=` (max 1000) and `?offset=`.
 

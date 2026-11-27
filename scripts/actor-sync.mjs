@@ -34,7 +34,7 @@ import { planActorApply } from './_actor-apply-plan.mjs';
 import { planIdentityItems, identityFieldTypes, identityPicks } from './_identity-item-plan.mjs';
 import { applyIdentityPlan, applyEntryRefresh, journalMentions } from './_identity-item-apply.mjs';
 import { planEntryRefresh } from './_campaign-entry-item.mjs';
-import { sendsChangeHere, memberOf, ownsCharacter } from './_change-author.mjs';
+import { sendsChangeHere, undoesLinkChangeHere, memberOf, ownsCharacter } from './_change-author.mjs';
 import { ASK, askModel, sameName } from './_player-asks.mjs';
 import { actingMemberOf, heldKeysOf, describeHeld, HeldNotices } from './_player-picks-held.mjs';
 import { getPlayerAsks, playerName } from './player-asks.mjs';
@@ -1480,15 +1480,14 @@ export class ActorSync {
     // An actor a player makes never arrives linked: the link is theirs to
     // write and would aim their later pushes at someone else's character.
     // Checked before the apply skip, since their client can send that option.
-    const byOther = userId !== game.user.id;
-    if (byOther && sendsChangeHere(userId) && actor.getFlag(FLAG_SCOPE, 'entityId')) await this._unlinkCopy(actor);
+    if (undoesLinkChangeHere(userId) && actor.getFlag(FLAG_SCOPE, 'entityId')) await this._unlinkCopy(actor);
     if (options?.[APPLY_OPTION]) return;
 
     // A copy (Duplicate, an import of an export) carries the original's link,
     // and its items the original's relations. Two actors on one character
     // would overwrite each other's pushes, so the copy starts unlinked.
     const linkedTo = actor.getFlag(FLAG_SCOPE, 'entityId');
-    if (linkedTo && !byOther) {
+    if (linkedTo && userId === game.user.id) {
       if (!game.actors.find((a) => a.id !== actor.id && a.getFlag(FLAG_SCOPE, 'entityId') === linkedTo)) return;
       await this._unlinkCopy(actor);
     }
@@ -1614,7 +1613,7 @@ export class ActorSync {
     // this client pull another page's fields onto it. Only sync writes the
     // link, so a player's change to it unlinks the actor (as a copy is).
     // Checked before the sync-write option, which a player's client can send.
-    if (userId !== game.user.id && sendsChangeHere(userId) && touchesLinkFlags(change, FLAG_SCOPE, ['entityId'])) {
+    if (undoesLinkChangeHere(userId) && touchesLinkFlags(change, FLAG_SCOPE, ['entityId'])) {
       await this._unlinkCopy(actor);
       const notice = game.i18n.format('CHRONICLE.Notifications.PlayerLinkUndone', { name: noticeText(actor.name) });
       ui.notifications?.warn?.(notice, { permanent: true });

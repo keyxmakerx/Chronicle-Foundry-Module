@@ -259,8 +259,11 @@ export class SyncManager {
       return;
     }
 
-    // Record links from the first write on, so none this session goes unseen.
+    // Record links from the first write on, so none this session goes unseen,
+    // and undo any no GM made before a module's hooks, a pull or a socket
+    // message can use them.
     this._linkRecord.start();
+    await this._checkLinks();
 
     // Detect game system and match against Chronicle systems.
     await this._detectSystem();
@@ -919,14 +922,13 @@ export class SyncManager {
   }
 
   /**
-   * Undo links made while no GM was online, before this connect's catch-up
-   * sends or applies anything through them (see link-record.mjs). A failure
-   * is logged, never a reason to skip the catch-up.
+   * Undo links no GM's sync made (see link-record.mjs). A failure is logged,
+   * never a reason not to start.
    * @private
    */
   async _checkLinks() {
     try {
-      await this._linkRecord.checkOnConnect(this.api, async (kind, doc) => {
+      await this._linkRecord.checkLinks(async (kind, doc) => {
         if (kind === 'journals') {
           await doc.update(flagRemoval(FLAG_SCOPE, ...LINK_FLAGS, 'pushedPermissions'), syncOptions());
           return;
@@ -978,7 +980,6 @@ export class SyncManager {
 
   /** The body of `_performInitialSync`. @private */
   async _runInitialSync() {
-    await this._checkLinks();
     const lastSync = getSetting('lastSyncTime') || '1970-01-01T00:00:00Z';
     // While live sync is off, an automatic pass only serves the parts that
     // never wait. Nothing is read for the others and the cursor stays, so

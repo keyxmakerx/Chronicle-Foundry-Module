@@ -2,9 +2,11 @@
  * Pure rules for the GM-only record of the Chronicle links sync made.
  *
  * Only sync makes a Chronicle link. The record lives in a world setting,
- * which only a GM can write; on the GM's connect every link is checked
- * against it, and against Chronicle's own sync mappings, which only the GM's
- * key writes. A link neither one confirms was not made by sync.
+ * which a GM can write and a player cannot (unless a GM gives players the
+ * "Modify Configuration Settings" permission); when a GM's sync starts,
+ * every link is checked against it. A link it doesn't hold was not made by a
+ * GM's sync. Chronicle's sync mappings are not used: they outlive an unlink,
+ * so they would confirm a link the GM took away.
  *
  * Every client receives world settings, so the record holds only hashes of
  * the links: a player learns how many there are, never which journals or
@@ -69,21 +71,16 @@ export function recordValue(hashes) {
 }
 
 /**
- * The documents whose link no GM made: neither the record nor a Chronicle
- * mapping of this document to that page confirms it. A note link (noteId)
- * has no mapping, so only the record confirms it.
+ * The documents whose link no GM made: the record does not hold it.
  * @param {{kind: string, id: string, name?: string, link: object|null, hash?: string}[]} docs
  * @param {Set<string>} recorded
- * @param {Set<string>|null} mapped `${foundryId}:${entityId}` for each mapping
  * @returns {object[]} the unconfirmed documents, as given
  */
-export function unconfirmedLinks(docs, recorded, mapped) {
+export function unconfirmedLinks(docs, recorded) {
   const out = [];
   for (const d of docs || []) {
     if (!d?.link || !LINK_KINDS[d.kind]) continue;
     if (d.hash && recorded?.has(d.hash)) continue;
-    const pageOnly = d.link.entityId && !d.link.noteId;
-    if (pageOnly && mapped?.has(`${d.id}:${d.link.entityId}`)) continue;
     out.push(d);
   }
   return out;
