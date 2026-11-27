@@ -239,13 +239,16 @@ The campaign's own pick-list entries (a homebrew ancestry, kit, culture...),
 as `{"data":[{fieldKey, slug, name, summary, description, properties, updatedAt}],"total":N}`.
 Always the player view, whoever holds the key: Directors-only entries are left
 out and secret spans are stripped, because the module writes this into items
-players can open. `properties` holds scalars and lists of `{name, cost?, description?}`.
+players can open. `properties` holds scalars, lists of `{name, cost?, description?}`,
+and abilities: objects of text parts (`name`, `flavor`, `type`, `action_type`, `cost`,
+`keywords`, `distance`, `target`, `trigger`, `power_roll`, `tier1`–`tier3`, `effect`,
+`special`), at most four an entry, which `_entry-abilities.mjs` makes into ability items.
 404 on a Chronicle without the route; the module then stops asking for the
 session and leaves made items name-only.
 
-**Used by:** `actor-sync.mjs` `_campaignEntries`, `_campaign-entry-item.mjs`
+**Used by:** `actor-sync.mjs` `_campaignEntries`, `_campaign-entry-item.mjs`, `_entry-abilities.mjs`
 
-Re-verify by: 2026-11-18 (Chronicle `internal/plugins/syncapi/system_entries_api.go`)
+Re-verify by: 2026-12-27 (Chronicle `internal/plugins/syncapi/system_entries_api.go`, `internal/systems/entry_ability.go`)
 
 ---
 
