@@ -49,9 +49,6 @@ import { CLASS_PICK_FLAG, classPick, pickToFinish, pickChanged, SUBCLASS_PICK_FL
 import { npcActorTypeFor, actorTypeForPage, switchTarget } from './_npc-character.mjs';
 import { ActorTypeSwitch, switchActorType } from './actor-type-switch.mjs';
 
-/** Actor flag: fingerprint of leftover GM-only-place text the GM was told about (_gm-field-clear.mjs). */
-const GM_TEXT_TOLD_FLAG = 'gmTextTold';
-
 /** How long a read of the campaign's pick-list entries is reused. */
 const ENTRY_CACHE_MS = 30_000;
 
@@ -807,6 +804,7 @@ export class ActorSync {
     const toCheck = game.actors.filter((a) => this._isCharacterActor(a)
       && !!a.getFlag(FLAG_SCOPE, 'entityId') && holdsGmFieldText(a, fields));
     const kept = [];
+    const told = { ...(getSetting('gmTextTold') || {}) };
     for (const actor of toCheck) {
       const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
       try {
@@ -817,9 +815,9 @@ export class ActorSync {
           if (Object.keys(plan.update).length > 0) {
             await actor.update(plan.update, syncOptions({ [APPLY_OPTION]: true }));
           }
-          if (plan.keptMark && actor.getFlag(FLAG_SCOPE, GM_TEXT_TOLD_FLAG) !== plan.keptMark) {
+          if (plan.keptMark && told[actor.id] !== plan.keptMark) {
             kept.push(actor.name);
-            await actor.update({ [`flags.${FLAG_SCOPE}.${GM_TEXT_TOLD_FLAG}`]: plan.keptMark }, syncOptions({ [APPLY_OPTION]: true }));
+            told[actor.id] = plan.keptMark;
           }
         });
       } catch (err) {
@@ -827,6 +825,7 @@ export class ActorSync {
       }
     }
     if (kept.length > 0) {
+      await setSetting('gmTextTold', told);
       const notice = game.i18n.format('CHRONICLE.Notifications.GmFieldTextLeft', { names: noticeText(kept.join(', ')) });
       ui.notifications.warn(notice, { permanent: true });
     }

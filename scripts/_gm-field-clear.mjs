@@ -63,8 +63,9 @@ export function planGmFieldClear({ actor, entity, fields }) {
 }
 
 /**
- * A short fingerprint of text (FNV-1a), stored on the actor in place of the
- * text itself, which must not be copied anywhere players can read.
+ * A short fingerprint of text (FNV-1a), kept in the GM's own client
+ * settings so the warning is not repeated. Never stored on a document: a
+ * player could test guesses at short notes against it.
  * @param {string} text
  * @returns {string}
  */
