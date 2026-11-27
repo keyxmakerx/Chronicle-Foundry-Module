@@ -185,11 +185,24 @@ test('a failed create leaves the old item and the other steps still run', async 
       { fieldKey: 'ancestry', itemType: 'ancestry', wantName: 'Boom', removeIds: ['a1'] },
       { fieldKey: 'kit', itemType: 'kit', wantName: 'Ok', removeIds: [] },
     ], fakeWorld());
-    assert.deepEqual(res, { done: ['kit'], failed: ['ancestry'] });
+    assert.deepEqual(res, { done: ['kit'], failed: ['ancestry'], held: [] });
   } finally {
     console.error = quiet;
   }
   assert.ok(!actor.log.some((l) => l[0] === 'delete'), 'old item kept');
+});
+
+test('a made item whose entry text holds GM-only content is reported, with its numbers kept', async () => {
+  const actor = fakeActor();
+  const entry = { name: 'Reedfolk', slug: 'reedfolk', description: '<p>Kin.</p><span data-secret="true">twist</span>', properties: { stability: 1 } };
+  const effects = { stability: { path: 'system.combat.stability', type: 'add', format: 'number' } };
+  const res = await applyIdentityPlan(actor, [{ fieldKey: 'ancestry', itemType: 'ancestry', wantName: 'Reedfolk', removeIds: [] }],
+    fakeWorld(), { ancestry: [entry] }, {}, { ancestry: effects });
+  assert.deepEqual(res, { done: ['ancestry'], failed: [], held: ['Reedfolk'] });
+  const made = actor.log[0][1][0];
+  assert.equal(made.system.description.value, '');
+  assert.equal(made.effects[0].system.changes[0].key, 'system.combat.stability');
+  assert.ok(!JSON.stringify(made).includes('twist'));
 });
 
 test('a joined kit field: each missing kit replaces one Chronicle no longer names, else is added', () => {
