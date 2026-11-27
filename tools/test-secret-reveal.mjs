@@ -12,7 +12,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   toFoundrySecrets, hideSecrets, restoreSecrets, applyReveals, carryReveals, revealableSecrets,
-  DEFAULT_PLACEHOLDER_TEXT,
+  DEFAULT_PLACEHOLDER_TEXT, piecesOwnedBy,
 } from '../scripts/_gm-secrets.mjs';
 
 const keyOf = async (c) => `h${c.length}`;
@@ -91,6 +91,31 @@ test('a revealed mark the GM\'s client never filled in is not carried, so a pull
   const before = applyReveals(foundryReveal(html, id), pieces, DEFAULT_PLACEHOLDER_TEXT);
   assert.equal(carryReveals(before, html, new Map()), html);
   assert.equal(carryReveals(before, html), html);
+});
+
+test('another journal\'s placeholder pasted into a page is never filled or restored there', async () => {
+  const { html, pieces } = await pulled();
+  const id = [...pieces.keys()][0];
+  const owners = new Map([[id, 'page-b']]);
+  // A player who owns page A plants page B's placeholder, marked revealed.
+  const planted = foundryReveal(html, id);
+  const ownOfA = piecesOwnedBy(pieces, owners, 'page-a');
+  assert.equal(ownOfA.size, 0);
+  assert.equal(applyReveals(planted, ownOfA, DEFAULT_PLACEHOLDER_TEXT), null, 'not filled on the GM\'s save');
+  const pushed = restoreSecrets(planted, ownOfA, DEFAULT_PLACEHOLDER_TEXT);
+  assert.ok(pushed.missing.includes(id), 'not restored into page A\'s Chronicle text');
+  assert.ok(!pushed.html.includes('Lastwell'));
+  // Page B itself still gets its own piece, and an unlinked page gets none.
+  assert.equal(piecesOwnedBy(pieces, owners, 'page-b').get(id), pieces.get(id));
+  assert.equal(piecesOwnedBy(pieces, owners, undefined).size, 0);
+});
+
+test('every fill and restore in journal sync uses only the page\'s own pieces', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../scripts/journal-sync.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /(applyReveals|restoreSecrets|carryReveals)\([^)]*this\._secretPieces/);
+  assert.equal((src.match(/this\._secretPieces\.set\(/g) || []).length, 1, 'pieces are stored only through _keepPieces');
+  assert.match(src, /_keepPieces\(entityId, pieces\) \{[\s\S]*?this\._secretOwners\.set\(id, entityId\)/);
 });
 
 test('a push of a revealed page sends the secret once, still secret', async () => {

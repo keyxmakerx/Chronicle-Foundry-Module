@@ -57,7 +57,8 @@ test('ActorSync applies through the plan, with the apply option', () => {
   assert.ok(apply.indexOf('_olderThanRecorded') < apply.indexOf('planActorApply'));
   assert.match(apply, /actor\.update\(changes, syncOptions\(\{ \[APPLY_OPTION\]: true \}\)\)/);
   // Echoes are recognised by the write's own option, never a shared flag.
-  assert.match(src, /async _handleUpdateActor[^{]*\{\n    if \(options\?\.\[APPLY_OPTION\]\) return;/);
+  // Only the player link guard, which a forged option must not skip, runs first.
+  assert.match(src, /async _handleUpdateActor[^{]*\{\n(    \/\/[^\n]*\n)+    if \(userId !== game\.user\.id && sendsChangeHere\(userId\) && touchesLinkFlags\([^\n]*\n[\s\S]*?\n    \}\n    if \(options\?\.\[APPLY_OPTION\]\) return;/);
   assert.match(src, /async _handleCreateActor[^{]*\{\n    if \(options\?\.\[APPLY_OPTION\]\) return;/);
   assert.doesNotMatch(src, /_syncing/);
 });

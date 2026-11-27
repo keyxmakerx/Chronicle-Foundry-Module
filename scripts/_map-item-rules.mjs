@@ -77,3 +77,31 @@ export function mapPageUuidOf(flags) {
   return typeof uuid === 'string' && /^JournalEntry\.[A-Za-z0-9]{16}\.JournalEntryPage\.[A-Za-z0-9]{16}$/.test(uuid)
     ? uuid : null;
 }
+
+/**
+ * Whether a map an actor carries may be shared with the actor's new owners.
+ * A player can put any flags on an item of a character they own, so the
+ * item alone proves nothing: the page must be a Chronicle map, and the
+ * map's journal, which only the GM can write, must list the actor as one
+ * the GM gave it to.
+ * @param {object} pageFlags the page's module flags
+ * @param {object} entryFlags the journal entry's module flags
+ * @param {string} actorId
+ * @returns {boolean}
+ */
+export function carriedMapShareable(pageFlags, entryFlags, actorId) {
+  if (!pageFlags?.mapId || !actorId) return false;
+  const given = entryFlags?.mapGivenTo;
+  return Array.isArray(given) && given.includes(actorId);
+}
+
+/**
+ * The journal's list of actors the GM gave its map to, with `actorId` added.
+ * @param {object} entryFlags the journal entry's module flags
+ * @param {string} actorId
+ * @returns {string[]}
+ */
+export function withMapGivenTo(entryFlags, actorId) {
+  const given = Array.isArray(entryFlags?.mapGivenTo) ? entryFlags.mapGivenTo.filter((id) => typeof id === 'string') : [];
+  return given.includes(actorId) ? given : [...given, actorId];
+}
