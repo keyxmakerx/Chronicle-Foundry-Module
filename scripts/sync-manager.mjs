@@ -290,6 +290,11 @@ export class SyncManager {
       }
     }
 
+    // Again now the modules' link guards are on: a link changed while the
+    // lookups above were in flight was seen by neither the first check nor a
+    // guard.
+    await this._checkLinks();
+
     // Listen for all WebSocket messages and route to modules.
     this.api.on('*', (msg) => this._routeMessage(msg));
 

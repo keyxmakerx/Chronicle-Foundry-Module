@@ -230,7 +230,7 @@ test('every GM client running sync checks, the active GM or not; a player\'s cli
   }
 });
 
-test('every GM client records; the check runs when sync starts, before any module hook, pull or socket message; the setting is world-scoped and hidden', async () => {
+test('every GM client records; the check runs when sync starts, before any module hook, pull or socket message, and again once the hooks are on; the setting is world-scoped and hidden', async () => {
   const { readFileSync } = await import('node:fs');
   const sm = readFileSync(new URL('../scripts/sync-manager.mjs', import.meta.url), 'utf8');
   const start = sm.slice(sm.indexOf('async _startOnce() {'), sm.indexOf('\n  }\n', sm.indexOf('async _startOnce() {')));
@@ -241,7 +241,11 @@ test('every GM client records; the check runs when sync starts, before any modul
   for (const later of ['mod.init(this.api)', "this.api.on('*'", 'this.api.connect()']) {
     assert.ok(start.indexOf(later) > check, `${later} comes after the check`);
   }
-  assert.equal((sm.match(/await this\._checkLinks\(\)/g) || []).length, 1, 'checked once per start');
+  // Checked again once the modules' guards are on, before any socket message.
+  const again = start.indexOf('await this._checkLinks();', check + 1);
+  assert.ok(again > start.indexOf('mod.init(this.api)'), 'checked again after the modules start');
+  assert.ok(again < start.indexOf("this.api.on('*'") && again < start.indexOf('this.api.connect()'), 'and before the socket');
+  assert.equal((sm.match(/await this\._checkLinks\(\)/g) || []).length, 2, 'twice per start, nowhere else');
   const settings = readFileSync(new URL('../scripts/settings.mjs', import.meta.url), 'utf8');
   assert.match(settings, /register\(MODULE_ID, 'linkRecord', \{\n    scope: 'world',\n    config: false,/);
 });

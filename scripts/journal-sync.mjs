@@ -196,8 +196,9 @@ export class JournalSync {
     /** Whether the full journal hooks are on (journals synced at init). */
     this._hooked = false;
     // The link guard alone, for while the full hooks are off.
-    this._onGuardCreate = (journal, _options, userId) => { if (!this._hooked) this._guardCreate(journal, userId); };
-    this._onGuardUpdate = (journal, change, _options, userId) => { if (!this._hooked) this._guardUpdate(journal, change, userId); };
+    const guardFailed = (err) => console.warn('Chronicle: could not undo a player\'s link change', err);
+    this._onGuardCreate = (journal, _options, userId) => { if (!this._hooked) this._guardCreate(journal, userId)?.catch(guardFailed); };
+    this._onGuardUpdate = (journal, change, _options, userId) => { if (!this._hooked) this._guardUpdate(journal, change, userId)?.catch(guardFailed); };
     this._onCreateJournal = this._handleCreateJournal.bind(this);
     this._onUpdateJournal = this._handleUpdateJournal.bind(this);
     this._onDeleteJournal = this._handleDeleteJournal.bind(this);

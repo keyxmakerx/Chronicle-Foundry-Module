@@ -276,6 +276,34 @@ test('a link a player changes while journals are not synced is undone, so switch
   assert.doesNotMatch(pageText(j) || '', /Not for this journal/);
 }));
 
+test('a link a player changes while sync is starting is undone before Foundry connects', () => scenario('relink-while-starting', async ({ seed, world }) => {
+  const mine = await chroniclePage(seed, 'Starting Journal');
+  const other = await chroniclePage(seed, 'Starting Someone Else');
+  await openWorld(world);
+  await JournalSync_resync(world);
+  const j = byEntity(world, mine.id);
+  assert.ok(j, 'linked');
+  await closeWorld(world);
+
+  // The relink lands as start's first Chronicle request leaves: after the
+  // first link check, before any module's guard is on.
+  let relinked = null;
+  traffic.onSend = () => {
+    relinked ??= world.asPlayer(() => j.update({ [`flags.${FLAG}.entityId`]: other.id }));
+  };
+  try {
+    await openWorld(world);
+  } finally {
+    traffic.onSend = null;
+  }
+  assert.ok(relinked, 'relinked while starting');
+  await relinked;
+  assert.equal(j.getFlag(FLAG, 'entityId'), undefined, 'undone');
+  await seed.chronicle.put(`/entities/${other.id}`, { entry: '<p>Not during start.</p>' });
+  await settle();
+  assert.doesNotMatch(pageText(j) || '', /Not during start/);
+}));
+
 test('a reopen reads only what changed (change feed), and its own pushes do not come back', () => scenario('feed-catchup', async ({ seed, world }) => {
   const pages = [];
   for (const n of ['North', 'South', 'East', 'West']) pages.push(await chroniclePage(seed, `${n} Gate`));
