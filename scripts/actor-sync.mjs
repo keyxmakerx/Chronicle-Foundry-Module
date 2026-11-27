@@ -1477,18 +1477,19 @@ export class ActorSync {
    * @private
    */
   async _handleCreateActor(actor, options, userId) {
+    // An actor a player makes never arrives linked: the link is theirs to
+    // write and would aim their later pushes at someone else's character.
+    // Checked before the apply skip, since their client can send that option.
+    const byOther = userId !== game.user.id;
+    if (byOther && sendsChangeHere(userId) && actor.getFlag(FLAG_SCOPE, 'entityId')) await this._unlinkCopy(actor);
     if (options?.[APPLY_OPTION]) return;
 
     // A copy (Duplicate, an import of an export) carries the original's link,
     // and its items the original's relations. Two actors on one character
     // would overwrite each other's pushes, so the copy starts unlinked.
     const linkedTo = actor.getFlag(FLAG_SCOPE, 'entityId');
-    if (linkedTo) {
-      if (!sendsChangeHere(userId)) return;
-      // An actor a player makes never arrives linked: the link is theirs to
-      // write and would aim their later pushes at someone else's character.
-      const byPlayer = userId !== game.user.id;
-      if (!byPlayer && !game.actors.find((a) => a.id !== actor.id && a.getFlag(FLAG_SCOPE, 'entityId') === linkedTo)) return;
+    if (linkedTo && !byOther) {
+      if (!game.actors.find((a) => a.id !== actor.id && a.getFlag(FLAG_SCOPE, 'entityId') === linkedTo)) return;
       await this._unlinkCopy(actor);
     }
     // A player's new character is theirs, so the active GM's client sends it.

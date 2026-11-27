@@ -18,7 +18,10 @@ import { walkChangeFeed, cursorFor, feedForArea, FEED_PAGE_SIZE, FEED_SETTLE_MS 
 import { getSetting, setSetting, isConfigured, getSyncDirections, getExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
 import { memberKey } from './_member-mapping.mjs';
 import { planMemberMatches } from './_member-match.mjs';
-import { FLAG_SCOPE } from './constants.mjs';
+import { FLAG_SCOPE, syncOptions } from './constants.mjs';
+import { flagRemoval } from './_flag-removal.mjs';
+import { LINK_FLAGS } from './_set-aside.mjs';
+import LinkRecord from './link-record.mjs';
 import { fetchChronicleVersion } from './_chronicle-version.mjs';
 import { connectionAction } from './_connection-change.mjs';
 import { pushGate, pullGate, parseHeld, holdChange, dropHeld } from './_held-changes.mjs';
@@ -123,6 +126,9 @@ export class SyncManager {
 
     /** @type {Array<object>} Registered sync modules. */
     this._modules = [];
+
+    /** Record of the links a GM's sync made, checked on each connect. */
+    this._linkRecord = new LinkRecord();
 
     /** @type {Array<object>|null} Foundry changes waiting for "Sync now"; read from the setting on first use. */
     this._held = null;
@@ -252,6 +258,9 @@ export class SyncManager {
       console.debug('Chronicle: Sync disabled in settings');
       return;
     }
+
+    // Record links from the first write on, so none this session goes unseen.
+    this._linkRecord.start();
 
     // Detect game system and match against Chronicle systems.
     await this._detectSystem();
@@ -734,6 +743,7 @@ export class SyncManager {
    */
   stop() {
     this.api.disconnect();
+    this._linkRecord.stop();
     for (const [name, fn] of this._playerHooks) Hooks.off(name, fn);
     this._playerHooks = [];
     if (this._playerTimer) { clearInterval(this._playerTimer); this._playerTimer = null; }
@@ -909,6 +919,28 @@ export class SyncManager {
   }
 
   /**
+   * Undo links made while no GM was online, before this connect's catch-up
+   * sends or applies anything through them (see link-record.mjs). A failure
+   * is logged, never a reason to skip the catch-up.
+   * @private
+   */
+  async _checkLinks() {
+    try {
+      await this._linkRecord.checkOnConnect(this.api, async (kind, doc) => {
+        if (kind === 'journals') {
+          await doc.update(flagRemoval(FLAG_SCOPE, ...LINK_FLAGS, 'pushedPermissions'), syncOptions());
+          return;
+        }
+        const actors = this._modules.find((m) => typeof m._unlinkCopy === 'function');
+        if (actors) await actors._unlinkCopy(doc);
+        else await doc.update(flagRemoval(FLAG_SCOPE, 'entityId', 'lastSync', 'chronicleUpdatedAt'), syncOptions());
+      });
+    } catch (err) {
+      console.warn('Chronicle: link check failed', err);
+    }
+  }
+
+  /**
    * Perform initial sync: pull all changes since last sync time.
    * @returns {Promise<boolean>} true when the whole pull was applied and the
    *   sync time saved; false when it failed or was cut short.
@@ -946,6 +978,7 @@ export class SyncManager {
 
   /** The body of `_performInitialSync`. @private */
   async _runInitialSync() {
+    await this._checkLinks();
     const lastSync = getSetting('lastSyncTime') || '1970-01-01T00:00:00Z';
     // While live sync is off, an automatic pass only serves the parts that
     // never wait. Nothing is read for the others and the cursor stays, so

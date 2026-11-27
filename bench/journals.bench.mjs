@@ -198,6 +198,35 @@ test('changes made while Foundry was closed arrive once on open, and a second op
   assert.deepEqual(writes(reqs).filter((r) => r.url.startsWith('/entities')).map((r) => `${r.method} ${r.url}`), [], 'second open wrote nothing in Chronicle');
 }));
 
+test('a journal link a player changes while no GM is online is undone on the next open, and nothing is sent through it', () => scenario('offline-relink', async ({ seed, world }) => {
+  const mine = await chroniclePage(seed, 'Player Journal');
+  const other = await chroniclePage(seed, 'Someone Else');
+  await openWorld(world);
+  await JournalSync_resync(world);
+  const j = byEntity(world, mine.id);
+  assert.ok(j, 'linked');
+  await closeWorld(world);
+
+  // With no GM online, the player who owns the journal changes its link and
+  // its text.
+  await world.asPlayer(() => j.update({ [`flags.${FLAG}.entityId`]: other.id }));
+  await world.asPlayer(() => j.pages.contents[0]?.update({ 'text.content': '<p>Not yours.</p>' }));
+
+  const reqs = await recordRequests(async () => {
+    await openWorld(world);
+  });
+  assert.equal(j.getFlag(FLAG, 'entityId'), undefined, 'link undone');
+  assert.deepEqual(writes(reqs).filter((r) => r.url.startsWith(`/entities/${other.id}`)).map((r) => `${r.method} ${r.url}`), [], 'nothing sent to the other page');
+  const remote = await seed.chronicle.get(`/entities/${other.id}`);
+  assert.doesNotMatch(remote.entry_html || remote.entry || '', /Not yours/);
+  await closeWorld(world);
+
+  // A second open finds nothing more to undo.
+  const before = world.log.writes.length;
+  await openWorld(world);
+  assert.deepEqual(world.log.writes.slice(before).filter((w) => JSON.stringify(w.change || {}).includes('entityId')).map((w) => `${w.op} ${w.type}`), [], 'no link changed on the second open');
+}));
+
 test('a reopen reads only what changed (change feed), and its own pushes do not come back', () => scenario('feed-catchup', async ({ seed, world }) => {
   const pages = [];
   for (const n of ['North', 'South', 'East', 'West']) pages.push(await chroniclePage(seed, `${n} Gate`));

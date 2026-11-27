@@ -140,3 +140,20 @@ test('a player who rewrites a journal\'s Chronicle link gets it unlinked, and no
   await make().js._handleUpdateJournal(g, { flags: { 'chronicle-sync': { entityId: 'e1' } } }, {}, 'gm');
   assert.equal(g.flags.entityId, 'e1', 'the GM\'s own link change stands');
 });
+
+test('a journal a player creates with a page or note link arrives unlinked, even with the sync option sent', async () => {
+  for (const flags of [{ entityId: 'someone-elses-page' }, { noteId: 'someone-elses-note', isNote: true }]) {
+    const j = makeJournal({ flags, pages: [page('<p>new</p>')] });
+    installJournals([j]);
+    const { js, puts } = make();
+    await js._handleCreateJournal(j, { chronicleSync: true }, 'player');
+    assert.equal(j.flags.entityId, undefined);
+    assert.equal(j.flags.noteId, undefined);
+    assert.deepEqual(puts, []);
+  }
+  // The GM's own linked journal (sync's create) keeps its link.
+  const g = makeJournal({ flags: { entityId: 'e1' }, pages: [page('<p>x</p>')] });
+  installJournals([g]);
+  await make().js._handleCreateJournal(g, { chronicleSync: true }, 'gm');
+  assert.equal(g.flags.entityId, 'e1');
+});
