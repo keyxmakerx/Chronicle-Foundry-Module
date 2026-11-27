@@ -82,6 +82,13 @@ const FRESHNESS_TESTS = {
   crafting: 'tools/test-craft-relay.mjs',
 };
 
+// True when the Chronicle comparison itself was skipped. Node 20 also
+// reports every test the name pattern filtered out as skipped, so the
+// total skip count can't tell.
+function comparisonSkipped(out) {
+  return /^\s*ok \d+ - [^\n]*needs CHRONICLE_DIR[^\n]*# SKIP/m.test(out);
+}
+
 // Runs only the Chronicle comparison of one freshness test. The parent
 // runner's context is dropped so the child reports on its own.
 function runFreshness(file, chronicleDir) {
@@ -107,7 +114,7 @@ test('with CHRONICLE_DIR set, a source Chronicle moved fails its freshness test 
       const moved = runFreshness(testFile, fake);
       assert.notEqual(moved.code, 0, `${testFile} fails when Chronicle has no ${source}`);
       assert.ok(moved.out.includes(source), `${testFile} names ${source}:\n${moved.out}`);
-      assert.match(moved.out, /# skipped 0/, `${testFile} does not skip`);
+      assert.ok(!comparisonSkipped(moved.out), `${testFile} does not skip:\n${moved.out}`);
     }
     // A whole folder gone (Chronicle moved the widgets) used to skip.
     const empty = mkdtempSync(join(tmpdir(), 'empty-chronicle-'));
@@ -116,7 +123,7 @@ test('with CHRONICLE_DIR set, a source Chronicle moved fails its freshness test 
         const gone = runFreshness(testFile, empty);
         assert.notEqual(gone.code, 0, `${testFile} fails against a Chronicle without the folder`);
         assert.match(gone.out, /Chronicle has no [\w/]+\.(?:js|css)/, `${testFile} names the missing path:\n${gone.out}`);
-        assert.match(gone.out, /# skipped 0/, `${testFile} does not skip`);
+        assert.ok(!comparisonSkipped(gone.out), `${testFile} does not skip:\n${gone.out}`);
       }
     } finally {
       rmSync(empty, { recursive: true, force: true });
