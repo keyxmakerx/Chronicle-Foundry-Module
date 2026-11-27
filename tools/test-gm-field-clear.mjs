@@ -106,3 +106,12 @@ test('holdsGmFieldText', () => {
   assert.equal(holdsGmFieldText({ system: {} }, FIELDS_NOW), false);
   assert.equal(holdsGmFieldText({ system: { biography: { director: SECRET } } }, []), false);
 });
+
+test('a field one page marks GM-only is not written for that page', async () => {
+  const adapter = await adapterFor(FIELDS_NOW);
+  const page = { ...ENTITY, field_overrides: { added: [{ key: 'backstory', gm_only: true }, { key: 'might' }] } };
+  const update = adapter.fromChronicleFields(page);
+  assert.equal(update['system.biography.value'], undefined);
+  assert.equal(update['system.characteristics.might.value'], 2);
+  assert.equal(adapter.fromChronicleFields(ENTITY)['system.biography.value'], 'Born under ash');
+});

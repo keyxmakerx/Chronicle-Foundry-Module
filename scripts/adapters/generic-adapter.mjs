@@ -145,8 +145,10 @@ export async function createGenericAdapter(api, chronicleSystemId) {
     fromChronicleFields(entity) {
       const f = entity.fields_data || {};
       const update = {};
+      const hiddenHere = pageGmOnlyKeys(entity);
 
       for (const field of writableFields) {
+        if (hiddenHere.has(field.key)) continue;
         const value = f[field.key];
         if (value == null) continue;
 
@@ -166,6 +168,19 @@ export async function createGenericAdapter(api, chronicleSystemId) {
       return update;
     },
   };
+}
+
+/**
+ * Keys this one page marks GM-only on a field added to it (Chronicle's
+ * `field_overrides.added`). Chronicle withholds such a value from players on
+ * that page, so sync never writes it onto the actor either.
+ * @param {object} entity
+ * @returns {Set<string>}
+ */
+export function pageGmOnlyKeys(entity) {
+  const added = entity?.field_overrides?.added;
+  if (!Array.isArray(added)) return new Set();
+  return new Set(added.filter((d) => d?.gm_only && typeof d.key === 'string').map((d) => d.key));
 }
 
 /**
