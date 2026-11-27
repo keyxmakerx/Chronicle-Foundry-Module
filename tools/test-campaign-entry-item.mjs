@@ -324,3 +324,34 @@ test('the hero\'s paths an effect changes are pushed as one pending change', () 
   assert.equal(effectPathsChange([{ x: { path: 'system.__proto__.x', type: 'add', format: 'number' } }]), null, 'a refused path is not touched');
   assert.equal(({}).x, undefined);
 });
+
+// A campaign's own career: the system adds its renown and wealth to the hero
+// when the item is made and takes the item's amount back when it goes.
+const CAREER_FIELDS = {
+  renown: { path: 'system.renown', format: 'number', once: true },
+  wealth: { path: 'system.wealth', format: 'number', once: true },
+  project_points: { path: 'system.projectPoints', format: 'number' },
+};
+const SMUGGLER = {
+  fieldKey: 'career', slug: 'smuggler', name: 'Smuggler', description: '<p>Quiet holds.</p>',
+  properties: { renown: '+1', wealth: 2, project_points: 120 },
+  updatedAt: '2026-11-27T12:00:00Z',
+};
+
+test('a made career carries its renown and wealth; a refresh leaves them as made', async () => {
+  const actor = fakeActor();
+  const step = { fieldKey: 'career', itemType: 'career', wantName: 'Smuggler', removeIds: [] };
+  await applyIdentityItem(actor, step, { items: [], packs: [] }, [SMUGGLER], CAREER_FIELDS);
+  const made = actor.log[0][1][0];
+  assert.deepEqual([made.system.renown, made.system.wealth, made.system.projectPoints], [1, 2, 120]);
+
+  const careerFields = identityFieldTypes([{ key: 'career', foundry_collection: 'items', foundry_item_type: ['career'], foundry_item_single: true }]);
+  const item = { id: 'c1', name: 'Smuggler', type: 'career', flags: { 'chronicle-sync': { chronicleMade: true, entryUpdatedAt: '2026-01-01T00:00:00Z', entryFormat: ENTRY_TEXT_FORMAT } } };
+  const edited = { ...SMUGGLER, properties: { renown: 3, wealth: 4, project_points: 240 } };
+  const [plan] = planEntryRefresh({
+    items: [item], fields: careerFields, fieldsData: { career: 'Smuggler' }, entriesByField: { career: [edited] }, entryFieldsByField: { career: CAREER_FIELDS },
+  });
+  assert.equal(plan.update['system.projectPoints'], 240, 'an ordinary value follows the entry');
+  assert.equal('system.renown' in plan.update, false, 'renown stays as the hero was given it');
+  assert.equal('system.wealth' in plan.update, false, 'wealth too');
+});
