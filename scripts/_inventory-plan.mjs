@@ -47,6 +47,35 @@ export function relationMeta(rel) {
 }
 
 /**
+ * Whether any player can see an actor, and so its items: a default or a
+ * per-user level of Limited or more for someone who is not a GM.
+ * @param {Record<string, number>|null|undefined} ownership
+ * @param {(userId: string) => boolean} isGM
+ * @param {number} [limited] - Foundry's LIMITED level
+ * @returns {boolean}
+ */
+export function seenByPlayers(ownership, isGM, limited = 1) {
+  return Object.entries(ownership || {}).some(([id, level]) => level >= limited && (id === 'default' || !isGM(id)));
+}
+
+/** A Has Item relation the Director marked Director-only. */
+function dmOnlyHasItem(r) {
+  return r?.relationType === HAS_ITEM && r.dmOnly === true;
+}
+
+/**
+ * The items still linked to a Director-only Has Item relation: made before
+ * those links were kept off heroes players see, so the GM is told of them.
+ * @param {object[]} relations
+ * @param {Array<{id: string, relationId: *}>} items
+ * @returns {string[]} item ids
+ */
+export function dmOnlyHeld(relations, items) {
+  const ids = new Set((relations || []).filter(dmOnlyHasItem).map((r) => String(r.id)));
+  return (items || []).filter((it) => it.relationId != null && ids.has(String(it.relationId))).map((it) => it.id);
+}
+
+/**
  * @param {object[]} relations  The character's relations (`GET /entities/:id/relations`).
  * @param {Array<{id: string, relationId: *, entityId: string|null, quantity?: number, equipped?: boolean, equippedPath?: string}>} items
  *   The actor's items as they stand; `equippedPath` is where an item keeps
@@ -57,9 +86,12 @@ export function relationMeta(rel) {
  *   one just unlinked), linked instead of copied. `update`: quantity or
  *   equipped differ. `unlink`: items whose relation is not on this character;
  *   their relation flag is cleared, the item kept.
+ * @param {{playerEyes?: boolean}} [opts] - `playerEyes` (the default): a
+ *   player can see this actor, so a Director-only link counts as absent.
  */
-export function planInventory(relations, items) {
-  const rels = (relations || []).filter((r) => r?.relationType === HAS_ITEM && r.id != null);
+export function planInventory(relations, items, { playerEyes = true } = {}) {
+  const rels = (relations || []).filter((r) => r?.relationType === HAS_ITEM && r.id != null
+    && !(playerEyes && dmOnlyHasItem(r)));
   const relIds = new Set(rels.map((r) => String(r.id)));
   const byRelation = new Map();
   const stale = [];

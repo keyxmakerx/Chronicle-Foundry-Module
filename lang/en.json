@@ -438,6 +438,7 @@
       "ReconnectingNow": "Chronicle: Reconnecting…"
     },
     "Notifications": {
+      "DmOnlyItemHeld": "Chronicle: {actor} still has {items}, linked as Director-only in Chronicle and added before such items were kept off characters players can see. Players who can see {actor} can read those names; remove them if they should not.",
       "ConflictKeptChronicle": "Conflict on \"{name}\" — kept Chronicle version.",
       "ConflictKeptFoundry": "Conflict on \"{name}\" — kept Foundry version.",
       "GmFieldTextLeft": "Chronicle: {names} still show notes on their sheet that their players can read. Chronicle keeps those notes GM-only, but this text is not the same as Chronicle's, so it was left alone. Open each one and clear anything secret.",

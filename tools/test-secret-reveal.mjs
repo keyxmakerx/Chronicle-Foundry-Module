@@ -71,10 +71,26 @@ test('a pull keeps the reveal', async () => {
   const { html, pieces } = await pulled();
   const id = [...pieces.keys()][0];
   const before = applyReveals(foundryReveal(html, id), pieces, DEFAULT_PLACEHOLDER_TEXT);
-  const kept = carryReveals(before, html);
+  const kept = carryReveals(before, html, pieces);
   assert.match(kept, /class="secret revealed"/);
   assert.ok(applyReveals(kept, pieces, DEFAULT_PLACEHOLDER_TEXT).includes('Lastwell is a dungeon break.'));
-  assert.equal(carryReveals(html, html), html);
+  assert.equal(carryReveals(html, html, pieces), html);
+});
+
+test('a revealed mark the GM\'s client never filled in is not carried, so a pull never reveals it', async () => {
+  const { html, pieces } = await pulled();
+  const id = [...pieces.keys()][0];
+  // What a player who owns the journal can save: the mark, the label still inside.
+  const playerMarked = foundryReveal(html, id);
+  const kept = carryReveals(playerMarked, html, pieces);
+  assert.equal(kept, html);
+  assert.equal(applyReveals(kept, pieces, DEFAULT_PLACEHOLDER_TEXT), null);
+  // Nor with text of their own inside, or with no content known.
+  const guessed = playerMarked.replace(DEFAULT_PLACEHOLDER_TEXT, 'my guess');
+  assert.equal(carryReveals(guessed, html, pieces), html);
+  const before = applyReveals(foundryReveal(html, id), pieces, DEFAULT_PLACEHOLDER_TEXT);
+  assert.equal(carryReveals(before, html, new Map()), html);
+  assert.equal(carryReveals(before, html), html);
 });
 
 test('a push of a revealed page sends the secret once, still secret', async () => {
