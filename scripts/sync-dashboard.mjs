@@ -1800,6 +1800,8 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       foundrySystem: statusData.foundrySystem,
       syncCharacters: statusData.syncCharacters,
       capability: capabilityData,
+      vendorMismatch: this._syncManager?.getVendorCheck?.()?.engines ?? [],
+      lang: game.i18n.lang,
       t,
     }).map((row) => (row.id === 'waiting' && this._healthWaitingOpen
       ? { ...row, expanded: true, waiting, sending: this._healthSending }
@@ -2559,6 +2561,7 @@ export class SyncDashboard extends HandlebarsApplicationMixin(ApplicationV2) {
       versions: {
         module: game.modules.get('chronicle-sync')?.version ?? null,
         chronicle: this._syncManager?.getChronicleVersion?.() ?? null,
+        vendored: this._syncManager?.getVendorCheck?.() ?? null,
         foundry: game.version ?? null,
         system: game.system?.title ?? null,
         systemId: game.system?.id ?? null,

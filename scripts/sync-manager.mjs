@@ -23,6 +23,7 @@ import { flagRemoval } from './_flag-removal.mjs';
 import { LINK_FLAGS } from './_set-aside.mjs';
 import LinkRecord from './link-record.mjs';
 import { fetchChronicleVersion } from './_chronicle-version.mjs';
+import { checkVendoredAssets } from './_vendor-check.mjs';
 import { connectionAction } from './_connection-change.mjs';
 import { pushGate, pullGate, parseHeld, holdChange, dropHeld } from './_held-changes.mjs';
 
@@ -151,6 +152,8 @@ export class SyncManager {
 
     /** @type {string|null} The connected Chronicle's version, read on connect. */
     this._chronicleVersion = null;
+    /** @type {{reported: boolean, engines: string[]}|null} */
+    this._vendorCheck = null;
 
     /** @type {boolean} Whether we've seen a disconnect since the last (re)sync. */
     this._sawDisconnect = false;
@@ -323,6 +326,15 @@ export class SyncManager {
   }
 
   /**
+   * Whether this module's copies of Chronicle's page code match the ones
+   * Chronicle serves, or null before it is known.
+   * @returns {{reported: boolean, engines: string[]}|null}
+   */
+  getVendorCheck() {
+    return this._vendorCheck;
+  }
+
+  /**
    * Handle a `sync.status` event from the API client and fire the one-time
    * initial sync on the first 'connected'.
    *
@@ -339,6 +351,7 @@ export class SyncManager {
     if (status === 'connected') {
       this._connectedAt ??= Date.now();
       fetchChronicleVersion(getSetting('apiUrl')).then((v) => { this._chronicleVersion = v; });
+      checkVendoredAssets(this.api).then((r) => { this._vendorCheck = r; });
     }
     if (status === 'connected' && !this._initialSyncDone) {
       // Latched only on success: a failed first sync is retried on the next

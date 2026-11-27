@@ -62,7 +62,7 @@ jobs:
           node-version: '22'
 
       # The vendored copies must be Chronicle's files unchanged; a Chronicle
-      # change to one fails here until the copy is refreshed.
+      # change to one fails here until tools/refresh-vendor.mjs copies it again.
       - name: Vendored Chronicle files match Chronicle ${{ steps.ref.outputs.ref }}
         env:
           CHRONICLE_DIR: chronicle
