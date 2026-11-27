@@ -210,6 +210,9 @@ function applyRig(js, { onPull } = {}) {
   js._placeJournal = async () => {};
   js._pullHtml = async (_id, html) => { await onPull?.(); return html; };
   js._journalPushDebouncer.has = () => false;
+  js._isHandledByActorSync = () => false;
+  js._isOwnCreateInFlight = () => false;
+  js._createJournalLocked = async () => {};
   js._olderThanRecorded = () => false;
 }
 const SECRET_PAGE = { id: 'B', name: 'Secret', entry_html: '<p>secret text</p>', updated_at: '2026-10-03T05:00:00Z' };

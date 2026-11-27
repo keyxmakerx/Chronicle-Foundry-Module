@@ -209,7 +209,7 @@ test('wiring: roll. is allowed, the relay is registered, and gated to the active
   assert.doesNotMatch(src, /_syncing/);
   assert.match(src, /ChatMessage\.create\(data, syncOptions\(\)\)/);
   // The hero's actor is found by the link flag and spoken through Foundry's own speaker.
-  assert.match(src, /getFlag\(FLAG_SCOPE, 'entityId'\) === id/);
+  assert.match(src, /findLinked\(game\.actors, id, FLAG_SCOPE\)/);
   assert.match(src, /ChatMessage\.getSpeaker\(\{ actor \}\)/);
   assert.match(src, /speaker: this\._heroSpeaker\(payload\)/);
   // The look is the shared "Sync with Chronicle" registration, read on the GM's client.

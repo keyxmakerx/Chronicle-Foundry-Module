@@ -9,6 +9,7 @@ import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
 import { touchesLinkFlags } from './_set-aside.mjs';
 import { noticeText } from './_escape-html.mjs';
 import { LINK_KINDS, linkOf, linkHash, readRecord, recordValue, unconfirmedLinks } from './_link-record.mjs';
+import { linkFence } from './_link-fence.mjs';
 
 /** The world setting that holds the record. */
 export const LINK_RECORD_SETTING = 'linkRecord';
@@ -48,7 +49,9 @@ export default class LinkRecord {
         if (!this._mine(userId) || !touchesLinkFlags(change, FLAG_SCOPE, keys)) return;
         const before = this._before.get(d.uuid) ?? null;
         this._before.delete(d.uuid);
-        this._note(kind, d.id, before, linkOf(d, FLAG_SCOPE, kind));
+        const after = linkOf(d, FLAG_SCOPE, kind);
+        if (after) linkFence.linkedByGM(d.id);
+        this._note(kind, d.id, before, after);
       });
       this._on(`create${doc}`, (d, _o, userId) => {
         if (this._mine(userId)) this._note(kind, d.id, null, linkOf(d, FLAG_SCOPE, kind));

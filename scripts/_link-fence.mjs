@@ -47,6 +47,15 @@ export default class LinkFence {
   }
 
   /**
+   * A GM's own client wrote a link to the document, so a failed unlink no
+   * longer stands for it.
+   * @param {string} id
+   */
+  linkedByGM(id) {
+    this._failed.delete(id);
+  }
+
+  /**
    * Whether a write for `entityId` may go to the document now: it is still
    * linked to that page, no unlink of it is in flight and none has failed.
    * @param {string} id - the document's id
@@ -57,4 +66,25 @@ export default class LinkFence {
   holds(id, linkedTo, entityId) {
     return !!entityId && linkedTo === entityId && !this._undoing.has(id) && !this._failed.has(id);
   }
+}
+
+/**
+ * The module's one fence. The guards fence through it and every lookup by
+ * link that sync writes through, or that decides what a player may do, reads
+ * it, so a document whose link is being undone is found by none of them.
+ */
+export const linkFence = new LinkFence();
+
+/**
+ * The document in `collection` linked to page `entityId`, or null. A fenced
+ * document is left out: it still names a page a player chose.
+ * @param {{find: Function}|null|undefined} collection - game.actors, game.journal
+ * @param {string} entityId
+ * @param {string} scope - the module's flag scope
+ * @returns {object|null}
+ */
+export function findLinked(collection, entityId, scope) {
+  if (!entityId) return null;
+  return collection?.find?.((d) => d.getFlag(scope, 'entityId') === entityId
+    && linkFence.holds(d.id, entityId, entityId)) ?? null;
 }

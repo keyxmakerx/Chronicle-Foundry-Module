@@ -53,7 +53,7 @@ import { folderKindFor, needsPlacing, FOLDER_PLACED_FLAG, ACTOR_FOLDER_FLAG, HER
 import { CLASS_PICK_FLAG, classPick, pickToFinish, pickChanged, SUBCLASS_PICK_FLAG, subclassPicks, subclassesToFinish, subclassPickChanged } from './_finish-hero.mjs';
 import { npcActorTypeFor, actorTypeForPage, switchTarget } from './_npc-character.mjs';
 import { ActorTypeSwitch, switchActorType } from './actor-type-switch.mjs';
-import LinkFence from './_link-fence.mjs';
+import { linkFence, findLinked } from './_link-fence.mjs';
 
 /** How long a read of the campaign's pick-list entries is reused. */
 const ENTRY_CACHE_MS = 30_000;
@@ -78,7 +78,7 @@ export class ActorSync {
     this._api = null;
 
     /** Actors whose player-set link is being undone (_link-fence.mjs). */
-    this._fence = new LinkFence();
+    this._fence = linkFence;
 
     /** @type {import('./sync-manager.mjs').SyncManager|null} */
     this._syncManager = null;
@@ -886,7 +886,7 @@ export class ActorSync {
 
   /** The actor linked to a Chronicle entity, or undefined. @private */
   _findLinkedActor(entityId) {
-    return game.actors.find((a) => a.getFlag(FLAG_SCOPE, 'entityId') === entityId);
+    return findLinked(game.actors, entityId, FLAG_SCOPE);
   }
 
   /** True when the actor has already applied this entity version. @private */

@@ -64,3 +64,36 @@ test('the actor apply asks the fence before its first write and between its step
   // Both actor guards fence the actor while they unlink it.
   assert.equal((src.match(/this\._fence\.undo\(actor\.id, \(\) => this\._unlinkCopy\(actor\)\)/g) || []).length, 2);
 });
+
+test('findLinked skips a fenced document, and a GM\'s own relink lifts a failed unlink', async () => {
+  const { linkFence, findLinked } = await import('../scripts/_link-fence.mjs');
+  const doc = (id, entityId) => ({ id, getFlag: (_s, k) => (k === 'entityId' ? entityId : undefined) });
+  const list = [doc('fenced-doc', 'e1'), doc('other', 'e1')];
+  assert.equal(findLinked(list, 'e1', 'chronicle-sync').id, 'fenced-doc');
+  let land;
+  const p = linkFence.undo('fenced-doc', () => new Promise((r) => { land = r; }));
+  assert.equal(findLinked(list, 'e1', 'chronicle-sync').id, 'other', 'the fenced one is passed over');
+  assert.equal(findLinked([list[0]], 'e1', 'chronicle-sync'), null);
+  assert.equal(findLinked(list, '', 'chronicle-sync'), null);
+  land();
+  await p;
+  await assert.rejects(linkFence.undo('fenced-doc', () => Promise.reject(new Error('refused'))));
+  assert.equal(findLinked([list[0]], 'e1', 'chronicle-sync'), null, 'still refused after a failed unlink');
+  linkFence.linkedByGM('fenced-doc');
+  assert.equal(findLinked([list[0]], 'e1', 'chronicle-sync').id, 'fenced-doc');
+});
+
+test('lookups by link that sync writes through, or that decide what a player may do, go through findLinked', async () => {
+  const { readFileSync } = await import('node:fs');
+  const read = (f) => readFileSync(new URL(`../scripts/${f}`, import.meta.url), 'utf8');
+  for (const f of ['item-sync.mjs', 'crafting-relay.mjs', 'roll-relay.mjs', 'stash-sync.mjs']) {
+    assert.doesNotMatch(read(f), /\.find\(\s*\(\w\) => \w\.getFlag\(FLAG_SCOPE, 'entityId'\) ===/, f);
+    assert.match(read(f), /findLinked\(game\.actors,/, f);
+  }
+  assert.match(read('journal-sync.mjs'), /_findJournal\(entityId\) \{\n\s*return findLinked\(game\.journal, entityId, FLAG_SCOPE\);/);
+  assert.match(read('actor-sync.mjs'), /_findLinkedActor\(entityId\) \{\n\s*return findLinked\(game\.actors, entityId, FLAG_SCOPE\);/);
+  // One fence: the guards and the lookups share it.
+  assert.match(read('journal-sync.mjs'), /this\._fence = linkFence;/);
+  assert.match(read('actor-sync.mjs'), /this\._fence = linkFence;/);
+  assert.match(read('link-record.mjs'), /if \(after\) linkFence\.linkedByGM\(d\.id\);/);
+});

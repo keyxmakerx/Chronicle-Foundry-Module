@@ -22,6 +22,7 @@
 import { flagRemoval } from './_flag-removal.mjs';
 import { getSetting, getUserMappings } from './settings.mjs';
 import { FLAG_SCOPE, APPLY_OPTION } from './constants.mjs';
+import { findLinked } from './_link-fence.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { collapseChanges } from './_change-feed.mjs';
 import { HAS_ITEM, EQUIPPED_FLAG, planInventory, itemDataFor, hasItemBody, seenByPlayers, dmOnlyHeld } from './_inventory-plan.mjs';
@@ -45,7 +46,7 @@ function equippedOf(item) {
 /** The actor linked to a Chronicle character, or null. */
 function linkedActor(entityId) {
   if (!entityId) return null;
-  return game.actors.find((a) => a.getFlag(FLAG_SCOPE, 'entityId') === entityId) || null;
+  return findLinked(game.actors, entityId, FLAG_SCOPE);
 }
 
 /**
