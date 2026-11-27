@@ -299,6 +299,13 @@ test('refresh: an edited ancestry rewrites only the effect sync made', async () 
   assert.equal(item.log[0][3].chronicleSyncApply, true, 'marked as sync\'s own write');
 });
 
+test('refresh: an entry edit that moves no number leaves the effect alone', () => {
+  const changes = entryEffectChanges(DRYAD, ANCESTRY_EFFECTS).map((c) => ({ ...c, value: String(c.value) }));
+  const own = { id: 'e1', name: 'Dryad', system: { changes }, flags: { 'chronicle-sync': { chronicleMade: true, [ENTRY_EFFECT_FLAG]: true } } };
+  assert.equal(refreshDryad(madeAncestry([own]), { ...DRYAD, summary: 'A new summary.' })[0]?.effect, undefined);
+  assert.ok(refreshDryad(madeAncestry([own]), { ...DRYAD, properties: { ...DRYAD.properties, speed: 9 } })[0].effect.update, 'a moved number still rewrites');
+});
+
 test('refresh: an item made before effects gains one; numbers taken out take it off', async () => {
   const bare = madeAncestry([]);
   const plan = refreshDryad(bare);

@@ -345,5 +345,16 @@ function refreshEffect(item, entry, changes) {
   const had = madeEffect(item);
   if (!had) return changes.length ? { effect: { create: entryEffectData(entry, changes) } } : {};
   if (!changes.length) return { effect: { remove: had.id ?? had._id } };
-  return { effect: { update: { _id: had.id ?? had._id, name: entryEffectData(entry, changes).name, 'system.changes': changes } } };
+  const name = entryEffectData(entry, changes).name;
+  // An entry edit that moves no number (its summary) rewrites nothing, so the
+  // hero isn't pushed back to Chronicle for it.
+  if (had.name === name && sameChanges(had.system?.changes, changes)) return {};
+  return { effect: { update: { _id: had.id ?? had._id, name, 'system.changes': changes } } };
+}
+
+/** Whether an effect's stored changes are these, ignoring how Foundry stores values. */
+function sameChanges(stored, changes) {
+  const list = Array.isArray(stored) ? stored : [];
+  const flat = (c) => [c?.key, c?.type, String(c?.value ?? ''), c?.phase ?? 'initial', c?.priority ?? null].join('\u0000');
+  return list.length === changes.length && list.every((c, i) => flat(c) === flat(changes[i]));
 }
