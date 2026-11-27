@@ -55,7 +55,8 @@ export const DEFAULT_STRINGS = {
   TriedMany: 'tried {count} times',
   VendorTitleOne: 'This module’s {engines} doesn’t match your Chronicle',
   VendorTitleMany: 'This module’s {engines} don’t match your Chronicle',
-  VendorDetail: 'Each side has a different release of it, so it may not behave as it does in Chronicle. Update the Chronicle Sync module to its newest release; if it already is, update Chronicle instead.',
+  VendorDetailOne: 'Each side has a different release of it, so it may not behave as it does in Chronicle. Update the Chronicle Sync module to its newest release; if it already is, update Chronicle instead.',
+  VendorDetailMany: 'Each side has a different release of them, so they may not behave as they do in Chronicle. Update the Chronicle Sync module to its newest release; if it already is, update Chronicle instead.',
   VendorEngine_cutscenes: 'cut scene player',
   VendorEngine_shop: 'shop room',
   VendorEngine_sky: 'Sky Clock',
@@ -197,7 +198,7 @@ function vendorRow(p, tr) {
   return {
     id: 'vendor', level: 'warn',
     title: tr(engines.length === 1 ? 'VendorTitleOne' : 'VendorTitleMany', { engines: list }),
-    detail: tr('VendorDetail'),
+    detail: tr(engines.length === 1 ? 'VendorDetailOne' : 'VendorDetailMany'),
   };
 }
 
