@@ -438,6 +438,7 @@
       "ReconnectingNow": "Chronicle: Reconnecting…"
     },
     "Notifications": {
+      "LinksUndoneOnConnect": "Chronicle: {count} link(s) to Chronicle pages were not made by a GM's sync, so they were undone: {names}. Link them again from the Chronicle Sync dashboard if they should sync.",
       "PlayerLinkUndone": "Chronicle: a player changed which Chronicle page \"{name}\" is linked to. Only sync may change that, so \"{name}\" was unlinked. Link it again from the Chronicle Sync dashboard if it should sync.",
       "DmOnlyItemHeld": "Chronicle: {actor} still has {items}, linked as Director-only in Chronicle and added before such items were kept off characters players can see. Players who can see {actor} can read those names; remove them if they should not.",
       "ConflictKeptChronicle": "Conflict on \"{name}\" — kept Chronicle version.",
@@ -638,6 +639,14 @@
         "WaitOther": "A change",
         "TriedOne": "tried 1 time",
         "TriedMany": "tried {count} times",
+        "VendorTitleOne": "This module’s {engines} doesn’t match your Chronicle",
+        "VendorTitleMany": "This module’s {engines} don’t match your Chronicle",
+        "VendorDetailOne": "Each side has a different release of it, so it may not behave as it does in Chronicle. Update the Chronicle Sync module to its newest release; if it already is, update Chronicle instead.",
+        "VendorDetailMany": "Each side has a different release of them, so they may not behave as they do in Chronicle. Update the Chronicle Sync module to its newest release; if it already is, update Chronicle instead.",
+        "VendorEngine_cutscenes": "cut scene player",
+        "VendorEngine_shop": "shop room",
+        "VendorEngine_sky": "Sky Clock",
+        "VendorEngine_crafting": "crafting",
         "SendThemNow": "Send them now",
         "CopyReport": "Copy a report for help",
         "CopyReportHint": "Versions, connection, recent errors. No keys.",

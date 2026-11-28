@@ -198,6 +198,112 @@ test('changes made while Foundry was closed arrive once on open, and a second op
   assert.deepEqual(writes(reqs).filter((r) => r.url.startsWith('/entities')).map((r) => `${r.method} ${r.url}`), [], 'second open wrote nothing in Chronicle');
 }));
 
+test('a journal link a player changes while no GM is online is undone on the next open, and nothing is sent through it', () => scenario('offline-relink', async ({ seed, world }) => {
+  const mine = await chroniclePage(seed, 'Player Journal');
+  const other = await chroniclePage(seed, 'Someone Else');
+  await openWorld(world);
+  await JournalSync_resync(world);
+  const j = byEntity(world, mine.id);
+  assert.ok(j, 'linked');
+  await closeWorld(world);
+
+  // With no GM online, the player who owns the journal changes its link and
+  // its text.
+  await world.asPlayer(() => j.update({ [`flags.${FLAG}.entityId`]: other.id }));
+  await world.asPlayer(() => j.pages.contents[0]?.update({ 'text.content': '<p>Not yours.</p>' }));
+
+  const reqs = await recordRequests(async () => {
+    await openWorld(world);
+  });
+  assert.equal(j.getFlag(FLAG, 'entityId'), undefined, 'link undone');
+  assert.deepEqual(writes(reqs).filter((r) => r.url.startsWith(`/entities/${other.id}`)).map((r) => `${r.method} ${r.url}`), [], 'nothing sent to the other page');
+  const remote = await seed.chronicle.get(`/entities/${other.id}`);
+  assert.doesNotMatch(remote.entry_html || remote.entry || '', /Not yours/);
+  await closeWorld(world);
+
+  // A second open finds nothing more to undo.
+  const before = world.log.writes.length;
+  await openWorld(world);
+  assert.deepEqual(world.log.writes.slice(before).filter((w) => JSON.stringify(w.change || {}).includes('entityId')).map((w) => `${w.op} ${w.type}`), [], 'no link changed on the second open');
+}));
+
+test('a GM that is not the active GM, but runs sync, undoes a player\'s link change live and on open', () => scenario('relink-other-gm', async ({ seed, world }) => {
+  const one = await chroniclePage(seed, 'Player Journal One');
+  const two = await chroniclePage(seed, 'Player Journal Two');
+  const other = await chroniclePage(seed, 'Someone Else Again');
+  await openWorld(world);
+  await JournalSync_resync(world);
+  const j1 = byEntity(world, one.id);
+  const j2 = byEntity(world, two.id);
+  assert.ok(j1 && j2, 'linked');
+  // The active GM is another GM whose client is not running sync.
+  const users = world.game.users;
+  const self = users.activeGM;
+  users.activeGM = { id: 'benchOtherGM0001', name: 'Other GM', isGM: true };
+  try {
+    await world.asPlayer(() => j1.update({ [`flags.${FLAG}.entityId`]: other.id }));
+    await settle();
+    assert.equal(j1.getFlag(FLAG, 'entityId'), undefined, 'live change undone here');
+    await closeWorld(world);
+    await world.asPlayer(() => j2.update({ [`flags.${FLAG}.entityId`]: other.id }));
+    const reqs = await recordRequests(async () => { await openWorld(world); });
+    assert.equal(j2.getFlag(FLAG, 'entityId'), undefined, 'offline change undone on open');
+    assert.deepEqual(writes(reqs).filter((r) => r.url.startsWith(`/entities/${other.id}`)).map((r) => `${r.method} ${r.url}`), [], 'nothing sent to the other page');
+  } finally {
+    users.activeGM = self;
+  }
+}));
+
+test('a link a player changes while journals are not synced is undone, so switching them on pulls nothing through it', () => scenario('relink-journals-off', async ({ seed, world }) => {
+  const mine = await chroniclePage(seed, 'Quiet Journal');
+  const other = await chroniclePage(seed, 'Quiet Someone Else');
+  await openWorld(world);
+  await JournalSync_resync(world);
+  const j = byEntity(world, mine.id);
+  assert.ok(j, 'linked');
+  await closeWorld(world);
+
+  world.settingsValues.syncJournals = false;
+  await openWorld(world);
+  await world.asPlayer(() => j.update({ [`flags.${FLAG}.entityId`]: other.id }));
+  await settle();
+  assert.equal(j.getFlag(FLAG, 'entityId'), undefined, 'undone with journals off');
+
+  // Journals switched on without a restart: an edit of the other page lands nowhere here.
+  world.settingsValues.syncJournals = true;
+  await seed.chronicle.put(`/entities/${other.id}`, { entry: '<p>Not for this journal.</p>' });
+  await settle();
+  assert.doesNotMatch(pageText(j) || '', /Not for this journal/);
+}));
+
+test('a link a player changes while sync is starting is undone before Foundry connects', () => scenario('relink-while-starting', async ({ seed, world }) => {
+  const mine = await chroniclePage(seed, 'Starting Journal');
+  const other = await chroniclePage(seed, 'Starting Someone Else');
+  await openWorld(world);
+  await JournalSync_resync(world);
+  const j = byEntity(world, mine.id);
+  assert.ok(j, 'linked');
+  await closeWorld(world);
+
+  // The relink lands as start's first Chronicle request leaves: after the
+  // first link check, before any module's guard is on.
+  let relinked = null;
+  traffic.onSend = () => {
+    relinked ??= world.asPlayer(() => j.update({ [`flags.${FLAG}.entityId`]: other.id }));
+  };
+  try {
+    await openWorld(world);
+  } finally {
+    traffic.onSend = null;
+  }
+  assert.ok(relinked, 'relinked while starting');
+  await relinked;
+  assert.equal(j.getFlag(FLAG, 'entityId'), undefined, 'undone');
+  await seed.chronicle.put(`/entities/${other.id}`, { entry: '<p>Not during start.</p>' });
+  await settle();
+  assert.doesNotMatch(pageText(j) || '', /Not during start/);
+}));
+
 test('a reopen reads only what changed (change feed), and its own pushes do not come back', () => scenario('feed-catchup', async ({ seed, world }) => {
   const pages = [];
   for (const n of ['North', 'South', 'East', 'West']) pages.push(await chroniclePage(seed, `${n} Gate`));

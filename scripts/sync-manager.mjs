@@ -18,8 +18,12 @@ import { walkChangeFeed, cursorFor, feedForArea, FEED_PAGE_SIZE, FEED_SETTLE_MS 
 import { getSetting, setSetting, isConfigured, getSyncDirections, getExcludedTags, getUserMappings, setUserMappings } from './settings.mjs';
 import { memberKey } from './_member-mapping.mjs';
 import { planMemberMatches } from './_member-match.mjs';
-import { FLAG_SCOPE } from './constants.mjs';
+import { FLAG_SCOPE, syncOptions } from './constants.mjs';
+import { flagRemoval } from './_flag-removal.mjs';
+import { LINK_FLAGS } from './_set-aside.mjs';
+import LinkRecord from './link-record.mjs';
 import { fetchChronicleVersion } from './_chronicle-version.mjs';
+import { checkVendoredAssets } from './_vendor-check.mjs';
 import { connectionAction } from './_connection-change.mjs';
 import { pushGate, pullGate, parseHeld, holdChange, dropHeld } from './_held-changes.mjs';
 
@@ -124,6 +128,9 @@ export class SyncManager {
     /** @type {Array<object>} Registered sync modules. */
     this._modules = [];
 
+    /** Record of the links a GM's sync made, checked on each connect. */
+    this._linkRecord = new LinkRecord();
+
     /** @type {Array<object>|null} Foundry changes waiting for "Sync now"; read from the setting on first use. */
     this._held = null;
     /** @type {Promise<void>} Saves of the waiting list, one after another. */
@@ -145,6 +152,8 @@ export class SyncManager {
 
     /** @type {string|null} The connected Chronicle's version, read on connect. */
     this._chronicleVersion = null;
+    /** @type {{reported: boolean, engines: string[]}|null} */
+    this._vendorCheck = null;
 
     /** @type {boolean} Whether we've seen a disconnect since the last (re)sync. */
     this._sawDisconnect = false;
@@ -242,6 +251,10 @@ export class SyncManager {
       return;
     }
 
+    // Every GM client records its own link writes, sync running or not: a
+    // link a GM removes by hand must leave the record too.
+    this._linkRecord.start();
+
     if (!isConfigured()) {
       console.warn('Chronicle: Module not configured. Set URL, API key, and campaign ID in settings.');
       ui.notifications.warn('Chronicle Sync is not set up yet. Open Chronicle settings to connect.');
@@ -252,6 +265,10 @@ export class SyncManager {
       console.debug('Chronicle: Sync disabled in settings');
       return;
     }
+
+    // Undo any link no GM made before a module's hooks, a pull or a socket
+    // message can use it.
+    await this._checkLinks();
 
     // Detect game system and match against Chronicle systems.
     await this._detectSystem();
@@ -275,6 +292,11 @@ export class SyncManager {
         }
       }
     }
+
+    // Again now the modules' link guards are on: a link changed while the
+    // lookups above were in flight was seen by neither the first check nor a
+    // guard.
+    await this._checkLinks();
 
     // Listen for all WebSocket messages and route to modules.
     this.api.on('*', (msg) => this._routeMessage(msg));
@@ -304,6 +326,15 @@ export class SyncManager {
   }
 
   /**
+   * Whether this module's copies of Chronicle's page code match the ones
+   * Chronicle serves, or null before it is known.
+   * @returns {{reported: boolean, engines: string[]}|null}
+   */
+  getVendorCheck() {
+    return this._vendorCheck;
+  }
+
+  /**
    * Handle a `sync.status` event from the API client and fire the one-time
    * initial sync on the first 'connected'.
    *
@@ -320,6 +351,7 @@ export class SyncManager {
     if (status === 'connected') {
       this._connectedAt ??= Date.now();
       fetchChronicleVersion(getSetting('apiUrl')).then((v) => { this._chronicleVersion = v; });
+      checkVendoredAssets(this.api).then((r) => { this._vendorCheck = r; });
     }
     if (status === 'connected' && !this._initialSyncDone) {
       // Latched only on success: a failed first sync is retried on the next
@@ -734,6 +766,7 @@ export class SyncManager {
    */
   stop() {
     this.api.disconnect();
+    this._linkRecord.stop();
     for (const [name, fn] of this._playerHooks) Hooks.off(name, fn);
     this._playerHooks = [];
     if (this._playerTimer) { clearInterval(this._playerTimer); this._playerTimer = null; }
@@ -905,6 +938,27 @@ export class SyncManager {
     } catch (err) {
       console.debug('Chronicle: change feed unavailable; areas will rescan', err?.status ?? err);
       return null;
+    }
+  }
+
+  /**
+   * Undo links no GM's sync made (see link-record.mjs). A failure is logged,
+   * never a reason not to start.
+   * @private
+   */
+  async _checkLinks() {
+    try {
+      await this._linkRecord.checkLinks(async (kind, doc) => {
+        if (kind === 'journals') {
+          await doc.update(flagRemoval(FLAG_SCOPE, ...LINK_FLAGS, 'pushedPermissions'), syncOptions());
+          return;
+        }
+        const actors = this._modules.find((m) => typeof m._unlinkCopy === 'function');
+        if (actors) await actors._unlinkCopy(doc);
+        else await doc.update(flagRemoval(FLAG_SCOPE, 'entityId', 'lastSync', 'chronicleUpdatedAt'), syncOptions());
+      });
+    } catch (err) {
+      console.warn('Chronicle: link check failed', err);
     }
   }
 
