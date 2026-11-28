@@ -74,6 +74,28 @@ test('a scene keeps only its own keys, with harmless defaults for missing layers
   assert.equal(cleanScene([]), null);
 });
 
+test('moments are kept without the Director\'s note, and a scene without them gets no moments key', () => {
+  const s = cleanScene({ name: 'x', moments: [{ at: 3, ask: 'Why?', ways: [{ kind: 'write' }], note: 'secret' }, 'junk', null] });
+  assert.deepEqual(s.moments, [{ at: 3, ask: 'Why?', ways: [{ kind: 'write' }] }]);
+  assert.ok(!JSON.stringify(s).includes('secret'));
+  assert.equal('moments' in cleanScene({ name: 'x' }), false);
+  assert.equal('moments' in cleanScene({ name: 'x', moments: [] }), false);
+  // A preview plays the moments too, with the GM's own Continue.
+  assert.deepEqual(parseFoundryPreview({ previewId: 'pv-2', director: 'm9', scene: { moments: [{ at: 1, ask: 'Q', note: 'n' }] } }).scene.moments, [{ at: 1, ask: 'Q' }]);
+});
+
+test('the preview, and only the preview, offers a moment\'s Continue; every moment word is translated', () => {
+  const src = readFileSync(new URL('../scripts/cutscenes.mjs', import.meta.url), 'utf8');
+  assert.match(src, /failed: t\('PreviewFailed'\),[\s\S]{0,120}canContinue: true/);
+  assert.equal((src.match(/canContinue: true/g) || []).length, 1);
+  assert.match(src, /canContinue = false/);
+  const lang = JSON.parse(readFileSync(new URL('../lang/en.json', import.meta.url), 'utf8'));
+  for (const k of ['MomentTurn', 'MomentContinue', 'MomentWrite', 'MomentWriteHint', 'MomentDirector', 'MomentDirectorHint']) {
+    assert.ok(lang.CHRONICLE.Cutscenes[k], k);
+    assert.ok(src.includes(`t('${k}')`), k);
+  }
+});
+
 test('viewers reach the Foundry users matched to them who are playing now', () => {
   const mappings = { m1: 'u1', m2: 'u2', m3: 'u3', m4: 'gone' };
   const users = [{ id: 'u1', active: true }, { id: 'u2', active: false }, { id: 'u3', active: true }];
