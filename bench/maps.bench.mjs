@@ -32,6 +32,18 @@ test('a marker added while Foundry was closed is on the map page after open, and
   assert.deepEqual(mapReads(again, map.id).map((r) => r.url), [], 'nothing changed, so no map items read');
 }, { settings: ON }));
 
+test('a new map opens to players as Observer, and a map the GM hides stays hidden after a resync', () => scenario('chr-maps-players', async ({ seed, world }) => {
+  const map = await seed.createMap('Old Quarter');
+  await openWorld(world, MODULES);
+  const entry = () => mapPage(world, map.id)?.parent;
+  assert.equal(entry()?.ownership?.default, 2, 'players can read the map, as in Chronicle, but not own it');
+
+  await entry().update({ 'ownership.default': 0 });
+  await closeWorld(world);
+  await openWorld(world, MODULES);
+  assert.equal(entry()?.ownership?.default, 0, 'the GM\'s choice to hide it is kept');
+}, { settings: ON }));
+
 test('a token dragged in Chronicle moves on the stored map, and an open map is not polled', () => scenario('chr-maps-live', async ({ seed, world }) => {
   const map = await seed.createMap('Crossroads');
   const token = await seed.chronicle.post(`/maps/${map.id}/tokens`, { name: 'Wagon', x: 10, y: 10, width: 1, height: 1 });

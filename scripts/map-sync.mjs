@@ -36,6 +36,8 @@ import {
   shadowSignature,
 } from './_map-player-image.mjs';
 import { PictureStore } from './picture-store.mjs';
+import { configuredDefaultOwnership } from './_ownership.mjs';
+import { MAP_ACCESS_FLAG, mapPlayerLevel, mapAccessUpdate } from './_map-access.mjs';
 import { PICTURE_DIR_NAME } from './_inline-pictures.mjs';
 import { mapsToRefresh } from './_map-feed.mjs';
 import {
@@ -1151,6 +1153,8 @@ export class MapSync {
     }
 
     let page = this.findPageByMapId(mapData.id);
+    const levels = globalThis.CONST?.DOCUMENT_OWNERSHIP_LEVELS || { NONE: 0, LIMITED: 1, OBSERVER: 2, OWNER: 3 };
+    const playerLevel = mapPlayerLevel(configuredDefaultOwnership(), levels);
 
     // A map with a shadow: the page gets only the stored player copy, and
     // the original stays in GM memory. The copy failing to arrive leaves the
@@ -1166,7 +1170,10 @@ export class MapSync {
       imageSrc = mapData.player_image_url ? await this._storePlayerImage(mapData, page) : '';
     } else {
       this._gmImages.delete(mapData.id);
-      if (imageSrc && mapData.image_id && this._playersCanSee(page)) {
+      // A new journal opens to players as it is made, so its picture is
+      // copied before.
+      const playersWillSee = page ? this._playersCanSee(page) : playerLevel >= levels.LIMITED;
+      if (imageSrc && mapData.image_id && playersWillSee) {
         imageSrc = (await this._storeMapImage(mapData.image_id, page)) || imageSrc;
       }
     }
@@ -1198,6 +1205,8 @@ export class MapSync {
       const entry = await JournalEntry.create({
         name: mapData.name || 'Untitled Map',
         folder: folder.id,
+        ownership: { default: playerLevel },
+        flags: { [FLAG_SCOPE]: { [MAP_ACCESS_FLAG]: true } },
         pages: [{
           name: mapData.name || 'Untitled Map',
           type: 'image',
@@ -1262,6 +1271,12 @@ export class MapSync {
           !entry.name.endsWith('(archived)')) {
         await entry.update({ name: mapData.name });
       }
+      // A journal made before players had access gets it once; the
+      // ownership change copies the picture (`_onOwnershipChange`).
+      const access = entry && mapAccessUpdate(
+        entry.ownership, entry.getFlag?.(FLAG_SCOPE, MAP_ACCESS_FLAG) === true, playerLevel, FLAG_SCOPE,
+      );
+      if (access) await entry.update(access);
     }
 
     return page;
