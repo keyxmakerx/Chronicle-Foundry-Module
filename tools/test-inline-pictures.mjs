@@ -226,12 +226,15 @@ test('store: signed links for the GM screen are reused for a while', async () =>
   assert.equal(await w.store.signedLink('../x'), '');
 });
 
-test('store: a players link only when Chronicle says every player could open the file', async () => {
+test('store: a players link only when Chronicle says, each time, every player could open the file', async () => {
   const q = `${B}?audience=players`;
   const yes = fakeWorld({ meta: { [q]: { url: `/media/${B}?expires=9&sig=p`, audience: 'players' } } });
   assert.equal(await yes.store.playersLink(B), `${API}/media/${B}?expires=9&sig=p`);
-  await yes.store.playersLink(B);
-  assert.deepEqual(yes.calls.get, [`/media/${q}`], 'asked for the players audience, and reused');
+  // Asked again every time, so a picture hidden from players since is never resent.
+  yes.calls.get.length = 0;
+  yes.store._api = { get: async (path) => { yes.calls.get.push(path); return null; } };
+  assert.equal(await yes.store.playersLink(B), '', 'a later no is honoured at once');
+  assert.deepEqual(yes.calls.get, [`/media/${q}`], 'asked for the players audience again');
 
   // An older Chronicle ignores the question and answers without the echo.
   const old = fakeWorld({ meta: { [q]: { url: `/media/${B}?expires=9&sig=k` } } });
