@@ -117,11 +117,11 @@ test("shared faces serve every set; a set's own faces win type by type", () => {
     faces: { d6: faces('d6', 6), d20: faces('d20', 20), d13: [] },
     sets: [{ id: 'cage', faces: { d6: own } }, { id: 'oak' }],
   });
-  assert.deepEqual(r.problems, [{ code: 'FaceType', detail: 'd13' }]);
+  assert.deepEqual(r.problems, [{ code: 'SharedFaceType', detail: 'd13' }]);
   assert.deepEqual(r.sets[0].faces.d6, own);
   assert.deepEqual(r.sets[0].faces.d20, faces('d20', 20));
   assert.deepEqual(r.sets[1].faces, { d6: faces('d6', 6), d20: faces('d20', 20) });
-  assert.equal(readManifest({ version: 1, faces: { d8: faces('d8', 7) }, sets: [{ id: 'plain' }] }).problems[0].code, 'FaceList');
+  assert.equal(readManifest({ version: 1, faces: { d8: faces('d8', 7) }, sets: [{ id: 'oak' }] }).problems[0].code, 'SharedFaceList');
 });
 
 test("face pictures take each colour's ink; colour-only sets keep plain labels", () => {

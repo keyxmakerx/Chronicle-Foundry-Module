@@ -1720,7 +1720,9 @@
           "SetMaterial": "the set {set} names a material Dice So Nice doesn't have ({detail}).",
           "FaceType": "the set {set} has faces for an unknown die ({detail}).",
           "FaceList": "the set {set} has the wrong number of faces, or a face outside the dice folder, for its {detail}.",
-          "ModelPath": "the set {set} has a 3D model outside the dice folder for its {detail}."
+          "ModelPath": "the set {set} has a 3D model outside the dice folder for its {detail}.",
+          "SharedFaceType": "the faces every set shares list an unknown die ({detail}).",
+          "SharedFaceList": "the faces every set shares have the wrong number of faces, or a face outside the dice folder, for the {detail}."
         },
         "NoSets": "No rune dice sets are shipped in this version yet.",
         "SetsListed": "{count} rune dice sets listed.",

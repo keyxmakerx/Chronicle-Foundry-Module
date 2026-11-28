@@ -79,15 +79,16 @@ export function safeAssetPath(p, ext) {
  */
 function readFaces(block, problems, set) {
   const faces = {};
-  const where = set ? { set } : {};
+  // The shared block's problems have their own codes, since no set is to blame.
+  const flag = (code, detail) => problems.push(set ? { code, set, detail } : { code: `Shared${code}`, detail });
   for (const [type, list] of Object.entries(block && typeof block === 'object' ? block : {})) {
     if (!DIE_TYPES.includes(type)) {
-      problems.push({ code: 'FaceType', ...where, detail: type });
+      flag('FaceType', type);
       continue;
     }
     const paths = Array.isArray(list) ? list.map((p) => safeAssetPath(p, LABEL_EXT)) : [];
     if (paths.length !== FACES[type] || paths.some((p) => !p)) {
-      problems.push({ code: 'FaceList', ...where, detail: type });
+      flag('FaceList', type);
       continue;
     }
     faces[type] = paths;
