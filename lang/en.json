@@ -646,6 +646,7 @@
         "VendorEngine_shop": "shop room",
         "VendorEngine_sky": "Sky Clock",
         "VendorEngine_crafting": "crafting",
+        "VendorEngine_dice": "dice mat",
         "SendThemNow": "Send them now",
         "CopyReport": "Copy a report for help",
         "CopyReportHint": "Versions, connection, recent errors. No keys.",
@@ -1103,7 +1104,8 @@
       "Dashboard": "Open Chronicle Sync",
       "DMScreen": "Open the GM Screen",
       "Satchel": "Open my Satchel",
-      "Calendar": "Open the Chronicle calendar"
+      "Calendar": "Open the Chronicle calendar",
+      "DiceMat": "Open the dice mat"
     },
     "Satchel": {
       "Title": "Satchel",
@@ -1617,6 +1619,27 @@
     },
     "Rolls": {
       "FallbackName": "Someone at the table"
+    },
+    "DiceMat": {
+      "Title": "Dice mat",
+      "LoadFailed": "The dice mat could not start.",
+      "Level": {
+        "Name": "Dice mat detail",
+        "Hint": "How much of the mat is drawn. Foundry draws flat dice at every level.",
+        "simple": "Simple",
+        "flat": "Flat paper",
+        "detailed": "Detailed"
+      },
+      "Finish": {
+        "Name": "Dice mat finish",
+        "Hint": "Detailed only: paper, or the Foundry window colours.",
+        "paper": "Paper",
+        "kit": "Window colours"
+      },
+      "Others": {
+        "Name": "Show other people's dice on the mat",
+        "Hint": "Turn off to see only your own rolls on the mat."
+      }
     },
     "DiceTray": {
       "Open": "Roll dice",

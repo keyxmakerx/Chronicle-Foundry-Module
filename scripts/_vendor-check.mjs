@@ -9,7 +9,7 @@
 import { VENDOR_MANIFEST } from './_vendor-manifest.mjs';
 
 /** The engines in the order the Health pane names them. */
-export const ENGINES = ['cutscenes', 'shop', 'sky', 'crafting'];
+export const ENGINES = ['cutscenes', 'shop', 'sky', 'crafting', 'dice'];
 
 export const VENDOR_ASSETS_PATH = '/vendored-assets';
 

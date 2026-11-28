@@ -61,6 +61,7 @@ export const DEFAULT_STRINGS = {
   VendorEngine_shop: 'shop room',
   VendorEngine_sky: 'Sky Clock',
   VendorEngine_crafting: 'crafting',
+  VendorEngine_dice: 'dice mat',
 };
 
 const defaultT = (key, data = {}) => {
