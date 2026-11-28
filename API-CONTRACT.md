@@ -1054,9 +1054,9 @@ picker is hidden and a marker keeps its icon.
 Re-verify by: 2026-12-01 (Chronicle `internal/plugins/syncapi/map_api_look.go`, keyxmakerx/Chronicle#1017)
 
 #### GET /maps/:mapId/holders
-The Players a map is given to: those who own a character carrying its handout
-on a line the Director made, by Chronicle's own rule (the same people who may
-see the map there). Owner or co-DM key only; others get **403**.
+The Players a map is given to: those who own a character holding a line a
+Director's give recorded for that map, by Chronicle's own rule (the same
+people who may see the map there). The handout page's fields play no part. Owner or co-DM key only; others get **403**.
 
 **Used by:** `item-sync.mjs` `_carryMaps` → a carried handout opens the map's
 journal only when every player who owns the actor is linked to a member on

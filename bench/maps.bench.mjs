@@ -82,7 +82,7 @@ test('the world\'s scenes reach Chronicle on open and again after a rename, with
   assert.deepEqual(sceneReports(quiet), [], 'an unchanged list is not sent again');
 }));
 
-test('a map given from Foundry goes through Chronicle: the carried item opens the journal for the hero\'s player, and taking it back in Chronicle takes the journal back; an editable handout page opens nothing', () => scenario('fvtt-maps-give-handout', async ({ seed, world }) => {
+test('a map given from Foundry goes through Chronicle: the carried item opens the journal for the hero\'s player, and taking it back in Chronicle takes the journal back; a line added by hand opens nothing', () => scenario('fvtt-maps-give-handout', async ({ seed, world }) => {
   const PLAYER = 'benchPlayer00001';
   const MAPS_AND_ITEMS = { modules: ['journals', 'actors', 'items', 'maps'] };
   await seed.enableAddon('armory');
@@ -134,8 +134,9 @@ test('a map given from Foundry goes through Chronicle: the carried item opens th
   assert.deepEqual(entry.getFlag(FLAG, 'mapHandoutRaised'), []);
   assert.equal(await playerMap(), 404, 'and Chronicle hides the map again');
 
-  // A handout page someone below the Director may edit could name any map, so
-  // a line to it opens nothing, in Chronicle or in Foundry.
+  // Only a give shows a map. A line to the handout added by hand (here even
+  // by the Owner's key, on a page Scribes may now edit) opens nothing, in
+  // Chronicle or in Foundry.
   await seed.chronicle.put(`/entities/${line.targetEntityId}/permissions`, { visibility: 'custom', permissions: [
     { subject_type: 'role', subject_id: '2', permission: 'edit' },
     { subject_type: 'user', subject_id: player.userId, permission: 'view' },
@@ -146,6 +147,6 @@ test('a map given from Foundry goes through Chronicle: the carried item opens th
   const againId = again?.id ?? again?.data?.id;
   await waitFor(() => actor.items.find((i) => i.getFlag(FLAG, 'relationId') === againId), 10000, 'the line reached the sheet');
   await new Promise((r) => setTimeout(r, 1500));
-  assert.equal(entry.ownership?.[PLAYER], undefined, 'an editable handout page opens no journal');
+  assert.equal(entry.ownership?.[PLAYER], undefined, 'a line added by hand opens no journal');
   assert.equal(await playerMap(), 404, 'nor the map in Chronicle');
 }, { settings: { syncMaps: true, syncCharacters: true } }));
