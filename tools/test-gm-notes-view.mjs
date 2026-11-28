@@ -80,7 +80,7 @@ test('notes that carry form parts lose every one before joining the sheet', () =
     el.removeAttribute = (name) => el.left.delete(name);
     return el;
   };
-  const div = attrs(['class', 'data-edit', 'name', 'form', 'contenteditable', 'onclick']);
+  const div = attrs(['class', 'data-edit', 'name', 'form', 'contenteditable', 'onclick', 'is']);
   const img = attrs(['src', 'alt', 'data-edit']);
   const link = attrs(['href', 'title', 'data-action', 'data-uuid', 'ONMOUSEOVER']);
   const gone = [];

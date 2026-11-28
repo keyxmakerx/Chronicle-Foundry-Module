@@ -15,12 +15,14 @@ import { readPath } from './_actor-apply-plan.mjs';
 export const FORM_PARTS = 'input, select, textarea, button, form, option, output, fieldset, prose-mirror';
 
 /** Attributes left on no element of the notes: a name, form or
- * contenteditable would put it in the form, and Foundry reads data-* ones
+ * contenteditable would put it in the form, an is makes a custom element of
+ * it, and Foundry reads data-* ones
  * (data-edit is saved with the form as that field, data-action runs a sheet
  * action). */
 function droppedAttribute(name) {
   const n = String(name).toLowerCase();
-  return n.startsWith('data-') || n.startsWith('on') || n === 'name' || n === 'form' || n === 'contenteditable';
+  return n.startsWith('data-') || n.startsWith('on') || n === 'name' || n === 'form' || n === 'contenteditable'
+    || n === 'is';
 }
 
 /**
