@@ -24,8 +24,8 @@ function webSession() {
   return {
     cookie,
     csrf,
-    async get(path) {
-      const res = await fetch(CHRONICLE_URL + path, { headers: { cookie: cookie() }, redirect: 'manual' });
+    async get(path, headers = {}) {
+      const res = await fetch(CHRONICLE_URL + path, { headers: { ...headers, cookie: cookie() }, redirect: 'manual' });
       store(res);
       return res;
     },
@@ -277,7 +277,7 @@ export async function seedCampaign(label = 'bench') {
     const members = await apiClient(campaignId, otherKey).get('/members');
     const member = (Array.isArray(members) ? members : members.data).find((m) => m.display_name === displayName);
     if (!member) throw new Error('the invited player is not a member');
-    return { userId: String(member.user_id ?? member.id), displayName };
+    return { userId: String(member.user_id ?? member.id), displayName, web: player };
   };
   // The owner's bell, newest first, as the topbar reads it.
   const ownerNotifications = async () => {

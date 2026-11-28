@@ -147,7 +147,7 @@ function list(rows, now) {
     watch.setAttribute('aria-label', t('WatchAgainNamed', { name: s.name || t('Untitled') }));
     watch.addEventListener('click', () => {
       // The window may have closed while the list was open.
-      if (s.rewatchUntil > Date.now()) playShowing(s);
+      if (s.rewatchUntil > Date.now()) playShowing(s, { answering: true });
     });
     li.append(text, watch);
     ul.append(li);
