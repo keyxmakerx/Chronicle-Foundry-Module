@@ -21,6 +21,7 @@ const MANIFEST = join(ROOT, 'scripts', '_vendor-manifest.mjs');
 
 const WIDGETS = 'static/js/widgets/';
 const CRAFTING = 'internal/plugins/crafting/static/';
+const ROLLS = 'internal/plugins/rolls/static/js/';
 
 /** Every vendored file: its engine and its path in Chronicle. Adding a copy starts here. */
 export const SOURCES = [
@@ -33,6 +34,7 @@ export const SOURCES = [
     'sky_shaders.js', 'sky_world.js'].map((f) => ['sky', WIDGETS + f]),
   ...['crafting_lib.js', 'crafting_tray.js', 'crafting_block.js'].map((f) => ['crafting', `${CRAFTING}js/${f}`]),
   ...['crafting.css', 'spoils.css'].map((f) => ['crafting', `${CRAFTING}css/${f}`]),
+  ...['dice_tray_art.js', 'dice_tray_core.js'].map((f) => ['dice', ROLLS + f]),
 ];
 
 /** First 12 hex characters of the bytes' sha256; Chronicle reports the same. */

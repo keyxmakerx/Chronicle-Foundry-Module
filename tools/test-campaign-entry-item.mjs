@@ -50,11 +50,18 @@ test('names match case-insensitively', () => {
   assert.equal(findEntry(undefined, 'Fairy'), null);
 });
 
-test('GM-only text is left off the item, and its numbers still go on', () => {
+test('a GM-only part is left off the item, and the rest, its numbers included, still goes on', () => {
   const secret = { ...FAIRY, description: '<p>ok</p><span data-secret="true">twist</span>', properties: { stamina_bonus: '6' } };
   const held = entryItemFill(secret, { entryFields: { stamina_bonus: { path: 'system.bonuses.stamina', format: 'number' } } });
-  assert.equal(held.system.description.value, '', 'no text at all, not even the part before the secret');
+  assert.equal(held.system.description.value, '<p>Small and winged.</p><ul><li><strong>Stamina bonus:</strong> 6</li></ul>', 'the summary stands in for the held text');
   assert.equal(held.system.bonuses.stamina, 6);
+  const trait = { ...FAIRY, properties: { ...FAIRY.properties, purchased_traits: [{ name: 'Glow', description: '<span data-secret>twist</span>' }, { name: 'Tiny', cost: 2 }] } };
+  const partial = entryItemFill(trait).system.description.value;
+  assert.ok(partial.includes('Born of the') && partial.includes('<strong>Glow</strong></li>') && partial.includes('Tiny'), 'only the secret trait text is left out');
+  assert.ok(!partial.includes('twist'));
+  assert.equal(entryTextHeld(trait), true);
+  const all = entryItemFill({ ...secret, summary: '<span data-secret>twist</span>', properties: { note: '<span data-secret>twist</span>' } });
+  assert.equal(all.system.description.value, '', 'nothing safe is left');
   assert.ok(!JSON.stringify(held).includes('twist'));
   assert.equal(entryTextHeld(secret), true);
   assert.equal(entryTextHeld(FAIRY), false);
@@ -139,13 +146,13 @@ test('refresh: nothing to do when current, not sync-made, renamed or missing', (
   }
 });
 
-test('refresh: an entry whose text gains GM-only content clears the text and says so', () => {
+test('refresh: an entry whose text gains GM-only content leaves that part out and says so', () => {
   const plan = planEntryRefresh({
     items: [made({ chronicleMade: true })], fields: FIELDS, fieldsData: { ancestry: 'Fairy' },
     entriesByField: { ancestry: [{ ...FAIRY, description: '<p>ok</p><span data-secret>twist</span>' }] },
   });
   assert.equal(plan.length, 1);
-  assert.equal(plan[0].update['system.description.value'], '');
+  assert.ok(plan[0].update['system.description.value'].startsWith('<p>Small and winged.</p>'));
   assert.equal(plan[0].textHeld, true);
   assert.equal(plan[0].name, 'Fairy');
   assert.ok(!JSON.stringify(plan).includes('twist'));
@@ -349,4 +356,35 @@ test('the hero\'s paths an effect changes are pushed as one pending change', () 
   assert.equal(effectPathsChange([undefined, {}]), null, 'nothing mapped, nothing pushed');
   assert.equal(effectPathsChange([{ x: { path: 'system.__proto__.x', type: 'add', format: 'number' } }]), null, 'a refused path is not touched');
   assert.equal(({}).x, undefined);
+});
+
+// A campaign's own career: the system adds its renown and wealth to the hero
+// when the item is made and takes the item's amount back when it goes.
+const CAREER_FIELDS = {
+  renown: { path: 'system.renown', format: 'number', once: true },
+  wealth: { path: 'system.wealth', format: 'number', once: true },
+  project_points: { path: 'system.projectPoints', format: 'number' },
+};
+const SMUGGLER = {
+  fieldKey: 'career', slug: 'smuggler', name: 'Smuggler', description: '<p>Quiet holds.</p>',
+  properties: { renown: '+1', wealth: 2, project_points: 120 },
+  updatedAt: '2026-11-27T12:00:00Z',
+};
+
+test('a made career carries its renown and wealth; a refresh leaves them as made', async () => {
+  const actor = fakeActor();
+  const step = { fieldKey: 'career', itemType: 'career', wantName: 'Smuggler', removeIds: [] };
+  await applyIdentityItem(actor, step, { items: [], packs: [] }, [SMUGGLER], CAREER_FIELDS);
+  const made = actor.log[0][1][0];
+  assert.deepEqual([made.system.renown, made.system.wealth, made.system.projectPoints], [1, 2, 120]);
+
+  const careerFields = identityFieldTypes([{ key: 'career', foundry_collection: 'items', foundry_item_type: ['career'], foundry_item_single: true }]);
+  const item = { id: 'c1', name: 'Smuggler', type: 'career', flags: { 'chronicle-sync': { chronicleMade: true, entryUpdatedAt: '2026-01-01T00:00:00Z', entryFormat: ENTRY_TEXT_FORMAT } } };
+  const edited = { ...SMUGGLER, properties: { renown: 3, wealth: 4, project_points: 240 } };
+  const [plan] = planEntryRefresh({
+    items: [item], fields: careerFields, fieldsData: { career: 'Smuggler' }, entriesByField: { career: [edited] }, entryFieldsByField: { career: CAREER_FIELDS },
+  });
+  assert.equal(plan.update['system.projectPoints'], 240, 'an ordinary value follows the entry');
+  assert.equal('system.renown' in plan.update, false, 'renown stays as the hero was given it');
+  assert.equal('system.wealth' in plan.update, false, 'wealth too');
 });

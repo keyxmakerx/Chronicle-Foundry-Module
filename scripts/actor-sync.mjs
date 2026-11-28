@@ -53,6 +53,7 @@ import { folderKindFor, needsPlacing, FOLDER_PLACED_FLAG, ACTOR_FOLDER_FLAG, HER
 import { CLASS_PICK_FLAG, classPick, pickToFinish, pickChanged, SUBCLASS_PICK_FLAG, subclassPicks, subclassesToFinish, subclassPickChanged } from './_finish-hero.mjs';
 import { npcActorTypeFor, actorTypeForPage, switchTarget } from './_npc-character.mjs';
 import { ActorTypeSwitch, switchActorType } from './actor-type-switch.mjs';
+import { linkFence, findLinked } from './_link-fence.mjs';
 
 /** How long a read of the campaign's pick-list entries is reused. */
 const ENTRY_CACHE_MS = 30_000;
@@ -75,6 +76,9 @@ export class ActorSync {
   constructor() {
     /** @type {import('./api-client.mjs').ChronicleAPI|null} */
     this._api = null;
+
+    /** Actors whose player-set link is being undone (_link-fence.mjs). */
+    this._fence = linkFence;
 
     /** @type {import('./sync-manager.mjs').SyncManager|null} */
     this._syncManager = null;
@@ -882,7 +886,7 @@ export class ActorSync {
 
   /** The actor linked to a Chronicle entity, or undefined. @private */
   _findLinkedActor(entityId) {
-    return game.actors.find((a) => a.getFlag(FLAG_SCOPE, 'entityId') === entityId);
+    return findLinked(game.actors, entityId, FLAG_SCOPE);
   }
 
   /** True when the actor has already applied this entity version. @private */
@@ -1309,9 +1313,12 @@ export class ActorSync {
         damageTypes: keys(dsConfig.damageTypes),
         conditions: Array.isArray(globalThis.CONFIG?.statusEffects) ? CONFIG.statusEffects.map((e) => e.id) : null,
         types: keys(dsConfig.abilities?.types),
+        itemTypes: Array.isArray(game.documentTypes?.Item) ? game.documentTypes.Item : null,
       };
       const items = actor.items?.contents ?? Array.from(actor.items ?? []);
-      const { create, remove } = planEntryAbilities({ items, fields, entriesByField, known });
+      const entryItemsByField = Object.fromEntries((this._adapter?.identityFields ?? []).map((d) => [d.key, d.foundry_entry_items]));
+      const identityTypes = identityFieldTypes(this._adapter?.identityFields ?? []).map((f) => f.itemType);
+      const { create, remove } = planEntryAbilities({ items, fields, entriesByField, known, entryItemsByField, identityTypes });
       const options = syncOptions({ [APPLY_OPTION]: true });
       if (remove.length) await actor.deleteEmbeddedDocuments('Item', remove, options);
       if (create.length) await actor.createEmbeddedDocuments('Item', create, options);
@@ -1453,15 +1460,23 @@ export class ActorSync {
       const sendingPictures = this._sendingPictures.has(actor.id)
         || [this._pendingChanges, this._pushingChanges].some((m) => m.get(actor.id)?.[PICTURES_CHANGED]);
       if (!sendingPictures) Object.assign(changes, await this._picturePlan(entity, actor));
+      // Asked again before each step below: a player's link change can land
+      // during any await (_link-fence.mjs).
+      const holds = () => this._fence.holds(actor.id, actor.getFlag(FLAG_SCOPE, 'entityId'), entity.id);
+      if (!holds()) return true;
       if (Object.keys(changes).length > 0) {
         await actor.update(changes, syncOptions({ [APPLY_OPTION]: true }));
       }
 
       if (!npc) {
+        if (!holds()) return true;
         await this._applyIdentityItems(actor, entity);
+        if (!holds()) return true;
         await this._recordClassPick(actor, entity);
+        if (!holds()) return true;
         await this._replanLayers(actor, entity);
       }
+      if (!holds()) return true;
 
       // Sync visibility: Chronicle is_private → Foundry actor hidden.
       // A private entity means the NPC is hidden from players.
@@ -1585,7 +1600,7 @@ export class ActorSync {
     // An actor a player makes never arrives linked: the link is theirs to
     // write and would aim their later pushes at someone else's character.
     // Checked before the apply skip, since their client can send that option.
-    if (undoesLinkChangeHere(userId) && actor.getFlag(FLAG_SCOPE, 'entityId')) await this._unlinkCopy(actor);
+    if (undoesLinkChangeHere(userId) && actor.getFlag(FLAG_SCOPE, 'entityId')) await this._fence.undo(actor.id, () => this._unlinkCopy(actor));
     if (options?.[APPLY_OPTION]) return;
 
     // A copy (Duplicate, an import of an export) carries the original's link,
@@ -1719,7 +1734,7 @@ export class ActorSync {
     // link, so a player's change to it unlinks the actor (as a copy is).
     // Checked before the sync-write option, which a player's client can send.
     if (undoesLinkChangeHere(userId) && touchesLinkFlags(change, FLAG_SCOPE, ['entityId'])) {
-      await this._unlinkCopy(actor);
+      await this._fence.undo(actor.id, () => this._unlinkCopy(actor));
       const notice = game.i18n.format('CHRONICLE.Notifications.PlayerLinkUndone', { name: noticeText(actor.name) });
       ui.notifications?.warn?.(notice, { permanent: true });
       return;
@@ -1825,7 +1840,9 @@ export class ActorSync {
    */
   _pushEffectPaths(actor, fieldKeys, entryEffectsByField) {
     const change = effectPathsChange([...new Set(fieldKeys)].map((k) => entryEffectsByField?.[k]));
-    if (change) this._handleUpdateActor(actor, change, {}, game.user?.id);
+    if (!change) return;
+    this._handleUpdateActor(actor, change, {}, game.user?.id)
+      .catch((err) => console.error(`Chronicle: could not push "${actor.name}"'s numbers to Chronicle`, err));
   }
 
   /**
@@ -1857,6 +1874,7 @@ export class ActorSync {
    */
   async _pushHidden(actor, entityId, isHidden) {
     try {
+      if (!this._aimsAt(actor, entityId)) return;
       await this._api.post(`/entities/${entityId}/reveal`, { is_private: isHidden });
       console.debug(`Chronicle: ${isHidden ? 'Hid' : 'Revealed'} page for actor "${actor.name}" (Foundry → Chronicle)`);
     } catch (err) {
@@ -1909,7 +1927,7 @@ export class ActorSync {
       const acting = actingMemberOf(players, (id) => memberOf(getUserMappings(), id));
       let wrote = false;
       if (fields && Object.keys(fields).length > 0) {
-        const answer = await this._putFieldsMerged(entityId, fields, acting);
+        const answer = await this._putFieldsMerged(entityId, fields, acting, actor);
         this._tellHeld(actor, heldKeysOf(answer));
         wrote = true;
       }
@@ -1960,9 +1978,10 @@ export class ActorSync {
             continue;
           }
           const acting = actingUserId ? { actingUserId } : {};
+          if (!this._aimsAt(actor, entityId)) return wrote;
           if (role === 'img') await this._api.put(`/entities/${entityId}/image`, { image_path: id, ...acting });
           else {
-            const answer = await this._putFieldsMerged(entityId, { [TOKEN_FIELD]: id }, actingUserId);
+            const answer = await this._putFieldsMerged(entityId, { [TOKEN_FIELD]: id }, actingUserId, actor);
             // A token Chronicle held back is not sent; the next change tries again.
             if (heldKeysOf(answer).some((h) => h.key === TOKEN_FIELD)) continue;
           }
@@ -2021,6 +2040,17 @@ export class ActorSync {
   }
 
   /**
+   * Whether a push from this actor may go to page `entityId` now: it is still
+   * linked there and its link is not being undone. Asked right before each
+   * send, since a player's link change can land during any await before it
+   * (_link-fence.mjs).
+   * @private
+   */
+  _aimsAt(actor, entityId) {
+    return this._fence.holds(actor.id, actor.getFlag(FLAG_SCOPE, 'entityId'), entityId);
+  }
+
+  /**
    * Write some fields without losing the rest. Older Chronicle servers
    * replace the whole field set on this PUT, so the current set is read and
    * the changes laid over it; newer ones merge, and sending the merged set
@@ -2029,11 +2059,14 @@ export class ActorSync {
    * @param {string} entityId
    * @param {object} fields
    * @param {string|null} [actingUserId] - Chronicle member a player's change is for.
+   * @param {Actor|null} [actor] - the actor the fields come from; nothing is
+   *   sent unless it is still linked to `entityId` and not fenced.
    * @returns {Promise<any>} Chronicle's answer, which names any `held` keys.
    * @private
    */
-  async _putFieldsMerged(entityId, fields, actingUserId = null) {
+  async _putFieldsMerged(entityId, fields, actingUserId = null, actor = null) {
     const current = (await this._api.get(`/entities/${entityId}`))?.fields_data;
+    if (actor && !this._aimsAt(actor, entityId)) return null;
     const merged = current && typeof current === 'object' && !Array.isArray(current)
       ? { ...current, ...fields }
       : fields;
@@ -2077,6 +2110,7 @@ export class ActorSync {
     }
 
     try {
+      if (!this._aimsAt(actor, entityId)) return false;
       const result = await this._api.put(`/entities/${entityId}`, nameBody);
       if (result?.updated_at) {
         await this._setActorFlag(actor, 'chronicleUpdatedAt', result.updated_at);
@@ -2101,6 +2135,7 @@ export class ActorSync {
       }
       // Force push.
       delete nameBody.expected_updated_at;
+      if (!this._aimsAt(actor, entityId)) return false;
       const forced = await this._api.put(`/entities/${entityId}`, nameBody);
       if (forced?.updated_at) {
         await this._setActorFlag(actor, 'chronicleUpdatedAt', forced.updated_at);
@@ -2597,7 +2632,7 @@ export class ActorSync {
       await this._setActorFlag(actor, 'lastSync', new Date().toISOString());
       return true;
     }
-    await this._putFieldsMerged(entityId, this._withoutLayered(actor, this._adapter.toChronicleFields(actor)));
+    await this._putFieldsMerged(entityId, this._withoutLayered(actor, this._adapter.toChronicleFields(actor)), null, actor);
     if (await this._pushPictures(actor, entityId)) await this._refreshChronicleVersion(actor, entityId);
     await this._setActorFlag(actor, 'lastSync', new Date().toISOString());
     console.debug(`Chronicle: Re-pushed actor "${actor.name}" → entity ${entityId}`);

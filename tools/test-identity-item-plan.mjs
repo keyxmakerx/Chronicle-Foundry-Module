@@ -200,7 +200,7 @@ test('a made item whose entry text holds GM-only content is reported, with its n
     fakeWorld(), { ancestry: [entry] }, {}, { ancestry: effects });
   assert.deepEqual(res, { done: ['ancestry'], failed: [], held: ['Reedfolk'] });
   const made = actor.log[0][1][0];
-  assert.equal(made.system.description.value, '');
+  assert.equal(made.system.description.value, '<ul><li><strong>Stability:</strong> 1</li></ul>', 'the held text is left out, the safe details stay');
   assert.equal(made.effects[0].system.changes[0].key, 'system.combat.stability');
   assert.ok(!JSON.stringify(made).includes('twist'));
 });

@@ -54,6 +54,7 @@ import { registerMotion } from './motion.mjs';
 import { registerDiceLookSetting, registerDiceSoNice } from './dice-so-nice.mjs';
 import { diceLookSync } from './dice-look-sync.mjs';
 import { registerDiceTray, registerDiceTraySetting } from './dice-tray.mjs';
+import { openDiceMat, registerDiceMatSettings, registerDiceMatSocket } from './dice-mat.mjs';
 import { questLive, registerQuestBoard } from './quest-board.mjs';
 import { CutsceneRelay, registerCutscenes } from './cutscenes.mjs';
 import { retireNotesFolder } from './_notes-folder.mjs';
@@ -109,6 +110,7 @@ Hooks.once('init', () => {
   registerSettings();
   registerHoverArtSettings();
   registerDiceTraySetting();
+  registerDiceMatSettings();
   registerMotion();
   try {
     // Every client, not only the GM: each one registers the rune dice with
@@ -231,6 +233,7 @@ Hooks.once('ready', async () => {
   // Players open a shop room when the GM shows one (they have no API key);
   // the active GM answers their buying requests.
   registerShopRoomSocket();
+  registerDiceMatSocket();
   // A shop's journal entry gets an "Open shop" button for anyone who can see it.
   registerShopJournalButton((id, name, opts) => shopWidget.openShop(id, name, opts));
   registerPlayerAsksChat();
@@ -455,7 +458,7 @@ async function _runtimeValidateDescriptor() {
 
 /**
  * Add the Chronicle group to Foundry's scene controls toolbar: the Sync
- * Dashboard and DM Screen for GMs, the Satchel and Calendar for everyone
+ * Dashboard and DM Screen for GMs, the Satchel, Calendar and Dice mat for everyone
  * once the world is connected to Chronicle.
  */
 Hooks.on('getSceneControlButtons', (controls) => {
@@ -470,6 +473,7 @@ Hooks.on('getSceneControlButtons', (controls) => {
       dmScreen: () => { openDMScreen(() => syncManager?.api ?? null); },
       satchel: () => { openSatchel(); },
       calendar: () => { openCalendarWindow(); },
+      diceMat: () => { openDiceMat(); },
       link: () => { openLinkWindow(); },
     },
     titles: {
@@ -477,6 +481,7 @@ Hooks.on('getSceneControlButtons', (controls) => {
       dmScreen: game.i18n.localize('CHRONICLE.SceneControl.DMScreen'),
       satchel: game.i18n.localize('CHRONICLE.SceneControl.Satchel'),
       calendar: game.i18n.localize('CHRONICLE.SceneControl.Calendar'),
+      diceMat: game.i18n.localize('CHRONICLE.SceneControl.DiceMat'),
       link: game.i18n.localize('CHRONICLE.PlayerLink.Tool'),
     },
   });

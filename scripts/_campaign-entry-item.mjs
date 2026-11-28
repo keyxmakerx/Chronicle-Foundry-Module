@@ -4,8 +4,9 @@
  * changes in Chronicle. PURE: no Foundry globals.
  *
  * Entries come from `GET /system-entries`, which only ever returns the player
- * view, so the text is safe for an item players can open. A description that
- * still holds GM-only content is refused anyway and the item stays name-only.
+ * view, so the text is safe for an item players can open. A part that still
+ * holds GM-only content (the text, one detail, one trait's text) is left out
+ * anyway, and the rest of the item is still filled.
  */
 import { FLAG_SCOPE } from './constants.mjs';
 import { hasClearSecrets } from './_gm-secrets.mjs';
@@ -14,11 +15,12 @@ import { entryTextHTML } from './_entry-text.mjs';
 
 /**
  * How an item is filled from its entry: the description's HTML, since 3 the
- * system's mapped values, and since 4 the effect its numbers give the hero.
+ * system's mapped values, since 4 the effect its numbers give the hero, and
+ * since 5 the safe parts of a description that holds a GM-only part.
  * Raised when that changes, so items filled the old way are rewritten even
  * though their entry hasn't.
  */
-export const ENTRY_TEXT_FORMAT = 4;
+export const ENTRY_TEXT_FORMAT = 5;
 
 /** Flag on the one Active Effect sync puts on an item it made. */
 export const ENTRY_EFFECT_FLAG = 'entryEffect';
@@ -56,13 +58,20 @@ function label(key) {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/** True for text safe to save; GM-only text is noted on `held` instead. */
+function keep(text, held) {
+  if (!hasClearSecrets(text)) return true;
+  held.any = true;
+  return false;
+}
+
 /** A list property's items, shaped like a package entry's traits. */
-function listHTML(key, items) {
+function listHTML(key, items, held) {
   const rows = items
-    .filter((it) => it && typeof it === 'object' && it.name)
+    .filter((it) => it && typeof it === 'object' && it.name && keep(String(it.name), held))
     .map((it) => {
       const cost = Number.isInteger(it.cost) ? ` (${it.cost} ${it.cost === 1 ? 'point' : 'points'})` : '';
-      const desc = it.description ? `: ${escapeHTML(it.description)}` : '';
+      const desc = it.description && keep(String(it.description), held) ? `: ${escapeHTML(it.description)}` : '';
       return `<li><strong>${escapeHTML(it.name)}</strong>${cost}${desc}</li>`;
     });
   return rows.length ? `<h3>${escapeHTML(label(key))}</h3><ul>${rows.join('')}</ul>` : '';
@@ -78,22 +87,36 @@ function listHTML(key, items) {
  * @returns {string} HTML
  */
 export function entryDescriptionHTML(entry, opts = {}) {
+  return describe(entry, opts).html;
+}
+
+/**
+ * The description built part by part: each part holding GM-only content is
+ * left out and `held` says one was, so a secret in one trait's text costs the
+ * item only that text.
+ */
+function describe(entry, opts) {
+  const held = { any: false };
   const parts = [];
-  const desc = typeof entry?.description === 'string' ? entryTextHTML(entry.description, opts) : '';
-  if (desc) parts.push(_sanitizeIncomingHTML(desc));
-  else if (entry?.summary) parts.push(`<p>${escapeHTML(entry.summary)}</p>`);
+  const raw = typeof entry?.description === 'string' ? entryTextHTML(entry.description, opts) : '';
+  const desc = raw && keep(raw, held) ? _sanitizeIncomingHTML(raw) : '';
+  if (desc) parts.push(desc);
+  else if (entry?.summary && keep(String(entry.summary), held)) parts.push(`<p>${escapeHTML(entry.summary)}</p>`);
 
   const props = entry?.properties && typeof entry.properties === 'object' ? entry.properties : {};
   const scalars = [];
   const lists = [];
   for (const [key, value] of Object.entries(props)) {
-    if (Array.isArray(value)) lists.push(listHTML(key, value));
-    else if (['string', 'number', 'boolean'].includes(typeof value) && value !== '') {
+    if (Array.isArray(value)) lists.push(listHTML(key, value, held));
+    else if (['string', 'number', 'boolean'].includes(typeof value) && value !== '' && keep(String(value), held)) {
       scalars.push(`<li><strong>${escapeHTML(label(key))}:</strong> ${escapeHTML(value)}</li>`);
     }
   }
   if (scalars.length) parts.push(`<ul>${scalars.join('')}</ul>`);
-  return parts.concat(lists.filter(Boolean)).join('');
+  const html = parts.concat(lists.filter(Boolean)).join('');
+  // Backstop: anything the part checks missed leaves the whole text out.
+  if (hasClearSecrets(html)) return { html: '', held: true };
+  return { html, held: held.any };
 }
 
 /** A number, or a numeric text such as "+2"; null for anything else. */
@@ -117,16 +140,21 @@ function entryTiers(value) {
  * field's `foundry_entry_fields` (Chronicle checked each path is under
  * `system`; checked again here). A property that is absent or doesn't read in
  * its format is left out, so the item keeps the system's default for it.
+ * A mapping marked `once` is left out of a refresh: the system counted it
+ * into the hero when the item was made (a career's renown) and takes the
+ * item's amount back when it goes, so a rewrite would unbalance the hero.
  * @param {object} entry - one `GET /system-entries` row
- * @param {Record<string, {path: string, format: string}>} [entryFields]
+ * @param {Record<string, {path: string, format: string, once?: boolean}>} [entryFields]
+ * @param {{refresh?: boolean}} [opts]
  * @returns {Record<string, number|string>}
  */
-export function entryItemValues(entry, entryFields) {
+export function entryItemValues(entry, entryFields, { refresh = false } = {}) {
   const props = entry?.properties && typeof entry.properties === 'object' ? entry.properties : {};
   const out = {};
   for (const [key, def] of Object.entries(entryFields ?? {})) {
     const path = def?.path;
     if (!usableEntryPath(path) || !Object.hasOwn(props, key)) continue;
+    if (refresh && def.once === true) continue;
     const value = props[key];
     if (def.format === 'number') {
       const n = entryNumber(value);
@@ -256,27 +284,27 @@ export function findEntry(entries, name) {
 }
 
 /**
- * Whether an entry's text still holds GM-only content, so it can't be saved
- * on a Foundry item.
+ * Whether part of an entry's text holds GM-only content and was left off the
+ * Foundry item, so the GM can be told.
  */
 export function entryTextHeld(entry, opts = {}) {
-  return !!entry && hasClearSecrets(entryDescriptionHTML(entry, opts));
+  return !!entry && describe(entry, opts).held;
 }
 
 /**
  * The fields to write for an entry: the description, the values its
  * properties give (`entryItemValues`), the effect they give the hero
  * (`entryEffectChanges`), and flags that record which entry version filled
- * it. Text still holding GM-only content is left out (an empty description)
- * while the numbers, which never come from it, are still written, so one
- * secret in a trait's text doesn't cost the hero their Speed.
+ * it. A part of the text holding GM-only content is left out while the rest,
+ * and the numbers, which never come from it, are still written, so one secret
+ * in a trait's text doesn't cost the hero the rest of the item.
  * @param {object} entry
  * @param {{mentionId?: (name: string) => string|null, entryFields?: object, entryEffects?: object}} [opts]
  * @returns {{system: object, flags: object, effects?: object[]}|null} null with no entry
  */
 export function entryItemFill(entry, opts = {}) {
   if (!entry) return null;
-  const html = entryTextHeld(entry, opts) ? '' : entryDescriptionHTML(entry, opts);
+  const { html } = describe(entry, opts);
   const { system: mapped = {} } = nestValues(entryItemValues(entry, opts.entryFields));
   const changes = entryEffectChanges(entry, opts.entryEffects);
   return {
@@ -335,7 +363,7 @@ export function planEntryRefresh({ items, fields, fieldsData, entriesByField, me
       ...refreshEffect(first, entry, entryEffectChanges(entry, entryEffects)),
       update: {
         _id: first.id,
-        ...entryItemValues(entry, entryFields),
+        ...entryItemValues(entry, entryFields, { refresh: true }),
         'system.description.value': fill.system.description.value,
         [`flags.${FLAG_SCOPE}.entrySlug`]: fill.flags[FLAG_SCOPE].entrySlug,
         [`flags.${FLAG_SCOPE}.entryUpdatedAt`]: fill.flags[FLAG_SCOPE].entryUpdatedAt,
