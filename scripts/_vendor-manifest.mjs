@@ -5,7 +5,7 @@
  * checks it against the files.
  */
 export const VENDOR_MANIFEST = Object.freeze({
-  "cutscene_engine.js": { engine: "cutscenes", source: "static/js/cutscene_engine.js", digest: "69533c967f80" },
+  "cutscene_engine.js": { engine: "cutscenes", source: "static/js/cutscene_engine.js", digest: "a35d95a9a6bf" },
   "gl_shared.js": { engine: "sky", source: "static/js/widgets/gl_shared.js", digest: "58a97f609643" },
   "shop_room.js": { engine: "shop", source: "static/js/widgets/shop_room.js", digest: "3d40b9a9065f" },
   "shop_room_counter.js": { engine: "shop", source: "static/js/widgets/shop_room_counter.js", digest: "a5c24d5a8e13" },
@@ -15,14 +15,14 @@ export const VENDOR_MANIFEST = Object.freeze({
   "shop_room_parts_places.js": { engine: "shop", source: "static/js/widgets/shop_room_parts_places.js", digest: "c5149e3891e6" },
   "shop_room_parts_strange.js": { engine: "shop", source: "static/js/widgets/shop_room_parts_strange.js", digest: "e7e1dda536ae" },
   "shop_room_parts_trades.js": { engine: "shop", source: "static/js/widgets/shop_room_parts_trades.js", digest: "118bc019657c" },
-  "sky_2d.js": { engine: "sky", source: "static/js/widgets/sky_2d.js", digest: "e30f8b7e86e4" },
+  "sky_2d.js": { engine: "sky", source: "static/js/widgets/sky_2d.js", digest: "558f714daeba" },
   "sky_events.js": { engine: "sky", source: "static/js/widgets/sky_events.js", digest: "494946e9464a" },
-  "sky_gl.js": { engine: "sky", source: "static/js/widgets/sky_gl.js", digest: "a59aa6874e84" },
-  "sky_looks.js": { engine: "sky", source: "static/js/widgets/sky_looks.js", digest: "eef7ec91a10b" },
+  "sky_gl.js": { engine: "sky", source: "static/js/widgets/sky_gl.js", digest: "81d6f13ed18d" },
+  "sky_looks.js": { engine: "sky", source: "static/js/widgets/sky_looks.js", digest: "34a4f4e2979e" },
   "sky_moon.js": { engine: "sky", source: "static/js/widgets/sky_moon.js", digest: "2a530ca4278a" },
   "sky_pane.js": { engine: "sky", source: "static/js/widgets/sky_pane.js", digest: "e3ab11ccd3e8" },
-  "sky_shaders.js": { engine: "sky", source: "static/js/widgets/sky_shaders.js", digest: "81ce6bdff71f" },
-  "sky_world.js": { engine: "sky", source: "static/js/widgets/sky_world.js", digest: "7b950d26f02e" },
+  "sky_shaders.js": { engine: "sky", source: "static/js/widgets/sky_shaders.js", digest: "2e89e8d30253" },
+  "sky_world.js": { engine: "sky", source: "static/js/widgets/sky_world.js", digest: "07a69640716b" },
   "crafting_lib.js": { engine: "crafting", source: "internal/plugins/crafting/static/js/crafting_lib.js", digest: "7c89a0bb6e26" },
   "crafting_tray.js": { engine: "crafting", source: "internal/plugins/crafting/static/js/crafting_tray.js", digest: "f54f053a1260" },
   "crafting_block.js": { engine: "crafting", source: "internal/plugins/crafting/static/js/crafting_block.js", digest: "a8cbf348587f" },
