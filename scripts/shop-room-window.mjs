@@ -26,8 +26,9 @@ import { _isAllowedImageHost } from './_url-validation.mjs';
 import { decryptReply, encryptReply, generateRequestKeys } from './_stash-crypto.mjs';
 import { loadVendored } from './vendor-chronicle.mjs';
 import { makeAskLimiter } from './_quest-relay.mjs';
+import { PictureStore } from './picture-store.mjs';
 import {
-  describeSale, sanitizeShopBuyReply, sanitizeShopBuyRequest,
+  createLiveRooms, describeSale, roomPictureId, sanitizeShopBuyReply, sanitizeShopBuyRequest,
   sanitizeShopRoomMessage, shopEndpoints, MAX_ROOM_REPLY_CHARS, SHOP_ROOM_FILES, SHOP_ROOM_MESSAGE,
 } from './_shop-room-data.mjs';
 
@@ -47,6 +48,12 @@ const QUIET_MS = 5000;
 
 let shim = null;
 let widgetLoad = null;
+/** Open rooms following their shop's wares (the widget's ShopRoom.live hook). */
+const liveRooms = createLiveRooms();
+/** The owner's own pictures, media id → a signed address this client can load. */
+const pictureUrls = new Map();
+/** GM side: signs those addresses; a plain /media/<id> doesn't load cross-origin. */
+let pictures = null;
 /** Player side: buying requests waiting for the GM's answer, by request id. */
 const pending = new Map();
 /** Player side: each waiting request's private key and answer size limit, by request id. */
@@ -103,6 +110,11 @@ function loadShopRoomWidget() {
     shim = await loadVendored(SHOP_ROOM_FILES);
     const def = shim.widgets.get('shop_room');
     if (!def) throw new Error('shop room widget did not register');
+    // The widget's host hooks. An unknown picture gives '' and the drawn wall
+    // or sky shows; open rooms hear of new wares from this window rather than
+    // a socket of their own, which can't reach Chronicle from Foundry.
+    if (window.ShopRoomCounter) window.ShopRoomCounter.pictureSrc = (id) => pictureUrls.get(String(id || '').toLowerCase()) || '';
+    if (window.ShopRoom) window.ShopRoom.live = (campaignId, shopId, onChange) => liveRooms.listen(campaignId, shopId, onChange);
     return def;
   })();
   widgetLoad.catch(() => { widgetLoad = null; });
@@ -191,7 +203,15 @@ export class ShopRoomWindow extends ApplicationV2 {
       this._api.get(`/entities/${this._shopId}`).catch(() => null),
     ]);
     if (entity?.name) this._name = entity.name;
-    return { layout: room?.layout ?? null, goods: Array.isArray(room?.goods) ? room.goods : [], image: keeperImageSrc(entity?.image_path) };
+    const layout = room?.layout ?? null;
+    const out = { layout, goods: Array.isArray(room?.goods) ? room.goods : [], image: keeperImageSrc(entity?.image_path) };
+    const picId = roomPictureId(layout);
+    if (picId) {
+      pictures ??= new PictureStore({ api: this._api });
+      const url = await pictures.signedLink(picId);
+      if (url) out.picture = { id: picId, url };
+    }
+    return out;
   }
 
   async _renderHTML() {
@@ -232,10 +252,13 @@ export class ShopRoomWindow extends ApplicationV2 {
       if (!this._room) return;
       const onAction = (kind, body) => this._onAction(kind, body);
       shim.setShop(this._campaignId, this._shopId, this._room, onAction);
-      const layoutKey = JSON.stringify(this._room.layout ?? null);
-      // Just after a sale the widget has already reloaded its goods; redraw
-      // only if the room itself changed.
-      if (!(Date.now() < this._quietUntil && layoutKey === this._mountedLayout)) {
+      if (this._room.picture) pictureUrls.set(this._room.picture.id, this._room.picture.url);
+      const layoutKey = JSON.stringify([this._room.layout ?? null, this._room.image || '', this._name]);
+      const sameRoom = layoutKey === this._mountedLayout && !!this._host.firstChild;
+      // Only the wares changed: an open room reads them again and keeps its
+      // basket, cut to what is left. Just after a sale the widget has already
+      // reloaded them itself. Anything else redraws the room.
+      if (!(sameRoom && (Date.now() < this._quietUntil || liveRooms.notify(this._shopId)))) {
         const ok = await canLoadImage(this._room.image);
         this._mount(ok ? this._room.image : '');
         this._mountedLayout = layoutKey;
@@ -450,6 +473,7 @@ export class ShopRoomWindow extends ApplicationV2 {
     const msg = { type: SHOP_ROOM_MESSAGE, action, shopId: this._shopId, userId: game.user.id };
     if (action === 'show') {
       Object.assign(msg, { campaignId: this._campaignId, name: this._name, image: this._room?.image || '', layout: this._room?.layout ?? null, goods: this._room?.goods || [] });
+      if (this._room?.picture) msg.picture = this._room.picture;
     }
     game.socket.emit(SOCKET_CHANNEL, msg);
   }
