@@ -19,6 +19,14 @@
  * Preview in Foundry, from the Director's cut scene workshop, comes the same
  * way but plays only on one GM's own screen: it is never put on the module
  * socket, so no player's client can hear of it, and it is not remembered.
+ *
+ * At a moment the player answers in the scene: the answer goes sealed to the
+ * GM's answer key (handed over with the scene), and the GM's client sends it
+ * to Chronicle for the player's own member. Chronicle's word that someone is
+ * answering goes on to the showing's other viewers, and when the Director
+ * lets the moment go each viewer's client is knocked and fetches the lines
+ * that joined the story, sealed to it. A player who reloads mid-hold is
+ * knocked again, with the moments let go and their own answers.
  * Pure rules: _cutscene-relay.mjs.
  */
 
@@ -33,21 +41,32 @@ import { loadStandalone } from './vendor-chronicle.mjs';
 import {
   CUTSCENE_MSG,
   CUTSCENE_WS,
+  answerPath,
+  answerRefusal,
+  cleanAnswer,
+  cleanLines,
   cleanShowing,
   cleanShowingList,
   cutscenesVerdict,
   isCutsceneMessage,
+  isHolding,
   isRequestId,
   lateJoinShowings,
   listErrorFrom,
   mayFetch,
+  mayReadLines,
+  parseFoundryAnswering,
+  parseFoundryGo,
   parseFoundryPreview,
   parseFoundryShowing,
+  pastOf,
   previewPlayer,
   showingIdOf,
   showingsPath,
   showingsWithin,
+  statusTargets,
   viewerTargets,
+  whoKey,
 } from './_cutscene-relay.mjs';
 
 const CHANNEL = `module.${MODULE_ID}`;
@@ -73,6 +92,9 @@ const remembered = new Map();
 
 /** The scene playing on this client now. */
 let current = null;
+
+/** Player side: the active GM's public key that answers are sealed to. */
+let answerKey = null;
 
 /** @type {CutsceneRelay|null} */
 let instance = null;
@@ -118,11 +140,14 @@ function stopCurrent(showingId = null) {
 /**
  * Play a showing full screen over everything, replacing one already playing.
  * @param {{showingId: string, scene: object}} showing
- * @param {{label?: string, failed?: string}} [opts] - the screen reader's
- *   name for it, and the warning when it cannot play
+ * @param {{label?: string, failed?: string, canContinue?: boolean, answering?: boolean, past?: object}} [opts] -
+ *   the screen reader's name for it, the warning when it cannot play,
+ *   whether a moment offers its own Continue (the Director's preview only),
+ *   whether its moments can be answered (a real showing), and what a
+ *   reloaded screen catches up on (`pastOf`)
  * @returns {Promise<boolean>} whether it started
  */
-export async function playShowing(showing, { label, failed } = {}) {
+export async function playShowing(showing, { label, failed, canContinue = false, answering = false, past = null } = {}) {
   let engine = null;
   try {
     await loadStandalone([ENGINE_FILE]);
@@ -134,16 +159,23 @@ export async function playShowing(showing, { label, failed } = {}) {
     return false;
   }
   stopCurrent();
-  const mine = { showingId: showing.showingId, run: null };
+  const mine = { showingId: showing.showingId, scene: showing.scene, who: {}, run: null };
   current = mine;
+  const caught = past ? pastOf(past) : { released: [], answers: [] };
   try {
     mine.run = engine.play(document.body, showing.scene, {
       // The module's Motion setting outranks the computer's: Calm and Off
       // both get the engine's still version.
       reducedMotion: currentMotion() !== 'full',
+      motion: currentMotion(),
       label: label || t('Label'),
+      canContinue,
+      words: momentWords(),
+      released: caught.released,
+      ...(answering ? { onAnswer: (i, ans) => sendAnswer(showing.showingId, i, ans) } : {}),
       onClose: () => { if (current === mine) current = null; },
     });
+    for (const a of caught.answers) mine.run?.answered?.(a.moment, a);
     return true;
   } catch (err) {
     if (current === mine) current = null;
@@ -151,6 +183,95 @@ export async function playShowing(showing, { label, failed } = {}) {
     ui.notifications?.warn(failed || t('PlayFailed'));
     return false;
   }
+}
+
+/** The words a moment's question is drawn with, in this client's language. */
+function momentWords() {
+  return {
+    turn: t('MomentTurn'),
+    go: t('MomentContinue'),
+    write: t('MomentWrite'),
+    writeHint: t('MomentWriteHint'),
+    director: t('MomentDirector'),
+    directorHint: t('MomentDirectorHint'),
+    yourAnswer: t('MomentYourAnswer'),
+    send: t('MomentSend'),
+    sending: t('MomentSending'),
+    back: t('MomentBack'),
+    empty: t('MomentEmpty'),
+    failed: t('MomentFailed'),
+    sent: t('MomentSent'),
+    leftIt: t('MomentLeftIt'),
+    change: t('MomentChange'),
+    joined: t('MomentJoined'),
+    from: t('MomentFrom'),
+  };
+}
+
+/** An error whose words a player may read on the scene. */
+function plain(message) {
+  const e = new Error(message);
+  e.plain = true;
+  return e;
+}
+
+/**
+ * Send this player's answer at a moment: to Chronicle straight away on the
+ * GM's own screen, otherwise sealed to the active GM's answer key. Rejects
+ * with words the scene shows.
+ */
+async function sendAnswer(showingId, moment, raw) {
+  const ans = cleanAnswer(raw);
+  if (!ans) throw plain(t('MomentEmpty'));
+  if (isActiveGM() && instance) {
+    const r = await instance.answerFor(game.user.id, showingId, moment, ans);
+    if (!r.ok) throw plain(r.error?.message || t('MomentFailed'));
+    return;
+  }
+  if (!game.users.activeGM) throw plain(t('MomentNoGM'));
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (!isPublicJwk(answerKey)) throw plain(t('MomentNoGM'));
+    let envelope;
+    try {
+      envelope = await encryptReply(answerKey, { showingId, moment, way: ans.way, text: ans.text });
+    } catch {
+      throw plain(t('MomentFailed'));
+    }
+    const reply = await ask(CUTSCENE_MSG.ANSWER, { envelope });
+    if (reply?.ok) return;
+    // The GM's Foundry reloaded since the scene came: take its new key once.
+    if (reply?.error?.code === 'stale_key' && isPublicJwk(reply.answerKey)) {
+      answerKey = reply.answerKey;
+      continue;
+    }
+    const msg = typeof reply?.error?.message === 'string' ? reply.error.message.slice(0, 200) : '';
+    throw plain(msg || (reply?.error?.code === 'timeout' ? t('MomentNoGM') : t('MomentFailed')));
+  }
+  throw plain(t('MomentFailed'));
+}
+
+/** Who else is answering a moment of the scene playing here. */
+function applyStatus(showingId, moment, member, name) {
+  if (!current || current.showingId !== showingId || typeof current.run?.status !== 'function') return;
+  const who = current.who[moment] || (current.who[moment] = {});
+  who[member] = name || t('MomentSomeone');
+  const one = current.scene?.moments?.[moment]?.to === 'one';
+  const k = whoKey(Object.values(who), one);
+  current.run.status(moment, k ? t(k.key, k.data) : '', one);
+}
+
+/** The Director let a moment go: show the lines that joined the story, then go on. */
+function goHere(showingId, moment, lines) {
+  if (!current || current.showingId !== showingId || typeof current.run?.go !== 'function') return;
+  current.run.go(moment, cleanLines(lines));
+}
+
+/** A knock that a moment was let go: fetch its lines, sealed, and go on. */
+async function onGo(showingId, moment) {
+  if (!current || current.showingId !== showingId) return;
+  const reply = await ask(CUTSCENE_MSG.LINES, { showingId, moment });
+  // Without the lines the scene still goes on; they are on the page.
+  goHere(showingId, moment, reply?.ok ? reply.lines : []);
 }
 
 // --- Player side: asking the GM's client ------------------------------------
@@ -177,8 +298,9 @@ async function onKnock(showingId) {
   if (!reply?.ok) return;
   const showing = cleanShowing(reply.showing);
   if (!showing || showing.showingId !== showingId) return;
+  if (isPublicJwk(reply.answerKey)) answerKey = reply.answerKey;
   remember(showing);
-  await playShowing(showing);
+  await playShowing(showing, { answering: true, past: reply.past });
 }
 
 /**
@@ -193,6 +315,7 @@ export async function askWatchList() {
   }
   if (!game.users.activeGM) return { ok: false, error: { code: 'no_gm' } };
   const reply = await ask(CUTSCENE_MSG.LIST, {});
+  if (isPublicJwk(reply?.answerKey)) answerKey = reply.answerKey;
   if (reply?.ok) return { ok: true, data: cleanShowingList(reply.data) };
   return {
     ok: false,
@@ -226,6 +349,19 @@ async function sendSealed(userId, type, requestId, publicKey, body) {
   }
 }
 
+/**
+ * What a reloaded player's screen catches up on: the moments let go here and
+ * that member's own answers.
+ */
+function pastFor(entry, member) {
+  const answers = [];
+  for (const [key, a] of entry.answers || []) {
+    const [m, i] = key.split('\n');
+    if (m === member) answers.push({ moment: Number(i), way: a.way, text: a.text });
+  }
+  return { released: [...(entry.released || [])], answers };
+}
+
 function knock(userId, showingId) {
   // Only the id travels in the clear; the scene follows encrypted.
   game.socket.emit(CHANNEL, { type: CUTSCENE_MSG.KNOCK, showingId, toUserId: userId }, { recipients: [userId] });
@@ -244,6 +380,10 @@ export class CutsceneRelay {
     this._syncManager = null;
     /** Showings Chronicle sent this session, by id, with their viewers. */
     this._showings = new Map();
+    /** Moments let go, by showing id: its viewers and each moment's lines. */
+    this._gone = new Map();
+    /** This client's key pair that players seal answers to. */
+    this._answerKeys = null;
     instance = this;
   }
 
@@ -287,10 +427,131 @@ export class CutsceneRelay {
   onMessage(msg) {
     // A preview picks its own GM, who need not be the active one.
     if (msg?.type === CUTSCENE_WS.PREVIEW) return this._preview(msg.payload);
-    if (msg?.type !== CUTSCENE_WS.SHOW && msg?.type !== CUTSCENE_WS.STOP) return;
-    if (!isActiveGM()) return;
-    if (msg.type === CUTSCENE_WS.SHOW) return this._show(msg.payload);
-    return this._stop(msg.payload);
+    const act = {
+      [CUTSCENE_WS.SHOW]: this._show,
+      [CUTSCENE_WS.STOP]: this._stop,
+      [CUTSCENE_WS.ANSWERING]: this._answering,
+      [CUTSCENE_WS.GO]: this._go,
+    }[msg?.type];
+    if (!act || !isActiveGM()) return;
+    return act.call(this, msg.payload);
+  }
+
+  /** The key pair players seal answers to, made once per session. */
+  async _keys() {
+    if (!this._answerKeys) this._answerKeys = generateRequestKeys();
+    try {
+      return await this._answerKeys;
+    } catch (err) {
+      this._answerKeys = null;
+      throw err;
+    }
+  }
+
+  async _answerKey() {
+    try {
+      return (await this._keys()).publicJwk;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Someone answered: tell the showing's other viewers here who. */
+  _answering(payload) {
+    const a = parseFoundryAnswering(payload);
+    if (!a) return;
+    const users = (game.users?.contents ?? []).map((u) => ({ id: u.id, active: !!u.active }));
+    for (const userId of statusTargets(a, getUserMappings(), users)) {
+      if (userId === game.user.id) applyStatus(a.showingId, a.moment, a.member, a.name);
+      else {
+        game.socket.emit(CHANNEL, { type: CUTSCENE_MSG.STATUS, showingId: a.showingId, moment: a.moment, member: a.member, name: a.name, toUserId: userId },
+          { recipients: [userId] });
+      }
+    }
+  }
+
+  /**
+   * The Director let a moment go: keep its lines for the viewers' clients to
+   * fetch, and knock on each one playing now.
+   */
+  _go(payload) {
+    const g = parseFoundryGo(payload);
+    if (!g) return;
+    const now = Date.now();
+    for (const [id, rec] of this._gone) if (now - rec.at > 60 * 60 * 1000) this._gone.delete(id);
+    const rec = this._gone.get(g.showingId) || { viewers: [], lines: new Map(), at: now };
+    if (g.viewers.length) rec.viewers = g.viewers;
+    rec.lines.set(g.moment, g.lines);
+    rec.at = now;
+    this._gone.set(g.showingId, rec);
+    const entry = this._showings.get(g.showingId);
+    if (entry) (entry.released || (entry.released = new Set())).add(g.moment);
+    const users = (game.users?.contents ?? []).map((u) => ({ id: u.id, active: !!u.active }));
+    for (const userId of viewerTargets(rec.viewers, getUserMappings(), users).deliver) {
+      if (userId === game.user.id) goHere(g.showingId, g.moment, g.lines);
+      // Only the id and the moment travel in the clear; the lines follow sealed.
+      else game.socket.emit(CHANNEL, { type: CUTSCENE_MSG.GO, showingId: g.showingId, moment: g.moment, toUserId: userId }, { recipients: [userId] });
+    }
+  }
+
+  /**
+   * One Foundry user's answer at a moment, sent to Chronicle for the member
+   * they are matched to; Chronicle checks that member is a viewer.
+   * @returns {Promise<{ok: true}|{ok: false, error: {code: string, message: string}}>}
+   */
+  async answerFor(foundryUserId, showingId, moment, raw) {
+    const member = chronicleUserFor(getUserMappings(), foundryUserId);
+    if (!member) return { ok: false, error: { code: 'no_mapping', message: t('MomentNoLink') } };
+    const id = showingIdOf(showingId);
+    const ans = cleanAnswer(raw);
+    if (!id || !ans || !Number.isInteger(moment) || moment < 0 || moment > 30) return { ok: false, error: { code: 'bad', message: t('MomentFailed') } };
+    if (!this._api) return { ok: false, error: { code: 'gm_not_ready', message: t('MomentNoGM') } };
+    try {
+      await this._api.post(answerPath(id, moment), { user: member, way: ans.way, text: ans.text });
+    } catch (err) {
+      const r = answerRefusal(err?.status, err?.serverMessage || err?.data?.message);
+      return { ok: false, error: { code: 'refused', message: r ? (r.key ? t(r.key) : r.text) : t('MomentFailed') } };
+    }
+    const entry = this._showings.get(id);
+    if (entry) (entry.answers || (entry.answers = new Map())).set(`${member}\n${moment}`, ans);
+    return { ok: true };
+  }
+
+  /**
+   * A player's client sends its answer, sealed to this client's answer key.
+   * @param {object} data
+   * @param {string} senderId - Foundry user id from the socket layer
+   */
+  async handleAnswer(data, senderId) {
+    if (!isActiveGM() || !askLimit(senderId)) return;
+    if (!isRequestId(data.requestId) || !isPublicJwk(data.publicKey)) return;
+    let inner = null;
+    let keys = null;
+    try {
+      keys = await this._keys();
+      inner = await decryptReply(keys.privateKey, data.envelope);
+    } catch {
+      inner = null;
+    }
+    const body = inner && typeof inner === 'object'
+      ? await this.answerFor(senderId, inner.showingId, inner.moment, inner)
+      : { ok: false, error: { code: 'stale_key' }, answerKey: keys?.publicJwk ?? null };
+    await sendSealed(senderId, CUTSCENE_MSG.ANSWER_REPLY, data.requestId, data.publicKey, body);
+  }
+
+  /**
+   * A viewer's client asks for the lines that joined the story at a moment.
+   * @param {object} data
+   * @param {string} senderId - Foundry user id from the socket layer
+   */
+  async handleLines(data, senderId) {
+    if (!isActiveGM() || !askLimit(senderId)) return;
+    if (!isRequestId(data.requestId) || !isPublicJwk(data.publicKey)) return;
+    const id = showingIdOf(data.showingId);
+    const rec = id ? this._gone.get(id) : null;
+    const ok = mayReadLines(rec, senderId, getUserMappings(), data.moment);
+    const body = ok ? { ok: true, lines: rec.lines.get(data.moment) } : { ok: false, error: { code: 'not_viewer' } };
+    await sendSealed(senderId, CUTSCENE_MSG.LINES_REPLY, data.requestId, data.publicKey, body);
   }
 
   _show(payload) {
@@ -301,7 +562,7 @@ export class CutsceneRelay {
       return;
     }
     for (const [id, s] of this._showings) if (!(s.rewatchUntil > now)) this._showings.delete(id);
-    const entry = { ...showing, stopped: false, delivered: new Set() };
+    const entry = { ...showing, stopped: false, delivered: new Set(), released: new Set(), answers: new Map() };
     this._showings.set(entry.showingId, entry);
     // A showing proves the add-on is on.
     this._store(true);
@@ -313,7 +574,7 @@ export class CutsceneRelay {
       if (userId === game.user.id) {
         // The Director picked the member this GM is matched to.
         remember(forPlayer(entry));
-        playShowing(entry);
+        playShowing(entry, { answering: true });
       } else {
         knock(userId, entry.showingId);
       }
@@ -343,6 +604,8 @@ export class CutsceneRelay {
     return playShowing({ showingId: `preview-${preview.previewId}`, scene: preview.scene }, {
       label: t('PreviewLabel', { name }),
       failed: t('PreviewFailed'),
+      // The GM watching their own preview lets each moment go on.
+      canContinue: true,
     });
   }
 
@@ -358,12 +621,54 @@ export class CutsceneRelay {
     game.socket.emit(CHANNEL, { type: CUTSCENE_MSG.STOP, showingId: id }, to.length ? { recipients: to } : undefined);
   }
 
-  /** A user just opened Foundry: hand over a showing that started moments ago. */
+  /**
+   * A user just opened Foundry: hand over a showing that started moments
+   * ago, and any still holding on a moment, which waits on them however
+   * long ago it began. One the GM's client never heard of (it reloaded too)
+   * comes from Chronicle's list for that member.
+   */
   onUserConnected(userId) {
     if (!isActiveGM() || userId === game.user.id) return;
+    const knocked = new Set();
     for (const id of lateJoinShowings(this._showings.values(), userId, getUserMappings())) {
       this._showings.get(id)?.delivered.add(userId);
       knock(userId, id);
+      knocked.add(id);
+    }
+    const member = chronicleUserFor(getUserMappings(), userId);
+    if (!member) return;
+    for (const s of this._showings.values()) {
+      if (knocked.has(s.showingId) || !s.viewers.includes(member) || !isHolding(s)) continue;
+      s.delivered.add(userId);
+      knock(userId, s.showingId);
+      knocked.add(s.showingId);
+    }
+    return this._catchUp(userId, member, knocked);
+  }
+
+  async _catchUp(userId, member, knocked) {
+    if (!this._api || !cutscenesAvailable()) return;
+    let body;
+    try {
+      body = await this._api.get(showingsPath(member));
+    } catch {
+      return;
+    }
+    const rows = Array.isArray(body) ? body : (Array.isArray(body?.data) ? body.data : []);
+    for (const raw of rows) {
+      const past = pastOf(raw);
+      const showing = past.holding ? cleanShowing(raw) : null;
+      if (!showing || knocked.has(showing.showingId)) continue;
+      const entry = this._showings.get(showing.showingId)
+        || { ...showing, viewers: [], stopped: false, delivered: new Set(), released: new Set(), answers: new Map() };
+      if (!entry.viewers.includes(member)) entry.viewers = [...entry.viewers, member];
+      entry.released = new Set([...(entry.released || []), ...past.released]);
+      entry.answers = entry.answers || new Map();
+      for (const a of past.answers) entry.answers.set(`${member}\n${a.moment}`, { way: a.way, text: a.text });
+      this._showings.set(entry.showingId, entry);
+      entry.delivered.add(userId);
+      knock(userId, entry.showingId);
+      knocked.add(entry.showingId);
     }
   }
 
@@ -379,7 +684,9 @@ export class CutsceneRelay {
     const entry = id ? this._showings.get(id) : null;
     const verdict = mayFetch(entry, senderId, getUserMappings());
     if (verdict.ok) entry.delivered.add(senderId);
-    const body = verdict.ok ? { ok: true, showing: forPlayer(entry) } : { ok: false, error: { code: verdict.reason } };
+    const body = verdict.ok
+      ? { ok: true, showing: forPlayer(entry), past: pastFor(entry, verdict.member), answerKey: await this._answerKey() }
+      : { ok: false, error: { code: verdict.reason } };
     await sendSealed(senderId, CUTSCENE_MSG.PLAY, data.requestId, data.publicKey, body);
   }
 
@@ -391,7 +698,7 @@ export class CutsceneRelay {
   async handleList(data, senderId) {
     if (!isActiveGM() || !askLimit(senderId)) return;
     if (!isRequestId(data.requestId) || !isPublicJwk(data.publicKey)) return;
-    const body = await this.listFor(senderId);
+    const body = { ...(await this.listFor(senderId)), answerKey: await this._answerKey() };
     await sendSealed(senderId, CUTSCENE_MSG.LIST_REPLY, data.requestId, data.publicKey, body);
   }
 
@@ -434,6 +741,24 @@ export function registerCutscenes() {
       case CUTSCENE_MSG.LIST:
         if (isActiveGM()) instance?.handleList(data, senderId);
         break;
+      case CUTSCENE_MSG.ANSWER:
+        if (isActiveGM()) instance?.handleAnswer(data, senderId);
+        break;
+      case CUTSCENE_MSG.LINES:
+        if (isActiveGM()) instance?.handleLines(data, senderId);
+        break;
+      case CUTSCENE_MSG.STATUS: {
+        const id = showingIdOf(data.showingId);
+        if (fromGM && forMe && id && Number.isInteger(data.moment) && typeof data.member === 'string') {
+          applyStatus(id, data.moment, data.member, typeof data.name === 'string' ? data.name.slice(0, 200) : '');
+        }
+        break;
+      }
+      case CUTSCENE_MSG.GO: {
+        const id = showingIdOf(data.showingId);
+        if (fromGM && forMe && id && Number.isInteger(data.moment)) onGo(id, data.moment);
+        break;
+      }
       case CUTSCENE_MSG.KNOCK: {
         const id = showingIdOf(data.showingId);
         if (fromGM && forMe && id) onKnock(id);
@@ -441,6 +766,8 @@ export function registerCutscenes() {
       }
       case CUTSCENE_MSG.PLAY:
       case CUTSCENE_MSG.LIST_REPLY:
+      case CUTSCENE_MSG.ANSWER_REPLY:
+      case CUTSCENE_MSG.LINES_REPLY:
         if (fromGM && forMe) settleSealed(data);
         break;
       case CUTSCENE_MSG.STOP: {

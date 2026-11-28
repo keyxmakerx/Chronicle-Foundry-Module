@@ -21,7 +21,7 @@ import vm from 'node:vm';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const VENDOR = join(REPO_ROOT, 'vendor', 'chronicle');
 const {
-  createChronicleShim, describeSale, MAX_ROOM_REPLY_CHARS, sanitizeShopBuyReply, sanitizeShopBuyRequest,
+  createChronicleShim, createLiveRooms, describeSale, MAX_ROOM_REPLY_CHARS, roomPictureId, sanitizeShopBuyReply, sanitizeShopBuyRequest,
   sanitizeShopRoomMessage, shopEndpoints, SHOP_ROOM_FILES, SHOP_ROOM_MESSAGE,
 } = await import('../scripts/_shop-room-data.mjs');
 
@@ -200,6 +200,85 @@ test('sanitize: drops a picture from another host and non-object goods, caps the
   assert.equal(sanitizeShopRoomMessage(show({ image: 'javascript:alert(1)' }), API_URL).image, '');
   assert.equal(sanitizeShopRoomMessage(show({ name: '' }), API_URL).name, 'Shop');
   assert.equal(sanitizeShopRoomMessage(show({ layout: null }), API_URL).layout, null);
+});
+
+const PIC = '0123abcd-0000-4000-8000-00000000beef';
+const picLayout = { counter: { theme: { picture: { id: PIC.toUpperCase(), on: 'wall', fit: 'fill' } } } };
+
+test('the owner\'s picture id comes from the saved counter theme, or nothing', () => {
+  assert.equal(roomPictureId(picLayout), PIC);
+  for (const l of [null, {}, { counter: {} }, { counter: { theme: { picture: { id: '../x' } } } }, { counter: { theme: { picture: 'x' } } }]) {
+    assert.equal(roomPictureId(l), '', JSON.stringify(l));
+  }
+});
+
+test('sanitize: keeps the GM\'s signed picture only for the layout\'s own picture on the Chronicle host', () => {
+  const url = `${API_URL}/media/${PIC}?expires=1&sig=x`;
+  assert.deepEqual(sanitizeShopRoomMessage(show({ layout: picLayout, picture: { id: PIC, url } }), API_URL).picture, { id: PIC, url });
+  const dropped = [
+    show({ layout: picLayout, picture: { id: PIC, url: `https://evil.example.net/media/${PIC}` } }),
+    show({ layout: picLayout, picture: { id: PIC, url: 'javascript:alert(1)' } }),
+    show({ layout: picLayout, picture: { id: '0123abcd-0000-4000-8000-00000000dead', url } }),
+    show({ layout: { v: 1 }, picture: { id: PIC, url } }),
+    show({ layout: picLayout, picture: 'x' }),
+  ];
+  for (const m of dropped) assert.equal(sanitizeShopRoomMessage(m, API_URL).picture, undefined, JSON.stringify(m.picture));
+});
+
+test('live rooms: an open room hears its own shop only, and stops when it says so', () => {
+  const live = createLiveRooms();
+  let a = 0, b = 0;
+  assert.equal(live.notify(SHOP), false, 'no open room: the window redraws instead');
+  const stopA = live.listen(CAMP, SHOP, () => { a++; });
+  live.listen(CAMP, 'other-shop', () => { b++; });
+  assert.equal(live.notify(SHOP), true);
+  assert.deepEqual([a, b], [1, 0]);
+  stopA();
+  stopA();
+  assert.equal(live.notify(SHOP), false);
+  assert.equal(a, 1);
+  assert.equal(typeof live.listen(CAMP, SHOP, null), 'function', 'a bad listener still gets a stop function');
+  live.listen(CAMP, SHOP, () => { throw new Error('boom'); });
+  const warn = console.warn; console.warn = () => {};
+  try { assert.equal(live.notify(SHOP), true, 'one room failing never stops the others'); } finally { console.warn = warn; }
+});
+
+test('vendored widget reads the host hooks this module sets', () => {
+  const room = readFileSync(join(VENDOR, 'shop_room.js'), 'utf8');
+  const counter = readFileSync(join(VENDOR, 'shop_room_counter.js'), 'utf8');
+  assert.match(room, /var host = window\.ShopRoom && window\.ShopRoom\.live;/);
+  assert.match(room, /host\(cid, sid, onChange\)/);
+  assert.match(counter, /window\.ShopRoomCounter && window\.ShopRoomCounter\.pictureSrc/);
+  assert.match(counter, /typeof f === 'function' \? f\(id\)/);
+});
+
+// These live in Foundry application classes with no runtime here, so the
+// lines that carry each rule are pinned in the source.
+test('players get only the picture Chronicle cleared for them, on every way in', () => {
+  const win = readFileSync(join(REPO_ROOT, 'scripts', 'shop-room-window.mjs'), 'utf8');
+  const widget = readFileSync(join(REPO_ROOT, 'scripts', 'shop-widget.mjs'), 'utf8');
+  // The table's link is the players audience; the GM's own link stays on this screen.
+  assert.match(win, /pictures\.playersLink\(picId\)\]\);[\s\S]*?if \(forPlayers\) out\.picture = /);
+  assert.match(win, /const seen = this\._api \? this\._ownPicture : this\._room\.picture;/);
+  assert.doesNotMatch(win, /msg\.picture = this\._ownPicture/);
+  // The journal door and Open shop answer carries it too.
+  assert.match(widget, /const \{ layout, goods, image, picture \} = room\._room;[\s\S]*?if \(picture\) body\.picture = picture;/);
+  // Show renews the link before sending, since links expire.
+  assert.match(win, /if \(this\._shown\) await this\._freshenPicture\(\)[\s\S]*?this\._emit\(this\._shown \? 'show' : 'hide'\);/);
+});
+
+test('a refused buy brings the shelves as they are now', () => {
+  const win = readFileSync(join(REPO_ROOT, 'scripts', 'shop-room-window.mjs'), 'utf8');
+  assert.match(win, /if \(kind === 'buy' && reply\.status >= 400 && reply\.status < 500\) \{\s*const goods = await this\._rereadGoods\(\);/);
+  // The player's window takes them whatever the status.
+  assert.match(win, /if \(kind === 'buy' && reply\.goods && this\._room\) this\._room\.goods = reply\.goods;/);
+});
+
+test('Chronicle\'s shop change message refreshes that shop\'s window', () => {
+  const widget = readFileSync(join(REPO_ROOT, 'scripts', 'shop-widget.mjs'), 'utf8');
+  const client = readFileSync(join(REPO_ROOT, 'scripts', 'api-client.mjs'), 'utf8');
+  assert.match(widget, /msg\.type === 'shop\.changed'[\s\S]*?this\._openWindows\.get\(msg\.resourceId\)\?\.refresh\(\)/);
+  assert.match(client, /'shop\.',/);
 });
 
 test('vendored widget keeps the contract the shim relies on', () => {

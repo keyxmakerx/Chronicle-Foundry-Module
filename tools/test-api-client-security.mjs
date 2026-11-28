@@ -345,7 +345,7 @@ test('WS dispatch: every prefix in ALLOWED_WS_TYPE_PREFIXES is accepted', () => 
     const allowedPrefixes = [
       'entity.', 'entity_type.', 'map.', 'marker.', 'drawing.',
       'token.', 'layer.', 'fog.', 'note.', 'calendar.', 'relation.', 'sync.',
-      'stash.', 'downtime.', 'npc.', 'system_state.', 'hero_layers.', 'creature_add.', 'roll.', 'cutscene.', 'system_entry.',
+      'stash.', 'downtime.', 'npc.', 'system_state.', 'hero_layers.', 'creature_add.', 'roll.', 'cutscene.', 'system_entry.', 'shop.',
     ];
     for (const prefix of allowedPrefixes) {
       let fired = false;
