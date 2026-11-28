@@ -50,11 +50,18 @@ test('names match case-insensitively', () => {
   assert.equal(findEntry(undefined, 'Fairy'), null);
 });
 
-test('GM-only text is left off the item, and its numbers still go on', () => {
+test('a GM-only part is left off the item, and the rest, its numbers included, still goes on', () => {
   const secret = { ...FAIRY, description: '<p>ok</p><span data-secret="true">twist</span>', properties: { stamina_bonus: '6' } };
   const held = entryItemFill(secret, { entryFields: { stamina_bonus: { path: 'system.bonuses.stamina', format: 'number' } } });
-  assert.equal(held.system.description.value, '', 'no text at all, not even the part before the secret');
+  assert.equal(held.system.description.value, '<p>Small and winged.</p><ul><li><strong>Stamina bonus:</strong> 6</li></ul>', 'the summary stands in for the held text');
   assert.equal(held.system.bonuses.stamina, 6);
+  const trait = { ...FAIRY, properties: { ...FAIRY.properties, purchased_traits: [{ name: 'Glow', description: '<span data-secret>twist</span>' }, { name: 'Tiny', cost: 2 }] } };
+  const partial = entryItemFill(trait).system.description.value;
+  assert.ok(partial.includes('Born of the') && partial.includes('<strong>Glow</strong></li>') && partial.includes('Tiny'), 'only the secret trait text is left out');
+  assert.ok(!partial.includes('twist'));
+  assert.equal(entryTextHeld(trait), true);
+  const all = entryItemFill({ ...secret, summary: '<span data-secret>twist</span>', properties: { note: '<span data-secret>twist</span>' } });
+  assert.equal(all.system.description.value, '', 'nothing safe is left');
   assert.ok(!JSON.stringify(held).includes('twist'));
   assert.equal(entryTextHeld(secret), true);
   assert.equal(entryTextHeld(FAIRY), false);
@@ -139,13 +146,13 @@ test('refresh: nothing to do when current, not sync-made, renamed or missing', (
   }
 });
 
-test('refresh: an entry whose text gains GM-only content clears the text and says so', () => {
+test('refresh: an entry whose text gains GM-only content leaves that part out and says so', () => {
   const plan = planEntryRefresh({
     items: [made({ chronicleMade: true })], fields: FIELDS, fieldsData: { ancestry: 'Fairy' },
     entriesByField: { ancestry: [{ ...FAIRY, description: '<p>ok</p><span data-secret>twist</span>' }] },
   });
   assert.equal(plan.length, 1);
-  assert.equal(plan[0].update['system.description.value'], '');
+  assert.ok(plan[0].update['system.description.value'].startsWith('<p>Small and winged.</p>'));
   assert.equal(plan[0].textHeld, true);
   assert.equal(plan[0].name, 'Fairy');
   assert.ok(!JSON.stringify(plan).includes('twist'));
