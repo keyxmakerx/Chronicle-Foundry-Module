@@ -42,6 +42,7 @@ import { getPlayerAsks, playerName } from './player-asks.mjs';
 import { planLayerEffects, layeredFieldKeys, storedLayers, LAYER_FLAG } from './_layer-effects.mjs';
 import { bringsInActor } from './_actor-catch-up.mjs';
 import { planGmFieldClear, holdsGmFieldText } from './_gm-field-clear.mjs';
+import { GmNotesView } from './gm-notes-view.mjs';
 import { usersWithHero, planPlayerHeroes, memberClaims, assignsCharacter } from './_player-hero.mjs';
 import { memberKey } from './_member-mapping.mjs';
 import { isAnsweringGM } from './_stash-relay.mjs';
@@ -222,6 +223,12 @@ export class ActorSync {
     Hooks.on('updateItem', this._onUpdateItem);
     Hooks.on('deleteItem', this._onDeleteItem);
     globalThis.window?.addEventListener?.('beforeunload', this._onBeforeUnload);
+    // The GM-only notes sync never saves on the actor, shown on this GM's
+    // sheet straight from Chronicle.
+    this._gmNotes = new GmNotesView({
+      api, fields: this._adapter.gmClearFields, isHero: (actor) => this._isCharacterActor(actor),
+    });
+    this._gmNotes.register();
 
     console.debug(`Chronicle: Actor sync initialized (adapter: ${this._adapter.systemId}, actorType: ${this._actorType})`);
   }
@@ -258,6 +265,7 @@ export class ActorSync {
         await this._inTurn(entity.id, () => this._onCharacterCreated(entity));
         break;
       case 'entity.updated':
+        this._gmNotes?.forget(entity.id);
         await this._inTurn(entity.id, () => this._onCharacterUpdated(entity));
         break;
       case 'entity.deleted':
@@ -1042,6 +1050,7 @@ export class ActorSync {
     Hooks.off('createItem', this._onCreateItem);
     Hooks.off('updateItem', this._onUpdateItem);
     Hooks.off('deleteItem', this._onDeleteItem);
+    this._gmNotes?.destroy();
     globalThis.window?.removeEventListener?.('beforeunload', this._onBeforeUnload);
     this._actorPushDebouncer.flushAll();
   }
