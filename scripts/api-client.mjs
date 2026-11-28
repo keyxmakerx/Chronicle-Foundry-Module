@@ -81,6 +81,8 @@ const ALLOWED_WS_TYPE_PREFIXES = Object.freeze([
   'cutscene.',
   // A campaign entry was made, saved or deleted: the field only, Directors and keys only.
   'system_entry.',
+  // A shop's wares changed: the shop page id only, no payload.
+  'shop.',
 ]);
 
 /**
