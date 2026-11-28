@@ -7,8 +7,8 @@
 export const VENDOR_MANIFEST = Object.freeze({
   "cutscene_engine.js": { engine: "cutscenes", source: "static/js/cutscene_engine.js", digest: "772a5866247d" },
   "gl_shared.js": { engine: "sky", source: "static/js/widgets/gl_shared.js", digest: "58a97f609643" },
-  "shop_room.js": { engine: "shop", source: "static/js/widgets/shop_room.js", digest: "3d40b9a9065f" },
-  "shop_room_counter.js": { engine: "shop", source: "static/js/widgets/shop_room_counter.js", digest: "2c4a64793ff5" },
+  "shop_room.js": { engine: "shop", source: "static/js/widgets/shop_room.js", digest: "2c7ceb7cd2e6" },
+  "shop_room_counter.js": { engine: "shop", source: "static/js/widgets/shop_room_counter.js", digest: "4078e91d6455" },
   "shop_room_icons.js": { engine: "shop", source: "static/js/widgets/shop_room_icons.js", digest: "c20c1dbc2311" },
   "shop_room_keeper.js": { engine: "shop", source: "static/js/widgets/shop_room_keeper.js", digest: "88519f50100b" },
   "shop_room_paper.js": { engine: "shop", source: "static/js/widgets/shop_room_paper.js", digest: "58550cb3b961" },
