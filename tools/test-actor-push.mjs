@@ -7,7 +7,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { settings } from './_journal-test-env.mjs';
-import { mergeChanges, changeTouchesPath, touchedScalarKeys } from '../scripts/_actor-field-diff.mjs';
+import { mergeChanges, changeTouchesPath, touchedScalarKeys, ITEMS_CHANGED } from '../scripts/_actor-field-diff.mjs';
 import { createGenericAdapter } from '../scripts/adapters/generic-adapter.mjs';
 
 const { ActorSync } = await import('../scripts/actor-sync.mjs');
@@ -65,6 +65,34 @@ test('adapter sends only the changed scalar fields, plus collections, and null w
   assert.deepEqual(Object.keys(out).sort(), ['hp', 'inventory']);
   assert.equal(adapter.toChronicleFieldsChanged(actor, { system: { unmapped: 1 } }), null);
   assert.deepEqual(touchedScalarKeys({ system: { details: { biography: 'x' } } }, [{ key: 'bio', foundry_path: 'system.details.biography' }]), ['bio']);
+});
+
+test('a pick goes only when an item of its own type changed; an unrelated edit leaves every pick out', async () => {
+  const defs = { fields: [
+    { key: 'victories', foundry_path: 'system.hero.victories', type: 'number' },
+    { key: 'culture', foundry_collection: 'items', foundry_item_type: 'culture', foundry_item_single: true, type: 'string' },
+    { key: 'career', foundry_collection: 'items', foundry_item_type: 'career', foundry_item_single: true, type: 'string' },
+    { key: 'class', foundry_collection: 'items', foundry_item_type: 'class', foundry_item_single: true, type: 'string' },
+    { key: 'inventory', foundry_collection: 'items', type: 'json' },
+  ] };
+  const adapter = await createGenericAdapter({ get: async () => defs }, 'drawsteel');
+  const items = [
+    { type: 'culture', name: 'Hidden Harbor' },
+    { type: 'career', name: 'Sailor' },
+    { type: 'class', name: 'Tactician' },
+  ];
+  const actor = actorDoc({ items: { contents: items }, system: { hero: { victories: 3 } } });
+  // A Victories edit: the scalar and the non-pick collection, no picks.
+  const scalar = adapter.toChronicleFieldsChanged(actor, { system: { hero: { victories: 3 } } });
+  assert.deepEqual(Object.keys(scalar).sort(), ['inventory', 'victories']);
+  // A career change sends the career, never the culture or class beside it.
+  const career = adapter.toChronicleFieldsChanged(actor, { [ITEMS_CHANGED]: { career: 'changed' } });
+  assert.equal(career.career, 'Sailor');
+  assert.equal('culture' in career, false);
+  assert.equal('class' in career, false);
+  // A removed culture still clears it.
+  const gone = adapter.toChronicleFieldsChanged(actorDoc({ items: { contents: [] } }), { [ITEMS_CHANGED]: { culture: 'deleted' } });
+  assert.equal(gone.culture, '');
 });
 
 async function harness() {
@@ -240,7 +268,7 @@ test('an item a single-item field reads, added or edited in Foundry, pushes that
   const sent = await push(() => { items.push(comp); sync._onCreateItem(comp, {}, 'gm'); });
   assert.equal(sent.length, 1);
   assert.equal(sent[0].complication, 'Amnesia');
-  assert.equal(sent[0].class, 'Fury');
+  assert.ok(!('class' in sent[0]), 'a pick whose item did not change stays out');
   assert.ok(!('hp' in sent[0]), 'scalars the change did not touch stay out');
 
   comp.name = 'Advanced Studies';
