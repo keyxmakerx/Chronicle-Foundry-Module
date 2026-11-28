@@ -312,3 +312,17 @@ test('a player who rewrites their actor\'s page link gets it unlinked, and nothi
     globalThis.game.users = users;
   }
 });
+
+test('an actor a player creates with a page link arrives unlinked, even with the apply option sent', async () => {
+  const { sync, calls } = await harness();
+  const users = globalThis.game.users;
+  globalThis.game.users = { get: (id) => (id === 'player-1' ? { id, isGM: false } : null), contents: [], activeGM: { id: 'gm' } };
+  try {
+    const actor = actorDoc({ flags: { entityId: 'someone-elses-page' } });
+    await sync._handleCreateActor(actor, { chronicleSyncApply: true }, 'player-1');
+    assert.equal(actor.getFlag('chronicle-sync', 'entityId'), undefined);
+    assert.deepEqual(calls, []);
+  } finally {
+    globalThis.game.users = users;
+  }
+});
