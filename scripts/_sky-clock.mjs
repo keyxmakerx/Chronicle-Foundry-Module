@@ -238,6 +238,8 @@ const GLOWS = {
   fireflies: (R) => R.parts[0]?.c, 'fey-lights': () => '#bff5e6', wisps: (R) => R.parts[0]?.c,
   dreamfog: (R) => R.air[1]?.c, rift: (R) => R.parts[0]?.c, 'star-rain': (R) => R.parts[0]?.c,
   'snow-glow': (R) => R.parts[0]?.c, witchfire: (R) => R.parts[0]?.c, brimstone: (R) => R.parts[0]?.c,
+  // St Elmo's fire burns on whatever stands highest, so it plays over the stone's points too.
+  'st-elmo': (R) => R.parts[0]?.c,
 };
 
 /** Particles that settle on the stone's tops as dust, and ones that come to rest on it whole. */
@@ -247,7 +249,7 @@ const LITTER = { leaf: 'leaf', petal: 'petal', fluff: 'petal', feather: 'leaf' }
 /** Frost along every edge, by the effect that brings it. */
 const RIMES = { ice: 0.9, 'snow-heavy': 0.4, frost: 0.8, 'diamond-dust': 0.6, 'freezing-rain': 0.9 };
 /** Smoke and fire that darken the stone. */
-const SOOTS = { smoke: 0.6, ashfall: 0.35, embers: 0.25, firestorm: 0.8, cinders: 0.5, brimstone: 0.45, smog: 0.5 };
+const SOOTS = { smoke: 0.6, ashfall: 0.35, embers: 0.25, firestorm: 0.8, cinders: 0.5, brimstone: 0.45, smog: 0.5, volcano: 0.4 };
 /** Effects whose grains are not grit: spray wets the stone, and a storm with no rain leaves it dry. */
 const SPRAY = { 'sea-spray': 0.45 };
 
