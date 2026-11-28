@@ -67,19 +67,30 @@ test('a sheet that draws several times reads Chronicle once, and a failure is no
 });
 
 test('notes that carry form parts lose every one before joining the sheet', () => {
-  for (const part of ['input', 'select', 'textarea', 'button', 'form', '[name]', '[contenteditable]']) {
+  for (const part of ['input', 'select', 'textarea', 'button', 'form', 'option', 'output', 'fieldset', 'prose-mirror']) {
     assert.ok(FORM_PARTS.split(',').map((p) => p.trim()).includes(part), `FORM_PARTS must cover ${part}`);
   }
-  // Notes as Foundry might parse them: a paragraph, a named input, a select
-  // and an element with a name, inside the box.
+  // Notes as Foundry might parse them: controls the form would collect, and
+  // elements whose attributes would join the form or that Foundry acts on.
   const removed = [];
-  const parts = ['input[name=system.biography.director]', 'select', 'span[name=x]']
-    .map((tag) => ({ tag, remove() { removed.push(tag); } }));
-  let asked = '';
-  const root = { querySelectorAll(sel) { asked = sel; return parts; } };
+  const parts = ['input', 'select', 'prose-mirror'].map((tag) => ({ tag, remove() { removed.push(tag); } }));
+  const attrs = (names) => {
+    const el = { left: new Set(names) };
+    el.attributes = names.map((name) => ({ name }));
+    el.removeAttribute = (name) => el.left.delete(name);
+    return el;
+  };
+  const div = attrs(['class', 'data-edit', 'name', 'form', 'contenteditable', 'onclick']);
+  const img = attrs(['src', 'alt', 'data-edit']);
+  const link = attrs(['href', 'title', 'data-action', 'data-uuid', 'ONMOUSEOVER']);
+  const root = {
+    querySelectorAll(sel) { return sel === FORM_PARTS ? parts : sel === '*' ? [div, img, link] : []; },
+  };
   assert.equal(stripFormParts(root), 3);
-  assert.equal(asked, FORM_PARTS);
-  assert.deepEqual(removed, parts.map((p) => p.tag));
+  assert.deepEqual(removed, ['input', 'select', 'prose-mirror']);
+  assert.deepEqual([...div.left], ['class']);
+  assert.deepEqual([...img.left], ['src', 'alt']);
+  assert.deepEqual([...link.left], ['href', 'title']);
 });
 
 test('a missing or failing sanitizer shows the notes as text, never as HTML', () => {

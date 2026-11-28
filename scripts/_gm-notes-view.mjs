@@ -9,8 +9,19 @@
 import { clearableGmFields } from './_gm-field-clear.mjs';
 import { readPath } from './_actor-apply-plan.mjs';
 
-/** Markup that a sheet's form would collect, or that could take typing. */
-export const FORM_PARTS = 'input, select, textarea, button, form, option, [name], [contenteditable]';
+/** Controls a sheet's form would collect or that take typing. They go
+ * whole; elements that only carry a form attribute keep their words and lose
+ * the attribute (see droppedAttribute). */
+export const FORM_PARTS = 'input, select, textarea, button, form, option, output, fieldset, prose-mirror';
+
+/** Attributes left on no element of the notes: a name, form or
+ * contenteditable would put it in the form, and Foundry reads data-* ones
+ * (data-edit is saved with the form as that field, data-action runs a sheet
+ * action). */
+function droppedAttribute(name) {
+  const n = String(name).toLowerCase();
+  return n.startsWith('data-') || n.startsWith('on') || n === 'name' || n === 'form' || n === 'contenteditable';
+}
 
 /**
  * The notes as HTML for the GM's sheet, or null when they can only be shown
@@ -45,17 +56,23 @@ export function notesPlainText(html) {
 }
 
 /**
- * Remove from parsed notes everything a sheet's form would collect or that
- * takes typing, so the notes inside the sheet's fieldset can never be saved
- * with it.
- * @param {{querySelectorAll: (sel: string) => Iterable<{remove: () => void}>}} root
- * @returns {number} how many were removed
+ * Remove from parsed notes every control a sheet's form would collect, and
+ * from every other element each attribute that would join it to the form or
+ * that Foundry acts on, so the notes inside the sheet's fieldset can never be
+ * saved with it or set off a sheet action.
+ * @param {{querySelectorAll: (sel: string) => Iterable<object>}} root
+ * @returns {number} how many controls were removed
  */
 export function stripFormParts(root) {
   let n = 0;
   for (const el of Array.from(root.querySelectorAll(FORM_PARTS))) {
     el.remove();
     n += 1;
+  }
+  for (const el of Array.from(root.querySelectorAll('*'))) {
+    for (const attr of Array.from(el.attributes ?? [])) {
+      if (droppedAttribute(attr.name)) el.removeAttribute(attr.name);
+    }
   }
   return n;
 }
