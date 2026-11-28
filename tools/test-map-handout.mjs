@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const {
-  handoutMapId, handoutCandidates, handoutSeenOnlyByHolders, withHandoutHolder, journalAccessToRevoke,
+  handoutMapId, handoutCandidates, handoutSeenOnlyByHolders, withHandoutHolder, journalAccessToRevoke, ownersHoldMap,
 } = await import('../scripts/_map-handout.mjs');
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const LV = { NONE: 0, LIMITED: 1, OBSERVER: 2, OWNER: 3 };
@@ -39,6 +39,40 @@ test('handoutCandidates: only visible Has Item lines named like a handout', () =
   ];
   assert.deepEqual(handoutCandidates(rels, 'Has Item').map((r) => r.id), ['a']);
   assert.deepEqual(handoutCandidates(null, 'Has Item'), []);
+});
+
+test('handoutCandidates: a line held at zero holds nothing', () => {
+  const line = (id, metadata) => ({ id, relationType: 'Has Item', targetEntityName: 'Map: Harbour', metadata });
+  const rels = [line('none'), line('one', { quantity: 1 }), line('zero', { quantity: 0 }), line('str', '{"quantity":0}'), line('two', '{"quantity":2}')];
+  assert.deepEqual(handoutCandidates(rels, 'Has Item').map((r) => r.id), ['none', 'one', 'two']);
+});
+
+test('ownersHoldMap: every player who owns the actor must be one Chronicle says holds the map', () => {
+  const members = { mira: 'c-mira', tom: 'c-tom' };
+  const memberOf = (id) => members[id] ?? null;
+  const isGM = (id) => id === 'gm';
+  const cases = [
+    ['the holder owns it', { default: 0, gm: 3, mira: 3 }, ['c-mira'], true],
+    ['the owner is not a holder', { mira: 3 }, ['c-tom'], false],
+    ['one of two owners is not a holder', { mira: 3, tom: 3 }, ['c-mira'], false],
+    ['an observer need not hold it', { mira: 3, tom: 2 }, ['c-mira'], true],
+    ['an unlinked owner', { mira: 3, nobody: 3 }, ['c-mira'], false],
+    ['default makes everyone an owner', { default: 3, mira: 3 }, ['c-mira'], false],
+    ['no player owner', { gm: 3 }, ['c-mira'], false],
+    ['holders unread', { mira: 3 }, null, false],
+  ];
+  for (const [name, own, holders, want] of cases) {
+    assert.equal(ownersHoldMap(own, holders, isGM, memberOf, LV.OWNER), want, name);
+  }
+});
+
+test('pin: a carried handout is shared only after Chronicle names its holders', () => {
+  const src = readFileSync(resolve(ROOT, 'scripts/item-sync.mjs'), 'utf8');
+  const carry = src.slice(src.indexOf('async _carryMaps('));
+  const ask = carry.indexOf('/holders');
+  assert.ok(ask > 0, 'asks Chronicle who holds the map');
+  assert.ok(carry.indexOf('ownersHoldMap(') > ask, 'checks the owners against the answer');
+  assert.ok(carry.indexOf('ownersHoldMap(') < carry.indexOf('carried.set('), 'before the map counts as carried');
 });
 
 test('handoutSeenOnlyByHolders: every player who sees the actor must be on the page', () => {

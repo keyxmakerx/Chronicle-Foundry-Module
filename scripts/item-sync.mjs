@@ -32,7 +32,7 @@ import { itemsToRemove } from './_stash-reconcile.mjs';
 import { sendsChangeHere, memberOf, ownsCharacter } from './_change-author.mjs';
 import { ASK, askModel, playersCanView } from './_player-asks.mjs';
 import { getPlayerAsks, playerName } from './player-asks.mjs';
-import { handoutCandidates, handoutMapId, handoutSeenOnlyByHolders } from './_map-handout.mjs';
+import { handoutCandidates, handoutMapId, handoutSeenOnlyByHolders, ownersHoldMap } from './_map-handout.mjs';
 import { carryHandoutMaps } from './map-handouts.mjs';
 
 /**
@@ -358,19 +358,29 @@ export class ItemSync {
   /**
    * Share the map of each handout the actor carries and take back the ones
    * it no longer does. Items the reconcile just made or adopted already carry
-   * their relation ids. A page that cannot be read stops the step for now:
-   * the next reconcile tries again.
+   * their relation ids. Chronicle says who holds each map; a map whose
+   * holders are not all of the actor's players is not shared. A page or
+   * holders list that cannot be read stops the step for now: the next
+   * reconcile tries again.
    * @private
    */
   async _carryMaps(actor, list, holds) {
     if (!holds()) return;
     try {
+      const L = globalThis.CONST?.DOCUMENT_OWNERSHIP_LEVELS;
+      const isGM = (id) => !!game.users?.get(id)?.isGM;
+      const mappings = getUserMappings();
       const carried = new Map();
+      const holders = new Map();
       for (const r of handoutCandidates(list, HAS_ITEM)) {
         const item = actor.items.find((i) => i.getFlag(FLAG_SCOPE, 'relationId') === r.id);
         if (!item) continue;
         const mapId = handoutMapId(await this._api.get(`/entities/${r.targetEntityId}`));
-        if (mapId) carried.set(item.id, mapId);
+        if (!mapId) continue;
+        if (!holders.has(mapId)) holders.set(mapId, (await this._api.get(`/maps/${mapId}/holders`))?.holders ?? null);
+        if (ownersHoldMap(actor.ownership, holders.get(mapId), isGM, (id) => memberOf(mappings, id), L?.OWNER ?? 3)) {
+          carried.set(item.id, mapId);
+        }
       }
       if (!holds()) return;
       await carryHandoutMaps(actor, carried);

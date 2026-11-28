@@ -6,6 +6,8 @@
  * that character's players, and the access goes when the item does.
  */
 
+import { relationMeta } from './_inventory-plan.mjs';
+
 /** Item pages Chronicle made to hand out a map start with this. */
 export const HANDOUT_PREFIX = 'Map: ';
 
@@ -26,15 +28,50 @@ export function handoutMapId(entity) {
 }
 
 /**
- * The Has Item lines that may be a handout: visible to players and named
- * like one. Only these are looked up, so ordinary items cost nothing.
+ * The Has Item lines that may be a handout: visible to players, named like
+ * one, and holding at least one (a line held at zero mid-move holds
+ * nothing; no quantity means one). Only these are looked up, so ordinary
+ * items cost nothing.
  * @param {object[]} relations a character's relations
  * @param {string} hasItem the Has Item relation type
  * @returns {object[]}
  */
 export function handoutCandidates(relations, hasItem) {
-  return (relations || []).filter((r) => r?.relationType === hasItem && r.dmOnly !== true
-    && typeof r.targetEntityName === 'string' && r.targetEntityName.startsWith(HANDOUT_PREFIX));
+  return (relations || []).filter((r) => {
+    if (r?.relationType !== hasItem || r.dmOnly === true) return false;
+    if (typeof r.targetEntityName !== 'string' || !r.targetEntityName.startsWith(HANDOUT_PREFIX)) return false;
+    const q = relationMeta(r).quantity;
+    return q === undefined || q === null || Number(q) >= 1;
+  });
+}
+
+/**
+ * Whether Chronicle gives the map to every player who owns the actor. Only
+ * Chronicle judges a give (who made the line, whether the handout page could
+ * have been re-pointed), so each non-GM owner must be linked to a member on
+ * the map's holders list; anyone unlinked, or a default level that makes
+ * everyone an owner, fails closed. An actor with no player owner holds
+ * nothing.
+ * @param {Record<string, number>} actorOwnership
+ * @param {string[]|null} holders the map's `/holders` answer
+ * @param {(id: string) => boolean} isGM
+ * @param {(foundryUserId: string) => string|null} memberOf
+ * @param {number} owner the OWNER ownership level
+ * @returns {boolean}
+ */
+export function ownersHoldMap(actorOwnership, holders, isGM, memberOf, owner = 3) {
+  if (!Array.isArray(holders)) return false;
+  const held = new Set(holders.map(String));
+  let any = false;
+  for (const [id, level] of Object.entries(actorOwnership || {})) {
+    if (level < owner) continue;
+    if (id === 'default') return false;
+    if (isGM(id)) continue;
+    const member = memberOf(id);
+    if (!member || !held.has(String(member))) return false;
+    any = true;
+  }
+  return any;
 }
 
 /**

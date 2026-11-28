@@ -1053,6 +1053,21 @@ sends only an `id` from that list; without the list (older Chronicle) the
 picker is hidden and a marker keeps its icon.
 Re-verify by: 2026-12-01 (Chronicle `internal/plugins/syncapi/map_api_look.go`, keyxmakerx/Chronicle#1017)
 
+#### GET /maps/:mapId/holders
+The Players a map is given to: those who own a character carrying its handout
+on a line the Director made, by Chronicle's own rule (the same people who may
+see the map there). Owner or co-DM key only; others get **403**.
+
+**Used by:** `item-sync.mjs` `_carryMaps` → a carried handout opens the map's
+journal only when every player who owns the actor is linked to a member on
+this list (`_map-handout.mjs` `ownersHoldMap`). A failed read shares nothing
+and takes nothing back until the next reconcile.
+
+**Response:** `{"holders": ["uuid"]}` (empty array when no one holds it), read
+fresh on every call, so a give or take-back a moment ago counts.
+
+Re-verify by: 2027-01-28 (Chronicle `internal/plugins/syncapi/map_api_handler.go` `MapHolders`; `internal/app/map_grants_adapter.go` `CurrentHolders`)
+
 #### GET /maps/:mapId/drawings
 All coordinates are percentage-based (0–100), not pixels. `drawing_type` is
 one of `freehand`, `rectangle`, `ellipse`, `polygon`, `text`.
