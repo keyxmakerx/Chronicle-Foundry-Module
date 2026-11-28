@@ -75,12 +75,14 @@ function placeButtons() {
     if (row.querySelector(`.${BUTTON_CLASS}`)) continue;
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = BUTTON_CLASS;
+    // Foundry's own chat buttons are ui-control icons with the glyph on the
+    // button itself; wearing the same classes gives this one their size and
+    // centring instead of a second, drifting copy of them.
+    button.className = `ui-control icon fa-solid fa-dice-d20 ${BUTTON_CLASS}`;
     button.dataset.tooltip = t('Open');
     button.setAttribute('aria-label', t('Open'));
     button.setAttribute('aria-haspopup', 'dialog');
     button.setAttribute('aria-expanded', 'false');
-    button.innerHTML = '<i class="fa-solid fa-dice-d20" aria-hidden="true"></i>';
     button.addEventListener('click', (event) => {
       event.preventDefault();
       if (panel && anchor === button) closeTray();

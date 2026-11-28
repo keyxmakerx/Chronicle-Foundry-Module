@@ -225,6 +225,25 @@ export class PictureStore {
       return '';
     }
   }
+
+  /**
+   * A signed link to hand to every player, or '' when they couldn't all open
+   * the file in Chronicle. Chronicle checks that only when asked for the
+   * players audience, and says so; an older server that ignores the question
+   * answers without the echo, which counts as no. Never cached: a picture
+   * hidden from players since the last answer must not go out again.
+   * @param {string} id
+   * @returns {Promise<string>}
+   */
+  async playersLink(id) {
+    if (!MEDIA_ID_RE.test(id)) return '';
+    try {
+      const meta = await this._api.get(`/media/${id}?audience=players`);
+      return meta?.audience === 'players' ? this._absolute(meta?.url || '') : '';
+    } catch {
+      return '';
+    }
+  }
 }
 
 /**

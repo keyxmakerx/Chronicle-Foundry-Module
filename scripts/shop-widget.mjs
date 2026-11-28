@@ -78,6 +78,12 @@ export class ShopWidget {
       }
     }
 
+    // Chronicle names the shop whose wares changed, a new listing included.
+    if (msg.type === 'shop.changed') {
+      this._openWindows.get(msg.resourceId)?.refresh();
+      return;
+    }
+
     // Refresh on relation changes (stock depleted after purchase).
     if (msg.type === 'relation.metadata_updated' || msg.type === 'relation.deleted') {
       for (const window of this._openWindows.values()) {
@@ -143,8 +149,10 @@ export class ShopWidget {
       } catch (err) {
         return { status: err.status || 502, body: { message: err.serverMessage || game.i18n.localize('CHRONICLE.ShopRoom.LoadFailed') } };
       }
-      const { layout, goods, image } = room._room;
-      return { status: 200, body: { campaignId: getSetting('campaignId'), name: room._name, image, layout, goods } };
+      const { layout, goods, image, picture } = room._room;
+      const body = { campaignId: getSetting('campaignId'), name: room._name, image, layout, goods };
+      if (picture) body.picture = picture;
+      return { status: 200, body };
     }
     return room.runAction(req.action, req.body, chronicleUserId, user.name);
   }

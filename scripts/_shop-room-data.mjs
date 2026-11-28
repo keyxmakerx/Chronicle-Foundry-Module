@@ -140,7 +140,7 @@ export function sanitizeShopRoomMessage(msg, apiUrl) {
   let image = typeof msg.image === 'string' ? msg.image : '';
   if (image && !(/^https?:/i.test(image) && _isAllowedImageHost(image, apiUrl))) image = '';
 
-  return {
+  const out = {
     action: 'show',
     campaignId: msg.campaignId,
     shopId: msg.shopId,
@@ -148,6 +148,59 @@ export function sanitizeShopRoomMessage(msg, apiUrl) {
     image,
     layout,
     goods,
+  };
+  // The owner's own picture, as the GM's client signed it: kept only for the
+  // picture this layout names and only from the Chronicle host.
+  const pic = msg.picture;
+  const want = roomPictureId(layout);
+  if (want && pic && typeof pic === 'object' && String(pic.id || '').toLowerCase() === want
+    && typeof pic.url === 'string' && /^https?:/i.test(pic.url) && _isAllowedImageHost(pic.url, apiUrl)) {
+    out.picture = { id: want, url: pic.url };
+  }
+  return out;
+}
+
+const MEDIA_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The media id of the owner's own picture in a saved room layout
+ * (layout.counter.theme.picture.id, as Chronicle's counter reads it), or ''.
+ */
+export function roomPictureId(layout) {
+  const id = layout?.counter?.theme?.picture?.id;
+  return typeof id === 'string' && MEDIA_ID.test(id) ? id.toLowerCase() : '';
+}
+
+/**
+ * Open rooms listening for their shop's wares to change. The vendored widget
+ * calls `listen` through `ShopRoom.live` while its room is open, and expects
+ * a stop function back; the window calls `notify` when it has new goods for
+ * a shop, and learns whether any open room took them, so it redraws only
+ * when none did (a redraw would empty the shopper's basket).
+ */
+export function createLiveRooms() {
+  const rooms = new Map();
+  return {
+    listen(campaignId, shopId, onChange) {
+      if (typeof onChange !== 'function' || !shopId) return () => {};
+      const key = String(shopId);
+      if (!rooms.has(key)) rooms.set(key, new Set());
+      rooms.get(key).add(onChange);
+      return () => {
+        const set = rooms.get(key);
+        if (!set) return;
+        set.delete(onChange);
+        if (!set.size) rooms.delete(key);
+      };
+    },
+    notify(shopId) {
+      const set = rooms.get(String(shopId));
+      if (!set || !set.size) return false;
+      for (const fn of [...set]) {
+        try { fn(); } catch (err) { console.warn('Chronicle: a shop room could not take new wares', err); }
+      }
+      return true;
+    },
   };
 }
 

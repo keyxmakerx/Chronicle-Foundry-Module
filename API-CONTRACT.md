@@ -1349,6 +1349,15 @@ Returns media metadata: `mime_type`, `file_size`, and `url`, a signed
 uses it to copy pictures inside page text into the world's files
 (`scripts/picture-store.mjs`); a saved signed link would expire.
 
+`?audience=players` answers only for a file any player could open with their
+own session, with `"audience":"players"` in the answer, and 404 otherwise. The
+shop room asks this way for the owner's picture (`PictureStore.playersLink`)
+before sending its link to players, and sends none when the answer lacks the
+echo, since an older Chronicle ignores the parameter. The GM's own screen uses
+the plain read. Re-verify by: 2026-12-28 (Chronicle
+`internal/plugins/syncapi/media_api_handler.go` `GetMedia`,
+`internal/plugins/media/player_audience.go`, from Chronicle PR #2978)
+
 #### DELETE /media/:mediaId
 Deletes a media file.
 
@@ -1825,11 +1834,12 @@ the module socket.
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/cutscenes/showings?user=<chronicleUserId>` | That member's showings still inside their rewatch window, newest first: `{"data":[{showingId, name, shownAt, rewatchUntil, scene}],"total":N}` (a bare array is read too). `shownAt` and `rewatchUntil` are RFC 3339 times; `scene` is the scene as shown (below). The module asks only for the member the asking Foundry user is matched to (`userMappings`, looked up by the socket's sender id), never one named in the request. |
+| GET | `/cutscenes/showings?user=<chronicleUserId>` | That member's showings still inside their rewatch window, newest first: `{"data":[{showingId, name, shownAt, rewatchUntil, scene, holding?, released?, answers?}],"total":N}` (a bare array is read too). `shownAt` and `rewatchUntil` are RFC 3339 times; `scene` is the scene as shown (below). `holding` is true while the showing waits on the Director at a moment; `released` lists the moments let go; `answers` are that member's own, `[{moment, way, text}]`. The module asks only for the member the asking Foundry user is matched to (`userMappings`, looked up by the socket's sender id), never one named in the request. |
+| POST | `/cutscenes/showings/:shid/moments/:m/answer` | A player's answer at moment `m`, relayed by the GM's client: `{user, way, text}`, `way` one of `write` (text 1–280 characters) or `director` (no text). Owner or co-DM key, `PermWrite`. Answers `{moment, way, text}`; 404 when `user` is not one of the showing's viewers, 409 once the moment is let go, the showing is stopped, or the Director already decided that answer, 400 for an empty or unoffered answer, each with a `message` a player may read. The module sends only the member the sending Foundry user is matched to. |
 
-A scene (camelCase JSON): `{id, name, background:{kind, seconds, params}, overlays:[{kind, at, seconds, params}], text:[{say, at, seconds, style}], ending:{kind, after?}}`. The module passes it unchanged (keeping only these keys) to Chronicle's engine, vendored at `vendor/chronicle/cutscene_engine.js`, which draws nothing for a kind it does not know and sets `say` as text, never markup.
+A scene (camelCase JSON): `{id, name, background:{kind, seconds, params}, overlays:[{kind, at, seconds, params}], text:[{say, at, seconds, style}], moments?:[{at, ask, ways:[{kind}], to?}], ending:{kind, after?}}`. A moment never carries the Director's note. The module passes it unchanged (keeping only these keys) to Chronicle's engine, vendored at `vendor/chronicle/cutscene_engine.js`, which draws nothing for a kind it does not know and sets `say` as text, never markup.
 
-Re-verify by: 2027-01-23 (Chronicle `internal/plugins/cutscenes/`, the syncapi route for showings, `static/js/cutscene_engine.js`)
+Re-verify by: 2027-01-28 (Chronicle `internal/plugins/cutscenes/`, the syncapi routes for showings and answers, `static/js/cutscene_engine.js`)
 
 ### Player notebook pages
 
@@ -1905,6 +1915,7 @@ allowlist (`api-client.mjs`) is ignored.
 | `relation.created` | Full relation row (`id`, `sourceEntityId`, `targetEntityId`, `relationType`, `metadata`, …); `resourceId` is the source entity | Relation row created (one message per direction) |
 | `relation.deleted` | Same | Relation row deleted |
 | `relation.metadata_updated` | Same | Relation metadata changed (quantity, equipped, stash moves) |
+| `shop.changed` | none; `resourceId` is the shop page. Players' sockets get it only for a shop page everyone may read and a listing that is not GM-only | A shop's wares changed (a listing added, removed, bought or repriced); the module refreshes that shop's open window |
 | `calendar.event.created` | Full event object | Calendar event created |
 | `calendar.event.updated` | Full event object | Calendar event modified |
 | `calendar.event.deleted` | `{ id }` | Calendar event deleted |
@@ -1931,6 +1942,8 @@ allowlist (`api-client.mjs`) is ignored.
 | `cutscene.foundry` | `{ showingId, viewers:[chronicleUserId…], scene, rewatchUntil }`; sent only to the campaign's Foundry-module socket; not in the change feed | The Director showed a cut scene to those members |
 | `cutscene.foundry_stop` | `{ showingId }`; the same audience | The Director stopped a showing; watching it again still works |
 | `cutscene.foundry_preview` | `{ previewId, director: chronicleUserId, scene }`; the same audience; nothing is stored on either side | The Director pressed Preview in Foundry on an unsaved or saved scene. One GM client plays it on its own screen (the GM `director` is matched to when that GM is playing, else the active GM) and never relays it to other clients |
+| `cutscene.foundry_answering` | `{ showingId, moment, userId, name, viewers:[chronicleUserId…] }`; the same audience; never the answer's words | A viewer answered at a moment; the module tells the showing's other viewers in Foundry who is adding to the story |
+| `cutscene.foundry_go` | `{ showingId, moment, lines:[{line, from}], viewers:[chronicleUserId…] }`; the same audience | The Director let a moment go; `lines` are what joined the story there |
 | `roll.made` | A roll (see "Shared rolls" below); `resourceId` is the roll id. Public, gm and blind rolls in full; a self roll only to its owner's key | A roll was made at Chronicle's table or crafting, or recorded from Foundry |
 | `sync.status` | `{ connected: bool }` | Connection state change |
 | `sync.error` | `{ message }` | Synchronization error |
@@ -2013,9 +2026,23 @@ gets it live. `cutscene.foundry_stop` sends the clients it reached a bare stop
 with the showing id. Nothing of a scene is written to a Foundry document; each
 client keeps what it received in memory for the session. The module does not
 mark a showing watched in Chronicle (the sync API has no route for it).
-`tools/test-cutscene-relay.mjs`.
 
-Re-verify by: 2027-01-23 (Chronicle `internal/websocket/message.go` `cutscene.foundry`, `Sources`; `internal/plugins/cutscenes/`)
+At a moment the player answers in the scene. The answer goes on the module
+socket sealed to the active GM client's answer key (a session key pair whose
+public half comes with the scene and the watch-again list), and the GM's
+client posts it to `POST /cutscenes/showings/:shid/moments/:m/answer` for the
+member the sender is matched to; a stale key is answered with the new one.
+`cutscene.foundry_answering` goes on to the showing's other viewers logged in
+now (`cutscene:status`: id, moment, member id and name). For
+`cutscene.foundry_go` each viewer logged in now gets a knock with the id and
+moment, and fetches the lines sealed to a one-off key, only if matched to a
+viewer. A viewer who logs in while a showing holds on a moment is knocked again
+however long ago it began, and their client gets the moments let go and their
+own answers with the scene; a GM client that never heard of the showing reads
+them from `GET /cutscenes/showings?user=`.
+`tools/test-cutscene-relay.mjs`, bench `fvtt-cutscene-moment`.
+
+Re-verify by: 2027-01-28 (Chronicle `internal/websocket/message.go` `cutscene.foundry*`, `Sources`; `internal/plugins/cutscenes/`)
 
 ### What the module does with `system_state.updated`
 

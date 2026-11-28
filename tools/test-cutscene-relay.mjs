@@ -16,26 +16,37 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   CUTSCENE_MSG,
+  answerPath,
+  answerRefusal,
+  cleanAnswer,
+  cleanLines,
   cleanScene,
   cleanShowing,
   cleanShowingList,
   cutscenesVerdict,
   isCutsceneMessage,
+  isHolding,
   lateJoinShowings,
   listErrorFrom,
   mayFetch,
+  mayReadLines,
   mergeShowings,
   nextExpiryDelay,
+  parseFoundryAnswering,
+  parseFoundryGo,
   parseFoundryPreview,
   parseFoundryShowing,
+  pastOf,
   previewPlayer,
   showingIdOf,
   showingsPath,
   showingsWithin,
+  statusTargets,
   untilLabel,
   viewerTargets,
+  whoKey,
 } from '../scripts/_cutscene-relay.mjs';
-import { decryptReply, generateRequestKeys } from '../scripts/_stash-crypto.mjs';
+import { decryptReply, encryptReply, generateRequestKeys } from '../scripts/_stash-crypto.mjs';
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 
@@ -72,6 +83,28 @@ test('a scene keeps only its own keys, with harmless defaults for missing layers
   assert.deepEqual(s.background, { kind: 'none' });
   assert.deepEqual(s.ending, { kind: 'tap' });
   assert.equal(cleanScene([]), null);
+});
+
+test('moments are kept without the Director\'s note, and a scene without them gets no moments key', () => {
+  const s = cleanScene({ name: 'x', moments: [{ at: 3, ask: 'Why?', ways: [{ kind: 'write' }], note: 'secret' }, 'junk', null] });
+  assert.deepEqual(s.moments, [{ at: 3, ask: 'Why?', ways: [{ kind: 'write' }] }]);
+  assert.ok(!JSON.stringify(s).includes('secret'));
+  assert.equal('moments' in cleanScene({ name: 'x' }), false);
+  assert.equal('moments' in cleanScene({ name: 'x', moments: [] }), false);
+  // A preview plays the moments too, with the GM's own Continue.
+  assert.deepEqual(parseFoundryPreview({ previewId: 'pv-2', director: 'm9', scene: { moments: [{ at: 1, ask: 'Q', note: 'n' }] } }).scene.moments, [{ at: 1, ask: 'Q' }]);
+});
+
+test('the preview, and only the preview, offers a moment\'s Continue; every moment word is translated', () => {
+  const src = readFileSync(new URL('../scripts/cutscenes.mjs', import.meta.url), 'utf8');
+  assert.match(src, /failed: t\('PreviewFailed'\),[\s\S]{0,120}canContinue: true/);
+  assert.equal((src.match(/canContinue: true/g) || []).length, 1);
+  assert.match(src, /canContinue = false/);
+  const lang = JSON.parse(readFileSync(new URL('../lang/en.json', import.meta.url), 'utf8'));
+  for (const k of ['MomentTurn', 'MomentContinue', 'MomentWrite', 'MomentWriteHint', 'MomentDirector', 'MomentDirectorHint']) {
+    assert.ok(lang.CHRONICLE.Cutscenes[k], k);
+    assert.ok(src.includes(`t('${k}')`), k);
+  }
 });
 
 test('viewers reach the Foundry users matched to them who are playing now', () => {
@@ -387,6 +420,178 @@ test('wiring: socket rules, the allowlist, the Satchel tab, and nothing saved in
   }
 });
 
+// --- Moments ------------------------------------------------------------------
+
+const askScene = { ...scene, moments: [{ at: 1, ask: 'What do they whisper?', ways: [{ kind: 'write' }, { kind: 'director' }] }, { at: 2, ask: 'Who?', ways: [{ kind: 'write' }], to: 'one' }] };
+
+test('an answer is a known way, with folded words only when written', () => {
+  assert.deepEqual(cleanAnswer({ way: 'write', text: '  It\nrang\ttwice. ' }), { way: 'write', text: 'It rang twice.' });
+  assert.deepEqual(cleanAnswer({ way: 'director', text: 'ignored' }), { way: 'director', text: '' });
+  assert.equal(cleanAnswer({ way: 'write', text: '   ' }), null);
+  assert.equal(cleanAnswer({ way: 'write', text: 'a'.repeat(281) }), null);
+  assert.equal(cleanAnswer({ way: 'dance' }), null);
+  assert.equal(cleanAnswer(null), null);
+  assert.equal(answerPath('sh 1', 0), '/cutscenes/showings/sh%201/moments/0/answer');
+});
+
+test('who is answering and a moment let go are read from Chronicle; malformed ones are refused', () => {
+  assert.deepEqual(parseFoundryAnswering({ showingId: 'sh-1', moment: 0, userId: 'm2', name: 'Bo', viewers: ['m1', 'm2', 'm2'] }),
+    { showingId: 'sh-1', moment: 0, member: 'm2', name: 'Bo', viewers: ['m1', 'm2'] });
+  assert.equal(parseFoundryAnswering({ showingId: 'sh-1', moment: -1, userId: 'm2' }), null);
+  assert.equal(parseFoundryAnswering({ showingId: 'sh-1', moment: 0 }), null);
+  assert.deepEqual(parseFoundryGo({ showingId: 'sh-1', moment: 1, lines: [{ line: 'It rang.', from: 'Ana' }, { line: '' }, 'x'], viewers: ['m1'] }),
+    { showingId: 'sh-1', moment: 1, lines: [{ line: 'It rang.', from: 'Ana' }], viewers: ['m1'] });
+  assert.equal(parseFoundryGo({ showingId: '../x', moment: 0 }), null);
+  assert.deepEqual(cleanLines(null), []);
+});
+
+test('who else is answering goes to the other viewers playing now, and the lines only to a viewer', () => {
+  const map = { m1: 'u1', m2: 'u2', m3: 'u3' };
+  const here = [{ id: 'u1', active: true }, { id: 'u2', active: true }, { id: 'u3', active: false }];
+  assert.deepEqual(statusTargets({ member: 'm1', viewers: ['m1', 'm2', 'm3'] }, map, here), ['u2']);
+  const rec = { viewers: ['m1'], lines: new Map([[0, []]]) };
+  assert.equal(mayReadLines(rec, 'u1', map, 0), true);
+  assert.equal(mayReadLines(rec, 'u2', map, 0), false, 'not a viewer');
+  assert.equal(mayReadLines(rec, 'u1', map, 1), false, 'not let go');
+  assert.equal(mayReadLines(null, 'u1', map, 0), false);
+});
+
+test('a reload catches up on what Chronicle says: holding, the moments let go, the member\'s own answers', () => {
+  assert.deepEqual(pastOf({ holding: true, released: [0, 'x', 40], answers: [{ moment: 1, way: 'write', text: 'mine' }, { moment: 0, way: 'sing' }] }),
+    { holding: true, released: [0], answers: [{ moment: 1, way: 'write', text: 'mine' }] });
+  assert.deepEqual(pastOf({}), { holding: false, released: [], answers: [] });
+  const entry = { scene: askScene, stopped: false, rewatchUntil: NOW + HOUR, released: new Set([0]) };
+  assert.equal(isHolding(entry, NOW), true);
+  entry.released.add(1);
+  assert.equal(isHolding(entry, NOW), false);
+  assert.equal(isHolding({ scene, rewatchUntil: NOW + HOUR }, NOW), false, 'a scene that asks nothing');
+  assert.equal(isHolding({ scene: askScene, stopped: true, rewatchUntil: NOW + HOUR }, NOW), false);
+});
+
+test('the quiet line names who else is answering, and every word of it is translated', () => {
+  assert.equal(whoKey([], false), null);
+  assert.deepEqual(whoKey(['Ana'], false), { key: 'MomentAdding', data: { name: 'Ana' } });
+  assert.deepEqual(whoKey(['Ana', 'Bo', 'Cy'], false), { key: 'MomentAddingMany', data: { names: 'Ana, Bo', last: 'Cy' } });
+  assert.deepEqual(whoKey(['Ana', 'Bo'], true), { key: 'MomentAnsweringOne', data: { name: 'Ana' } });
+  const lang = JSON.parse(read('lang/en.json')).CHRONICLE.Cutscenes;
+  for (const k of ['MomentAdding', 'MomentAddingMany', 'MomentAnsweringOne', 'MomentSomeone']) assert.equal(typeof lang[k], 'string', k);
+  for (const [, k] of read('scripts/cutscenes.mjs').matchAll(/: t\('(Moment[A-Za-z]+)'\)/g)) assert.equal(typeof lang[k], 'string', k);
+});
+
+test('a player\'s answer goes sealed to the GM\'s key, to Chronicle for the asker\'s own member, and the reply comes back sealed', async () => {
+  emits.length = 0;
+  const posts = [];
+  const relay = new CutsceneRelay();
+  relay._api = { post: async (path, body) => { posts.push([path, body]); return { moment: 0 }; }, get: async () => ({ data: [] }) };
+  relay.onMessage({ type: 'cutscene.foundry', payload: { ...showPayload('sh-20'), scene: askScene } });
+  const fetchKeys = await generateRequestKeys();
+  await relay.handleFetch({ type: CUTSCENE_MSG.FETCH, requestId: 'reqfetch20', showingId: 'sh-20', publicKey: fetchKeys.publicJwk }, 'u1');
+  const play = await decryptReply(fetchKeys.privateKey, emits.find(([, m]) => m.type === CUTSCENE_MSG.PLAY)[1].envelope);
+  assert.ok(play.answerKey && play.answerKey.kty === 'EC', 'the scene comes with the GM\'s answer key');
+  assert.deepEqual(play.past, { released: [], answers: [] });
+  assert.equal(JSON.stringify(play).includes('note'), false);
+
+  emits.length = 0;
+  const keys = await generateRequestKeys();
+  const envelope = await encryptReply(play.answerKey, { showingId: 'sh-20', moment: 0, way: 'write', text: 'It rang twice.' });
+  // The payload's own claim of a user is ignored: the sender is the socket's.
+  await relay.handleAnswer({ type: CUTSCENE_MSG.ANSWER, requestId: 'reqansw20', publicKey: keys.publicJwk, envelope, user: 'm2' }, 'u1');
+  assert.deepEqual(posts, [['/cutscenes/showings/sh-20/moments/0/answer', { user: 'm1', way: 'write', text: 'It rang twice.' }]]);
+  assert.equal(JSON.stringify(emits).includes('It rang twice'), false, 'no answer in the clear');
+  assert.deepEqual(await decryptReply(keys.privateKey, emits[0][1].envelope), { ok: true });
+  assert.deepEqual(emits[0][2], { recipients: ['u1'] });
+
+  // A reloaded screen gets its own answer back with the scene.
+  emits.length = 0;
+  await relay.handleFetch({ type: CUTSCENE_MSG.FETCH, requestId: 'reqfetch21', showingId: 'sh-20', publicKey: fetchKeys.publicJwk }, 'u1');
+  const again = await decryptReply(fetchKeys.privateKey, emits[0][1].envelope);
+  assert.deepEqual(again.past.answers, [{ moment: 0, way: 'write', text: 'It rang twice.' }]);
+
+  // Sealed to another key (the GM reloaded): the player is handed the new one.
+  emits.length = 0;
+  const stale = await generateRequestKeys();
+  const old = await encryptReply(stale.publicJwk, { showingId: 'sh-20', moment: 0, way: 'director' });
+  await relay.handleAnswer({ type: CUTSCENE_MSG.ANSWER, requestId: 'reqansw21', publicKey: keys.publicJwk, envelope: old }, 'u1');
+  const told = await decryptReply(keys.privateKey, emits[0][1].envelope);
+  assert.equal(told.error.code, 'stale_key');
+  assert.deepEqual(told.answerKey, play.answerKey);
+  assert.equal(posts.length, 1);
+
+  // Chronicle's refusal comes back in its own words; an unmatched user never reaches Chronicle.
+  relay._api.post = async () => { throw Object.assign(new Error('409'), { status: 409, data: { message: 'The scene has moved on from this moment.' } }); };
+  assert.deepEqual(await relay.answerFor('u1', 'sh-20', 0, { way: 'director' }), { ok: false, error: { code: 'refused', message: 'The scene has moved on from this moment.' } });
+  assert.equal((await relay.answerFor('stranger', 'sh-20', 0, { way: 'director' })).error.code, 'no_mapping');
+  relay._api.post = async () => { throw Object.assign(new Error('502'), { status: 502, serverMessage: 'upstream stack trace' }); };
+  assert.equal((await relay.answerFor('u1', 'sh-20', 0, { way: 'director' })).error.message, 'CHRONICLE.Cutscenes.MomentFailed', 'a server failure is not shown in its own words');
+});
+
+test('who is answering goes to the other viewers here; a moment let go knocks each viewer, and the lines come back sealed to a viewer alone', async () => {
+  emits.length = 0;
+  const relay = new CutsceneRelay();
+  relay.onMessage({ type: 'cutscene.foundry_answering', payload: { showingId: 'sh-30', moment: 0, userId: 'm2', name: 'Bo', viewers: ['m1', 'm2'] } });
+  assert.deepEqual(emits.map(([, m, o]) => [m, o]), [[{ type: CUTSCENE_MSG.STATUS, showingId: 'sh-30', moment: 0, member: 'm2', name: 'Bo', toUserId: 'u1' }, { recipients: ['u1'] }]]);
+
+  emits.length = 0;
+  relay.onMessage({ type: 'cutscene.foundry_go', payload: { showingId: 'sh-30', moment: 0, lines: [{ line: 'The bell is still down there.', from: 'Bo' }], viewers: ['m1', 'm2'] } });
+  assert.deepEqual(emits.map(([, m, o]) => [m, o]), [[{ type: CUTSCENE_MSG.GO, showingId: 'sh-30', moment: 0, toUserId: 'u1' }, { recipients: ['u1'] }]]);
+  assert.equal(JSON.stringify(emits).includes('bell'), false, 'no line in the clear');
+
+  emits.length = 0;
+  const keys = await generateRequestKeys();
+  await relay.handleLines({ type: CUTSCENE_MSG.LINES, requestId: 'reqlines30', publicKey: keys.publicJwk, showingId: 'sh-30', moment: 0 }, 'u1');
+  assert.deepEqual(await decryptReply(keys.privateKey, emits[0][1].envelope), { ok: true, lines: [{ line: 'The bell is still down there.', from: 'Bo' }] });
+  emits.length = 0;
+  await relay.handleLines({ type: CUTSCENE_MSG.LINES, requestId: 'reqlines31', publicKey: keys.publicJwk, showingId: 'sh-30', moment: 0 }, 'u9');
+  assert.deepEqual(await decryptReply(keys.privateKey, emits[0][1].envelope), { ok: false, error: { code: 'not_viewer' } });
+});
+
+test('a player who reconnects mid-hold is knocked again, from what the GM holds or from Chronicle\'s list', async () => {
+  emits.length = 0;
+  const relay = new CutsceneRelay();
+  // Shown long ago and still holding: past the two-minute late join.
+  relay.onMessage({ type: 'cutscene.foundry', payload: { ...showPayload('sh-40'), scene: askScene, shownAt: new Date(Date.now() - HOUR / 2).toISOString() } });
+  emits.length = 0;
+  await relay.onUserConnected('u1');
+  assert.deepEqual(emits.map(([, m]) => [m.type, m.showingId]), [[CUTSCENE_MSG.KNOCK, 'sh-40']]);
+
+  // A GM that never heard of it reads Chronicle's list for that member.
+  emits.length = 0;
+  settings.cutscenesAvailable = true;
+  const fresh = new CutsceneRelay();
+  const calls = [];
+  fresh._api = {
+    get: async (path) => {
+      calls.push(path);
+      return { data: [
+        { showingId: 'sh-41', name: 'Asks', shownAt: new Date(Date.now() - HOUR).toISOString(), rewatchUntil: new Date(Date.now() + HOUR).toISOString(), scene: askScene, holding: true, released: [0], answers: [{ moment: 1, way: 'write', text: 'Vell' }] },
+        { showingId: 'sh-42', name: 'Done', shownAt: new Date(Date.now() - HOUR).toISOString(), rewatchUntil: new Date(Date.now() + HOUR).toISOString(), scene },
+      ] };
+    },
+  };
+  try {
+    await fresh.onUserConnected('u1');
+  } finally {
+    settings.cutscenesAvailable = false;
+  }
+  assert.deepEqual(calls, ['/cutscenes/showings?user=m1']);
+  assert.deepEqual(emits.map(([, m]) => [m.type, m.showingId]), [[CUTSCENE_MSG.KNOCK, 'sh-41']]);
+  emits.length = 0;
+  const keys = await generateRequestKeys();
+  await fresh.handleFetch({ type: CUTSCENE_MSG.FETCH, requestId: 'reqfetch41', showingId: 'sh-41', publicKey: keys.publicJwk }, 'u1');
+  const body = await decryptReply(keys.privateKey, emits[0][1].envelope);
+  assert.deepEqual(body.past, { released: [0], answers: [{ moment: 1, way: 'write', text: 'Vell' }] });
+});
+
+test('wiring: moment messages count only from a GM for this user, and each GM answer is rate-limited first', () => {
+  const src = read('scripts/cutscenes.mjs');
+  assert.match(src, /if \(fromGM && forMe && id && Number\.isInteger\(data\.moment\) && typeof data\.member === 'string'\)/);
+  assert.match(src, /if \(fromGM && forMe && id && Number\.isInteger\(data\.moment\)\) onGo\(id, data\.moment\);/);
+  for (const fn of ['async handleAnswer(', 'async handleLines(']) {
+    const body = src.slice(src.indexOf(fn), src.indexOf('\n  }\n', src.indexOf(fn)));
+    assert.match(body, /if \(!isActiveGM\(\) \|\| !askLimit\(senderId\)\) return;/, fn);
+  }
+});
+
 const VENDORED = new URL('../vendor/chronicle/cutscene_engine.js', import.meta.url);
 const vendored = existsSync(VENDORED);
 
@@ -407,4 +612,15 @@ test('the vendored engine matches Chronicle\'s (needs CHRONICLE_DIR)', { skip: !
   assert.ok(existsSync(chronicle), 'Chronicle has no static/js/cutscene_engine.js; it moved or was renamed, so update tools/refresh-vendor.mjs');
   assert.ok(readFileSync(chronicle).equals(readFileSync(VENDORED)),
     'vendor/chronicle/cutscene_engine.js differs from Chronicle\'s; copy it again from static/js/');
+});
+
+test('a refused answer reaches the player in words they can use', () => {
+  assert.deepEqual(answerRefusal(404, 'page not found'), { key: 'MomentGone' });
+  assert.deepEqual(answerRefusal(409, ' The scene has moved on from this moment. '), { text: 'The scene has moved on from this moment.' });
+  assert.deepEqual(answerRefusal(429, 'Slow down.'), { text: 'Slow down.' });
+  assert.equal(answerRefusal(500, 'boom'), null);
+  assert.equal(answerRefusal(400, ''), null);
+  assert.equal(answerRefusal(undefined, undefined), null);
+  const en = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'lang', 'en.json'), 'utf8'));
+  assert.ok(en.CHRONICLE.Cutscenes.MomentGone);
 });
