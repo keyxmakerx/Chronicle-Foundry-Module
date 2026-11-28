@@ -10,7 +10,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const { gmNotesBoxes, gmNotesText, holdsOwnText, pageReader } = await import('../scripts/_gm-notes-view.mjs');
+const {
+  gmNotesBoxes, gmNotesText, holdsOwnText, pageReader, notesHtml, notesPlainText, stripFormParts, FORM_PARTS,
+} = await import('../scripts/_gm-notes-view.mjs');
 
 const FIELDS = [
   { key: 'backstory', owner_only: true, foundry_path: 'system.biography.value' },
@@ -64,6 +66,32 @@ test('a sheet that draws several times reads Chronicle once, and a failure is no
   assert.equal(calls, 4, 'a failed read is read again, not served from the cache');
 });
 
+test('notes that carry form parts lose every one before joining the sheet', () => {
+  for (const part of ['input', 'select', 'textarea', 'button', 'form', '[name]', '[contenteditable]']) {
+    assert.ok(FORM_PARTS.split(',').map((p) => p.trim()).includes(part), `FORM_PARTS must cover ${part}`);
+  }
+  // Notes as Foundry might parse them: a paragraph, a named input, a select
+  // and an element with a name, inside the box.
+  const removed = [];
+  const parts = ['input[name=system.biography.director]', 'select', 'span[name=x]']
+    .map((tag) => ({ tag, remove() { removed.push(tag); } }));
+  let asked = '';
+  const root = { querySelectorAll(sel) { asked = sel; return parts; } };
+  assert.equal(stripFormParts(root), 3);
+  assert.equal(asked, FORM_PARTS);
+  assert.deepEqual(removed, parts.map((p) => p.tag));
+});
+
+test('a missing or failing sanitizer shows the notes as text, never as HTML', () => {
+  const raw = '<p>Secret <img src=x onerror=alert(1)></p><script>x()</script>';
+  assert.equal(notesHtml(raw, null), null);
+  assert.equal(notesHtml(raw, undefined), null);
+  assert.equal(notesHtml(raw, () => { throw new Error('boom'); }), null);
+  assert.equal(notesHtml(raw, () => 42), null);
+  assert.equal(notesHtml(raw, (h) => h.replace(/<script>.*<\/script>/, '')), '<p>Secret <img src=x onerror=alert(1)></p>');
+  assert.equal(notesPlainText('<p>One &amp; two</p><ul><li>A</li><li>B</li></ul>'), 'One & two\nA\nB');
+});
+
 const VIEW = readFileSync(new URL('../scripts/gm-notes-view.mjs', import.meta.url), 'utf8');
 const CODE = VIEW.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 const SYNC = readFileSync(new URL('../scripts/actor-sync.mjs', import.meta.url), 'utf8');
@@ -82,11 +110,16 @@ test('the view never writes to the actor or into the sheet\'s form', () => {
 test('only a GM client draws the notes, and the HTML is sanitized', () => {
   assert.match(CODE, /register\(\) \{\s*if \(!this\.active \|\| !game\.user\?\.isGM\) return;/);
   assert.match(CODE, /_onRender\(app, html\) \{\s*if \(!game\.user\?\.isGM\) return;/);
-  const html = CODE.match(/innerHTML = ([^;]+);/g) ?? [];
-  assert.ok(html.length >= 1);
-  for (const line of html) {
-    assert.ok(/_sanitizeIncomingHTML\(|escapeHtml\(/.test(line), `unsanitized innerHTML: ${line}`);
-  }
+  // The notes are parsed in an inert template, stripped, then moved in;
+  // the only other innerHTML is the escaped link label.
+  const html = CODE.match(/\.innerHTML = [^;]+;/g) ?? [];
+  assert.deepEqual(html.map((l) => l.replace(/\s+/g, ' ')).sort(), [
+    '.innerHTML = `${escapeHtml(t(\'Edit\'))} <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>`;',
+    '.innerHTML = clean;',
+  ].sort());
+  assert.match(CODE, /const clean = notesHtml\(html, _resolveCleanHTML\(\)\);\s*if \(clean === null\) \{\s*body\.textContent = notesPlainText\(html\);/);
+  assert.match(CODE, /tpl\.innerHTML = clean;\s*stripFormParts\(tpl\.content\);\s*body\.replaceChildren\(tpl\.content\);/);
+  assert.ok(!CODE.includes('_sanitizeIncomingHTML'), 'the fail-open sanitizer is not used for live DOM');
 });
 
 test('actor sync builds the view with its GM-only fields and drops a read on each update', () => {

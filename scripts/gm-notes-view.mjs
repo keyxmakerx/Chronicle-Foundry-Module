@@ -13,9 +13,11 @@ import { FLAG_SCOPE } from './constants.mjs';
 import { getSetting } from './settings.mjs';
 import { escapeHtml } from './_escape-html.mjs';
 import { entryTextHTML } from './_entry-text.mjs';
-import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
+import { _resolveCleanHTML } from './_html-sanitizer.mjs';
 import { chroniclePageUrl } from './_hero-looks.mjs';
-import { gmNotesBoxes, gmNotesText, holdsOwnText, pageReader } from './_gm-notes-view.mjs';
+import {
+  gmNotesBoxes, gmNotesText, holdsOwnText, notesHtml, notesPlainText, pageReader, stripFormParts,
+} from './_gm-notes-view.mjs';
 
 const VIEW_CLASS = 'chronicle-gm-notes';
 
@@ -96,7 +98,7 @@ export class GmNotesView {
         body.textContent = t('Empty');
         return;
       }
-      body.innerHTML = _sanitizeIncomingHTML(entryTextHTML(text));
+      showNotes(body, entryTextHTML(text));
     }).catch((err) => {
       console.warn(`Chronicle: could not load "${actor.name}"'s GM notes`, err);
       body.textContent = '';
@@ -113,6 +115,23 @@ export class GmNotesView {
       body.append(msg, ' ', retry);
     });
   }
+}
+
+/**
+ * Put the notes in the box: sanitized HTML parsed in an inert template, with
+ * every form part taken out before it joins the sheet's form; plain text
+ * when sanitizing can't run.
+ */
+function showNotes(body, html) {
+  const clean = notesHtml(html, _resolveCleanHTML());
+  if (clean === null) {
+    body.textContent = notesPlainText(html);
+    return;
+  }
+  const tpl = document.createElement('template');
+  tpl.innerHTML = clean;
+  stripFormParts(tpl.content);
+  body.replaceChildren(tpl.content);
 }
 
 /**

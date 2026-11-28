@@ -9,6 +9,57 @@
 import { clearableGmFields } from './_gm-field-clear.mjs';
 import { readPath } from './_actor-apply-plan.mjs';
 
+/** Markup that a sheet's form would collect, or that could take typing. */
+export const FORM_PARTS = 'input, select, textarea, button, form, option, [name], [contenteditable]';
+
+/**
+ * The notes as HTML for the GM's sheet, or null when they can only be shown
+ * as text. The view writes into the live page, where nothing sanitizes
+ * afterwards, so a missing or failing sanitizer means text, never raw HTML;
+ * the operator's skip-sanitizing setting does not apply here.
+ * @param {string} html
+ * @param {((html: string) => string)|null} clean - Foundry's cleanHTML
+ * @returns {string|null}
+ */
+export function notesHtml(html, clean) {
+  if (typeof clean !== 'function') return null;
+  try {
+    const out = clean(String(html ?? ''));
+    return typeof out === 'string' ? out : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The notes as plain words, for when they can't be shown as HTML.
+ * @param {string} html
+ * @returns {string}
+ */
+export function notesPlainText(html) {
+  return String(html ?? '')
+    .replace(/<\/(p|div|h[1-6]|li|ul|ol)>|<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+    .replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/**
+ * Remove from parsed notes everything a sheet's form would collect or that
+ * takes typing, so the notes inside the sheet's fieldset can never be saved
+ * with it.
+ * @param {{querySelectorAll: (sel: string) => Iterable<{remove: () => void}>}} root
+ * @returns {number} how many were removed
+ */
+export function stripFormParts(root) {
+  let n = 0;
+  for (const el of Array.from(root.querySelectorAll(FORM_PARTS))) {
+    el.remove();
+    n += 1;
+  }
+  return n;
+}
+
 /**
  * The boxes to fill: each GM-only field the system maps to a path on the
  * actor's own data.

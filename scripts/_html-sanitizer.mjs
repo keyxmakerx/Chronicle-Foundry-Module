@@ -27,7 +27,7 @@ import { MODULE_ID } from './constants.mjs';
  *
  * @returns {((html: string) => string) | null}
  */
-function _resolveCleanHTML() {
+export function _resolveCleanHTML() {
   // v14: the sanitizer left TextEditor for foundry.utils.
   try {
     const utils = globalThis.foundry?.utils?.cleanHTML;
