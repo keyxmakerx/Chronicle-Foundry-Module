@@ -10,10 +10,17 @@
  * Chronicle replaces it, and it goes when its kit goes. The text conversion
  * is the creature one (`_creature-abilities.mjs`), with a hero's power roll:
  * the characteristics it names, and "3 + A or R" damage read as `3 + @chr`.
+ *
+ * A list property the field's `foundry_entry_items` names (an ancestry's
+ * signature traits) gives one item of the mapped type per named object, with
+ * its description, kept in step the same way.
  * `tools/test-entry-abilities.mjs`.
  */
 import { FLAG_SCOPE } from './constants.mjs';
 import { abilityItem, fingerprint, plainText, planAbilityItems } from './_creature-abilities.mjs';
+import { hasClearSecrets } from './_gm-secrets.mjs';
+import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
+import { entryTextHTML } from './_entry-text.mjs';
 
 /** Item flag naming the entry ability an item was made from: `field:entry name:part`. */
 export const ENTRY_ABILITY_FLAG = 'entryAbility';
@@ -81,6 +88,53 @@ export function heroAbilityItem(ability, { known = {}, key, hash }) {
 }
 
 /**
+ * The items one list property of an entry gives under `foundry_entry_items`:
+ * each named object in the list. A type the system doesn't define gives
+ * none, so a mapping can't make a document Foundry would refuse; nor does a
+ * type an identity field syncs, since sync would read a second ancestry or
+ * kit as the hero's. Two objects whose names match give one item, the first.
+ * @param {object} entry
+ * @param {Record<string, {type: string}>} [entryItems]
+ * @param {string[]|null} [itemTypes] - the system's item types
+ * @param {string[]} [identityTypes] - the item types identity fields sync
+ * @returns {Array<{prop: string, type: string, item: {name: string, description?: string}}>}
+ */
+export function entryListItems(entry, entryItems, itemTypes, identityTypes = []) {
+  const props = entry?.properties && typeof entry.properties === 'object' ? entry.properties : {};
+  if (!Array.isArray(itemTypes)) return [];
+  const out = [];
+  for (const [prop, def] of Object.entries(entryItems ?? {}).sort(([a], [b]) => a.localeCompare(b))) {
+    const list = Object.hasOwn(props, prop) ? props[prop] : null;
+    if (!Array.isArray(list) || typeof def?.type !== 'string' || !itemTypes.includes(def.type)) continue;
+    if (identityTypes.includes(def.type)) continue;
+    const seen = new Set();
+    for (const item of list) {
+      if (!item || typeof item !== 'object' || typeof item.name !== 'string' || !item.name.trim()) continue;
+      if (seen.has(norm(item.name))) continue;
+      seen.add(norm(item.name));
+      out.push({ prop, type: def.type, item });
+    }
+  }
+  return out;
+}
+
+/**
+ * One list object as item data: its name, and its description as the item's
+ * text (Markdown or HTML, cleaned as every Chronicle text is). Null when the
+ * text still holds GM-only content.
+ */
+export function entryListItemData({ type, item }, { key, hash }) {
+  const html = typeof item.description === 'string' ? _sanitizeIncomingHTML(entryTextHTML(item.description)) : '';
+  if (hasClearSecrets(html)) return null;
+  return {
+    name: item.name.trim().slice(0, 200),
+    type,
+    system: { description: { value: html } },
+    flags: { [FLAG_SCOPE]: { chronicleMade: true, [ENTRY_ABILITY_FLAG]: key, [ENTRY_ABILITY_HASH]: hash } },
+  };
+}
+
+/**
  * The ability items to make and remove on an actor so the abilities match
  * the entries of the items sync made from campaign entries. Only fields
  * whose entries were read are planned; a field's made abilities go when its
@@ -91,10 +145,13 @@ export function heroAbilityItem(ability, { known = {}, key, hash }) {
  * @param {Array<{id: string, name: string, type: string, flags?: object}>} args.items
  * @param {Array<{fieldKey: string, itemType: string}>} args.fields - identity fields
  * @param {Record<string, Array<object>>} args.entriesByField - only the fields read
- * @param {object} [args.known]
+ * @param {object} [args.known] - also `itemTypes`, the system's item types
+ * @param {Record<string, object>} [args.entryItemsByField] - each field's `foundry_entry_items`
+ * @param {string[]} [args.identityTypes] - every identity field's item type, not only `fields`'
  * @returns {{create: object[], remove: string[]}}
  */
-export function planEntryAbilities({ items, fields, entriesByField, known = {} }) {
+export function planEntryAbilities({ items, fields, entriesByField, known = {}, entryItemsByField, identityTypes = [] }) {
+  const notListable = [...identityTypes, ...(fields ?? []).map((f) => f.itemType)];
   const list = Array.isArray(items) ? items : [];
   const read = (fields ?? []).filter((f) => Array.isArray(entriesByField?.[f.fieldKey]));
   const desired = [];
@@ -105,6 +162,12 @@ export function planEntryAbilities({ items, fields, entriesByField, known = {} }
         const key = `${fieldKey}:${norm(it.name)}:${prop}`;
         const hash = fingerprint(ability);
         desired.push({ key, hash, data: heroAbilityItem(ability, { known, key, hash }) });
+      }
+      for (const listed of entryListItems(entry, entryItemsByField?.[fieldKey], known.itemTypes, notListable)) {
+        const key = `${fieldKey}:${norm(it.name)}:${listed.prop}:${norm(listed.item.name)}`;
+        const hash = fingerprint(listed.item);
+        const data = entryListItemData(listed, { key, hash });
+        if (data) desired.push({ key, hash, data });
       }
     }
   }

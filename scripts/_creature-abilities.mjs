@@ -349,12 +349,14 @@ export function desiredAbilities(fieldsData, { known = {}, flagScope }) {
  */
 export function planAbilityItems(desired, items) {
   const ours = new Map(items.filter((i) => i.key).map((i) => [i.key, i]));
-  const theirs = new Set(items.filter((i) => !i.key && i.type === 'ability').map((i) => i.name.trim().toLowerCase()));
+  // The GM's own item of the same type and name wins over a made one.
+  const own = (type, name) => `${type}\u0000${String(name ?? '').trim().toLowerCase()}`;
+  const theirs = new Set(items.filter((i) => !i.key).map((i) => own(i.type, i.name)));
   const wanted = new Set();
   const create = [];
   const remove = [];
   for (const d of desired) {
-    if (theirs.has(d.data.name.trim().toLowerCase())) continue;
+    if (theirs.has(own(d.data.type ?? 'ability', d.data.name))) continue;
     wanted.add(d.key);
     const have = ours.get(d.key);
     if (have && have.hash === d.hash) continue;
