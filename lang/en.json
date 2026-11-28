@@ -471,6 +471,15 @@
       "GMLinked": "{user} linked themselves to {name} in Chronicle with a code.",
       "Tool": "Link to Chronicle"
     },
+    "GmNotes": {
+      "Loading": "Loading your notes from Chronicle\u2026",
+      "Empty": "No notes in Chronicle yet.",
+      "Failed": "Couldn't load your notes from Chronicle.",
+      "Retry": "Try again",
+      "OnlyYou": "Only you see this. It's loaded from Chronicle and never saved in Foundry.",
+      "Edit": "Edit in Chronicle",
+      "OwnText": "The text below is saved on the character, where players can read it, and doesn't go to Chronicle."
+    },
     "FinishHero": {
       "Title": "Finish {actor}",
       "Body": "Chronicle picked <strong>{cls}</strong> as {actor}'s class. Foundry builds a class through its own level-up steps. Run them now with {cls} chosen?",

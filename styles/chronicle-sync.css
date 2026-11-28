@@ -107,6 +107,29 @@ html[data-cs-motion="off"] :is(.cs-grow, .cs-settle, .cs-peek) {
   padding: 0 10px;
 }
 
+/* The GM's notes in the sheet's GM-only box: the sheet's own type, a quiet
+   footer under them. Shown on the GM's client only, never saved. */
+.chronicle-gm-notes__body > :first-child {
+  margin-top: 0;
+}
+
+.chronicle-gm-notes__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
+  margin: 8px 0 0;
+  padding-top: 6px;
+  border-top: 1px solid currentColor;
+  border-top-color: color-mix(in srgb, currentColor 20%, transparent);
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.chronicle-gm-notes__own {
+  flex-basis: 100%;
+}
+
 /* Sync status indicator in the sidebar */
 .chronicle-sync-status {
   display: flex;
