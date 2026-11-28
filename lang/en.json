@@ -438,6 +438,7 @@
       "ReconnectingNow": "Chronicle: Reconnecting…"
     },
     "Notifications": {
+      "LinksUndoneOnConnect": "Chronicle: {count} link(s) to Chronicle pages were not made by a GM's sync, so they were undone: {names}. Link them again from the Chronicle Sync dashboard if they should sync.",
       "PlayerLinkUndone": "Chronicle: a player changed which Chronicle page \"{name}\" is linked to. Only sync may change that, so \"{name}\" was unlinked. Link it again from the Chronicle Sync dashboard if it should sync.",
       "DmOnlyItemHeld": "Chronicle: {actor} still has {items}, linked as Director-only in Chronicle and added before such items were kept off characters players can see. Players who can see {actor} can read those names; remove them if they should not.",
       "ConflictKeptChronicle": "Conflict on \"{name}\" — kept Chronicle version.",

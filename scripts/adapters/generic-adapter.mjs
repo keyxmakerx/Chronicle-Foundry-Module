@@ -102,7 +102,8 @@ export async function createGenericAdapter(api, chronicleSystemId) {
     /**
      * Like toChronicleFields, but only the scalar fields the update `change`
      * touched, plus the Foundry-derived collection fields (items) when at
-     * least one scalar or a mapped item changed. Returns null when nothing
+     * least one scalar or a mapped item changed; a single-item field only
+     * when an item of its type changed. Returns null when nothing
      * mapped changed, so the caller skips the push. Chronicle merges the
      * result into the stored fields, so Chronicle-only fields are never
      * overwritten.
@@ -123,7 +124,15 @@ export async function createGenericAdapter(api, chronicleSystemId) {
       if (touched.size === 0 && !itemsTouched) return null;
       const out = buildChronicleFields(
         actor,
-        mappedFields.filter((f) => f.foundry_collection || touched.has(f.key)),
+        mappedFields.filter((f) => {
+          if (touched.has(f.key)) return true;
+          if (!f.foundry_collection) return false;
+          // A pick (a single-item field: ancestry, culture, class...) goes
+          // only when an item of its own type changed in this burst, so an
+          // unrelated edit leaves every pick as Chronicle has it.
+          if (f.foundry_item_single) return itemTypesOf(f).some((t) => itemsTouched && t in items);
+          return true;
+        }),
       );
       if (itemsTouched) {
         for (const def of identity) {
@@ -241,6 +250,12 @@ export function normalizeFoundryValue(value, depth) {
     out[k] = normalizeFoundryValue(value[k], depth + 1);
   }
   return out;
+}
+
+/** The item types a collection field reads. */
+function itemTypesOf(field) {
+  const types = Array.isArray(field?.foundry_item_type) ? field.foundry_item_type : [field?.foundry_item_type];
+  return types.filter((t) => typeof t === 'string' && t);
 }
 
 /**
