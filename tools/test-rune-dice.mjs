@@ -15,7 +15,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
-  ASSET_ROOT, CRITS, CRIT_TRIGGER, GROUP, MANIFEST_PATH, RUNE_SET_IDS, appearanceFor, critRegistrations, critSfx, buildRegistrations, colorsetId, readManifest, safeAssetPath, syncAppearance, systemId, SYNC_ID,
+  ASSET_ROOT, CRITS, CRIT_TRIGGER, GROUP, MANIFEST_PATH, RUNE_SET_IDS, appearanceFor, critRegistrations, critSfx, buildRegistrations, colorsetId, readManifest, safeAssetPath, syncAppearance, syncRegistrations, systemId, SYNC_ID,
 } from '../scripts/_rune-dice.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -110,6 +110,34 @@ test('registrations: a theme per set colour, a dice set only where there is art'
   assert.notEqual(colorsetId('a-b', 'c'), colorsetId('a', 'b-c'));
 });
 
+test("shared faces serve every set; a set's own faces win type by type", () => {
+  const own = faces('d6', 6).map((p) => p.replace('ember/', 'cage/'));
+  const r = readManifest({
+    version: 1,
+    faces: { d6: faces('d6', 6), d20: faces('d20', 20), d13: [] },
+    sets: [{ id: 'cage', faces: { d6: own } }, { id: 'oak' }],
+  });
+  assert.deepEqual(r.problems, [{ code: 'SharedFaceType', detail: 'd13' }]);
+  assert.deepEqual(r.sets[0].faces.d6, own);
+  assert.deepEqual(r.sets[0].faces.d20, faces('d20', 20));
+  assert.deepEqual(r.sets[1].faces, { d6: faces('d6', 6), d20: faces('d20', 20) });
+  assert.equal(readManifest({ version: 1, faces: { d8: faces('d8', 7) }, sets: [{ id: 'oak' }] }).problems[0].code, 'SharedFaceList');
+});
+
+test("face pictures take each colour's ink; colour-only sets keep plain labels", () => {
+  const { sets } = readManifest({
+    version: 1,
+    sets: [
+      { id: 'cage', colours: [{ id: 'bronze', foreground: '#c48a52' }, { id: 'iron' }], faces: { d6: faces('d6', 6) } },
+      { id: 'plain' },
+    ],
+  });
+  const r = buildRegistrations(sets, '');
+  assert.deepEqual(r.colorsets.map((c) => c.labelComposite), ['multiply', 'multiply', undefined]);
+  const sync = syncRegistrations(r, { set: 'cage', colour: 'iron' }, 'Sync');
+  assert.equal(sync.colorset.labelComposite, 'multiply');
+});
+
 test("a die wears its roller's set and colour only when they registered here", () => {
   const registered = {
     colorsets: new Set([colorsetId('cage', 'bronze'), colorsetId('cage', 'iron'), colorsetId('plain', 'default')]),
@@ -172,4 +200,7 @@ test('the shipped list is the 24 signed sets', () => {
   assert.deepEqual(r.sets.map((s) => s.id), [...RUNE_SET_IDS]);
   assert.ok(r.sets.every((s) => s.colours.length >= 5 && s.material));
   assert.equal(r.sets.find((s) => s.id === 'jewelled').colours[0].id, 'onyx');
+  // Every set wears Chronicle's rune numerals. The d4 keeps Dice So Nice's own:
+  // it draws d4 pictures untinted, so one white set could not take each colour.
+  for (const s of r.sets) assert.deepEqual(Object.keys(s.faces), ['d6', 'd8', 'd10', 'd12', 'd20', 'd100'], s.id);
 });

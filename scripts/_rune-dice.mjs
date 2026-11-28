@@ -70,8 +70,37 @@ export function safeAssetPath(p, ext) {
 }
 
 /**
+ * One faces block: per die type, a picture for every face, in value order.
+ * A type with a wrong count or a bad path drops only that type.
+ * @param {*} block
+ * @param {object[]} problems
+ * @param {string} [set] - the set it belongs to; none for the shared block
+ * @returns {Object<string, string[]>}
+ */
+function readFaces(block, problems, set) {
+  const faces = {};
+  // The shared block's problems have their own codes, since no set is to blame.
+  const flag = (code, detail) => problems.push(set ? { code, set, detail } : { code: `Shared${code}`, detail });
+  for (const [type, list] of Object.entries(block && typeof block === 'object' ? block : {})) {
+    if (!DIE_TYPES.includes(type)) {
+      flag('FaceType', type);
+      continue;
+    }
+    const paths = Array.isArray(list) ? list.map((p) => safeAssetPath(p, LABEL_EXT)) : [];
+    if (paths.length !== FACES[type] || paths.some((p) => !p)) {
+      flag('FaceList', type);
+      continue;
+    }
+    faces[type] = paths;
+  }
+  return faces;
+}
+
+/**
  * Read the shipped set list. Never throws: a broken file is one problem, a
- * broken set is one problem and the other sets still load.
+ * broken set is one problem and the other sets still load. A top-level
+ * `faces` block is every set's faces, since Chronicle's rune numerals are the
+ * same on every set; a set's own `faces` replace it type by type.
  * @param {*} raw - parsed JSON
  * @returns {{version: number, sets: object[], problems: {code: string, set?: string, detail?: string}[]}}
  */
@@ -83,6 +112,7 @@ export function readManifest(raw) {
   const version = Number.isInteger(raw.version) ? raw.version : 0;
   if (version !== 1) problems.push({ code: 'ManifestVersion', detail: String(raw.version) });
 
+  const sharedFaces = readFaces(raw.faces, problems);
   const sets = [];
   const seen = new Set();
   for (const entry of raw.sets) {
@@ -129,19 +159,8 @@ export function readManifest(raw) {
       else problems.push({ code: 'SetMaterial', set: id, detail: String(entry.material) });
     }
 
-    const faces = {};
-    for (const [type, list] of Object.entries(entry.faces ?? {})) {
-      if (!DIE_TYPES.includes(type)) {
-        problems.push({ code: 'FaceType', set: id, detail: type });
-        continue;
-      }
-      const paths = Array.isArray(list) ? list.map((p) => safeAssetPath(p, LABEL_EXT)) : [];
-      if (paths.length !== FACES[type] || paths.some((p) => !p)) {
-        problems.push({ code: 'FaceList', set: id, detail: type });
-        continue;
-      }
-      faces[type] = paths;
-    }
+    // A set's own faces win type by type over the faces every set shares.
+    const faces = { ...sharedFaces, ...readFaces(entry.faces, problems, id) };
 
     const models = {};
     for (const [type, p] of Object.entries(entry.models ?? {})) {
@@ -184,6 +203,9 @@ export function buildRegistrations(sets, moduleRoot) {
     for (const c of s.colours) {
       const cs = { name: colorsetId(s.id, c.id), description: c.id === DEFAULT_COLOUR ? s.name : `${s.name}: ${c.name}`, category: GROUP, ...c.values };
       if (s.material) cs.material = s.material;
+      // Face pictures are white numerals on a clear tile: multiplying tints
+      // them to each colour's ink, so one picture set serves every colour.
+      if (Object.keys(s.faces).length) cs.labelComposite = 'multiply';
       colorsets.push(cs);
       setOf.set(cs.name, s.id);
     }
