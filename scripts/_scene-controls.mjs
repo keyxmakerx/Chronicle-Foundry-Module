@@ -1,8 +1,8 @@
 /**
  * Pure builder for the Chronicle group in Foundry's scene controls.
  *
- * GMs get Chronicle Sync and the DM Screen; the Satchel and the Calendar are
- * for every user once the world is connected to Chronicle. The GM tools must
+ * GMs get Chronicle Sync and the DM Screen; the Satchel, the Calendar and the Dice mat
+ * are for every user once the world is connected to Chronicle. The GM tools must
  * never reach a player: tools/test-scene-controls.mjs pins that.
  */
 
@@ -15,8 +15,8 @@
  * @param {boolean} opts.isGM
  * @param {boolean} opts.notebook - the world is connected to Chronicle
  * @param {boolean} [opts.link] - a player not yet linked to a Chronicle member
- * @param {{dashboard: Function, dmScreen: Function, satchel: Function, calendar?: Function, link?: Function}} opts.run
- * @param {{dashboard: string, dmScreen: string, satchel: string, calendar?: string, link?: string}} opts.titles - localized
+ * @param {{dashboard: Function, dmScreen: Function, satchel: Function, calendar?: Function, diceMat?: Function, link?: Function}} opts.run
+ * @param {{dashboard: string, dmScreen: string, satchel: string, calendar?: string, diceMat?: string, link?: string}} opts.titles - localized
  */
 export function addChronicleControls(controls, { isGM, notebook, link = false, run, titles }) {
   const tools = [];
@@ -51,6 +51,15 @@ export function addChronicleControls(controls, { isGM, notebook, link = false, r
         icon: 'fa-solid fa-calendar-days',
         button: true,
         run: run.calendar,
+      });
+    }
+    if (run.diceMat) {
+      tools.push({
+        name: 'dice-mat',
+        title: titles.diceMat,
+        icon: 'fa-solid fa-dice',
+        button: true,
+        run: run.diceMat,
       });
     }
     if (link && !isGM && run.link) {

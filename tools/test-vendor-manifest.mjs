@@ -20,6 +20,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { VENDOR_MANIFEST } from '../scripts/_vendor-manifest.mjs';
 import { SHOP_ROOM_FILES } from '../scripts/_shop-room-data.mjs';
+import { MAT_FILES } from '../scripts/_dice-mat.mjs';
 import { SOURCES, digestOf, manifestSource } from './refresh-vendor.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -61,6 +62,9 @@ function freshnessPairs() {
   const craftPairs = [...craft.matchAll(/\['([\w.]+\.(?:js|css))', '(js|css)'\]/g)];
   assert.ok(craftPairs.length, 'test-craft-relay.mjs keeps its file list');
   for (const [, f, from] of craftPairs) pairs.set(f, `internal/plugins/crafting/static/${from}/${f}`);
+  const dice = read('tools/test-dice-mat.mjs');
+  assert.match(dice, /'internal', 'plugins', 'rolls', 'static', 'js'/);
+  for (const f of MAT_FILES) pairs.set(f, `internal/plugins/rolls/static/js/${f}`);
   return pairs;
 }
 
@@ -70,9 +74,9 @@ test('the freshness tests compare exactly the manifest\'s files, from the same s
   for (const [file, source] of pairs) assert.equal(VENDOR_MANIFEST[file].source, source, file);
 });
 
-test('engines are the four the version check names', () => {
+test('engines are the five the version check names', () => {
   const engines = new Set(Object.values(VENDOR_MANIFEST).map((e) => e.engine));
-  assert.deepEqual([...engines].sort(), ['crafting', 'cutscenes', 'shop', 'sky']);
+  assert.deepEqual([...engines].sort(), ['crafting', 'cutscenes', 'dice', 'shop', 'sky']);
 });
 
 const FRESHNESS_TESTS = {
@@ -80,6 +84,7 @@ const FRESHNESS_TESTS = {
   shop: 'tools/test-shop-room.mjs',
   sky: 'tools/test-sky-clock.mjs',
   crafting: 'tools/test-craft-relay.mjs',
+  dice: 'tools/test-dice-mat.mjs',
 };
 
 // True when the Chronicle comparison itself was skipped. Node 20 also

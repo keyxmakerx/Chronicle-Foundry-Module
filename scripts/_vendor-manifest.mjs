@@ -28,4 +28,6 @@ export const VENDOR_MANIFEST = Object.freeze({
   "crafting_block.js": { engine: "crafting", source: "internal/plugins/crafting/static/js/crafting_block.js", digest: "a8cbf348587f" },
   "crafting.css": { engine: "crafting", source: "internal/plugins/crafting/static/css/crafting.css", digest: "5923751e2ffd" },
   "spoils.css": { engine: "crafting", source: "internal/plugins/crafting/static/css/spoils.css", digest: "eed01b5e6662" },
+  "dice_tray_art.js": { engine: "dice", source: "internal/plugins/rolls/static/js/dice_tray_art.js", digest: "4314ba71f2d0" },
+  "dice_tray_core.js": { engine: "dice", source: "internal/plugins/rolls/static/js/dice_tray_core.js", digest: "cbc6453e3291" },
 });

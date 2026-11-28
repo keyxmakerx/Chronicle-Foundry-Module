@@ -693,6 +693,7 @@ Envelope `{type, campaignId, resourceId: <roll id>, payload}`, payload:
   "dice": [{"sides": 10, "value": 7}, {"sides": 10, "value": 9}], "modifier": 2,
   "total": 18, "outcome": "Tier 3", "why": "", "from": "",
   "mode": "public|gm|blind|self", "hidden": true, "characterId": "<hero page id, optional>",
+  "rollerDice": {"set": "<dice set slug>", "colour": "#rrggbb"},
   "createdAt": "<RFC3339>" }
 ```
 
@@ -715,7 +716,20 @@ flag). `characterId` comes only on a Table roll of a hero's own numbers
 checked the roller has claimed that hero or is a Director, and, for a public
 roll, that every player may see the page; it is not in the roll log. `tools/test-roll-relay.mjs`.
 
-Re-verify by: 2027-01-28 (Chronicle's rolls route and `roll.made` broadcast; keyxmakerx/Chronicle-Foundry-Module#240)
+The **Dice mat** panel (`dice-mat.mjs`, rules in `_dice-mat.mjs`) also reads
+this payload on any GM client holding the socket. Fields used: `id`, `mode`,
+`hidden`, `rollerId`, `rollerName`, `formula`, `dice[{sides, value}]`,
+`modifier`, `total`, `rollerDice.set` and `rollerDice.colour`; everything else
+is dropped. Only `mode` `public`, not `hidden`, with at least one die of 4, 6,
+8, 10, 12 or 20 sides is drawn (gm, blind, self and stub rolls never are), at
+most 10 dice per roll. The active GM's client relays the rebuilt roll to
+players over the module socket (`dice-mat` message); a player's client takes it
+only from a GM and judges it again. `mine` is always false on the broadcast;
+each client sets it from the matched Foundry user. Chronicle's tray script
+(`dice_tray_art.js`, `dice_tray_core.js`) is vendored from
+`internal/plugins/rolls/static/js/`. `tools/test-dice-mat.mjs`.
+
+Re-verify by: 2027-02-28 (Chronicle's rolls route and `roll.made` broadcast, `rollerDice`; keyxmakerx/Chronicle-Foundry-Module#240)
 
 ---
 
