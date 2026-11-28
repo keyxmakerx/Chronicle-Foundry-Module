@@ -1825,7 +1825,9 @@ export class ActorSync {
    */
   _pushEffectPaths(actor, fieldKeys, entryEffectsByField) {
     const change = effectPathsChange([...new Set(fieldKeys)].map((k) => entryEffectsByField?.[k]));
-    if (change) this._handleUpdateActor(actor, change, {}, game.user?.id);
+    if (!change) return;
+    this._handleUpdateActor(actor, change, {}, game.user?.id)
+      .catch((err) => console.error(`Chronicle: could not push "${actor.name}"'s numbers to Chronicle`, err));
   }
 
   /**
