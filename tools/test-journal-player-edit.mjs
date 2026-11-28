@@ -210,6 +210,9 @@ function applyRig(js, { onPull } = {}) {
   js._placeJournal = async () => {};
   js._pullHtml = async (_id, html) => { await onPull?.(); return html; };
   js._journalPushDebouncer.has = () => false;
+  js._isHandledByActorSync = () => false;
+  js._isOwnCreateInFlight = () => false;
+  js._createJournalLocked = async () => {};
   js._olderThanRecorded = () => false;
 }
 const SECRET_PAGE = { id: 'B', name: 'Secret', entry_html: '<p>secret text</p>', updated_at: '2026-10-03T05:00:00Z' };
@@ -250,4 +253,22 @@ test('a player\'s link change landing during an apply\'s awaits stops the apply\
   await unlink;
   assert.equal(j.pages[0].text.content, '<p>A text</p>', 'no page written after the link changed');
   assert.equal(j.flags.entityId, undefined);
+});
+
+test('a push is not sent while the journal\'s link is being undone, or once it names another page', async () => {
+  const j = makeJournal({ flags: { entityId: 'e1' }, pages: [page('<p>GM text</p>')] });
+  installJournals([j]);
+  const { js, puts } = make();
+  let land;
+  const unlink = js._fence.undo(j.id, () => new Promise((r) => { land = r; }));
+  await js._pushJournalUpdate(j, 'e1');
+  assert.deepEqual(puts, [], 'fenced: nothing sent');
+  land();
+  await unlink;
+  j.flags.entityId = 'someone-elses-page';
+  await js._pushJournalUpdate(j, 'e1');
+  assert.deepEqual(puts, [], 'relinked: nothing sent to either page');
+  j.flags.entityId = 'e1';
+  await js._pushJournalUpdate(j, 'e1');
+  assert.equal(puts.length, 1, 'linked and unfenced: sent');
 });

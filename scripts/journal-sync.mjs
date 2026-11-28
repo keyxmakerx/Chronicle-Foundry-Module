@@ -45,7 +45,7 @@ import { PictureStore, watchGMPictures } from './picture-store.mjs';
 import { sendsChangeHere, undoesLinkChangeHere, memberOf, mayEditPage } from './_change-author.mjs';
 import { ASK, askModel, sameName } from './_player-asks.mjs';
 import { getPlayerAsks, playerName } from './player-asks.mjs';
-import LinkFence from './_link-fence.mjs';
+import { linkFence, findLinked } from './_link-fence.mjs';
 
 
 /** The facts flag write for a journal update; nothing when facts are unknown. */
@@ -196,7 +196,7 @@ export class JournalSync {
     // Bound hook handlers for cleanup.
     /** Whether the full journal hooks are on (journals synced at init). */
     this._hooked = false;
-    this._fence = new LinkFence();
+    this._fence = linkFence;
     // The link guard alone, for while the full hooks are off.
     const guardFailed = (err) => console.warn('Chronicle: could not undo a player\'s link change', err);
     this._onGuardCreate = (journal, _options, userId) => { if (!this._hooked) this._guardCreate(journal, userId)?.catch(guardFailed); };
@@ -779,7 +779,7 @@ export class JournalSync {
 
   /** @private */
   _findJournal(entityId) {
-    return game.journal.find((j) => j.getFlag(FLAG_SCOPE, 'entityId') === entityId) || null;
+    return findLinked(game.journal, entityId, FLAG_SCOPE);
   }
 
   /**
@@ -1094,7 +1094,7 @@ export class JournalSync {
     const current = journal.folder ?? null;
     if (current && !this._isSyncFolder(current)) return;
     const target = await this._getOrCreateEntityFolder(entity);
-    if (target && current?.id !== target.id) await journal.update({ folder: target.id }, syncOptions());
+    if (target && current?.id !== target.id && this._holdsLink(journal, entity.id)) await journal.update({ folder: target.id }, syncOptions());
   }
 
   /**
@@ -1695,6 +1695,9 @@ export class JournalSync {
         body.expected_updated_at = chronicleUpdatedAt;
       }
 
+      // The text was gathered across awaits; a player's link change in that
+      // time would aim it at the page they chose.
+      if (!this._holdsLink(journal, entityId)) return;
       let result;
       try {
         result = await this._api.put(`/entities/${entityId}`, body);
@@ -1710,7 +1713,7 @@ export class JournalSync {
       this._api.clearRetry?.('PUT', `/entities/${entityId}`);
 
       // Push ownership changes as Chronicle permission updates.
-      if (changed?.ownership) {
+      if (changed?.ownership && this._holdsLink(journal, entityId)) {
         await this._pushPermissions(entityId, journal.ownership, isPrivate, journal.name, journal);
       }
 

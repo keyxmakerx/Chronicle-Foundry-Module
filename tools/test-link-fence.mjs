@@ -64,3 +64,68 @@ test('the actor apply asks the fence before its first write and between its step
   // Both actor guards fence the actor while they unlink it.
   assert.equal((src.match(/this\._fence\.undo\(actor\.id, \(\) => this\._unlinkCopy\(actor\)\)/g) || []).length, 2);
 });
+
+test('findLinked skips a fenced document, and a GM\'s own relink lifts a failed unlink', async () => {
+  const { linkFence, findLinked } = await import('../scripts/_link-fence.mjs');
+  const doc = (id, entityId) => ({ id, getFlag: (_s, k) => (k === 'entityId' ? entityId : undefined) });
+  const list = [doc('fenced-doc', 'e1'), doc('other', 'e1')];
+  assert.equal(findLinked(list, 'e1', 'chronicle-sync').id, 'fenced-doc');
+  let land;
+  const p = linkFence.undo('fenced-doc', () => new Promise((r) => { land = r; }));
+  assert.equal(findLinked(list, 'e1', 'chronicle-sync').id, 'other', 'the fenced one is passed over');
+  assert.equal(findLinked([list[0]], 'e1', 'chronicle-sync'), null);
+  assert.equal(findLinked(list, '', 'chronicle-sync'), null);
+  land();
+  await p;
+  await assert.rejects(linkFence.undo('fenced-doc', () => Promise.reject(new Error('refused'))));
+  assert.equal(findLinked([list[0]], 'e1', 'chronicle-sync'), null, 'still refused after a failed unlink');
+  linkFence.linkedByGM('fenced-doc');
+  assert.equal(findLinked([list[0]], 'e1', 'chronicle-sync').id, 'fenced-doc');
+});
+
+test('lookups by link that sync writes through, or that decide what a player may do, go through findLinked', async () => {
+  const { readFileSync } = await import('node:fs');
+  const read = (f) => readFileSync(new URL(`../scripts/${f}`, import.meta.url), 'utf8');
+  for (const f of ['item-sync.mjs', 'crafting-relay.mjs', 'roll-relay.mjs', 'stash-sync.mjs']) {
+    assert.doesNotMatch(read(f), /\.find\(\s*\(\w\) => \w\.getFlag\(FLAG_SCOPE, 'entityId'\) ===/, f);
+    assert.match(read(f), /findLinked\(game\.actors,/, f);
+  }
+  assert.match(read('journal-sync.mjs'), /_findJournal\(entityId\) \{\n\s*return findLinked\(game\.journal, entityId, FLAG_SCOPE\);/);
+  assert.match(read('actor-sync.mjs'), /_findLinkedActor\(entityId\) \{\n\s*return findLinked\(game\.actors, entityId, FLAG_SCOPE\);/);
+  // One fence: the guards and the lookups share it.
+  assert.match(read('journal-sync.mjs'), /this\._fence = linkFence;/);
+  assert.match(read('actor-sync.mjs'), /this\._fence = linkFence;/);
+  assert.match(read('link-record.mjs'), /if \(after\) linkFence\.linkedByGM\(d\.id\);/);
+});
+
+test('actor pushes and the inventory reconcile ask the fence right before each send or write', async () => {
+  const { readFileSync } = await import('node:fs');
+  const read = (f) => readFileSync(new URL(`../scripts/${f}`, import.meta.url), 'utf8');
+  const actor = read('actor-sync.mjs');
+  // Each send to Chronicle from an actor is directly preceded by the check.
+  for (const send of [
+    "await this._api.post(`/entities/${entityId}/reveal`",
+    "const result = await this._api.put(`/entities/${entityId}`, nameBody)",
+    "const forced = await this._api.put(`/entities/${entityId}`, nameBody)",
+    "if (role === 'img') await this._api.put(`/entities/${entityId}/image`",
+  ]) {
+    const at = actor.indexOf(send);
+    assert.ok(at > 0, send);
+    const before = actor.slice(actor.lastIndexOf('\n', actor.lastIndexOf('\n', at) - 1), at);
+    assert.match(before, /if \(!this\._aimsAt\(actor, entityId\)\) return/, send);
+  }
+  const merged = actor.slice(actor.indexOf('async _putFieldsMerged'), actor.indexOf('return this._api.put(`/entities/${entityId}/fields`'));
+  assert.match(merged, /if \(actor && !this\._aimsAt\(actor, entityId\)\) return null;/);
+  assert.equal((actor.match(/this\._putFieldsMerged\([^)]*\bactor\)/g) || []).length, 3, 'every caller names the actor');
+  const items = read('item-sync.mjs');
+  const add = items.indexOf("const relation = await this._api.post(`/entities/${entityId}/relations`");
+  assert.ok(add > 0);
+  assert.match(items.slice(items.lastIndexOf('if (!linkFence.holds(', add), add), /^if \(!linkFence\.holds\(actor\.id, actor\.getFlag\(FLAG_SCOPE, 'entityId'\), entityId\)\) return;\n\s*$/, 'the item add is checked right before its POST');
+  const rec = items.slice(items.indexOf('async _reconcileNow'), items.indexOf('\n  }\n', items.indexOf('async _reconcileNow')));
+  for (const w of ['.update({ [`flags.', '.update(change', "createEmbeddedDocuments('Item'", 'const item = actor.items.get(id);', "deleteEmbeddedDocuments('Item'"]) {
+    const at = rec.indexOf(w);
+    assert.ok(at > 0, w);
+    const check = Math.max(rec.lastIndexOf('if (!holds()) return;', at), rec.lastIndexOf('&& holds()', at));
+    assert.ok(check > 0 && !/await /.test(rec.slice(check, rec.lastIndexOf('\n', at)).replace(/^[^\n]*\n/, '')), `${w} is checked with no await before it`);
+  }
+});

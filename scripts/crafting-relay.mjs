@@ -15,6 +15,7 @@
  */
 
 import { FLAG_SCOPE } from './constants.mjs';
+import { findLinked } from './_link-fence.mjs';
 import { getSetting, getUserMappings, setSetting } from './settings.mjs';
 import { SOCKET_CHANNEL, getStashSync } from './stash-sync.mjs';
 import { PendingRequests, chronicleUserFor, isAnsweringGM } from './_stash-relay.mjs';
@@ -218,7 +219,7 @@ export class CraftingSync {
 
   /** Does this Foundry user own the actor linked to a Chronicle character? */
   _userOwns(user, entityId) {
-    const actor = game.actors.find((a) => a.getFlag(FLAG_SCOPE, 'entityId') === entityId);
+    const actor = findLinked(game.actors, entityId, FLAG_SCOPE);
     return !!actor && actor.testUserPermission(user, 'OWNER');
   }
 

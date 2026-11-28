@@ -14,6 +14,7 @@
 
 import { log } from './logger.mjs';
 import { FLAG_SCOPE, syncOptions } from './constants.mjs';
+import { findLinked } from './_link-fence.mjs';
 import {
   ROLL_MESSAGE_TYPE,
   SeenRolls,
@@ -114,7 +115,7 @@ export const rollRelay = {
     const id = characterIdOf(payload);
     if (!id) return null;
     try {
-      const actor = game.actors?.find((a) => a.getFlag(FLAG_SCOPE, 'entityId') === id);
+      const actor = findLinked(game.actors, id, FLAG_SCOPE);
       if (!actor) return null;
       return heroSpeaker(ChatMessage.getSpeaker({ actor }), actor);
     } catch (err) {
