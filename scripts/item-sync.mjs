@@ -416,6 +416,9 @@ export class ItemSync {
       // A player's new item goes straight up on a character Chronicle says
       // is theirs; on anyone else's it becomes a card for the GM.
       if (userId !== game.user.id && !(await this._playerAdd(item, actor, entityId, targetEntityId, userId))) return;
+      // The relation goes on the page the actor names; while a player's
+      // change to that link stands it is their page, not the character's.
+      if (!linkFence.holds(actor.id, actor.getFlag(FLAG_SCOPE, 'entityId'), entityId)) return;
       const relation = await this._api.post(`/entities/${entityId}/relations`, hasItemBody({
         targetEntityId,
         quantity: item.system?.quantity,

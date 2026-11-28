@@ -118,6 +118,9 @@ test('actor pushes and the inventory reconcile ask the fence right before each s
   assert.match(merged, /if \(actor && !this\._aimsAt\(actor, entityId\)\) return null;/);
   assert.equal((actor.match(/this\._putFieldsMerged\([^)]*\bactor\)/g) || []).length, 3, 'every caller names the actor');
   const items = read('item-sync.mjs');
+  const add = items.indexOf("const relation = await this._api.post(`/entities/${entityId}/relations`");
+  assert.ok(add > 0);
+  assert.match(items.slice(items.lastIndexOf('if (!linkFence.holds(', add), add), /^if \(!linkFence\.holds\(actor\.id, actor\.getFlag\(FLAG_SCOPE, 'entityId'\), entityId\)\) return;\n\s*$/, 'the item add is checked right before its POST');
   const rec = items.slice(items.indexOf('async _reconcileNow'), items.indexOf('\n  }\n', items.indexOf('async _reconcileNow')));
   for (const w of ['.update({ [`flags.', '.update(change', "createEmbeddedDocuments('Item'", 'const item = actor.items.get(id);', "deleteEmbeddedDocuments('Item'"]) {
     const at = rec.indexOf(w);
