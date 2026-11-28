@@ -252,6 +252,35 @@ test('vendored widget reads the host hooks this module sets', () => {
   assert.match(counter, /typeof f === 'function' \? f\(id\)/);
 });
 
+// These live in Foundry application classes with no runtime here, so the
+// lines that carry each rule are pinned in the source.
+test('players get only the picture Chronicle cleared for them, on every way in', () => {
+  const win = readFileSync(join(REPO_ROOT, 'scripts', 'shop-room-window.mjs'), 'utf8');
+  const widget = readFileSync(join(REPO_ROOT, 'scripts', 'shop-widget.mjs'), 'utf8');
+  // The table's link is the players audience; the GM's own link stays on this screen.
+  assert.match(win, /pictures\.playersLink\(picId\)\]\);[\s\S]*?if \(forPlayers\) out\.picture = /);
+  assert.match(win, /const seen = this\._api \? this\._ownPicture : this\._room\.picture;/);
+  assert.doesNotMatch(win, /msg\.picture = this\._ownPicture/);
+  // The journal door and Open shop answer carries it too.
+  assert.match(widget, /const \{ layout, goods, image, picture \} = room\._room;[\s\S]*?if \(picture\) body\.picture = picture;/);
+  // Show renews the link before sending, since links expire.
+  assert.match(win, /if \(this\._shown\) await this\._freshenPicture\(\)[\s\S]*?this\._emit\(this\._shown \? 'show' : 'hide'\);/);
+});
+
+test('a refused buy brings the shelves as they are now', () => {
+  const win = readFileSync(join(REPO_ROOT, 'scripts', 'shop-room-window.mjs'), 'utf8');
+  assert.match(win, /if \(kind === 'buy' && reply\.status >= 400 && reply\.status < 500\) \{\s*const goods = await this\._rereadGoods\(\);/);
+  // The player's window takes them whatever the status.
+  assert.match(win, /if \(kind === 'buy' && reply\.goods && this\._room\) this\._room\.goods = reply\.goods;/);
+});
+
+test('Chronicle\'s shop change message refreshes that shop\'s window', () => {
+  const widget = readFileSync(join(REPO_ROOT, 'scripts', 'shop-widget.mjs'), 'utf8');
+  const client = readFileSync(join(REPO_ROOT, 'scripts', 'api-client.mjs'), 'utf8');
+  assert.match(widget, /msg\.type === 'shop\.changed'[\s\S]*?this\._openWindows\.get\(msg\.resourceId\)\?\.refresh\(\)/);
+  assert.match(client, /'shop\.',/);
+});
+
 test('vendored widget keeps the contract the shim relies on', () => {
   const src = readFileSync(join(VENDOR, 'shop_room.js'), 'utf8');
   assert.match(src, /Chronicle\.register\('shop_room'/);

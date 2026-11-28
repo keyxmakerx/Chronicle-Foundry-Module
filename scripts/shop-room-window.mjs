@@ -186,6 +186,8 @@ export class ShopRoomWindow extends ApplicationV2 {
     this._shown = false;
     this._quietUntil = 0;
     this._mountedLayout = undefined;
+    /** The GM's own picture link, never sent to players. */
+    this._ownPicture = null;
     /** Character names from the last buyers answers, for the GM's sale line. */
     this._buyerNames = new Map();
     this._buyerMoneyKeys = new Map();
@@ -206,12 +208,26 @@ export class ShopRoomWindow extends ApplicationV2 {
     const layout = room?.layout ?? null;
     const out = { layout, goods: Array.isArray(room?.goods) ? room.goods : [], image: keeperImageSrc(entity?.image_path) };
     const picId = roomPictureId(layout);
+    this._ownPicture = null;
     if (picId) {
       pictures ??= new PictureStore({ api: this._api });
-      const url = await pictures.signedLink(picId);
-      if (url) out.picture = { id: picId, url };
+      // The GM's own link shows any picture on this screen; players get one
+      // only when Chronicle says every player could open it, else the drawn
+      // wall or sky.
+      const [own, forPlayers] = await Promise.all([pictures.signedLink(picId), pictures.playersLink(picId)]);
+      if (own) this._ownPicture = { id: picId, url: own };
+      if (forPlayers) out.picture = { id: picId, url: forPlayers };
     }
     return out;
+  }
+
+  /** Renew the players' picture link before it goes out again; links expire. */
+  async _freshenPicture() {
+    const picId = roomPictureId(this._room?.layout);
+    if (!this._api || !picId || !pictures) return;
+    const url = await pictures.playersLink(picId);
+    if (url) this._room.picture = { id: picId, url };
+    else delete this._room.picture;
   }
 
   async _renderHTML() {
@@ -252,7 +268,8 @@ export class ShopRoomWindow extends ApplicationV2 {
       if (!this._room) return;
       const onAction = (kind, body) => this._onAction(kind, body);
       shim.setShop(this._campaignId, this._shopId, this._room, onAction);
-      if (this._room.picture) pictureUrls.set(this._room.picture.id, this._room.picture.url);
+      const seen = this._api ? this._ownPicture : this._room.picture;
+      if (seen) pictureUrls.set(seen.id, seen.url);
       const layoutKey = JSON.stringify([this._room.layout ?? null, this._room.image || '', this._name]);
       const sameRoom = layoutKey === this._mountedLayout && !!this._host.firstChild;
       // Only the wares changed: an open room reads them again and keeps its
@@ -333,7 +350,9 @@ export class ShopRoomWindow extends ApplicationV2 {
     } finally {
       if (kind === 'buy') this._quietUntil = Date.now() + QUIET_MS;
     }
-    if (kind === 'buy' && reply.status < 400 && reply.goods && this._room) this._room.goods = reply.goods;
+    // A refused buy brings the shelves as they are now, so the widget's
+    // reload shows what sold and settles the basket.
+    if (kind === 'buy' && reply.goods && this._room) this._room.goods = reply.goods;
     return reply;
   }
 
@@ -364,15 +383,7 @@ export class ShopRoomWindow extends ApplicationV2 {
         if (!actingUserId) this._quietUntil = Date.now() + QUIET_MS;
       }
       const goodsBefore = this._room?.goods || [];
-      let goods;
-      try {
-        this._room = await this._fetchRoom();
-        goods = this._room.goods;
-        // A room served only for a player's journal button has no widget here.
-        shim?.setShop(this._campaignId, this._shopId, this._room, (k, b) => this._onAction(k, b));
-      } catch (err) {
-        console.warn('Chronicle: could not re-read the shop after a sale', err);
-      }
+      const goods = await this._rereadGoods();
       // A request outside downtime is not a sale yet; the GM approves it on
       // Chronicle's Stashes page.
       if (result?.status === 'bought') this._announceSale(describeSale({
@@ -383,7 +394,27 @@ export class ShopRoomWindow extends ApplicationV2 {
       }));
       return { status: 200, body: result || {}, goods };
     } catch (err) {
-      return { status: err.status || 502, body: { message: err.serverMessage || err.data?.message || t('BuyFailed') } };
+      const reply = { status: err.status || 502, body: { message: err.serverMessage || err.data?.message || t('BuyFailed') } };
+      // Refused because the shelves moved on (sold out, repriced): send them
+      // as they are now, or the room would re-read its old copy.
+      if (kind === 'buy' && reply.status >= 400 && reply.status < 500) {
+        const goods = await this._rereadGoods();
+        if (goods) reply.goods = goods;
+      }
+      return reply;
+    }
+  }
+
+  /** Read the room again after a buy; the goods, or undefined if that failed. */
+  async _rereadGoods() {
+    try {
+      this._room = await this._fetchRoom();
+      // A room served only for a player's journal button has no widget here.
+      shim?.setShop(this._campaignId, this._shopId, this._room, (k, b) => this._onAction(k, b));
+      return this._room.goods;
+    } catch (err) {
+      console.warn('Chronicle: could not re-read the shop after a buy', err);
+      return undefined;
     }
   }
 
@@ -452,10 +483,11 @@ export class ShopRoomWindow extends ApplicationV2 {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'header-control chronicle-shop-show';
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       this._shown = !this._shown;
-      this._emit(this._shown ? 'show' : 'hide');
       this._paintShowButton(btn);
+      if (this._shown) await this._freshenPicture().catch(() => {});
+      this._emit(this._shown ? 'show' : 'hide');
     });
     this._paintShowButton(btn);
     if (header) header.insertBefore(btn, this.window.close || null);

@@ -226,6 +226,23 @@ test('store: signed links for the GM screen are reused for a while', async () =>
   assert.equal(await w.store.signedLink('../x'), '');
 });
 
+test('store: a players link only when Chronicle says every player could open the file', async () => {
+  const q = `${B}?audience=players`;
+  const yes = fakeWorld({ meta: { [q]: { url: `/media/${B}?expires=9&sig=p`, audience: 'players' } } });
+  assert.equal(await yes.store.playersLink(B), `${API}/media/${B}?expires=9&sig=p`);
+  await yes.store.playersLink(B);
+  assert.deepEqual(yes.calls.get, [`/media/${q}`], 'asked for the players audience, and reused');
+
+  // An older Chronicle ignores the question and answers without the echo.
+  const old = fakeWorld({ meta: { [q]: { url: `/media/${B}?expires=9&sig=k` } } });
+  assert.equal(await old.store.playersLink(B), '');
+  // Players can't open it: Chronicle answers 404.
+  const refused = fakeWorld({ meta: {} });
+  refused.store._api.get = async () => { throw Object.assign(new Error('nf'), { status: 404 }); };
+  assert.equal(await refused.store.playersLink(B), '');
+  assert.equal(await yes.store.playersLink('../x'), '');
+});
+
 test('with the GM-only text pass: pull then push gives Chronicle back exactly what it sent', async () => {
   const { toFoundrySecrets, toChronicleSecrets } = await import('../scripts/_gm-secrets.mjs');
   const html = `<p>Mira <span data-secret="true">is the spy</span> runs docks.</p>${shared(A)}${gm(B)}<p>end</p>`;

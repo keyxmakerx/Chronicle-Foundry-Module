@@ -58,6 +58,8 @@ export class PictureStore {
     this._inFlight = new Map();
     /** @type {Map<string, {url: string, at: number}>} */
     this._signed = new Map();
+    /** @type {Map<string, {url: string, at: number}>} links for every player, by media id */
+    this._forPlayers = new Map();
     this._dirReady = null;
   }
 
@@ -220,6 +222,29 @@ export class PictureStore {
       const meta = await this._api.get(`/media/${id}`);
       const url = this._absolute(meta?.url || '');
       if (url) this._signed.set(id, { url, at: Date.now() });
+      return url;
+    } catch {
+      return '';
+    }
+  }
+
+  /**
+   * A signed link to hand to every player, or '' when they couldn't all open
+   * the file in Chronicle. Chronicle checks that only when asked for the
+   * players audience, and says so; an older server that ignores the question
+   * answers without the echo, which counts as no.
+   * @param {string} id
+   * @returns {Promise<string>}
+   */
+  async playersLink(id) {
+    if (!MEDIA_ID_RE.test(id)) return '';
+    const hit = this._forPlayers.get(id);
+    if (hit && Date.now() - hit.at < SIGNED_LINK_TTL_MS) return hit.url;
+    this._forPlayers.delete(id);
+    try {
+      const meta = await this._api.get(`/media/${id}?audience=players`);
+      const url = meta?.audience === 'players' ? this._absolute(meta?.url || '') : '';
+      if (url) this._forPlayers.set(id, { url, at: Date.now() });
       return url;
     } catch {
       return '';

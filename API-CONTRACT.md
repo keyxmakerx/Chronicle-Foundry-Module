@@ -1349,6 +1349,15 @@ Returns media metadata: `mime_type`, `file_size`, and `url`, a signed
 uses it to copy pictures inside page text into the world's files
 (`scripts/picture-store.mjs`); a saved signed link would expire.
 
+`?audience=players` answers only for a file any player could open with their
+own session, with `"audience":"players"` in the answer, and 404 otherwise. The
+shop room asks this way for the owner's picture (`PictureStore.playersLink`)
+before sending its link to players, and sends none when the answer lacks the
+echo, since an older Chronicle ignores the parameter. The GM's own screen uses
+the plain read. Re-verify by: 2026-12-28 (Chronicle
+`internal/plugins/syncapi/media_api_handler.go` `GetMedia`,
+`internal/plugins/media/player_audience.go`, from Chronicle PR #2978)
+
 #### DELETE /media/:mediaId
 Deletes a media file.
 
@@ -1906,6 +1915,7 @@ allowlist (`api-client.mjs`) is ignored.
 | `relation.created` | Full relation row (`id`, `sourceEntityId`, `targetEntityId`, `relationType`, `metadata`, …); `resourceId` is the source entity | Relation row created (one message per direction) |
 | `relation.deleted` | Same | Relation row deleted |
 | `relation.metadata_updated` | Same | Relation metadata changed (quantity, equipped, stash moves) |
+| `shop.changed` | none; `resourceId` is the shop page. Players' sockets get it only for a shop page everyone may read and a listing that is not GM-only | A shop's wares changed (a listing added, removed, bought or repriced); the module refreshes that shop's open window |
 | `calendar.event.created` | Full event object | Calendar event created |
 | `calendar.event.updated` | Full event object | Calendar event modified |
 | `calendar.event.deleted` | `{ id }` | Calendar event deleted |
