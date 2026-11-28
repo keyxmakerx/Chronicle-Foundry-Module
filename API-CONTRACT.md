@@ -1004,7 +1004,11 @@ Generic sync endpoint for batch operations.
 ### Maps
 
 #### GET /maps
-Lists all maps in the campaign.
+Lists all maps in the campaign the key's owner may see. A Scribe or above
+sees every map. A Player sees only the maps a character they own carries:
+the map's handout item, an item page named `Map: <name>` whose `map_id` is
+the map and whose `fields_data.chronicle_map_handout` is the same id. Every
+other map route answers **404** for a map the key's owner may not see.
 
 > **Note:** the module renders a Chronicle map as a JournalEntry image page
 > with an SVG overlay (`MapViewerSheet`), not a Foundry Scene. Drawing, token,
@@ -1737,6 +1741,7 @@ request body.
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/stashes/view?characterId=&actingUserId=` | `{downtimeOpen, canApprove, character:{id,name,moneyKey,money,items:[{itemId,name,quantity}]}, stashes:[{id,name,money,items}], destinations:[{kind,id,name}]}`. `characterId` is the Chronicle entity id (the actor's `entityId` flag). `moneyKey` is empty when the system has no money field. |
+| POST | `/stashes/give` | Body `{actingUserId, characterId, itemId \| mapId, quantity}`. The Owner's give, the same as the character page's: an Armory item, or a map as its handout item (made once per map, reused after). `quantity` defaults to 1. Answer `{move, itemId, itemName, characterName}`; the character's Has Item line arrives as the usual relation event. Used by `giveMapToActor` (`scripts/map-sheet-items.mjs`) for a linked character. |
 | POST | `/stashes/moves` | Body `{actingUserId, kind:"item"\|"money", itemId, quantity, amount, from:{kind,id}, to:{kind,id}}`, endpoint kinds `character`\|`stash`. Items send `itemId`+integer `quantity`; money sends a number `amount` (at most two decimals). Answer `{status:"applied"\|"pending", move}`. 403 not your character, 404 unseen stash, 409 not enough / not applicable. |
 | GET | `/stashes/history?characterId=&actingUserId=` | Exactly one of `characterId` or `stashId` (else 400). `{history:[line]}`, newest first, at most 50. A line has `id, kind, status, quantity, amount, itemName, fromName, toName, requesterName, summary, createdAt`; a sheet money edit has both ends the same character and reads e.g. "Wealth changed 2 → 3 · in Foundry". |
 | GET | `/stashes/requests` | `{requests:[line]}`, pending only; the actor must be able to approve. |

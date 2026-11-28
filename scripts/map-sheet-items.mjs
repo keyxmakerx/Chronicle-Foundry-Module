@@ -8,6 +8,11 @@
  * window while the sheet stays open. Giving the map also lets the players
  * who own that character open its journal.
  *
+ * A character linked to a Chronicle page is given the map in Chronicle, so
+ * Chronicle's handout item arrives on the sheet through item sync, and the
+ * map shows for that character's players there too (map-handouts.mjs).
+ * An unlinked character gets a Foundry-only item.
+ *
  * Sheet markup differs per system, so the Open button is added where an
  * item row can be found and always on the item's own sheet; if neither is
  * found the map is still an ordinary item, never an error.
@@ -23,8 +28,15 @@ import {
 
 const OPEN_CLASS = 'cs-open-map';
 
-/** Register hooks. Called once at `ready`. */
-export function registerMapSheetItems() {
+/** Getters for the sync connection and item sync; null when not connected. */
+let _sync = { api: () => null, items: () => null };
+
+/**
+ * Register hooks. Called once at `ready`.
+ * @param {{ api?: () => object|null, items?: () => object|null }} [sync]
+ */
+export function registerMapSheetItems(sync = {}) {
+  _sync = { api: sync.api ?? (() => null), items: sync.items ?? (() => null) };
   // v12 names the directory context hook per document; v13+ per directory.
   Hooks.on('getJournalEntryContext', _addGiveOption);
   Hooks.on('getJournalEntryContextOptions', _addGiveOption);
@@ -159,6 +171,21 @@ async function _promptGive(entry) {
 export async function giveMapToActor(page, actor) {
   if (!game.user.isGM) return;
   const entry = page.parent;
+  const characterId = actor.getFlag(FLAG_SCOPE, 'entityId');
+  const mapId = page.getFlag(FLAG_SCOPE, 'mapId');
+  if (characterId && mapId) {
+    // Chronicle owns who holds a map: a Foundry-only item would show the map
+    // here while Chronicle still hid it from the player.
+    const api = _sync.api();
+    if (!api) {
+      ui.notifications.warn(game.i18n.localize('CHRONICLE.MapItems.NotConnected'));
+      return;
+    }
+    await api.post('/stashes/give', { characterId, mapId });
+    await _sync.items()?.refreshInventory?.(actor);
+    ui.notifications.info(game.i18n.format('CHRONICLE.MapItems.Given', { name: noticeText(entry.name), actor: noticeText(actor.name) }));
+    return;
+  }
   const already = actor.items.find((i) => i.getFlag(FLAG_SCOPE, 'mapPageUuid') === page.uuid);
   if (already) {
     // Giving again records the gift on the journal, for maps given before

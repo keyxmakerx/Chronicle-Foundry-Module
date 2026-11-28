@@ -81,3 +81,54 @@ test('the world\'s scenes reach Chronicle on open and again after a rename, with
   });
   assert.deepEqual(sceneReports(quiet), [], 'an unchanged list is not sent again');
 }));
+
+test('a map given from Foundry goes through Chronicle: the carried item opens the journal for the hero\'s player, and taking it back in Chronicle takes the journal back', () => scenario('fvtt-maps-give-handout', async ({ seed, world }) => {
+  const PLAYER = 'benchPlayer00001';
+  const MAPS_AND_ITEMS = { modules: ['journals', 'actors', 'items', 'maps'] };
+  await seed.enableAddon('armory');
+  await seed.enableClaiming();
+  const player = await seed.addPlayer();
+  const types = await seed.chronicle.entityTypes();
+  const charType = types.find((t) => t.slug === 'character' || /character/i.test(t.name));
+  const map = await seed.createMap('Smugglers Cove');
+  const playerMap = async () => (await player.web.get(`/campaigns/${seed.campaignId}/maps/${map.id}`)).status;
+
+  const sm = await openWorld(world, MAPS_AND_ITEMS);
+  await world.game.settings.set(FLAG, 'userMappings', JSON.stringify({ [player.userId]: PLAYER }));
+  await world.asPlayer(async () => {}, PLAYER);
+  const hero = await seed.chronicle.post('/entities', { name: 'Wren', entity_type_id: charType.id, is_private: false });
+  await seed.assignOwner(hero.id, player.userId);
+  assert.equal(await playerMap(), 404, 'Chronicle hides the map from the player before the give');
+  const actorOf = () => world.game.actors.find((a) => a.getFlag(FLAG, 'entityId') === hero.id);
+  await waitFor(actorOf, 10000, 'actor made');
+  const actor = actorOf();
+  await actor.update({ ownership: { default: 0, [PLAYER]: 3 } });
+  await waitFor(() => mapPage(world, map.id), 10000, 'map journal made');
+  const page = mapPage(world, map.id);
+  const entry = page.parent;
+  assert.notEqual(entry.ownership?.[PLAYER], 2, 'the player cannot open the map journal yet');
+
+  const { registerMapSheetItems, giveMapToActor } = await import('../scripts/map-sheet-items.mjs');
+  const items = sm._modules.find((m) => m.constructor.name === 'ItemSync');
+  registerMapSheetItems({ api: () => sm.api, items: () => items });
+  const gave = await recordRequests(() => giveMapToActor(page, actor));
+  // Other sync traffic (mappings) can land in the same window; only the give matters here.
+  assert.deepEqual(gave.filter((r) => r.method === 'POST' && r.url.startsWith('/stashes/')).map((r) => `${r.url} ${r.status}`), ['/stashes/give 200'], 'the give went to Chronicle');
+
+  const carriedOf = () => actor.items.find((i) => i.getFlag(FLAG, 'mapId') === map.id);
+  await waitFor(carriedOf, 10000, 'the handout arrived and carries the map');
+  const carried = carriedOf();
+  assert.equal(carried.getFlag(FLAG, 'mapPageUuid'), page.uuid, 'its Open button opens the map journal');
+  assert.match(carried.name, /^Map: Smugglers Cove/);
+  await waitFor(() => entry.ownership?.[PLAYER] === 2, 10000, 'the hero\'s player may open the map journal');
+  assert.deepEqual(entry.getFlag(FLAG, 'mapHandoutTo'), [actor.id]);
+  assert.equal(await playerMap(), 200, 'Chronicle shows the map to the player now');
+  assert.equal(actor.items.filter((i) => i.getFlag(FLAG, 'mapId') === map.id).length, 1, 'one item, not a Foundry copy as well');
+
+  const rels = await seed.chronicle.get(`/entities/${hero.id}/relations`);
+  const line = (Array.isArray(rels) ? rels : rels.data).find((r) => r.relationType === 'Has Item' && r.targetEntityName.startsWith('Map: '));
+  await seed.chronicle.del(`/relations/${line.id}`);
+  await waitFor(() => entry.ownership?.[PLAYER] === undefined, 10000, 'taking the item back takes the journal back');
+  assert.deepEqual(entry.getFlag(FLAG, 'mapHandoutTo'), []);
+  assert.equal(await playerMap(), 404, 'and Chronicle hides the map again');
+}, { settings: { syncMaps: true, syncCharacters: true } }));

@@ -51,7 +51,7 @@ test('mapPageUuidOf: only a JournalEntryPage UUID', () => {
 test('pin: sheet hooks are registered for every client, not only the GM', () => {
   const src = readFileSync(resolve(ROOT, 'scripts/module.mjs'), 'utf8');
   const ready = src.slice(src.indexOf("Hooks.once('ready'"));
-  const call = ready.indexOf('registerMapSheetItems();');
+  const call = ready.indexOf('registerMapSheetItems(');
   assert.ok(call > 0, 'registerMapSheetItems is called on ready');
   assert.ok(!/if\s*\(\s*!?game\.user\.isGM/.test(ready.slice(0, call)), 'no GM gate before it');
 });

@@ -11,11 +11,22 @@
  * @returns {Record<string, *>} entries to spread into a document update.
  */
 export function flagRemoval(scope, ...keys) {
+  return keyRemoval(`flags.${scope}`, ...keys);
+}
+
+/**
+ * The update keys that remove entries of any object field, such as a user's
+ * own level in `ownership`.
+ * @param {string} path - The object field, e.g. `ownership`.
+ * @param {...string} keys - Entries to remove.
+ * @returns {Record<string, *>} entries to spread into a document update.
+ */
+export function keyRemoval(path, ...keys) {
   const ForcedDeletion = globalThis.foundry?.data?.operators?.ForcedDeletion;
   const out = {};
   for (const key of keys) {
-    if (typeof ForcedDeletion === 'function') out[`flags.${scope}.${key}`] = new ForcedDeletion();
-    else out[`flags.${scope}.-=${key}`] = null;
+    if (typeof ForcedDeletion === 'function') out[`${path}.${key}`] = new ForcedDeletion();
+    else out[`${path}.-=${key}`] = null;
   }
   return out;
 }

@@ -65,6 +65,9 @@ import { stateKey, statusLabel, statusTooltip, isChronicleChange } from './_stat
 /** @type {SyncManager|null} */
 let syncManager = null;
 
+/** Item sync, for the map give that goes through Chronicle. */
+let itemSync = null;
+
 /** @type {SyncDashboard|null} */
 let dashboard = null;
 
@@ -203,7 +206,8 @@ Hooks.once('ready', async () => {
   syncManager.registerModule(new ActorSync());
   const creatureSync = new CreatureSync();
   syncManager.registerModule(creatureSync);
-  syncManager.registerModule(new ItemSync());
+  itemSync = new ItemSync();
+  syncManager.registerModule(itemSync);
   syncManager.registerModule(new StashSync());
   syncManager.registerModule(new PlayerAsks());
   syncManager.registerModule(new CraftingSync());
@@ -301,7 +305,7 @@ Hooks.once('ready', async () => {
     console.warn('Chronicle Sync | Mention links unavailable', err);
   }
   try {
-    registerMapSheetItems();
+    registerMapSheetItems({ api: () => syncManager?.api ?? null, items: () => itemSync });
   } catch (err) {
     console.warn('Chronicle Sync | Map items unavailable', err);
   }
