@@ -409,6 +409,21 @@ function momentOf(v) {
  * @param {any} raw
  * @returns {{way: string, text: string}|null}
  */
+/**
+ * What a player is told when Chronicle refuses their answer: Chronicle's own
+ * words for a refusal it explains (400, 409, 429), the moment being gone for
+ * a 404 (its words there are a generic "not found"), and null otherwise so
+ * the caller says it didn't send.
+ * @param {number} status
+ * @param {unknown} said
+ * @returns {{key: string}|{text: string}|null}
+ */
+export function answerRefusal(status, said) {
+  if (status === 404) return { key: 'MomentGone' };
+  if (status >= 400 && status < 500 && typeof said === 'string' && said.trim()) return { text: said.trim().slice(0, 200) };
+  return null;
+}
+
 export function cleanAnswer(raw) {
   if (!plainObject(raw) || !ANSWER_WAYS.includes(raw.way)) return null;
   if (raw.way !== 'write') return { way: raw.way, text: '' };

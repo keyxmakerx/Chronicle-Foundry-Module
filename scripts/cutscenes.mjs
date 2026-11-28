@@ -42,6 +42,7 @@ import {
   CUTSCENE_MSG,
   CUTSCENE_WS,
   answerPath,
+  answerRefusal,
   cleanAnswer,
   cleanLines,
   cleanShowing,
@@ -508,9 +509,8 @@ export class CutsceneRelay {
     try {
       await this._api.post(answerPath(id, moment), { user: member, way: ans.way, text: ans.text });
     } catch (err) {
-      const said = err?.serverMessage || err?.data?.message;
-      const refused = err?.status >= 400 && err?.status < 500 && typeof said === 'string' && said;
-      return { ok: false, error: { code: 'refused', message: refused ? said.slice(0, 200) : t('MomentFailed') } };
+      const r = answerRefusal(err?.status, err?.serverMessage || err?.data?.message);
+      return { ok: false, error: { code: 'refused', message: r ? (r.key ? t(r.key) : r.text) : t('MomentFailed') } };
     }
     const entry = this._showings.get(id);
     if (entry) (entry.answers || (entry.answers = new Map())).set(`${member}\n${moment}`, ans);

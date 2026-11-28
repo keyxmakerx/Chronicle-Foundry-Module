@@ -1152,6 +1152,7 @@
       "MomentBack": "Back",
       "MomentEmpty": "Write a few words first.",
       "MomentFailed": "That didn't send. Try again in a moment.",
+      "MomentGone": "This moment isn't open any more.",
       "MomentNoGM": "Your GM's Foundry isn't connected, so your answer can't reach Chronicle. Try again once your GM is back.",
       "MomentNoLink": "Your Foundry player isn't linked to a Chronicle player, so your answer can't be sent. Use Link to Chronicle, or ask your GM.",
       "MomentSent": "Your GM reads it before it joins the story.",

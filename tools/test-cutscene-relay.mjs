@@ -17,6 +17,7 @@ import { join } from 'node:path';
 import {
   CUTSCENE_MSG,
   answerPath,
+  answerRefusal,
   cleanAnswer,
   cleanLines,
   cleanScene,
@@ -611,4 +612,15 @@ test('the vendored engine matches Chronicle\'s (needs CHRONICLE_DIR)', { skip: !
   assert.ok(existsSync(chronicle), 'Chronicle has no static/js/cutscene_engine.js; it moved or was renamed, so update tools/refresh-vendor.mjs');
   assert.ok(readFileSync(chronicle).equals(readFileSync(VENDORED)),
     'vendor/chronicle/cutscene_engine.js differs from Chronicle\'s; copy it again from static/js/');
+});
+
+test('a refused answer reaches the player in words they can use', () => {
+  assert.deepEqual(answerRefusal(404, 'page not found'), { key: 'MomentGone' });
+  assert.deepEqual(answerRefusal(409, ' The scene has moved on from this moment. '), { text: 'The scene has moved on from this moment.' });
+  assert.deepEqual(answerRefusal(429, 'Slow down.'), { text: 'Slow down.' });
+  assert.equal(answerRefusal(500, 'boom'), null);
+  assert.equal(answerRefusal(400, ''), null);
+  assert.equal(answerRefusal(undefined, undefined), null);
+  const en = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'lang', 'en.json'), 'utf8'));
+  assert.ok(en.CHRONICLE.Cutscenes.MomentGone);
 });
