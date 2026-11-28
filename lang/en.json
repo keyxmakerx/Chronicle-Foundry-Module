@@ -438,6 +438,7 @@
       "ReconnectingNow": "Chronicle: Reconnecting…"
     },
     "Notifications": {
+      "LinksUndoneOnConnect": "Chronicle: {count} link(s) to Chronicle pages were not made by a GM's sync, so they were undone: {names}. Link them again from the Chronicle Sync dashboard if they should sync.",
       "PlayerLinkUndone": "Chronicle: a player changed which Chronicle page \"{name}\" is linked to. Only sync may change that, so \"{name}\" was unlinked. Link it again from the Chronicle Sync dashboard if it should sync.",
       "DmOnlyItemHeld": "Chronicle: {actor} still has {items}, linked as Director-only in Chronicle and added before such items were kept off characters players can see. Players who can see {actor} can read those names; remove them if they should not.",
       "ConflictKeptChronicle": "Conflict on \"{name}\" — kept Chronicle version.",
@@ -493,6 +494,7 @@
       "PlayerPicksHeld": "Chronicle: not saved to Chronicle for {actor}: {reasons}. Their change stays in Foundry. Ask the player to choose from the list, or change it in Chronicle yourself.",
       "PreviousOwnerKept": "Chronicle: {player} is no longer the owner of {actor} in Chronicle, but still owns the actor in Foundry. Change this in the actor's Ownership settings if you want.",
       "ClaimantUnmapped": "Chronicle: a player owns {actor} in Chronicle but has no Foundry user mapped, so Foundry ownership was not changed. Link them in Chronicle Sync, under Settings, Players.",
+      "EntryTextHeld": "Chronicle: The text of {entries} still has GM-only parts, so {actor}'s item has its numbers but no text. It fills in once those parts are gone from the entry in Chronicle.",
       "IdentityItemFailed": "Chronicle: Could not update {actor}'s ancestry, culture, career or kit item ({fields}). The sheet was left as it was; see the console for details."
     },
     "Dashboard": {
@@ -637,6 +639,15 @@
         "WaitOther": "A change",
         "TriedOne": "tried 1 time",
         "TriedMany": "tried {count} times",
+        "VendorTitleOne": "This module’s {engines} doesn’t match your Chronicle",
+        "VendorTitleMany": "This module’s {engines} don’t match your Chronicle",
+        "VendorDetailOne": "Each side has a different release of it, so it may not behave as it does in Chronicle. Update the Chronicle Sync module to its newest release; if it already is, update Chronicle instead.",
+        "VendorDetailMany": "Each side has a different release of them, so they may not behave as they do in Chronicle. Update the Chronicle Sync module to its newest release; if it already is, update Chronicle instead.",
+        "VendorEngine_cutscenes": "cut scene player",
+        "VendorEngine_shop": "shop room",
+        "VendorEngine_sky": "Sky Clock",
+        "VendorEngine_crafting": "crafting",
+        "VendorEngine_dice": "dice mat",
         "SendThemNow": "Send them now",
         "CopyReport": "Copy a report for help",
         "CopyReportHint": "Versions, connection, recent errors. No keys.",
@@ -1094,7 +1105,8 @@
       "Dashboard": "Open Chronicle Sync",
       "DMScreen": "Open the GM Screen",
       "Satchel": "Open my Satchel",
-      "Calendar": "Open the Chronicle calendar"
+      "Calendar": "Open the Chronicle calendar",
+      "DiceMat": "Open the dice mat"
     },
     "Satchel": {
       "Title": "Satchel",
@@ -1128,6 +1140,12 @@
       "PreviewLabel": "Preview: {name}",
       "PreviewFailed": "Your cut scene preview couldn't play here. Reload Foundry, then press Preview in Foundry again.",
       "PlayFailed": "A cut scene couldn't play here. Reload Foundry, then watch it again from the Satchel's Cut scenes tab.",
+      "MomentTurn": "Your turn",
+      "MomentContinue": "Continue",
+      "MomentWrite": "Write it",
+      "MomentWriteHint": "in your words",
+      "MomentDirector": "Leave it to your GM",
+      "MomentDirectorHint": "they decide",
       "ListLabel": "Cut scenes you can watch again",
       "Untitled": "Untitled scene",
       "Until": "Until {time}",
@@ -1608,6 +1626,27 @@
     },
     "Rolls": {
       "FallbackName": "Someone at the table"
+    },
+    "DiceMat": {
+      "Title": "Dice mat",
+      "LoadFailed": "The dice mat could not start.",
+      "Level": {
+        "Name": "Dice mat detail",
+        "Hint": "How much of the mat is drawn. Foundry draws flat dice at every level.",
+        "simple": "Simple",
+        "flat": "Flat paper",
+        "detailed": "Detailed"
+      },
+      "Finish": {
+        "Name": "Dice mat finish",
+        "Hint": "Detailed only: paper, or the Foundry window colours.",
+        "paper": "Paper",
+        "kit": "Window colours"
+      },
+      "Others": {
+        "Name": "Show other people's dice on the mat",
+        "Hint": "Turn off to see only your own rolls on the mat."
+      }
     },
     "DiceTray": {
       "Open": "Roll dice",

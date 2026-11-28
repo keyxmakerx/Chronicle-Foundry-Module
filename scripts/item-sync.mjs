@@ -22,6 +22,7 @@
 import { flagRemoval } from './_flag-removal.mjs';
 import { getSetting, getUserMappings } from './settings.mjs';
 import { FLAG_SCOPE, APPLY_OPTION } from './constants.mjs';
+import { findLinked, linkFence } from './_link-fence.mjs';
 import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { collapseChanges } from './_change-feed.mjs';
 import { HAS_ITEM, EQUIPPED_FLAG, planInventory, itemDataFor, hasItemBody, seenByPlayers, dmOnlyHeld } from './_inventory-plan.mjs';
@@ -45,7 +46,7 @@ function equippedOf(item) {
 /** The actor linked to a Chronicle character, or null. */
 function linkedActor(entityId) {
   if (!entityId) return null;
-  return game.actors.find((a) => a.getFlag(FLAG_SCOPE, 'entityId') === entityId) || null;
+  return findLinked(game.actors, entityId, FLAG_SCOPE);
 }
 
 /**
@@ -261,6 +262,11 @@ export class ItemSync {
     const entityId = actor.getFlag(FLAG_SCOPE, 'entityId');
     if (!entityId) return;
     const relations = await this._api.get(`/entities/${entityId}/relations`);
+    // Asked before each write: a player's link change can land during any
+    // await here, and the relations read are the page they chose
+    // (_link-fence.mjs).
+    const holds = () => linkFence.holds(actor.id, actor.getFlag(FLAG_SCOPE, 'entityId'), entityId);
+    if (!holds()) return;
     const list = Array.isArray(relations) ? relations : (relations?.data || []);
     const items = actor.items.contents.map((i) => ({
       id: i.id,
@@ -296,9 +302,11 @@ export class ItemSync {
     // A fresh options object per write: Foundry writes into the one it gets.
     const opts = () => ({ [APPLY_OPTION]: true });
     for (const { id, relationId } of plan.adopt) {
+      if (!holds()) return;
       await actor.items.get(id)?.update({ [`flags.${FLAG_SCOPE}.relationId`]: relationId, ...flagRemoval(FLAG_SCOPE, 'unlinkedRelationId') }, opts());
     }
     for (const { id, change } of plan.update) {
+      if (!holds()) return;
       await actor.items.get(id)?.update(change, opts());
     }
     if (plan.create.length) {
@@ -312,17 +320,19 @@ export class ItemSync {
         }
         data.push(itemDataFor(r, this._treasureFrom(page)));
       }
+      if (!holds()) return;
       if (data.length) await actor.createEmbeddedDocuments('Item', data, opts());
     }
     // Never deleted: the item stays in Foundry, only its link is dropped.
     for (const id of unlink) {
+      if (!holds()) return;
       const item = actor.items.get(id);
       await item?.update({
         ...flagRemoval(FLAG_SCOPE, 'relationId'),
         [`flags.${FLAG_SCOPE}.unlinkedRelationId`]: item.getFlag(FLAG_SCOPE, 'relationId'),
       }, opts());
     }
-    if (moved.size) {
+    if (moved.size && holds()) {
       await actor.deleteEmbeddedDocuments('Item', [...moved], opts());
     }
   }
@@ -406,6 +416,9 @@ export class ItemSync {
       // A player's new item goes straight up on a character Chronicle says
       // is theirs; on anyone else's it becomes a card for the GM.
       if (userId !== game.user.id && !(await this._playerAdd(item, actor, entityId, targetEntityId, userId))) return;
+      // The relation goes on the page the actor names; while a player's
+      // change to that link stands it is their page, not the character's.
+      if (!linkFence.holds(actor.id, actor.getFlag(FLAG_SCOPE, 'entityId'), entityId)) return;
       const relation = await this._api.post(`/entities/${entityId}/relations`, hasItemBody({
         targetEntityId,
         quantity: item.system?.quantity,

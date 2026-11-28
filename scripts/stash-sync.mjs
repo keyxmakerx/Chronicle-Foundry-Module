@@ -15,6 +15,7 @@
  */
 
 import { FLAG_SCOPE, MODULE_ID } from './constants.mjs';
+import { findLinked } from './_link-fence.mjs';
 import { getSetting, getUserMappings, setSetting } from './settings.mjs';
 import {
   buildMovePayload,
@@ -264,7 +265,7 @@ export class StashSync {
    */
   _userOwns(foundryUserId, entityId) {
     const user = game.users.get(foundryUserId);
-    const actor = game.actors.find((a) => a.getFlag(FLAG_SCOPE, 'entityId') === entityId);
+    const actor = findLinked(game.actors, entityId, FLAG_SCOPE);
     if (!user || !actor) return false;
     return actor.testUserPermission(user, 'OWNER');
   }
@@ -478,7 +479,7 @@ export class StashSync {
     const actorSync = mods.find((m) => typeof m.refreshFromChronicle === 'function');
     const itemSync = mods.find((m) => typeof m.refreshInventory === 'function');
     for (const entityId of entityIds) {
-      const actor = game.actors.find((a) => a.getFlag(FLAG_SCOPE, 'entityId') === entityId);
+      const actor = findLinked(game.actors, entityId, FLAG_SCOPE);
       if (!actor) continue;
       try {
         await actorSync?.refreshFromChronicle(entityId);

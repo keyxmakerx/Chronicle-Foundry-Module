@@ -1,31 +1,14 @@
 /* The dice button by the chat box and the tray it opens. The button is an
-   icon control: monochrome, no frame until hover or focus. The tray is a tool
+   icon control like Foundry's own chat buttons. The tray is a tool
    window on the shared tokens, so it follows Foundry's light and dark themes. */
 
+/* Size, centring and hover come from Foundry's ui-control, as on the export
+   and clear buttons beside it; only the open state is ours. */
 .chronicle-dice-button {
-  display: inline-grid;
-  place-items: center;
   flex: 0 0 auto;
-  width: var(--sidebar-item-height, 32px);
-  min-width: 0;
-  height: var(--sidebar-item-height, 32px);
-  margin: 0;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  box-shadow: none;
-  color: inherit;
-  font-size: 1.1em;
-  line-height: 1;
-  cursor: pointer;
 }
-.chronicle-dice-button:hover,
-.chronicle-dice-button:focus-visible,
 .chronicle-dice-button[aria-expanded="true"] {
   border-color: currentColor;
-  background: transparent;
-  box-shadow: none;
 }
 .chronicle-dice-button:focus-visible {
   outline: 2px solid var(--cs-accent);

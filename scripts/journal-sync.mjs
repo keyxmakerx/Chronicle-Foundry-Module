@@ -42,9 +42,10 @@ import { queueRemoteDelete } from './_remote-deletes.mjs';
 import { collapseChanges } from './_change-feed.mjs';
 import { sharedPictureIds, toFoundryPictures, toChroniclePictures } from './_inline-pictures.mjs';
 import { PictureStore, watchGMPictures } from './picture-store.mjs';
-import { sendsChangeHere, memberOf, mayEditPage } from './_change-author.mjs';
+import { sendsChangeHere, undoesLinkChangeHere, memberOf, mayEditPage } from './_change-author.mjs';
 import { ASK, askModel, sameName } from './_player-asks.mjs';
 import { getPlayerAsks, playerName } from './player-asks.mjs';
+import { linkFence, findLinked } from './_link-fence.mjs';
 
 
 /** The facts flag write for a journal update; nothing when facts are unknown. */
@@ -193,6 +194,13 @@ export class JournalSync {
     this._stopGMSecrets = null;
 
     // Bound hook handlers for cleanup.
+    /** Whether the full journal hooks are on (journals synced at init). */
+    this._hooked = false;
+    this._fence = linkFence;
+    // The link guard alone, for while the full hooks are off.
+    const guardFailed = (err) => console.warn('Chronicle: could not undo a player\'s link change', err);
+    this._onGuardCreate = (journal, _options, userId) => { if (!this._hooked) this._guardCreate(journal, userId)?.catch(guardFailed); };
+    this._onGuardUpdate = (journal, change, _options, userId) => { if (!this._hooked) this._guardUpdate(journal, change, userId)?.catch(guardFailed); };
     this._onCreateJournal = this._handleCreateJournal.bind(this);
     this._onUpdateJournal = this._handleUpdateJournal.bind(this);
     this._onDeleteJournal = this._handleDeleteJournal.bind(this);
@@ -229,7 +237,13 @@ export class JournalSync {
   async init(api) {
     this._api = api;
 
+    // A player's link change is undone whether or not journals sync now:
+    // switching them on mid-session starts pulls at once, through whatever
+    // links stand. While the full hooks are on, they undo it themselves.
+    Hooks.on('createJournalEntry', this._onGuardCreate);
+    Hooks.on('updateJournalEntry', this._onGuardUpdate);
     if (!getSetting('syncJournals')) return;
+    this._hooked = true;
 
     this._pictures = new PictureStore({ api });
     if (game.user?.isGM) this._stopGMPictures = watchGMPictures(this._pictures);
@@ -700,6 +714,9 @@ export class JournalSync {
    * Clean up hooks on destroy.
    */
   destroy() {
+    Hooks.off('createJournalEntry', this._onGuardCreate);
+    Hooks.off('updateJournalEntry', this._onGuardUpdate);
+    this._hooked = false;
     Hooks.off('createJournalEntry', this._onCreateJournal);
     Hooks.off('updateJournalEntry', this._onUpdateJournal);
     Hooks.off('deleteJournalEntry', this._onDeleteJournal);
@@ -762,7 +779,7 @@ export class JournalSync {
 
   /** @private */
   _findJournal(entityId) {
-    return game.journal.find((j) => j.getFlag(FLAG_SCOPE, 'entityId') === entityId) || null;
+    return findLinked(game.journal, entityId, FLAG_SCOPE);
   }
 
   /**
@@ -831,6 +848,7 @@ export class JournalSync {
     // One write for name, ownership and link flags; pages follow.
     // With "Follow Chronicle's visibility" off, ownership stays as the GM set it.
     const ownership = this._followsVisibility() ? await this._buildOwnership(entity) : undefined;
+    if (!this._holdsLink(journal, entity.id)) return;
     await journal.update({
       name: entity.name,
       ...(ownership && { ownership }),
@@ -854,10 +872,10 @@ export class JournalSync {
     }
 
     // Split entity content into pages and sync them.
-    await this._syncPagesToJournal(journal, await this._pullHtml(entity.id, entity.entry_html));
+    await this._syncPagesToJournal(journal, await this._pullHtml(entity.id, entity.entry_html), entity.id);
 
     // Sync player notes page.
-    await this._syncPlayerNotesPage(journal, await this._pullHtml(entity.id, entity.player_notes_html));
+    await this._syncPlayerNotesPage(journal, await this._pullHtml(entity.id, entity.player_notes_html), entity.id);
 
     console.debug(`Chronicle: Updated journal "${journal.name}" from entity`);
   }
@@ -1076,7 +1094,7 @@ export class JournalSync {
     const current = journal.folder ?? null;
     if (current && !this._isSyncFolder(current)) return;
     const target = await this._getOrCreateEntityFolder(entity);
-    if (target && current?.id !== target.id) await journal.update({ folder: target.id }, syncOptions());
+    if (target && current?.id !== target.id && this._holdsLink(journal, entity.id)) await journal.update({ folder: target.id }, syncOptions());
   }
 
   /**
@@ -1269,6 +1287,46 @@ export class JournalSync {
   // --- Foundry → Chronicle ---
 
   /**
+   * Whether a write carrying page `entityId` may go to this journal now. Asked
+   * right before each write, since a player's link change can land during
+   * any await before it (_link-fence.mjs).
+   * @private
+   */
+  _holdsLink(journal, entityId) {
+    return this._fence.holds(journal.id, journal.getFlag(FLAG_SCOPE, 'entityId'), entityId);
+  }
+
+  /**
+   * A journal a player makes never arrives linked: the link is theirs to
+   * write and would aim their later pushes at someone else's page.
+   * @returns {Promise<void>|null} the unlink, or null (synchronously) when
+   *   there is none, so the hook's other work keeps its order
+   * @private
+   */
+  _guardCreate(journal, userId) {
+    if (!undoesLinkChangeHere(userId) || !LINK_ID_FLAGS.some((k) => journal.getFlag(FLAG_SCOPE, k) != null)) return null;
+    return this._fence.undo(journal.id, () => journal.update(flagRemoval(FLAG_SCOPE, ...LINK_FLAGS, 'pushedPermissions'), syncOptions()));
+  }
+
+  /**
+   * A player who owns a journal can rewrite its link to Chronicle, which
+   * would have this client pull another page's text into it or aim their
+   * pushes there. Only sync writes links, so a player's change to one
+   * unlinks the journal; the old link is gone, and the GM can link it again
+   * from the dashboard.
+   * @returns {Promise<void>|null} the unlink, or null (synchronously) when
+   *   there is none, so a push is still scheduled before the hook returns
+   * @private
+   */
+  _guardUpdate(journal, change, userId) {
+    if (!undoesLinkChangeHere(userId) || !touchesLinkFlags(change, FLAG_SCOPE, LINK_ID_FLAGS)) return null;
+    return this._fence.undo(journal.id, () => journal.update(flagRemoval(FLAG_SCOPE, ...LINK_FLAGS, 'pushedPermissions'), syncOptions()).then(() => {
+      const notice = game.i18n.format('CHRONICLE.Notifications.PlayerLinkUndone', { name: noticeText(journal.name) });
+      ui.notifications?.warn?.(notice, { permanent: true });
+    }));
+  }
+
+  /**
    * Handle Foundry JournalEntry creation — push to Chronicle if not from sync.
    * @param {JournalEntry} journal
    * @param {object} options
@@ -1276,18 +1334,18 @@ export class JournalSync {
    * @private
    */
   async _handleCreateJournal(journal, options, userId) {
+    // Checked before the sync-write skip, since a player's client can send
+    // that option too.
+    const unlink = this._guardCreate(journal, userId);
+    if (unlink) await unlink;
     if (options?.chronicleSync) return;
 
     // A copy (Duplicate, an import of an export) carries the original's link.
     // Two journals on one page would overwrite each other's pushes while only
     // one received Chronicle's changes, so the copy starts unlinked.
     const linkedTo = journal.getFlag(FLAG_SCOPE, 'entityId');
-    if (linkedTo) {
-      if (!sendsChangeHere(userId)) return;
-      // A journal a player makes never arrives linked: the link is theirs to
-      // write and would aim their later pushes at someone else's page.
-      const byPlayer = userId !== game.user.id;
-      if (!byPlayer && !game.journal.find((j) => j.id !== journal.id && j.getFlag(FLAG_SCOPE, 'entityId') === linkedTo)) return;
+    if (linkedTo && userId === game.user.id) {
+      if (!game.journal.find((j) => j.id !== journal.id && j.getFlag(FLAG_SCOPE, 'entityId') === linkedTo)) return;
       await journal.update(flagRemoval(FLAG_SCOPE, ...LINK_FLAGS, 'pushedPermissions'), syncOptions());
     }
     // A player's new journal is theirs, so the active GM's client sends it.
@@ -1496,18 +1554,9 @@ export class JournalSync {
    * @private
    */
   async _handleUpdateJournal(journal, change, options, userId) {
-    // A player who owns a journal can rewrite its link to Chronicle, which
-    // would have this client pull another page's text into it or aim their
-    // pushes there. Only this client's sync writes links, so a player's
-    // change to one unlinks the journal; the old link is gone, and the GM can
-    // link it again from the dashboard. Checked before the sync-write option,
-    // which a player's client can send too.
-    if (userId !== game.user.id && sendsChangeHere(userId) && touchesLinkFlags(change, FLAG_SCOPE, LINK_ID_FLAGS)) {
-      await journal.update(flagRemoval(FLAG_SCOPE, ...LINK_FLAGS, 'pushedPermissions'), syncOptions());
-      const notice = game.i18n.format('CHRONICLE.Notifications.PlayerLinkUndone', { name: noticeText(journal.name) });
-      ui.notifications?.warn?.(notice, { permanent: true });
-      return;
-    }
+    // Checked before the sync-write option, which a player's client can send too.
+    const unlink = this._guardUpdate(journal, change, userId);
+    if (unlink) { await unlink; return; }
     if (options?.chronicleSync) return;
     if (!sendsChangeHere(userId)) return;
 
@@ -1646,6 +1695,9 @@ export class JournalSync {
         body.expected_updated_at = chronicleUpdatedAt;
       }
 
+      // The text was gathered across awaits; a player's link change in that
+      // time would aim it at the page they chose.
+      if (!this._holdsLink(journal, entityId)) return;
       let result;
       try {
         result = await this._api.put(`/entities/${entityId}`, body);
@@ -1661,7 +1713,7 @@ export class JournalSync {
       this._api.clearRetry?.('PUT', `/entities/${entityId}`);
 
       // Push ownership changes as Chronicle permission updates.
-      if (changed?.ownership) {
+      if (changed?.ownership && this._holdsLink(journal, entityId)) {
         await this._pushPermissions(entityId, journal.ownership, isPrivate, journal.name, journal);
       }
 
@@ -2477,11 +2529,11 @@ export class JournalSync {
     const textPages = journal.pages.filter((p) => p.type === 'text');
     if (typeof result.entry_html === 'string'
       && textPages.some((p) => !p.getFlag(FLAG_SCOPE, 'isPlayerNotes') && clear(p))) {
-      await this._syncPagesToJournal(journal, await this._pullHtml(result.id, result.entry_html));
+      await this._syncPagesToJournal(journal, await this._pullHtml(result.id, result.entry_html), result.id);
     }
     if (typeof result.player_notes_html === 'string'
       && textPages.some((p) => p.getFlag(FLAG_SCOPE, 'isPlayerNotes') && clear(p))) {
-      await this._syncPlayerNotesPage(journal, await this._pullHtml(result.id, result.player_notes_html));
+      await this._syncPlayerNotesPage(journal, await this._pullHtml(result.id, result.player_notes_html), result.id);
     }
   }
 
@@ -2526,7 +2578,8 @@ export class JournalSync {
    * @param {string} playerNotesHtml
    * @private
    */
-  async _syncPlayerNotesPage(journal, playerNotesHtml) {
+  async _syncPlayerNotesPage(journal, playerNotesHtml, entityId) {
+    if (!this._holdsLink(journal, entityId)) return;
     const existingPage = journal.pages.find(
       (p) => p.getFlag(FLAG_SCOPE, 'isPlayerNotes')
     );
@@ -2643,7 +2696,7 @@ export class JournalSync {
    * @param {string} html - Entity entry_html content.
    * @private
    */
-  async _syncPagesToJournal(journal, html) {
+  async _syncPagesToJournal(journal, html, entityId) {
     const sections = this._splitByHeadings(html);
     const existingTextPages = journal.pages
       .filter((p) => p.type === 'text' && !p.getFlag(FLAG_SCOPE, 'isPlayerNotes'))
@@ -2663,9 +2716,11 @@ export class JournalSync {
         if (page.name !== section.title) {
           updates.name = section.title;
         }
+        if (!this._holdsLink(journal, entityId)) return;
         await page.update(updates, syncOptions());
       } else {
         // Create new page.
+        if (!this._holdsLink(journal, entityId)) return;
         await journal.createEmbeddedDocuments('JournalEntryPage', [
           {
             name: section.title,
@@ -2682,7 +2737,7 @@ export class JournalSync {
       const pagesToDelete = existingTextPages
         .slice(sections.length)
         .map((p) => p.id);
-      if (pagesToDelete.length > 0) {
+      if (pagesToDelete.length > 0 && this._holdsLink(journal, entityId)) {
         await journal.deleteEmbeddedDocuments('JournalEntryPage', pagesToDelete, syncOptions());
       }
     }

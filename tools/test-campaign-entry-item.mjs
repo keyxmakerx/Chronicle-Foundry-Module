@@ -6,7 +6,9 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ENTRY_TEXT_FORMAT, entryDescriptionHTML, entryItemFill, entryItemValues, findEntry, planEntryRefresh, usableEntryPath } from '../scripts/_campaign-entry-item.mjs';
+import {
+  ENTRY_TEXT_FORMAT, ENTRY_EFFECT_FLAG, effectPathsChange, entryDescriptionHTML, entryEffectChanges, entryItemFill, entryItemValues, entryTextHeld, findEntry, planEntryRefresh, usableEntryPath,
+} from '../scripts/_campaign-entry-item.mjs';
 import { applyIdentityItem, applyEntryRefresh } from '../scripts/_identity-item-apply.mjs';
 import { identityFieldTypes } from '../scripts/_identity-item-plan.mjs';
 
@@ -48,8 +50,23 @@ test('names match case-insensitively', () => {
   assert.equal(findEntry(undefined, 'Fairy'), null);
 });
 
-test('GM-only text keeps the item name-only', () => {
-  assert.equal(entryItemFill({ ...FAIRY, description: '<p>ok</p><span data-secret="true">twist</span>' }), null);
+test('a GM-only part is left off the item, and the rest, its numbers included, still goes on', () => {
+  const secret = { ...FAIRY, description: '<p>ok</p><span data-secret="true">twist</span>', properties: { stamina_bonus: '6' } };
+  const held = entryItemFill(secret, { entryFields: { stamina_bonus: { path: 'system.bonuses.stamina', format: 'number' } } });
+  assert.equal(held.system.description.value, '<p>Small and winged.</p><ul><li><strong>Stamina bonus:</strong> 6</li></ul>', 'the summary stands in for the held text');
+  assert.equal(held.system.bonuses.stamina, 6);
+  const trait = { ...FAIRY, properties: { ...FAIRY.properties, purchased_traits: [{ name: 'Glow', description: '<span data-secret>twist</span>' }, { name: 'Tiny', cost: 2 }] } };
+  const partial = entryItemFill(trait).system.description.value;
+  assert.ok(partial.includes('Born of the') && partial.includes('<strong>Glow</strong></li>') && partial.includes('Tiny'), 'only the secret trait text is left out');
+  assert.ok(!partial.includes('twist'));
+  assert.equal(entryTextHeld(trait), true);
+  const all = entryItemFill({ ...secret, summary: '<span data-secret>twist</span>', properties: { note: '<span data-secret>twist</span>' } });
+  assert.equal(all.system.description.value, '', 'nothing safe is left');
+  assert.ok(!JSON.stringify(held).includes('twist'));
+  assert.equal(entryTextHeld(secret), true);
+  assert.equal(entryTextHeld(FAIRY), false);
+  const text = entryItemValues({ properties: { motto: '<span data-secret="true">twist</span>' } }, { motto: { path: 'system.motto', format: 'text' } });
+  assert.deepEqual(text, {}, 'a text value holding GM-only content is left out');
   assert.equal(entryItemFill(null), null);
   const fill = entryItemFill(FAIRY);
   assert.deepEqual(fill.flags, { 'chronicle-sync': { chronicleMade: true, entrySlug: 'fairy', entryUpdatedAt: FAIRY.updatedAt, entryFormat: ENTRY_TEXT_FORMAT } });
@@ -113,12 +130,11 @@ test('a Markdown entry from the AI tools reads as text, with mentions linked', (
     + '<a data-mention-id="ent-7">The Dragon Knights</a>, kin of someone.</p>');
 });
 
-test('refresh: nothing to do when current, not sync-made, renamed, secret or missing', () => {
+test('refresh: nothing to do when current, not sync-made, renamed or missing', () => {
   const cases = [
     { items: [made({ chronicleMade: true, entryUpdatedAt: FAIRY.updatedAt, entryFormat: ENTRY_TEXT_FORMAT })] },
     { items: [{ id: 'i1', name: 'Fairy', type: 'ancestry', flags: {} }] },
     { items: [made({ chronicleMade: true })], fieldsData: { ancestry: 'Elf' } },
-    { items: [made({ chronicleMade: true })], entries: [{ ...FAIRY, description: '<span data-secret>x</span>' }] },
     { items: [made({ chronicleMade: true })], entries: [] },
   ];
   for (const c of cases) {
@@ -128,6 +144,18 @@ test('refresh: nothing to do when current, not sync-made, renamed, secret or mis
     });
     assert.deepEqual(plan, []);
   }
+});
+
+test('refresh: an entry whose text gains GM-only content leaves that part out and says so', () => {
+  const plan = planEntryRefresh({
+    items: [made({ chronicleMade: true })], fields: FIELDS, fieldsData: { ancestry: 'Fairy' },
+    entriesByField: { ancestry: [{ ...FAIRY, description: '<p>ok</p><span data-secret>twist</span>' }] },
+  });
+  assert.equal(plan.length, 1);
+  assert.ok(plan[0].update['system.description.value'].startsWith('<p>Small and winged.</p>'));
+  assert.equal(plan[0].textHeld, true);
+  assert.equal(plan[0].name, 'Fairy');
+  assert.ok(!JSON.stringify(plan).includes('twist'));
 });
 
 test('refresh writes are marked as sync-applied', async () => {
@@ -206,4 +234,157 @@ test('a mapped path that could reach a shared object, or runs too deep, writes n
   assert.equal(({}).x, undefined, 'nothing reached the shared prototype');
   const made = entryItemFill({ name: 'Bog', properties: { stamina_bonus: '6' } }, { entryFields: { stamina_bonus: { path: 'system.bonuses.stamina', format: 'number' } } });
   assert.equal(Object.getPrototypeOf(made.system.bonuses), Object.prototype, 'Foundry gets plain objects');
+});
+
+// The Draw Steel package's ancestry map: an ancestry's numbers change the hero.
+const ANCESTRY_EFFECTS = {
+  speed: { path: 'system.movement.value', type: 'upgrade', format: 'number' },
+  size: { path: 'system.combat.size', type: 'override', format: 'size' },
+  stability: { path: 'system.combat.stability', type: 'add', format: 'number' },
+};
+const change = (key, type, value) => ({ key, type, value, phase: 'initial', priority: type === 'upgrade' ? 5 : null });
+
+test('an ancestry\'s numbers become changes to the hero', () => {
+  assert.deepEqual(entryEffectChanges({ properties: { size: '1T', speed: 6, stability: '+1' } }, ANCESTRY_EFFECTS), [
+    change('system.combat.size.value', 'override', 1),
+    change('system.combat.size.letter', 'override', 'T'),
+    change('system.movement.value', 'upgrade', 6),
+    change('system.combat.stability', 'add', 1),
+  ]);
+  assert.deepEqual(entryEffectChanges({ properties: { size: '2' } }, ANCESTRY_EFFECTS),
+    [change('system.combat.size.value', 'override', 2)], 'a letter only for size 1');
+  assert.deepEqual(entryEffectChanges({ properties: { size: 2 } }, ANCESTRY_EFFECTS),
+    [change('system.combat.size.value', 'override', 2)], 'a bare number is a size');
+  assert.deepEqual(entryEffectChanges({ properties: { size: 'huge', speed: 'fast', stability: '' } }, ANCESTRY_EFFECTS), [], 'what does not read is left out');
+  assert.deepEqual(entryEffectChanges({ properties: { size: '0' } }, ANCESTRY_EFFECTS), [], 'no size below 1');
+  assert.deepEqual(entryEffectChanges({ properties: { speed: 6 } }, undefined), [], 'no map, no changes');
+  assert.equal(entryEffectChanges({ properties: { speed: 6 } }, ANCESTRY_EFFECTS)[0].priority, 5, 'an upgrade goes before bonuses added on top');
+});
+
+test('an effect mapping Chronicle would refuse changes nothing', () => {
+  const props = { properties: { speed: 6, size: '1S' } };
+  const bad = [
+    { speed: { path: 'token.light.bright', type: 'upgrade', format: 'number' } },
+    { speed: { path: 'system.__proto__.x', type: 'upgrade', format: 'number' } },
+    { speed: { path: 'system.movement.value', type: 'custom', format: 'number' } },
+    { speed: { path: 'system.movement.value', type: 'upgrade', format: 'text' } },
+    { size: { path: 'system.combat.size', type: 'add', format: 'size' } },
+  ];
+  for (const map of bad) assert.deepEqual(entryEffectChanges(props, map), [], JSON.stringify(map));
+});
+
+const DRYAD = {
+  fieldKey: 'ancestry', slug: 'dryad', name: 'Dryad', description: '<p>Bark and leaf.</p>',
+  properties: { size: '1S', speed: 6, stability: 1 },
+  updatedAt: '2026-11-27T12:00:00Z',
+};
+
+test('a made ancestry carries one effect with its numbers, marked as sync\'s', async () => {
+  const actor = fakeActor();
+  const step = { fieldKey: 'ancestry', itemType: 'ancestry', wantName: 'Dryad', removeIds: [] };
+  assert.equal(await applyIdentityItem(actor, step, { items: [], packs: [] }, [DRYAD], undefined, ANCESTRY_EFFECTS), 'made');
+  const item = actor.log[0][1][0];
+  assert.equal(item.effects.length, 1);
+  const [effect] = item.effects;
+  assert.equal(effect.transfer, true, 'the hero has it while the item is on the sheet');
+  assert.equal(effect.type, 'base');
+  assert.equal(effect.name, 'Dryad');
+  assert.deepEqual(effect.flags['chronicle-sync'], { chronicleMade: true, [ENTRY_EFFECT_FLAG]: true });
+  assert.deepEqual(effect.system.changes.map((c) => [c.key, c.value]), [
+    ['system.combat.size.value', 1], ['system.combat.size.letter', 'S'], ['system.movement.value', 6], ['system.combat.stability', 1],
+  ]);
+  const plain = fakeActor();
+  await applyIdentityItem(plain, step, { items: [], packs: [] }, [{ ...DRYAD, properties: {} }], undefined, ANCESTRY_EFFECTS);
+  assert.equal(plain.log[0][1][0].effects, undefined, 'no numbers, no effect');
+});
+
+// A made ancestry item, with whatever effects it carries.
+function madeAncestry(effects) {
+  const log = [];
+  const record = (op) => async (t, list, opts) => { log.push([op, t, list, opts]); return list; };
+  return {
+    id: 'a1', name: 'Dryad', type: 'ancestry', log, effects,
+    flags: { 'chronicle-sync': { chronicleMade: true, entryUpdatedAt: '2026-01-01T00:00:00Z', entryFormat: ENTRY_TEXT_FORMAT } },
+    createEmbeddedDocuments: record('create'), updateEmbeddedDocuments: record('update'), deleteEmbeddedDocuments: record('delete'),
+  };
+}
+const ANCESTRY_FIELDS = identityFieldTypes([{ key: 'ancestry', foundry_collection: 'items', foundry_item_type: ['ancestry'], foundry_item_single: true }]);
+const refreshDryad = (item, entry = DRYAD, map = ANCESTRY_EFFECTS) => planEntryRefresh({
+  items: [item], fields: ANCESTRY_FIELDS, fieldsData: { ancestry: 'Dryad' }, entriesByField: { ancestry: [entry] }, entryEffectsByField: { ancestry: map },
+});
+const withItem = (item) => ({ ...fakeActor(), items: { get: (id) => (id === item.id ? item : undefined) } });
+
+test('refresh: an edited ancestry rewrites only the effect sync made', async () => {
+  const gm = { id: 'gm1', flags: {} };
+  const own = { id: 'e1', flags: { 'chronicle-sync': { chronicleMade: true, [ENTRY_EFFECT_FLAG]: true } } };
+  const item = madeAncestry([gm, own]);
+  const plan = refreshDryad(item, { ...DRYAD, properties: { speed: 7 } });
+  assert.deepEqual(plan[0].effect, { update: { _id: 'e1', name: 'Dryad', 'system.changes': [change('system.movement.value', 'upgrade', 7)] } });
+  await applyEntryRefresh(withItem(item), plan);
+  assert.deepEqual(item.log.map(([op, t, list]) => [op, t, list[0]._id]), [['update', 'ActiveEffect', 'e1']]);
+  assert.equal(item.log[0][3].chronicleSyncApply, true, 'marked as sync\'s own write');
+});
+
+test('refresh: an entry edit that moves no number leaves the effect alone', () => {
+  const changes = entryEffectChanges(DRYAD, ANCESTRY_EFFECTS).map((c) => ({ ...c, value: String(c.value) }));
+  const own = { id: 'e1', name: 'Dryad', system: { changes }, flags: { 'chronicle-sync': { chronicleMade: true, [ENTRY_EFFECT_FLAG]: true } } };
+  assert.equal(refreshDryad(madeAncestry([own]), { ...DRYAD, summary: 'A new summary.' })[0]?.effect, undefined);
+  assert.ok(refreshDryad(madeAncestry([own]), { ...DRYAD, properties: { ...DRYAD.properties, speed: 9 } })[0].effect.update, 'a moved number still rewrites');
+});
+
+test('refresh: an item made before effects gains one; numbers taken out take it off', async () => {
+  const bare = madeAncestry([]);
+  const plan = refreshDryad(bare);
+  assert.equal(plan[0].effect.create.system.changes.length, 4);
+  await applyEntryRefresh(withItem(bare), plan);
+  assert.deepEqual(bare.log.map(([op, t]) => [op, t]), [['create', 'ActiveEffect']]);
+
+  const own = { id: 'e1', flags: { 'chronicle-sync': { chronicleMade: true, [ENTRY_EFFECT_FLAG]: true } } };
+  const item = madeAncestry([{ id: 'gm1', flags: {} }, own]);
+  const removed = refreshDryad(item, { ...DRYAD, properties: {} });
+  assert.deepEqual(removed[0].effect, { remove: 'e1' });
+  await applyEntryRefresh(withItem(item), removed);
+  assert.deepEqual(item.log.map(([op, t, list]) => [op, t, list]), [['delete', 'ActiveEffect', ['e1']]], 'the GM\'s own effect stays');
+
+  assert.equal(refreshDryad(madeAncestry([{ id: 'gm1', flags: {} }]), { ...DRYAD, properties: {} })[0].effect, undefined, 'nothing to make or take off');
+});
+
+test('the hero\'s paths an effect changes are pushed as one pending change', () => {
+  assert.deepEqual(effectPathsChange([ANCESTRY_EFFECTS, undefined]), {
+    system: { movement: { value: true }, combat: { size: true, stability: true } },
+  });
+  assert.equal(effectPathsChange([undefined, {}]), null, 'nothing mapped, nothing pushed');
+  assert.equal(effectPathsChange([{ x: { path: 'system.__proto__.x', type: 'add', format: 'number' } }]), null, 'a refused path is not touched');
+  assert.equal(({}).x, undefined);
+});
+
+// A campaign's own career: the system adds its renown and wealth to the hero
+// when the item is made and takes the item's amount back when it goes.
+const CAREER_FIELDS = {
+  renown: { path: 'system.renown', format: 'number', once: true },
+  wealth: { path: 'system.wealth', format: 'number', once: true },
+  project_points: { path: 'system.projectPoints', format: 'number' },
+};
+const SMUGGLER = {
+  fieldKey: 'career', slug: 'smuggler', name: 'Smuggler', description: '<p>Quiet holds.</p>',
+  properties: { renown: '+1', wealth: 2, project_points: 120 },
+  updatedAt: '2026-11-27T12:00:00Z',
+};
+
+test('a made career carries its renown and wealth; a refresh leaves them as made', async () => {
+  const actor = fakeActor();
+  const step = { fieldKey: 'career', itemType: 'career', wantName: 'Smuggler', removeIds: [] };
+  await applyIdentityItem(actor, step, { items: [], packs: [] }, [SMUGGLER], CAREER_FIELDS);
+  const made = actor.log[0][1][0];
+  assert.deepEqual([made.system.renown, made.system.wealth, made.system.projectPoints], [1, 2, 120]);
+
+  const careerFields = identityFieldTypes([{ key: 'career', foundry_collection: 'items', foundry_item_type: ['career'], foundry_item_single: true }]);
+  const item = { id: 'c1', name: 'Smuggler', type: 'career', flags: { 'chronicle-sync': { chronicleMade: true, entryUpdatedAt: '2026-01-01T00:00:00Z', entryFormat: ENTRY_TEXT_FORMAT } } };
+  const edited = { ...SMUGGLER, properties: { renown: 3, wealth: 4, project_points: 240 } };
+  const [plan] = planEntryRefresh({
+    items: [item], fields: careerFields, fieldsData: { career: 'Smuggler' }, entriesByField: { career: [edited] }, entryFieldsByField: { career: CAREER_FIELDS },
+  });
+  assert.equal(plan.update['system.projectPoints'], 240, 'an ordinary value follows the entry');
+  assert.equal('system.renown' in plan.update, false, 'renown stays as the hero was given it');
+  assert.equal('system.wealth' in plan.update, false, 'wealth too');
 });

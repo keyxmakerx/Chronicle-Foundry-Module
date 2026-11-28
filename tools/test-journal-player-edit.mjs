@@ -139,4 +139,136 @@ test('a player who rewrites a journal\'s Chronicle link gets it unlinked, and no
   installJournals([g]);
   await make().js._handleUpdateJournal(g, { flags: { 'chronicle-sync': { entityId: 'e1' } } }, {}, 'gm');
   assert.equal(g.flags.entityId, 'e1', 'the GM\'s own link change stands');
+  // A GM running sync that is not the active GM undoes it too: it would pull
+  // the other page through the link.
+  const users = globalThis.game.users;
+  globalThis.game.users = { ...users, activeGM: { id: 'another-gm' } };
+  try {
+    const k = makeJournal({ flags: { entityId: 'someone-elses-page' }, pages: [page('<p>new</p>')] });
+    installJournals([k]);
+    await make().js._handleUpdateJournal(k, { flags: { 'chronicle-sync': { entityId: 'someone-elses-page' } } }, {}, 'player');
+    assert.equal(k.flags.entityId, undefined, 'unlinked by a GM that is not the active GM');
+  } finally {
+    globalThis.game.users = users;
+  }
+});
+
+test('a journal a player creates with a page or note link arrives unlinked, even with the sync option sent', async () => {
+  for (const flags of [{ entityId: 'someone-elses-page' }, { noteId: 'someone-elses-note', isNote: true }]) {
+    const j = makeJournal({ flags, pages: [page('<p>new</p>')] });
+    installJournals([j]);
+    const { js, puts } = make();
+    await js._handleCreateJournal(j, { chronicleSync: true }, 'player');
+    assert.equal(j.flags.entityId, undefined);
+    assert.equal(j.flags.noteId, undefined);
+    assert.deepEqual(puts, []);
+  }
+  // The GM's own linked journal (sync's create) keeps its link.
+  const g = makeJournal({ flags: { entityId: 'e1' }, pages: [page('<p>x</p>')] });
+  installJournals([g]);
+  await make().js._handleCreateJournal(g, { chronicleSync: true }, 'gm');
+  assert.equal(g.flags.entityId, 'e1');
+});
+
+test('with journals not synced, the link guard still undoes a player\'s link change, and stops once the full hooks are on', async () => {
+  const hooks = new Map();
+  const realHooks = globalThis.Hooks;
+  globalThis.Hooks = {
+    on: (n, fn) => hooks.set(n, [...(hooks.get(n) || []), fn]),
+    off: (n, fn) => hooks.set(n, (hooks.get(n) || []).filter((f) => f !== fn)),
+    once: () => {},
+  };
+  const was = settings.syncJournals;
+  settings.syncJournals = false;
+  try {
+    const { js } = make();
+    await js.init(js._api);
+    // Switching journals on mid-session would start pulls through this link.
+    const j = makeJournal({ flags: { entityId: 'someone-elses-page' }, pages: [page('<p>x</p>')] });
+    installJournals([j]);
+    const change = { flags: { 'chronicle-sync': { entityId: 'someone-elses-page' } } };
+    for (const fn of hooks.get('updateJournalEntry') || []) await fn(j, change, {}, 'player');
+    assert.equal(j.flags.entityId, undefined, 'unlinked with journals off');
+    assert.equal(notes.warn.length, 1);
+    const k = makeJournal({ flags: { entityId: 'another-page' }, pages: [page('<p>x</p>')] });
+    installJournals([k]);
+    for (const fn of hooks.get('createJournalEntry') || []) await fn(k, {}, 'player');
+    assert.equal(k.flags.entityId, undefined, 'a linked create unlinked with journals off');
+    js.destroy();
+    assert.equal((hooks.get('updateJournalEntry') || []).length, 0, 'destroy removes the guard');
+  } finally {
+    settings.syncJournals = was;
+    globalThis.Hooks = realHooks;
+  }
+});
+
+// A Chronicle change applied while a player's link change is still being
+// undone, or while it lands during the apply's own awaits, writes nothing.
+function applyRig(js, { onPull } = {}) {
+  js._isExcluded = () => false;
+  js._followsVisibility = () => false;
+  js._placeJournal = async () => {};
+  js._pullHtml = async (_id, html) => { await onPull?.(); return html; };
+  js._journalPushDebouncer.has = () => false;
+  js._isHandledByActorSync = () => false;
+  js._isOwnCreateInFlight = () => false;
+  js._createJournalLocked = async () => {};
+  js._olderThanRecorded = () => false;
+}
+const SECRET_PAGE = { id: 'B', name: 'Secret', entry_html: '<p>secret text</p>', updated_at: '2026-10-03T05:00:00Z' };
+
+test('a Chronicle change does not reach a journal whose player-set link is still being undone', async () => {
+  const j = makeJournal({ flags: { entityId: 'B' }, pages: [page('<p>mine</p>')] });
+  installJournals([j]);
+  const { js } = make();
+  applyRig(js);
+  const realUpdate = j.update;
+  let land;
+  j.update = (data, options) => new Promise((resolve) => { land = () => resolve(realUpdate(data, options)); });
+  const unlink = js._guardUpdate(j, { flags: { 'chronicle-sync': { entityId: 'B' } } }, 'player');
+  assert.ok(unlink, 'the guard undoes the change');
+  await js._applyEntityUpdated(SECRET_PAGE);
+  assert.equal(j.name, 'Journal');
+  assert.equal(j.pages[0].text.content, '<p>mine</p>');
+  j.update = realUpdate;
+  land();
+  await unlink;
+  assert.equal(j.flags.entityId, undefined);
+  assert.equal(js._holdsLink(j, 'B'), false);
+});
+
+test('a player\'s link change landing during an apply\'s awaits stops the apply\'s later writes', async () => {
+  const j = makeJournal({ flags: { entityId: 'A' }, pages: [page('<p>A text</p>')] });
+  installJournals([j]);
+  const { js } = make();
+  let unlink;
+  applyRig(js, {
+    onPull: () => {
+      // The player re-points the journal while this client fetches the text.
+      j.flags.entityId = 'B';
+      unlink = js._guardUpdate(j, { flags: { 'chronicle-sync': { entityId: 'B' } } }, 'player');
+    },
+  });
+  await js._applyEntityUpdated({ id: 'A', name: 'Journal', entry_html: '<p>A text, edited</p>', updated_at: '2026-10-03T05:00:00Z' });
+  await unlink;
+  assert.equal(j.pages[0].text.content, '<p>A text</p>', 'no page written after the link changed');
+  assert.equal(j.flags.entityId, undefined);
+});
+
+test('a push is not sent while the journal\'s link is being undone, or once it names another page', async () => {
+  const j = makeJournal({ flags: { entityId: 'e1' }, pages: [page('<p>GM text</p>')] });
+  installJournals([j]);
+  const { js, puts } = make();
+  let land;
+  const unlink = js._fence.undo(j.id, () => new Promise((r) => { land = r; }));
+  await js._pushJournalUpdate(j, 'e1');
+  assert.deepEqual(puts, [], 'fenced: nothing sent');
+  land();
+  await unlink;
+  j.flags.entityId = 'someone-elses-page';
+  await js._pushJournalUpdate(j, 'e1');
+  assert.deepEqual(puts, [], 'relinked: nothing sent to either page');
+  j.flags.entityId = 'e1';
+  await js._pushJournalUpdate(j, 'e1');
+  assert.equal(puts.length, 1, 'linked and unfenced: sent');
 });

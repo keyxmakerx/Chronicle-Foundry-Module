@@ -15,7 +15,7 @@
 
 /**
  * @typedef {object} DiagnosticInput
- * @property {object} [versions]    - { module, chronicle, foundry, system, systemId }
+ * @property {object} [versions]    - { module, chronicle, vendored:{reported, engines}, foundry, system, systemId }
  * @property {object} [connection]  - { state, uptimePercent, restSuccess, restError, reconnectAttempts, retryQueue }
  * @property {Array}  [syncStatus]  - [{ resource, direction, lastSync, count, errors }]
  * @property {object} [fieldMapping]- { systemId, characterTypeSlug, adapterType }
@@ -45,6 +45,7 @@ export function buildDiagnosticBundle(input) {
   const v = d.versions || {};
   L.push(`- Module: **${_s(v.module)}**`);
   L.push(`- Chronicle: **${_s(v.chronicle)}**`);
+  L.push(`- Vendored Chronicle files: **${_vendored(v.vendored)}**`);
   L.push(`- Foundry: **${_s(v.foundry)}**`);
   L.push(`- Game system: **${_s(v.system)}** (\`${_s(v.systemId)}\`)`);
   L.push('');
@@ -152,4 +153,12 @@ function _n(v) {
 }
 function _count(arr) {
   return Array.isArray(arr) ? arr.length : 0;
+}
+
+/** Whether the vendored copies match Chronicle's, by engine id. */
+function _vendored(check) {
+  if (!check || typeof check !== 'object') return '—';
+  if (!check.reported) return 'not reported by this Chronicle';
+  const engines = Array.isArray(check.engines) ? check.engines.map(_s) : [];
+  return engines.length ? `differ: ${engines.join(', ')}` : 'match';
 }

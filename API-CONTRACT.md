@@ -152,7 +152,9 @@ Returns character preset field definitions with Foundry annotations.
 - `foundry_actor_type` — Actor type to create/filter (e.g., "character", "hero")
 - `foundry_path` — Dot-notation path on `actor.system` (e.g., "system.abilities.str.value")
 - `foundry_writable` — Whether this field can be written back to Foundry (false = read-only from Foundry)
-- `foundry_entry_fields` — on a single-item field (a kit), where a campaign's own entry's properties go on the item sync makes for it: `{"stamina_bonus": {"path": "system.bonuses.stamina", "format": "number"}, "melee_damage_bonus": {"path": "system.bonuses.melee.damage", "format": "tiers"}}`. Formats are `number`, `text` and `tiers` (`"+0/+2/+4"` to `path.tier1`–`tier3`); a value that doesn't read is left out. Chronicle drops a mapping whose path is not under `system` (at most eight parts, each starting with a letter, never `constructor` or `prototype`), and the module checks the same again (`_campaign-entry-item.mjs` `usableEntryPath`). Re-verify by: 2026-12-27 (Chronicle `internal/systems/entry_fields.go`)
+- `foundry_entry_fields` — on a single-item field (a kit), where a campaign's own entry's properties go on the item sync makes for it: `{"stamina_bonus": {"path": "system.bonuses.stamina", "format": "number"}, "melee_damage_bonus": {"path": "system.bonuses.melee.damage", "format": "tiers"}}`. Formats are `number`, `text` and `tiers` (`"+0/+2/+4"` to `path.tier1`–`tier3`); a value that doesn't read is left out. A mapping may carry `"once": true`: written when the item is made, never on a refresh (a career's renown and wealth, which Draw Steel counts into the hero on create and subtracts on delete). Chronicle drops a mapping whose path is not under `system` (at most eight parts, each starting with a letter, never `constructor` or `prototype`), and the module checks the same again (`_campaign-entry-item.mjs` `usableEntryPath`). Re-verify by: 2026-12-27 (Chronicle `internal/systems/entry_fields.go`)
+- `foundry_entry_effects` — on the same kind of field (an ancestry), which of a campaign's own entry's properties change the hero who has its item: `{"speed": {"path": "system.movement.value", "type": "upgrade", "format": "number"}, "size": {"path": "system.combat.size", "type": "override", "format": "size"}}`. Types are `override`, `add` and `upgrade` (Active Effect change types); formats are `number` and `size` (`"1S"` to `path.value` 1 and `path.letter` "S", only as an `override`). The path is under the hero's `system` data, with the same rules as `foundry_entry_fields`, checked by Chronicle and again by the module. Re-verify by: 2026-12-27 (Chronicle `internal/systems/entry_effects.go`)
+- `foundry_entry_items` — on the same kind of field (an ancestry), which list properties of a campaign's own entry become items of their own beside its item: `{"signature_traits": {"type": "ancestryTrait"}}`. Each named object (`{name, description}`) in the list becomes one item of that type. Chronicle requires a plain identifier type; both refuse a type a single-item field syncs (a second ancestry or kit would be read as the hero's), and the module also requires a type the system defines (`game.documentTypes.Item`). Re-verify by: 2026-12-27 (Chronicle `internal/systems/entry_items.go`)
 - `system_entry.changed` (WebSocket, GM sockets only): `{ "fieldKey": "kit" }` when one of the campaign's own entries for that field is made, saved or deleted. The field only, never the entry. The module re-reads `GET /system-entries?fieldKey=` and refreshes the items it made (`ActorSync._refreshMadeItems`); not in the change feed, so connect re-checks every field. Re-verify by: 2026-12-27 (Chronicle `internal/systems/entry_announce.go`, `internal/app/system_state_adapters.go`)
 - `gm_only` — the value is the GM's alone. Such a field comes with no `foundry_path` or `foundry_collection`, so it is never written to or read from Foundry; the adapter also skips a `gm_only` field that does carry a path. `foundry_clear_path` is where the manifest put it: the connect pass and each hero apply empty that path while it still holds Chronicle's text, and tell the GM once about other text left there (`_gm-field-clear.mjs`, `tools/test-gm-field-clear.mjs`). The same holds on the creature and item field endpoints, and for a field the campaign's own category marks GM-only. A field one page marks GM-only (`field_overrides.added` on the page) is skipped for that page's actor (`pageGmOnlyKeys`)
 - `owner_only` — only the GM and the page's player see it; the mapping is kept
@@ -480,6 +482,32 @@ Lists addons with their enabled/disabled state for the campaign.
 
 ---
 
+### Vendored assets
+
+#### GET /vendored-assets
+The digest of each Chronicle file the module keeps an unchanged copy of in
+`vendor/chronicle/`, keyed by the copy's file name: the first 12 hex
+characters of the sha256 of the bytes Chronicle serves.
+
+**Used by:** `sync-manager.mjs` once per connect, through `_vendor-check.mjs`
+
+**Response:**
+```json
+{ "assets": { "shop_room.js": "d0bcb3b739f2", "sky_gl.js": "1f2e3d4c5b6a" } }
+```
+
+The module keeps at most 100 entries, each a file name of at most 64
+characters with a 12-hex value, and compares them with
+`scripts/_vendor-manifest.mjs`; a copy Chronicle doesn't list is ignored.
+A differing engine (cut scene player, shop room, Sky Clock, crafting) is a
+warn row in the Health pane, never a reason to load code from Chronicle. A
+Chronicle without the route answers 404: no list, no notice, and the entry
+is dropped from the error log.
+
+Re-verify by: 2027-01-27 (Chronicle `internal/plugins/foundry_vtt/vendored_assets.go` and its syncapi route; not on Chronicle main when this was written)
+
+---
+
 ### Tags
 
 #### GET /tags
@@ -665,6 +693,7 @@ Envelope `{type, campaignId, resourceId: <roll id>, payload}`, payload:
   "dice": [{"sides": 10, "value": 7}, {"sides": 10, "value": 9}], "modifier": 2,
   "total": 18, "outcome": "Tier 3", "why": "", "from": "",
   "mode": "public|gm|blind|self", "hidden": true, "characterId": "<hero page id, optional>",
+  "rollerDice": {"set": "<dice set slug>", "colour": "#rrggbb"},
   "createdAt": "<RFC3339>" }
 ```
 
@@ -687,7 +716,20 @@ flag). `characterId` comes only on a Table roll of a hero's own numbers
 checked the roller has claimed that hero or is a Director, and, for a public
 roll, that every player may see the page; it is not in the roll log. `tools/test-roll-relay.mjs`.
 
-Re-verify by: 2027-01-28 (Chronicle's rolls route and `roll.made` broadcast; keyxmakerx/Chronicle-Foundry-Module#240)
+The **Dice mat** panel (`dice-mat.mjs`, rules in `_dice-mat.mjs`) also reads
+this payload on any GM client holding the socket. Fields used: `id`, `mode`,
+`hidden`, `rollerId`, `rollerName`, `formula`, `dice[{sides, value}]`,
+`modifier`, `total`, `rollerDice.set` and `rollerDice.colour`; everything else
+is dropped. Only `mode` `public`, not `hidden`, with at least one die of 4, 6,
+8, 10, 12 or 20 sides is drawn (gm, blind, self and stub rolls never are), at
+most 10 dice per roll. The active GM's client relays the rebuilt roll to
+players over the module socket (`dice-mat` message); a player's client takes it
+only from a GM and judges it again. `mine` is always false on the broadcast;
+each client sets it from the matched Foundry user. Chronicle's tray script
+(`dice_tray_art.js`, `dice_tray_core.js`) is vendored from
+`internal/plugins/rolls/static/js/`. `tools/test-dice-mat.mjs`.
+
+Re-verify by: 2027-02-28 (Chronicle's rolls route and `roll.made` broadcast, `rollerDice`; keyxmakerx/Chronicle-Foundry-Module#240)
 
 ---
 

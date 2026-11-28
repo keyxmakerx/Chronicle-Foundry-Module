@@ -98,6 +98,13 @@ export function cleanScene(scene) {
   out.overlays = Array.isArray(scene.overlays) ? scene.overlays.filter(plainObject) : [];
   out.text = Array.isArray(scene.text) ? scene.text.filter(plainObject) : [];
   out.ending = plainObject(scene.ending) ? scene.ending : { kind: 'tap' };
+  // Moments only when the scene has some, each without a note: the note is
+  // the Director's, and Chronicle never sends one, so one that arrives is
+  // dropped rather than kept on a client.
+  if (Array.isArray(scene.moments)) {
+    const moments = scene.moments.filter(plainObject).map(({ note: _note, ...m }) => m);
+    if (moments.length) out.moments = moments;
+  }
   return out;
 }
 

@@ -53,6 +53,15 @@ export const DEFAULT_STRINGS = {
   WaitOther: 'A change',
   TriedOne: 'tried 1 time',
   TriedMany: 'tried {count} times',
+  VendorTitleOne: 'This module’s {engines} doesn’t match your Chronicle',
+  VendorTitleMany: 'This module’s {engines} don’t match your Chronicle',
+  VendorDetailOne: 'Each side has a different release of it, so it may not behave as it does in Chronicle. Update the Chronicle Sync module to its newest release; if it already is, update Chronicle instead.',
+  VendorDetailMany: 'Each side has a different release of them, so they may not behave as they do in Chronicle. Update the Chronicle Sync module to its newest release; if it already is, update Chronicle instead.',
+  VendorEngine_cutscenes: 'cut scene player',
+  VendorEngine_shop: 'shop room',
+  VendorEngine_sky: 'Sky Clock',
+  VendorEngine_crafting: 'crafting',
+  VendorEngine_dice: 'dice mat',
 };
 
 const defaultT = (key, data = {}) => {
@@ -174,6 +183,26 @@ function fieldsRow(p, tr) {
   };
 }
 
+// Either side may be the newer one, so the row says "doesn't match" and
+// offers both updates rather than guessing which is behind.
+function vendorRow(p, tr) {
+  const engines = (Array.isArray(p.vendorMismatch) ? p.vendorMismatch : [])
+    .filter((e) => typeof e === 'string' && Object.hasOwn(DEFAULT_STRINGS, `VendorEngine_${e}`));
+  if (!engines.length) return null;
+  const names = engines.map((e) => tr(`VendorEngine_${e}`));
+  let list;
+  try {
+    list = new Intl.ListFormat(p.lang || 'en', { type: 'conjunction' }).format(names);
+  } catch {
+    list = names.join(', ');
+  }
+  return {
+    id: 'vendor', level: 'warn',
+    title: tr(engines.length === 1 ? 'VendorTitleOne' : 'VendorTitleMany', { engines: list }),
+    detail: tr(engines.length === 1 ? 'VendorDetailOne' : 'VendorDetailMany'),
+  };
+}
+
 /**
  * The checklist rows, problems first (bad, then warn, then ok), keeping the
  * natural order within a level.
@@ -191,6 +220,8 @@ function fieldsRow(p, tr) {
  * @param {string} [p.foundrySystem]
  * @param {boolean} [p.syncCharacters]
  * @param {object|null} [p.capability] the dashboard's capability data
+ * @param {string[]} [p.vendorMismatch] engines whose vendored copies differ from Chronicle's
+ * @param {string} [p.lang] language for joining engine names into a list
  * @param {Function} [p.t] (key, data) => string
  * @returns {{id: string, level: 'bad'|'warn'|'ok', title: string, detail: string,
  *   action?: {kind: string, label: string}}[]}
@@ -205,6 +236,7 @@ export function buildHealthChecks(p = {}) {
     ...diceRows(p, tr),
     systemRow(p, tr),
     fieldsRow(p, tr),
+    vendorRow(p, tr),
   ].filter(Boolean);
   return rows
     .map((r, i) => ({ r, i }))

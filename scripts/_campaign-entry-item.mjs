@@ -4,8 +4,9 @@
  * changes in Chronicle. PURE: no Foundry globals.
  *
  * Entries come from `GET /system-entries`, which only ever returns the player
- * view, so the text is safe for an item players can open. A description that
- * still holds GM-only content is refused anyway and the item stays name-only.
+ * view, so the text is safe for an item players can open. A part that still
+ * holds GM-only content (the text, one detail, one trait's text) is left out
+ * anyway, and the rest of the item is still filled.
  */
 import { FLAG_SCOPE } from './constants.mjs';
 import { hasClearSecrets } from './_gm-secrets.mjs';
@@ -13,11 +14,19 @@ import { _sanitizeIncomingHTML } from './_html-sanitizer.mjs';
 import { entryTextHTML } from './_entry-text.mjs';
 
 /**
- * How an item is filled from its entry: the description's HTML, and since 3
- * the system's mapped values. Raised when that changes, so items filled the
- * old way are rewritten even though their entry hasn't.
+ * How an item is filled from its entry: the description's HTML, since 3 the
+ * system's mapped values, since 4 the effect its numbers give the hero, and
+ * since 5 the safe parts of a description that holds a GM-only part.
+ * Raised when that changes, so items filled the old way are rewritten even
+ * though their entry hasn't.
  */
-export const ENTRY_TEXT_FORMAT = 3;
+export const ENTRY_TEXT_FORMAT = 5;
+
+/** Flag on the one Active Effect sync puts on an item it made. */
+export const ENTRY_EFFECT_FLAG = 'entryEffect';
+
+/** The Active Effect change types a system may map an entry property to. */
+const EFFECT_TYPES = new Set(['override', 'add', 'upgrade']);
 
 /** Longest text a `text` mapping writes; an entry property is a short value. */
 const MAX_ENTRY_TEXT = 1000;
@@ -49,13 +58,20 @@ function label(key) {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/** True for text safe to save; GM-only text is noted on `held` instead. */
+function keep(text, held) {
+  if (!hasClearSecrets(text)) return true;
+  held.any = true;
+  return false;
+}
+
 /** A list property's items, shaped like a package entry's traits. */
-function listHTML(key, items) {
+function listHTML(key, items, held) {
   const rows = items
-    .filter((it) => it && typeof it === 'object' && it.name)
+    .filter((it) => it && typeof it === 'object' && it.name && keep(String(it.name), held))
     .map((it) => {
       const cost = Number.isInteger(it.cost) ? ` (${it.cost} ${it.cost === 1 ? 'point' : 'points'})` : '';
-      const desc = it.description ? `: ${escapeHTML(it.description)}` : '';
+      const desc = it.description && keep(String(it.description), held) ? `: ${escapeHTML(it.description)}` : '';
       return `<li><strong>${escapeHTML(it.name)}</strong>${cost}${desc}</li>`;
     });
   return rows.length ? `<h3>${escapeHTML(label(key))}</h3><ul>${rows.join('')}</ul>` : '';
@@ -71,22 +87,36 @@ function listHTML(key, items) {
  * @returns {string} HTML
  */
 export function entryDescriptionHTML(entry, opts = {}) {
+  return describe(entry, opts).html;
+}
+
+/**
+ * The description built part by part: each part holding GM-only content is
+ * left out and `held` says one was, so a secret in one trait's text costs the
+ * item only that text.
+ */
+function describe(entry, opts) {
+  const held = { any: false };
   const parts = [];
-  const desc = typeof entry?.description === 'string' ? entryTextHTML(entry.description, opts) : '';
-  if (desc) parts.push(_sanitizeIncomingHTML(desc));
-  else if (entry?.summary) parts.push(`<p>${escapeHTML(entry.summary)}</p>`);
+  const raw = typeof entry?.description === 'string' ? entryTextHTML(entry.description, opts) : '';
+  const desc = raw && keep(raw, held) ? _sanitizeIncomingHTML(raw) : '';
+  if (desc) parts.push(desc);
+  else if (entry?.summary && keep(String(entry.summary), held)) parts.push(`<p>${escapeHTML(entry.summary)}</p>`);
 
   const props = entry?.properties && typeof entry.properties === 'object' ? entry.properties : {};
   const scalars = [];
   const lists = [];
   for (const [key, value] of Object.entries(props)) {
-    if (Array.isArray(value)) lists.push(listHTML(key, value));
-    else if (['string', 'number', 'boolean'].includes(typeof value) && value !== '') {
+    if (Array.isArray(value)) lists.push(listHTML(key, value, held));
+    else if (['string', 'number', 'boolean'].includes(typeof value) && value !== '' && keep(String(value), held)) {
       scalars.push(`<li><strong>${escapeHTML(label(key))}:</strong> ${escapeHTML(value)}</li>`);
     }
   }
   if (scalars.length) parts.push(`<ul>${scalars.join('')}</ul>`);
-  return parts.concat(lists.filter(Boolean)).join('');
+  const html = parts.concat(lists.filter(Boolean)).join('');
+  // Backstop: anything the part checks missed leaves the whole text out.
+  if (hasClearSecrets(html)) return { html: '', held: true };
+  return { html, held: held.any };
 }
 
 /** A number, or a numeric text such as "+2"; null for anything else. */
@@ -110,16 +140,21 @@ function entryTiers(value) {
  * field's `foundry_entry_fields` (Chronicle checked each path is under
  * `system`; checked again here). A property that is absent or doesn't read in
  * its format is left out, so the item keeps the system's default for it.
+ * A mapping marked `once` is left out of a refresh: the system counted it
+ * into the hero when the item was made (a career's renown) and takes the
+ * item's amount back when it goes, so a rewrite would unbalance the hero.
  * @param {object} entry - one `GET /system-entries` row
- * @param {Record<string, {path: string, format: string}>} [entryFields]
+ * @param {Record<string, {path: string, format: string, once?: boolean}>} [entryFields]
+ * @param {{refresh?: boolean}} [opts]
  * @returns {Record<string, number|string>}
  */
-export function entryItemValues(entry, entryFields) {
+export function entryItemValues(entry, entryFields, { refresh = false } = {}) {
   const props = entry?.properties && typeof entry.properties === 'object' ? entry.properties : {};
   const out = {};
   for (const [key, def] of Object.entries(entryFields ?? {})) {
     const path = def?.path;
     if (!usableEntryPath(path) || !Object.hasOwn(props, key)) continue;
+    if (refresh && def.once === true) continue;
     const value = props[key];
     if (def.format === 'number') {
       const n = entryNumber(value);
@@ -127,11 +162,100 @@ export function entryItemValues(entry, entryFields) {
     } else if (def.format === 'tiers') {
       const tiers = entryTiers(value);
       if (tiers) tiers.forEach((n, i) => { out[`${path}.tier${i + 1}`] = n; });
-    } else if (def.format === 'text' && ['string', 'number'].includes(typeof value)) {
+    } else if (def.format === 'text' && ['string', 'number'].includes(typeof value) && !hasClearSecrets(String(value))) {
       out[path] = String(value).trim().slice(0, MAX_ENTRY_TEXT);
     }
   }
   return out;
+}
+
+/** "1M" or "2" as {value, letter}; the letter only for size 1. Null otherwise. */
+function entrySize(value) {
+  const m = /^\s*(\d+)\s*([TSML])?\s*$/i.exec(String(value ?? ''));
+  if (!m || Number(m[1]) < 1) return null;
+  const size = Number(m[1]);
+  return { value: size, letter: size === 1 && m[2] ? m[2].toUpperCase() : null };
+}
+
+/**
+ * The Active Effect changes an entry's properties give the hero who has its
+ * item, from the field's `foundry_entry_effects` (Chronicle checked each
+ * mapping; checked again here). A property that is absent or doesn't read is
+ * left out, so the hero keeps what they had.
+ * @param {object} entry - one `GET /system-entries` row
+ * @param {Record<string, {path: string, type: string, format: string}>} [entryEffects]
+ * @returns {Array<{key: string, type: string, value: number|string, phase: string, priority: number|null}>}
+ */
+export function entryEffectChanges(entry, entryEffects) {
+  const props = entry?.properties && typeof entry.properties === 'object' ? entry.properties : {};
+  const out = [];
+  // An upgrade goes first, as the system's own ancestries set theirs, so a
+  // bonus added on top (a kit's speed) adds to the ancestry's number.
+  const change = (key, type, value) => out.push({ key, type, value, phase: 'initial', priority: type === 'upgrade' ? 5 : null });
+  // Sorted so the same entry always gives the same changes.
+  for (const [key, def] of Object.entries(entryEffects ?? {}).sort(([a], [b]) => a.localeCompare(b))) {
+    if (!usableEntryPath(def?.path) || !EFFECT_TYPES.has(def.type) || !Object.hasOwn(props, key)) continue;
+    if (def.format === 'number') {
+      const n = entryNumber(props[key]);
+      if (n !== null) change(def.path, def.type, n);
+    } else if (def.format === 'size' && def.type === 'override') {
+      const size = entrySize(props[key]);
+      if (!size) continue;
+      change(`${def.path}.value`, 'override', size.value);
+      if (size.letter) change(`${def.path}.letter`, 'override', size.letter);
+    }
+  }
+  return out;
+}
+
+/**
+ * The effect an item sync made carries, so the hero has its numbers while
+ * the item is on the sheet and loses them when it goes.
+ * @param {object} entry
+ * @param {Array<object>} changes - from `entryEffectChanges`
+ */
+export function entryEffectData(entry, changes) {
+  return {
+    name: String(entry?.name ?? '').trim() || 'Chronicle',
+    type: 'base',
+    transfer: true,
+    disabled: false,
+    system: { changes },
+    flags: { [FLAG_SCOPE]: { chronicleMade: true, [ENTRY_EFFECT_FLAG]: true } },
+  };
+}
+
+/**
+ * The hero's paths that the fields' effect mappings change, as a pending
+ * actor change touching each one, or null when there are none. Foundry fires
+ * no actor update when an item's effect changes, so sync pushes these itself
+ * for Chronicle to show the hero's new numbers.
+ * @param {Array<object|undefined>} mappings - `foundry_entry_effects` of the fields whose item changed
+ * @returns {object|null}
+ */
+export function effectPathsChange(mappings) {
+  const out = Object.create(null);
+  let any = false;
+  for (const map of mappings) {
+    for (const def of Object.values(map ?? {})) {
+      if (!usableEntryPath(def?.path)) continue;
+      let node = out;
+      const keys = def.path.split('.');
+      for (const k of keys.slice(0, -1)) {
+        if (!Object.hasOwn(node, k) || typeof node[k] !== 'object') node[k] = Object.create(null);
+        node = node[k];
+      }
+      node[keys[keys.length - 1]] = true;
+      any = true;
+    }
+  }
+  return any ? structuredClone(out) : null;
+}
+
+/** The effect sync put on this item, or null. */
+function madeEffect(item) {
+  const effects = item?.effects?.contents ?? (Array.isArray(item?.effects) ? item.effects : []);
+  return effects.find((e) => e?.flags?.[FLAG_SCOPE]?.[ENTRY_EFFECT_FLAG]) ?? null;
 }
 
 /** Dotted values as nested objects, for an item that doesn't exist yet. */
@@ -160,20 +284,31 @@ export function findEntry(entries, name) {
 }
 
 /**
+ * Whether part of an entry's text holds GM-only content and was left off the
+ * Foundry item, so the GM can be told.
+ */
+export function entryTextHeld(entry, opts = {}) {
+  return !!entry && describe(entry, opts).held;
+}
+
+/**
  * The fields to write for an entry: the description, the values its
- * properties give (`entryItemValues`), and flags that record which entry
- * version filled it. Null when the description is not safe to save, so the
- * caller keeps the item name-only.
+ * properties give (`entryItemValues`), the effect they give the hero
+ * (`entryEffectChanges`), and flags that record which entry version filled
+ * it. A part of the text holding GM-only content is left out while the rest,
+ * and the numbers, which never come from it, are still written, so one secret
+ * in a trait's text doesn't cost the hero the rest of the item.
  * @param {object} entry
- * @param {{mentionId?: (name: string) => string|null, entryFields?: object}} [opts]
- * @returns {{system: object, flags: object}|null}
+ * @param {{mentionId?: (name: string) => string|null, entryFields?: object, entryEffects?: object}} [opts]
+ * @returns {{system: object, flags: object, effects?: object[]}|null} null with no entry
  */
 export function entryItemFill(entry, opts = {}) {
   if (!entry) return null;
-  const html = entryDescriptionHTML(entry, opts);
-  if (hasClearSecrets(html)) return null;
+  const { html } = describe(entry, opts);
   const { system: mapped = {} } = nestValues(entryItemValues(entry, opts.entryFields));
+  const changes = entryEffectChanges(entry, opts.entryEffects);
   return {
+    ...(changes.length ? { effects: [entryEffectData(entry, changes)] } : {}),
     system: { ...mapped, description: { value: html } },
     flags: {
       [FLAG_SCOPE]: {
@@ -198,9 +333,12 @@ export function entryItemFill(entry, opts = {}) {
  * @param {Record<string, Array<object>>} args.entriesByField
  * @param {(name: string) => string|null} [args.mentionId] - see `mentionLookup`
  * @param {Record<string, object>} [args.entryFieldsByField] - each field's `foundry_entry_fields`
- * @returns {Array<{itemId: string, fieldKey: string, update: object}>}
+ * @param {Record<string, object>} [args.entryEffectsByField] - each field's `foundry_entry_effects`
+ * @returns {Array<{itemId: string, fieldKey: string, name: string, update: object, effect?: object, textHeld?: true}>}
+ *   `effect` is `{create}`, `{update}` or `{remove}` for the item's own effect, when it changes;
+ *   `textHeld` when the entry's text was left out for holding GM-only content
  */
-export function planEntryRefresh({ items, fields, fieldsData, entriesByField, mentionId, entryFieldsByField }) {
+export function planEntryRefresh({ items, fields, fieldsData, entriesByField, mentionId, entryFieldsByField, entryEffectsByField }) {
   const list = Array.isArray(items) ? items : [];
   const data = fieldsData && typeof fieldsData === 'object' ? fieldsData : {};
   const out = [];
@@ -214,14 +352,18 @@ export function planEntryRefresh({ items, fields, fieldsData, entriesByField, me
     const current = flags.entryFormat === ENTRY_TEXT_FORMAT;
     if (current && flags.entryUpdatedAt && flags.entryUpdatedAt === entry.updatedAt) continue;
     const entryFields = entryFieldsByField?.[fieldKey];
-    const fill = entryItemFill(entry, { mentionId, entryFields });
+    const entryEffects = entryEffectsByField?.[fieldKey];
+    const fill = entryItemFill(entry, { mentionId, entryFields, entryEffects });
     if (!fill) continue;
     out.push({
       itemId: first.id,
       fieldKey,
+      name: first.name,
+      ...(entryTextHeld(entry, { mentionId }) ? { textHeld: true } : {}),
+      ...refreshEffect(first, entry, entryEffectChanges(entry, entryEffects)),
       update: {
         _id: first.id,
-        ...entryItemValues(entry, entryFields),
+        ...entryItemValues(entry, entryFields, { refresh: true }),
         'system.description.value': fill.system.description.value,
         [`flags.${FLAG_SCOPE}.entrySlug`]: fill.flags[FLAG_SCOPE].entrySlug,
         [`flags.${FLAG_SCOPE}.entryUpdatedAt`]: fill.flags[FLAG_SCOPE].entryUpdatedAt,
@@ -230,4 +372,23 @@ export function planEntryRefresh({ items, fields, fieldsData, entriesByField, me
     });
   }
   return out;
+}
+
+/** How the item's own effect changes: made, rewritten, taken off, or not at all. */
+function refreshEffect(item, entry, changes) {
+  const had = madeEffect(item);
+  if (!had) return changes.length ? { effect: { create: entryEffectData(entry, changes) } } : {};
+  if (!changes.length) return { effect: { remove: had.id ?? had._id } };
+  const name = entryEffectData(entry, changes).name;
+  // An entry edit that moves no number (its summary) rewrites nothing, so the
+  // hero isn't pushed back to Chronicle for it.
+  if (had.name === name && sameChanges(had.system?.changes, changes)) return {};
+  return { effect: { update: { _id: had.id ?? had._id, name, 'system.changes': changes } } };
+}
+
+/** Whether an effect's stored changes are these, ignoring how Foundry stores values. */
+function sameChanges(stored, changes) {
+  const list = Array.isArray(stored) ? stored : [];
+  const flat = (c) => [c?.key, c?.type, String(c?.value ?? ''), c?.phase ?? 'initial', c?.priority ?? null].join('\u0000');
+  return list.length === changes.length && list.every((c, i) => flat(c) === flat(changes[i]));
 }

@@ -40,6 +40,14 @@ test('versions, connection and capability surface', () => {
   assert.match(out, /Synced: \*\*19\*\* \/ 29 declared/);
 });
 
+test('whether the vendored Chronicle files match is in the versions', () => {
+  const line = (vendored) => buildDiagnosticBundle({ versions: { vendored } }).match(/- Vendored Chronicle files: \*\*(.*)\*\*/)[1];
+  assert.equal(line(undefined), '—');
+  assert.equal(line({ reported: false, engines: [] }), 'not reported by this Chronicle');
+  assert.equal(line({ reported: true, engines: [] }), 'match');
+  assert.equal(line({ reported: true, engines: ['shop', 'sky'] }), 'differ: shop, sky');
+});
+
 test('logs render with counts; sync status table when present', () => {
   const out = buildDiagnosticBundle({
     syncStatus: [{ resource: 'characters', direction: 'both', lastSync: '12:01', count: 3, errors: 0 }],

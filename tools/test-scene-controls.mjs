@@ -4,8 +4,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { IDLE_TOOL, addChronicleControls } from '../scripts/_scene-controls.mjs';
 
-const run = { dashboard() {}, dmScreen() {}, satchel() {}, calendar() {} };
-const titles = { dashboard: 'Open Chronicle Sync', dmScreen: 'Open the DM Screen', satchel: 'Open my Satchel', calendar: 'Open the Chronicle calendar' };
+const run = { dashboard() {}, dmScreen() {}, satchel() {}, calendar() {}, diceMat() {} };
+const titles = { dashboard: 'Open Chronicle Sync', dmScreen: 'Open the DM Screen', satchel: 'Open my Satchel', calendar: 'Open the Chronicle calendar', diceMat: 'Open the dice mat' };
 
 function names(controls) {
   if (Array.isArray(controls)) {
@@ -17,9 +17,9 @@ function names(controls) {
 }
 
 const CASES = [
-  ['GM, connected', { isGM: true, notebook: true }, ['dashboard', 'dm-screen', 'satchel', 'calendar']],
+  ['GM, connected', { isGM: true, notebook: true }, ['dashboard', 'dm-screen', 'satchel', 'calendar', 'dice-mat']],
   ['GM, not connected', { isGM: true, notebook: false }, ['dashboard', 'dm-screen']],
-  ['player, connected', { isGM: false, notebook: true }, ['satchel', 'calendar']],
+  ['player, connected', { isGM: false, notebook: true }, ['satchel', 'calendar', 'dice-mat']],
   ['player, not connected', { isGM: false, notebook: false }, null],
 ];
 
@@ -54,7 +54,7 @@ test('v12 tools use onClick; v13 tools use onChange and name an activeTool', () 
 
 test('without a calendar opener there is no Calendar button', () => {
   const controls = {};
-  const { calendar, ...noCal } = run;
+  const { calendar, diceMat, ...noCal } = run;
   addChronicleControls(controls, { isGM: false, notebook: true, run: noCal, titles });
   assert.deepEqual(names(controls), ['satchel']);
 });
@@ -113,11 +113,17 @@ test('an unlinked player of a connected world gets Link to Chronicle; a GM never
   const allTitles = { ...titles, link: 'Link to Chronicle' };
   const player = {};
   addChronicleControls(player, { isGM: false, notebook: true, link: true, run: withLink, titles: allTitles });
-  assert.deepEqual(names(player), ['satchel', 'calendar', 'link']);
+  assert.deepEqual(names(player), ['satchel', 'calendar', 'dice-mat', 'link']);
   const gm = {};
   addChronicleControls(gm, { isGM: true, notebook: true, link: true, run: withLink, titles: allTitles });
   assert.ok(!names(gm).includes('link'));
   const offline = [];
   addChronicleControls(offline, { isGM: false, notebook: false, link: true, run: withLink, titles: allTitles });
   assert.equal(names(offline), null);
+});
+
+test('the Dice mat button is for connected worlds only', () => {
+  const controls = {};
+  addChronicleControls(controls, { isGM: true, notebook: false, run, titles });
+  assert.ok(!names(controls).includes('dice-mat'));
 });
