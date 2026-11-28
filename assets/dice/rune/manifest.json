@@ -1,5 +1,85 @@
 {
   "version": 1,
+  "faces": {
+    "d6": [
+      "assets/dice/rune/faces/d6-1.png",
+      "assets/dice/rune/faces/d6-2.png",
+      "assets/dice/rune/faces/d6-3.png",
+      "assets/dice/rune/faces/d6-4.png",
+      "assets/dice/rune/faces/d6-5.png",
+      "assets/dice/rune/faces/d6-6.png"
+    ],
+    "d8": [
+      "assets/dice/rune/faces/d8-1.png",
+      "assets/dice/rune/faces/d8-2.png",
+      "assets/dice/rune/faces/d8-3.png",
+      "assets/dice/rune/faces/d8-4.png",
+      "assets/dice/rune/faces/d8-5.png",
+      "assets/dice/rune/faces/d8-6.png",
+      "assets/dice/rune/faces/d8-7.png",
+      "assets/dice/rune/faces/d8-8.png"
+    ],
+    "d10": [
+      "assets/dice/rune/faces/d10-1.png",
+      "assets/dice/rune/faces/d10-2.png",
+      "assets/dice/rune/faces/d10-3.png",
+      "assets/dice/rune/faces/d10-4.png",
+      "assets/dice/rune/faces/d10-5.png",
+      "assets/dice/rune/faces/d10-6.png",
+      "assets/dice/rune/faces/d10-7.png",
+      "assets/dice/rune/faces/d10-8.png",
+      "assets/dice/rune/faces/d10-9.png",
+      "assets/dice/rune/faces/d10-10.png"
+    ],
+    "d12": [
+      "assets/dice/rune/faces/d12-1.png",
+      "assets/dice/rune/faces/d12-2.png",
+      "assets/dice/rune/faces/d12-3.png",
+      "assets/dice/rune/faces/d12-4.png",
+      "assets/dice/rune/faces/d12-5.png",
+      "assets/dice/rune/faces/d12-6.png",
+      "assets/dice/rune/faces/d12-7.png",
+      "assets/dice/rune/faces/d12-8.png",
+      "assets/dice/rune/faces/d12-9.png",
+      "assets/dice/rune/faces/d12-10.png",
+      "assets/dice/rune/faces/d12-11.png",
+      "assets/dice/rune/faces/d12-12.png"
+    ],
+    "d20": [
+      "assets/dice/rune/faces/d20-1.png",
+      "assets/dice/rune/faces/d20-2.png",
+      "assets/dice/rune/faces/d20-3.png",
+      "assets/dice/rune/faces/d20-4.png",
+      "assets/dice/rune/faces/d20-5.png",
+      "assets/dice/rune/faces/d20-6.png",
+      "assets/dice/rune/faces/d20-7.png",
+      "assets/dice/rune/faces/d20-8.png",
+      "assets/dice/rune/faces/d20-9.png",
+      "assets/dice/rune/faces/d20-10.png",
+      "assets/dice/rune/faces/d20-11.png",
+      "assets/dice/rune/faces/d20-12.png",
+      "assets/dice/rune/faces/d20-13.png",
+      "assets/dice/rune/faces/d20-14.png",
+      "assets/dice/rune/faces/d20-15.png",
+      "assets/dice/rune/faces/d20-16.png",
+      "assets/dice/rune/faces/d20-17.png",
+      "assets/dice/rune/faces/d20-18.png",
+      "assets/dice/rune/faces/d20-19.png",
+      "assets/dice/rune/faces/d20-20.png"
+    ],
+    "d100": [
+      "assets/dice/rune/faces/d100-10.png",
+      "assets/dice/rune/faces/d100-20.png",
+      "assets/dice/rune/faces/d100-30.png",
+      "assets/dice/rune/faces/d100-40.png",
+      "assets/dice/rune/faces/d100-50.png",
+      "assets/dice/rune/faces/d100-60.png",
+      "assets/dice/rune/faces/d100-70.png",
+      "assets/dice/rune/faces/d100-80.png",
+      "assets/dice/rune/faces/d100-90.png",
+      "assets/dice/rune/faces/d100-00.png"
+    ]
+  },
   "sets": [
     {
       "id": "jewelled",
