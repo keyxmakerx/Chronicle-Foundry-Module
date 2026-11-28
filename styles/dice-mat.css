@@ -1,0 +1,38 @@
+/* The Dice mat panel: Chronicle's tray script draws the mat and the flat dice
+   (vendor/chronicle/dice_tray_*.js); these rules are the host stylesheet it
+   expects, on the module's shared tokens. Paper stays paper in dark mode, a
+   little dimmer, never inverted. */
+
+.chronicle-dice-mat { padding: 8px; min-width: 0; }
+
+.dtr-core { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+/* The mat is one picture from above; its shape is the art's, so the dice line up at any width. */
+.dtr-mat { position: relative; width: 100%; aspect-ratio: 10.7 / 7.5; overflow: hidden; border-radius: 12px; }
+.dtr-matart { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.dtr-flat { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+
+.tray3d-tag {
+  position: absolute; left: 0; top: 0; padding: 1px 7px; border-radius: 999px;
+  font-size: 0.6875rem; font-weight: 600; white-space: nowrap;
+  color: var(--cs-on-accent); background: var(--tag, var(--cs-accent));
+  box-shadow: 0 1px 3px var(--cs-line);
+}
+
+/* A flat die: outline, lit face, shaded sides, facet lines. */
+.dtr-fd {
+  --dtr-paper: #efe6d2; --dtr-cut: #f8f2e4; --dtr-edge-paper: #c4b89a; --dtr-ink: #4a4152;
+  position: absolute; filter: drop-shadow(0 4px 4px rgb(0 0 0 / 0.22));
+}
+.dtr-fd svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.dtr-fd[data-look="simple"] { --td-body: var(--cs-surface); --td-lit: var(--cs-surface-2); --td-shade: var(--cs-line); --td-ink: var(--cs-text); }
+.dtr-fd[data-look="paper"] { --td-body: var(--dtr-paper); --td-lit: var(--dtr-cut); --td-shade: var(--dtr-edge-paper); --td-ink: var(--dtr-ink); }
+.theme-dark .dtr-fd[data-look="paper"] { filter: drop-shadow(0 4px 4px rgb(0 0 0 / 0.5)) brightness(0.82); }
+.dtr-fb { fill: var(--td-body); stroke: var(--td-shade); stroke-width: 1; stroke-linejoin: round; }
+.dtr-ff { fill: var(--td-lit); }
+.dtr-fs { fill: var(--td-shade); opacity: 0.55; }
+.dtr-fl { stroke: var(--td-shade); stroke-width: 1; }
+.dtr-fr { fill: none; stroke: var(--dtr-edge, transparent); stroke-width: 2.5; stroke-linejoin: round; }
+.dtr-fd text { font: 600 17px system-ui, sans-serif; fill: var(--td-ink); text-anchor: middle; dominant-baseline: central; font-variant-numeric: tabular-nums; }
+
+.dtr-result { margin: 0; min-height: 1.25rem; font-size: 0.8125rem; color: var(--cs-text-2); font-variant-numeric: tabular-nums; }

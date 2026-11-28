@@ -29,6 +29,7 @@
     "styles/map-frames.css",
     "styles/stashes.css",
     "styles/dice-tray.css",
+    "styles/dice-mat.css",
     "styles/crafting.css",
     "styles/dm-screen.css",
     "styles/quests.css",

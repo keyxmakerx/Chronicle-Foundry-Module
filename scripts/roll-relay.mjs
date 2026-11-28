@@ -26,6 +26,7 @@ import {
   postBodies,
 } from './_roll-relay.mjs';
 import { chronicleRollAppearance } from './dice-so-nice.mjs';
+import { feedDiceMat } from './dice-mat.mjs';
 
 /** True on the one client that should relay: the active GM. */
 function _isActiveGM() {
@@ -59,8 +60,23 @@ export const rollRelay = {
 
   onMessage(msg) {
     if (msg?.type !== ROLL_MESSAGE_TYPE) return;
+    if (!game.user?.isGM) return;
+    // The mat takes the roll before chat's judgement: it has its own, and a
+    // roll made in Foundry should show there too.
+    this._feedMat(msg.payload);
     if (!_isActiveGM()) return;
     return this._postIncoming(msg.payload);
+  },
+
+  /** Show a public roll on the Dice mat and, from the active GM, relay it to players. */
+  _feedMat(payload) {
+    try {
+      const rollerId = payload?.rollerId;
+      const fid = rollerId ? this._syncManager?.getFoundryUserId?.(rollerId) ?? null : null;
+      feedDiceMat(payload, { rollerFoundryId: fid && game.users.get(fid) ? fid : null, relay: _isActiveGM() });
+    } catch (err) {
+      log.warn('Could not show a Chronicle roll on the Dice mat', err);
+    }
   },
 
   /** Post a Chronicle roll to chat, once. */
