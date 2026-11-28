@@ -32,6 +32,8 @@ import { itemsToRemove } from './_stash-reconcile.mjs';
 import { sendsChangeHere, memberOf, ownsCharacter } from './_change-author.mjs';
 import { ASK, askModel, playersCanView } from './_player-asks.mjs';
 import { getPlayerAsks, playerName } from './player-asks.mjs';
+import { handoutCandidates, handoutMapId, handoutSeenOnlyByHolders, ownersHoldMap } from './_map-handout.mjs';
+import { carryHandoutMaps } from './map-handouts.mjs';
 
 /**
  * An item's equipped state and where it keeps it: `system.equipped` when the
@@ -294,7 +296,10 @@ export class ItemSync {
     const adopted = new Set(plan.adopt.map((a) => a.id));
     const moved = new Set(itemsToRemove(lastLinked, live, removeItemIds).map((g) => g.id).filter((id) => !adopted.has(id)));
     const unlink = plan.unlink.filter((id) => !moved.has(id));
-    if (!plan.create.length && !plan.update.length && !plan.adopt.length && !unlink.length && !moved.size) return;
+    if (!plan.create.length && !plan.update.length && !plan.adopt.length && !unlink.length && !moved.size) {
+      await this._carryMaps(actor, list, holds);
+      return;
+    }
 
     // Tagged per write rather than behind `_syncing`: a GM edit to another
     // item while this runs must still push, and a reconcile on another
@@ -314,7 +319,7 @@ export class ItemSync {
       for (const r of plan.create) {
         const page = playerEyes || this._itemType ? await this._readItemPage(r.targetEntityId) : null;
         // Fails closed: an unread page adds nothing now; the next reconcile tries again.
-        if (playerEyes && !(page && playersCanView(page.entity, page.perms))) {
+        if (playerEyes && !(page && (playersCanView(page.entity, page.perms) || this._handoutForHolders(page, actor)))) {
           console.debug(`Chronicle: a Has Item link on "${actor.name}" points at a page players cannot view; no item added.`);
           continue;
         }
@@ -334,6 +339,53 @@ export class ItemSync {
     }
     if (moved.size && holds()) {
       await actor.deleteEmbeddedDocuments('Item', [...moved], opts());
+    }
+    await this._carryMaps(actor, list, holds);
+  }
+
+  /**
+   * A map's Chronicle handout is shown only to its holders' players, by
+   * name, so it joins a sheet players see only when each of them is one.
+   * @private
+   */
+  _handoutForHolders(page, actor) {
+    if (!handoutMapId(page.entity)) return false;
+    const L = globalThis.CONST?.DOCUMENT_OWNERSHIP_LEVELS;
+    return handoutSeenOnlyByHolders(page.perms, actor.ownership, (id) => !!game.users?.get(id)?.isGM,
+      (id) => memberOf(getUserMappings(), id), L?.LIMITED ?? 1);
+  }
+
+  /**
+   * Share the map of each handout the actor carries and take back the ones
+   * it no longer does. Items the reconcile just made or adopted already carry
+   * their relation ids. Chronicle says who holds each map; a map whose
+   * holders are not all of the actor's players is not shared. A page or
+   * holders list that cannot be read stops the step for now: the next
+   * reconcile tries again.
+   * @private
+   */
+  async _carryMaps(actor, list, holds) {
+    if (!holds()) return;
+    try {
+      const L = globalThis.CONST?.DOCUMENT_OWNERSHIP_LEVELS;
+      const isGM = (id) => !!game.users?.get(id)?.isGM;
+      const mappings = getUserMappings();
+      const carried = new Map();
+      const holders = new Map();
+      for (const r of handoutCandidates(list, HAS_ITEM)) {
+        const item = actor.items.find((i) => i.getFlag(FLAG_SCOPE, 'relationId') === r.id);
+        if (!item) continue;
+        const mapId = handoutMapId(await this._api.get(`/entities/${r.targetEntityId}`));
+        if (!mapId) continue;
+        if (!holders.has(mapId)) holders.set(mapId, (await this._api.get(`/maps/${mapId}/holders`))?.holders ?? null);
+        if (ownersHoldMap(actor.ownership, holders.get(mapId), isGM, (id) => memberOf(mappings, id), L?.OWNER ?? 3)) {
+          carried.set(item.id, mapId);
+        }
+      }
+      if (!holds()) return;
+      await carryHandoutMaps(actor, carried);
+    } catch (err) {
+      console.warn(`Chronicle: could not bring "${actor.name}"'s given maps up to date`, err);
     }
   }
 
@@ -617,6 +669,12 @@ export class ItemSync {
     ]);
     if (!playersCanView(page, perms)) {
       console.debug(`Chronicle: Item "${item.name}" points at a page players cannot view — not sent.`);
+      return false;
+    }
+    // A map is given only by the GM: the line would be sent under the GM's
+    // key, and Chronicle counts a GM-made line as the give.
+    if (handoutMapId(page)) {
+      console.debug(`Chronicle: Item "${item.name}" is a map the GM gives — not sent.`);
       return false;
     }
     if (ownsCharacter(character, memberOf(getUserMappings(), userId))) return true;

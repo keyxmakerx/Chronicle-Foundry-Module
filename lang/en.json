@@ -899,6 +899,7 @@
       "GiveButton": "Give map",
       "Character": "Character",
       "GiveFailed": "Chronicle: could not give the map. See the console for details.",
+      "NotConnected": "Chronicle: connect to Chronicle first. This character's maps are given there.",
       "NoCharacters": "Chronicle: no characters have a player owner yet.",
       "NoItemType": "Chronicle: this game system has no item type a map can become.",
       "AlreadyHas": "{actor} already has this map.",
