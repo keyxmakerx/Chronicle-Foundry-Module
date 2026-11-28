@@ -34,7 +34,7 @@ test('mapAccessUpdate: once per journal, raise only', () => {
   assert.deepEqual(mapAccessUpdate({ default: 0 }, false, LV.OBSERVER, SCOPE), { [flag]: true, 'ownership.default': LV.OBSERVER });
   assert.deepEqual(mapAccessUpdate(undefined, false, LV.OBSERVER, SCOPE), { [flag]: true, 'ownership.default': LV.OBSERVER }, 'no ownership reads as None');
   assert.deepEqual(mapAccessUpdate({ default: LV.OWNER }, false, LV.OBSERVER, SCOPE), { [flag]: true }, 'a higher default the GM set is left');
-  assert.deepEqual(mapAccessUpdate({ default: 0, u1: LV.OBSERVER }, false, LV.NONE, SCOPE), { [flag]: true }, 'None changes nothing, a given map stays given');
+  assert.equal(mapAccessUpdate({ default: 0, u1: LV.OBSERVER }, false, LV.NONE, SCOPE), null, 'None changes and records nothing, so raising the dashboard level later opens the map');
   const up = mapAccessUpdate({ default: 0, u1: LV.OBSERVER }, false, LV.OBSERVER, SCOPE);
   assert.ok(!Object.keys(up).some((k) => k.includes('u1')), 'a user the GM let in is not touched');
 });
@@ -42,6 +42,6 @@ test('mapAccessUpdate: once per journal, raise only', () => {
 test('map sync sets the access when it makes a map journal and on later syncs', () => {
   const src = readFileSync(resolve(ROOT, 'scripts/map-sync.mjs'), 'utf8');
   assert.match(src, /ownership: \{ default: playerLevel \}/, 'created with the players\' level');
-  assert.match(src, /\[MAP_ACCESS_FLAG\]: true/, 'and marked as set');
+  assert.match(src, /\[MAP_ACCESS_FLAG\]: playerLevel > levels\.NONE/, 'and marked as set only when players got access');
   assert.match(src, /mapAccessUpdate\(\s*entry\.ownership/, 'older journals get it once');
 });

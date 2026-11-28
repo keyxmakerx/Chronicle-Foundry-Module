@@ -28,7 +28,8 @@ export function mapPlayerLevel(configured, levels) {
 /**
  * The update that gives an existing map journal its players' access, or null
  * when it already has it. Access is only raised: a user the GM already let
- * in, or a default the GM set higher, is left as it is.
+ * in, or a default the GM set higher, is left as it is. Null for a level
+ * of None as well.
  * @param {Record<string, number>|undefined} ownership the journal's ownership
  * @param {boolean} applied whether `MAP_ACCESS_FLAG` is already set
  * @param {number} level from `mapPlayerLevel`
@@ -36,7 +37,9 @@ export function mapPlayerLevel(configured, levels) {
  * @returns {object|null}
  */
 export function mapAccessUpdate(ownership, applied, level, scope) {
-  if (applied) return null;
+  // A dashboard level of None gives nothing and records nothing, so maps
+  // open once the GM raises it.
+  if (applied || !(level > 0)) return null;
   const current = Number.isInteger(ownership?.default) ? ownership.default : 0;
   const update = { [`flags.${scope}.${MAP_ACCESS_FLAG}`]: true };
   if (level > current) update['ownership.default'] = level;

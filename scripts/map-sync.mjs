@@ -1206,7 +1206,7 @@ export class MapSync {
         name: mapData.name || 'Untitled Map',
         folder: folder.id,
         ownership: { default: playerLevel },
-        flags: { [FLAG_SCOPE]: { [MAP_ACCESS_FLAG]: true } },
+        flags: { [FLAG_SCOPE]: { [MAP_ACCESS_FLAG]: playerLevel > levels.NONE } },
         pages: [{
           name: mapData.name || 'Untitled Map',
           type: 'image',
