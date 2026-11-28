@@ -69,6 +69,12 @@ export function stripFormParts(root) {
     el.remove();
     n += 1;
   }
+  for (const el of Array.from(root.querySelectorAll('template'))) el.remove();
+  // A custom element can build markup of its own once it joins the page, after
+  // this strip; its children stay, the element itself goes.
+  for (const el of Array.from(root.querySelectorAll('*'))) {
+    if (String(el.localName ?? '').includes('-')) el.replaceWith(...Array.from(el.childNodes ?? []));
+  }
   for (const el of Array.from(root.querySelectorAll('*'))) {
     for (const attr of Array.from(el.attributes ?? [])) {
       if (droppedAttribute(attr.name)) el.removeAttribute(attr.name);

@@ -83,10 +83,18 @@ test('notes that carry form parts lose every one before joining the sheet', () =
   const div = attrs(['class', 'data-edit', 'name', 'form', 'contenteditable', 'onclick']);
   const img = attrs(['src', 'alt', 'data-edit']);
   const link = attrs(['href', 'title', 'data-action', 'data-uuid', 'ONMOUSEOVER']);
+  const gone = [];
+  const tpl = { remove() { gone.push('template'); } };
+  const embed = { localName: 'document-embed', childNodes: ['words'], replaceWith(...kids) { gone.push(`embed:${kids.join()}`); } };
   const root = {
-    querySelectorAll(sel) { return sel === FORM_PARTS ? parts : sel === '*' ? [div, img, link] : []; },
+    querySelectorAll(sel) {
+      if (sel === FORM_PARTS) return parts;
+      if (sel === 'template') return [tpl];
+      return sel === '*' ? [div, img, link, embed] : [];
+    },
   };
   assert.equal(stripFormParts(root), 3);
+  assert.deepEqual(gone, ['template', 'embed:words'], 'templates go; a custom element leaves its children');
   assert.deepEqual(removed, ['input', 'select', 'prose-mirror']);
   assert.deepEqual([...div.left], ['class']);
   assert.deepEqual([...img.left], ['src', 'alt']);
