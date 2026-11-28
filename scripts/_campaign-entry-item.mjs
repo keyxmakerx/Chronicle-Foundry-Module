@@ -117,16 +117,21 @@ function entryTiers(value) {
  * field's `foundry_entry_fields` (Chronicle checked each path is under
  * `system`; checked again here). A property that is absent or doesn't read in
  * its format is left out, so the item keeps the system's default for it.
+ * A mapping marked `once` is left out of a refresh: the system counted it
+ * into the hero when the item was made (a career's renown) and takes the
+ * item's amount back when it goes, so a rewrite would unbalance the hero.
  * @param {object} entry - one `GET /system-entries` row
- * @param {Record<string, {path: string, format: string}>} [entryFields]
+ * @param {Record<string, {path: string, format: string, once?: boolean}>} [entryFields]
+ * @param {{refresh?: boolean}} [opts]
  * @returns {Record<string, number|string>}
  */
-export function entryItemValues(entry, entryFields) {
+export function entryItemValues(entry, entryFields, { refresh = false } = {}) {
   const props = entry?.properties && typeof entry.properties === 'object' ? entry.properties : {};
   const out = {};
   for (const [key, def] of Object.entries(entryFields ?? {})) {
     const path = def?.path;
     if (!usableEntryPath(path) || !Object.hasOwn(props, key)) continue;
+    if (refresh && def.once === true) continue;
     const value = props[key];
     if (def.format === 'number') {
       const n = entryNumber(value);
@@ -335,7 +340,7 @@ export function planEntryRefresh({ items, fields, fieldsData, entriesByField, me
       ...refreshEffect(first, entry, entryEffectChanges(entry, entryEffects)),
       update: {
         _id: first.id,
-        ...entryItemValues(entry, entryFields),
+        ...entryItemValues(entry, entryFields, { refresh: true }),
         'system.description.value': fill.system.description.value,
         [`flags.${FLAG_SCOPE}.entrySlug`]: fill.flags[FLAG_SCOPE].entrySlug,
         [`flags.${FLAG_SCOPE}.entryUpdatedAt`]: fill.flags[FLAG_SCOPE].entryUpdatedAt,

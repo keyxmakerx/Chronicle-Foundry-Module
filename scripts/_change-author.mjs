@@ -76,3 +76,23 @@ export function mayEditPage(perms, memberId) {
 export function sendsChangeHere(userId) {
   return sendsChange(userId, { user: globalThis.game?.user, users: globalThis.game?.users });
 }
+
+/**
+ * Whether this client undoes another user's change to a Chronicle link.
+ * Every GM client running sync does, not only the one that sends players'
+ * changes: each pulls pages through the links it finds, and the client that
+ * sends may not be running sync. Undoing twice is harmless. Another GM's
+ * change stands; an unknown author's does not.
+ * @param {string} userId - the user the change hook names as its author.
+ * @param {{user?: {id: string, isGM?: boolean}, users?: {get?: Function}}} world
+ * @returns {boolean}
+ */
+export function undoesLinkChange(userId, { user, users } = {}) {
+  if (!user?.isGM || !userId || userId === user.id) return false;
+  return users?.get?.(userId)?.isGM !== true;
+}
+
+/** `undoesLinkChange` for the live world. */
+export function undoesLinkChangeHere(userId) {
+  return undoesLinkChange(userId, { user: globalThis.game?.user, users: globalThis.game?.users });
+}

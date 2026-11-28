@@ -344,6 +344,16 @@ export function registerSettings() {
   });
 
   // Internal: last sync timestamp (not shown in UI).
+  // Internal: hashes of the Chronicle links a GM's sync made (see
+  // _link-record.mjs). World scope so only a GM can write it; hashes only,
+  // since every client receives it.
+  game.settings.register(MODULE_ID, 'linkRecord', {
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: null,
+  });
+
   game.settings.register(MODULE_ID, 'lastSyncTime', {
     scope: 'world',
     config: false,
