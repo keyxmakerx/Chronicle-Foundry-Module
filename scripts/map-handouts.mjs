@@ -56,6 +56,11 @@ export async function carryHandoutMaps(actor, carried) {
     if (!_sameList(flags?.mapHandoutTo, holders)) update[`flags.${FLAG_SCOPE}.mapHandoutTo`] = holders;
     if (!_sameList(flags?.mapGivenTo, given)) update[`flags.${FLAG_SCOPE}.mapGivenTo`] = given;
     for (const [userId, level] of Object.entries(access)) update[`ownership.${userId}`] = level;
+    // Remembered so a take-back lowers only what a handout raised.
+    if (Object.keys(access).length) {
+      const raised = Array.isArray(flags?.mapHandoutRaised) ? flags.mapHandoutRaised : [];
+      update[`flags.${FLAG_SCOPE}.mapHandoutRaised`] = [...new Set([...raised, ...Object.keys(access)])];
+    }
     if (Object.keys(update).length) await entry.update(update);
   }
 
@@ -73,10 +78,12 @@ export async function carryHandoutMaps(actor, carried) {
         if (userId !== 'default' && level >= L.OWNER) stillOwners.add(userId);
       }
     }
-    const revoke = journalAccessToRevoke(actor.ownership, entry.ownership, gmIds, stillOwners, L);
+    const raised = Array.isArray(flags.mapHandoutRaised) ? flags.mapHandoutRaised : [];
+    const revoke = journalAccessToRevoke(actor.ownership, entry.ownership, gmIds, stillOwners, L, raised);
     await entry.update({
       [`flags.${FLAG_SCOPE}.mapHandoutTo`]: withHandoutHolder(flags, actor.id, false),
       [`flags.${FLAG_SCOPE}.mapGivenTo`]: givenTo,
+      [`flags.${FLAG_SCOPE}.mapHandoutRaised`]: raised.filter((id) => !revoke.includes(id)),
       ...keyRemoval('ownership', ...revoke),
     });
   }

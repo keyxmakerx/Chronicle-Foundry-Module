@@ -94,7 +94,15 @@ async function _onUpdateActor(actor, changes) {
     );
     for (const [id, access] of grants) {
       const entry = journals.get(id);
-      await entry.update({ ownership: { ...entry.ownership, ...access } });
+      const update = { ownership: { ...entry.ownership, ...access } };
+      // A map given in Chronicle is taken back with its item, so a later
+      // owner's access is remembered as the handout's to lower (map-handouts.mjs).
+      const flags = entry.flags?.[FLAG_SCOPE];
+      if (Array.isArray(flags?.mapHandoutTo) && flags.mapHandoutTo.includes(actor.id)) {
+        const raised = Array.isArray(flags.mapHandoutRaised) ? flags.mapHandoutRaised : [];
+        update[`flags.${FLAG_SCOPE}.mapHandoutRaised`] = [...new Set([...raised, ...Object.keys(access)])];
+      }
+      await entry.update(update);
     }
   } catch (err) {
     console.warn('Chronicle: could not share a carried map with the actor\'s new owners', err);

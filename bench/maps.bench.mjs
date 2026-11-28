@@ -122,6 +122,7 @@ test('a map given from Foundry goes through Chronicle: the carried item opens th
   assert.match(carried.name, /^Map: Smugglers Cove/);
   await waitFor(() => entry.ownership?.[PLAYER] === 2, 10000, 'the hero\'s player may open the map journal');
   assert.deepEqual(entry.getFlag(FLAG, 'mapHandoutTo'), [actor.id]);
+  assert.deepEqual(entry.getFlag(FLAG, 'mapHandoutRaised'), [PLAYER], 'the raise is remembered as the handout\'s');
   assert.equal(await playerMap(), 200, 'Chronicle shows the map to the player now');
   assert.equal(actor.items.filter((i) => i.getFlag(FLAG, 'mapId') === map.id).length, 1, 'one item, not a Foundry copy as well');
 
@@ -130,5 +131,6 @@ test('a map given from Foundry goes through Chronicle: the carried item opens th
   await seed.chronicle.del(`/relations/${line.id}`);
   await waitFor(() => entry.ownership?.[PLAYER] === undefined, 10000, 'taking the item back takes the journal back');
   assert.deepEqual(entry.getFlag(FLAG, 'mapHandoutTo'), []);
+  assert.deepEqual(entry.getFlag(FLAG, 'mapHandoutRaised'), []);
   assert.equal(await playerMap(), 404, 'and Chronicle hides the map again');
 }, { settings: { syncMaps: true, syncCharacters: true } }));

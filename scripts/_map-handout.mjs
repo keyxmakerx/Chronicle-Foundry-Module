@@ -81,22 +81,25 @@ export function withHandoutHolder(entryFlags, actorId, carries) {
 
 /**
  * Who loses the map's journal when an actor stops carrying its handout: the
- * actor's player owners whose access is exactly OBSERVER (what the give
- * granted; a level the GM set by hand is left alone) and who own no other
- * actor the map is still given to. Their own entry is removed, so they fall
- * back to the journal's default.
+ * actor's player owners that a handout raised (the journal's
+ * `mapHandoutRaised` list; a level the GM set by hand is never on it), whose
+ * access is still exactly OBSERVER, and who own no other actor the map is
+ * still given to. Their own entry is removed, so they fall back to the
+ * journal's default.
  * @param {Record<string, number>} actorOwnership the actor's `ownership`
  * @param {Record<string, number>} journalOwnership the journal's `ownership`
  * @param {Set<string>} gmIds
  * @param {Set<string>} stillGivenOwners users who own another actor still given the map
  * @param {{ OWNER: number, OBSERVER: number }} levels
+ * @param {string[]} raised users a handout raised on this journal
  * @returns {string[]} user ids whose journal entry goes
  */
-export function journalAccessToRevoke(actorOwnership, journalOwnership, gmIds, stillGivenOwners, levels) {
+export function journalAccessToRevoke(actorOwnership, journalOwnership, gmIds, stillGivenOwners, levels, raised = []) {
   const out = [];
+  const byHandout = new Set(Array.isArray(raised) ? raised : []);
   for (const [userId, level] of Object.entries(actorOwnership || {})) {
     if (userId === 'default' || gmIds.has(userId) || level < levels.OWNER) continue;
-    if (stillGivenOwners.has(userId)) continue;
+    if (stillGivenOwners.has(userId) || !byHandout.has(userId)) continue;
     if (journalOwnership?.[userId] === levels.OBSERVER) out.push(userId);
   }
   return out;

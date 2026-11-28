@@ -71,15 +71,17 @@ test('withHandoutHolder: added once, taken out cleanly', () => {
 
 test('journalAccessToRevoke: only the give\'s own OBSERVER, never someone still given the map', () => {
   const gm = new Set(['gm']);
+  const all = ['p1', 'gm', 'default'];
   const cases = [
-    ['the owner loses it', { p1: 3 }, { p1: 2 }, new Set(), ['p1']],
-    ['owner of another given actor keeps it', { p1: 3 }, { p1: 2 }, new Set(['p1']), []],
-    ['a level the GM set by hand stays', { p1: 3 }, { p1: 3 }, new Set(), []],
-    ['an observer of the actor was never granted', { p1: 2 }, { p1: 2 }, new Set(), []],
-    ['GMs and default are never touched', { gm: 3, default: 3 }, { gm: 2, default: 2 }, new Set(), []],
+    ['the owner loses it', { p1: 3 }, { p1: 2 }, new Set(), all, ['p1']],
+    ['owner of another given actor keeps it', { p1: 3 }, { p1: 2 }, new Set(['p1']), all, []],
+    ['a level the GM raised further stays', { p1: 3 }, { p1: 3 }, new Set(), all, []],
+    ['an OBSERVER the GM set by hand stays', { p1: 3 }, { p1: 2 }, new Set(), [], []],
+    ['an observer of the actor was never granted', { p1: 2 }, { p1: 2 }, new Set(), all, []],
+    ['GMs and default are never touched', { gm: 3, default: 3 }, { gm: 2, default: 2 }, new Set(), all, []],
   ];
-  for (const [name, actor, journal, still, want] of cases) {
-    assert.deepEqual(journalAccessToRevoke(actor, journal, gm, still, LV), want, name);
+  for (const [name, actor, journal, still, raised, want] of cases) {
+    assert.deepEqual(journalAccessToRevoke(actor, journal, gm, still, LV, raised), want, name);
   }
 });
 
@@ -89,4 +91,12 @@ test('pin: a linked character is given the map in Chronicle, not with a Foundry-
   const post = give.indexOf("api.post('/stashes/give'");
   assert.ok(post > 0, 'posts the give to Chronicle');
   assert.ok(post < give.indexOf('createEmbeddedDocuments'), 'before any local item is made');
+});
+
+test('pin: a player\'s own Foundry add never sends a map handout under the GM\'s key', () => {
+  const src = readFileSync(resolve(ROOT, 'scripts/item-sync.mjs'), 'utf8');
+  const add = src.slice(src.indexOf('async _playerAdd('));
+  const refuse = add.indexOf('if (handoutMapId(page))');
+  assert.ok(refuse > 0, 'the player path checks for a handout');
+  assert.ok(refuse < add.indexOf('ownsCharacter('), 'before the owner\'s own add is sent');
 });

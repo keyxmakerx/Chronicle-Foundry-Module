@@ -661,6 +661,12 @@ export class ItemSync {
       console.debug(`Chronicle: Item "${item.name}" points at a page players cannot view — not sent.`);
       return false;
     }
+    // A map is given only by the GM: the line would be sent under the GM's
+    // key, and Chronicle counts a GM-made line as the give.
+    if (handoutMapId(page)) {
+      console.debug(`Chronicle: Item "${item.name}" is a map the GM gives — not sent.`);
+      return false;
+    }
     if (ownsCharacter(character, memberOf(getUserMappings(), userId))) return true;
     await getPlayerAsks()?.ask(askModel({
       kind: ASK.ITEM_ADD, docId: item.id, who: playerName(userId), name: item.name, where: actor.name,
